@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profit Split Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f6f3;
+    --surface: #ffffff;
+    --border: #e4e2db;
+    --border-strong: #ccc9c0;
+    --text: #1a1916;
+    --text-muted: #7a786f;
+    --text-hint: #aaa89f;
+    --accent: #2d5a3d;
+    --accent-light: #e8f2eb;
+    --accent-text: #1e3f2a;
+    --danger: #8b2a2a;
+    --danger-light: #fdf0f0;
+    --amber: #7a4f00;
+    --amber-light: #fdf6e3;
+    --purple: #3c3489;
+    --purple-light: #eeedfe;
+    --teal: #085041;
+    --teal-light: #e1f5ee;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.5;
+    min-height: 100vh;
+    padding-bottom: 3rem;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 1.25rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  header h1 {
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  header p {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+
+  .container { max-width: 520px; margin: 0 auto; padding: 0 1rem; }
+
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.1rem 0.9rem;
+    margin-top: 1rem;
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 0.9rem;
+  }
+
+  .field-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+    margin-top: 0.75rem;
+  }
+
+  .field-label:first-of-type { margin-top: 0; }
+
+  .cur-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+  }
+
+  .cur-wrap { display: flex; flex-direction: column; }
+
+  .cur-tag {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: var(--text-hint);
+    margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  input[type="number"] {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-appearance: none;
+    appearance: none;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  input[type="number"]:focus { border-color: var(--accent); background: #fff; }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+  .rate-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .rate-row:last-child { margin-bottom: 0; }
+
+  .rate-row label {
+    font-size: 13px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    min-width: 60px;
+  }
+
+  .rate-row input { width: 90px; flex-shrink: 0; }
+
+  .rate-row .cur-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .divider { height: 1px; background: var(--border); margin: 0.85rem 0; }
+
+  .calc-btn {
+    display: block;
+    width: 100%;
+    padding: 13px;
+    margin-top: 1rem;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    letter-spacing: -0.01em;
+    transition: background 0.15s, transform 0.1s;
+  }
+
+  .calc-btn:active { transform: scale(0.98); background: var(--accent-text); }
+
+  #results { margin-top: 0; }
+
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-top: 1rem;
+    overflow: hidden;
+  }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 1rem 1.1rem 0.85rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+    font-size: 13px;
+    font-family: 'DM Mono', monospace;
+    flex-shrink: 0;
+  }
+
+  .av-devi { background: var(--purple-light); color: var(--purple); }
+  .av-guja { background: var(--teal-light); color: var(--teal); }
+  .av-us { background: var(--amber-light); color: var(--amber); }
+
+  .person-name { font-size: 15px; font-weight: 500; }
+  .person-role { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+  .steps { padding: 0.75rem 1.1rem; }
+
+  .step {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 13px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+  }
+
+  .step:last-child { border-bottom: none; }
+
+  .step-label { color: var(--text-muted); flex: 1; }
+
+  .step-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: right;
+    white-space: nowrap;
+    color: var(--text);
+  }
+
+  .step-val.neg { color: var(--danger); }
+  .step-val.pos { color: var(--accent); }
+
+  .result-footer {
+    border-top: 1px solid var(--border);
+    padding: 0.85rem 1.1rem;
+    background: var(--bg);
+  }
+
+  .result-footer-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .metric {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 7px 9px;
+  }
+
+  .metric-cur {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-hint);
+    margin-bottom: 2px;
+  }
+
+  .metric-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .conv-note {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-hint);
+    margin-top: 1rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <h1>Profit Split Calculator</h1>
+    <p>Devi · Guja · Us</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="section">
+    <div class="section-title">Exchange rates</div>
+    <div class="rate-row">
+      <label>1 EUR =</label>
+      <input type="number" id="rate-gel" value="2.97" step="0.01" min="0.01" inputmode="decimal">
+      <span class="cur-name">GEL</span>
+    </div>
+    <div class="rate-row">
+      <label>1 EUR =</label>
+      <input type="number" id="rate-usd" value="1.08" step="0.01" min="0.01" inputmode="decimal">
+      <span class="cur-name">USD</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Shartava — 50/50 Devi & Guja</div>
+
+    <div class="field-label">Income</div>
+    <div class="cur-inputs">
+      <div class="cur-wrap"><span class="cur-tag">EUR</span><input type="number" id="sh-eur" value="0" min="0" inputmode="decimal"></div>
+      <div class="cur-wrap"><span class="cur-tag">GEL</span><input type="number" id="sh-gel" value="0" min="0" inputmode="decimal"></div>
+      <div class="cur-wrap"><span class="cur-tag">USD</span><input type="number" id="sh-usd" value="0" min="0" inputmode="decimal"></div>
+    </div>
+
+    <div class="field-label">Expenses (paid by Guja — repaid)</div>
+    <div class="cur-inputs">
+      <div class="cur-wrap"><span class="cur-tag">EUR</span><input type="number" id="sh-exp-eur" value="0" min="0" inputmode="decimal"></div>
+      <div class="cur-wrap"><span class="cur-tag">GEL</span><input type="number" id="sh-exp-gel" value="0" min="0" inputmode="decimal"></div>
+      <div class="cur-wrap"><span class="cur-tag">USD</span><input type="number" id="sh-exp-usd" value="0" min="0" inputmode="decimal"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Freedom Square — Devi 100%</div>
+
+    <div class="field-label">Income</div>
+    <div class="cur-inputs">
+      <div class="cur-wrap"><span class="cur-tag">EUR</span><input type="number" id="fs-eur" value="0" min="0" inputmode="decimal"></div>
+      <div class="cur-wrap"><span class="cur-tag">GEL</span><input type="number" id="fs-gel" value="0" min="0" inputmode="decimal"></div>
+      <div class="cur-wrap"><span class="cur-tag">USD</span><input type="number" id="fs-usd" value="0" min="0" inputmode="decimal"></div>
+    </div>
+
+    <div class="field-label">Loan (paid by Guja — repaid)</div>
+    <div class="cur-inputs">
+      <div class="cur-wrap"><span class="cur-tag">EUR</span><input type="number" id="fs-loan-eur" value="0" min="0" inputmode="decimal"></div>
+      <div class="cur-wrap"><span class="cur-tag">GEL</span><input type="number" id="fs-loan-gel" value="0" min="0" inputmode="decimal"></div>
+      <div class="cur-wrap"><span class="cur-tag">USD</span><input type="number" id="fs-loan-usd" value="0" min="0" inputmode="decimal"></div>
+    </div>
+
+    <div class="field-label">Bills (paid by Guja — repaid)</div>
+    <div class="cur-inputs">
+      <div class="cur-wrap"><span class="cur-tag">EUR</span><input type="number" id="fs-bill-eur" value="0" min="0" inputmode="decimal"></div>
+      <div class="cur-wrap"><span class="cur-tag">GEL</span><input type="number" id="fs-bill-gel" value="0" min="0" inputmode="decimal"></div>
+      <div class="cur-wrap"><span class="cur-tag">USD</span><input type="number" id="fs-bill-usd" value="0" min="0" inputmode="decimal"></div>
+    </div>
+  </div>
+
+  <button class="calc-btn" onclick="calculate()">Calculate profit split</button>
+
+  <div id="results" class="hidden">
+
+    <div class="result-card">
+      <div class="result-header">
+        <div class="avatar av-devi">DE</div>
+        <div>
+          <div class="person-name">Devi</div>
+          <div class="person-role">Freedom Square owner · 50% Shartava</div>
+        </div>
+      </div>
+      <div class="steps" id="devi-steps"></div>
+      <div class="result-footer">
+        <div class="result-footer-label">Devi net profit</div>
+        <div class="metrics" id="devi-metrics"></div>
+      </div>
+    </div>
+
+    <div class="result-card">
+      <div class="result-header">
+        <div class="avatar av-guja">GU</div>
+        <div>
+          <div class="person-name">Guja</div>
+          <div class="person-role">50% Shartava · expense payer</div>
+        </div>
+      </div>
+      <div class="steps" id="guja-steps"></div>
+      <div class="result-footer">
+        <div class="result-footer-label">Guja receives</div>
+        <div class="metrics" id="guja-metrics"></div>
+      </div>
+    </div>
+
+    <div class="result-card">
+      <div class="result-header">
+        <div class="avatar av-us">US</div>
+        <div>
+          <div class="person-name">Our share</div>
+          <div class="person-role">50% of Devi · 20% of Guja</div>
+        </div>
+      </div>
+      <div class="steps" id="us-steps"></div>
+      <div class="result-footer">
+        <div class="result-footer-label">Our total</div>
+        <div class="metrics" id="us-metrics"></div>
+      </div>
+    </div>
+
+    <div class="conv-note" id="conv-note"></div>
+  </div>
+
+</div>
+
+<script>
+function v(id) { return parseFloat(document.getElementById(id).value) || 0; }
+
+function fmt(eur, gel, usd) {
+  const parts = [];
+  if (Math.abs(eur) >= 0.01) parts.push((eur < 0 ? '-' : '') + '€' + Math.abs(eur).toFixed(2));
+  if (Math.abs(gel) >= 0.01) parts.push((gel < 0 ? '-' : '') + Math.abs(gel).toFixed(2) + ' ₾');
+  if (Math.abs(usd) >= 0.01) parts.push((usd < 0 ? '-' : '') + '$' + Math.abs(usd).toFixed(2));
+  return parts.length ? parts.join(' · ') : '0';
+}
+
+function addStep(containerId, label, eur, gel, usd, cls) {
+  const c = document.getElementById(containerId);
+  const d = document.createElement('div');
+  d.className = 'step';
+  const isNeg = !cls && (eur < 0 || (eur === 0 && gel < 0) || (eur === 0 && gel === 0 && usd < 0));
+  const valClass = cls || (isNeg ? 'neg' : '');
+  d.innerHTML = '<span class="step-label">' + label + '</span><span class="step-val ' + valClass + '">' + fmt(eur, gel, usd) + '</span>';
+  c.appendChild(d);
+}
+
+function setMetrics(id, eur, gel, usd) {
+  document.getElementById(id).innerHTML =
+    '<div class="metric"><div class="metric-cur">EUR</div><div class="metric-val">€' + eur.toFixed(2) + '</div></div>' +
+    '<div class="metric"><div class="metric-cur">GEL</div><div class="metric-val">' + gel.toFixed(2) + ' ₾</div></div>' +
+    '<div class="metric"><div class="metric-cur">USD</div><div class="metric-val">$' + usd.toFixed(2) + '</div></div>';
+}
+
+function calculate() {
+  const rGel = v('rate-gel'), rUsd = v('rate-usd');
+
+  const shEur = v('sh-eur'), shGel = v('sh-gel'), shUsd = v('sh-usd');
+  const shExpEur = v('sh-exp-eur'), shExpGel = v('sh-exp-gel'), shExpUsd = v('sh-exp-usd');
+  const fsEur = v('fs-eur'), fsGel = v('fs-gel'), fsUsd = v('fs-usd');
+  const fsLoanEur = v('fs-loan-eur'), fsLoanGel = v('fs-loan-gel'), fsLoanUsd = v('fs-loan-usd');
+  const fsBillEur = v('fs-bill-eur'), fsBillGel = v('fs-bill-gel'), fsBillUsd = v('fs-bill-usd');
+
+  const shNetEur = shEur - shExpEur, shNetGel = shGel - shExpGel, shNetUsd = shUsd - shExpUsd;
+
+  const deviShEur = shNetEur / 2, deviShGel = shNetGel / 2, deviShUsd = shNetUsd / 2;
+  const gujaShEur = shNetEur / 2, gujaShGel = shNetGel / 2, gujaShUsd = shNetUsd / 2;
+
+  const fsTotalExpEur = fsLoanEur + fsBillEur;
+  const fsTotalExpGel = fsLoanGel + fsBillGel;
+  const fsTotalExpUsd = fsLoanUsd + fsBillUsd;
+
+  const fsNetEur = fsEur - fsTotalExpEur, fsNetGel = fsGel - fsTotalExpGel, fsNetUsd = fsUsd - fsTotalExpUsd;
+
+  const deviNetEur = deviShEur + fsNetEur, deviNetGel = deviShGel + fsNetGel, deviNetUsd = deviShUsd + fsNetUsd;
+  const gujaNetEur = gujaShEur, gujaNetGel = gujaShGel, gujaNetUsd = gujaShUsd;
+
+  const usFromDeviEur = deviNetEur * 0.5, usFromDeviGel = deviNetGel * 0.5, usFromDeviUsd = deviNetUsd * 0.5;
+  const usFromGujaEur = gujaNetEur * 0.2, usFromGujaGel = gujaNetGel * 0.2, usFromGujaUsd = gujaNetUsd * 0.2;
+
+  const deviAfterEur = deviNetEur - usFromDeviEur;
+  const deviAfterGel = deviNetGel - usFromDeviGel;
+  const deviAfterUsd = deviNetUsd - usFromDeviUsd;
+
+  const gujaAfterEur = gujaNetEur - usFromGujaEur + fsTotalExpEur + shExpEur;
+  const gujaAfterGel = gujaNetGel - usFromGujaGel + fsTotalExpGel + shExpGel;
+  const gujaAfterUsd = gujaNetUsd - usFromGujaUsd + fsTotalExpUsd + shExpUsd;
+
+  const usTotalEur = usFromDeviEur + usFromGujaEur;
+  const usTotalGel = usFromDeviGel + usFromGujaGel;
+  const usTotalUsd = usFromDeviUsd + usFromGujaUsd;
+
+  ['devi-steps','guja-steps','us-steps'].forEach(id => document.getElementById(id).innerHTML = '');
+
+  addStep('devi-steps', 'Shartava income (50%)', deviShEur, deviShGel, deviShUsd);
+  addStep('devi-steps', 'Freedom Square income', fsEur, fsGel, fsUsd);
+  addStep('devi-steps', 'Loan repaid to Guja', -fsLoanEur, -fsLoanGel, -fsLoanUsd, 'neg');
+  addStep('devi-steps', 'Bills repaid to Guja', -fsBillEur, -fsBillGel, -fsBillUsd, 'neg');
+  addStep('devi-steps', 'Net income before cut', deviNetEur, deviNetGel, deviNetUsd);
+  addStep('devi-steps', 'Our 50% cut', -usFromDeviEur, -usFromDeviGel, -usFromDeviUsd, 'neg');
+
+  addStep('guja-steps', 'Shartava income (50%)', gujaShEur, gujaShGel, gujaShUsd);
+  addStep('guja-steps', 'Shartava expenses repaid', shExpEur, shExpGel, shExpUsd, 'pos');
+  addStep('guja-steps', 'FS loan repaid', fsLoanEur, fsLoanGel, fsLoanUsd, 'pos');
+  addStep('guja-steps', 'FS bills repaid', fsBillEur, fsBillGel, fsBillUsd, 'pos');
+  addStep('guja-steps', 'Net profit before cut', gujaNetEur, gujaNetGel, gujaNetUsd);
+  addStep('guja-steps', 'Our 20% cut', -usFromGujaEur, -usFromGujaGel, -usFromGujaUsd, 'neg');
+
+  addStep('us-steps', '50% from Devi net', usFromDeviEur, usFromDeviGel, usFromDeviUsd, 'pos');
+  addStep('us-steps', '20% from Guja net', usFromGujaEur, usFromGujaGel, usFromGujaUsd, 'pos');
+
+  setMetrics('devi-metrics', deviAfterEur, deviAfterGel, deviAfterUsd);
+  setMetrics('guja-metrics', gujaAfterEur, gujaAfterGel, gujaAfterUsd);
+  setMetrics('us-metrics', usTotalEur, usTotalGel, usTotalUsd);
+
+  document.getElementById('conv-note').textContent = 'Rates: 1 EUR = ' + rGel.toFixed(2) + ' GEL · 1 EUR = ' + rUsd.toFixed(2) + ' USD';
+  document.getElementById('results').classList.remove('hidden');
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+</body>
+</html>
