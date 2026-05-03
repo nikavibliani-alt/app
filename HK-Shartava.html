@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Housekeeping — Shartava</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f5f5f7;--surface:#fff;--border:#e8e8ed;--border2:#d1d1d6;
+  --text:#1c1c1e;--muted:#6e6e73;--hint:#aeaeb2;
+  --red:#dc2626;--red-bg:#fef2f2;--red-border:#fca5a5;--red-dark:#991b1b;
+  --yellow:#d97706;--yellow-bg:#fffbeb;--yellow-border:#fcd34d;--yellow-dark:#92400e;
+  --green:#16a34a;--green-bg:#f0fdf4;--green-border:#86efac;--green-dark:#166534;
+  --blue:#2563eb;--blue-bg:#eff6ff;--blue-border:#93c5fd;
+  --r:14px;--rs:10px;
+}
+html,body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:15px;min-height:100vh;padding-bottom:3rem;}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes pop{0%{transform:scale(0.95);opacity:0;}100%{transform:scale(1);opacity:1;}}
+
+/* Loading */
+.loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:999;}
+.loading-logo{font-size:22px;font-weight:700;letter-spacing:-0.02em;}
+.loading-logo span{color:var(--blue);}
+.spinner{width:22px;height:22px;border:2.5px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;}
+
+/* Toast */
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1c1c1e;color:#fff;font-size:13px;font-weight:500;padding:9px 20px;border-radius:20px;z-index:9999;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;}
+
+/* Header */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0.85rem 1rem 0.7rem;position:sticky;top:0;z-index:50;}
+.header-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.logo{font-size:15px;font-weight:700;letter-spacing:-0.02em;}
+.logo span{color:var(--blue);}
+.loc-badge{font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);}
+.header-date{font-size:12px;color:var(--muted);margin-top:4px;font-family:'DM Mono',monospace;}
+.sync-row{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--hint);margin-top:3px;}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--hint);}
+.sdot.live{background:#22c55e;}
+.sdot.err{background:var(--red);}
+
+/* Day tabs */
+.day-tabs{display:flex;gap:6px;padding:0.75rem 1rem;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.day-tabs::-webkit-scrollbar{display:none;}
+.day-tab{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:transparent;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--muted);transition:all 0.15s;-webkit-tap-highlight-color:transparent;}
+.day-tab.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+.tab-count{font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
+.day-tab .tab-count{background:rgba(255,255,255,0.25);color:#fff;}
+.day-tab:not(.active) .tab-count{background:var(--red);color:#fff;}
+.day-tab:not(.active) .tab-count.zero{display:none;}
+
+/* Legend */
+.legend{display:flex;gap:10px;padding:0.6rem 1rem;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--muted);}
+.leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.leg-red{background:var(--red);}
+.leg-yellow{background:var(--yellow);}
+.leg-green{background:var(--green);}
+
+/* Content */
+.container{padding:0.75rem 1rem;}
+.group-label{font-size:11px;font-weight:700;color:var(--hint);text-transform:uppercase;letter-spacing:0.08em;margin:1rem 0 0.5rem;padding:0 0.1rem;}
+
+/* Task card */
+.task-card{border-radius:var(--r);margin-bottom:8px;overflow:hidden;border:2px solid transparent;animation:pop 0.2s ease;position:relative;}
+.task-card.priority-red{background:var(--red-bg);border-color:var(--red-border);}
+.task-card.priority-yellow{background:var(--yellow-bg);border-color:var(--yellow-border);}
+.task-card.priority-green{background:var(--green-bg);border-color:var(--green-border);}
+.task-card.done-card{opacity:0.55;filter:grayscale(0.3);}
+
+.card-top{display:flex;align-items:center;gap:10px;padding:0.85rem 1rem 0.6rem;}
+.priority-bar{width:4px;height:44px;border-radius:2px;flex-shrink:0;}
+.priority-red .priority-bar{background:var(--red);}
+.priority-yellow .priority-bar{background:var(--yellow);}
+.priority-green .priority-bar{background:var(--green);}
+.room-info{flex:1;min-width:0;}
+.room-code{font-size:20px;font-weight:700;letter-spacing:-0.02em;font-family:'DM Mono',monospace;line-height:1.1;}
+.room-name{font-size:12px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.priority-chip{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;}
+.chip-red{background:var(--red);color:#fff;}
+.chip-yellow{background:var(--yellow);color:#fff;}
+.chip-green{background:var(--green);color:#fff;}
+.chip-done{background:var(--border);color:var(--muted);}
+
+.times-row{display:flex;gap:6px;padding:0 1rem 0.6rem;}
+.time-box{flex:1;border-radius:var(--rs);padding:7px 10px;border:1px solid;}
+.tb-out{background:#fff;border-color:var(--red-border);}
+.tb-in{background:#fff;border-color:var(--green-border);}
+.tb-free{background:#fff;border-color:var(--border);}
+.tb-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px;}
+.tb-out .tb-label{color:var(--red);}
+.tb-in .tb-label{color:var(--green);}
+.tb-free .tb-label{color:var(--hint);}
+.tb-time{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;line-height:1.1;}
+.tb-guest{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+.notes-box{margin:0 1rem 0.6rem;background:#fff;border-radius:var(--rs);padding:8px 10px;border:1px solid var(--yellow-border);}
+.notes-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--yellow-dark);margin-bottom:2px;}
+.notes-txt{font-size:13px;color:var(--text);}
+
+.card-footer{display:flex;align-items:center;gap:8px;padding:0 1rem 0.85rem;}
+.cleaner-sel{flex:1;height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--rs);font-family:'Inter',sans-serif;font-size:13px;background:#fff;color:var(--text);outline:none;cursor:pointer;}
+.done-btn{height:36px;padding:0 16px;border:none;border-radius:var(--rs);font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;transition:all 0.15s;}
+.btn-mark{background:var(--green);color:#fff;}
+.btn-mark:active{opacity:0.85;}
+.btn-undo{background:var(--border);color:var(--muted);}
+
+/* Empty */
+.empty{text-align:center;padding:3rem 1rem;color:var(--hint);}
+.empty-icon{font-size:44px;margin-bottom:12px;}
+.empty-title{font-size:15px;font-weight:600;color:var(--muted);margin-bottom:6px;}
+.empty-sub{font-size:13px;}
+
+/* Summary bar */
+.summary-bar{background:var(--surface);border-top:1px solid var(--border);padding:0.75rem 1rem;display:flex;gap:12px;justify-content:center;position:fixed;bottom:0;left:0;right:0;}
+.sum-item{text-align:center;}
+.sum-num{font-size:18px;font-weight:700;font-family:'DM Mono',monospace;}
+.sum-lbl{font-size:10px;color:var(--hint);font-weight:500;text-transform:uppercase;letter-spacing:0.05em;}
+.sum-red{color:var(--red);}
+.sum-yellow{color:var(--yellow);}
+.sum-green{color:var(--green);}
+.sum-done{color:var(--muted);}
+</style>
+</head>
+<body>
+
+<div class="loading" id="loading">
+  <div class="loading-logo">Sleepy <span>HK</span></div>
+  <div class="spinner"></div>
+  <div style="font-size:13px;color:var(--hint);">Loading Shartava...</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<header>
+  <div class="header-row">
+    <div class="logo">Sleepy <span>HK</span></div>
+    <div class="loc-badge">📍 Shartava</div>
+  </div>
+  <div class="header-date" id="hdr-date"></div>
+  <div class="sync-row"><div class="sdot" id="sdot"></div><span id="slbl">Connecting...</span></div>
+</header>
+
+<div class="day-tabs">
+  <button class="day-tab active" id="tab-today" onclick="switchDay('today')">
+    Today <span class="tab-count zero" id="cnt-today">0</span>
+  </button>
+  <button class="day-tab" id="tab-tomorrow" onclick="switchDay('tomorrow')">
+    Tomorrow <span class="tab-count zero" id="cnt-tomorrow">0</span>
+  </button>
+</div>
+
+<div class="legend">
+  <div class="leg-item"><div class="leg-dot leg-red"></div>Same-day check-in</div>
+  <div class="leg-item"><div class="leg-dot leg-yellow"></div>Check-in tomorrow</div>
+  <div class="leg-item"><div class="leg-dot leg-green"></div>No reservation yet</div>
+</div>
+
+<div class="container" id="main-list"></div>
+
+<div class="summary-bar" id="sum-bar" style="display:none;">
+  <div class="sum-item"><div class="sum-num sum-red" id="sum-red">0</div><div class="sum-lbl">Urgent</div></div>
+  <div class="sum-item"><div class="sum-num sum-yellow" id="sum-yellow">0</div><div class="sum-lbl">Today</div></div>
+  <div class="sum-item"><div class="sum-num sum-green" id="sum-green">0</div><div class="sum-lbl">Free</div></div>
+  <div class="sum-item"><div class="sum-num sum-done" id="sum-done">0</div><div class="sum-lbl">Done ✓</div></div>
+</div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import{getFirestore,collection,doc,setDoc,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+const fb=initializeApp({
+  apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
+  authDomain:"sleepy-5c962.firebaseapp.com",
+  projectId:"sleepy-5c962",
+  storageBucket:"sleepy-5c962.firebasestorage.app",
+  messagingSenderId:"152940098906",
+  appId:"1:152940098906:web:bf245230d705c0a62c2f63"
+});
+const db=getFirestore(fb);
+
+// ── ROOM DEFINITIONS ──────────────────────────────────────
+const ROOMS=[
+  // 0- small rooms
+  {code:'0-1',name:'Small room 1',group:'0- Rooms',location:'shartava'},
+  {code:'0-2',name:'Small room 2',group:'0- Rooms',location:'shartava'},
+  {code:'0-3',name:'Small room 3',group:'0- Rooms',location:'shartava'},
+  {code:'0-4',name:'Small room 4',group:'0- Rooms',location:'shartava'},
+  {code:'0-5',name:'Small room 5',group:'0- Rooms',location:'shartava'},
+  // 6- apartments
+  {code:'6-1',name:'Apartment 6-1',group:'6- Apartments',location:'shartava'},
+  {code:'6-2',name:'Apartment 6-2',group:'6- Apartments',location:'shartava'},
+  {code:'6-3',name:'Apartment 6-3',group:'6- Apartments',location:'shartava'},
+  {code:'6-4',name:'Apartment 6-4',group:'6- Apartments',location:'shartava'},
+  // 7- apartments
+  {code:'7-1',name:'Apartment 7-1',group:'7- Apartments',location:'shartava'},
+  {code:'7-2',name:'Apartment 7-2',group:'7- Apartments',location:'shartava'},
+  {code:'7-4',name:'Apartment 7-4',group:'7- Apartments',location:'shartava'},
+];
+
+const CLEANERS=['Cleaner 1','Cleaner 2'];
+
+let reservations=[];
+let cleaningStatus={};
+let cleanerAssign={};
+let activeDay='today';
+let loadCount=0;
+
+function fmtDate(d){return d.toISOString().split('T')[0];}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+function parseDate(s){return new Date(s+'T00:00:00');}
+function today(){const d=new Date();d.setHours(0,0,0,0);return d;}
+function tomorrow(){return addDays(today(),1);}
+
+function setSyncing(s){
+  const d=document.getElementById('sdot');
+  const l=document.getElementById('slbl');
+  if(d)d.className='sdot'+(s==='live'?' live':s==='err'?' err':'');
+  if(l)l.textContent=s==='live'?'Live sync':s==='err'?'Offline':'Connecting...';
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+function targetDate(){return activeDay==='today'?today():tomorrow();}
+
+function getResForRoom(roomCode,date){
+  const ds=fmtDate(date);
+  return reservations.filter(r=>r.roomCode===roomCode&&r.checkin<=ds&&r.checkout>ds);
+}
+
+function getCheckoutToday(roomCode,date){
+  const ds=fmtDate(date);
+  return reservations.find(r=>r.roomCode===roomCode&&r.checkout===ds);
+}
+
+function getNextCheckin(roomCode,afterDate){
+  const ds=fmtDate(afterDate);
+  return reservations
+    .filter(r=>r.roomCode===roomCode&&r.checkin>=ds)
+    .sort((a,b)=>a.checkin.localeCompare(b.checkin))[0]||null;
+}
+
+function getPriority(roomCode,date){
+  const co=getCheckoutToday(roomCode,date);
+  if(!co)return null; // no checkout = nothing to clean
+  const ds=fmtDate(date);
+  const nextRes=getNextCheckin(roomCode,addDays(date,1));
+  if(!nextRes)return 'green';
+  const nextCI=nextRes.checkin;
+  const todayDs=fmtDate(date);
+  const tomorrowDs=fmtDate(addDays(date,1));
+  if(nextCI===ds)return 'red';       // same day checkin
+  if(nextCI===tomorrowDs)return 'yellow'; // next day checkin
+  return 'green';                    // free
+}
+
+function statusKey(roomCode,date){return roomCode+'_'+fmtDate(date);}
+
+window.switchDay=function(day){
+  activeDay=day;
+  document.getElementById('tab-today').className='day-tab'+(day==='today'?' active':'');
+  document.getElementById('tab-tomorrow').className='day-tab'+(day==='tomorrow'?' active':'');
+  render();
+}
+
+window.toggleDone=async function(roomCode,dateStr){
+  const key=roomCode+'_'+dateStr;
+  const current=cleaningStatus[key]||false;
+  cleaningStatus[key]=!current;
+  const cleanerSel=document.getElementById('sel-'+key);
+  const cleaner=cleanerSel?cleanerSel.value:'';
+  render();
+  try{
+    await setDoc(doc(db,'hk_status',key),{
+      done:!current,roomCode,date:dateStr,
+      cleaner,updatedAt:serverTimestamp()
+    });
+    toast(!current?'✓ Marked as cleaned!':'Marked as pending');
+  }catch(e){toast('Save failed');cleaningStatus[key]=current;render();}
+}
+
+window.saveCleaner=async function(roomCode,dateStr,val){
+  const key=roomCode+'_'+dateStr;
+  cleanerAssign[key]=val;
+  try{
+    await setDoc(doc(db,'hk_cleaner',key),{roomCode,date:dateStr,cleaner:val,updatedAt:serverTimestamp()});
+  }catch(e){}
+}
+
+function render(){
+  const date=targetDate();
+  const ds=fmtDate(date);
+
+  // update tab counts
+  let todayCount=0,tomorrowCount=0;
+  ROOMS.forEach(r=>{
+    if(getCheckoutToday(r.code,today()))todayCount++;
+    if(getCheckoutToday(r.code,tomorrow()))tomorrowCount++;
+  });
+  const cnt1=document.getElementById('cnt-today');
+  const cnt2=document.getElementById('cnt-tomorrow');
+  if(cnt1){cnt1.textContent=todayCount;cnt1.className='tab-count'+(todayCount?'':' zero');}
+  if(cnt2){cnt2.textContent=tomorrowCount;cnt2.className='tab-count'+(tomorrowCount?'':' zero');}
+
+  // get rooms with checkouts
+  const checkoutRooms=ROOMS.filter(r=>getCheckoutToday(r.code,date));
+
+  const main=document.getElementById('main-list');
+  if(!checkoutRooms.length){
+    main.innerHTML=`<div class="empty">
+      <div class="empty-icon">✨</div>
+      <div class="empty-title">No checkouts ${activeDay==='today'?'today':'tomorrow'}</div>
+      <div class="empty-sub">Nothing to clean — have a great day!</div>
+    </div>`;
+    document.getElementById('sum-bar').style.display='none';
+    return;
+  }
+
+  // sort by priority: red first, then yellow, then green
+  const priorityOrder={red:0,yellow:1,green:2};
+  checkoutRooms.sort((a,b)=>{
+    const pa=getPriority(a.code,date)||'green';
+    const pb=getPriority(b.code,date)||'green';
+    if(priorityOrder[pa]!==priorityOrder[pb])return priorityOrder[pa]-priorityOrder[pb];
+    return a.code.localeCompare(b.code);
+  });
+
+  // group by building
+  const groups={};
+  checkoutRooms.forEach(r=>{
+    if(!groups[r.group])groups[r.group]=[];
+    groups[r.group].push(r);
+  });
+
+  let html='';
+  let sumRed=0,sumYellow=0,sumGreen=0,sumDone=0;
+
+  Object.entries(groups).forEach(([grp,rooms])=>{
+    html+=`<div class="group-label">${grp}</div>`;
+    rooms.forEach((room,idx)=>{
+      const priority=getPriority(room.code,date)||'green';
+      const co=getCheckoutToday(room.code,date);
+      const nextRes=getNextCheckin(room.code,activeDay==='today'?addDays(date,0):date);
+      const key=statusKey(room.code,ds);
+      const done=cleaningStatus[key]||false;
+      const assignedCleaner=cleanerAssign[key]||'';
+
+      if(priority==='red')sumRed++;
+      else if(priority==='yellow')sumYellow++;
+      else sumGreen++;
+      if(done)sumDone++;
+
+      const chipLabel={red:'Urgent',yellow:'Today',green:'Free'}[priority];
+      const chipCls={red:'chip-red',yellow:'chip-yellow',green:'chip-green'}[priority];
+
+      const nextCheckinSameDay=nextRes&&nextRes.checkin===ds;
+      const nextCheckinNextDay=nextRes&&nextRes.checkin===fmtDate(addDays(date,1));
+
+      const outBox=`<div class="time-box tb-out">
+        <div class="tb-label">Checkout</div>
+        <div class="tb-time">${co?.checkoutTime||'12:00'}</div>
+        <div class="tb-guest">${co?.guest||'Guest'}</div>
+      </div>`;
+
+      let inBox='';
+      if(nextRes){
+        inBox=`<div class="time-box tb-in">
+          <div class="tb-label">Check-in ${nextCheckinSameDay?'today':nextCheckinNextDay?'tomorrow':nextRes.checkin}</div>
+          <div class="tb-time">${nextRes.checkinTime||'14:00'}</div>
+          <div class="tb-guest">${nextRes.guest||'Guest'}</div>
+        </div>`;
+      } else {
+        inBox=`<div class="time-box tb-free">
+          <div class="tb-label">Next check-in</div>
+          <div class="tb-time" style="color:var(--hint);font-size:13px;">No reservation</div>
+        </div>`;
+      }
+
+      const notesHtml=co?.notes?`<div class="notes-box"><div class="notes-lbl">📝 Notes</div><div class="notes-txt">${co.notes}</div></div>`:'';
+
+      const cleanerOptions=CLEANERS.map(c=>`<option value="${c}"${assignedCleaner===c?' selected':''}>${c}</option>`).join('');
+
+      html+=`<div class="task-card priority-${priority}${done?' done-card':''}">
+        <div class="card-top">
+          <div class="priority-bar"></div>
+          <div class="room-info">
+            <div class="room-code">${room.code}</div>
+            <div class="room-name">${room.name}</div>
+          </div>
+          <div class="priority-chip ${done?'chip-done':chipCls}">${done?'Done ✓':chipLabel}</div>
+        </div>
+        <div class="times-row">${outBox}${inBox}</div>
+        ${notesHtml}
+        <div class="card-footer">
+          <select class="cleaner-sel" id="sel-${key}" onchange="window.saveCleaner('${room.code}','${ds}',this.value)">
+            <option value="">Assign cleaner...</option>
+            ${cleanerOptions}
+          </select>
+          <button class="done-btn ${done?'btn-undo':'btn-mark'}" onclick="window.toggleDone('${room.code}','${ds}')">
+            ${done?'Undo':'✓ Done'}
+          </button>
+        </div>
+      </div>`;
+    });
+  });
+
+  main.innerHTML=html;
+  document.getElementById('sum-bar').style.display='flex';
+  document.getElementById('sum-red').textContent=sumRed;
+  document.getElementById('sum-yellow').textContent=sumYellow;
+  document.getElementById('sum-green').textContent=sumGreen;
+  document.getElementById('sum-done').textContent=sumDone+'/'+checkoutRooms.length;
+}
+
+function checkReady(){loadCount++;if(loadCount>=2){document.getElementById('loading').style.display='none';render();setSyncing('live');}}
+
+// set date
+document.getElementById('hdr-date').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+onSnapshot(collection(db,'reservations'),snap=>{
+  reservations=snap.docs.map(d=>({id:d.id,...d.data()}));
+  if(loadCount<2)checkReady();else render();
+},(e)=>setSyncing('err'));
+
+onSnapshot(collection(db,'properties'),snap=>{
+  // not needed for static room list but triggers ready
+  if(loadCount<2)checkReady();
+},(e)=>setSyncing('err'));
+
+onSnapshot(collection(db,'hk_status'),snap=>{
+  snap.docs.forEach(d=>{cleaningStatus[d.id]=d.data().done||false;});
+  render();
+});
+
+onSnapshot(collection(db,'hk_cleaner'),snap=>{
+  snap.docs.forEach(d=>{cleanerAssign[d.id]=d.data().cleaner||'';});
+  render();
+});
+
+// safety fallback
+setTimeout(()=>{
+  document.getElementById('loading').style.display='none';
+  render();
+},5000);
+</script>
+</body>
+</html>

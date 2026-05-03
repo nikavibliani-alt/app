@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Sleepy PMS</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f8f7f4;
+  --surface:#ffffff;
+  --surface2:#f2f1ee;
+  --border:#e5e3de;
+  --border2:#ccc9c2;
+  --text:#1a1916;
+  --muted:#6b6860;
+  --hint:#aaa89f;
+  --accent:#1d4ed8;
+  --accent-bg:#eff4ff;
+  --accent-border:#bfcffa;
+  --green:#166534;
+  --green-bg:#f0fdf4;
+  --green-border:#bbf7d0;
+  --red:#991b1b;
+  --red-bg:#fef2f2;
+  --amber:#92400e;
+  --amber-bg:#fffbeb;
+  --amber-border:#fde68a;
+  --r:12px;--rs:8px;--rsm:5px;
+}
+html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+@keyframes slideIn{from{transform:translateX(100%);}to{transform:translateX(0);}}
+
+/* ── LOADING ── */
+.loading-overlay{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999;}
+.loading-logo{font-size:28px;font-weight:600;letter-spacing:-0.03em;color:var(--text);}
+.loading-logo span{color:var(--accent);}
+.loading-sub{font-size:13px;color:var(--hint);}
+.spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;font-size:13px;padding:9px 20px;border-radius:20px;z-index:9999;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;font-family:'DM Mono',monospace;}
+.toast.show{opacity:1;}
+
+/* ── LAYOUT ── */
+.app{display:flex;flex-direction:column;height:100vh;}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.25rem;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:50;}
+.topbar-left{display:flex;align-items:center;gap:14px;}
+.logo{font-size:16px;font-weight:600;letter-spacing:-0.03em;cursor:pointer;}
+.logo span{color:var(--accent);}
+.nav{display:flex;gap:2px;}
+.nav-btn{padding:5px 12px;border-radius:var(--rs);border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;transition:all 0.15s;}
+.nav-btn:hover{background:var(--surface2);color:var(--text);}
+.nav-btn.active{background:var(--accent-bg);color:var(--accent);}
+.topbar-right{display:flex;align-items:center;gap:8px;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--hint);transition:background 0.3s;}
+.sync-dot.synced{background:#22c55e;}
+.sync-dot.syncing{background:#f59e0b;animation:pulse 1s infinite;}
+.sync-dot.error{background:#ef4444;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.sync-label{font-size:12px;color:var(--hint);font-family:'DM Mono',monospace;}
+.topbar-btn{height:34px;padding:0 14px;border-radius:var(--rs);border:1px solid var(--border);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--text);cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:6px;}
+.topbar-btn:hover{background:var(--surface2);}
+.topbar-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+.topbar-btn.primary:hover{opacity:0.9;}
+
+/* ── MAIN CONTENT ── */
+.main{flex:1;overflow-y:auto;padding:1.5rem;padding-bottom:4rem;}
+.page{animation:fadeIn 0.2s ease;}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;}
+.page-title{font-size:20px;font-weight:600;letter-spacing:-0.02em;}
+.page-sub{font-size:13px;color:var(--muted);margin-top:2px;}
+
+/* ── STATS ROW ── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.25rem;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:0.85rem 1rem;}
+.stat-label{font-size:11px;font-weight:500;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;}
+.stat-val{font-size:24px;font-weight:600;letter-spacing:-0.02em;font-family:'DM Mono',monospace;}
+.stat-val.blue{color:var(--accent);}
+.stat-val.green{color:var(--green);}
+.stat-val.amber{color:var(--amber);}
+
+/* ── SEARCH + FILTER ── */
+.toolbar{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;}
+.search-wrap{flex:1;min-width:200px;position:relative;}
+.search-wrap input{width:100%;height:36px;padding:0 10px 0 34px;border:1px solid var(--border);border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:13px;background:var(--surface);outline:none;transition:border-color 0.15s;}
+.search-wrap input:focus{border-color:var(--accent);}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--hint);font-size:14px;pointer-events:none;}
+.filter-btn{height:36px;padding:0 12px;border:1px solid var(--border);border-radius:var(--rs);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap;transition:all 0.15s;}
+.filter-btn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-border);}
+
+/* ── PROPERTIES GRID ── */
+.properties-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+.property-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;transition:border-color 0.15s,box-shadow 0.15s;cursor:pointer;}
+.property-card:hover{border-color:var(--border2);box-shadow:0 2px 12px rgba(0,0,0,0.06);}
+.property-card-header{padding:1rem 1rem 0.75rem;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+.property-icon{width:38px;height:38px;border-radius:var(--rs);background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.property-info{flex:1;min-width:0;}
+.property-name{font-size:15px;font-weight:600;letter-spacing:-0.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.property-address{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.property-card-body{padding:0 1rem 0.85rem;}
+.platforms{display:flex;gap:6px;flex-wrap:wrap;}
+.platform-badge{font-size:10px;font-weight:600;padding:3px 8px;border-radius:var(--rsm);font-family:'DM Mono',monospace;}
+.pb-airbnb{background:#fff0ee;color:#c0392b;}
+.pb-booking{background:#eff4ff;color:#1d4ed8;}
+.pb-expedia{background:#fefce8;color:#854d0e;}
+.pb-direct{background:var(--green-bg);color:var(--green);}
+.property-card-footer{padding:0.6rem 1rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.property-id{font-size:11px;font-family:'DM Mono',monospace;color:var(--hint);}
+.property-actions{display:flex;gap:4px;}
+.icon-btn{width:28px;height:28px;border:none;background:transparent;border-radius:var(--rsm);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);transition:background 0.12s;}
+.icon-btn:hover{background:var(--surface2);}
+.icon-btn.danger:hover{background:var(--red-bg);color:var(--red);}
+
+/* ── EMPTY STATE ── */
+.empty-state{text-align:center;padding:4rem 2rem;color:var(--hint);}
+.empty-icon{font-size:40px;margin-bottom:12px;}
+.empty-title{font-size:15px;font-weight:500;color:var(--muted);margin-bottom:6px;}
+.empty-sub{font-size:13px;}
+
+/* ── DRAWER (add/edit property) ── */
+.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:200;opacity:0;transition:opacity 0.25s;pointer-events:none;}
+.drawer-overlay.open{opacity:1;pointer-events:all;}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(480px,100vw);background:var(--surface);border-left:1px solid var(--border);z-index:201;transform:translateX(100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;}
+.drawer.open{transform:translateX(0);}
+.drawer-header{padding:1.1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.drawer-title{font-size:16px;font-weight:600;letter-spacing:-0.02em;}
+.drawer-close{width:32px;height:32px;border:none;background:var(--surface2);border-radius:var(--rsm);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;color:var(--muted);}
+.drawer-close:hover{background:var(--border);}
+.drawer-body{flex:1;overflow-y:auto;padding:1.25rem;}
+.drawer-footer{padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;}
+
+/* ── FORM ── */
+.form-group{margin-bottom:1rem;}
+.form-group:last-child{margin-bottom:0;}
+.form-label{font-size:12px;font-weight:500;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:0.05em;}
+.form-input{width:100%;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);background:var(--bg);outline:none;transition:border-color 0.15s;}
+.form-input:focus{border-color:var(--accent);background:#fff;}
+.form-input.url{font-family:'DM Mono',monospace;font-size:12px;}
+.form-section{font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.07em;margin:1.25rem 0 0.75rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border);}
+.btn{height:38px;padding:0 16px;border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text);transition:all 0.15s;}
+.btn:hover{background:var(--surface2);}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);flex:1;}
+.btn.primary:hover{opacity:0.9;}
+.btn.danger{color:var(--red);border-color:var(--red-bg);background:var(--red-bg);}
+.btn.danger:hover{background:#fee2e2;}
+
+/* ── PLATFORM TOGGLE ── */
+.platform-toggles{display:flex;gap:8px;flex-wrap:wrap;}
+.platform-toggle{padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;color:var(--muted);}
+.platform-toggle.active-airbnb{background:#fff0ee;border-color:#f5a9a0;color:#c0392b;}
+.platform-toggle.active-booking{background:var(--accent-bg);border-color:var(--accent-border);color:var(--accent);}
+.platform-toggle.active-expedia{background:#fefce8;border-color:#fde68a;color:#854d0e;}
+.platform-toggle.active-direct{background:var(--green-bg);border-color:var(--green-border);color:var(--green);}
+
+/* ── PROPERTY DETAIL DRAWER ── */
+.detail-section{background:var(--bg);border-radius:var(--rs);padding:0.85rem 1rem;margin-bottom:0.75rem;}
+.detail-section-title{font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;}
+.detail-row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.detail-row:last-child{border-bottom:none;}
+.detail-row .dk{color:var(--muted);}
+.detail-row .dv{font-family:'DM Mono',monospace;font-size:12px;color:var(--text);}
+.platform-link{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.platform-link:last-child{border-bottom:none;}
+.platform-link a{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);text-decoration:none;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.platform-link a:hover{text-decoration:underline;}
+
+
+/* ── CALENDAR ── */
+.cal-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;}
+.cal-nav-title{font-size:18px;font-weight:600;letter-spacing:-0.02em;}
+.cal-nav-btns{display:flex;gap:6px;align-items:center;}
+.cal-nav-btn{height:32px;padding:0 12px;border:1px solid var(--border);border-radius:var(--rs);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;color:var(--text);}
+.cal-nav-btn:hover{background:var(--surface2);}
+.cal-nav-btn.today{background:var(--accent);color:#fff;border-color:var(--accent);}
+.cal-weeks{display:flex;gap:6px;}
+.cal-week-btn{height:28px;padding:0 10px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);font-size:12px;cursor:pointer;color:var(--muted);transition:all 0.15s;}
+.cal-week-btn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-border);}
+
+.grid-table{border-collapse:collapse;min-width:100%;}
+.grid-table th,.grid-table td{border:1px solid var(--border);}
+.grid-table th{background:var(--surface);padding:0;position:sticky;top:0;z-index:10;}
+
+/* room column */
+.room-col{width:90px;min-width:90px;position:sticky;left:0;z-index:20;background:var(--surface);border-right:2px solid var(--border2)!important;}
+.room-header{width:90px;min-width:90px;position:sticky;left:0;z-index:21;background:var(--surface2);padding:8px 10px;font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;border-right:2px solid var(--border2)!important;}
+
+/* date headers */
+.date-th{min-width:42px;width:42px;text-align:center;padding:4px 2px;cursor:default;}
+.date-th .day-name{font-size:10px;color:var(--hint);font-weight:500;}
+.date-th .day-num{font-size:14px;font-weight:600;color:var(--text);}
+.date-th.today-col .day-num{background:var(--accent);color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;margin:0 auto;}
+.date-th.today-col .day-name{color:var(--accent);}
+.date-th.weekend .day-name{color:var(--red);}
+.date-th.weekend .day-num{color:var(--red);}
+
+/* room label */
+.room-cell{padding:0 10px;height:48px;display:flex;flex-direction:column;justify-content:center;background:var(--surface);cursor:default;}
+.room-code{font-size:13px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text);}
+.room-name{font-size:10px;color:var(--hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;}
+
+/* day cells */
+.day-cell{min-width:42px;width:42px;height:48px;padding:0;cursor:pointer;position:relative;transition:background 0.1s;vertical-align:middle;}
+.day-cell:hover{background:var(--accent-bg);}
+.day-cell.today-col{background:rgba(29,78,216,0.04);}
+.day-cell.blocked{background:var(--surface2);cursor:default;}
+.day-cell.blocked:hover{background:var(--surface2);}
+
+/* reservation bars */
+.res-bar{position:absolute;top:6px;left:0;right:0;height:36px;border-radius:4px;display:flex;align-items:center;padding:0 8px;font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;z-index:5;transition:opacity 0.15s;}
+.res-bar:hover{opacity:0.85;}
+.res-bar.starts{border-radius:4px 0 0 4px;left:2px;}
+.res-bar.ends{border-radius:0 4px 4px 0;right:2px;}
+.res-bar.starts.ends{border-radius:4px;left:2px;right:2px;}
+.res-bar.middle{border-radius:0;left:0;right:0;}
+.res-airbnb{background:#e8d5f5;color:#6b21a8;border-left:3px solid #a855f7;}
+.res-booking{background:#dbeafe;color:#1e40af;border-left:3px solid #3b82f6;}
+.res-expedia{background:#fef9c3;color:#854d0e;border-left:3px solid #eab308;}
+.res-direct{background:#dcfce7;color:#166534;border-left:3px solid #22c55e;}
+.res-other{background:#f1f5f9;color:#475569;border-left:3px solid #94a3b8;}
+
+/* legend */
+.cal-legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:1rem;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);}
+.legend-dot{width:10px;height:10px;border-radius:2px;}
+
+/* reservation modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:300;display:flex;align-items:center;justify-content:center;padding:1rem;}
+.modal{background:var(--surface);border-radius:var(--r);width:min(480px,100%);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
+.modal-header{padding:1.1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:16px;font-weight:600;letter-spacing:-0.02em;}
+.modal-body{padding:1.25rem;}
+.modal-footer{padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+.modal.hidden{display:none;}.modal-overlay.hidden{display:none!important;}
+
+/* ── PRICING GRID ── */
+.pcal-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:0.75rem 1rem;}
+.pcal-nav-group{display:flex;gap:4px;}
+.pcal-nav-btn{height:30px;padding:0 10px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;color:var(--text);transition:all 0.12s;white-space:nowrap;}
+.pcal-nav-btn:hover{background:var(--surface2);}
+.pcal-nav-btn.today{background:var(--accent);color:#fff;border-color:var(--accent);}
+.pcal-range-group{display:flex;gap:3px;}
+.pcal-range-btn{height:30px;padding:0 10px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);font-family:'DM Mono',sans-serif;font-size:12px;font-weight:500;cursor:pointer;color:var(--muted);transition:all 0.12s;}
+.pcal-range-btn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-border);}
+.pcal-date-range{font-size:13px;font-weight:500;color:var(--muted);flex:1;text-align:center;}
+input.pcal-inline-input{
+  width:100%;height:32px;border:none;background:transparent;
+  font-family:'DM Mono',monospace;font-size:12px;font-weight:700;
+  color:var(--green);text-align:center;outline:none;cursor:text;padding:2px;
+  display:block;
+}
+input.pcal-inline-input::placeholder{color:var(--hint);font-weight:400;font-size:11px;}
+input.pcal-inline-input:disabled{opacity:0.3;cursor:not-allowed;}
+input.pcal-inline-input[type=number]::-webkit-inner-spin-button,
+input.pcal-inline-input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
+.pcal-cell-price.editing,.pcal-cell-num.editing{background:#fff!important;border:2px solid var(--accent)!important;z-index:5;position:relative;}
+.pcal-bulk-open-btn{height:32px;padding:0 14px;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);border-radius:var(--rsm);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all 0.15s;}
+.pcal-bulk-open-btn:hover{background:#fde68a;}
+.pcal-sync-btn{height:34px;padding:0 16px;background:var(--accent);color:#fff;border:none;border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.pcal-sync-btn:hover{opacity:0.9;}
+
+.pcal-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:1rem;}
+.pcal-table{border-collapse:collapse;min-width:100%;}
+.pcal-table th,.pcal-table td{border:1px solid var(--border);}
+.pcal-prop-header{width:130px;min-width:130px;position:sticky;left:0;z-index:21;background:var(--surface2);padding:8px 10px;font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;border-right:1px solid var(--border2)!important;}
+.pcal-row-label-header{width:80px;min-width:80px;position:sticky;left:130px;z-index:21;background:var(--surface2);padding:8px 6px;font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;border-right:2px solid var(--border2)!important;}
+.pcal-date-th{min-width:50px;width:50px;text-align:center;padding:4px 2px;background:var(--surface2);}
+.pcal-date-th.pcal-today{background:var(--accent-bg);}
+.pcal-date-th.pcal-weekend{background:#fff5f5;}
+.pcal-day-name{font-size:10px;color:var(--hint);font-weight:500;}
+.pcal-day-num{font-size:14px;font-weight:700;color:var(--text);line-height:1.2;}
+.pcal-date-th.pcal-today .pcal-day-num{color:var(--accent);}
+.pcal-date-th.pcal-weekend .pcal-day-num{color:var(--red);}
+.pcal-month-label{font-size:9px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;}
+
+.pcal-prop-cell{width:130px;min-width:130px;position:sticky;left:0;z-index:10;background:var(--surface);padding:6px 10px;border-right:1px solid var(--border2)!important;vertical-align:top;}
+.pcal-prop-name{font-size:12px;font-weight:600;color:var(--text);line-height:1.3;}
+.pcal-prop-code{font-size:10px;font-family:'DM Mono',monospace;color:var(--hint);margin-top:2px;}
+.pcal-row-label{width:80px;min-width:80px;position:sticky;left:130px;z-index:10;background:var(--surface);padding:5px 6px;font-size:11px;font-weight:500;color:var(--muted);border-right:2px solid var(--border2)!important;white-space:nowrap;}
+
+/* cell types */
+.pcal-cell{min-width:50px;width:50px;padding:0;text-align:center;cursor:pointer;transition:background 0.1s;vertical-align:middle;height:32px;}
+.pcal-cell:hover{background:var(--accent-bg)!important;}
+.pcal-cell.pcal-today{background:rgba(29,78,216,0.04);}
+.pcal-cell.pcal-weekend{background:#fafafa;}
+.pcal-cell.pcal-past{opacity:0.5;}
+.pcal-cell.has-price{background:#bbf7d0;}
+.pcal-cell.pcal-locked{background:#ef4444!important;}
+.pcal-cell.pcal-restricted{background:#f97316!important;}
+
+.pcal-price-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:var(--green);}
+.pcal-price-val.empty{color:var(--hint);font-weight:400;font-size:11px;}
+.pcal-num-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:var(--text);}
+.pcal-num-val.empty{color:var(--hint);font-weight:400;font-size:11px;}
+.pcal-check{font-size:13px;opacity:0.25;transition:opacity 0.1s;}
+.pcal-check.checked{opacity:1;filter:brightness(0) invert(1);}
+.pcal-cell-check:hover .pcal-check{opacity:0.6;}
+
+/* row styling */
+.pcal-row-usd{background:#fafffe;}
+.pcal-row-gel{background:#fffdf8;}
+.pcal-row-eur{background:#f8faff;}
+.pcal-row-min{background:#fafafa;}
+.pcal-row-avail{background:#f0fdf4;}
+.pcal-row-lock{background:#fff8f8;}
+.pcal-row-restrict{background:#fffbf5;}
+.pcal-row-first td,.pcal-row-first th{border-top:2px solid var(--border2)!important;}
+.pcal-separator td{height:6px;background:var(--bg);border:none!important;padding:0;}
+
+/* bottom bulk panel */
+.pcal-bottom{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem;}
+.pcal-bulk-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;}
+.pcal-bulk-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.pcal-input{height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);background:var(--bg);outline:none;transition:border-color 0.15s;}
+.pcal-input:focus{border-color:var(--accent);background:#fff;}
+.pcal-bulk-apply-btn{height:36px;padding:0 18px;background:var(--accent);color:#fff;border:none;border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;margin-left:auto;}
+.pcal-bulk-apply-btn:hover{opacity:0.9;}
+
+/* ── MOBILE adjustments ── */
+@media(max-width:600px){
+  .topbar{padding:0 1rem;}
+  .main{padding:1rem;}
+  .nav-btn span{display:none;}
+  .properties-grid{grid-template-columns:1fr;}
+  .stats-row{grid-template-columns:1fr 1fr;}
+  .drawer{width:100vw;}
+}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading">
+  <div class="loading-logo">Sleepy <span>PMS</span></div>
+  <div class="spinner"></div>
+  <div class="loading-sub">Loading properties...</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- Drawer overlay -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+
+<!-- Add/Edit Drawer -->
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <div class="drawer-title" id="drawer-title">Add property</div>
+    <button class="drawer-close" onclick="closeDrawer()">×</button>
+  </div>
+  <div class="drawer-body">
+    <input type="hidden" id="edit-id">
+
+    <div class="form-section">Property info</div>
+    <div class="form-group">
+      <label class="form-label">Property name</label>
+      <input type="text" class="form-input" id="f-name" placeholder="e.g. Freedom Square Apt 3">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Short code <span style="font-weight:400;color:var(--hint);">(shown on calendar, max 6 chars)</span></label>
+      <input type="text" class="form-input" id="f-shortcode" placeholder="e.g. FS-3" maxlength="6" style="text-transform:uppercase;">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <input type="text" class="form-input" id="f-notes" placeholder="e.g. 2nd floor, studio">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Number of rooms <span style="font-weight:400;color:var(--hint);">(how many identical units)</span></label>
+      <input type="number" class="form-input" id="f-rooms" placeholder="1" min="1" max="50" value="1">
+    </div>
+  </div>
+  <div class="drawer-footer">
+    <button class="btn danger hidden" id="btn-delete" onclick="deleteProperty()">Delete</button>
+    <button class="btn" onclick="closeDrawer()">Cancel</button>
+    <button class="btn primary" onclick="saveProperty()">Save property</button>
+  </div>
+</div>
+
+<!-- Detail Drawer -->
+<div class="drawer" id="detail-drawer" style="z-index:202;">
+  <div class="drawer-header">
+    <div class="drawer-title" id="detail-drawer-title">Property</div>
+    <button class="drawer-close" onclick="closeDetailDrawer()">×</button>
+  </div>
+  <div class="drawer-body" id="detail-drawer-body"></div>
+  <div class="drawer-footer">
+    <button class="btn" onclick="closeDetailDrawer()">Close</button>
+    <button class="btn primary" id="detail-edit-btn">Edit property</button>
+  </div>
+</div>
+
+<!-- App -->
+<div class="app">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo">Sleepy <span>PMS</span></div>
+      <nav class="nav">
+        <button class="nav-btn active" data-page="properties" onclick="switchPage('properties')">🏠 <span>Properties</span></button>
+        <button class="nav-btn" data-page="calendar" onclick="switchPage('calendar')">📅 <span>Calendar</span></button>
+        <button class="nav-btn" data-page="reservations" onclick="switchPage('reservations')">📋 <span>Reservations</span></button>
+        <button class="nav-btn" data-page="pricing" onclick="switchPage('pricing')">💰 <span>Pricing</span></button>
+      </nav>
+    </div>
+    <div class="topbar-right">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span class="sync-label" id="sync-label">...</span>
+      <button class="topbar-btn primary" id="topbar-action-btn" onclick="openAddDrawer()">+ Add property</button>
+    </div>
+  </div>
+
+  <div class="main" id="main">
+    <!-- content injected by JS -->
+  </div>
+</div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import{getFirestore,collection,doc,addDoc,updateDoc,deleteDoc,setDoc,getDocs,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+const fb=initializeApp({
+  apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
+  authDomain:"sleepy-5c962.firebaseapp.com",
+  projectId:"sleepy-5c962",
+  storageBucket:"sleepy-5c962.firebasestorage.app",
+  messagingSenderId:"152940098906",
+  appId:"1:152940098906:web:bf245230d705c0a62c2f63"
+});
+const db=getFirestore(fb);
+
+let properties=[];
+let currentPage='properties';
+let searchQuery='';
+let filterPlatform='all';
+
+// ── helpers ──────────────────────────────
+function setSyncDot(s,label){
+  const d=document.getElementById('sync-dot');
+  const l=document.getElementById('sync-label');
+  d.className='sync-dot '+s;
+  if(l)l.textContent=label||s;
+}
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ── pages ─────────────────────────────────
+window.switchPage=function(page){
+  currentPage=page;
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+  if(page==='properties'){
+    document.getElementById('topbar-action-btn').textContent='+ Add property';
+    document.getElementById('topbar-action-btn').onclick=openAddDrawer;
+    renderPropertiesPage();
+  } else if(page==='calendar'){
+    document.getElementById('topbar-action-btn').textContent='+ Reservation';
+    document.getElementById('topbar-action-btn').textContent='+ Reservation';
+    document.getElementById('topbar-action-btn').onclick=openNewReservationModal;
+    renderCalendarPage();
+  } else if(page==='reservations'){
+    document.getElementById('topbar-action-btn').textContent='+ Reservation';
+    document.getElementById('topbar-action-btn').onclick=openNewReservationModal;
+    renderComingSoon('📋','Reservations','Coming soon — for now add reservations from the Calendar view!');
+  } else if(page==='pricing'){
+    document.getElementById('topbar-action-btn').textContent='🔄 Sync';
+    document.getElementById('topbar-action-btn').textContent='🔄 Sync';
+    document.getElementById('topbar-action-btn').onclick=window.openSyncModal;
+    renderPricingPage();
+  }
+}
+
+function renderComingSoon(icon,title,sub){
+  document.getElementById('main').innerHTML=`
+    <div class="page">
+      <div class="empty-state" style="margin-top:4rem;">
+        <div class="empty-icon">${icon}</div>
+        <div class="empty-title">${title}</div>
+        <div class="empty-sub">${sub}</div>
+      </div>
+    </div>`;
+}
+
+// ── properties page ───────────────────────
+function renderPropertiesPage(){
+  const main=document.getElementById('main');
+  const filtered=properties.filter(p=>{
+    const q=searchQuery.toLowerCase();
+    const matchSearch=!q||p.name.toLowerCase().includes(q)||p.address.toLowerCase().includes(q)||p.city.toLowerCase().includes(q);
+    const matchFilter=filterPlatform==='all'||(p.platforms&&p.platforms.includes(filterPlatform));
+    return matchSearch&&matchFilter;
+  });
+
+  const airbnbCount=properties.filter(p=>p.platforms?.includes('airbnb')).length;
+  const bookingCount=properties.filter(p=>p.platforms?.includes('booking')).length;
+  const directCount=properties.filter(p=>p.platforms?.includes('direct')).length;
+
+  main.innerHTML=`
+  <div class="page">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Properties</div>
+        <div class="page-sub">${properties.length} properties total</div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Properties</div><div class="stat-val blue">${properties.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Total rooms</div><div class="stat-val green">${properties.reduce((s,p)=>s+(p.rooms||1),0)}</div></div>
+      <div class="stat-card"><div class="stat-label">Direct</div><div class="stat-val">${directCount}</div></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" placeholder="Search properties..." value="${esc(searchQuery)}" id="search-input" oninput="onSearch(this.value)">
+      </div>
+    </div>
+
+    ${filtered.length===0?`
+      <div class="empty-state">
+        <div class="empty-icon">🏠</div>
+        <div class="empty-title">${properties.length===0?'No properties yet':'No results found'}</div>
+        <div class="empty-sub">${properties.length===0?'Add your first property to get started':'Try a different search or filter'}</div>
+      </div>
+    `:`
+      <div class="properties-grid">
+        ${filtered.map(p=>propertyCardHTML(p)).join('')}
+      </div>
+    `}
+  </div>`;
+}
+
+function propertyCardHTML(p){
+  const platforms=p.platforms||[];
+  const platformBadges=platforms.map(pl=>{
+    const labels={airbnb:'Airbnb',booking:'Booking',expedia:'Expedia',direct:'Direct'};
+    return `<span class="platform-badge pb-${pl}">${labels[pl]||pl}</span>`;
+  }).join('');
+  const icons=['🏠','🏡','🏢','🏗️','🏘️'];
+  const icon=icons[Math.abs(p.name.charCodeAt(0))%icons.length];
+  return `
+  <div class="property-card" onclick="openDetail('${p.id}')">
+    <div class="property-card-header">
+      <div class="property-icon">${icon}</div>
+      <div class="property-info">
+        <div class="property-name">${esc(p.name)}</div>
+        <div class="property-address">${esc(p.address||'')}${p.city?', '+esc(p.city):''}</div>
+      </div>
+    </div>
+    <div class="property-card-body">
+      <div class="platforms">${platformBadges||'<span style="font-size:12px;color:var(--hint);">No platforms set</span>'}</div>
+    </div>
+    <div class="property-card-footer">
+      <span class="property-id">#${p.id.slice(-6).toUpperCase()}</span>
+      <div class="property-actions">
+        <button class="icon-btn" title="Edit" onclick="event.stopPropagation();openEditDrawer('${p.id}')">✏️</button>
+        <button class="icon-btn danger" title="Delete" onclick="event.stopPropagation();confirmDelete('${p.id}')">🗑️</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── search & filter ───────────────────────
+window.onSearch=function(v){searchQuery=v;renderPropertiesPage();}
+window.setFilter=function(f){filterPlatform=f;renderPropertiesPage();}
+
+// ── drawer ────────────────────────────────
+let deleteTargetId=null;
+
+window.openAddDrawer=function(){
+  document.getElementById('edit-id').value='';
+  document.getElementById('drawer-title').textContent='Add property';
+  document.getElementById('btn-delete').classList.add('hidden');
+  ['f-name','f-shortcode','f-notes','f-rooms'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  openDrawer();
+}
+
+window.openEditDrawer=function(id){
+  const p=properties.find(x=>x.id===id);if(!p)return;
+  document.getElementById('edit-id').value=id;
+  document.getElementById('drawer-title').textContent='Edit property';
+  document.getElementById('btn-delete').classList.remove('hidden');
+  document.getElementById('f-name').value=p.name||'';
+  const sc=document.getElementById('f-shortcode');if(sc)sc.value=p.shortCode||'';
+  const fn=document.getElementById('f-notes');if(fn)fn.value=p.notes||'';
+  const fr=document.getElementById('f-rooms');if(fr)fr.value=p.rooms||1;
+  openDrawer();
+}
+
+function openDrawer(){
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('open');
+}
+window.closeDrawer=function(){
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+}
+
+
+
+window.saveProperty=async function(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){alert('Property name is required');return;}
+  const scRaw=(document.getElementById('f-shortcode')?.value||'').trim().toUpperCase();
+  const shortCode=scRaw||name.replace(/\s+/g,'').slice(0,6).toUpperCase();
+  const data={
+    name,
+    shortCode,
+    notes:document.getElementById('f-notes')?.value.trim()||'',
+    rooms:parseInt(document.getElementById('f-rooms')?.value)||1,
+    updatedAt:serverTimestamp()
+  };
+  const editId=document.getElementById('edit-id').value;
+  try{
+    setSyncDot('syncing','Saving...');
+    if(editId){
+      await updateDoc(doc(db,'properties',editId),data);
+      showToast('Property updated ✓');
+    } else {
+      data.createdAt=serverTimestamp();
+      await addDoc(collection(db,'properties'),data);
+      showToast('Property added ✓');
+    }
+    setSyncDot('synced','Synced');
+    closeDrawer();
+  } catch(e){setSyncDot('error','Error');showToast('Failed to save — check connection');}
+}
+
+window.confirmDelete=function(id){
+  deleteTargetId=id;
+  const p=properties.find(x=>x.id===id);
+  if(confirm(`Delete "${p?.name}"? This cannot be undone.`))deleteProperty();
+}
+
+window.deleteProperty=async function(){
+  const id=document.getElementById('edit-id').value||deleteTargetId;
+  if(!id)return;
+  try{
+    setSyncDot('syncing','Saving...');
+    await deleteDoc(doc(db,'properties',id));
+    setSyncDot('synced','Synced');
+    showToast('Property deleted');
+    closeDrawer();
+  } catch(e){setSyncDot('error','Error');showToast('Failed to delete');}
+}
+
+// ── detail drawer ─────────────────────────
+window.openDetail=function(id){
+  const p=properties.find(x=>x.id===id);if(!p)return;
+  document.getElementById('detail-drawer-title').textContent=p.name;
+  document.getElementById('detail-edit-btn').onclick=()=>{closeDetailDrawer();openEditDrawer(id);};
+
+  document.getElementById('detail-drawer-body').innerHTML=`
+    <div class="detail-section">
+      <div class="detail-section-title">Property info</div>
+      <div class="detail-row"><span class="dk">Name</span><span class="dv">${esc(p.name)}</span></div>
+      <div class="detail-row"><span class="dk">Short code</span><span class="dv">${esc(p.shortCode||'—')}</span></div>
+      ${p.notes?`<div class="detail-row"><span class="dk">Notes</span><span class="dv">${esc(p.notes)}</span></div>`:''}
+      <div class="detail-row"><span class="dk">Rooms</span><span class="dv">${p.rooms||1} unit${(p.rooms||1)>1?'s':''}</span></div>
+      <div class="detail-row"><span class="dk">ID</span><span class="dv">#${p.id.slice(-6).toUpperCase()}</span></div>
+    </div>
+    <div class="detail-section" style="background:var(--amber-bg);border:1px solid var(--amber-border);">
+      <div class="detail-section-title" style="color:var(--amber);">iCal sync — coming in Phase 2</div>
+      <div style="font-size:13px;color:var(--amber);">Connect Airbnb, Booking.com and Expedia calendars to auto-sync bookings.</div>
+    </div>`;
+
+  document.getElementById('detail-drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('open');
+}
+
+window.closeDetailDrawer=function(){
+  document.getElementById('detail-drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+}
+
+// ══════════════ CALENDAR ══════════════
+let reservations=[];
+let calStartDate=new Date();
+let calWeeks=4;
+let resSelectedSource='airbnb';
+
+function toDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x;}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+function sameDay(a,b){return a.toDateString()===b.toDateString();}
+function formatDate(d){return d.toISOString().split('T')[0];}
+function parseDate(s){return new Date(s+'T00:00:00');}
+const DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function renderCalendarPage(){
+  const today=toDay(new Date());
+  calStartDate=toDay(new Date());
+  const dow=calStartDate.getDay();
+  calStartDate.setDate(calStartDate.getDate()-(dow===0?6:dow-1));
+  const main=document.getElementById('main');
+  main.innerHTML=`
+  <div class="page">
+    <div class="cal-nav">
+      <div class="cal-nav-title" id="cal-title"></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div class="cal-weeks">
+          <button class="cal-week-btn" onclick="setCalWeeks(1)">1 week</button>
+          <button class="cal-week-btn" onclick="setCalWeeks(2)">2 weeks</button>
+          <button class="cal-week-btn active" onclick="setCalWeeks(4)">4 weeks</button>
+        </div>
+        <button class="cal-nav-btn" onclick="calMove(-calWeeks*7)">◀ Prev</button>
+        <button class="cal-nav-btn today" onclick="calToday()">Today</button>
+        <button class="cal-nav-btn" onclick="calMove(calWeeks*7)">Next ▶</button>
+      </div>
+    </div>
+    <div class="cal-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#a855f7;"></div>Airbnb</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div>Booking</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#eab308;"></div>Expedia</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e;"></div>Direct</div>
+    </div>
+    <div class="cal-wrap"><div id="cal-grid"></div></div>
+  </div>`;
+  renderGrid();
+}
+
+function renderGrid(){
+  const today=toDay(new Date());
+  const totalDays=calWeeks*7;
+  const days=[];
+  for(let i=0;i<totalDays;i++)days.push(addDays(calStartDate,i));
+  const endDate=days[days.length-1];
+  const titleEl=document.getElementById('cal-title');
+  if(titleEl){
+    titleEl.textContent=calStartDate.getDate()+' '+MONTH_NAMES[calStartDate.getMonth()]+' — '+endDate.getDate()+' '+MONTH_NAMES[endDate.getMonth()]+' '+endDate.getFullYear();
+  }
+  document.querySelectorAll('.cal-week-btn').forEach(b=>{
+    const w=parseInt(b.textContent);
+    b.className='cal-week-btn'+(calWeeks===w?' active':'');
+  });
+  const props=[...properties].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  let html='<table class="grid-table"><thead><tr><th class="room-header">Room</th>';
+  days.forEach(d=>{
+    const isToday=sameDay(d,today);
+    const isWknd=d.getDay()===0||d.getDay()===6;
+    html+=`<th class="date-th${isToday?' today-col':''}${isWknd?' weekend':''}"><div class="day-name">${DAY_NAMES[d.getDay()]}</div><div class="day-num">${d.getDate()}</div></th>`;
+  });
+  html+='</tr></thead><tbody>';
+  if(!props.length){
+    html+=`<tr><td colspan="${totalDays+1}" style="text-align:center;padding:3rem;color:var(--hint);font-size:13px;">No properties yet — add properties first</td></tr>`;
+  }
+  props.forEach(prop=>{
+    const code=(prop.shortCode||(prop.name||'').replace(/\s+/g,'').slice(0,6)).toUpperCase();
+    html+=`<tr><td class="room-col"><div class="room-cell"><div class="room-code">${esc(code)}</div><div class="room-name">${esc(prop.name||'')}</div></div></td>`;
+    const propRes=reservations.filter(r=>r.propertyId===prop.id);
+    days.forEach(day=>{
+      const isToday=sameDay(day,today);
+      const dayStr=formatDate(day);
+      const res=propRes.find(r=>{
+        const cin=parseDate(r.checkin);
+        const cout=parseDate(r.checkout);
+        return day>=cin&&day<cout;
+      });
+      if(res){
+        const cin=parseDate(res.checkin);
+        const cout=parseDate(res.checkout);
+        const isStart=sameDay(day,cin);
+        const isEnd=sameDay(addDays(cout,-1),day);
+        const srcClass='res-'+(res.source||'other');
+        const posClass=isStart&&isEnd?'starts ends':isStart?'starts':isEnd?'ends':'middle';
+        const showName=isStart;
+        html+=`<td class="day-cell${isToday?' today-col':''}" onclick="window.cellClick('${prop.id}','${dayStr}','${res.id||''}')">
+          <div class="res-bar ${srcClass} ${posClass}" title="${esc(res.guest||'')} | ${res.checkin}→${res.checkout}" onclick="event.stopPropagation();window.openEditRes('${res.id}')">
+            ${showName?esc((res.guest||'Guest').toUpperCase()):''}
+          </div></td>`;
+      } else {
+        html+=`<td class="day-cell${isToday?' today-col':''}" onclick="window.cellClick('${prop.id}','${dayStr}','')"></td>`;
+      }
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table>';
+  const grid=document.getElementById('cal-grid');
+  if(grid)grid.innerHTML=html;
+}
+
+window.setCalWeeks=function(w){calWeeks=w;renderGrid();}
+window.calMove=function(days){calStartDate=addDays(calStartDate,days);renderGrid();}
+window.calToday=function(){
+  calStartDate=toDay(new Date());
+  const dow=calStartDate.getDay();
+  calStartDate.setDate(calStartDate.getDate()-(dow===0?6:dow-1));
+  renderGrid();
+}
+window.cellClick=function(propId,dateStr,resId){
+  if(resId){window.openEditRes(resId);return;}
+  window.openNewReservationModal(propId,dateStr);
+}
+
+// ══════════════ RESERVATION MODAL ══════════════
+window.openNewReservationModal=function(propId,dateStr){
+  if(properties.length===0){showToast('Add a property first');return;}
+  document.getElementById('res-id').value='';
+  document.getElementById('res-modal-title').textContent='New Reservation';
+  document.getElementById('res-guest').value='';
+  document.getElementById('res-notes').value='';
+  document.getElementById('res-price').value='';
+  document.getElementById('res-delete-btn').classList.add('hidden');
+  document.getElementById('res-total-wrap').style.display='none';
+  const today=formatDate(new Date());
+  document.getElementById('res-checkin').value=dateStr||today;
+  document.getElementById('res-checkout').value=dateStr?formatDate(addDays(parseDate(dateStr),1)):formatDate(addDays(new Date(),1));
+  populatePropertySelect(propId);
+  resSelectedSource='airbnb';
+  document.querySelectorAll('#res-source-btns .platform-toggle').forEach(b=>{
+    b.className='platform-toggle'+(b.dataset.source==='airbnb'?' active-airbnb':'');
+  });
+  ['res-checkin','res-checkout','res-price'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.oninput=updateResTotal;
+  });
+  document.getElementById('res-modal-overlay').classList.remove('hidden');
+}
+
+window.openEditRes=function(resId){
+  const res=reservations.find(r=>r.id===resId);if(!res)return;
+  document.getElementById('res-id').value=resId;
+  document.getElementById('res-modal-title').textContent='Edit Reservation';
+  document.getElementById('res-guest').value=res.guest||'';
+  document.getElementById('res-checkin').value=res.checkin||'';
+  document.getElementById('res-checkout').value=res.checkout||'';
+  document.getElementById('res-notes').value=res.notes||'';
+  document.getElementById('res-price').value=res.price||'';
+  document.getElementById('res-currency').value=res.currency||'USD';
+  document.getElementById('res-delete-btn').classList.remove('hidden');
+  populatePropertySelect(res.propertyId);
+  resSelectedSource=res.source||'airbnb';
+  document.querySelectorAll('#res-source-btns .platform-toggle').forEach(b=>{
+    const s=b.dataset.source;
+    b.className='platform-toggle'+(s===resSelectedSource?' active-'+s:'');
+  });
+  ['res-checkin','res-checkout','res-price'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.oninput=updateResTotal;
+  });
+  updateResTotal();
+  document.getElementById('res-modal-overlay').classList.remove('hidden');
+}
+
+function populatePropertySelect(selectedId){
+  const sel=document.getElementById('res-property');if(!sel)return;
+  if(!properties.length){sel.innerHTML='<option value="">No properties yet</option>';return;}
+  sel.innerHTML=properties.map(p=>`<option value="${p.id}"${p.id===selectedId?' selected':''}>${esc(p.name)}</option>`).join('');
+}
+
+function updateResTotal(){
+  const cin=document.getElementById('res-checkin')?.value;
+  const cout=document.getElementById('res-checkout')?.value;
+  const price=parseFloat(document.getElementById('res-price')?.value)||0;
+  const cur=document.getElementById('res-currency')?.value||'USD';
+  const wrap=document.getElementById('res-total-wrap');
+  if(cin&&cout&&price>0){
+    const nights=Math.max(0,Math.round((parseDate(cout)-parseDate(cin))/(1000*60*60*24)));
+    document.getElementById('res-total').textContent=nights+' nights × '+price+' '+cur+' = '+(nights*price).toFixed(2)+' '+cur;
+    if(wrap)wrap.style.display='block';
+  } else {if(wrap)wrap.style.display='none';}
+}
+
+window.selectSource=function(btn){
+  resSelectedSource=btn.dataset.source;
+  document.querySelectorAll('#res-source-btns .platform-toggle').forEach(b=>{
+    const s=b.dataset.source;
+    b.className='platform-toggle'+(s===resSelectedSource?' active-'+s:'');
+  });
+}
+
+window.handleOverlayClick=function(e){
+  if(e.target.id==='res-modal-overlay')window.closeResModal();
+}
+
+window.closeResModal=function(){
+  const el=document.getElementById('res-modal-overlay');
+  if(el)el.classList.add('hidden');
+}
+
+window.saveReservation=async function(){
+  const guest=document.getElementById('res-guest').value.trim();
+  const checkin=document.getElementById('res-checkin').value;
+  const checkout=document.getElementById('res-checkout').value;
+  const propertyId=document.getElementById('res-property').value;
+  if(!guest){alert('Guest name is required');return;}
+  if(!checkin||!checkout){alert('Dates are required');return;}
+  if(parseDate(checkout)<=parseDate(checkin)){alert('Check-out must be after check-in');return;}
+  if(!propertyId){alert('Please select a property');return;}
+  const data={
+    guest,checkin,checkout,propertyId,
+    source:resSelectedSource,
+    price:parseFloat(document.getElementById('res-price').value)||0,
+    currency:document.getElementById('res-currency').value||'USD',
+    notes:document.getElementById('res-notes').value.trim(),
+    updatedAt:serverTimestamp()
+  };
+  const editId=document.getElementById('res-id').value;
+  try{
+    setSyncDot('syncing','Saving...');
+    if(editId){
+      await updateDoc(doc(db,'reservations',editId),data);
+      showToast('Reservation updated ✓');
+    } else {
+      data.createdAt=serverTimestamp();
+      await addDoc(collection(db,'reservations'),data);
+      showToast('Reservation saved ✓');
+    }
+    setSyncDot('synced','Synced');
+    window.closeResModal();
+  } catch(e){setSyncDot('error','Error');showToast('Failed to save — '+e.message);}
+}
+
+window.deleteReservation=async function(){
+  const id=document.getElementById('res-id').value;if(!id)return;
+  const res=reservations.find(r=>r.id===id);
+  if(!confirm(`Delete reservation for "${res?.guest||'this guest'}"?`))return;
+  try{
+    await deleteDoc(doc(db,'reservations',id));
+    showToast('Reservation deleted');
+    window.closeResModal();
+  }catch(e){showToast('Failed to delete');}
+}
+
+// ══════════════ PRICING ══════════════
+let prices={};
+let pricingStart=new Date();
+let pricingDays=14;
+let pendingPriceChanges={};
+let bulkSelProp=null;
+
+function formatDate2(d){return d.toISOString().split('T')[0];}
+function parseDate2(s){return new Date(s+'T00:00:00');}
+function addDays2(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+function sameDay2(a,b){return formatDate2(a)===formatDate2(b);}
+
+function getPricingDays(){
+  const days=[];
+  for(let i=0;i<pricingDays;i++)days.push(addDays2(pricingStart,i));
+  return days;
+}
+
+function renderPricingPage(){
+  if(properties.length===0){
+    document.getElementById('main').innerHTML=`<div class="empty-state" style="margin-top:4rem;"><div class="empty-icon">🏠</div><div class="empty-title">No properties yet</div><div class="empty-sub">Add properties first</div></div>`;
+    return;
+  }
+  const days=getPricingDays();
+  const startStr=days[0].toLocaleString('default',{month:'short',day:'numeric'});
+  const endStr=days[days.length-1].toLocaleString('default',{month:'short',day:'numeric',year:'numeric'});
+  const today=new Date();today.setHours(0,0,0,0);
+  const DAY_SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MONTHS_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // detect month change points
+  let lastMonth=-1;
+
+  let html=`
+  <div class="page" style="padding-bottom:2rem;">
+    <div class="pcal-toolbar">
+      <div class="pcal-nav-group">
+        <button class="pcal-nav-btn" onclick="window.pricingMove(-7)">◀ Week</button>
+        <button class="pcal-nav-btn" onclick="window.pricingMove(-14)">◀◀ 2W</button>
+        <button class="pcal-nav-btn today" onclick="window.pricingToday()">Today</button>
+        <button class="pcal-nav-btn" onclick="window.pricingMove(7)">Week ▶</button>
+        <button class="pcal-nav-btn" onclick="window.pricingMove(14)">2W ▶▶</button>
+      </div>
+      <div class="pcal-range-group">
+        <button class="pcal-range-btn${pricingDays===7?' active':''}" onclick="window.setPricingDays(7)">1W</button>
+        <button class="pcal-range-btn${pricingDays===14?' active':''}" onclick="window.setPricingDays(14)">2W</button>
+        <button class="pcal-range-btn${pricingDays===30?' active':''}" onclick="window.setPricingDays(30)">1M</button>
+      </div>
+      <div class="pcal-date-range">${startStr} — ${endStr}</div>
+      <button class="pcal-bulk-open-btn" onclick="window.openBulkModal()">📋 Bulk update</button>
+      <button class="pcal-sync-btn" onclick="window.openSyncModal()">🔄 Sync to platforms</button>
+    </div>
+
+    <div class="pcal-wrap">
+    <table class="pcal-table">
+      <thead>
+        <tr>
+          <th class="pcal-prop-header">Property</th>
+          <th class="pcal-row-label-header">Rate</th>`;
+
+  // month headers
+  days.forEach(d=>{
+    const mo=d.getMonth();
+    const isWknd=d.getDay()===0||d.getDay()===6;
+    const isTdy=sameDay2(d,today);
+    html+=`<th class="pcal-date-th${isTdy?' pcal-today':''}${isWknd?' pcal-weekend':''}">
+      <div class="pcal-day-name">${DAY_SHORT[d.getDay()]}</div>
+      <div class="pcal-day-num">${d.getDate()}</div>
+      ${d.getDate()===1||days.indexOf(d)===0?`<div class="pcal-month-label">${MONTHS_SHORT[mo]}</div>`:''}
+    </th>`;
+  });
+  html+=`</tr></thead><tbody>`;
+
+  // one row group per property
+  properties.forEach(prop=>{
+    const pd=prices[prop.id]||{};
+    const code=prop.shortCode||(prop.name||'').replace(/\s+/g,'').slice(0,6).toUpperCase();
+    const totalRooms=prop.rooms||1;
+    const rows=[
+      {key:'usd',label:'USD',cls:'pcal-row-usd'},
+      {key:'gel',label:'GEL',cls:'pcal-row-gel'},
+      {key:'eur',label:'EUR',cls:'pcal-row-eur'},
+      {key:'minNights',label:'Min nights',cls:'pcal-row-min'},
+      {key:'availability',label:'Available',cls:'pcal-row-avail'},
+      {key:'locked',label:'Closed',cls:'pcal-row-lock'},
+      {key:'noArrival',label:'No arrival',cls:'pcal-row-restrict'},
+      {key:'noDeparture',label:'No depart.',cls:'pcal-row-restrict'},
+    ];
+
+    rows.forEach((row,rowIdx)=>{
+      html+=`<tr class="${row.cls}${rowIdx===0?' pcal-row-first':''}${rowIdx===rows.length-1?' pcal-row-last':''}">`;
+      if(rowIdx===0){
+        html+=`<td class="pcal-prop-cell" rowspan="${rows.length}">
+          <div class="pcal-prop-name">${esc(prop.name)}</div>
+          <div class="pcal-prop-code">${esc(code)}</div>
+        </td>`;
+      }
+      html+=`<td class="pcal-row-label">${row.label}</td>`;
+
+      days.forEach(d=>{
+        const ds=formatDate2(d);
+        const dayData=pd[ds]||{};
+        const isWknd=d.getDay()===0||d.getDay()===6;
+        const isTdy=sameDay2(d,today);
+        const isPast=d<today;
+
+        if(row.key==='availability'){
+          const avail=dayData.availability!==undefined?dayData.availability:totalRooms;
+          const pct=avail/totalRooms;
+          const availColor=avail===0?'#ef4444':avail<totalRooms?'#f97316':'#166534';
+          html+=`<td class="pcal-cell pcal-cell-num${isTdy?' pcal-today':''}${isWknd?' pcal-weekend':''}${isPast?' pcal-past':''}" style="background:${avail===0?'#fef2f2':avail<totalRooms?'#fff7ed':''};">
+            <input class="pcal-inline-input" type="number" min="0" max="${totalRooms}" step="1"
+              value="${avail}"
+              data-prop="${prop.id}" data-date="${ds}" data-field="availability"
+              onchange="window.saveInlinePrice(this)"
+              onfocus="this.parentElement.classList.add('editing')"
+              onblur="this.parentElement.classList.remove('editing')"
+              style="color:${availColor};font-weight:700;"
+              ${isPast?'disabled':''}>
+          </td>`;
+        } else if(row.key==='locked'){
+          const locked=dayData.locked||false;
+          html+=`<td class="pcal-cell pcal-cell-check${isTdy?' pcal-today':''}${isWknd?' pcal-weekend':''}${isPast?' pcal-past':''}${locked?' pcal-locked':''}"
+            onclick="window.toggleRestriction('${prop.id}','${ds}','locked')">
+            <div class="pcal-check${locked?' checked':''}">🔒</div>
+          </td>`;
+        } else if(row.key==='noArrival'){
+          const val=dayData.noArrival||false;
+          html+=`<td class="pcal-cell pcal-cell-check${isTdy?' pcal-today':''}${isWknd?' pcal-weekend':''}${isPast?' pcal-past':''}${val?' pcal-restricted':''}"
+            onclick="window.toggleRestriction('${prop.id}','${ds}','noArrival')">
+            <div class="pcal-check${val?' checked':''}">⛔</div>
+          </td>`;
+        } else if(row.key==='noDeparture'){
+          const val=dayData.noDeparture||false;
+          html+=`<td class="pcal-cell pcal-cell-check${isTdy?' pcal-today':''}${isWknd?' pcal-weekend':''}${isPast?' pcal-past':''}${val?' pcal-restricted':''}"
+            onclick="window.toggleRestriction('${prop.id}','${ds}','noDeparture')">
+            <div class="pcal-check${val?' checked':''}">🚫</div>
+          </td>`;
+        } else if(row.key==='minNights'){
+          const val=dayData.minNights||'';
+          html+=`<td class="pcal-cell pcal-cell-num${isTdy?' pcal-today':''}${isWknd?' pcal-weekend':''}${isPast?' pcal-past':''}">
+            <input class="pcal-inline-input"
+              type="number" min="1" step="1"
+              value="${val||''}"
+              placeholder="—"
+              data-prop="${prop.id}" data-date="${ds}" data-field="minNights"
+              onchange="window.saveInlinePrice(this)"
+              onfocus="this.parentElement.classList.add('editing')"
+              onblur="this.parentElement.classList.remove('editing')"
+              ${isPast?'disabled':''}>
+          </td>`;
+        } else {
+          const val=dayData[row.key]||'';
+          const hasVal=!!val;
+          html+=`<td class="pcal-cell pcal-cell-price${isTdy?' pcal-today':''}${isWknd?' pcal-weekend':''}${isPast?' pcal-past':''}${hasVal?' has-price':''}">
+            <input class="pcal-inline-input"
+              type="number" min="0" step="1"
+              value="${val||''}"
+              placeholder="—"
+              data-prop="${prop.id}" data-date="${ds}" data-field="${row.key}"
+              onchange="window.saveInlinePrice(this)"
+              onfocus="this.parentElement.classList.add('editing')"
+              onblur="this.parentElement.classList.remove('editing')"
+              ${isPast?'disabled':''}>
+          </td>`;
+        }
+      });
+      html+=`</tr>`;
+    });
+
+    // separator row
+    html+=`<tr class="pcal-separator"><td colspan="${days.length+2}"></td></tr>`;
+  });
+
+  html+=`</tbody></table>
+  </div>
+
+  </div>`;
+
+  document.getElementById('main').innerHTML=html;
+
+  // set default bulk dates
+  const todayStr=formatDate2(new Date());
+  const nextWeekStr=formatDate2(addDays2(new Date(),6));
+  const bf=document.getElementById('bulk-from');
+  const bt=document.getElementById('bulk-to');
+  if(bf&&!bf.value)bf.value=todayStr;
+  if(bt&&!bt.value)bt.value=nextWeekStr;
+}
+
+// ── inline price save ─────────────────────
+let saveDebounce={};
+window.saveInlinePrice=async function(input){
+  const propId=input.dataset.prop;
+  const dateStr=input.dataset.date;
+  const field=input.dataset.field;
+  const val=input.value===''?null:parseFloat(input.value);
+  if(!prices[propId])prices[propId]={};
+  if(!prices[propId][dateStr])prices[propId][dateStr]={};
+  if(val===null||isNaN(val)){
+    delete prices[propId][dateStr][field];
+    input.parentElement.classList.remove('has-price');
+  } else {
+    prices[propId][dateStr][field]=val;
+    input.parentElement.classList.add('has-price');
+  }
+  // debounce saves — wait 800ms after last keystroke
+  const dkey=propId+dateStr;
+  clearTimeout(saveDebounce[dkey]);
+  saveDebounce[dkey]=setTimeout(async()=>{
+    await flushPrices(propId);
+  },800);
+}
+
+window.toggleRestriction=async function(propId,dateStr,field){
+  if(!prices[propId])prices[propId]={};
+  if(!prices[propId][dateStr])prices[propId][dateStr]={};
+  prices[propId][dateStr][field]=!prices[propId][dateStr][field];
+  await flushPrices(propId);
+  if(currentPage==='pricing')renderPricingPage();
+}
+
+async function flushPrices(propId){
+  try{
+    setSyncDot('syncing','Saving...');
+    await setDoc(doc(db,'prices',propId),prices[propId]||{});
+    setSyncDot('synced','Synced');
+  }catch(e){setSyncDot('error','Error');showToast('Save failed');}
+}
+
+window.pricingMove=function(days){pricingStart=addDays2(pricingStart,days);if(currentPage==='pricing')renderPricingPage();}
+window.setPricingDays=function(n){pricingDays=n;if(currentPage==='pricing')renderPricingPage();}
+window.pricingToday=function(){
+  pricingStart=new Date();pricingStart.setHours(0,0,0,0);
+  if(currentPage==='pricing')renderPricingPage();
+}
+
+window.openBulkModal=function(){
+  if(properties.length===0){showToast('Add a property first');return;}
+  const existing=document.getElementById('bulk-modal-dyn');
+  if(existing)existing.remove();
+  const today=formatDate2(new Date());
+  const nextWeek=formatDate2(addDays2(new Date(),6));
+  const propOpts=properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  const overlay=document.createElement('div');
+  overlay.id='bulk-modal-dyn';
+  overlay.className='modal-overlay';
+  overlay.style.display='flex';
+  overlay.innerHTML=`<div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">📋 Bulk update prices</div>
+      <button class="drawer-close" onclick="document.getElementById('bulk-modal-dyn').remove()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Property</label>
+        <select class="form-input" id="bm-prop">${propOpts}</select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label class="form-label">From</label>
+          <input type="date" class="form-input" id="bm-from" value="${today}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">To</label>
+          <input type="date" class="form-input" id="bm-to" value="${nextWeek}">
+        </div>
+      </div>
+      <div class="form-section">Prices (leave blank to keep existing)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label class="form-label">USD per night</label>
+          <input type="number" class="form-input" id="bm-usd" placeholder="—" min="0" step="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">GEL per night</label>
+          <input type="number" class="form-input" id="bm-gel" placeholder="—" min="0" step="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">EUR per night</label>
+          <input type="number" class="form-input" id="bm-eur" placeholder="—" min="0" step="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Min nights</label>
+          <input type="number" class="form-input" id="bm-min" placeholder="—" min="1" step="1">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="document.getElementById('bulk-modal-dyn').remove()">Cancel</button>
+      <button class="btn primary" onclick="window.applyBulkPricing()">Apply to range</button>
+    </div>
+  </div>`;
+  overlay.onclick=(e)=>{if(e.target===overlay)overlay.remove();};
+  document.body.appendChild(overlay);
+}
+
+window.applyBulkPricing=async function(){
+  const propId=document.getElementById('bm-prop')?.value;
+  const from=document.getElementById('bm-from')?.value;
+  const to=document.getElementById('bm-to')?.value;
+  const usd=parseFloat(document.getElementById('bm-usd')?.value)||null;
+  const gel=parseFloat(document.getElementById('bm-gel')?.value)||null;
+  const eur=parseFloat(document.getElementById('bm-eur')?.value)||null;
+  const min=parseInt(document.getElementById('bm-min')?.value)||null;
+  if(!propId){alert('Select a property');return;}
+  if(!from||!to){alert('Select date range');return;}
+  if(parseDate2(to)<parseDate2(from)){alert('End date must be after start');return;}
+  if(!usd&&!gel&&!eur&&!min){alert('Enter at least one value');return;}
+  if(!prices[propId])prices[propId]={};
+  let cur=parseDate2(from);const end=parseDate2(to);let count=0;
+  while(cur<=end){
+    const ds=formatDate2(cur);
+    if(!prices[propId][ds])prices[propId][ds]={};
+    if(usd)prices[propId][ds].usd=usd;
+    if(gel)prices[propId][ds].gel=gel;
+    if(eur)prices[propId][ds].eur=eur;
+    if(min)prices[propId][ds].minNights=min;
+    cur=addDays2(cur,1);count++;
+  }
+  await flushPrices(propId);
+  const overlay=document.getElementById('bulk-modal-dyn');
+  if(overlay)overlay.remove();
+  showToast(`✓ Updated ${count} days`);
+  if(currentPage==='pricing')renderPricingPage();
+}
+
+
+// ── sync modal ────────────────────────────
+window.openSyncModal=function(){
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';overlay.style.display='flex';
+  overlay.innerHTML=`<div class="modal">
+    <div class="modal-header"><div class="modal-title">🔄 Sync to platforms</div><button class="drawer-close" onclick="this.closest('.modal-overlay').remove()">×</button></div>
+    <div class="modal-body">
+      <div style="font-size:14px;color:var(--muted);margin-bottom:1rem;">Select which platforms to push prices to:</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;"><input type="checkbox" checked> <span>🏠 Airbnb</span></label>
+        <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;"><input type="checkbox" checked> <span>📋 Booking.com</span></label>
+        <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;"><input type="checkbox" checked> <span>✈️ Expedia</span></label>
+      </div>
+      <div style="margin-top:1rem;padding:0.85rem 1rem;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--rs);font-size:13px;color:var(--amber);">
+        ⚠️ Direct API sync with platforms requires API credentials setup. This will be configured in Phase 3.
+        For now, prices are saved in the system and ready to sync once credentials are added.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+      <button class="btn primary" onclick="window.doSync(this)">Sync now</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+window.doSync=function(btn){
+  btn.textContent='Syncing...';btn.disabled=true;
+  setTimeout(()=>{
+    btn.closest('.modal-overlay').remove();
+    showToast('✓ Prices synced to platforms');
+  },1500);
+}
+
+// ── init ──────────────────────────────────
+setSyncDot('syncing','Connecting...');
+// Safety fallback — always hide loading after 5 seconds no matter what
+setTimeout(()=>{
+  const l=document.getElementById('loading');
+  if(l)l.style.display='none';
+  if(currentPage==='properties')renderPropertiesPage();
+},5000);
+
+try{
+  onSnapshot(collection(db,'properties'),(snap)=>{
+    try{
+      properties=snap.docs.map(d=>({id:d.id,...d.data()}));
+      properties.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+      setSyncDot('synced','Synced');
+      if(!pricingPropId&&properties.length>0)pricingPropId=properties[0].id;
+      const l=document.getElementById('loading');if(l)l.style.display='none';
+      if(currentPage==='properties')renderPropertiesPage();
+      else if(currentPage==='calendar')renderGrid();
+      else if(currentPage==='pricing')renderPricingPage();
+    }catch(e){console.error('Properties render error:',e);const l=document.getElementById('loading');if(l)l.style.display='none';}
+  },(err)=>{
+    console.error('Firebase properties error:',err);
+    setSyncDot('error','Offline');
+    const l=document.getElementById('loading');if(l)l.style.display='none';
+    document.getElementById('main').innerHTML=`<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Connection error</div><div class="empty-sub">${err.message||'Check connection and refresh'}</div></div>`;
+  });
+
+  onSnapshot(collection(db,'reservations'),(snap)=>{
+    try{
+      reservations=snap.docs.map(d=>({id:d.id,...d.data()}));
+      if(currentPage==='calendar')renderGrid();
+    }catch(e){console.error('Reservations error:',e);}
+  },(err)=>console.error('Reservations listener error:',err));
+
+  onSnapshot(collection(db,'prices'),(snap)=>{
+    try{
+      snap.docs.forEach(d=>{prices[d.id]=d.data();});
+      if(currentPage==='pricing')renderPricingPage();
+    }catch(e){console.error('Prices error:',e);}
+  },(err)=>console.error('Prices listener error:',err));
+
+}catch(e){
+  console.error('Firebase init error:',e);
+  const l=document.getElementById('loading');if(l)l.style.display='none';
+  document.getElementById('main').innerHTML=`<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Failed to connect</div><div class="empty-sub">${e.message}</div></div>`;
+}
+</script>
+
+<!-- Reservation Modal -->
+<div class="modal-overlay hidden" id="res-modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal" id="res-modal">
+    <div class="modal-header">
+      <div class="modal-title" id="res-modal-title">New Reservation</div>
+      <button class="drawer-close" onclick="closeResModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="res-id">
+      <div class="form-group">
+        <label class="form-label">Guest name</label>
+        <input type="text" class="form-input" id="res-guest" placeholder="e.g. John Smith">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label class="form-label">Check-in</label>
+          <input type="date" class="form-input" id="res-checkin">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Check-out</label>
+          <input type="date" class="form-input" id="res-checkout">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Property</label>
+        <select class="form-input" id="res-property"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Source</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;" id="res-source-btns">
+          <button class="platform-toggle active-airbnb" data-source="airbnb" onclick="selectSource(this)">🏠 Airbnb</button>
+          <button class="platform-toggle" data-source="booking" onclick="selectSource(this)">📋 Booking</button>
+          <button class="platform-toggle" data-source="expedia" onclick="selectSource(this)">✈️ Expedia</button>
+          <button class="platform-toggle" data-source="direct" onclick="selectSource(this)">🔗 Direct</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label class="form-label">Price per night</label>
+          <input type="number" class="form-input" id="res-price" placeholder="0.00" min="0" step="0.01">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Currency</label>
+          <select class="form-input" id="res-currency">
+            <option value="USD">USD</option>
+            <option value="GEL">GEL</option>
+            <option value="EUR">EUR</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input type="text" class="form-input" id="res-notes" placeholder="Optional notes...">
+      </div>
+      <div id="res-total-wrap" style="background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:var(--rs);padding:10px 14px;font-size:13px;color:var(--accent);font-family:'DM Mono',monospace;display:none;">
+        Total: <span id="res-total">—</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn danger hidden" id="res-delete-btn" onclick="deleteReservation()">Delete</button>
+      <button class="btn" onclick="closeResModal()">Cancel</button>
+      <button class="btn primary" onclick="saveReservation()">Save reservation</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reservation Modal -->
+<div class="modal-overlay hidden" id="res-modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal" id="res-modal">
+    <div class="modal-header">
+      <div class="modal-title" id="res-modal-title">New Reservation</div>
+      <button class="drawer-close" onclick="closeResModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="res-id">
+      <div class="form-group">
+        <label class="form-label">Guest name</label>
+        <input type="text" class="form-input" id="res-guest" placeholder="e.g. John Smith">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label class="form-label">Check-in</label>
+          <input type="date" class="form-input" id="res-checkin">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Check-out</label>
+          <input type="date" class="form-input" id="res-checkout">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Property</label>
+        <select class="form-input" id="res-property"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Source</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;" id="res-source-btns">
+          <button class="platform-toggle active-airbnb" data-source="airbnb" onclick="selectSource(this)">🏠 Airbnb</button>
+          <button class="platform-toggle" data-source="booking" onclick="selectSource(this)">📋 Booking</button>
+          <button class="platform-toggle" data-source="expedia" onclick="selectSource(this)">✈️ Expedia</button>
+          <button class="platform-toggle" data-source="direct" onclick="selectSource(this)">🔗 Direct</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label class="form-label">Price per night</label>
+          <input type="number" class="form-input" id="res-price" placeholder="0.00" min="0" step="0.01">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Currency</label>
+          <select class="form-input" id="res-currency">
+            <option value="USD">USD</option>
+            <option value="GEL">GEL</option>
+            <option value="EUR">EUR</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input type="text" class="form-input" id="res-notes" placeholder="Optional notes...">
+      </div>
+      <div id="res-total-wrap" style="background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:var(--rs);padding:10px 14px;font-size:13px;color:var(--accent);font-family:'DM Mono',monospace;display:none;">
+        Total: <span id="res-total">—</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn danger hidden" id="res-delete-btn" onclick="deleteReservation()">Delete</button>
+      <button class="btn" onclick="closeResModal()">Cancel</button>
+      <button class="btn primary" onclick="saveReservation()">Save reservation</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
