@@ -379,7 +379,19 @@ window.openAptDrawer=function(aptId){
   openDrawer();
 }
 
-window.deletePhoto=async function(aptId,idx){
+window.uploadVideo=async function(aptId,input){
+  const file=input.files[0];if(!file)return;
+  if(file.size>100*1024*1024){alert('Video too large. Max 100MB.');return;}
+  toast('Uploading video... please wait',60000);
+  try{
+    const url=await uploadToCloudinary(file,'maxela/'+aptId+'/videos');
+    const vi=document.getElementById('apt-video');
+    if(vi)vi.value=url;
+    toast('Video uploaded! Click Save to apply.');
+  }catch(e){toast('Video upload failed: '+e.message);}
+}
+
+window.deletePhoto=async function(aptId,idx){(aptId,idx){
   if(!confirm('Delete this photo?'))return;
   const photos=(aptData[aptId]?.photos||[]).filter((_,i)=>i!==idx);
   await setDoc(doc(db,'checkin_apartments',aptId),{photos},{merge:true});
