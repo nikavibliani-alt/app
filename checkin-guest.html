@@ -116,9 +116,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .rules-box{background:var(--gold-light);border:1px solid var(--gold-border);border-radius:var(--rs);padding:1rem 1.1rem;margin-bottom:1rem;}
 .rules-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--gold);margin-bottom:6px;}
 .rules-text{font-size:13px;color:var(--text);line-height:1.75;white-space:pre-wrap;}
-.photos-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;margin-bottom:1rem;}
-.photos-scroll::-webkit-scrollbar{display:none;}
-.photos-scroll img{height:160px;border-radius:var(--rs);flex-shrink:0;object-fit:cover;cursor:pointer;}
+.photos-scroll{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem;}
+.photos-scroll img{width:100%;aspect-ratio:1;border-radius:var(--rs);object-fit:cover;cursor:pointer;}
 .video-wrap{border-radius:var(--r);overflow:hidden;margin-bottom:1rem;aspect-ratio:16/9;background:var(--surface2);}
 .video-wrap iframe{width:100%;height:100%;border:none;}
 
@@ -500,7 +499,7 @@ window.openPage=function(type){
     <div class="code-box"><div class="code-lbl">${t('dc')}</div><div class="code-val" id="door-code-val">${esc(d.doorCode)}</div>
     <button class="code-copy" onclick="copySth('${esc(d.doorCode)}',this)">${t('cp')}</button></div>`:'')
     +(d.instructions?`<div class="section-title">${t('hi')}</div><div class="instr-text">${esc(d.instructions)}</div>`:'')
-    +((d.photos||[]).length?`<div class="section-title">Photos</div><div class="photos-scroll">${d.photos.map(u=>`<img src="${u}" onclick="window.openLightbox(d.photos,i)">`).join('')}</div>`:'')
+    +((d.photos||[]).length?`<div class="section-title">Photos</div><div class="photos-scroll">${d.photos.map((u,i)=>`<img src="${u}" onclick="window.openLightbox(${JSON.stringify(d.photos).replace(/'/g,'\\'')},${i})">`).join('')}</div>`:'')
     +(embed?`<div class="section-title">Video</div><div class="video-wrap">${
       isCloudinaryVideo(d.videoUrl||'')?
       `<video src="${embed}" controls playsinline style="width:100%;height:100%;border-radius:var(--r);" controlsList="nodownload">Your browser does not support video.</video>`:
