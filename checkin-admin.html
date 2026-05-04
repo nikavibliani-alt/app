@@ -104,9 +104,9 @@ textarea.form-input{height:auto;padding:10px;resize:vertical;line-height:1.5;}
 .drawer-footer{padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;}
 
 /* Photo preview */
-.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px;}
-.photo-thumb{aspect-ratio:1;border-radius:var(--rsm);object-fit:cover;border:1px solid var(--border);}
-.photo-add{aspect-ratio:1;border-radius:var(--rsm);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--hint);font-size:24px;transition:all 0.15s;}
+.photo-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px;}
+.photo-thumb{width:100%;aspect-ratio:1;border-radius:var(--rsm);object-fit:cover;border:1px solid var(--border);display:block;}
+.photo-add{aspect-ratio:1;border-radius:var(--rsm);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--hint);font-size:20px;transition:all 0.15s;background:var(--bg);}
 .photo-add:hover{border-color:var(--accent);color:var(--accent);}
 
 /* Guest photo */
@@ -360,7 +360,7 @@ window.openAptDrawer=function(aptId){
     <div style="font-size:12px;color:var(--hint);margin-bottom:8px;">Upload photos of the entrance, door, apartment interior</div>
     <input type="file" id="apt-photo-input" accept="image/*" multiple style="display:none;" onchange="window.uploadPhotos('${aptId}',this)">
     <div class="photo-grid" id="photo-grid">
-      ${(d.photos||[]).map((url,i)=>`<div style="position:relative;"><img src="${url}" class="photo-thumb"><button onclick="window.deletePhoto('${aptId}',${i})" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;border:none;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;line-height:1;">×</button></div>`).join('')}
+      ${(d.photos||[]).map((url,i)=>`<div style="position:relative;"><img src="${url}" class="photo-thumb"><button onclick="window.deletePhoto('${aptId}',${i})" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.7);color:#fff;border:none;cursor:pointer;font-size:11px;line-height:1;">×</button></div>`).join('')}
       <div class="photo-add" onclick="document.getElementById('apt-photo-input').click()">+</div>
     </div>
 
@@ -381,7 +381,7 @@ window.openAptDrawer=function(aptId){
 
 window.uploadVideo=async function(aptId,input){
   const file=input.files[0];if(!file)return;
-  if(file.size>100*1024*1024){alert('Video too large. Max 100MB.');return;}
+  if(file.size>100*1024*1024){alert('Video too large. Max 100MB. Please compress it first.');return;}
   toast('Uploading video... please wait',60000);
   try{
     const url=await uploadToCloudinary(file,'maxela/'+aptId+'/videos');
@@ -391,7 +391,7 @@ window.uploadVideo=async function(aptId,input){
   }catch(e){toast('Video upload failed: '+e.message);}
 }
 
-window.deletePhoto=async function(aptId,idx){(aptId,idx){
+window.deletePhoto=async function(aptId,idx){
   if(!confirm('Delete this photo?'))return;
   const photos=(aptData[aptId]?.photos||[]).filter((_,i)=>i!==idx);
   await setDoc(doc(db,'checkin_apartments',aptId),{photos},{merge:true});
