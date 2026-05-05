@@ -502,7 +502,7 @@ window.openPage=function(type){
     <div class="code-box"><div class="code-lbl">${t('dc')}</div><div class="code-val" id="door-code-val">${esc(d.doorCode)}</div>
     <button class="code-copy" onclick="copySth('${esc(d.doorCode)}',this)">${t('cp')}</button></div>`:'')
     +(d.instructions?`<div class="section-title">${t('hi')}</div><div class="instr-text">${esc(d.instructions)}</div>`:'')
-    +(()=>{if(!(d.photos||[]).length)return'';window._lbPhotos=d.photos;return`<div class="section-title">Photos</div><div class="photos-scroll">${d.photos.map((u,i)=>`<img src="${u}" onclick="window.openLightbox(window._lbPhotos,${i})">`).join('')}</div>`;})()
+    +(()=>{if(!(d.photos||[]).length)return'';window._lbPhotos=d.photos;const caps=d.photoCaptions||[];return`<div class="section-title">Photos</div><div class="photos-scroll">${d.photos.map((u,i)=>{const cap=(caps[i]||'').trim();return cap?`<div style="border-radius:var(--rs);overflow:hidden;border:1px solid var(--border);margin-bottom:0;"><img src="${u}" onclick="window.openLightbox(window._lbPhotos,${i})" style="border-radius:0;display:block;width:100%;max-height:300px;object-fit:cover;cursor:pointer;"><div style="background:var(--surface2);padding:10px 12px;border-top:1px solid var(--border);"><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);display:block;margin-bottom:4px;">Instructions</span><div style="font-size:13px;color:var(--text);line-height:1.6;">${esc(cap)}</div></div></div>`:`<img src="${u}" onclick="window.openLightbox(window._lbPhotos,${i})">`;}).join('')}</div>`;})()
     +(embed?`<div class="section-title">Video</div><div class="video-wrap">${
       isCloudinaryVideo(d.videoUrl||'')?
       `<video src="${embed}" controls playsinline style="width:100%;height:100%;border-radius:var(--r);" controlsList="nodownload">Your browser does not support video.</video>`:
@@ -521,13 +521,14 @@ window.openPage=function(type){
 
   if(type==='services'){
     const SVCS=[
-      {id:'cleaning',icon:'🧹',name:{en:'Room Cleaning',ka:'ოთახის დასუფთავება',ru:'Уборка номера',ar:'تنظيف الغرفة'},desc:{en:'Professional mid-stay cleaning',ka:'დასუფთავება ყოფნის დროს',ru:'Профессиональная уборка',ar:'تنظيف احترافي'},price:'30 GEL'},
-      {id:'laundry',icon:'👕',name:{en:'Laundry',ka:'სამრეცხაო',ru:'Стирка',ar:'غسيل'},desc:{en:'We collect, wash & return. Note: we do not wash socks or underwear.',ka:'ვაგროვებთ, ვრეცხავთ, ვაბრუნებთ',ru:'Собираем, стираем, возвращаем',ar:'نجمع ونغسل ونعيد'},price:'25 GEL'},
-      {id:'tour',icon:'🗺️',name:{en:'City Tour',ka:'ქალაქის ტური',ru:'Экскурсия',ar:'جولة المدينة'},desc:{en:'Guided tours around Tbilisi',ka:'გიდური ტური თბილისში',ru:'Экскурсии по Тбилиси',ar:'جولات مرشدة في تبليسي'},price:'50 GEL/person'},
-      {id:'transfer',icon:'🚕',name:{en:'Airport Transfer',ka:'ტრანსფერი',ru:'Трансфер',ar:'نقل المطار'},desc:{en:'Comfortable airport transfer',ka:'კომფორტული ტრანსფერი',ru:'Комфортный трансфер',ar:'نقل مريح'},price:'On request'},
-      {id:'custom',icon:'✨',name:{en:'Other Request',ka:'სხვა მოთხოვნა',ru:'Другое',ar:'طلب آخر'},desc:{en:'Anything else we can help with?',ka:'სხვა რამე გჭირდებათ?',ru:'Чем ещё помочь?',ar:'أي شيء آخر؟'},price:''},
+      {id:'cleaning',icon:'🧹',name:{en:'Room Cleaning',ka:'ოთახის დასუფთავება',ru:'Уборка номера',ar:'تنظيف الغرفة'},desc:{en:'Professional mid-stay cleaning',ka:'დასუფთავება ყოფნის დროს',ru:'Профессиональная уборка',ar:'تنظيف احترافي'},price:'30 GEL',hasTime:true},
+      {id:'laundry',icon:'👕',name:{en:'Laundry',ka:'სამრეცხაო',ru:'Стирка',ar:'غسيل'},desc:{en:'We collect, wash & return. Note: we do not wash socks or underwear.',ka:'ვაგროვებთ, ვრეცხავთ, ვაბრუნებთ',ru:'Собираем, стираем, возвращаем',ar:'نجمع ونغسل ونعيد'},price:'25 GEL',hasTime:true},
+      {id:'tour',icon:'🗺️',name:{en:'City Tour',ka:'ქალაქის ტური',ru:'Экскурсия',ar:'جولة المدينة'},desc:{en:'Guided tours around Tbilisi',ka:'გიდური ტური თბილისში',ru:'Экскурсии по Тбилиси',ar:'جولات مرشدة في تبليسي'},price:'50 GEL/person',hasTime:false},
+      {id:'transfer',icon:'🚕',name:{en:'Airport Transfer',ka:'ტრანსფერი',ru:'Трансфер',ar:'نقل المطار'},desc:{en:'Comfortable airport transfer',ka:'კომფორტული ტრანსფერი',ru:'Комфортный трансфер',ar:'نقل مريح'},price:'On request',hasTime:false},
+      {id:'custom',icon:'✨',name:{en:'Other Request',ka:'სხვა მოთხოვნა',ru:'Другое',ar:'طلب آخر'},desc:{en:'Anything else we can help with?',ka:'სხვა რამე გჭირდებათ?',ru:'Чем ещё помочь?',ar:'أي شيء آخر؟'},price:'',hasTime:false},
     ];
-    body=SVCS.map(s=>`<div class="service-card" onclick="window.openSvc('${s.id}','${esc(s.name[lang]||s.name.en)}')">
+    body=`<div style="background:var(--gold-light);border:1px solid var(--gold-border);border-radius:var(--rs);padding:0.75rem 1rem;margin-bottom:1rem;font-size:13px;color:var(--text);line-height:1.5;">💵 Payment is directly to the cleaning staff in cash.</div>`;
+    body+=SVCS.map(s=>`<div class="service-card" onclick="window.openSvc('${s.id}','${esc(s.name[lang]||s.name.en)}',${s.hasTime})">
       <div class="sc-icon">${s.icon}</div>
       <div class="sc-info"><div class="sc-name">${esc(s.name[lang]||s.name.en)}</div><div class="sc-desc">${esc(s.desc[lang]||s.desc.en)}</div></div>
       ${s.price?`<div class="sc-price">${s.price}</div>`:''}
@@ -618,21 +619,20 @@ window.openSvc=function(id,name,hasTime){
   document.getElementById('svc-note').placeholder=t('snh');
   document.getElementById('svc-note').value='';
 
-  // Add time picker if needed
-  let timePicker=document.getElementById('svc-time-wrap');
-  if(timePicker)timePicker.remove();
-  if(hasTime==='yes'){
-    const wrap=document.createElement('div');
-    wrap.id='svc-time-wrap';
-    wrap.style='margin-bottom:0.85rem;';
-    wrap.innerHTML=`<label style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:0.06em;">Preferred time (10:00–19:00)</label>
-    <select id="svc-time" style="width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);background:var(--bg);outline:none;">
-      <option value="">Select a time...</option>
-      ${['10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00'].map(h=>`<option value="${h}">${h}</option>`).join('')}
-    </select>
-    <div style="font-size:11px;color:var(--hint);margin-top:5px;line-height:1.5;">Request must be accepted first. Apartment must be empty during service. Staff will confirm availability.</div>`;
-    const noteGroup=modal.querySelector('.form-group');
-    modal.querySelector('.modal-sheet').insertBefore(wrap, noteGroup);
+  const extra=document.getElementById('svc-modal-extra');
+  if(hasTime){
+    const specificMsg=id==='cleaning'?'Apartment must be empty during cleaning.':'Choose when to leave your items for pick-up.';
+    extra.innerHTML=`<div style="background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:var(--rs);padding:0.75rem 1rem;font-size:13px;color:var(--blue);line-height:1.5;margin-bottom:8px;">${specificMsg}</div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:0.75rem 1rem;font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:0.85rem;">Staff checks requests the next day. For urgent requests contact us on WhatsApp. Request must be accepted before confirmed.</div>
+    <div style="margin-bottom:0.85rem;">
+      <label style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:0.06em;">Preferred time <span style="color:var(--red);">*</span></label>
+      <select id="svc-time" style="width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);background:var(--bg);outline:none;">
+        <option value="">Select a time (10:00–19:00)...</option>
+        ${['10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00'].map(h=>`<option value="${h}">${h}</option>`).join('')}
+      </select>
+    </div>`;
+  } else {
+    extra.innerHTML='';
   }
   modal.classList.remove('hidden');
 }
@@ -640,7 +640,9 @@ window.closeServiceModal=function(){document.getElementById('svc-modal').classLi
 window.submitService=async function(){
   if(!currentSvcId||!guestId)return;
   const note=document.getElementById('svc-note')?.value.trim()||'';
-  const preferredTime=document.getElementById('svc-time')?.value||'';
+  const timeEl=document.getElementById('svc-time');
+  const preferredTime=timeEl?.value||'';
+  if(timeEl&&!preferredTime){alert('Please select a preferred time.');return;}
   const aptName=APT_NAMES[aptId]||aptId;
   try{
     await addDoc(collection(db,'checkin_requests'),{
