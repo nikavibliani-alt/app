@@ -201,29 +201,38 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .date-th.weekend .day-num{color:var(--red);}
 
 /* room label */
-.room-cell{padding:0 10px;height:48px;display:flex;flex-direction:column;justify-content:center;background:var(--surface);cursor:default;}
+.room-cell{padding:0 10px;height:68px;display:flex;flex-direction:column;justify-content:center;background:var(--surface);cursor:default;}
 .room-code{font-size:13px;font-weight:600;font-family:'DM Mono',monospace;color:var(--text);}
 .room-name{font-size:10px;color:var(--hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;}
 
 /* day cells */
-.day-cell{min-width:42px;width:42px;height:48px;padding:0;cursor:pointer;position:relative;transition:background 0.1s;vertical-align:middle;}
+.day-cell{min-width:42px;width:42px;height:68px;padding:0;cursor:pointer;position:relative;transition:background 0.1s;vertical-align:middle;}
 .day-cell:hover{background:var(--accent-bg);}
 .day-cell.today-col{background:rgba(29,78,216,0.04);}
 .day-cell.blocked{background:var(--surface2);cursor:default;}
 .day-cell.blocked:hover{background:var(--surface2);}
 
 /* reservation bars */
-.res-bar{position:absolute;top:6px;left:0;right:0;height:36px;border-radius:4px;display:flex;align-items:center;padding:0 8px;font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;z-index:5;transition:opacity 0.15s;}
-.res-bar:hover{opacity:0.85;}
-.res-bar.starts{border-radius:4px 0 0 4px;left:2px;}
-.res-bar.ends{border-radius:0 4px 4px 0;right:2px;}
+.res-bar{position:absolute;top:3px;left:0;right:0;height:62px;border-radius:4px;display:flex;flex-direction:column;justify-content:center;padding:4px 10px;cursor:pointer;z-index:5;transition:filter 0.15s;overflow:hidden;user-select:none;}
+.res-bar:hover{filter:brightness(0.88);}
+.res-bar.starts{border-radius:4px 0 0 4px;left:2px;right:-1px;}
+.res-bar.ends{border-radius:0 4px 4px 0;right:2px;left:-1px;}
 .res-bar.starts.ends{border-radius:4px;left:2px;right:2px;}
-.res-bar.middle{border-radius:0;left:0;right:0;}
-.res-airbnb{background:#e8d5f5;color:#6b21a8;border-left:3px solid #a855f7;}
-.res-booking{background:#dbeafe;color:#1e40af;border-left:3px solid #3b82f6;}
-.res-expedia{background:#fef9c3;color:#854d0e;border-left:3px solid #eab308;}
-.res-direct{background:#dcfce7;color:#166534;border-left:3px solid #22c55e;}
-.res-other{background:#f1f5f9;color:#475569;border-left:3px solid #94a3b8;}
+.res-bar.middle{border-radius:0;left:-1px;right:-1px;}
+.res-bar.starts:not(.ends){overflow:visible;z-index:6;}
+.res-bar:not(.starts){border-left:none;}
+.res-bar.back-to-back-start{box-shadow:-3px 0 0 #fff;}
+.res-bar-guest{font-size:11px;font-weight:700;white-space:nowrap;color:#fff;}
+.res-bar-dates{font-size:10px;font-weight:400;color:rgba(255,255,255,0.82);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.res-handle{position:absolute;top:0;bottom:0;width:9px;z-index:10;cursor:col-resize;}
+.res-handle-left{left:0;border-radius:4px 0 0 4px;}
+.res-handle-right{right:0;border-radius:0 4px 4px 0;}
+.res-airbnb{background:#7c3aed;border-left:3px solid #4c1d95;}
+.res-booking{background:#1d4ed8;border-left:3px solid #1e3a8a;}
+.res-expedia{background:#d97706;border-left:3px solid #78350f;}
+.res-direct{background:#15803d;border-left:3px solid #14532d;}
+.res-other{background:#475569;border-left:3px solid #1e293b;}
+.resize-preview{outline:2px dashed rgba(37,99,235,0.7)!important;outline-offset:-2px;background:rgba(37,99,235,0.12)!important;}
 
 /* legend */
 .cal-legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:1rem;}
@@ -637,24 +646,24 @@ window.saveProperty=async function(){
 window.seedProperties=async function(){
   if(properties.length>0){showToast('Properties already exist — skipping seed');return;}
   const seed=[
-    {name:'Small Room 0-1',shortCode:'0-1',location:'shartava',rooms:1},
-    {name:'Small Room 0-2',shortCode:'0-2',location:'shartava',rooms:1},
-    {name:'Small Room 0-3',shortCode:'0-3',location:'shartava',rooms:1},
-    {name:'Small Room 0-4',shortCode:'0-4',location:'shartava',rooms:1},
-    {name:'Small Room 0-5',shortCode:'0-5',location:'shartava',rooms:1},
-    {name:'Apartment 6-1',shortCode:'6-1',location:'shartava',rooms:1},
-    {name:'Apartment 6-2',shortCode:'6-2',location:'shartava',rooms:1},
-    {name:'3 Bedroom Apartment 6-3',shortCode:'6-3',location:'shartava',rooms:3},
-    {name:'Apartment 6-4',shortCode:'6-4',location:'shartava',rooms:1},
-    {name:'Apartment 7-1',shortCode:'7-1',location:'shartava',rooms:1},
-    {name:'Apartment 7-2',shortCode:'7-2',location:'shartava',rooms:1},
-    {name:'Apartment 7-4',shortCode:'7-4',location:'shartava',rooms:1},
-    {name:'Orb 1',shortCode:'orb-1',location:'centre',rooms:1},
-    {name:'Orb 2',shortCode:'orb-2',location:'centre',rooms:1},
-    {name:'Orb 3',shortCode:'orb-3',location:'centre',rooms:1},
-    {name:'Tab 1',shortCode:'tab-1',location:'centre',rooms:1},
-    {name:'Tab 2',shortCode:'tab-2',location:'centre',rooms:1},
-    {name:'Tab 3',shortCode:'tab-3',location:'centre',rooms:1},
+    {name:'Small Room 0-1',shortCode:'0-1',location:'shartava',rooms:1,order:1},
+    {name:'Small Room 0-2',shortCode:'0-2',location:'shartava',rooms:1,order:2},
+    {name:'Small Room 0-3',shortCode:'0-3',location:'shartava',rooms:1,order:3},
+    {name:'Small Room 0-4',shortCode:'0-4',location:'shartava',rooms:1,order:4},
+    {name:'Small Room 0-5',shortCode:'0-5',location:'shartava',rooms:1,order:5},
+    {name:'Apartment 6-1',shortCode:'6-1',location:'shartava',rooms:1,order:6},
+    {name:'Apartment 6-2',shortCode:'6-2',location:'shartava',rooms:1,order:7},
+    {name:'3 Bedroom Apartment 6-3',shortCode:'6-3',location:'shartava',rooms:3,order:8},
+    {name:'Apartment 6-4',shortCode:'6-4',location:'shartava',rooms:1,order:9},
+    {name:'Apartment 7-1',shortCode:'7-1',location:'shartava',rooms:1,order:10},
+    {name:'Apartment 7-2',shortCode:'7-2',location:'shartava',rooms:1,order:11},
+    {name:'Apartment 7-4',shortCode:'7-4',location:'shartava',rooms:1,order:12},
+    {name:'Tab 1',shortCode:'tab-1',location:'centre',rooms:1,order:13},
+    {name:'Tab 2',shortCode:'tab-2',location:'centre',rooms:1,order:14},
+    {name:'Tab 3',shortCode:'tab-3',location:'centre',rooms:1,order:15},
+    {name:'Orb 1',shortCode:'orb-1',location:'centre',rooms:1,order:16},
+    {name:'Orb 2',shortCode:'orb-2',location:'centre',rooms:1,order:17},
+    {name:'Orb 3',shortCode:'orb-3',location:'centre',rooms:1,order:18},
   ];
   try{
     setSyncDot('syncing','Seeding...');
@@ -721,8 +730,12 @@ let resSelectedSource='airbnb';
 function toDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x;}
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
 function sameDay(a,b){return a.toDateString()===b.toDateString();}
-function formatDate(d){return d.toISOString().split('T')[0];}
-function parseDate(s){return new Date(s+'T00:00:00');}
+function formatDate(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dy=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dy}`;}
+function parseDate(s){
+  if(!s)return new Date('invalid');
+  if(typeof s.toDate==='function')return s.toDate(); // Firestore Timestamp
+  return new Date(String(s).substring(0,10)+'T00:00:00'); // strip any time component, parse as local date
+}
 const DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -772,7 +785,7 @@ function renderGrid(){
     const w=parseInt(b.textContent);
     b.className='cal-week-btn'+(calWeeks===w?' active':'');
   });
-  const props=[...properties].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const props=[...properties].sort((a,b)=>(a.order??999)-(b.order??999)||(a.name||'').localeCompare(b.name||''));
   let html='<table class="grid-table"><thead><tr><th class="room-header">Room</th>';
   days.forEach(d=>{
     const isToday=sameDay(d,today);
@@ -786,7 +799,12 @@ function renderGrid(){
   props.forEach(prop=>{
     const code=(prop.shortCode||(prop.name||'').replace(/\s+/g,'').slice(0,6)).toUpperCase();
     html+=`<tr><td class="room-col"><div class="room-cell"><div class="room-code">${esc(code)}</div><div class="room-name">${esc(prop.name||'')}</div></div></td>`;
-    const propRes=reservations.filter(r=>r.propertyId===prop.id||(r.roomCode&&r.roomCode.toUpperCase()===code));
+    const scLower=(prop.shortCode||'').toLowerCase();
+    const propRes=reservations.filter(r=>{
+      const rc=(r.roomCode||'').trim().toLowerCase();
+      if(rc)return rc===scLower; // roomCode present → match only by roomCode, never by propertyId
+      return r.propertyId===prop.id; // no roomCode → fall back to propertyId
+    });
     days.forEach(day=>{
       const isToday=sameDay(day,today);
       const dayStr=formatDate(day);
@@ -802,13 +820,19 @@ function renderGrid(){
         const isEnd=sameDay(addDays(cout,-1),day);
         const srcClass='res-'+(res.source||'other');
         const posClass=isStart&&isEnd?'starts ends':isStart?'starts':isEnd?'ends':'middle';
-        const showName=isStart;
-        html+=`<td class="day-cell${isToday?' today-col':''}" onclick="window.cellClick('${prop.id}','${dayStr}','${res.id||''}')">
-          <div class="res-bar ${srcClass} ${posClass}" title="${esc(res.guest||'')} | ${res.checkin}→${res.checkout}" onclick="event.stopPropagation();window.openEditRes('${res.id}')">
-            ${showName?esc((res.guest||'Guest').toUpperCase()):''}
+        const isBackToBack=isStart&&propRes.some(r=>r.id!==res.id&&r.checkout===dayStr);
+        const datesLabel=isStart?`${res.checkin} → ${res.checkout}`:'';
+        const leftHandle=isStart?`<div class="res-handle res-handle-left" onmousedown="window.onResHandleMouseDown(event,'${res.id}','left')"></div>`:'';
+        const rightHandle=isEnd?`<div class="res-handle res-handle-right" onmousedown="window.onResHandleMouseDown(event,'${res.id}','right')"></div>`:'';
+        html+=`<td class="day-cell${isToday?' today-col':''}" data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','${res.id||''}')">
+          <div class="res-bar ${srcClass} ${posClass}${isBackToBack?' back-to-back-start':''}" draggable="true" ondragstart="window.onResDragStart(event,'${res.id}','${dayStr}')" onclick="event.stopPropagation();window.onResBarClick(event,'${res.id}')">
+            ${leftHandle}
+            ${isStart?`<div class="res-bar-guest">${esc((res.guest||'Guest').toUpperCase())}${res.guests>1?` <span style="font-size:9px;opacity:0.85">👥${res.guests}</span>`:''}</div>`:''}
+            ${datesLabel?`<div class="res-bar-dates">${esc(datesLabel)}</div>`:''}
+            ${rightHandle}
           </div></td>`;
       } else {
-        html+=`<td class="day-cell${isToday?' today-col':''}" onclick="window.cellClick('${prop.id}','${dayStr}','')"></td>`;
+        html+=`<td class="day-cell${isToday?' today-col':''}" data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','')"></td>`;
       }
     });
     html+='</tr>';
@@ -831,12 +855,143 @@ window.cellClick=function(propId,dateStr,resId){
   window.openNewReservationModal(propId,dateStr);
 }
 
+// ══════════════ DRAG TO MOVE (horizontal + vertical) ══════════════
+let _dragResId=null,_dragOriginDate=null,_didDrag=false;
+
+window.onResDragStart=function(e,resId,dateStr){
+  if(_resizeState){e.preventDefault();return;}
+  _dragResId=resId;_dragOriginDate=dateStr;_didDrag=false;
+  const res=reservations.find(r=>r.id===resId);
+  if(res){
+    const CELL_W=42,H=54;
+    const duration=Math.round((parseDate(res.checkout)-parseDate(res.checkin))/86400000);
+    const grabIndex=Math.round((parseDate(dateStr)-parseDate(res.checkin))/86400000);
+    const srcColors={airbnb:'#7c3aed',booking:'#1d4ed8',expedia:'#d97706',direct:'#15803d',other:'#475569'};
+    const bg=srcColors[res.source||'other']||srcColors.other;
+    const W=Math.max(duration*CELL_W,CELL_W);
+    const canvas=document.createElement('canvas');
+    canvas.width=W;canvas.height=H;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle=bg;
+    if(ctx.roundRect){ctx.beginPath();ctx.roundRect(0,0,W,H,4);ctx.fill();}
+    else{ctx.fillRect(0,0,W,H);}
+    ctx.fillStyle='rgba(255,255,255,0.18)';
+    ctx.fillRect(0,0,3,H);
+    ctx.fillStyle='#fff';
+    ctx.font='700 12px "DM Sans",system-ui,sans-serif';
+    ctx.textBaseline='middle';
+    ctx.fillText((res.guest||'Guest').toUpperCase(),12,H/2);
+    e.dataTransfer.setDragImage(canvas,grabIndex*CELL_W+CELL_W/2,H/2);
+  }
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',resId);
+};
+window.onDayDragOver=function(e){
+  if(!_dragResId)return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+};
+window.onDayDrop=function(e,dropDateStr,dropPropId){
+  e.preventDefault();
+  if(!_dragResId)return;
+  const res=reservations.find(r=>r.id===_dragResId);
+  _dragResId=null;
+  if(!res)return;
+  const dateDiff=Math.round((parseDate(dropDateStr)-parseDate(_dragOriginDate))/86400000);
+  const newCheckin=formatDate(addDays(parseDate(res.checkin),dateDiff));
+  const newCheckout=formatDate(addDays(parseDate(res.checkout),dateDiff));
+  const updates={checkin:newCheckin,checkout:newCheckout,updatedAt:serverTimestamp()};
+  const propChanged=dropPropId&&dropPropId!==res.propertyId;
+  if(propChanged){
+    updates.propertyId=dropPropId;
+    const newProp=properties.find(p=>p.id===dropPropId);
+    if(newProp)updates.roomCode=newProp.shortCode;
+  }
+  if(!propChanged&&dateDiff===0)return;
+  _didDrag=true;
+  updateDoc(doc(db,'reservations',res.id),updates)
+    .then(()=>showToast(propChanged?'Reservation moved to new room ✓':'Reservation moved ✓'))
+    .catch(err=>showToast('Move failed — '+err.message));
+};
+window.onResBarClick=function(e,resId){
+  if(_didDrag){_didDrag=false;return;}
+  window.openEditRes(resId);
+};
+
+// ══════════════ RESIZE HANDLES ══════════════
+let _resizeState=null,_previewCells=[];
+
+function _clearResizePreview(){
+  _previewCells.forEach(c=>c.classList.remove('resize-preview'));
+  _previewCells=[];
+}
+function _updateResizePreview(hoverDate){
+  _clearResizePreview();
+  if(!hoverDate||!_resizeState)return;
+  const res=reservations.find(r=>r.id===_resizeState.resId);
+  if(!res)return;
+  let cin,cout;
+  if(_resizeState.handle==='left'){
+    cin=parseDate(hoverDate);
+    cout=parseDate(res.checkout);
+  }else{
+    cin=parseDate(res.checkin);
+    cout=addDays(parseDate(hoverDate),1);
+  }
+  if(cin>=cout)return;
+  const propId=res.propertyId;
+  document.querySelectorAll(`td[data-date][data-prop-id="${propId}"]`).forEach(cell=>{
+    const d=parseDate(cell.dataset.date);
+    if(d>=cin&&d<cout){cell.classList.add('resize-preview');_previewCells.push(cell);}
+  });
+}
+
+window.onResHandleMouseDown=function(e,resId,handle){
+  e.stopPropagation();e.preventDefault();
+  if(!reservations.find(r=>r.id===resId))return;
+  _resizeState={resId,handle,hoverDate:null};
+  document.body.style.cursor='col-resize';
+  document.body.style.userSelect='none';
+};
+document.addEventListener('mousemove',function(e){
+  if(!_resizeState)return;
+  const el=document.elementFromPoint(e.clientX,e.clientY);
+  const cell=el&&el.closest('td[data-date]');
+  if(cell&&cell.dataset.date!==_resizeState.hoverDate){
+    _resizeState.hoverDate=cell.dataset.date;
+    _updateResizePreview(_resizeState.hoverDate);
+  }
+});
+document.addEventListener('mouseup',function(){
+  if(!_resizeState)return;
+  const{resId,handle,hoverDate}=_resizeState;
+  _resizeState=null;
+  _clearResizePreview();
+  document.body.style.cursor='';
+  document.body.style.userSelect='';
+  if(!hoverDate)return;
+  const res=reservations.find(r=>r.id===resId);
+  if(!res)return;
+  let newCheckin=res.checkin,newCheckout=res.checkout;
+  if(handle==='left'){
+    newCheckin=hoverDate;
+    if(parseDate(newCheckin)>=parseDate(newCheckout)){showToast('Check-in must be before checkout');return;}
+  }else{
+    newCheckout=formatDate(addDays(parseDate(hoverDate),1));
+    if(parseDate(newCheckin)>=parseDate(newCheckout)){showToast('Checkout must be after check-in');return;}
+  }
+  updateDoc(doc(db,'reservations',resId),{checkin:newCheckin,checkout:newCheckout,updatedAt:serverTimestamp()})
+    .then(()=>showToast('Reservation updated ✓'))
+    .catch(err=>showToast('Update failed — '+err.message));
+});
+
 // ══════════════ RESERVATION MODAL ══════════════
 window.openNewReservationModal=function(propId,dateStr){
   if(properties.length===0){showToast('Add a property first');return;}
   document.getElementById('res-id').value='';
   document.getElementById('res-modal-title').textContent='New Reservation';
   document.getElementById('res-guest').value='';
+  document.getElementById('res-guests').value=1;
   document.getElementById('res-notes').value='';
   document.getElementById('res-price').value='';
   document.getElementById('res-delete-btn').classList.add('hidden');
@@ -862,6 +1017,7 @@ window.openEditRes=function(resId){
   document.getElementById('res-guest').value=res.guest||'';
   document.getElementById('res-checkin').value=res.checkin||'';
   document.getElementById('res-checkout').value=res.checkout||'';
+  document.getElementById('res-guests').value=res.guests||1;
   document.getElementById('res-notes').value=res.notes||'';
   document.getElementById('res-price').value=res.price||'';
   document.getElementById('res-currency').value=res.currency||'USD';
@@ -927,6 +1083,7 @@ window.saveReservation=async function(){
   const data={
     guest,checkin,checkout,propertyId,
     source:resSelectedSource,
+    guests:parseInt(document.getElementById('res-guests')?.value)||1,
     price:parseFloat(document.getElementById('res-price').value)||0,
     currency:document.getElementById('res-currency').value||'USD',
     notes:document.getElementById('res-notes').value.trim(),
@@ -966,7 +1123,7 @@ let pricingDays=14;
 let pendingPriceChanges={};
 let bulkSelProp=null;
 
-function formatDate2(d){return d.toISOString().split('T')[0];}
+function formatDate2(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dy=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dy}`;}
 function parseDate2(s){return new Date(s+'T00:00:00');}
 function addDays2(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
 function sameDay2(a,b){return formatDate2(a)===formatDate2(b);}
@@ -1334,7 +1491,7 @@ try{
   onSnapshot(collection(db,'properties'),(snap)=>{
     try{
       properties=snap.docs.map(d=>({id:d.id,...d.data()}));
-      properties.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+      properties.sort((a,b)=>(a.order??999)-(b.order??999)||(a.name||'').localeCompare(b.name||''));
       setSyncDot('synced','Synced');
       if(!pricingPropId&&properties.length>0)pricingPropId=properties[0].id;
       const l=document.getElementById('loading');if(l)l.style.display='none';
@@ -1379,9 +1536,15 @@ try{
     </div>
     <div class="modal-body">
       <input type="hidden" id="res-id">
-      <div class="form-group">
-        <label class="form-label">Guest name</label>
-        <input type="text" class="form-input" id="res-guest" placeholder="e.g. John Smith">
+      <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Guest name</label>
+          <input type="text" class="form-input" id="res-guest" placeholder="e.g. John Smith">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Guests</label>
+          <input type="number" class="form-input" id="res-guests" value="1" min="1" max="20" style="width:60px;">
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div class="form-group">
@@ -1445,9 +1608,15 @@ try{
     </div>
     <div class="modal-body">
       <input type="hidden" id="res-id">
-      <div class="form-group">
-        <label class="form-label">Guest name</label>
-        <input type="text" class="form-input" id="res-guest" placeholder="e.g. John Smith">
+      <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Guest name</label>
+          <input type="text" class="form-input" id="res-guest" placeholder="e.g. John Smith">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Guests</label>
+          <input type="number" class="form-input" id="res-guests" value="1" min="1" max="20" style="width:60px;">
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div class="form-group">
