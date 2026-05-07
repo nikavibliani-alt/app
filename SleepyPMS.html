@@ -526,6 +526,7 @@ function renderPropertiesPage(){
         <div class="empty-icon">🏠</div>
         <div class="empty-title">${properties.length===0?'No properties yet':'No results found'}</div>
         <div class="empty-sub">${properties.length===0?'Add your first property to get started':'Try a different search or filter'}</div>
+        ${properties.length===0?`<button class="btn primary" style="margin-top:16px;" onclick="seedProperties()">Seed 18 rooms</button>`:''}
       </div>
     `:`
       <div class="properties-grid">
@@ -632,6 +633,37 @@ window.saveProperty=async function(){
     closeDrawer();
   } catch(e){setSyncDot('error','Error');showToast('Failed to save — check connection');}
 }
+
+window.seedProperties=async function(){
+  if(properties.length>0){showToast('Properties already exist — skipping seed');return;}
+  const seed=[
+    {name:'Small Room 0-1',shortCode:'0-1',location:'shartava',rooms:1},
+    {name:'Small Room 0-2',shortCode:'0-2',location:'shartava',rooms:1},
+    {name:'Small Room 0-3',shortCode:'0-3',location:'shartava',rooms:1},
+    {name:'Small Room 0-4',shortCode:'0-4',location:'shartava',rooms:1},
+    {name:'Small Room 0-5',shortCode:'0-5',location:'shartava',rooms:1},
+    {name:'Apartment 6-1',shortCode:'6-1',location:'shartava',rooms:1},
+    {name:'Apartment 6-2',shortCode:'6-2',location:'shartava',rooms:1},
+    {name:'3 Bedroom Apartment 6-3',shortCode:'6-3',location:'shartava',rooms:3},
+    {name:'Apartment 6-4',shortCode:'6-4',location:'shartava',rooms:1},
+    {name:'Apartment 7-1',shortCode:'7-1',location:'shartava',rooms:1},
+    {name:'Apartment 7-2',shortCode:'7-2',location:'shartava',rooms:1},
+    {name:'Apartment 7-4',shortCode:'7-4',location:'shartava',rooms:1},
+    {name:'Orb 1',shortCode:'orb-1',location:'centre',rooms:1},
+    {name:'Orb 2',shortCode:'orb-2',location:'centre',rooms:1},
+    {name:'Orb 3',shortCode:'orb-3',location:'centre',rooms:1},
+    {name:'Tab 1',shortCode:'tab-1',location:'centre',rooms:1},
+    {name:'Tab 2',shortCode:'tab-2',location:'centre',rooms:1},
+    {name:'Tab 3',shortCode:'tab-3',location:'centre',rooms:1},
+  ];
+  try{
+    setSyncDot('syncing','Seeding...');
+    const ts=serverTimestamp();
+    await Promise.all(seed.map(p=>addDoc(collection(db,'properties'),{...p,createdAt:ts,updatedAt:ts})));
+    setSyncDot('synced','Synced');
+    showToast('18 rooms seeded ✓');
+  }catch(e){setSyncDot('error','Error');showToast('Seed failed — '+e.message);}
+};
 
 window.confirmDelete=function(id){
   deleteTargetId=id;
