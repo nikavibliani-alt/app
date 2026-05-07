@@ -754,7 +754,7 @@ function renderGrid(){
   props.forEach(prop=>{
     const code=(prop.shortCode||(prop.name||'').replace(/\s+/g,'').slice(0,6)).toUpperCase();
     html+=`<tr><td class="room-col"><div class="room-cell"><div class="room-code">${esc(code)}</div><div class="room-name">${esc(prop.name||'')}</div></div></td>`;
-    const propRes=reservations.filter(r=>r.propertyId===prop.id);
+    const propRes=reservations.filter(r=>r.propertyId===prop.id||(r.roomCode&&r.roomCode.toUpperCase()===code));
     days.forEach(day=>{
       const isToday=sameDay(day,today);
       const dayStr=formatDate(day);
