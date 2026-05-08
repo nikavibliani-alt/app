@@ -845,9 +845,7 @@ const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','
 
 function renderCalendarPage(){
   const today=toDay(new Date());
-  calStartDate=toDay(new Date());
-  const dow=calStartDate.getDay();
-  calStartDate.setDate(calStartDate.getDate()-(dow===0?6:dow-1));
+  calStartDate=addDays(today,-1); // today in column 2, one day of prior context
   const main=document.getElementById('main');
   main.innerHTML=`
   <div class="page">
@@ -954,9 +952,7 @@ function renderGrid(){
 window.setCalWeeks=function(w){calWeeks=w;renderGrid();}
 window.calMove=function(days){calStartDate=addDays(calStartDate,days);renderGrid();}
 window.calToday=function(){
-  calStartDate=toDay(new Date());
-  const dow=calStartDate.getDay();
-  calStartDate.setDate(calStartDate.getDate()-(dow===0?6:dow-1));
+  calStartDate=addDays(toDay(new Date()),-1);
   renderGrid();
 }
 window.cellClick=function(propId,dateStr,resId){
