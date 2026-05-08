@@ -845,7 +845,7 @@ const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','
 
 function renderCalendarPage(){
   const today=toDay(new Date());
-  calStartDate=addDays(today,-1); // today in column 2, one day of prior context
+  calStartDate=today; // start exactly on today
   const main=document.getElementById('main');
   main.innerHTML=`
   <div class="page">
@@ -949,7 +949,7 @@ function renderGrid(){
 window.setCalWeeks=function(w){calWeeks=w;renderGrid();}
 window.calMovePrev=function(){calStartDate=addDays(calStartDate,-calWeeks*7);renderGrid();}
 window.calMoveNext=function(){calStartDate=addDays(calStartDate,calWeeks*7);renderGrid();}
-window.calToday=function(){calStartDate=addDays(toDay(new Date()),-1);renderGrid();}
+window.calToday=function(){calStartDate=toDay(new Date());renderGrid();}
 window.cellClick=function(propId,dateStr,resId){
   if(resId){window.openEditRes(resId);return;}
   window.openNewReservationModal(propId,dateStr);
