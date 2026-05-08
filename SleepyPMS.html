@@ -857,9 +857,9 @@ function renderCalendarPage(){
           <button class="cal-week-btn" onclick="setCalWeeks(2)">2 weeks</button>
           <button class="cal-week-btn active" onclick="setCalWeeks(4)">4 weeks</button>
         </div>
-        <button class="cal-nav-btn" onclick="calMove(-calWeeks*7)">◀ Prev</button>
-        <button class="cal-nav-btn today" onclick="calToday()">Today</button>
-        <button class="cal-nav-btn" onclick="calMove(calWeeks*7)">Next ▶</button>
+        <button class="cal-nav-btn" onclick="window.calMovePrev()">◀ Prev</button>
+        <button class="cal-nav-btn today" onclick="window.calToday()">Today</button>
+        <button class="cal-nav-btn" onclick="window.calMoveNext()">Next ▶</button>
       </div>
     </div>
     <div class="cal-legend">
@@ -947,11 +947,9 @@ function renderGrid(){
 }
 
 window.setCalWeeks=function(w){calWeeks=w;renderGrid();}
-window.calMove=function(days){calStartDate=addDays(calStartDate,days);renderGrid();}
-window.calToday=function(){
-  calStartDate=addDays(toDay(new Date()),-1);
-  renderGrid();
-}
+window.calMovePrev=function(){calStartDate=addDays(calStartDate,-calWeeks*7);renderGrid();}
+window.calMoveNext=function(){calStartDate=addDays(calStartDate,calWeeks*7);renderGrid();}
+window.calToday=function(){calStartDate=addDays(toDay(new Date()),-1);renderGrid();}
 window.cellClick=function(propId,dateStr,resId){
   if(resId){window.openEditRes(resId);return;}
   window.openNewReservationModal(propId,dateStr);
@@ -1646,11 +1644,15 @@ window.doSync=function(btn){
 
 // ── init ──────────────────────────────────
 setSyncDot('syncing','Connecting...');
+// Set up the default page structure immediately (loading screen covers it)
+if(currentPage==='calendar')renderCalendarPage();
+else if(currentPage==='properties')renderPropertiesPage();
 // Safety fallback — always hide loading after 5 seconds no matter what
 setTimeout(()=>{
   const l=document.getElementById('loading');
   if(l)l.style.display='none';
-  if(currentPage==='properties')renderPropertiesPage();
+  if(currentPage==='calendar')renderGrid();
+  else if(currentPage==='properties')renderPropertiesPage();
 },5000);
 
 try{
