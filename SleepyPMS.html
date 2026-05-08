@@ -990,36 +990,49 @@ function renderGrid(){
       if(rc)return rc===scLower;
       return r.propertyId===prop.id;
     });
+    const renderedBars=new Set(); // track bars rendered in this row
     days.forEach(day=>{
       const isToday=sameDay(day,today);
       const dayStr=formatDate(day);
-      // Explicit two-pass lookup: start check is separate from coverage check
       const startRes=propRes.find(r=>sameDay(day,parseDate(r.checkin)));
-      const coverRes=startRes||propRes.find(r=>{
+      const coverRes=startRes?null:propRes.find(r=>{
         const cin=parseDate(r.checkin);const cout=parseDate(r.checkout);
-        return day>cin&&day<cout; // strictly interior — start day handled above
+        return day>cin&&day<cout;
       });
       const cellClass=`day-cell${isToday?' today-col':''}`;
-      if(startRes){
-        // This day is the checkin of startRes — render its full bar
-        const cin=parseDate(startRes.checkin);
-        const cout=parseDate(startRes.checkout);
-        const duration=Math.max(1,Math.round((cout-cin)/86400000));
-        const srcClass='res-'+(startRes.source||'other');
+      const attrs=`data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')"`;
+
+      function renderBar(res,effectiveStart){
+        // effectiveStart: the cell this bar visually begins from (may differ from res.checkin if truncated)
+        const cin=parseDate(res.checkin);
+        const cout=parseDate(res.checkout);
+        const isTruncated=!sameDay(effectiveStart,cin);
+        const duration=Math.max(1,Math.round((cout-effectiveStart)/86400000));
+        const srcClass='res-'+(res.source||'other');
         const barW=`calc(${duration} * 42px - 4px)`;
-        const nameText=guestLabel(startRes.guest,duration);
-        const guestBadge=startRes.guests>1?` <span style="font-size:9px;opacity:0.85;flex-shrink:0;">👥${startRes.guests}</span>`:'';
-        html+=`<td class="${cellClass}" data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','${startRes.id}')">
-          <div class="res-bar ${srcClass}" data-res-id="${startRes.id}" draggable="true" style="width:${barW};" title="${esc(startRes.guest||'Guest')}" ondragstart="window.onResDragStart(event,'${startRes.id}','${dayStr}')" onclick="event.stopPropagation();window.onResBarClick(event,'${startRes.id}')">
-            <div class="res-handle res-handle-left" onmousedown="window.onResHandleMouseDown(event,'${startRes.id}','left')"></div>
+        const nameText=guestLabel(res.guest,duration);
+        const guestBadge=res.guests>1?` <span style="font-size:9px;opacity:0.85;flex-shrink:0;">👥${res.guests}</span>`:'';
+        const leftHandle=isTruncated?'':`<div class="res-handle res-handle-left" onmousedown="window.onResHandleMouseDown(event,'${res.id}','left')"></div>`;
+        return `<td class="${cellClass}" ${attrs} onclick="window.cellClick('${prop.id}','${dayStr}','${res.id}')">
+          <div class="res-bar ${srcClass}" data-res-id="${res.id}" draggable="true" style="width:${barW};${isTruncated?'border-radius:0 4px 4px 0;':''}" title="${esc(res.guest||'Guest')}" ondragstart="window.onResDragStart(event,'${res.id}','${dayStr}')" onclick="event.stopPropagation();window.onResBarClick(event,'${res.id}')">
+            ${leftHandle}
             ${nameText?`<div class="res-bar-guest">${esc(nameText)}${guestBadge}</div>`:''}
-            <div class="res-handle res-handle-right" onmousedown="window.onResHandleMouseDown(event,'${startRes.id}','right')"></div>
+            <div class="res-handle res-handle-right" onmousedown="window.onResHandleMouseDown(event,'${res.id}','right')"></div>
           </div></td>`;
+      }
+
+      if(startRes){
+        renderedBars.add(startRes.id);
+        html+=renderBar(startRes,day);
+      } else if(coverRes&&!renderedBars.has(coverRes.id)){
+        // First visible cell of a reservation whose checkin is before the visible range — render truncated bar
+        renderedBars.add(coverRes.id);
+        html+=renderBar(coverRes,day);
       } else if(coverRes){
-        // Interior of a multi-day reservation — empty cell, bar from start day covers it
-        html+=`<td class="${cellClass}" data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','${coverRes.id}')"></td>`;
+        // Interior cell — bar was already rendered earlier in this row
+        html+=`<td class="${cellClass}" ${attrs} onclick="window.cellClick('${prop.id}','${dayStr}','${coverRes.id}')"></td>`;
       } else {
-        html+=`<td class="${cellClass}" data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','')"></td>`;
+        html+=`<td class="${cellClass}" ${attrs} onclick="window.cellClick('${prop.id}','${dayStr}','')"></td>`;
       }
     });
     html+='</tr>';
