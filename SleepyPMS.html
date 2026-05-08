@@ -218,7 +218,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .res-bar{position:absolute;top:3px;left:2px;height:62px;border-radius:4px;display:flex;flex-direction:row;align-items:center;padding:0 10px;cursor:pointer;z-index:5;transition:filter 0.15s;overflow:hidden;user-select:none;}
 .res-bar:hover{filter:brightness(0.88);}
 .res-bar-guest{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;flex:1;min-width:0;}
-.res-handle{position:absolute;top:0;bottom:0;width:9px;z-index:10;cursor:col-resize;}
+.res-handle{position:absolute;top:0;bottom:0;width:14px;z-index:10;cursor:col-resize;}
 .res-handle-left{left:0;border-radius:4px 0 0 4px;}
 .res-handle-right{right:0;border-radius:0 4px 4px 0;}
 .res-airbnb{background:#7c3aed;border-left:3px solid #4c1d95;}
@@ -1235,8 +1235,8 @@ window.onResHandleMouseDown=function(e,resId,handle){
 
 document.addEventListener('mousemove',function(e){
   if(!_resizeState)return;
-  const el=document.elementFromPoint(e.clientX,e.clientY);
-  const cell=el&&el.closest('td[data-date]');
+  // elementsFromPoint returns all stacked elements — finds the <td> even when the bar is on top
+  const cell=(document.elementsFromPoint(e.clientX,e.clientY)||[]).find(el=>el.matches&&el.matches('td[data-date]'));
   if(!cell||cell.dataset.date===_resizeState.hoverDate)return;
   _resizeState.hoverDate=cell.dataset.date;
 
@@ -1298,6 +1298,15 @@ document.addEventListener('mouseup',function(){
       showToast('Update failed — '+err.message);
       if(bar){bar.style.left=origLeft;bar.style.width=origWidth;}
     });
+});
+
+// Fallback: if the mouse leaves the browser window during a resize, commit whatever we have
+document.addEventListener('mouseleave',function(){
+  if(_resizeState&&_resizeState.hoverDate){
+    // Simulate a mouseup to save the current position
+    const ev=new MouseEvent('mouseup');
+    document.dispatchEvent(ev);
+  }
 });
 
 // ══════════════ RESERVATION MODAL ══════════════
