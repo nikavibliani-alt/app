@@ -157,7 +157,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 <div class="pin-screen" id="pin-screen" style="display:none;">
   <div class="pin-card">
     <div class="pin-logo">Sleepy <span>HK</span></div>
-    <div class="pin-sub">Enter your PIN to continue</div>
+    <div class="pin-sub" id="pin-sub">Connecting to server...</div>
     <div class="pin-dots">
       <div class="pin-dot" id="dot-0"></div>
       <div class="pin-dot" id="dot-1"></div>
@@ -345,15 +345,15 @@ function renderTabs(){
   el.innerHTML=html;
 }
 // ── PIN / AUTH ────────────────────────────────────────────────────────────────
-const VALID_PINS={'1111':'shartava','2222':'centre','0000':'all'};
-const PIN_LABELS={'1111':'📍 Shartava','2222':'📍 Centre','0000':'📍 All Properties'};
+let _hkPins={shartava:'',centre:'',admin:''};
+let _pinsReady=false;
+const ROLE_LABELS={shartava:'📍 Shartava',centre:'📍 Centre',admin:'📍 All Properties'};
 let _pinBuf='';
 
 function getActiveRooms(){
-  const p=localStorage.getItem('hk_pin')||'';
-  const loc=VALID_PINS[p];
-  if(loc==='shartava')return ROOMS.filter(r=>r.location==='shartava');
-  if(loc==='centre')return ROOMS.filter(r=>r.location==='centre');
+  const role=localStorage.getItem('hk_role')||'';
+  if(role==='shartava')return ROOMS.filter(r=>r.location==='shartava');
+  if(role==='centre')return ROOMS.filter(r=>r.location==='centre');
   return ROOMS;
 }
 function _updateDots(){
@@ -366,11 +366,21 @@ window.pinKey=function(k){
   if(_pinBuf.length===4)setTimeout(_submitPin,120);
 };
 function _submitPin(){
-  if(VALID_PINS[_pinBuf]){
-    localStorage.setItem('hk_pin',_pinBuf);
+  if(!_pinsReady){
+    const e=document.getElementById('pin-err');if(e)e.textContent='Still connecting — try again';
+    _pinBuf='';_updateDots();
+    setTimeout(()=>{const e=document.getElementById('pin-err');if(e)e.textContent='';},2000);
+    return;
+  }
+  let matchedRole=null;
+  if(_pinBuf&&_pinBuf===_hkPins.shartava)matchedRole='shartava';
+  else if(_pinBuf&&_pinBuf===_hkPins.centre)matchedRole='centre';
+  else if(_pinBuf&&_pinBuf===_hkPins.admin)matchedRole='admin';
+  if(matchedRole){
+    localStorage.setItem('hk_role',matchedRole);
     document.getElementById('pin-screen').style.display='none';
     document.getElementById('app').style.display='';
-    const lb=document.getElementById('loc-badge');if(lb)lb.textContent=PIN_LABELS[_pinBuf];
+    const lb=document.getElementById('loc-badge');if(lb)lb.textContent=ROLE_LABELS[matchedRole];
     render();
   } else {
     const e=document.getElementById('pin-err');if(e)e.textContent='Wrong PIN — try again';
@@ -379,17 +389,17 @@ function _submitPin(){
   }
 }
 window.logout=function(){
-  localStorage.removeItem('hk_pin');
+  localStorage.removeItem('hk_role');
   document.getElementById('app').style.display='none';
   document.getElementById('pin-screen').style.display='flex';
   _pinBuf='';_updateDots();
 };
 // Restore session from localStorage on load
 (function(){
-  const p=localStorage.getItem('hk_pin');
-  if(p&&VALID_PINS[p]){
+  const role=localStorage.getItem('hk_role');
+  if(role&&ROLE_LABELS[role]){
     document.getElementById('app').style.display='';
-    const lb=document.getElementById('loc-badge');if(lb)lb.textContent=PIN_LABELS[p];
+    const lb=document.getElementById('loc-badge');if(lb)lb.textContent=ROLE_LABELS[role];
   } else {
     document.getElementById('pin-screen').style.display='flex';
   }
@@ -545,20 +555,19 @@ function render(){
   document.getElementById('sum-done').textContent=sumDone+'/'+checkoutRooms.length;
 }
 
-function checkReady(){loadCount++;if(loadCount>=2){document.getElementById('loading').style.display='none';render();setSyncing('live');}}
+function checkReady(){loadCount++;if(loadCount>=1){document.getElementById('loading').style.display='none';render();setSyncing('live');}}
 
 // set date
 document.getElementById('hdr-date').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
 onSnapshot(collection(db,'reservations'),snap=>{
   reservations=snap.docs.map(d=>({id:d.id,...d.data()}));
-  if(loadCount<2)checkReady();else render();
-},(e)=>setSyncing('err'));
+  if(loadCount<1)checkReady();else render();
+},(e)=>{console.error('reservations listener error:',e);setSyncing('err');});
 
 onSnapshot(collection(db,'properties'),snap=>{
-  // not needed for static room list but triggers ready
-  if(loadCount<2)checkReady();
-},(e)=>setSyncing('err'));
+  // properties not used — HK uses hardcoded ROOMS array
+},(e)=>console.error('properties listener error:',e));
 
 onSnapshot(collection(db,'hk_status'),snap=>{
   snap.docs.forEach(d=>{cleaningStatus[d.id]=d.data().done||false;});
@@ -568,6 +577,18 @@ onSnapshot(collection(db,'hk_status'),snap=>{
 onSnapshot(collection(db,'hk_cleaner'),snap=>{
   snap.docs.forEach(d=>{cleanerAssign[d.id]=d.data().cleaner||'';});
   render();
+});
+
+// Load PINs from Firebase
+onSnapshot(collection(db,'hk_pins'),snap=>{
+  snap.docs.forEach(d=>{if(d.id in _hkPins)_hkPins[d.id]=d.data().pin||'';});
+  _pinsReady=true;
+  const sub=document.getElementById('pin-sub');
+  if(sub&&sub.textContent!=='Enter your PIN to continue')sub.textContent='Enter your PIN to continue';
+},(e)=>{
+  _pinsReady=false;
+  const sub=document.getElementById('pin-sub');
+  if(sub)sub.textContent='Connection error — refresh page';
 });
 
 // safety fallback

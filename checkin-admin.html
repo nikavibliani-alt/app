@@ -143,8 +143,9 @@ textarea.form-input{height:auto;padding:10px;resize:vertical;line-height:1.5;}
 </header>
 
 <div class="tabs">
-  <button class="tab active" onclick="switchTab('apartments')">Apartments</button>
-  <button class="tab" onclick="switchTab('guests')">Guests</button>
+  <button class="tab active" data-tab="apartments" onclick="switchTab('apartments')">Apartments</button>
+  <button class="tab" data-tab="guests" onclick="switchTab('guests')">Guests</button>
+  <button class="tab" data-tab="hkpins" onclick="switchTab('hkpins')">HK Pins</button>
 </div>
 
 <div class="main" id="main"></div>
@@ -207,6 +208,7 @@ const APARTMENTS=[
 let aptData={}; // Firebase data per apartment
 let guestData=[]; // All guest registrations
 let currentTab='apartments';
+let hkPinsData={shartava:'',centre:'',admin:''};
 let currentDrawerApt=null;
 
 // ── HELPERS ───────────────────────────────────────
@@ -228,13 +230,14 @@ window.closeDrawer=function(){
 // ── TAB SWITCHING ─────────────────────────────────
 window.switchTab=function(tab){
   currentTab=tab;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.textContent.toLowerCase()===tab));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',(t.dataset.tab||t.textContent.toLowerCase())===tab));
   render();
 }
 
 // ── RENDER ────────────────────────────────────────
 function render(){
   if(currentTab==='apartments') renderApartments();
+  else if(currentTab==='hkpins') renderHkPins();
   else renderGuests();
 }
 
@@ -537,6 +540,51 @@ window.viewGuest=function(guestId){
   openDrawer();
 }
 
+// ── HK PINS ───────────────────────────────────────
+function renderHkPins(){
+  const main=document.getElementById('main');
+  const roles=[
+    {id:'shartava',label:'Shartava Team PIN',desc:'Used by Shartava housekeeping staff'},
+    {id:'centre',label:'Centre Team PIN',desc:'Used by City Centre housekeeping staff'},
+    {id:'admin',label:'Admin PIN',desc:'Shows all rooms across both properties'}
+  ];
+  let html=`<div style="padding:1rem;max-width:480px;">
+    <div class="section-title">🔑 HK App PINs</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:1.25rem;">4-digit PINs used by housekeeping staff to log in to the HK app. Changes take effect immediately.</p>`;
+  roles.forEach(({id,label,desc})=>{
+    const cur=hkPinsData[id]||'';
+    html+=`<div class="card" style="margin-bottom:10px;">
+      <div class="card-body">
+        <div class="card-title">${label}</div>
+        <div class="card-sub" style="margin-bottom:10px;">${desc}</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" inputmode="numeric" maxlength="4" placeholder="••••"
+            value="${esc(cur)}" id="pin-inp-${id}"
+            style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;
+                   font-family:'DM Mono',monospace;font-size:20px;letter-spacing:6px;text-align:center;">
+          <button onclick="window.saveHkPin('${id}')"
+            style="padding:9px 20px;background:var(--accent);color:#fff;border:none;
+                   border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">
+            Save
+          </button>
+        </div>
+      </div>
+    </div>`;
+  });
+  html+='</div>';
+  main.innerHTML=html;
+}
+window.saveHkPin=async function(roleId){
+  const input=document.getElementById('pin-inp-'+roleId);
+  const pin=(input?.value||'').trim();
+  if(!/^\d{4}$/.test(pin)){toast('PIN must be exactly 4 digits');return;}
+  try{
+    await setDoc(doc(db,'hk_pins',roleId),{pin,updatedAt:serverTimestamp()});
+    hkPinsData[roleId]=pin;
+    toast('PIN saved ✓');
+  }catch(e){toast('Failed: '+e.message);}
+};
+
 // ── FIREBASE LISTENERS ────────────────────────────
 let loaded=0;
 function checkLoaded(){loaded++;if(loaded>=2){document.getElementById('loading').style.display='none';render();}}
@@ -550,6 +598,11 @@ onSnapshot(collection(db,'checkin_apartments'),snap=>{
 onSnapshot(collection(db,'checkin_guests'),snap=>{
   guestData=snap.docs.map(d=>({id:d.id,...d.data()}));
   if(loaded>=2)render();else checkLoaded();
+});
+
+onSnapshot(collection(db,'hk_pins'),snap=>{
+  snap.docs.forEach(d=>{if(d.id in hkPinsData)hkPinsData[d.id]=d.data().pin||'';});
+  if(currentTab==='hkpins')render();
 });
 
 setTimeout(()=>{document.getElementById('loading').style.display='none';render();},5000);
