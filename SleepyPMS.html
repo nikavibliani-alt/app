@@ -219,10 +219,10 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .res-bar.ends{border-radius:0 4px 4px 0;right:2px;left:-1px;}
 .res-bar.starts.ends{border-radius:4px;left:2px;right:2px;}
 .res-bar.middle{border-radius:0;left:-1px;right:-1px;}
-.res-bar.starts:not(.ends){overflow:visible;z-index:6;}
+.res-bar.starts:not(.ends){z-index:6;}
 .res-bar:not(.starts){border-left:none;}
 .res-bar.back-to-back-start{box-shadow:-3px 0 0 #fff;}
-.res-bar-guest{font-size:11px;font-weight:700;white-space:nowrap;color:#fff;}
+.res-bar-guest{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;}
 .res-bar-dates{font-size:10px;font-weight:400;color:rgba(255,255,255,0.82);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .res-handle{position:absolute;top:0;bottom:0;width:9px;z-index:10;cursor:col-resize;}
 .res-handle-left{left:0;border-radius:4px 0 0 4px;}
@@ -964,25 +964,18 @@ window.onResDragStart=function(e,resId,dateStr){
   _dragResId=resId;_dragOriginDate=dateStr;_didDrag=false;
   const res=reservations.find(r=>r.id===resId);
   if(res){
-    const CELL_W=42,H=54;
-    const duration=Math.round((parseDate(res.checkout)-parseDate(res.checkin))/86400000);
-    const grabIndex=Math.round((parseDate(dateStr)-parseDate(res.checkin))/86400000);
+    const CELL_W=42,H=62;
+    const duration=Math.max(1,Math.round((parseDate(res.checkout)-parseDate(res.checkin))/86400000));
+    const grabIndex=Math.max(0,Math.round((parseDate(dateStr)-parseDate(res.checkin))/86400000));
     const srcColors={airbnb:'#7c3aed',booking:'#1d4ed8',expedia:'#d97706',direct:'#15803d',other:'#475569'};
     const bg=srcColors[res.source||'other']||srcColors.other;
-    const W=Math.max(duration*CELL_W,CELL_W);
-    const canvas=document.createElement('canvas');
-    canvas.width=W;canvas.height=H;
-    const ctx=canvas.getContext('2d');
-    ctx.fillStyle=bg;
-    if(ctx.roundRect){ctx.beginPath();ctx.roundRect(0,0,W,H,4);ctx.fill();}
-    else{ctx.fillRect(0,0,W,H);}
-    ctx.fillStyle='rgba(255,255,255,0.18)';
-    ctx.fillRect(0,0,3,H);
-    ctx.fillStyle='#fff';
-    ctx.font='700 12px "DM Sans",system-ui,sans-serif';
-    ctx.textBaseline='middle';
-    ctx.fillText((res.guest||'Guest').toUpperCase(),12,H/2);
-    e.dataTransfer.setDragImage(canvas,grabIndex*CELL_W+CELL_W/2,H/2);
+    const W=duration*CELL_W;
+    const ghost=document.createElement('div');
+    ghost.style.cssText=`position:fixed;left:0;top:0;transform:translateX(-10000px);width:${W}px;height:${H}px;background:${bg};border-radius:4px;display:flex;align-items:center;padding:0 12px;color:#fff;font-weight:700;font-size:12px;font-family:'DM Sans',system-ui,sans-serif;white-space:nowrap;overflow:hidden;opacity:0.85;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.25);`;
+    ghost.textContent=(res.guest||'Guest').toUpperCase();
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost,grabIndex*CELL_W+CELL_W/2,H/2);
+    setTimeout(()=>ghost.remove(),0);
   }
   e.dataTransfer.effectAllowed='move';
   e.dataTransfer.setData('text/plain',resId);

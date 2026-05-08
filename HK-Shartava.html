@@ -70,6 +70,8 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .task-card.priority-yellow{background:var(--yellow-bg);border-color:var(--yellow-border);}
 .task-card.priority-green{background:var(--green-bg);border-color:var(--green-border);}
 .task-card.done-card{opacity:0.55;filter:grayscale(0.3);}
+@keyframes cardSlideDown{0%{transform:translateY(0);opacity:1;}60%{transform:translateY(12px);}100%{transform:translateY(0);opacity:0.55;}}
+.task-card.card-completing{animation:cardSlideDown 0.32s ease forwards!important;}
 
 .card-top{display:flex;align-items:center;gap:10px;padding:0.85rem 1rem 0.6rem;}
 .priority-bar{width:4px;height:44px;border-radius:2px;flex-shrink:0;}
@@ -96,6 +98,15 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .tb-free .tb-label{color:var(--hint);}
 .tb-time{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;line-height:1.1;}
 .tb-guest{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tb-count{font-size:14px;font-weight:700;margin-top:4px;}
+.tb-out .tb-count{color:var(--red-dark);}
+.tb-in .tb-count{color:var(--green-dark);}
+.tb-when{font-size:12px;font-weight:800;letter-spacing:0.02em;margin-bottom:2px;}
+.tb-in .tb-when{color:var(--green-dark);}
+.tb-in.tb-urgent .tb-when{color:var(--green);font-size:14px;}
+.tb-in.tb-urgent{background:var(--green-bg);border-color:var(--green);border-width:2px;}
+.tb-in.tb-urgent .tb-time{font-size:20px;}
+.done-section-label{font-size:11px;font-weight:700;color:var(--hint);text-transform:uppercase;letter-spacing:0.08em;margin:1.25rem 0 0.5rem;padding:0 0.1rem;opacity:0.6;}
 
 .notes-box{margin:0 1rem 0.6rem;background:#fff;border-radius:var(--rs);padding:8px 10px;border:1px solid var(--yellow-border);}
 .notes-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--yellow-dark);margin-bottom:2px;}
@@ -420,7 +431,14 @@ window.toggleDone=async function(roomCode,dateStr){
   const key=roomCode+'_'+dateStr;
   const current=cleaningStatus[key]||false;
   cleaningStatus[key]=!current;
-  render();
+  if(!current){
+    // Marking done: animate card out, then re-render with it at bottom
+    const card=document.querySelector(`[data-key="${key}"]`);
+    if(card){card.classList.add('card-completing');setTimeout(()=>render(),320);}
+    else render();
+  } else {
+    render(); // Undo: immediately put card back at top
+  }
   try{
     await setDoc(doc(db,'hk_status',key),{
       done:!current,roomCode,date:dateStr,
@@ -453,95 +471,96 @@ function render(){
     return;
   }
 
-  // sort by priority: red first, then yellow, then green
+  // Split pending vs done, keep priority sort only for pending
   const priorityOrder={red:0,yellow:1,green:2};
-  checkoutRooms.sort((a,b)=>{
+  const pendingRooms=checkoutRooms.filter(r=>!(cleaningStatus[statusKey(r.code,ds)]||false));
+  const doneRooms=checkoutRooms.filter(r=>cleaningStatus[statusKey(r.code,ds)]||false);
+  pendingRooms.sort((a,b)=>{
     const pa=getPriority(a.code,date)||'green';
     const pb=getPriority(b.code,date)||'green';
     if(priorityOrder[pa]!==priorityOrder[pb])return priorityOrder[pa]-priorityOrder[pb];
     return a.code.localeCompare(b.code);
   });
+  doneRooms.sort((a,b)=>a.code.localeCompare(b.code));
 
-  // group by building
-  const groups={};
-  checkoutRooms.forEach(r=>{
-    if(!groups[r.group])groups[r.group]=[];
-    groups[r.group].push(r);
-  });
+  const pendingGroups={};
+  pendingRooms.forEach(r=>{if(!pendingGroups[r.group])pendingGroups[r.group]=[];pendingGroups[r.group].push(r);});
 
   let html='';
   let sumRed=0,sumYellow=0,sumGreen=0,sumDone=0;
 
-  Object.entries(groups).forEach(([grp,rooms])=>{
-    html+=`<div class="group-label">${grp}</div>`;
-    rooms.forEach((room,idx)=>{
-      const priority=getPriority(room.code,date)||'green';
-      const co=getCheckoutToday(room.code,date);
-      const nextRes=getNextCheckin(room.code,date);
-      const outGuests=getGuestCount(co);
-      const inGuests=getGuestCount(nextRes);
-      const beddingAlert=nextRes?getBeddingAlert(room.code,inGuests):null;
-      const key=statusKey(room.code,ds);
-      const done=cleaningStatus[key]||false;
+  function buildCard(room,isDone){
+    const priority=getPriority(room.code,date)||'green';
+    const co=getCheckoutToday(room.code,date);
+    const nextRes=getNextCheckin(room.code,date);
+    const outGuests=getGuestCount(co);
+    const inGuests=getGuestCount(nextRes);
+    const beddingAlert=nextRes?getBeddingAlert(room.code,inGuests):null;
+    const key=statusKey(room.code,ds);
+    const chipLabel={red:'Urgent',yellow:'Today',green:'Free'}[priority];
+    const chipCls={red:'chip-red',yellow:'chip-yellow',green:'chip-green'}[priority];
+    const nextCheckinSameDay=nextRes&&nextRes.checkin===ds;
+    const nextCheckinNextDay=nextRes&&nextRes.checkin===fmtDate(addDays(date,1));
+    const outBox=`<div class="time-box tb-out">
+      <div class="tb-label">Checkout</div>
+      <div class="tb-time">${co?.checkoutTime||'12:00'}</div>
+      ${outGuests>0?`<div class="tb-count">👥 ${outGuests} leaving</div>`:'<div class="tb-count" style="color:var(--hint);">👥 —</div>'}
+    </div>`;
+    let inBox='';
+    if(nextRes){
+      const whenLabel=nextCheckinSameDay?'TODAY':nextCheckinNextDay?'TOMORROW':nextRes.checkin;
+      inBox=`<div class="time-box tb-in${nextCheckinSameDay?' tb-urgent':''}">
+        <div class="tb-label">Check-in</div>
+        <div class="tb-when">${whenLabel}</div>
+        <div class="tb-time">${nextRes.checkinTime||'14:00'}</div>
+        ${inGuests>0?`<div class="tb-count">👥 ${inGuests} arriving</div>`:''}
+      </div>`;
+    } else {
+      inBox=`<div class="time-box tb-free">
+        <div class="tb-label">Next check-in</div>
+        <div class="tb-time" style="color:var(--hint);font-size:13px;">No reservation</div>
+      </div>`;
+    }
+    const notesHtml=co?.notes?`<div class="notes-box"><div class="notes-lbl">📝 Notes</div><div class="notes-txt">${co.notes}</div></div>`:'';
+    const beddingHtml=beddingAlert?`<div class="bedding-alert">${beddingAlert}</div>`:'';
+    return `<div class="task-card priority-${priority}${isDone?' done-card':''}" data-key="${key}">
+      <div class="card-top">
+        <div class="priority-bar"></div>
+        <div class="room-info">
+          <div class="room-code">${room.code}</div>
+          <div class="room-name">${room.name}</div>
+        </div>
+        <div class="priority-chip ${isDone?'chip-done':chipCls}">${isDone?'Done ✓':chipLabel}</div>
+      </div>
+      <div class="times-row">${outBox}${inBox}</div>
+      ${notesHtml}${beddingHtml}
+      <div class="card-footer">
+        <span class="cleaner-label">🧹 ${getCleanerName()}</span>
+        <button class="done-btn ${isDone?'btn-undo':'btn-mark'}" onclick="window.toggleDone('${room.code}','${ds}')">
+          ${isDone?'Undo':'✓ Done'}
+        </button>
+      </div>
+    </div>`;
+  }
 
+  // Pending rooms grouped by building
+  Object.entries(pendingGroups).forEach(([grp,rooms])=>{
+    html+=`<div class="group-label">${grp}</div>`;
+    rooms.forEach(room=>{
+      const priority=getPriority(room.code,date)||'green';
       if(priority==='red')sumRed++;
       else if(priority==='yellow')sumYellow++;
       else sumGreen++;
-      if(done)sumDone++;
-
-      const chipLabel={red:'Urgent',yellow:'Today',green:'Free'}[priority];
-      const chipCls={red:'chip-red',yellow:'chip-yellow',green:'chip-green'}[priority];
-
-      const nextCheckinSameDay=nextRes&&nextRes.checkin===ds;
-      const nextCheckinNextDay=nextRes&&nextRes.checkin===fmtDate(addDays(date,1));
-
-      const outBox=`<div class="time-box tb-out">
-        <div class="tb-label">Checkout</div>
-        <div class="tb-time">${co?.checkoutTime||'12:00'}</div>
-        <div class="tb-guest">${co?.guest||'Guest'}</div>
-        ${outGuests>0?`<div class="guest-count">👥 ${outGuests} guest${outGuests!==1?'s':''}</div>`:''}
-      </div>`;
-
-      let inBox='';
-      if(nextRes){
-        inBox=`<div class="time-box tb-in">
-          <div class="tb-label">Check-in ${nextCheckinSameDay?'today':nextCheckinNextDay?'tomorrow':nextRes.checkin}</div>
-          <div class="tb-time">${nextRes.checkinTime||'14:00'}</div>
-          <div class="tb-guest">${nextRes.guest||'Guest'}</div>
-          ${inGuests>0?`<div class="guest-count">👥 ${inGuests} guest${inGuests!==1?'s':''}</div>`:''}
-        </div>`;
-      } else {
-        inBox=`<div class="time-box tb-free">
-          <div class="tb-label">Next check-in</div>
-          <div class="tb-time" style="color:var(--hint);font-size:13px;">No reservation</div>
-        </div>`;
-      }
-
-      const notesHtml=co?.notes?`<div class="notes-box"><div class="notes-lbl">📝 Notes</div><div class="notes-txt">${co.notes}</div></div>`:'';
-      const beddingHtml=beddingAlert?`<div class="bedding-alert">${beddingAlert}</div>`:'';
-
-
-
-      html+=`<div class="task-card priority-${priority}${done?' done-card':''}">
-        <div class="card-top">
-          <div class="priority-bar"></div>
-          <div class="room-info">
-            <div class="room-code">${room.code}</div>
-            <div class="room-name">${room.name}</div>
-          </div>
-          <div class="priority-chip ${done?'chip-done':chipCls}">${done?'Done ✓':chipLabel}</div>
-        </div>
-        <div class="times-row">${outBox}${inBox}</div>
-        ${notesHtml}${beddingHtml}
-        <div class="card-footer">
-          <span class="cleaner-label">🧹 ${getCleanerName()}</span>
-          <button class="done-btn ${done?'btn-undo':'btn-mark'}" onclick="window.toggleDone('${room.code}','${ds}')">
-            ${done?'Undo':'✓ Done'}
-          </button>
-        </div>
-      </div>`;
+      html+=buildCard(room,false);
     });
   });
+
+  // Done rooms at bottom
+  if(doneRooms.length){
+    sumDone=doneRooms.length;
+    html+=`<div class="done-section-label">✓ Completed (${doneRooms.length})</div>`;
+    doneRooms.forEach(room=>html+=buildCard(room,true));
+  }
 
   main.innerHTML=html;
   document.getElementById('sum-bar').style.display='flex';
