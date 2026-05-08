@@ -900,18 +900,23 @@ function allocate(reservations){
   return result;
 }
 function buildDisplayAllocation(){
-  const prepared=reservations.map(res=>{
+  const map={};
+  const toAllocate=[];
+  reservations.forEach(res=>{
     let room=(res.roomCode||'').trim().toLowerCase();
     if(!room&&res.propertyId){
       const prop=properties.find(p=>p.id===res.propertyId);
       room=(prop?.shortCode||'').toLowerCase();
     }
-    if(!room)return null;
-    return{_firebaseId:res.id,checkIn:res.checkin||'',checkOut:res.checkout||'',room};
-  }).filter(Boolean);
-  const result=allocate(prepared);
-  const map={};
-  result.forEach(r=>{if(r._firebaseId)map[r._firebaseId]=r.assignedRoom;});
+    if(!room)return;
+    if(res.manualRoom){
+      // Manually placed by drag-and-drop — skip allocation, lock to assigned room
+      map[res.id]=room;
+    }else{
+      toAllocate.push({_firebaseId:res.id,checkIn:res.checkin||'',checkOut:res.checkout||'',room});
+    }
+  });
+  allocate(toAllocate).forEach(r=>{if(r._firebaseId)map[r._firebaseId]=r.assignedRoom;});
   return map;
 }
 
@@ -1116,6 +1121,7 @@ window.onDayDrop=function(e,dropDateStr,dropPropId){
   const propChanged=dropPropId&&dropPropId!==res.propertyId;
   if(propChanged){
     updates.propertyId=dropPropId;
+    updates.manualRoom=true; // prevent auto-allocation from overwriting this assignment
     const newProp=properties.find(p=>p.id===dropPropId);
     if(newProp)updates.roomCode=newProp.shortCode;
     // Detect category change
