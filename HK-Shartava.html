@@ -102,7 +102,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .notes-txt{font-size:13px;color:var(--text);}
 
 .card-footer{display:flex;align-items:center;gap:8px;padding:0 1rem 0.85rem;}
-.cleaner-sel{flex:1;height:36px;padding:0 10px;border:1px solid var(--border);border-radius:var(--rs);font-family:'Inter',sans-serif;font-size:13px;background:#fff;color:var(--text);outline:none;cursor:pointer;}
+.cleaner-label{font-size:13px;color:var(--muted);font-weight:500;flex:1;}
 .done-btn{height:36px;padding:0 16px;border:none;border-radius:var(--rs);font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;transition:all 0.15s;}
 .btn-mark{background:var(--green);color:#fff;}
 .btn-mark:active{opacity:0.85;}
@@ -255,11 +255,11 @@ const ROOMS=[
   {code:'tab-3',name:'Tab 3',group:'Centre — Tab',location:'centre'},
 ];
 
-const CLEANERS=['Cleaner 1','Cleaner 2'];
+
 
 let reservations=[];
 let cleaningStatus={};
-let cleanerAssign={};
+
 let activeDay=0;
 let loadCount=0;
 
@@ -405,6 +405,13 @@ window.logout=function(){
   }
 })();
 
+function getCleanerName(){
+  const role=localStorage.getItem('hk_role')||'';
+  if(role==='shartava')return 'Shartava Team';
+  if(role==='centre')return 'Centre Team';
+  if(role==='admin')return 'Admin';
+  return '';
+}
 function statusKey(roomCode,date){return roomCode+'_'+(typeof date==='string'?date.slice(0,10):fmtDate(date));}
 
 window.switchDay=function(day){activeDay=day;render();}
@@ -413,25 +420,16 @@ window.toggleDone=async function(roomCode,dateStr){
   const key=roomCode+'_'+dateStr;
   const current=cleaningStatus[key]||false;
   cleaningStatus[key]=!current;
-  const cleanerSel=document.getElementById('sel-'+key);
-  const cleaner=cleanerSel?cleanerSel.value:'';
   render();
   try{
     await setDoc(doc(db,'hk_status',key),{
       done:!current,roomCode,date:dateStr,
-      cleaner,updatedAt:serverTimestamp()
+      cleaner:getCleanerName(),updatedAt:serverTimestamp()
     });
     toast(!current?'✓ Marked as cleaned!':'Marked as pending');
   }catch(e){toast('Save failed');cleaningStatus[key]=current;render();}
 }
 
-window.saveCleaner=async function(roomCode,dateStr,val){
-  const key=roomCode+'_'+dateStr;
-  cleanerAssign[key]=val;
-  try{
-    await setDoc(doc(db,'hk_cleaner',key),{roomCode,date:dateStr,cleaner:val,updatedAt:serverTimestamp()});
-  }catch(e){}
-}
 
 function render(){
   const date=targetDate();
@@ -485,7 +483,6 @@ function render(){
       const beddingAlert=nextRes?getBeddingAlert(room.code,inGuests):null;
       const key=statusKey(room.code,ds);
       const done=cleaningStatus[key]||false;
-      const assignedCleaner=cleanerAssign[key]||'';
 
       if(priority==='red')sumRed++;
       else if(priority==='yellow')sumYellow++;
@@ -523,7 +520,7 @@ function render(){
       const notesHtml=co?.notes?`<div class="notes-box"><div class="notes-lbl">📝 Notes</div><div class="notes-txt">${co.notes}</div></div>`:'';
       const beddingHtml=beddingAlert?`<div class="bedding-alert">${beddingAlert}</div>`:'';
 
-      const cleanerOptions=CLEANERS.map(c=>`<option value="${c}"${assignedCleaner===c?' selected':''}>${c}</option>`).join('');
+
 
       html+=`<div class="task-card priority-${priority}${done?' done-card':''}">
         <div class="card-top">
@@ -537,10 +534,7 @@ function render(){
         <div class="times-row">${outBox}${inBox}</div>
         ${notesHtml}${beddingHtml}
         <div class="card-footer">
-          <select class="cleaner-sel" id="sel-${key}" onchange="window.saveCleaner('${room.code}','${ds}',this.value)">
-            <option value="">Assign cleaner...</option>
-            ${cleanerOptions}
-          </select>
+          <span class="cleaner-label">🧹 ${getCleanerName()}</span>
           <button class="done-btn ${done?'btn-undo':'btn-mark'}" onclick="window.toggleDone('${room.code}','${ds}')">
             ${done?'Undo':'✓ Done'}
           </button>
@@ -578,10 +572,7 @@ onSnapshot(collection(db,'hk_status'),snap=>{
   render();
 });
 
-onSnapshot(collection(db,'hk_cleaner'),snap=>{
-  snap.docs.forEach(d=>{cleanerAssign[d.id]=d.data().cleaner||'';});
-  render();
-});
+
 
 // Load PINs from Firebase
 onSnapshot(collection(db,'hk_pins'),snap=>{
