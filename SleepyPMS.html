@@ -818,6 +818,7 @@ window.closeDetailDrawer=function(){
 
 // ══════════════ CALENDAR ══════════════
 let reservations=[];
+let displayAllocation={}; // display-only room assignments — never written to Firebase
 let calStartDate=new Date();
 let calWeeks=4;
 let resSelectedSource='airbnb';
@@ -842,6 +843,78 @@ function parseDate(s){
   if(typeof s.toDate==='function')return s.toDate(); // Firestore Timestamp
   return new Date(String(s).substring(0,10)+'T00:00:00'); // strip any time component, parse as local date
 }
+// ══════════════ AUTO ROOM ALLOCATION (display only) ══════════════
+const ROOM_GROUPS={
+  'Small Rooms':['0-1','0-2','0-3','0-4','0-5'],
+  'Apartments':['6-1','6-2','6-4','7-1','7-2','7-4'],
+  'Tab Rooms':['tab-1','tab-2','tab-3'],
+  'Orb Rooms':['orb-1','orb-2'],
+  'Standalone':['6-3','orb-3']
+};
+function conflicts(a,b){return a.checkIn<b.checkOut&&a.checkOut>b.checkIn;}
+function allocate(reservations){
+  let assigned=reservations.map((res,i)=>({...res,_idx:i,assignedRoom:res.room}));
+  function tryAssign(allAssigned,newRes){
+    const entry=Object.entries(ROOM_GROUPS).find(([,rooms])=>rooms.includes(newRes.room));
+    const group=entry?.[0];
+    if(!group||group==='Standalone'){
+      return{success:true,assignments:[...allAssigned,{...newRes,assignedRoom:newRes.room}]};
+    }
+    const rooms=ROOM_GROUPS[group];
+    // Step 1: direct placement
+    for(const room of rooms){
+      const occupants=allAssigned.filter(r=>r.assignedRoom===room);
+      if(!occupants.some(o=>conflicts(o,newRes))){
+        return{success:true,assignments:[...allAssigned,{...newRes,assignedRoom:room}]};
+      }
+    }
+    // Step 2: reshuffle
+    for(const room of rooms){
+      const conflicting=allAssigned.filter(r=>r.assignedRoom===room&&conflicts(r,newRes));
+      if(!conflicting.length)continue;
+      let temp=[...allAssigned];
+      let reshuffled=true;
+      for(const conf of conflicting){
+        let moved=false;
+        for(const alt of rooms){
+          if(alt===room)continue;
+          const altOcc=temp.filter(r=>r.assignedRoom===alt&&r._idx!==conf._idx);
+          if(!altOcc.some(o=>conflicts(o,conf))){
+            temp=temp.map(r=>r._idx===conf._idx?{...r,assignedRoom:alt}:r);
+            moved=true;break;
+          }
+        }
+        if(!moved){reshuffled=false;break;}
+      }
+      if(reshuffled){
+        if(!temp.filter(r=>r.assignedRoom===room).some(o=>conflicts(o,newRes))){
+          return{success:true,assignments:[...temp,{...newRes,assignedRoom:room}]};
+        }
+      }
+    }
+    // Step 3: overflow — keep original room
+    return{success:false,assignments:[...allAssigned,{...newRes,assignedRoom:newRes.room,overflow:true}]};
+  }
+  let result=[];
+  for(const res of assigned){const out=tryAssign(result,res);result=out.assignments;}
+  return result;
+}
+function buildDisplayAllocation(){
+  const prepared=reservations.map(res=>{
+    let room=(res.roomCode||'').trim().toLowerCase();
+    if(!room&&res.propertyId){
+      const prop=properties.find(p=>p.id===res.propertyId);
+      room=(prop?.shortCode||'').toLowerCase();
+    }
+    if(!room)return null;
+    return{_firebaseId:res.id,checkIn:res.checkin||'',checkOut:res.checkout||'',room};
+  }).filter(Boolean);
+  const result=allocate(prepared);
+  const map={};
+  result.forEach(r=>{if(r._firebaseId)map[r._firebaseId]=r.assignedRoom;});
+  return map;
+}
+
 const DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -911,9 +984,11 @@ function renderGrid(){
     html+=`<tr><td class="room-col"><div class="room-cell"><div class="room-code">${esc(code)}</div><div class="room-name">${esc(prop.name||'')}</div></div></td>`;
     const scLower=(prop.shortCode||'').toLowerCase();
     const propRes=reservations.filter(r=>{
+      const alloc=displayAllocation[r.id];
+      if(alloc!==undefined)return alloc===scLower; // use allocated room for display
       const rc=(r.roomCode||'').trim().toLowerCase();
-      if(rc)return rc===scLower; // roomCode present → match only by roomCode, never by propertyId
-      return r.propertyId===prop.id; // no roomCode → fall back to propertyId
+      if(rc)return rc===scLower;
+      return r.propertyId===prop.id;
     });
     days.forEach(day=>{
       const isToday=sameDay(day,today);
@@ -1676,6 +1751,7 @@ try{
     try{
       properties=snap.docs.map(d=>({id:d.id,...d.data()}));
       properties.sort((a,b)=>(a.order??999)-(b.order??999)||(a.name||'').localeCompare(b.name||''));
+      displayAllocation=buildDisplayAllocation();
       setSyncDot('synced','Synced');
       if(!pricingPropId&&properties.length>0)pricingPropId=properties[0].id;
       const l=document.getElementById('loading');if(l)l.style.display='none';
@@ -1693,6 +1769,7 @@ try{
   onSnapshot(collection(db,'reservations'),(snap)=>{
     try{
       reservations=snap.docs.map(d=>({id:d.id,...d.data()}));
+      displayAllocation=buildDisplayAllocation();
       if(currentPage==='calendar')renderGrid();
       else if(currentPage==='reservations')renderReservationsPage();
     }catch(e){console.error('Reservations error:',e);}
