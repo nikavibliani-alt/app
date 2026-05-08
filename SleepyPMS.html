@@ -1191,70 +1191,88 @@ window.onResBarClick=function(e,resId){
 };
 
 // ══════════════ RESIZE HANDLES ══════════════
-let _resizeState=null,_previewCells=[];
-
-function _clearResizePreview(){
-  _previewCells.forEach(c=>c.classList.remove('resize-preview'));
-  _previewCells=[];
-}
-function _updateResizePreview(hoverDate){
-  _clearResizePreview();
-  if(!hoverDate||!_resizeState)return;
-  const res=reservations.find(r=>r.id===_resizeState.resId);
-  if(!res)return;
-  let cin,cout;
-  if(_resizeState.handle==='left'){
-    cin=parseDate(hoverDate);
-    cout=parseDate(res.checkout);
-  }else{
-    cin=parseDate(res.checkin);
-    cout=addDays(parseDate(hoverDate),1);
-  }
-  if(cin>=cout)return;
-  const propId=res.propertyId;
-  document.querySelectorAll(`td[data-date][data-prop-id="${propId}"]`).forEach(cell=>{
-    const d=parseDate(cell.dataset.date);
-    if(d>=cin&&d<cout){cell.classList.add('resize-preview');_previewCells.push(cell);}
-  });
-}
+let _resizeState=null;
 
 window.onResHandleMouseDown=function(e,resId,handle){
   e.stopPropagation();e.preventDefault();
-  if(!reservations.find(r=>r.id===resId))return;
-  _resizeState={resId,handle,hoverDate:null};
+  const res=reservations.find(r=>r.id===resId);
+  if(!res)return;
+  const bar=document.querySelector(`[data-res-id="${resId}"]`);
+  if(!bar)return;
+  _resizeState={
+    resId,handle,hoverDate:null,bar,
+    origCheckin:res.checkin,origCheckout:res.checkout,
+    origLeft:bar.style.left,origWidth:bar.style.width
+  };
   document.body.style.cursor='col-resize';
   document.body.style.userSelect='none';
 };
+
 document.addEventListener('mousemove',function(e){
   if(!_resizeState)return;
   const el=document.elementFromPoint(e.clientX,e.clientY);
   const cell=el&&el.closest('td[data-date]');
-  if(cell&&cell.dataset.date!==_resizeState.hoverDate){
-    _resizeState.hoverDate=cell.dataset.date;
-    _updateResizePreview(_resizeState.hoverDate);
+  if(!cell||cell.dataset.date===_resizeState.hoverDate)return;
+  _resizeState.hoverDate=cell.dataset.date;
+
+  const{bar,handle,origCheckin,origCheckout}=_resizeState;
+  const cin=parseDate(origCheckin);
+  const cout=parseDate(origCheckout);
+  const hoverDay=parseDate(_resizeState.hoverDate);
+
+  if(handle==='right'){
+    // hoverDay = last occupied night → checkout = hoverDay+1
+    const newCout=addDays(hoverDay,1);
+    if(newCout<=cin)return;
+    const dur=Math.round((newCout-cin)/86400000);
+    bar.style.left='2px';
+    bar.style.width=`calc(${dur} * 42px - 4px)`;
+  }else{
+    // hoverDay = new checkin — bar shifts left/right + width changes
+    if(hoverDay>=cout)return;
+    const leftShift=Math.round((hoverDay-cin)/86400000); // negative=extend left, positive=shrink left
+    const dur=Math.round((cout-hoverDay)/86400000);
+    bar.style.left=`calc(${leftShift} * 42px + 2px)`;
+    bar.style.width=`calc(${dur} * 42px - 4px)`;
   }
 });
+
 document.addEventListener('mouseup',function(){
   if(!_resizeState)return;
-  const{resId,handle,hoverDate}=_resizeState;
+  const{resId,handle,hoverDate,bar,origLeft,origWidth,origCheckin,origCheckout}=_resizeState;
   _resizeState=null;
-  _clearResizePreview();
   document.body.style.cursor='';
   document.body.style.userSelect='';
-  if(!hoverDate)return;
+
+  if(!hoverDate){
+    // No movement — restore bar
+    if(bar){bar.style.left=origLeft;bar.style.width=origWidth;}
+    return;
+  }
   const res=reservations.find(r=>r.id===resId);
-  if(!res)return;
-  let newCheckin=res.checkin,newCheckout=res.checkout;
+  if(!res){if(bar){bar.style.left=origLeft;bar.style.width=origWidth;}return;}
+
+  let newCheckin=origCheckin,newCheckout=origCheckout;
   if(handle==='left'){
     newCheckin=hoverDate;
-    if(parseDate(newCheckin)>=parseDate(newCheckout)){showToast('Check-in must be before checkout');return;}
+    if(parseDate(newCheckin)>=parseDate(newCheckout)){
+      if(bar){bar.style.left=origLeft;bar.style.width=origWidth;}
+      showToast('Check-in must be before checkout');return;
+    }
   }else{
     newCheckout=formatDate(addDays(parseDate(hoverDate),1));
-    if(parseDate(newCheckin)>=parseDate(newCheckout)){showToast('Checkout must be after check-in');return;}
+    if(parseDate(newCheckin)>=parseDate(newCheckout)){
+      if(bar){bar.style.left=origLeft;bar.style.width=origWidth;}
+      showToast('Checkout must be after check-in');return;
+    }
   }
+  // Bar already shows new size — Firebase save + onSnapshot re-render will confirm it
   updateDoc(doc(db,'reservations',resId),{checkin:newCheckin,checkout:newCheckout,updatedAt:serverTimestamp()})
     .then(()=>showToast('Reservation updated ✓'))
-    .catch(err=>showToast('Update failed — '+err.message));
+    .catch(err=>{
+      showToast('Update failed — '+err.message);
+      if(bar){bar.style.left=origLeft;bar.style.width=origWidth;}
+    });
 });
 
 // ══════════════ RESERVATION MODAL ══════════════
@@ -1791,6 +1809,8 @@ try{
   onSnapshot(collection(db,'reservations'),(snap)=>{
     try{
       reservations=snap.docs.map(d=>({id:d.id,...d.data()}));
+      // Skip re-render and re-allocation during an active resize — the bar is being manipulated live
+      if(_resizeState)return;
       displayAllocation=buildDisplayAllocation();
       if(currentPage==='calendar')renderGrid();
       else if(currentPage==='reservations')renderReservationsPage();
