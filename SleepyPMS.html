@@ -179,6 +179,8 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .cal-nav-btn{height:32px;padding:0 12px;border:1px solid var(--border);border-radius:var(--rs);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;color:var(--text);}
 .cal-nav-btn:hover{background:var(--surface2);}
 .cal-nav-btn.today{background:var(--accent);color:#fff;border-color:var(--accent);}
+.cal-step-btn{height:28px;padding:0 7px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);font-family:'DM Mono',monospace;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s;color:var(--muted);}
+.cal-step-btn:hover{background:var(--surface2);color:var(--text);}
 .cal-weeks{display:flex;gap:6px;}
 .cal-week-btn{height:28px;padding:0 10px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--surface);font-size:12px;cursor:pointer;color:var(--muted);transition:all 0.15s;}
 .cal-week-btn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-border);}
@@ -851,15 +853,21 @@ function renderCalendarPage(){
   <div class="page">
     <div class="cal-nav">
       <div class="cal-nav-title" id="cal-title"></div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
         <div class="cal-weeks">
-          <button class="cal-week-btn" onclick="setCalWeeks(1)">1 week</button>
-          <button class="cal-week-btn" onclick="setCalWeeks(2)">2 weeks</button>
-          <button class="cal-week-btn active" onclick="setCalWeeks(4)">4 weeks</button>
+          <button class="cal-week-btn" onclick="setCalWeeks(1)">1w</button>
+          <button class="cal-week-btn" onclick="setCalWeeks(2)">2w</button>
+          <button class="cal-week-btn active" onclick="setCalWeeks(4)">4w</button>
         </div>
-        <button class="cal-nav-btn" onclick="window.calMovePrev()">◀ Prev</button>
+        <button class="cal-step-btn" onclick="window.calShift(-14)" title="Back 14 days">−14</button>
+        <button class="cal-step-btn" onclick="window.calShift(-7)" title="Back 7 days">−7</button>
+        <button class="cal-step-btn" onclick="window.calShift(-1)" title="Back 1 day">−1</button>
         <button class="cal-nav-btn today" onclick="window.calToday()">Today</button>
-        <button class="cal-nav-btn" onclick="window.calMoveNext()">Next ▶</button>
+        <button class="cal-step-btn" onclick="window.calShift(1)" title="Forward 1 day">+1</button>
+        <button class="cal-step-btn" onclick="window.calShift(7)" title="Forward 7 days">+7</button>
+        <button class="cal-step-btn" onclick="window.calShift(14)" title="Forward 14 days">+14</button>
+        <input type="date" id="cal-date-picker" style="position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;" onchange="window.calJumpDate(this.value)">
+        <button class="cal-nav-btn" onclick="window.calOpenDatePicker()" title="Jump to date">📅</button>
       </div>
     </div>
     <div class="cal-legend">
@@ -949,7 +957,15 @@ function renderGrid(){
 window.setCalWeeks=function(w){calWeeks=w;renderGrid();}
 window.calMovePrev=function(){calStartDate=addDays(calStartDate,-calWeeks*7);renderGrid();}
 window.calMoveNext=function(){calStartDate=addDays(calStartDate,calWeeks*7);renderGrid();}
+window.calShift=function(n){calStartDate=addDays(calStartDate,n);renderGrid();}
 window.calToday=function(){calStartDate=toDay(new Date());renderGrid();}
+window.calJumpDate=function(ds){if(!ds)return;calStartDate=parseDate(ds);renderGrid();}
+window.calOpenDatePicker=function(){
+  const p=document.getElementById('cal-date-picker');
+  if(!p)return;
+  p.value=formatDate(calStartDate);
+  if(p.showPicker)p.showPicker();else p.click();
+};
 window.cellClick=function(propId,dateStr,resId){
   if(resId){window.openEditRes(resId);return;}
   window.openNewReservationModal(propId,dateStr);
