@@ -436,11 +436,13 @@ window.saveCleaner=async function(roomCode,dateStr,val){
 function render(){
   const date=targetDate();
   const ds=fmtDate(date);
+  console.log(`[HK] render() — activeDay=${activeDay} | targetDate=${ds} | today=${fmtDate(today())} | reservations in memory=${reservations.length}`);
 
   renderTabs();
 
   // get rooms with checkouts
   const checkoutRooms=getActiveRooms().filter(r=>getCheckoutToday(r.code,date));
+  console.log(`[HK] checkouts on ${ds}:`, checkoutRooms.map(r=>r.code));
 
   const main=document.getElementById('main-list');
   if(!checkoutRooms.length){
@@ -562,6 +564,8 @@ document.getElementById('hdr-date').textContent=new Date().toLocaleDateString('e
 
 onSnapshot(collection(db,'reservations'),snap=>{
   reservations=snap.docs.map(d=>({id:d.id,...d.data()}));
+  console.log(`[HK] reservations loaded: ${reservations.length} total`);
+  reservations.forEach(r=>console.log(`  ${r.id} | guest="${r.guest}" | roomCode="${r.roomCode}" | checkin=${r.checkin} | checkout=${r.checkout}`));
   if(loadCount<1)checkReady();else render();
 },(e)=>{console.error('reservations listener error:',e);setSyncing('err');});
 
