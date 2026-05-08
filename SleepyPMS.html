@@ -212,18 +212,10 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .day-cell.blocked{background:var(--surface2);cursor:default;}
 .day-cell.blocked:hover{background:var(--surface2);}
 
-/* reservation bars */
-.res-bar{position:absolute;top:3px;left:0;right:0;height:62px;border-radius:4px;display:flex;flex-direction:column;justify-content:center;padding:4px 10px;cursor:pointer;z-index:5;transition:filter 0.15s;overflow:hidden;user-select:none;}
+/* reservation bars — single element spanning full duration */
+.res-bar{position:absolute;top:3px;left:2px;height:62px;border-radius:4px;display:flex;flex-direction:row;align-items:center;padding:0 10px;cursor:pointer;z-index:5;transition:filter 0.15s;overflow:hidden;user-select:none;}
 .res-bar:hover{filter:brightness(0.88);}
-.res-bar.starts{border-radius:4px 0 0 4px;left:2px;right:-1px;}
-.res-bar.ends{border-radius:0 4px 4px 0;right:2px;left:-1px;}
-.res-bar.starts.ends{border-radius:4px;left:2px;right:2px;}
-.res-bar.middle{border-radius:0;left:-1px;right:-1px;}
-.res-bar.starts:not(.ends){z-index:6;}
-.res-bar:not(.starts){border-left:none;}
-.res-bar.back-to-back-start{box-shadow:-3px 0 0 #fff;}
-.res-bar-guest{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;}
-.res-bar-dates{font-size:10px;font-weight:400;color:rgba(255,255,255,0.82);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.res-bar-guest{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;flex:1;min-width:0;}
 .res-handle{position:absolute;top:0;bottom:0;width:9px;z-index:10;cursor:col-resize;}
 .res-handle-left{left:0;border-radius:4px 0 0 4px;}
 .res-handle-right{right:0;border-radius:0 4px 4px 0;}
@@ -929,20 +921,25 @@ function renderGrid(){
         const cin=parseDate(res.checkin);
         const cout=parseDate(res.checkout);
         const isStart=sameDay(day,cin);
-        const isEnd=sameDay(addDays(cout,-1),day);
-        const srcClass='res-'+(res.source||'other');
-        const posClass=isStart&&isEnd?'starts ends':isStart?'starts':isEnd?'ends':'middle';
-        const isBackToBack=isStart&&propRes.some(r=>r.id!==res.id&&r.checkout===dayStr);
         const duration=Math.round((cout-cin)/86400000);
-        const leftHandle=isStart?`<div class="res-handle res-handle-left" onmousedown="window.onResHandleMouseDown(event,'${res.id}','left')"></div>`:'';
-        const rightHandle=isEnd?`<div class="res-handle res-handle-right" onmousedown="window.onResHandleMouseDown(event,'${res.id}','right')"></div>`:'';
-        const nameText=isStart?guestLabel(res.guest,duration):'';
-        html+=`<td class="day-cell${isToday?' today-col':''}" data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','${res.id||''}')">
-          <div class="res-bar ${srcClass} ${posClass}${isBackToBack?' back-to-back-start':''}" data-res-id="${res.id}" draggable="true" ondragstart="window.onResDragStart(event,'${res.id}','${dayStr}')" onclick="event.stopPropagation();window.onResBarClick(event,'${res.id}')">
-            ${leftHandle}
-            ${nameText?`<div class="res-bar-guest">${esc(nameText)}${res.guests>1?` <span style="font-size:9px;opacity:0.85">👥${res.guests}</span>`:''}</div>`:''}
-            ${rightHandle}
-          </div></td>`;
+        const srcClass='res-'+(res.source||'other');
+        const cellClass=`day-cell${isToday?' today-col':''}`;
+        const cellAttrs=`data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','${res.id||''}')"`;
+        if(isStart){
+          // Single bar spanning full reservation width
+          const barW=`calc(${duration} * 42px - 4px)`;
+          const nameText=guestLabel(res.guest,duration);
+          const guestBadge=res.guests>1?` <span style="font-size:9px;opacity:0.85;flex-shrink:0;">👥${res.guests}</span>`:'';
+          html+=`<td class="${cellClass}" ${cellAttrs}>
+            <div class="res-bar ${srcClass}" data-res-id="${res.id}" draggable="true" style="width:${barW};" title="${esc(res.guest||'Guest')}" ondragstart="window.onResDragStart(event,'${res.id}','${dayStr}')" onclick="event.stopPropagation();window.onResBarClick(event,'${res.id}')">
+              <div class="res-handle res-handle-left" onmousedown="window.onResHandleMouseDown(event,'${res.id}','left')"></div>
+              ${nameText?`<div class="res-bar-guest">${esc(nameText)}${guestBadge}</div>`:''}
+              <div class="res-handle res-handle-right" onmousedown="window.onResHandleMouseDown(event,'${res.id}','right')"></div>
+            </div></td>`;
+        } else {
+          // Middle/end cells: empty — the start cell's bar overflows across them
+          html+=`<td class="${cellClass}" ${cellAttrs}></td>`;
+        }
       } else {
         html+=`<td class="day-cell${isToday?' today-col':''}" data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','')"></td>`;
       }
