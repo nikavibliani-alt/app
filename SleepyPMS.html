@@ -1108,9 +1108,28 @@ function _getRoomCategory(sc){
 const _CAT_LABELS={'small-rooms':'Small Rooms','apartments':'Apartments','orb':'Orb Rooms','tab':'Tab Rooms'};
 let _pendingMove=null;
 
-window.onDayDrop=function(e,dropDateStr,dropPropId){
+// Snap clientX to the nearest day-column center (50% snap zone = half cell width on each side)
+function _snapDateFromX(clientX,fallbackDateStr){
+  const seen=new Set();
+  const cols=[];
+  document.querySelectorAll('td[data-date]').forEach(cell=>{
+    const date=cell.dataset.date;
+    if(!seen.has(date)){
+      seen.add(date);
+      const r=cell.getBoundingClientRect();
+      cols.push({date,cx:r.left+r.width/2});
+    }
+  });
+  if(!cols.length)return fallbackDateStr;
+  let best=fallbackDateStr,minD=Infinity;
+  for(const c of cols){const d=Math.abs(clientX-c.cx);if(d<minD){minD=d;best=c.date;}}
+  return best;
+}
+
+window.onDayDrop=function(e,_rawDropDate,dropPropId){
   e.preventDefault();
   if(!_dragResId)return;
+  const dropDateStr=_snapDateFromX(e.clientX,_rawDropDate);
   const res=reservations.find(r=>r.id===_dragResId);
   _dragResId=null;
   if(!res)return;
