@@ -351,6 +351,9 @@ input.pcal-inline-input[type=number]::-webkit-outer-spin-button{-webkit-appearan
   .stats-row{grid-template-columns:1fr 1fr;}
   .drawer{width:100vw;}
 }
+.res-tooltip{position:fixed;z-index:1200;pointer-events:none;display:none;background:#1c1c1e;color:#fff;padding:10px 14px;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.6;max-width:240px;box-shadow:0 6px 24px rgba(0,0,0,0.35);white-space:nowrap;}
+.res-tooltip-name{font-size:13px;font-weight:700;margin-bottom:5px;}
+.res-tooltip-row{color:rgba(255,255,255,0.8);}
 </style>
 </head>
 <body>
@@ -361,6 +364,7 @@ input.pcal-inline-input[type=number]::-webkit-outer-spin-button{-webkit-appearan
   <div class="loading-sub">Loading properties...</div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="res-tooltip" id="res-tooltip"></div>
 
 <!-- Drawer overlay -->
 <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
@@ -923,6 +927,35 @@ function buildDisplayAllocation(){
 const DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+// ══════════════ RESERVATION TOOLTIP ══════════════
+const _ttEl=()=>document.getElementById('res-tooltip');
+function _ttPosition(e){
+  const tt=_ttEl();if(!tt)return;
+  const pad=14,w=tt.offsetWidth||220,h=tt.offsetHeight||120;
+  let x=e.clientX+pad,y=e.clientY+pad;
+  if(x+w>window.innerWidth-pad)x=e.clientX-w-pad;
+  if(y+h>window.innerHeight-pad)y=e.clientY-h-pad;
+  tt.style.left=x+'px';tt.style.top=y+'px';
+}
+window._showResTooltip=function(e,resId){
+  if(_resizeState||_dragResId)return; // no tooltip during resize or drag
+  const res=reservations.find(r=>r.id===resId);
+  const tt=_ttEl();
+  if(!res||!tt)return;
+  const nights=Math.max(0,Math.round((parseDate(res.checkout)-parseDate(res.checkin))/86400000));
+  const srcLabel={airbnb:'Airbnb',booking:'Booking.com',expedia:'Expedia',direct:'Direct'}[res.source]||res.source||'—';
+  tt.innerHTML=`<div class="res-tooltip-name">${esc(res.guest||'—')}</div>`
+    +(res.phone?`<div class="res-tooltip-row">📞 ${esc(res.phone)}</div>`:'')
+    +(res.email?`<div class="res-tooltip-row">✉️ ${esc(res.email)}</div>`:'')
+    +`<div class="res-tooltip-row">📅 ${esc(res.checkin||'?')} → ${esc(res.checkout||'?')}</div>`
+    +`<div class="res-tooltip-row">🌙 ${nights} night${nights!==1?'s':''}</div>`
+    +`<div class="res-tooltip-row">🏷 ${esc(srcLabel)}</div>`;
+  tt.style.display='block';
+  _ttPosition(e);
+};
+window._moveResTooltip=function(e){if(_ttEl()&&_ttEl().style.display!=='none')_ttPosition(e);};
+window._hideResTooltip=function(){const tt=_ttEl();if(tt)tt.style.display='none';};
+
 function renderCalendarPage(){
   const today=toDay(new Date());
   calStartDate=today; // start exactly on today
@@ -1019,7 +1052,7 @@ function renderGrid(){
         const guestBadge=res.guests>1?` <span style="font-size:9px;opacity:0.85;flex-shrink:0;">👥${res.guests}</span>`:'';
         const leftHandle=isTruncated?'':`<div class="res-handle res-handle-left" onmousedown="window.onResHandleMouseDown(event,'${res.id}','left')"></div>`;
         return `<td class="${cellClass}" ${attrs} onclick="window.cellClick('${prop.id}','${dayStr}','${res.id}')">
-          <div class="res-bar ${srcClass}" data-res-id="${res.id}" draggable="true" style="width:${barW};${isTruncated?'border-radius:0 4px 4px 0;':''}" title="${esc(res.guest||'Guest')}" ondragstart="window.onResDragStart(event,'${res.id}','${dayStr}')" onclick="event.stopPropagation();window.onResBarClick(event,'${res.id}')">
+          <div class="res-bar ${srcClass}" data-res-id="${res.id}" draggable="true" style="width:${barW};${isTruncated?'border-radius:0 4px 4px 0;':''}" ondragstart="window.onResDragStart(event,'${res.id}','${dayStr}')" onmouseenter="window._showResTooltip(event,'${res.id}')" onmousemove="window._moveResTooltip(event)" onmouseleave="window._hideResTooltip()" onclick="event.stopPropagation();window.onResBarClick(event,'${res.id}')">
             ${leftHandle}
             ${nameText?`<div class="res-bar-guest">${esc(nameText)}${guestBadge}</div>`:''}
             <div class="res-handle res-handle-right" onmousedown="window.onResHandleMouseDown(event,'${res.id}','right')"></div>
@@ -1210,8 +1243,10 @@ window.cancelMove=function(){
     bar.addEventListener('animationend',()=>bar.classList.remove('res-flash'),{once:true});
   });
 };
+let _resizeDone=false;
 window.onResBarClick=function(e,resId){
   if(_didDrag){_didDrag=false;return;}
+  if(_resizeDone){_resizeDone=false;return;} // resize just finished — suppress click
   window.openEditRes(resId);
 };
 
@@ -1266,6 +1301,7 @@ document.addEventListener('mouseup',function(){
   if(!_resizeState)return;
   const{resId,handle,hoverDate,bar,origLeft,origWidth,origCheckin,origCheckout}=_resizeState;
   _resizeState=null;
+  _resizeDone=true; // block the click event that follows mouseup
   document.body.style.cursor='';
   document.body.style.userSelect='';
 
