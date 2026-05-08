@@ -247,6 +247,15 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .legend-item{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);}
 .legend-dot{width:10px;height:10px;border-radius:2px;}
 
+/* reservation list */
+.res-list-row{display:grid;grid-template-columns:1fr 70px 160px 70px;gap:8px;align-items:center;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);margin-bottom:5px;font-size:13px;cursor:default;}
+.res-list-dup{border-color:var(--amber-border);background:var(--amber-bg);}
+.res-list-guest{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.res-list-room{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);}
+.res-list-dates{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);white-space:nowrap;}
+.res-list-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;text-align:center;}
+.dup-badge{background:var(--amber-border);color:var(--amber);}
+
 /* reservation modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:300;display:flex;align-items:center;justify-content:center;padding:1rem;}
 .modal{background:var(--surface);border-radius:var(--r);width:min(480px,100%);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
@@ -482,7 +491,7 @@ window.switchPage=function(page){
   } else if(page==='reservations'){
     document.getElementById('topbar-action-btn').textContent='+ Reservation';
     document.getElementById('topbar-action-btn').onclick=openNewReservationModal;
-    renderComingSoon('📋','Reservations','Coming soon — for now add reservations from the Calendar view!');
+    renderReservationsPage();
   } else if(page==='pricing'){
     document.getElementById('topbar-action-btn').textContent='🔄 Sync';
     document.getElementById('topbar-action-btn').textContent='🔄 Sync';
@@ -501,6 +510,90 @@ function renderComingSoon(icon,title,sub){
       </div>
     </div>`;
 }
+
+function _resTimestamp(r){
+  const t=r.updatedAt||r.createdAt;
+  if(!t)return 0;
+  if(typeof t.toMillis==='function')return t.toMillis();
+  if(typeof t.seconds==='number')return t.seconds*1000;
+  return new Date(String(t)).getTime()||0;
+}
+
+function renderReservationsPage(){
+  const main=document.getElementById('main');
+  // Group by reservationNumber to find duplicates
+  const byNum={};
+  reservations.forEach(r=>{
+    if(!r.reservationNumber)return;
+    if(!byNum[r.reservationNumber])byNum[r.reservationNumber]=[];
+    byNum[r.reservationNumber].push(r);
+  });
+  const dupNums=new Set(Object.keys(byNum).filter(k=>byNum[k].length>1));
+  const dupCount=Object.values(byNum).filter(g=>g.length>1).reduce((s,g)=>s+g.length-1,0);
+  const sorted=[...reservations].sort((a,b)=>(b.checkin||'').localeCompare(a.checkin||''));
+  const srcColors={airbnb:'#7c3aed',booking:'#1d4ed8',expedia:'#d97706',direct:'#15803d',other:'#94a3b8'};
+  let html=`<div class="page">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Reservations</div>
+        <div class="page-sub">${reservations.length} total${dupCount>0?` &nbsp;·&nbsp; <span style="color:var(--amber);font-weight:600;">⚠️ ${dupCount} duplicate${dupCount!==1?'s':''}</span>`:''}</div>
+      </div>
+      <button class="btn${dupCount>0?' primary':''}" onclick="window.cleanDuplicates()" style="${dupCount===0?'opacity:0.5;':''}" title="Find and remove duplicate reservations with the same booking number">
+        🧹 Clean duplicates${dupCount>0?` (${dupCount})`:''}
+      </button>
+    </div>`;
+  if(!sorted.length){
+    html+=`<div class="empty-state" style="margin-top:2rem;"><div class="empty-icon">📋</div><div class="empty-title">No reservations</div><div class="empty-sub">Add reservations from the Calendar view</div></div>`;
+  } else {
+    html+=`<div style="margin-top:1rem;">
+      <div style="display:grid;grid-template-columns:1fr 70px 160px 70px;gap:8px;padding:4px 12px;margin-bottom:4px;">
+        <div style="font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.06em;">Guest</div>
+        <div style="font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.06em;">Room</div>
+        <div style="font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.06em;">Dates</div>
+        <div style="font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.06em;">Source</div>
+      </div>`;
+    sorted.forEach(res=>{
+      const isDup=dupNums.has(res.reservationNumber);
+      const col=srcColors[res.source||'other']||srcColors.other;
+      html+=`<div class="res-list-row${isDup?' res-list-dup':''}" onclick="window.openEditRes('${res.id}')">
+        <div class="res-list-guest">${esc(res.guest||'—')}${isDup?' <span class="dup-badge res-list-badge">DUP</span>':''}</div>
+        <div class="res-list-room">${esc(res.roomCode||'—')}</div>
+        <div class="res-list-dates">${esc(res.checkin||'?')} → ${esc(res.checkout||'?')}</div>
+        <div><span style="font-size:11px;font-weight:600;color:${col};">${esc((res.source||'—').toUpperCase())}</span></div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+  html+=`</div>`;
+  main.innerHTML=html;
+}
+
+window.cleanDuplicates=async function(){
+  const byNum={};
+  reservations.forEach(r=>{
+    if(!r.reservationNumber)return;
+    if(!byNum[r.reservationNumber])byNum[r.reservationNumber]=[];
+    byNum[r.reservationNumber].push(r);
+  });
+  const toDelete=[];
+  Object.values(byNum).forEach(group=>{
+    if(group.length<2)return;
+    // Sort desc by updatedAt/createdAt — keep index 0 (most recent), delete the rest
+    group.sort((a,b)=>_resTimestamp(b)-_resTimestamp(a));
+    toDelete.push(...group.slice(1));
+  });
+  if(!toDelete.length){showToast('No duplicates found ✓');return;}
+  if(!confirm(`Remove ${toDelete.length} duplicate reservation${toDelete.length!==1?'s':''}? The most recent copy of each will be kept. This cannot be undone.`))return;
+  setSyncDot('syncing','Removing...');
+  try{
+    await Promise.all(toDelete.map(res=>deleteDoc(doc(db,'reservations',res.id))));
+    setSyncDot('synced','Synced');
+    showToast(`Removed ${toDelete.length} duplicate${toDelete.length!==1?'s':''} ✓`);
+  }catch(e){
+    setSyncDot('error','Error');
+    showToast('Failed: '+e.message);
+  }
+};
 
 // ── properties page ───────────────────────
 function renderPropertiesPage(){
@@ -1589,6 +1682,7 @@ try{
     try{
       reservations=snap.docs.map(d=>({id:d.id,...d.data()}));
       if(currentPage==='calendar')renderGrid();
+      else if(currentPage==='reservations')renderReservationsPage();
     }catch(e){console.error('Reservations error:',e);}
   },(err)=>console.error('Reservations listener error:',err));
 
