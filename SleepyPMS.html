@@ -227,7 +227,6 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .res-expedia{background:#f59e0b;border-left:3px solid #d97706;}
 .res-direct{background:#22c55e;border-left:3px solid #16a34a;}
 .res-other{background:#94a3b8;border-left:3px solid #64748b;}
-.split-checkout{position:absolute;top:3px;left:0;width:21px;height:62px;border-radius:4px 0 0 4px;opacity:0.5;pointer-events:none;z-index:6;}
 .checkin-marker{position:absolute;left:2px;top:8px;bottom:8px;width:3px;background:rgba(255,255,255,0.85);border-radius:2px;pointer-events:none;z-index:8;}
 .resize-preview{outline:2px dashed rgba(37,99,235,0.7)!important;outline-offset:-2px;background:rgba(37,99,235,0.12)!important;}
 @keyframes resFlash{0%,100%{filter:brightness(1);}30%{filter:brightness(1.6);}65%{filter:brightness(0.55);}90%{filter:brightness(1.3);}}
@@ -1057,15 +1056,13 @@ function renderGrid(){
         const leftHandle=isTruncated?'':`<div class="res-handle res-handle-left" onmousedown="window.onResHandleMouseDown(event,'${res.id}','left')"></div>`;
         // Bright marker on the left edge of every real check-in (not truncated)
         const checkinMarker=isTruncated?'':'<div class="checkin-marker"></div>';
-        // Back-to-back: is there a checkout happening on this same day in this room?
-        const checkoutRes=isTruncated?null:propRes.find(r=>r.checkout===dayStr&&r.id!==res.id);
-        const splitHtml=checkoutRes?`<div class="split-checkout res-${checkoutRes.source||'other'}"></div>`:'';
+
         return `<td class="${cellClass}" ${attrs} onclick="window.cellClick('${prop.id}','${dayStr}','${res.id}')">
           <div class="res-bar ${srcClass}" data-res-id="${res.id}" draggable="true" style="width:${barW};${isTruncated?'border-radius:0 4px 4px 0;':''}" ondragstart="window.onResDragStart(event,'${res.id}','${dayStr}')" onmouseenter="window._showResTooltip(event,'${res.id}')" onmousemove="window._moveResTooltip(event)" onmouseleave="window._hideResTooltip()" onclick="event.stopPropagation();window.onResBarClick(event,'${res.id}')">
             ${leftHandle}
             ${nameText?`<div class="res-bar-guest">${esc(nameText)}${guestBadge}</div>`:''}
             <div class="res-handle res-handle-right" onmousedown="window.onResHandleMouseDown(event,'${res.id}','right')"></div>
-          </div>${checkinMarker}${splitHtml}</td>`;
+          </div>${checkinMarker}</td>`;
       }
 
       if(startRes){
@@ -1507,6 +1504,20 @@ function getPricingDays(){
   for(let i=0;i<pricingDays;i++)days.push(addDays2(pricingStart,i));
   return days;
 }
+function getPricingGroups(){
+  const DEFS=[
+    {id:'small-rooms',label:'Small Rooms',abbrev:'0-1 … 0-5',codes:['0-1','0-2','0-3','0-4','0-5']},
+    {id:'apartments',label:'Apartments',abbrev:'6-1,6-2,6-4,7-1,7-2,7-4',codes:['6-1','6-2','6-4','7-1','7-2','7-4']},
+    {id:'tab-rooms',label:'Tab Rooms',abbrev:'tab-1 … tab-3',codes:['tab-1','tab-2','tab-3']},
+    {id:'orb-rooms',label:'Orb Rooms',abbrev:'orb-1, orb-2',codes:['orb-1','orb-2']},
+    {id:'6-3',label:'6-3',abbrev:'standalone',codes:['6-3']},
+    {id:'orb-3',label:'orb-3',abbrev:'standalone',codes:['orb-3']},
+  ];
+  return DEFS.map(g=>{
+    const memberProps=properties.filter(p=>g.codes.includes((p.shortCode||'').toLowerCase()));
+    return{...g,memberProps,memberPropIds:memberProps.map(p=>p.id)};
+  }).filter(g=>g.memberProps.length>0);
+}
 
 function renderPricingPage(){
   if(properties.length===0){
@@ -1563,11 +1574,10 @@ function renderPricingPage(){
   });
   html+=`</tr></thead><tbody>`;
 
-  // one row group per property
-  properties.forEach(prop=>{
-    const pd=prices[prop.id]||{};
-    const code=prop.shortCode||(prop.name||'').replace(/\s+/g,'').slice(0,6).toUpperCase();
-    const totalRooms=prop.rooms||1;
+  // one row group per pricing group (groups rooms by type)
+  getPricingGroups().forEach(group=>{
+    const pd=prices[group.id]||prices[group.memberPropIds[0]]||{};
+    const totalRooms=group.memberProps.reduce((s,p)=>s+(p.rooms||1),0)||1;
     const rows=[
       {key:'usd',label:'USD',cls:'pcal-row-usd'},
       {key:'gel',label:'GEL',cls:'pcal-row-gel'},
@@ -1583,8 +1593,8 @@ function renderPricingPage(){
       html+=`<tr class="${row.cls}${rowIdx===0?' pcal-row-first':''}${rowIdx===rows.length-1?' pcal-row-last':''}">`;
       if(rowIdx===0){
         html+=`<td class="pcal-prop-cell" rowspan="${rows.length}">
-          <div class="pcal-prop-name">${esc(prop.name)}</div>
-          <div class="pcal-prop-code">${esc(code)}</div>
+          <div class="pcal-prop-name">${esc(group.label)}</div>
+          <div class="pcal-prop-code">${esc(group.abbrev)}</div>
         </td>`;
       }
       html+=`<td class="pcal-row-label">${row.label}</td>`;
@@ -1603,7 +1613,7 @@ function renderPricingPage(){
           html+=`<td class="pcal-cell pcal-cell-num${isTdy?' pcal-today':''}${isWknd?' pcal-weekend':''}${isPast?' pcal-past':''}" style="background:${avail===0?'#fef2f2':avail<totalRooms?'#fff7ed':''};">
             <input class="pcal-inline-input" type="number" min="0" max="${totalRooms}" step="1"
               value="${avail}"
-              data-prop="${prop.id}" data-date="${ds}" data-field="availability"
+              data-prop="${group.id}" data-date="${ds}" data-field="availability"
               onchange="window.saveInlinePrice(this)"
               onfocus="this.parentElement.classList.add('editing')"
               onblur="this.parentElement.classList.remove('editing')"
@@ -1613,19 +1623,19 @@ function renderPricingPage(){
         } else if(row.key==='locked'){
           const locked=dayData.locked||false;
           html+=`<td class="pcal-cell pcal-cell-check${isTdy?' pcal-today':''}${isWknd?' pcal-weekend':''}${isPast?' pcal-past':''}${locked?' pcal-locked':''}"
-            onclick="window.toggleRestriction('${prop.id}','${ds}','locked')">
+            onclick="window.toggleRestriction('${group.id}','${ds}','locked')">
             <div class="pcal-check${locked?' checked':''}">🔒</div>
           </td>`;
         } else if(row.key==='noArrival'){
           const val=dayData.noArrival||false;
           html+=`<td class="pcal-cell pcal-cell-check${isTdy?' pcal-today':''}${isWknd?' pcal-weekend':''}${isPast?' pcal-past':''}${val?' pcal-restricted':''}"
-            onclick="window.toggleRestriction('${prop.id}','${ds}','noArrival')">
+            onclick="window.toggleRestriction('${group.id}','${ds}','noArrival')">
             <div class="pcal-check${val?' checked':''}">⛔</div>
           </td>`;
         } else if(row.key==='noDeparture'){
           const val=dayData.noDeparture||false;
           html+=`<td class="pcal-cell pcal-cell-check${isTdy?' pcal-today':''}${isWknd?' pcal-weekend':''}${isPast?' pcal-past':''}${val?' pcal-restricted':''}"
-            onclick="window.toggleRestriction('${prop.id}','${ds}','noDeparture')">
+            onclick="window.toggleRestriction('${group.id}','${ds}','noDeparture')">
             <div class="pcal-check${val?' checked':''}">🚫</div>
           </td>`;
         } else if(row.key==='minNights'){
@@ -1635,7 +1645,7 @@ function renderPricingPage(){
               type="number" min="1" step="1"
               value="${val||''}"
               placeholder="—"
-              data-prop="${prop.id}" data-date="${ds}" data-field="minNights"
+              data-prop="${group.id}" data-date="${ds}" data-field="minNights"
               onchange="window.saveInlinePrice(this)"
               onfocus="this.parentElement.classList.add('editing')"
               onblur="this.parentElement.classList.remove('editing')"
@@ -1649,7 +1659,7 @@ function renderPricingPage(){
               type="number" min="0" step="1"
               value="${val||''}"
               placeholder="—"
-              data-prop="${prop.id}" data-date="${ds}" data-field="${row.key}"
+              data-prop="${group.id}" data-date="${ds}" data-field="${row.key}"
               onchange="window.saveInlinePrice(this)"
               onfocus="this.parentElement.classList.add('editing')"
               onblur="this.parentElement.classList.remove('editing')"
@@ -1712,10 +1722,19 @@ window.toggleRestriction=async function(propId,dateStr,field){
   if(currentPage==='pricing')renderPricingPage();
 }
 
-async function flushPrices(propId){
+async function flushPrices(id){
   try{
     setSyncDot('syncing','Saving...');
-    await setDoc(doc(db,'prices',propId),prices[propId]||{});
+    const data=prices[id]||{};
+    await setDoc(doc(db,'prices',id),data);
+    // If id is a pricing group, mirror the same data to each member property doc
+    const grp=getPricingGroups().find(g=>g.id===id);
+    if(grp&&grp.memberPropIds.length){
+      await Promise.all(grp.memberPropIds.map(pid=>{
+        prices[pid]=data;
+        return setDoc(doc(db,'prices',pid),data);
+      }));
+    }
     setSyncDot('synced','Synced');
   }catch(e){setSyncDot('error','Error');showToast('Save failed');}
 }
@@ -1733,7 +1752,7 @@ window.openBulkModal=function(){
   if(existing)existing.remove();
   const today=formatDate2(new Date());
   const nextWeek=formatDate2(addDays2(new Date(),6));
-  const propOpts=properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  const propOpts=getPricingGroups().map(g=>`<option value="${g.id}">${esc(g.label)} — ${esc(g.abbrev)}</option>`).join('');
   const overlay=document.createElement('div');
   overlay.id='bulk-modal-dyn';
   overlay.className='modal-overlay';
