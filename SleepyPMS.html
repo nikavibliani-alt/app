@@ -1042,7 +1042,11 @@ window.calOpenDatePicker=function(){
   if(p.showPicker)p.showPicker();else p.click();
 };
 window.cellClick=function(propId,dateStr,resId){
-  if(resId){window.openEditRes(resId);return;}
+  if(resId&&reservations.find(r=>r.id===resId)){
+    window.openEditRes(resId);
+    return;
+  }
+  // No resId, or resId refers to a reservation that no longer exists → new reservation
   window.openNewReservationModal(propId,dateStr);
 }
 
@@ -1366,8 +1370,13 @@ window.deleteReservation=async function(){
   if(!confirm(`Delete reservation for "${res?.guest||'this guest'}"?`))return;
   try{
     await deleteDoc(doc(db,'reservations',id));
+    // Remove from local state immediately — don't wait for onSnapshot to propagate
+    reservations=reservations.filter(r=>r.id!==id);
+    displayAllocation=buildDisplayAllocation();
     showToast('Reservation deleted');
     window.closeResModal();
+    if(currentPage==='calendar')renderGrid();
+    else if(currentPage==='reservations')renderReservationsPage();
   }catch(e){showToast('Failed to delete');}
 }
 
