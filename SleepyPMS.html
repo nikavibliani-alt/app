@@ -910,36 +910,33 @@ function renderGrid(){
     days.forEach(day=>{
       const isToday=sameDay(day,today);
       const dayStr=formatDate(day);
-      const res=propRes.find(r=>{
-        const cin=parseDate(r.checkin);
-        const cout=parseDate(r.checkout);
-        return day>=cin&&day<cout;
+      // Explicit two-pass lookup: start check is separate from coverage check
+      const startRes=propRes.find(r=>sameDay(day,parseDate(r.checkin)));
+      const coverRes=startRes||propRes.find(r=>{
+        const cin=parseDate(r.checkin);const cout=parseDate(r.checkout);
+        return day>cin&&day<cout; // strictly interior — start day handled above
       });
-      if(res){
-        const cin=parseDate(res.checkin);
-        const cout=parseDate(res.checkout);
-        const isStart=sameDay(day,cin);
-        const duration=Math.round((cout-cin)/86400000);
-        const srcClass='res-'+(res.source||'other');
-        const cellClass=`day-cell${isToday?' today-col':''}`;
-        const cellAttrs=`data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','${res.id||''}')"`;
-        if(isStart){
-          // Single bar spanning full reservation width
-          const barW=`calc(${duration} * 42px - 4px)`;
-          const nameText=guestLabel(res.guest,duration);
-          const guestBadge=res.guests>1?` <span style="font-size:9px;opacity:0.85;flex-shrink:0;">👥${res.guests}</span>`:'';
-          html+=`<td class="${cellClass}" ${cellAttrs}>
-            <div class="res-bar ${srcClass}" data-res-id="${res.id}" draggable="true" style="width:${barW};" title="${esc(res.guest||'Guest')}" ondragstart="window.onResDragStart(event,'${res.id}','${dayStr}')" onclick="event.stopPropagation();window.onResBarClick(event,'${res.id}')">
-              <div class="res-handle res-handle-left" onmousedown="window.onResHandleMouseDown(event,'${res.id}','left')"></div>
-              ${nameText?`<div class="res-bar-guest">${esc(nameText)}${guestBadge}</div>`:''}
-              <div class="res-handle res-handle-right" onmousedown="window.onResHandleMouseDown(event,'${res.id}','right')"></div>
-            </div></td>`;
-        } else {
-          // Middle/end cells: empty — the start cell's bar overflows across them
-          html+=`<td class="${cellClass}" ${cellAttrs}></td>`;
-        }
+      const cellClass=`day-cell${isToday?' today-col':''}`;
+      if(startRes){
+        // This day is the checkin of startRes — render its full bar
+        const cin=parseDate(startRes.checkin);
+        const cout=parseDate(startRes.checkout);
+        const duration=Math.max(1,Math.round((cout-cin)/86400000));
+        const srcClass='res-'+(startRes.source||'other');
+        const barW=`calc(${duration} * 42px - 4px)`;
+        const nameText=guestLabel(startRes.guest,duration);
+        const guestBadge=startRes.guests>1?` <span style="font-size:9px;opacity:0.85;flex-shrink:0;">👥${startRes.guests}</span>`:'';
+        html+=`<td class="${cellClass}" data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','${startRes.id}')">
+          <div class="res-bar ${srcClass}" data-res-id="${startRes.id}" draggable="true" style="width:${barW};" title="${esc(startRes.guest||'Guest')}" ondragstart="window.onResDragStart(event,'${startRes.id}','${dayStr}')" onclick="event.stopPropagation();window.onResBarClick(event,'${startRes.id}')">
+            <div class="res-handle res-handle-left" onmousedown="window.onResHandleMouseDown(event,'${startRes.id}','left')"></div>
+            ${nameText?`<div class="res-bar-guest">${esc(nameText)}${guestBadge}</div>`:''}
+            <div class="res-handle res-handle-right" onmousedown="window.onResHandleMouseDown(event,'${startRes.id}','right')"></div>
+          </div></td>`;
+      } else if(coverRes){
+        // Interior of a multi-day reservation — empty cell, bar from start day covers it
+        html+=`<td class="${cellClass}" data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','${coverRes.id}')"></td>`;
       } else {
-        html+=`<td class="day-cell${isToday?' today-col':''}" data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','')"></td>`;
+        html+=`<td class="${cellClass}" data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','')"></td>`;
       }
     });
     html+='</tr>';
