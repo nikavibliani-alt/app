@@ -424,8 +424,8 @@ input.pcal-inline-input[type=number]::-webkit-outer-spin-button{-webkit-appearan
     <div class="topbar-left">
       <div class="logo">Sleepy <span>PMS</span></div>
       <nav class="nav">
-        <button class="nav-btn active" data-page="properties" onclick="switchPage('properties')">🏠 <span>Properties</span></button>
-        <button class="nav-btn" data-page="calendar" onclick="switchPage('calendar')">📅 <span>Calendar</span></button>
+        <button class="nav-btn" data-page="properties" onclick="switchPage('properties')">🏠 <span>Properties</span></button>
+        <button class="nav-btn active" data-page="calendar" onclick="switchPage('calendar')">📅 <span>Calendar</span></button>
         <button class="nav-btn" data-page="reservations" onclick="switchPage('reservations')">📋 <span>Reservations</span></button>
         <button class="nav-btn" data-page="pricing" onclick="switchPage('pricing')">💰 <span>Pricing</span></button>
       </nav>
@@ -457,7 +457,7 @@ const fb=initializeApp({
 const db=getFirestore(fb);
 
 let properties=[];
-let currentPage='properties';
+let currentPage='calendar';
 let searchQuery='';
 let filterPlatform='all';
 
@@ -832,6 +832,17 @@ function toDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x;}
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
 function sameDay(a,b){return a.toDateString()===b.toDateString();}
 function formatDate(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dy=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dy}`;}
+function guestLabel(name,duration){
+  if(!name)return duration>=2?'GUEST':'';
+  const u=name.trim().toUpperCase();
+  if(duration>=3)return u;
+  if(duration===2){
+    const p=u.split(/\s+/);
+    return p.length<2?u.slice(0,10):`${p[0]} ${p[1][0]}.`;
+  }
+  // 1 day: initials only
+  return u.split(/\s+/).map(p=>p[0]).filter(Boolean).slice(0,3).join('');
+}
 function parseDate(s){
   if(!s)return new Date('invalid');
   if(typeof s.toDate==='function')return s.toDate(); // Firestore Timestamp
@@ -922,14 +933,14 @@ function renderGrid(){
         const srcClass='res-'+(res.source||'other');
         const posClass=isStart&&isEnd?'starts ends':isStart?'starts':isEnd?'ends':'middle';
         const isBackToBack=isStart&&propRes.some(r=>r.id!==res.id&&r.checkout===dayStr);
-        const datesLabel=isStart?`${res.checkin} → ${res.checkout}`:'';
+        const duration=Math.round((cout-cin)/86400000);
         const leftHandle=isStart?`<div class="res-handle res-handle-left" onmousedown="window.onResHandleMouseDown(event,'${res.id}','left')"></div>`:'';
         const rightHandle=isEnd?`<div class="res-handle res-handle-right" onmousedown="window.onResHandleMouseDown(event,'${res.id}','right')"></div>`:'';
+        const nameText=isStart?guestLabel(res.guest,duration):'';
         html+=`<td class="day-cell${isToday?' today-col':''}" data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')" onclick="window.cellClick('${prop.id}','${dayStr}','${res.id||''}')">
           <div class="res-bar ${srcClass} ${posClass}${isBackToBack?' back-to-back-start':''}" data-res-id="${res.id}" draggable="true" ondragstart="window.onResDragStart(event,'${res.id}','${dayStr}')" onclick="event.stopPropagation();window.onResBarClick(event,'${res.id}')">
             ${leftHandle}
-            ${isStart?`<div class="res-bar-guest">${esc((res.guest||'Guest').toUpperCase())}${res.guests>1?` <span style="font-size:9px;opacity:0.85">👥${res.guests}</span>`:''}</div>`:''}
-            ${datesLabel?`<div class="res-bar-dates">${esc(datesLabel)}</div>`:''}
+            ${nameText?`<div class="res-bar-guest">${esc(nameText)}${res.guests>1?` <span style="font-size:9px;opacity:0.85">👥${res.guests}</span>`:''}</div>`:''}
             ${rightHandle}
           </div></td>`;
       } else {
