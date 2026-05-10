@@ -356,6 +356,44 @@ input.pcal-inline-input[type=number]::-webkit-outer-spin-button{-webkit-appearan
 .res-tooltip{position:fixed;z-index:1200;pointer-events:none;display:none;background:#1c1c1e;color:#fff;padding:10px 14px;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.6;max-width:240px;box-shadow:0 6px 24px rgba(0,0,0,0.35);white-space:nowrap;}
 .res-tooltip-name{font-size:13px;font-weight:700;margin-bottom:5px;}
 .res-tooltip-row{color:rgba(255,255,255,0.8);}
+
+/* ── DASHBOARD ── */
+.dash-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:1.25rem;}
+.dash-kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem;}
+.dash-kpi-label{font-size:11px;font-weight:500;color:var(--hint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+.dash-kpi-num{font-size:32px;font-weight:700;letter-spacing:-0.03em;font-family:'DM Mono',monospace;line-height:1;margin-bottom:4px;}
+.dash-kpi-sub{font-size:11px;color:var(--hint);}
+.dash-row{display:grid;gap:12px;margin-bottom:12px;}
+.dash-row-2{grid-template-columns:2fr 1fr;}
+.dash-row-pace{grid-template-columns:3fr 2fr;}
+.dash-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.25rem;}
+.dash-card-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.85rem;}
+.dash-card-title{font-size:14px;font-weight:600;letter-spacing:-0.01em;}
+.dash-card-sub{font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+.rev-big{font-size:26px;font-weight:700;letter-spacing:-0.03em;font-family:'DM Mono',monospace;}
+.rev-axis{display:flex;justify-content:space-between;font-size:9px;font-family:'DM Mono',monospace;color:var(--hint);margin-top:4px;letter-spacing:.04em;}
+.occ-gauge-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:.85rem;}
+.occ-breakdown{display:flex;flex-direction:column;gap:7px;}
+.occ-row{display:flex;align-items:center;gap:8px;font-size:12px;}
+.occ-label{width:76px;color:var(--muted);font-size:11px;flex-shrink:0;}
+.occ-track{flex:1;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;border:1px solid var(--border);}
+.occ-fill{height:100%;background:var(--accent);border-radius:3px;}
+.occ-val{width:32px;text-align:right;font-family:'DM Mono',monospace;font-size:11px;font-weight:600;color:var(--text);}
+.pace-chart{display:flex;align-items:flex-end;gap:3px;height:100px;}
+.pace-col{flex:1;min-width:0;}
+.pace-booked{background:var(--accent);border-radius:2px 2px 0 0;width:100%;}
+.pace-col.is-today .pace-booked{background:var(--green);}
+.pace-axis{display:flex;gap:3px;margin-top:5px;}
+.pace-axis-lbl{flex:1;text-align:center;font-size:9px;font-family:'DM Mono',monospace;color:var(--hint);overflow:hidden;}
+.pace-axis-lbl.is-today{color:var(--accent);font-weight:700;}
+.chan-donut-wrap{display:flex;align-items:center;gap:16px;}
+.chan-list{display:flex;flex-direction:column;gap:7px;flex:1;}
+.chan-row{display:flex;align-items:center;gap:7px;font-size:12px;}
+.chan-swatch{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.chan-name{flex:1;color:var(--muted);}
+.chan-pct{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;color:var(--text);}
+@media(max-width:900px){.dash-kpis{grid-template-columns:repeat(3,1fr);}.dash-row-2,.dash-row-pace{grid-template-columns:1fr;}}
+@media(max-width:600px){.dash-kpis{grid-template-columns:1fr 1fr;}}
 </style>
 </head>
 <body>
@@ -424,6 +462,7 @@ input.pcal-inline-input[type=number]::-webkit-outer-spin-button{-webkit-appearan
     <div class="topbar-left">
       <div class="logo">Sleepy <span>PMS</span></div>
       <nav class="nav">
+        <button class="nav-btn" data-page="dashboard" onclick="switchPage('dashboard')"><span>Dashboard</span></button>
         <button class="nav-btn" data-page="properties" onclick="switchPage('properties')">🏠 <span>Properties</span></button>
         <button class="nav-btn active" data-page="calendar" onclick="switchPage('calendar')">📅 <span>Calendar</span></button>
         <button class="nav-btn" data-page="reservations" onclick="switchPage('reservations')">📋 <span>Reservations</span></button>
@@ -494,9 +533,12 @@ window.switchPage=function(page){
     renderReservationsPage();
   } else if(page==='pricing'){
     document.getElementById('topbar-action-btn').textContent='🔄 Sync';
-    document.getElementById('topbar-action-btn').textContent='🔄 Sync';
     document.getElementById('topbar-action-btn').onclick=window.openSyncModal;
     renderPricingPage();
+  } else if(page==='dashboard'){
+    document.getElementById('topbar-action-btn').textContent='+ Reservation';
+    document.getElementById('topbar-action-btn').onclick=openNewReservationModal;
+    renderDashboardPage();
   }
 }
 
@@ -1871,6 +1913,225 @@ window.doSync=function(btn){
   },1500);
 }
 
+// ══════════════ DASHBOARD ══════════════
+function computeDashboardData(){
+  const today=toDay(new Date());
+  const totalKeys=properties.length||18;
+
+  // Tonight's reservations
+  const tonightRes=reservations.filter(r=>{
+    const cin=parseDate(r.checkin),cout=parseDate(r.checkout);
+    return cin<=today&&today<cout;
+  });
+  const occupancyPct=totalKeys?Math.round(tonightRes.length/totalKeys*100):0;
+
+  // Arrivals & departures today
+  const arrivals=reservations.filter(r=>sameDay(parseDate(r.checkin),today));
+  const departures=reservations.filter(r=>sameDay(parseDate(r.checkout),today));
+
+  // ADR from USD-priced reservations occupying tonight
+  const pricedTonight=tonightRes.filter(r=>r.price>0&&(!r.currency||r.currency==='USD'));
+  const adr=pricedTonight.length?Math.round(pricedTonight.reduce((s,r)=>s+(r.price||0),0)/pricedTonight.length):0;
+  const revpar=Math.round(adr*occupancyPct/100);
+
+  // Last 30 days daily revenue (USD per night, summed per day)
+  const revDays=[];
+  for(let i=29;i>=0;i--){
+    const d=addDays(today,-i);
+    const dayRev=reservations
+      .filter(r=>{const cin=parseDate(r.checkin),cout=parseDate(r.checkout);return r.price>0&&(!r.currency||r.currency==='USD')&&cin<=d&&d<cout;})
+      .reduce((s,r)=>s+(r.price||0),0);
+    revDays.push(dayRev);
+  }
+  const totalRev30=revDays.reduce((s,v)=>s+v,0);
+
+  // Pickup pace: next 14 days booked rooms
+  const paceData=[];
+  for(let i=0;i<14;i++){
+    const d=addDays(today,i);
+    const booked=reservations.filter(r=>{const cin=parseDate(r.checkin),cout=parseDate(r.checkout);return cin<=d&&d<cout;}).length;
+    paceData.push({booked,isToday:i===0,date:addDays(today,i)});
+  }
+
+  // Channel mix — last 90 days reservations
+  const cutoff=addDays(today,-90);
+  const mixRes=reservations.filter(r=>parseDate(r.checkin)>=cutoff);
+  const srcCounts={airbnb:0,booking:0,expedia:0,direct:0};
+  mixRes.forEach(r=>{const s=r.source||'other';if(s in srcCounts)srcCounts[s]++;});
+  const srcTotal=mixRes.length;
+
+  // Occupancy by room type tonight
+  const occupiedCodes=new Set();
+  tonightRes.forEach(r=>{
+    const code=displayAllocation[r.id]||(r.roomCode||'').toLowerCase();
+    if(code)occupiedCodes.add(code);
+  });
+  const rtGroups=[
+    {label:'Small Rooms',rooms:['0-1','0-2','0-3','0-4','0-5']},
+    {label:'Apartments',rooms:['6-1','6-2','6-4','7-1','7-2','7-4']},
+    {label:'6-3 Suite',rooms:['6-3']},
+    {label:'Orb / Tab',rooms:['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3']},
+  ];
+  const roomTypeOcc=rtGroups.map(g=>({label:g.label,total:g.rooms.length,occ:g.rooms.filter(rc=>occupiedCodes.has(rc)).length}));
+
+  return{occupancyPct,occupiedTonight:tonightRes.length,totalKeys,arrivals,departures,adr,revpar,revDays,totalRev30,paceData,srcCounts,srcTotal,roomTypeOcc};
+}
+
+function renderDashboardPage(){
+  const main=document.getElementById('main');
+  const kd=computeDashboardData();
+  const today=new Date();
+  const DAY_FULL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const MON_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const hour=today.getHours();
+  const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
+
+  // Revenue SVG — 30-day polyline
+  const SW=600,SH=100;
+  const maxRev=Math.max(...kd.revDays,1);
+  const xStep=SW/29;
+  const ptArr=kd.revDays.map((v,i)=>[Math.round(i*xStep),SH-Math.round(v/maxRev*SH)]);
+  const polyPts=ptArr.map(([x,y])=>`${x},${y}`).join(' ');
+  const fillD=`M0,${SH} L${ptArr.map(([x,y])=>`${x},${y}`).join(' L')} L${SW},${SH} Z`;
+  const lastPt=ptArr[ptArr.length-1];
+  const fmtRev=v=>v>=1000?'$'+(v/1000).toFixed(1)+'k':'$'+Math.round(v);
+
+  const axisIdxs=[0,6,12,18,24,29];
+  const revAxisHTML=axisIdxs.map(i=>{
+    const d2=addDays(toDay(today),i-29);
+    return `<span>${i===29?'TODAY':MONTH_NAMES[d2.getMonth()].slice(0,3).toUpperCase()+' '+d2.getDate()}</span>`;
+  }).join('');
+
+  // Pace chart — pixel bars
+  const CAPACITY=kd.totalKeys||18;
+  const MAX_BAR=100;
+  const paceColsHTML=kd.paceData.map(p=>{
+    const h=CAPACITY?Math.round(p.booked/CAPACITY*MAX_BAR):0;
+    return `<div class="pace-col${p.isToday?' is-today':''}"><div class="pace-booked" style="height:${h}px;min-height:${p.booked>0?2:0}px"></div></div>`;
+  }).join('');
+  const paceAxisHTML=kd.paceData.map(p=>{
+    const label=p.isToday?'TODAY':p.date.getDate();
+    return `<span class="pace-axis-lbl${p.isToday?' is-today':''}">${label}</span>`;
+  }).join('');
+
+  // Channel mix donut
+  const SRC_COLORS={airbnb:'#FF385C',booking:'#499FDD',expedia:'#0e214b',direct:'#22c55e'};
+  const SRC_LABELS={airbnb:'Airbnb',booking:'Booking.com',expedia:'Expedia',direct:'Direct'};
+  const R=46,CIRC=2*Math.PI*R;
+  const total=kd.srcTotal||1;
+  const chanRows=Object.entries(kd.srcCounts).map(([src,cnt])=>({src,cnt,pct:Math.round(cnt/total*100),color:SRC_COLORS[src],label:SRC_LABELS[src]})).filter(c=>c.cnt>0);
+  let segOffset=0;
+  const donutSegs=chanRows.map(c=>{
+    const segLen=(c.cnt/total)*CIRC;
+    const seg=`<circle cx="60" cy="60" r="${R}" fill="none" stroke="${c.color}" stroke-width="12" stroke-dasharray="${segLen.toFixed(1)} ${CIRC.toFixed(1)}" stroke-dashoffset="${(-segOffset).toFixed(1)}" transform="rotate(-90 60 60)"/>`;
+    segOffset+=segLen;
+    return seg;
+  }).join('');
+
+  main.innerHTML=`<div class="page">
+    <div class="page-header" style="margin-bottom:1.25rem;">
+      <div>
+        <div class="page-sub">${DAY_FULL[today.getDay()]} · ${MON_FULL[today.getMonth()]} ${today.getDate()}, ${today.getFullYear()}</div>
+        <div class="page-title" style="font-size:22px;">${greeting}, team.</div>
+      </div>
+      <button class="topbar-btn" onclick="switchPage('calendar')">Open Calendar</button>
+    </div>
+
+    <div class="dash-kpis">
+      <div class="dash-kpi">
+        <div class="dash-kpi-label">Occupancy</div>
+        <div class="dash-kpi-num" style="color:var(--accent)">${kd.occupancyPct}<span style="font-size:18px;font-weight:600;">%</span></div>
+        <div class="dash-kpi-sub">${kd.occupiedTonight}/${kd.totalKeys} rooms tonight</div>
+      </div>
+      <div class="dash-kpi">
+        <div class="dash-kpi-label">ADR</div>
+        <div class="dash-kpi-num">$${kd.adr}</div>
+        <div class="dash-kpi-sub">avg rate · USD tonight</div>
+      </div>
+      <div class="dash-kpi">
+        <div class="dash-kpi-label">RevPAR</div>
+        <div class="dash-kpi-num">$${kd.revpar}</div>
+        <div class="dash-kpi-sub">revenue per avail. room</div>
+      </div>
+      <div class="dash-kpi">
+        <div class="dash-kpi-label" style="color:var(--green);">Arrivals</div>
+        <div class="dash-kpi-num" style="color:var(--green);">${kd.arrivals.length}</div>
+        <div class="dash-kpi-sub">checking in today</div>
+      </div>
+      <div class="dash-kpi">
+        <div class="dash-kpi-label" style="color:var(--amber);">Departures</div>
+        <div class="dash-kpi-num" style="color:var(--amber);">${kd.departures.length}</div>
+        <div class="dash-kpi-sub">checking out today</div>
+      </div>
+    </div>
+
+    <div class="dash-row dash-row-2">
+      <div class="dash-card">
+        <div class="dash-card-head">
+          <div><div class="dash-card-title">Revenue</div><div class="dash-card-sub">Last 30 days · USD per night</div></div>
+          <div class="rev-big">${fmtRev(kd.totalRev30)}</div>
+        </div>
+        <svg viewBox="0 0 ${SW} ${SH}" style="width:100%;height:100px;" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="dashRevGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18"/>
+              <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="${fillD}" fill="url(#dashRevGrad)"/>
+          <polyline points="${polyPts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          <circle cx="${lastPt[0]}" cy="${lastPt[1]}" r="4" fill="white" stroke="var(--accent)" stroke-width="2"/>
+        </svg>
+        <div class="rev-axis">${revAxisHTML}</div>
+      </div>
+
+      <div class="dash-card">
+        <div class="dash-card-head">
+          <div><div class="dash-card-title">Occupancy</div><div class="dash-card-sub">Tonight · by room type</div></div>
+        </div>
+        <div class="occ-gauge-wrap">
+          <svg width="160" height="100" viewBox="0 0 160 100">
+            <path d="M 16 86 A 64 64 0 0 1 144 86" stroke="var(--border)" stroke-width="10" fill="none" stroke-linecap="round"/>
+            ${kd.occupancyPct>0?`<path d="M 16 86 A 64 64 0 0 1 144 86" stroke="var(--accent)" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="${(kd.occupancyPct/100*201.1).toFixed(1)} 201.1" pathLength="201.1"/>`:''}
+            <text x="80" y="74" text-anchor="middle" font-family="'DM Mono',monospace" font-size="24" font-weight="700" fill="var(--text)">${kd.occupancyPct}%</text>
+            <text x="80" y="90" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="9" fill="var(--hint)">${kd.occupiedTonight} / ${kd.totalKeys} KEYS</text>
+          </svg>
+        </div>
+        <div class="occ-breakdown">
+          ${kd.roomTypeOcc.map(g=>{const pct=g.total?Math.round(g.occ/g.total*100):0;return `<div class="occ-row"><span class="occ-label">${g.label}</span><div class="occ-track"><div class="occ-fill" style="width:${pct}%"></div></div><span class="occ-val">${g.occ}/${g.total}</span></div>`;}).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="dash-row dash-row-pace">
+      <div class="dash-card">
+        <div class="dash-card-head">
+          <div><div class="dash-card-title">Pickup Pace</div><div class="dash-card-sub">Next 14 nights · rooms on books of ${CAPACITY}</div></div>
+        </div>
+        <div class="pace-chart">${paceColsHTML}</div>
+        <div class="pace-axis">${paceAxisHTML}</div>
+      </div>
+
+      <div class="dash-card">
+        <div class="dash-card-head">
+          <div><div class="dash-card-title">Channel Mix</div><div class="dash-card-sub">Last 90 days · reservations</div></div>
+        </div>
+        <div class="chan-donut-wrap">
+          <svg width="120" height="120" viewBox="0 0 120 120" style="flex-shrink:0;">
+            <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--surface2)" stroke-width="12"/>
+            ${donutSegs||`<circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--border)" stroke-width="12"/>`}
+            <text x="60" y="56" text-anchor="middle" font-family="'DM Mono',monospace" font-size="14" font-weight="700" fill="var(--text)">${kd.srcTotal}</text>
+            <text x="60" y="70" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="9" fill="var(--hint)">BOOKINGS</text>
+          </svg>
+          <div class="chan-list">
+            ${chanRows.length?chanRows.map(c=>`<div class="chan-row"><span class="chan-swatch" style="background:${c.color}"></span><span class="chan-name">${c.label}</span><span class="chan-pct">${c.pct}%</span></div>`).join(''):'<div style="font-size:12px;color:var(--hint);">No data yet</div>'}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 // ── init ──────────────────────────────────
 setSyncDot('syncing','Connecting...');
 // Set up the default page structure immediately (loading screen covers it)
@@ -1896,6 +2157,7 @@ try{
       if(currentPage==='properties')renderPropertiesPage();
       else if(currentPage==='calendar')renderGrid();
       else if(currentPage==='pricing')renderPricingPage();
+      else if(currentPage==='dashboard')renderDashboardPage();
     }catch(e){console.error('Properties render error:',e);const l=document.getElementById('loading');if(l)l.style.display='none';}
   },(err)=>{
     console.error('Firebase properties error:',err);
@@ -1912,6 +2174,7 @@ try{
       displayAllocation=buildDisplayAllocation();
       if(currentPage==='calendar')renderGrid();
       else if(currentPage==='reservations')renderReservationsPage();
+      else if(currentPage==='dashboard')renderDashboardPage();
     }catch(e){console.error('Reservations error:',e);}
   },(err)=>console.error('Reservations listener error:',err));
 
@@ -2001,76 +2264,5 @@ try{
   </div>
 </div>
 
-<!-- Reservation Modal -->
-<div class="modal-overlay hidden" id="res-modal-overlay" onclick="handleOverlayClick(event)">
-  <div class="modal" id="res-modal">
-    <div class="modal-header">
-      <div class="modal-title" id="res-modal-title">New Reservation</div>
-      <button class="drawer-close" onclick="closeResModal()">×</button>
-    </div>
-    <div class="modal-body">
-      <input type="hidden" id="res-id">
-      <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;">
-        <div class="form-group" style="margin:0;">
-          <label class="form-label">Guest name</label>
-          <input type="text" class="form-input" id="res-guest" placeholder="e.g. John Smith">
-        </div>
-        <div class="form-group" style="margin:0;">
-          <label class="form-label">Guests</label>
-          <input type="number" class="form-input" id="res-guests" value="1" min="1" max="20" style="width:60px;">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="form-group">
-          <label class="form-label">Check-in</label>
-          <input type="date" class="form-input" id="res-checkin">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Check-out</label>
-          <input type="date" class="form-input" id="res-checkout">
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Property</label>
-        <select class="form-input" id="res-property"></select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Source</label>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;" id="res-source-btns">
-          <button class="platform-toggle active-airbnb" data-source="airbnb" onclick="selectSource(this)">🏠 Airbnb</button>
-          <button class="platform-toggle" data-source="booking" onclick="selectSource(this)">📋 Booking</button>
-          <button class="platform-toggle" data-source="expedia" onclick="selectSource(this)">✈️ Expedia</button>
-          <button class="platform-toggle" data-source="direct" onclick="selectSource(this)">🔗 Direct</button>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="form-group">
-          <label class="form-label">Price per night</label>
-          <input type="number" class="form-input" id="res-price" placeholder="0.00" min="0" step="0.01">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Currency</label>
-          <select class="form-input" id="res-currency">
-            <option value="USD">USD</option>
-            <option value="GEL">GEL</option>
-            <option value="EUR">EUR</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Notes</label>
-        <input type="text" class="form-input" id="res-notes" placeholder="Optional notes...">
-      </div>
-      <div id="res-total-wrap" style="background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:var(--rs);padding:10px 14px;font-size:13px;color:var(--accent);font-family:'DM Mono',monospace;display:none;">
-        Total: <span id="res-total">—</span>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn danger hidden" id="res-delete-btn" onclick="deleteReservation()">Delete</button>
-      <button class="btn" onclick="closeResModal()">Cancel</button>
-      <button class="btn primary" onclick="saveReservation()">Save reservation</button>
-    </div>
-  </div>
-</div>
 </body>
 </html>
