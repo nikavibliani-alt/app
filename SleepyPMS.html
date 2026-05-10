@@ -1914,36 +1914,79 @@ window.doSync=function(btn){
 }
 
 // ══════════════ DASHBOARD ══════════════
-function computeDashboardData(){
-  const today=toDay(new Date());
-  const totalKeys=properties.length||18;
+let dashRevPeriod=30;
+window.setDashRevPeriod=function(p){dashRevPeriod=p;if(currentPage==='dashboard')renderDashboardPage();};
 
-  // Tonight's reservations
+function computeDashboardData(revPeriod){
+  const today=toDay(new Date());
+
+  // Fixed room groups per spec: Small 5, Apartments 6, 6-3 Suite 1, Orb/Tab 5 = 17 total
+  const RT_GROUPS=[
+    {label:'Small Rooms',rooms:['0-1','0-2','0-3','0-4','0-5']},
+    {label:'Apartments',rooms:['6-1','6-2','6-4','7-1','7-2','7-4']},
+    {label:'6-3 Suite',rooms:['6-3']},
+    {label:'Orb / Tab',rooms:['orb-1','orb-2','tab-1','tab-2','tab-3']},
+  ];
+  const TOTAL_CAPACITY=RT_GROUPS.reduce((s,g)=>s+g.rooms.length,0);
+
+  // Tonight's active reservations (checkin <= today < checkout)
   const tonightRes=reservations.filter(r=>{
     const cin=parseDate(r.checkin),cout=parseDate(r.checkout);
     return cin<=today&&today<cout;
   });
-  const occupancyPct=totalKeys?Math.round(tonightRes.length/totalKeys*100):0;
+
+  // Map each reservation to its room code via displayAllocation or roomCode field
+  const occupiedCodes=new Set();
+  tonightRes.forEach(r=>{
+    const code=displayAllocation[r.id]||(r.roomCode||'').toLowerCase();
+    if(code)occupiedCodes.add(code);
+  });
+
+  // Per-group and overall occupancy — count only rooms in the defined groups
+  const roomTypeOcc=RT_GROUPS.map(g=>({
+    label:g.label,total:g.rooms.length,
+    occ:g.rooms.filter(rc=>occupiedCodes.has(rc)).length
+  }));
+  const occupiedCount=roomTypeOcc.reduce((s,g)=>s+g.occ,0);
+  const occupancyPct=TOTAL_CAPACITY?Math.round(occupiedCount/TOTAL_CAPACITY*100):0;
 
   // Arrivals & departures today
   const arrivals=reservations.filter(r=>sameDay(parseDate(r.checkin),today));
   const departures=reservations.filter(r=>sameDay(parseDate(r.checkout),today));
 
-  // ADR from USD-priced reservations occupying tonight
+  // ADR: avg nightly price of USD-priced rooms occupied tonight
   const pricedTonight=tonightRes.filter(r=>r.price>0&&(!r.currency||r.currency==='USD'));
   const adr=pricedTonight.length?Math.round(pricedTonight.reduce((s,r)=>s+(r.price||0),0)/pricedTonight.length):0;
   const revpar=Math.round(adr*occupancyPct/100);
 
-  // Last 30 days daily revenue (USD per night, summed per day)
-  const revDays=[];
-  for(let i=29;i>=0;i--){
+  // Revenue period bounds
+  let periodStart;
+  if(revPeriod==='ytd'){periodStart=new Date(today.getFullYear(),0,1);}
+  else{periodStart=addDays(today,-revPeriod);}
+  const periodDays=Math.max(1,Math.round((today-periodStart)/86400000)+1);
+
+  // Total revenue: sum(pricePerNight × nights) for reservations with checkin in period
+  const periodRevRes=reservations.filter(r=>{
+    const cin=parseDate(r.checkin);
+    return r.price>0&&cin>=periodStart&&cin<=today;
+  });
+  const totalRevPeriod=periodRevRes.reduce((s,r)=>{
+    const nights=Math.max(0,Math.round((parseDate(r.checkout)-parseDate(r.checkin))/86400000));
+    return s+(r.price||0)*nights;
+  },0);
+
+  // Chart: for each day in period, revenue from reservations that checked in that day
+  const revChartData=[];
+  for(let i=periodDays-1;i>=0;i--){
     const d=addDays(today,-i);
     const dayRev=reservations
-      .filter(r=>{const cin=parseDate(r.checkin),cout=parseDate(r.checkout);return r.price>0&&(!r.currency||r.currency==='USD')&&cin<=d&&d<cout;})
-      .reduce((s,r)=>s+(r.price||0),0);
-    revDays.push(dayRev);
+      .filter(r=>r.price>0&&sameDay(parseDate(r.checkin),d))
+      .reduce((s,r)=>{
+        const nights=Math.max(0,Math.round((parseDate(r.checkout)-parseDate(r.checkin))/86400000));
+        return s+(r.price||0)*nights;
+      },0);
+    revChartData.push(dayRev);
   }
-  const totalRev30=revDays.reduce((s,v)=>s+v,0);
 
   // Pickup pace: next 14 days booked rooms
   const paceData=[];
@@ -1953,65 +1996,65 @@ function computeDashboardData(){
     paceData.push({booked,isToday:i===0,date:addDays(today,i)});
   }
 
-  // Channel mix — last 90 days reservations
+  // Channel mix — last 90 days
   const cutoff=addDays(today,-90);
   const mixRes=reservations.filter(r=>parseDate(r.checkin)>=cutoff);
   const srcCounts={airbnb:0,booking:0,expedia:0,direct:0};
   mixRes.forEach(r=>{const s=r.source||'other';if(s in srcCounts)srcCounts[s]++;});
   const srcTotal=mixRes.length;
 
-  // Occupancy by room type tonight
-  const occupiedCodes=new Set();
-  tonightRes.forEach(r=>{
-    const code=displayAllocation[r.id]||(r.roomCode||'').toLowerCase();
-    if(code)occupiedCodes.add(code);
-  });
-  const rtGroups=[
-    {label:'Small Rooms',rooms:['0-1','0-2','0-3','0-4','0-5']},
-    {label:'Apartments',rooms:['6-1','6-2','6-4','7-1','7-2','7-4']},
-    {label:'6-3 Suite',rooms:['6-3']},
-    {label:'Orb / Tab',rooms:['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3']},
-  ];
-  const roomTypeOcc=rtGroups.map(g=>({label:g.label,total:g.rooms.length,occ:g.rooms.filter(rc=>occupiedCodes.has(rc)).length}));
-
-  return{occupancyPct,occupiedTonight:tonightRes.length,totalKeys,arrivals,departures,adr,revpar,revDays,totalRev30,paceData,srcCounts,srcTotal,roomTypeOcc};
+  return{occupancyPct,occupiedCount,TOTAL_CAPACITY,roomTypeOcc,arrivals,departures,adr,revpar,
+         revChartData,totalRevPeriod,periodDays,paceData,srcCounts,srcTotal};
 }
 
 function renderDashboardPage(){
   const main=document.getElementById('main');
-  const kd=computeDashboardData();
+  const kd=computeDashboardData(dashRevPeriod);
   const today=new Date();
   const DAY_FULL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const MON_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DAY_SHORT3=['SUN','MON','TUE','WED','THU','FRI','SAT'];
   const hour=today.getHours();
   const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
 
-  // Revenue SVG — 30-day polyline
+  // Revenue chart SVG — points based on period length
+  const nPts=kd.revChartData.length;
   const SW=600,SH=100;
-  const maxRev=Math.max(...kd.revDays,1);
-  const xStep=SW/29;
-  const ptArr=kd.revDays.map((v,i)=>[Math.round(i*xStep),SH-Math.round(v/maxRev*SH)]);
+  const maxRev=Math.max(...kd.revChartData,1);
+  const xStep=nPts>1?SW/(nPts-1):SW/2;
+  const ptArr=kd.revChartData.map((v,i)=>[Math.round(nPts>1?i*xStep:SW/2),SH-Math.round(v/maxRev*SH)]);
   const polyPts=ptArr.map(([x,y])=>`${x},${y}`).join(' ');
   const fillD=`M0,${SH} L${ptArr.map(([x,y])=>`${x},${y}`).join(' L')} L${SW},${SH} Z`;
   const lastPt=ptArr[ptArr.length-1];
   const fmtRev=v=>v>=1000?'$'+(v/1000).toFixed(1)+'k':'$'+Math.round(v);
 
-  const axisIdxs=[0,6,12,18,24,29];
+  // Rev axis labels — adapt to period length
+  const numAxis=nPts<=7?nPts:7;
+  const axisIdxs=numAxis<=1?[0]:Array.from({length:numAxis},(_,j)=>Math.round(j*(nPts-1)/(numAxis-1)));
   const revAxisHTML=axisIdxs.map(i=>{
-    const d2=addDays(toDay(today),i-29);
-    return `<span>${i===29?'TODAY':MONTH_NAMES[d2.getMonth()].slice(0,3).toUpperCase()+' '+d2.getDate()}</span>`;
+    const d2=addDays(toDay(today),-(nPts-1-i));
+    if(i===nPts-1)return '<span>TODAY</span>';
+    if(nPts<=7)return `<span>${DAY_SHORT3[d2.getDay()]}</span>`;
+    return `<span>${MONTH_NAMES[d2.getMonth()].slice(0,3).toUpperCase()+' '+d2.getDate()}</span>`;
   }).join('');
 
-  // Pace chart — pixel bars
-  const CAPACITY=kd.totalKeys||18;
+  // Period selector buttons
+  const mkPBtn=(p,lbl)=>{
+    const active=dashRevPeriod===p?' active':'';
+    const arg=typeof p==='string'?`'${p}'`:p;
+    return `<button class="filter-btn${active}" onclick="window.setDashRevPeriod(${arg})">${lbl}</button>`;
+  };
+  const periodBtns=`<div style="display:flex;gap:4px;">${mkPBtn(7,'7D')}${mkPBtn(30,'30D')}${mkPBtn(90,'90D')}${mkPBtn('ytd','YTD')}</div>`;
+
+  // Pace chart — pixel bars, scaled to 17 capacity
+  const CAPACITY=kd.TOTAL_CAPACITY||17;
   const MAX_BAR=100;
   const paceColsHTML=kd.paceData.map(p=>{
     const h=CAPACITY?Math.round(p.booked/CAPACITY*MAX_BAR):0;
     return `<div class="pace-col${p.isToday?' is-today':''}"><div class="pace-booked" style="height:${h}px;min-height:${p.booked>0?2:0}px"></div></div>`;
   }).join('');
   const paceAxisHTML=kd.paceData.map(p=>{
-    const label=p.isToday?'TODAY':p.date.getDate();
-    return `<span class="pace-axis-lbl${p.isToday?' is-today':''}">${label}</span>`;
+    return `<span class="pace-axis-lbl${p.isToday?' is-today':''}">${p.isToday?'TODAY':p.date.getDate()}</span>`;
   }).join('');
 
   // Channel mix donut
@@ -2019,7 +2062,9 @@ function renderDashboardPage(){
   const SRC_LABELS={airbnb:'Airbnb',booking:'Booking.com',expedia:'Expedia',direct:'Direct'};
   const R=46,CIRC=2*Math.PI*R;
   const total=kd.srcTotal||1;
-  const chanRows=Object.entries(kd.srcCounts).map(([src,cnt])=>({src,cnt,pct:Math.round(cnt/total*100),color:SRC_COLORS[src],label:SRC_LABELS[src]})).filter(c=>c.cnt>0);
+  const chanRows=Object.entries(kd.srcCounts)
+    .map(([src,cnt])=>({src,cnt,pct:Math.round(cnt/total*100),color:SRC_COLORS[src],label:SRC_LABELS[src]}))
+    .filter(c=>c.cnt>0);
   let segOffset=0;
   const donutSegs=chanRows.map(c=>{
     const segLen=(c.cnt/total)*CIRC;
@@ -2041,7 +2086,7 @@ function renderDashboardPage(){
       <div class="dash-kpi">
         <div class="dash-kpi-label">Occupancy</div>
         <div class="dash-kpi-num" style="color:var(--accent)">${kd.occupancyPct}<span style="font-size:18px;font-weight:600;">%</span></div>
-        <div class="dash-kpi-sub">${kd.occupiedTonight}/${kd.totalKeys} rooms tonight</div>
+        <div class="dash-kpi-sub">${kd.occupiedCount}/${kd.TOTAL_CAPACITY} rooms tonight</div>
       </div>
       <div class="dash-kpi">
         <div class="dash-kpi-label">ADR</div>
@@ -2068,8 +2113,11 @@ function renderDashboardPage(){
     <div class="dash-row dash-row-2">
       <div class="dash-card">
         <div class="dash-card-head">
-          <div><div class="dash-card-title">Revenue</div><div class="dash-card-sub">Last 30 days · USD per night</div></div>
-          <div class="rev-big">${fmtRev(kd.totalRev30)}</div>
+          <div><div class="dash-card-title">Revenue</div><div class="dash-card-sub">Check-ins in period · price &times; nights · USD</div></div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            ${periodBtns}
+            <div class="rev-big">${fmtRev(kd.totalRevPeriod)}</div>
+          </div>
         </div>
         <svg viewBox="0 0 ${SW} ${SH}" style="width:100%;height:100px;" preserveAspectRatio="none">
           <defs>
@@ -2094,11 +2142,14 @@ function renderDashboardPage(){
             <path d="M 16 86 A 64 64 0 0 1 144 86" stroke="var(--border)" stroke-width="10" fill="none" stroke-linecap="round"/>
             ${kd.occupancyPct>0?`<path d="M 16 86 A 64 64 0 0 1 144 86" stroke="var(--accent)" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="${(kd.occupancyPct/100*201.1).toFixed(1)} 201.1" pathLength="201.1"/>`:''}
             <text x="80" y="74" text-anchor="middle" font-family="'DM Mono',monospace" font-size="24" font-weight="700" fill="var(--text)">${kd.occupancyPct}%</text>
-            <text x="80" y="90" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="9" fill="var(--hint)">${kd.occupiedTonight} / ${kd.totalKeys} KEYS</text>
+            <text x="80" y="90" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="9" fill="var(--hint)">${kd.occupiedCount} / ${kd.TOTAL_CAPACITY} KEYS</text>
           </svg>
         </div>
         <div class="occ-breakdown">
-          ${kd.roomTypeOcc.map(g=>{const pct=g.total?Math.round(g.occ/g.total*100):0;return `<div class="occ-row"><span class="occ-label">${g.label}</span><div class="occ-track"><div class="occ-fill" style="width:${pct}%"></div></div><span class="occ-val">${g.occ}/${g.total}</span></div>`;}).join('')}
+          ${kd.roomTypeOcc.map(g=>{
+            const pct=g.total?Math.round(g.occ/g.total*100):0;
+            return `<div class="occ-row"><span class="occ-label">${g.label}</span><div class="occ-track"><div class="occ-fill" style="width:${pct}%"></div></div><span class="occ-val">${g.occ}/${g.total}</span></div>`;
+          }).join('')}
         </div>
       </div>
     </div>
