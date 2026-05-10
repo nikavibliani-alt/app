@@ -576,17 +576,35 @@ function _resTimestamp(r){
   return new Date(String(t)).getTime()||0;
 }
 
+function _dupKey(r){
+  // True duplicate = same bookingId + same room + same check-in date.
+  // Same bookingId alone is NOT a duplicate (multi-room bookings share one bookingId).
+  const bid=(r.bookingId||'').trim();
+  const room=(r.roomCode||'').trim().toLowerCase();
+  const cin=(r.checkin||'').trim();
+  if(!bid||!room||!cin)return null; // can't determine — skip
+  return `${bid}|${room}|${cin}`;
+}
+
 function renderReservationsPage(){
   const main=document.getElementById('main');
-  // Group by reservationNumber to find duplicates
-  const byNum={};
+  // Group by bookingId+room+checkin to find true duplicates
+  const byKey={};
   reservations.forEach(r=>{
-    if(!r.reservationNumber)return;
-    if(!byNum[r.reservationNumber])byNum[r.reservationNumber]=[];
-    byNum[r.reservationNumber].push(r);
+    const k=_dupKey(r);
+    if(!k)return;
+    if(!byKey[k])byKey[k]=[];
+    byKey[k].push(r);
   });
-  const dupNums=new Set(Object.keys(byNum).filter(k=>byNum[k].length>1));
-  const dupCount=Object.values(byNum).filter(g=>g.length>1).reduce((s,g)=>s+g.length-1,0);
+  const dupKeys=new Set(Object.keys(byKey).filter(k=>byKey[k].length>1));
+  // Map each reservation id to whether it's a dup
+  const dupIds=new Set();
+  Object.values(byKey).filter(g=>g.length>1).forEach(g=>{
+    // keep the most-recent, flag the rest
+    g.sort((a,b)=>_resTimestamp(b)-_resTimestamp(a));
+    g.slice(1).forEach(r=>dupIds.add(r.id));
+  });
+  const dupCount=dupIds.size;
   const sorted=[...reservations].sort((a,b)=>(b.checkin||'').localeCompare(a.checkin||''));
   const srcColors={airbnb:'#7c3aed',booking:'#1d4ed8',expedia:'#d97706',direct:'#15803d',other:'#94a3b8'};
   let html=`<div class="page">
@@ -610,7 +628,7 @@ function renderReservationsPage(){
         <div style="font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.06em;">Source</div>
       </div>`;
     sorted.forEach(res=>{
-      const isDup=dupNums.has(res.reservationNumber);
+      const isDup=dupIds.has(res.id);
       const col=srcColors[res.source||'other']||srcColors.other;
       html+=`<div class="res-list-row${isDup?' res-list-dup':''}" onclick="window.openEditRes('${res.id}')">
         <div class="res-list-guest">${esc(res.guest||'—')}${isDup?' <span class="dup-badge res-list-badge">DUP</span>':''}</div>
@@ -626,16 +644,18 @@ function renderReservationsPage(){
 }
 
 window.cleanDuplicates=async function(){
-  const byNum={};
+  // True duplicate = same bookingId + same room + same check-in
+  const byKey={};
   reservations.forEach(r=>{
-    if(!r.reservationNumber)return;
-    if(!byNum[r.reservationNumber])byNum[r.reservationNumber]=[];
-    byNum[r.reservationNumber].push(r);
+    const k=_dupKey(r);
+    if(!k)return;
+    if(!byKey[k])byKey[k]=[];
+    byKey[k].push(r);
   });
   const toDelete=[];
-  Object.values(byNum).forEach(group=>{
+  Object.values(byKey).forEach(group=>{
     if(group.length<2)return;
-    // Sort desc by updatedAt/createdAt — keep index 0 (most recent), delete the rest
+    // Keep the most recently updated copy, delete the rest
     group.sort((a,b)=>_resTimestamp(b)-_resTimestamp(a));
     toDelete.push(...group.slice(1));
   });
