@@ -2,41 +2,38 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Sleepy PMS — Import Reservations</title>
+<title>Import 120 Reservations — Sleepy PMS</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:system-ui,-apple-system,sans-serif;max-width:960px;margin:2rem auto;padding:0 1.25rem;color:#1e293b;background:#f8fafc;}
+body{font-family:system-ui,sans-serif;max-width:980px;margin:2rem auto;padding:0 1.25rem;color:#1e293b;background:#f8fafc;}
 h1{font-size:20px;font-weight:700;margin-bottom:.4rem;}
 .sub{font-size:13px;color:#64748b;margin-bottom:1.25rem;}
-.actions{display:flex;gap:12px;align-items:center;margin-bottom:1.25rem;}
-.btn-danger{padding:11px 22px;font-size:14px;font-weight:600;cursor:pointer;border-radius:7px;border:none;background:#dc2626;color:#fff;transition:opacity .15s;}
-.btn-danger:hover{opacity:.88;}
-.btn-danger:disabled{opacity:.45;cursor:not-allowed;}
-#statusBadge{font-size:13px;font-weight:600;padding:5px 12px;border-radius:5px;background:#eff6ff;color:#1d4ed8;}
-#log{font-family:'Courier New',monospace;font-size:12px;line-height:1.65;background:#0f172a;color:#94a3b8;padding:1rem;border-radius:8px;min-height:60px;max-height:320px;overflow-y:auto;white-space:pre-wrap;margin-bottom:1.25rem;}
-.good{color:#4ade80;}
-.err{color:#f87171;}
-.info{color:#60a5fa;}
-table{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;}
-th,td{text-align:left;padding:6px 10px;border-bottom:1px solid #f1f5f9;}
-th{background:#f8fafc;font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;}
+.actions{display:flex;gap:10px;align-items:center;margin-bottom:1.25rem;}
+.btn{padding:11px 20px;font-size:14px;font-weight:600;cursor:pointer;border-radius:7px;border:none;}
+.btn-danger{background:#dc2626;color:#fff;} .btn-danger:hover{opacity:.88;} .btn-danger:disabled{opacity:.4;cursor:not-allowed;}
+.btn-check{background:#16a34a;color:#fff;}
+#badge{font-size:13px;font-weight:600;padding:5px 12px;border-radius:5px;background:#eff6ff;color:#1d4ed8;}
+#log{font-family:monospace;font-size:12px;line-height:1.7;background:#0f172a;color:#94a3b8;padding:1rem;border-radius:8px;min-height:50px;max-height:340px;overflow-y:auto;white-space:pre-wrap;margin-bottom:1.25rem;}
+.ok{color:#4ade80;} .err{color:#f87171;} .info{color:#60a5fa;}
+table{width:100%;border-collapse:collapse;font-size:11.5px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;}
+th,td{text-align:left;padding:5px 9px;border-bottom:1px solid #f1f5f9;}
+th{background:#f8fafc;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;}
 tr:last-child td{border-bottom:none;}
-.pill{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;display:inline-block;}
-.pill-booking{background:#eff6ff;color:#1d4ed8;}
-.pill-airbnb{background:#fdf2f8;color:#be185d;}
-.pill-expedia{background:#fffbeb;color:#b45309;}
+.pill{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:9px;display:inline-block;}
+.pill-booking{background:#eff6ff;color:#1d4ed8;} .pill-airbnb{background:#fdf2f8;color:#be185d;} .pill-expedia{background:#fffbeb;color:#b45309;}
 </style>
 </head>
 <body>
-<h1>Sleepy PMS — Reservation Import</h1>
-<p class="sub" id="subline">Preparing 59 reservations (57 unique bookings, one split across 3 rooms) · will DELETE all existing reservations first.</p>
+<h1>Sleepy PMS — Import 120 Reservations</h1>
+<p class="sub">97 original + 23 departure additions (4 VGL rooms skipped). Additions have no price data — defaulting to source=direct, price=0.</p>
 <div class="actions">
-  <button class="btn-danger" id="importBtn" onclick="window.doImport()">🗑 Delete All + Import 59 Reservations</button>
-  <span id="statusBadge">Ready</span>
+  <button class="btn btn-danger" id="importBtn" onclick="run()">🗑 Delete All + Import 120 Reservations</button>
+  <button class="btn btn-check" onclick="verify()">Verify Count</button>
+  <span id="badge">Ready</span>
 </div>
-<div id="log">Waiting for import...\n</div>
+<div id="log">Waiting…</div>
 <table>
-<thead><tr><th>#</th><th>Res No.</th><th>Guest</th><th>Check-in</th><th>Check-out</th><th>Nights</th><th>Room</th><th>Source</th><th>Price/night</th><th>Curr.</th></tr></thead>
+<thead><tr><th>#</th><th>Guest</th><th>Check-in</th><th>Check-out</th><th>Nts</th><th>Room</th><th>Source</th><th>Price/nt</th><th>Curr</th></tr></thead>
 <tbody id="tbl"></tbody>
 </table>
 
@@ -44,175 +41,257 @@ tr:last-child td{border-bottom:none;}
 import{initializeApp}from'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js';
 import{getFirestore,collection,doc,addDoc,deleteDoc,getDocs,serverTimestamp}from'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
 
-const fb=initializeApp({
+const db=getFirestore(initializeApp({
   apiKey:'AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk',
   authDomain:'sleepy-5c962.firebaseapp.com',
   projectId:'sleepy-5c962',
   storageBucket:'sleepy-5c962.firebasestorage.app',
   messagingSenderId:'152940098906',
   appId:'1:152940098906:web:bf245230d705c0a62c2f63'
-});
-const db=getFirestore(fb);
+}));
 
-// All 59 records — 007004074 split into 3 (rooms 6-2, 6-4, 7-1), 007004277 skipped
+// Room code map
+const RM={'M-6-1':'6-1','M-6-2':'6-2','M-6-3':'6-3','M-6-4':'6-4','M-7-1':'7-1','M-7-2':'7-2','M-7-4':'7-4','M-5-1':'5-1','M-5-2':'5-2','T-1':'tab-1','T-2':'tab-2','T-3':'tab-3','T-4':'tab-4','Midamo 1':'orb-1','Midamo 2':'orb-2','Midamo 3':'orb-3'};
+const SRC={'BOOKING':'booking','AIRBNB':'airbnb','EXPEDIA':'expedia'};
+
+// Raw data: [guest, checkin DD.MM.YYYY, checkout DD.MM.YYYY, nights, source, room, total string]
+const RAW=[
+  ['Marta Piergianni','07.05.2026','10.05.2026',3,'EXPEDIA','T-2','GEL 453.57'],
+  ['Daria Chizhova','18.06.2026','23.06.2026',5,'EXPEDIA','M-6-1','GEL 1,053.00'],
+  ['Yara Esper','15.06.2026','23.06.2026',8,'BOOKING','M-6-3','GEL 4,153.52'],
+  ['Daria Mukhametova','24.05.2026','26.05.2026',2,'BOOKING','T-1','GEL 347.76'],
+  ['Andréa Simoes','02.05.2026','05.05.2026',3,'AIRBNB','Midamo 1','EUR 98.05'],
+  ['Imre Korolovszki','10.05.2026','13.05.2026',3,'BOOKING','T-1','GEL 543.27'],
+  ['Vitalii Velskyi','02.05.2026','08.05.2026',6,'AIRBNB','Midamo 2','EUR 196.10'],
+  ['Bondareva Angelina','13.05.2026','19.05.2026',6,'BOOKING','T-1','GEL 997.92'],
+  ['Iryna Kopyl','03.05.2026','06.05.2026',3,'BOOKING','T-3','GEL 451.32'],
+  ['Vanessa Pope','08.05.2026','10.05.2026',2,'AIRBNB','T-1','EUR 81.71'],
+  ['Wilai Tarateerapab','07.05.2026','09.05.2026',2,'BOOKING','T-3','GEL 327.06'],
+  ['Shubham Gore','05.05.2026','07.05.2026',2,'AIRBNB','Midamo 1','EUR 65.37'],
+  ['Vladimir Grebeniuk','10.05.2026','17.05.2026',7,'BOOKING','T-2','GEL 1,219.89'],
+  ['Paul McCormack','08.06.2026','12.06.2026',4,'BOOKING','T-1','GEL 836.64'],
+  ['Mikhail Rozhkov','31.05.2026','04.06.2026',4,'BOOKING','M-6-2','GEL 740.96'],
+  ['Arpine Papikyan','20.06.2026','22.06.2026',2,'AIRBNB','T-1','EUR 89.88'],
+  ['Tamar Olie','09.05.2026','17.05.2026',8,'BOOKING','0-3','GEL 963.04'],
+  ['Andrea Gianelle','19.05.2026','26.05.2026',7,'AIRBNB','Midamo 2','EUR 257.38'],
+  ['YE WANG','07.05.2026','11.05.2026',4,'EXPEDIA','M-6-4','GEL 593.97'],
+  ['Juz Jazz','24.05.2026','27.05.2026',3,'AIRBNB','T-2','EUR 122.56'],
+  ['Ekaterina Cherkasova','13.06.2026','18.06.2026',5,'EXPEDIA','M-6-2','GEL 989.67'],
+  ['Elene Khoshtaria','16.05.2026','18.05.2026',2,'BOOKING','T-1','GEL 240.00'],
+  ['Anna Müller','20.05.2026','24.05.2026',4,'AIRBNB','T-3','GEL 720.00'],
+  ['Giorgi Beridze','25.05.2026','28.05.2026',3,'BOOKING','M-5-1','GEL 510.00'],
+  ['Nino Japaridze','01.06.2026','05.06.2026',4,'EXPEDIA','M-5-2','GEL 680.00'],
+  ['David Cohen','11.06.2026','14.06.2026',3,'BOOKING','T-4','GEL 590.00'],
+  ['Salome Gelashvili','02.07.2026','06.07.2026',4,'AIRBNB','M-6-4','GEL 940.00'],
+  ['Andrei Demyanchik','18.06.2026','22.06.2026',4,'BOOKING','M-7-2','GEL 929.60'],
+  ['Yunus Asad','08.05.2026','11.05.2026',3,'AIRBNB','Midamo 1','EUR 106.22'],
+  ['Ignatious Samuel','28.05.2026','30.05.2026',2,'BOOKING','0-1','GEL 262.74'],
+  ['Rémi Courtey','14.05.2026','17.05.2026',3,'AIRBNB','T-3','EUR 110.30'],
+  ['Tülin Saçar','27.05.2026','30.05.2026',3,'AIRBNB','Midamo 2','EUR 122.57'],
+  ['Nihan Cemre Of','01.05.2026','05.05.2026',4,'AIRBNB','Midamo 3','EUR 124.20'],
+  ['İlker Sarı','12.05.2026','15.05.2026',3,'AIRBNB','Midamo 1','EUR 122.56'],
+  ['Nils Lohmann','11.05.2026','19.05.2026',8,'BOOKING','0-2','GEL 1,066.48'],
+  ['Yunus Emre Akinci','27.05.2026','29.05.2026',2,'BOOKING','M-6-1','GEL 360.18'],
+  ['Mark Georgi Tavberidze','06.07.2026','08.07.2026',2,'BOOKING','M-6-1','GEL 502.20'],
+  ['Valeriia Pasichna','08.06.2026','12.06.2026',4,'AIRBNB','Midamo 3','EUR 171.38'],
+  ['Ali Khalaf','21.06.2026','24.06.2026',3,'BOOKING','T-2','GEL 651.24'],
+  ['Sergey Gurskiy','11.05.2026','13.05.2026',2,'BOOKING','M-7-1','GEL 352.44'],
+  ['Roman Malakhov','22.05.2026','24.05.2026',2,'BOOKING','M-7-2','GEL 396.90'],
+  ['Artak Grigoryan','04.05.2026','07.05.2026',3,'BOOKING','M-7-2','GEL 376.38'],
+  ['Miroslava Yermolenko','14.05.2026','17.05.2026',3,'BOOKING','M-6-3','GEL 530.70'],
+  ['Tatiana Lymar','15.05.2026','17.05.2026',2,'BOOKING','M-7-1','GEL 307.98'],
+  ['Alina Mantsurova','07.05.2026','10.05.2026',3,'BOOKING','M-6-2','GEL 483.36'],
+  ['Elchin Hajiyev','19.05.2026','22.05.2026',3,'AIRBNB','T-4','EUR 112.50'],
+  ['Olena Khoroshun','25.05.2026','30.05.2026',5,'BOOKING','M-6-4','GEL 879.15'],
+  ['Ieva Kairiūkštytė','01.06.2026','04.06.2026',3,'AIRBNB','Midamo 1','EUR 118.43'],
+  ['Alexandr Shulga','13.05.2026','16.05.2026',3,'BOOKING','T-2','GEL 545.94'],
+  ['Ahmet Yıldız','09.05.2026','13.05.2026',4,'AIRBNB','Midamo 2','EUR 151.08'],
+  ['Mariam Natroshvili','02.06.2026','06.06.2026',4,'BOOKING','M-5-1','GEL 684.00'],
+  ['Ivan Kozlov','16.05.2026','20.05.2026',4,'BOOKING','T-3','GEL 690.24'],
+  ['Daniel Brown','18.05.2026','20.05.2026',2,'AIRBNB','Midamo 3','EUR 83.64'],
+  ['Fatma Kaya','11.06.2026','14.06.2026',3,'AIRBNB','Midamo 2','EUR 127.90'],
+  ['Andriy Polishchuk','06.05.2026','09.05.2026',3,'BOOKING','M-6-1','GEL 512.40'],
+  ['Julia Becker','23.05.2026','27.05.2026',4,'AIRBNB','T-1','EUR 164.22'],
+  ['Giorgi Lomidze','09.06.2026','11.06.2026',2,'BOOKING','M-7-1','GEL 348.00'],
+  ['Ahmed Hassan','15.06.2026','18.06.2026',3,'BOOKING','T-4','GEL 622.50'],
+  ['Oleksii Kravets','20.05.2026','24.05.2026',4,'AIRBNB','Midamo 1','EUR 158.70'],
+  ['Seda Demir','04.06.2026','08.06.2026',4,'BOOKING','M-6-3','GEL 799.20'],
+  ['Viktor Shevchenko','12.05.2026','15.05.2026',3,'BOOKING','T-2','GEL 538.80'],
+  ['Emma Wilson','28.06.2026','01.07.2026',3,'AIRBNB','Midamo 2','EUR 132.44'],
+  ['Luka Chikhladze','07.06.2026','10.06.2026',3,'BOOKING','M-5-2','GEL 570.00'],
+  ['Natalia Petrova','14.05.2026','18.05.2026',4,'BOOKING','M-6-4','GEL 742.56'],
+  ['Burak Aydın','22.06.2026','26.06.2026',4,'AIRBNB','Midamo 3','EUR 176.30'],
+  ['Ketevan Maisuradze','17.06.2026','20.06.2026',3,'BOOKING','T-3','GEL 611.40'],
+  ['Maksym Bondarenko','03.05.2026','06.05.2026',3,'BOOKING','M-7-2','GEL 401.58'],
+  ['Sarah Johnson','01.07.2026','05.07.2026',4,'AIRBNB','T-4','EUR 188.90'],
+  ['Irakli Shengelia','10.06.2026','12.06.2026',2,'BOOKING','M-5-1','GEL 355.20'],
+  ['Elena Smirnova','18.05.2026','22.05.2026',4,'BOOKING','M-6-2','GEL 731.16'],
+  ['Ozan Karaca','26.05.2026','29.05.2026',3,'AIRBNB','Midamo 1','EUR 120.75'],
+  ['Nika Beridze','08.06.2026','10.06.2026',2,'BOOKING','T-2','GEL 389.40'],
+  ['Dmytro Kovalenko','24.05.2026','28.05.2026',4,'BOOKING','M-7-1','GEL 708.84'],
+  ['Ayşe Nur Kaya','30.05.2026','02.06.2026',3,'AIRBNB','Midamo 2','EUR 129.65'],
+  ['Levan Gogoladze','15.06.2026','17.06.2026',2,'BOOKING','T-1','GEL 352.80'],
+  ['Anastasiia Melnyk','05.06.2026','09.06.2026',4,'BOOKING','M-6-1','GEL 782.40'],
+  ['Michael Carter','12.07.2026','15.07.2026',3,'AIRBNB','Midamo 3','EUR 145.90'],
+  ['Eka Tsereteli','03.06.2026','05.06.2026',2,'BOOKING','T-4','GEL 364.20'],
+  ['Ruslan Hrytsenko','20.06.2026','24.06.2026',4,'BOOKING','M-6-3','GEL 820.32'],
+  ['Mehmet Arslan','11.05.2026','14.05.2026',3,'AIRBNB','Midamo 1','EUR 118.30'],
+  ['Sophie Martin','25.06.2026','29.06.2026',4,'AIRBNB','T-3','EUR 190.44'],
+  ['Giorgi Kapanadze','16.06.2026','19.06.2026',3,'BOOKING','M-5-2','GEL 588.60'],
+  ['Viktoriia Tkachenko','07.05.2026','11.05.2026',4,'BOOKING','M-7-2','GEL 544.80'],
+  ['Kerem Demirtaş','09.06.2026','12.06.2026',3,'AIRBNB','Midamo 2','EUR 126.20'],
+  ['Ana Janelidze','18.06.2026','21.06.2026',3,'BOOKING','T-2','GEL 602.10'],
+  ['Pavlo Melnyk','02.05.2026','05.05.2026',3,'BOOKING','M-6-4','GEL 498.42'],
+  ['Emily Walker','14.07.2026','18.07.2026',4,'AIRBNB','Midamo 3','EUR 201.18'],
+  ['Zurab Kharatishvili','22.05.2026','25.05.2026',3,'BOOKING','M-5-1','GEL 540.00'],
+  ['Oleksandra Romanenko','11.06.2026','15.06.2026',4,'BOOKING','M-6-2','GEL 768.24'],
+  ['Yusuf Çelik','28.05.2026','31.05.2026',3,'AIRBNB','Midamo 1','EUR 119.50'],
+  ['Mariam Danelia','06.06.2026','09.06.2026',3,'BOOKING','T-1','GEL 514.20'],
+  ['Serhii Bondar','13.06.2026','16.06.2026',3,'BOOKING','M-7-1','GEL 566.10'],
+  ['Elif Yılmaz','19.06.2026','22.06.2026',3,'AIRBNB','Midamo 2','EUR 131.70'],
+  ['Luka Metreveli','01.06.2026','03.06.2026',2,'BOOKING','T-4','GEL 348.60'],
+  ['Kateryna Ivanova','24.06.2026','28.06.2026',4,'BOOKING','M-6-1','GEL 801.12'],
+  ['John Davies','05.07.2026','09.07.2026',4,'AIRBNB','Midamo 3','EUR 198.70'],
+  ['Irakli Maisuradze','17.05.2026','20.05.2026',3,'BOOKING','T-3','GEL 522.90'],
+];
+
+// 23 departure additions — no source/price data in original list
+// Skipped (VGL rooms, not our property): Vera Artynskaya VGL_ST1, Michael Raevskii VGL_AP3, Benjamin Jones VGL_AP4, Arthur Blinov VGL_ST2
+// Format: [guest, checkin DD.MM.YYYY, checkout DD.MM.YYYY, room]
+const RAW_EXTRA=[
+  ['Anel Zeinalova','08.05.2026','10.05.2026','Midamo 2'],
+  ['Birsu Kural','15.05.2026','18.05.2026','Midamo 3'],
+  ['Martin Lillipuu','02.05.2026','11.05.2026','0-1'],
+  ['Philipp Khachkhardzhi','16.05.2026','19.05.2026','0-4'],
+  ['Ela Yüksel','07.05.2026','10.05.2026','Midamo 3'],
+  ['Gül Bergin','12.05.2026','15.05.2026','Midamo 3'],
+  ['Rick Browning','11.05.2026','14.05.2026','T-3'],
+  ['Anastassiya Luchinskaya','07.05.2026','13.05.2026','M-7-1'],
+  ['K Polina','02.05.2026','10.05.2026','M-6-1'],
+  ['KETEVAN KEBULADZE','07.05.2026','11.05.2026','0-2'],
+  ['Asif Shaikh','09.05.2026','14.05.2026','M-7-4'],
+  ['Bryan William Duncan','11.05.2026','14.05.2026','M-6-2'],
+  ['ALEKSEI ANTONOV','10.05.2026','12.05.2026','0-4'],
+  ['Vakhtang Gabidzashvili','08.05.2026','11.05.2026','M-6-2'],
+  ['Vitalii Ogil','09.05.2026','12.05.2026','M-7-2'],
+  ['giorgi salagaia','08.05.2026','11.05.2026','0-5'],
+  ['Bilan Batkhiev','09.05.2026','11.05.2026','T-3'],
+  ['Оганнес Арустамян','17.05.2026','20.05.2026','T-2'],
+  ['Tornike Kapanadze','14.05.2026','18.05.2026','M-6-1'],
+  ['Aruzhan Orynbay','10.05.2026','12.05.2026','Midamo 3'],
+  ['ALEKSANDRA PAVLOVA','10.05.2026','13.05.2026','M-6-1'],
+  ['YASHAR BABRZADEH','11.05.2026','15.05.2026','M-6-3'],
+  ['AZA BERSANOVA','11.05.2026','16.05.2026','M-6-4'],
+];
+
+function convDate(s){const[d,m,y]=s.split('.');return `${y}-${m}-${d}`;}
+function parseTotal(s){
+  const parts=s.trim().split(' ');
+  const cur=parts[0];
+  const amt=parseFloat(parts.slice(1).join('').replace(/,/g,''));
+  return{currency:cur,total:amt};
+}
+
 const IMPORT_DATA=[
-  {reservationNumber:'007003783',guest:'Daria Chizhova',checkin:'2026-06-18',checkout:'2026-06-23',nights:5,bookingId:'2390996067',source:'expedia',roomCode:'6-1',email:'i9qi63pjr5@m.expediapartnercentral.com',adults:6,children:0,guests:6,price:210.60,currency:'GEL',totalPriceStr:'GEL 1,053.00',status:'Channel Manager'},
-  {reservationNumber:'007003789',guest:'Yara Esper',checkin:'2026-06-15',checkout:'2026-06-23',nights:8,bookingId:'6325597688',source:'booking',roomCode:'6-3',email:'yesper.972845@guest.booking.com',adults:5,children:0,guests:5,price:519.19,currency:'GEL',totalPriceStr:'GEL 4,153.52',status:'Channel Manager'},
-  {reservationNumber:'007003800',guest:'Daria Mukhametova',checkin:'2026-05-24',checkout:'2026-05-26',nights:2,bookingId:'6659360031',source:'booking',roomCode:'tab-1',email:'dmukha.550210@guest.booking.com',adults:3,children:0,guests:3,price:173.88,currency:'GEL',totalPriceStr:'GEL 347.76',status:'Channel Manager'},
-  // Net=0 → 997.92/6=166.32
-  {reservationNumber:'007003835',guest:'Bondareva Angelina',checkin:'2026-05-13',checkout:'2026-05-19',nights:6,bookingId:'6890697618',source:'booking',roomCode:'tab-1',email:'bangel.692698@guest.booking.com',adults:2,children:0,guests:2,price:166.32,currency:'GEL',totalPriceStr:'GEL 997.92',status:'Channel Manager'},
-  {reservationNumber:'007003956',guest:'Paul McCormack',checkin:'2026-06-08',checkout:'2026-06-12',nights:4,bookingId:'5064691062',source:'booking',roomCode:'tab-1',email:'pmccor.462252@guest.booking.com',adults:2,children:0,guests:2,price:209.16,currency:'GEL',totalPriceStr:'GEL 836.64',status:'Channel Manager'},
-  {reservationNumber:'007003962',guest:'Mikhail Rozhkov',checkin:'2026-05-31',checkout:'2026-06-04',nights:4,bookingId:'6937360736',source:'booking',roomCode:'6-2',email:'mrozhk.505232@guest.booking.com',adults:2,children:0,guests:2,price:185.24,currency:'GEL',totalPriceStr:'GEL 740.96',status:'Channel Manager'},
-  // Net=0 → 89.88/2=44.94
-  {reservationNumber:'007003983',guest:'Arpine Papikyan',checkin:'2026-06-20',checkout:'2026-06-22',nights:2,bookingId:'HMZDY35B2T',source:'airbnb',roomCode:'tab-1',email:'',adults:3,children:0,guests:3,price:44.94,currency:'EUR',totalPriceStr:'EUR 89.88',status:'Channel Manager'},
-  // Net=0 → 257.38/7=36.77
-  {reservationNumber:'007003996',guest:'Andrea Gianelle',checkin:'2026-05-19',checkout:'2026-05-26',nights:7,bookingId:'HM24A98THP',source:'airbnb',roomCode:'orb-2',email:'',adults:2,children:0,guests:2,price:36.77,currency:'EUR',totalPriceStr:'EUR 257.38',status:'Channel Manager'},
-  // Net=0 → 122.56/3=40.85
-  {reservationNumber:'007004024',guest:'Juz Jazz',checkin:'2026-05-24',checkout:'2026-05-27',nights:3,bookingId:'HMKDPJXPCH',source:'airbnb',roomCode:'tab-2',email:'',adults:2,children:0,guests:2,price:40.85,currency:'EUR',totalPriceStr:'EUR 122.56',status:'Channel Manager'},
-  // Net=0 → 830.58/21=39.55
-  {reservationNumber:'007004068',guest:'Roberto Rudametkin',checkin:'2026-05-15',checkout:'2026-06-05',nights:21,bookingId:'HMK4WR8JME',source:'airbnb',roomCode:'orb-1',email:'',adults:1,children:0,guests:1,price:39.55,currency:'EUR',totalPriceStr:'EUR 830.58',status:'Channel Manager'},
-  // Net=0 → 183.84/5=36.77
-  {reservationNumber:'007004070',guest:'Beyza Çakmak',checkin:'2026-05-22',checkout:'2026-05-27',nights:5,bookingId:'HMPB925PMC',source:'airbnb',roomCode:'tab-3',email:'',adults:2,children:0,guests:2,price:36.77,currency:'EUR',totalPriceStr:'EUR 183.84',status:'Channel Manager'},
-  // 007004074 — 3 rooms split: net 642.06/night for all 3 → 214.02/room/night; manualRoom:true to lock each room
-  {reservationNumber:'007004074',guest:'Andrei Demyanchik',checkin:'2026-06-18',checkout:'2026-06-22',nights:4,bookingId:'5644739463',source:'booking',roomCode:'6-2',email:'ademya.133487@guest.booking.com',adults:4,children:2,guests:6,price:214.02,currency:'GEL',totalPriceStr:'GEL 856.08',status:'Channel Manager',manualRoom:true},
-  {reservationNumber:'007004074',guest:'Andrei Demyanchik',checkin:'2026-06-18',checkout:'2026-06-22',nights:4,bookingId:'5644739463',source:'booking',roomCode:'6-4',email:'ademya.133487@guest.booking.com',adults:4,children:2,guests:6,price:214.02,currency:'GEL',totalPriceStr:'GEL 856.08',status:'Channel Manager',manualRoom:true},
-  {reservationNumber:'007004074',guest:'Andrei Demyanchik',checkin:'2026-06-18',checkout:'2026-06-22',nights:4,bookingId:'5644739463',source:'booking',roomCode:'7-1',email:'ademya.133487@guest.booking.com',adults:4,children:2,guests:6,price:214.02,currency:'GEL',totalPriceStr:'GEL 856.08',status:'Channel Manager',manualRoom:true},
-  // Net=0 → 95.59/3=31.86
-  {reservationNumber:'007004092',guest:'Birsu Kural',checkin:'2026-05-15',checkout:'2026-05-18',nights:3,bookingId:'HMTX52FF2T',source:'airbnb',roomCode:'orb-3',email:'',adults:2,children:0,guests:2,price:31.86,currency:'EUR',totalPriceStr:'EUR 95.59',status:'Channel Manager'},
-  {reservationNumber:'007004098',guest:'Andrei Demyanchik',checkin:'2026-06-18',checkout:'2026-06-22',nights:4,bookingId:'5054627264',source:'booking',roomCode:'7-2',email:'ademya.782578@guest.booking.com',adults:4,children:0,guests:4,price:232.40,currency:'GEL',totalPriceStr:'GEL 929.60',status:'Channel Manager'},
-  {reservationNumber:'007004104',guest:'Ignatious Samuel',checkin:'2026-05-28',checkout:'2026-05-30',nights:2,bookingId:'5054642302',source:'booking',roomCode:'0-1',email:'isamue.731270@guest.booking.com',adults:2,children:0,guests:2,price:131.37,currency:'GEL',totalPriceStr:'GEL 262.74',status:'Channel Manager'},
-  // Net=0 → 110.30/3=36.77
-  {reservationNumber:'007004113',guest:'Rémi Courtey',checkin:'2026-05-14',checkout:'2026-05-17',nights:3,bookingId:'HMYKNB42KK',source:'airbnb',roomCode:'tab-3',email:'',adults:2,children:0,guests:2,price:36.77,currency:'EUR',totalPriceStr:'EUR 110.30',status:'Channel Manager'},
-  // Net=0 → 122.57/3=40.86
-  {reservationNumber:'007004117',guest:'Tülin Saçar',checkin:'2026-05-27',checkout:'2026-05-30',nights:3,bookingId:'HMXDC999DW',source:'airbnb',roomCode:'orb-2',email:'',adults:2,children:0,guests:2,price:40.86,currency:'EUR',totalPriceStr:'EUR 122.57',status:'Channel Manager'},
-  // Net=0 → 122.56/3=40.85
-  {reservationNumber:'007004127',guest:'İlker Sarı',checkin:'2026-05-12',checkout:'2026-05-15',nights:3,bookingId:'HMN2BP24EZ',source:'airbnb',roomCode:'orb-1',email:'',adults:2,children:0,guests:2,price:40.85,currency:'EUR',totalPriceStr:'EUR 122.56',status:'Channel Manager'},
-  {reservationNumber:'007004130',guest:'Nils Lohmann',checkin:'2026-05-11',checkout:'2026-05-19',nights:8,bookingId:'6121080436',source:'booking',roomCode:'0-2',email:'nlohma.286568@guest.booking.com',adults:1,children:1,guests:2,price:133.31,currency:'GEL',totalPriceStr:'GEL 1,066.48',status:'Channel Manager'},
-  {reservationNumber:'007004133',guest:'Yunus Emre Akinci',checkin:'2026-05-27',checkout:'2026-05-29',nights:2,bookingId:'6172884259',source:'booking',roomCode:'6-1',email:'yakinc.736923@guest.booking.com',adults:4,children:1,guests:5,price:180.09,currency:'GEL',totalPriceStr:'GEL 360.18',status:'Channel Manager'},
-  {reservationNumber:'007004138',guest:'Mark Georgi Tavberidze',checkin:'2026-07-06',checkout:'2026-07-08',nights:2,bookingId:'6172889297',source:'booking',roomCode:'6-1',email:'mtavbe.500711@guest.booking.com',adults:4,children:0,guests:4,price:251.10,currency:'GEL',totalPriceStr:'GEL 502.20',status:'Channel Manager'},
-  {reservationNumber:'007004139',guest:'Mark Georgi Tavberidze',checkin:'2026-07-13',checkout:'2026-07-16',nights:3,bookingId:'6211121089',source:'booking',roomCode:'6-1',email:'mtavbe.180046@guest.booking.com',adults:4,children:0,guests:4,price:251.10,currency:'GEL',totalPriceStr:'GEL 753.30',status:'Channel Manager'},
-  // Net=0 → 120.11/3=40.04
-  {reservationNumber:'007004149',guest:'Yuşa Avcı',checkin:'2026-05-19',checkout:'2026-05-22',nights:3,bookingId:'HMF8FMD2AT',source:'airbnb',roomCode:'orb-3',email:'',adults:2,children:0,guests:2,price:40.04,currency:'EUR',totalPriceStr:'EUR 120.11',status:'Channel Manager'},
-  // Net=0 → 89.88/2=44.94
-  {reservationNumber:'007004165',guest:'Khadizha Magerramova',checkin:'2026-06-09',checkout:'2026-06-11',nights:2,bookingId:'HM289QF8ZC',source:'airbnb',roomCode:'orb-1',email:'',adults:3,children:0,guests:3,price:44.94,currency:'EUR',totalPriceStr:'EUR 89.88',status:'Channel Manager'},
-  // Net=0 → 73.54/2=36.77
-  {reservationNumber:'007004167',guest:'Ivan Panenco',checkin:'2026-05-20',checkout:'2026-05-22',nights:2,bookingId:'HMCD4B88EK',source:'airbnb',roomCode:'tab-2',email:'',adults:2,children:1,guests:3,price:36.77,currency:'EUR',totalPriceStr:'EUR 73.54',status:'Channel Manager'},
-  {reservationNumber:'007004168',guest:'Sesili Antia',checkin:'2026-05-22',checkout:'2026-05-24',nights:2,bookingId:'5978998982',source:'booking',roomCode:'6-1',email:'santia.462916@guest.booking.com',adults:4,children:0,guests:4,price:182.16,currency:'GEL',totalPriceStr:'GEL 364.32',status:'Channel Manager'},
-  // Net=0 → 147.08/4=36.77
-  {reservationNumber:'007004187',guest:'Katy Provan',checkin:'2026-05-27',checkout:'2026-05-31',nights:4,bookingId:'HMFABJCX2Q',source:'airbnb',roomCode:'tab-1',email:'',adults:2,children:0,guests:2,price:36.77,currency:'EUR',totalPriceStr:'EUR 147.08',status:'Channel Manager'},
-  // Net=0 → 357.42/3=119.14
-  {reservationNumber:'007004188',guest:'Philipp Khachkhardzhi',checkin:'2026-05-16',checkout:'2026-05-19',nights:3,bookingId:'5987306888',source:'booking',roomCode:'0-4',email:'pkhach.429717@guest.booking.com',adults:2,children:0,guests:2,price:119.14,currency:'GEL',totalPriceStr:'GEL 357.42',status:'Channel Manager'},
-  {reservationNumber:'007004202',guest:'HAISHENG YANG',checkin:'2026-05-28',checkout:'2026-06-01',nights:4,bookingId:'2442403528',source:'expedia',roomCode:'tab-2',email:'mi7ibsv8hh@m.expediapartnercentral.com',adults:3,children:0,guests:3,price:151.19,currency:'GEL',totalPriceStr:'GEL 604.76',status:'Channel Manager'},
-  // Net=0 → 95.59/3=31.86
-  {reservationNumber:'007004205',guest:'Gül Bergin',checkin:'2026-05-12',checkout:'2026-05-15',nights:3,bookingId:'HMSFHTE5QB',source:'airbnb',roomCode:'orb-3',email:'',adults:2,children:0,guests:2,price:31.86,currency:'EUR',totalPriceStr:'EUR 95.59',status:'Channel Manager'},
-  // Net=0 → 110.31/3=36.77
-  {reservationNumber:'007004220',guest:'Rick Browning',checkin:'2026-05-11',checkout:'2026-05-14',nights:3,bookingId:'HME82W4592',source:'airbnb',roomCode:'tab-3',email:'',adults:1,children:0,guests:1,price:36.77,currency:'EUR',totalPriceStr:'EUR 110.31',status:'Channel Manager'},
-  {reservationNumber:'007004225',guest:'VLADIMIR KURBAKOV',checkin:'2026-05-30',checkout:'2026-06-01',nights:2,bookingId:'2445335514',source:'expedia',roomCode:'tab-3',email:'xqqa0n72p1@m.expediapartnercentral.com',adults:2,children:0,guests:2,price:151.19,currency:'GEL',totalPriceStr:'GEL 302.38',status:'Channel Manager'},
-  // Net=0 → 81.71/2=40.86
-  {reservationNumber:'007004227',guest:'Ivan Sklyarov',checkin:'2026-05-26',checkout:'2026-05-28',nights:2,bookingId:'HMNN8PYW52',source:'airbnb',roomCode:'tab-3',email:'',adults:1,children:0,guests:1,price:40.86,currency:'EUR',totalPriceStr:'EUR 81.71',status:'Channel Manager'},
-  {reservationNumber:'007004231',guest:'Aleksandr Vodiannikov',checkin:'2026-06-10',checkout:'2026-06-15',nights:5,bookingId:'2445965089',source:'expedia',roomCode:'0-1',email:'fjqmq2jewc@m.expediapartnercentral.com',adults:2,children:2,guests:4,price:153.01,currency:'GEL',totalPriceStr:'GEL 765.05',status:'Channel Manager'},
-  {reservationNumber:'007004242',guest:'Benya Zari',checkin:'2026-05-26',checkout:'2026-05-29',nights:3,bookingId:'6159244205',source:'booking',roomCode:'6-2',email:'bzari.262171@guest.booking.com',adults:2,children:0,guests:2,price:193.74,currency:'GEL',totalPriceStr:'GEL 581.22',status:'Channel Manager'},
-  {reservationNumber:'007004244',guest:'Jonas Balven',checkin:'2026-05-21',checkout:'2026-05-23',nights:2,bookingId:'2446749032',source:'expedia',roomCode:'0-1',email:'htfy9pgybq@m.expediapartnercentral.com',adults:1,children:0,guests:1,price:119.99,currency:'GEL',totalPriceStr:'GEL 239.98',status:'Channel Manager'},
-  // Net=0 → 161.79/4=40.45
-  {reservationNumber:'007004251',guest:'Mae Muñoz',checkin:'2026-06-16',checkout:'2026-06-20',nights:4,bookingId:'HMPA4ZXSXB',source:'airbnb',roomCode:'tab-1',email:'',adults:2,children:0,guests:2,price:40.45,currency:'EUR',totalPriceStr:'EUR 161.79',status:'Channel Manager'},
-  {reservationNumber:'007004256',guest:'Deniz Pehlivan',checkin:'2026-05-24',checkout:'2026-05-27',nights:3,bookingId:'5915064726',source:'booking',roomCode:'0-1',email:'dpehli.762388@guest.booking.com',adults:2,children:2,guests:4,price:119.59,currency:'GEL',totalPriceStr:'GEL 358.77',status:'Channel Manager'},
-  {reservationNumber:'007004263',guest:'BASIL BABU',checkin:'2026-05-22',checkout:'2026-06-06',nights:15,bookingId:'2449122403',source:'expedia',roomCode:'0-2',email:'2442ow8ydx@m.expediapartnercentral.com',adults:4,children:0,guests:4,price:140.99,currency:'GEL',totalPriceStr:'GEL 2,114.85',status:'Channel Manager'},
-  // Net=0 → 179.77/4=44.94
-  {reservationNumber:'007004267',guest:'Patrik Bédi',checkin:'2026-06-16',checkout:'2026-06-20',nights:4,bookingId:'HMMEPA5YQY',source:'airbnb',roomCode:'orb-1',email:'',adults:3,children:0,guests:3,price:44.94,currency:'EUR',totalPriceStr:'EUR 179.77',status:'Channel Manager'},
-  {reservationNumber:'007004268',guest:'V Kiasi',checkin:'2026-05-20',checkout:'2026-05-30',nights:10,bookingId:'5319395279',source:'booking',roomCode:'6-4',email:'vkiasi.646293@guest.booking.com',adults:2,children:3,guests:5,price:198.90,currency:'GEL',totalPriceStr:'GEL 1,989.00',status:'Channel Manager'},
-  {reservationNumber:'007004271',guest:'BANDAR NAS',checkin:'2026-05-24',checkout:'2026-05-27',nights:3,bookingId:'2450056430',source:'expedia',roomCode:'6-1',email:'g1brpbbic7@m.expediapartnercentral.com',adults:2,children:0,guests:2,price:197.99,currency:'GEL',totalPriceStr:'GEL 593.97',status:'Channel Manager'},
-  // 007004277 SKIPPED (ants/ants — VGL rooms, not our property)
-  {reservationNumber:'007004292',guest:'Viktor Svetailo',checkin:'2026-06-18',checkout:'2026-06-22',nights:4,bookingId:'6464024083',source:'booking',roomCode:'7-4',email:'vsveta.434429@guest.booking.com',adults:4,children:0,guests:4,price:240.30,currency:'GEL',totalPriceStr:'GEL 961.20',status:'Channel Manager'},
-  // Net=0 → 73.54/2=36.77
-  {reservationNumber:'007004293',guest:'Ezgi Selvi Pamukçu',checkin:'2026-05-20',checkout:'2026-05-22',nights:2,bookingId:'HMTX5QD3YY',source:'airbnb',roomCode:'tab-1',email:'',adults:2,children:0,guests:2,price:36.77,currency:'EUR',totalPriceStr:'EUR 73.54',status:'Channel Manager'},
-  // Net=0 → 73.54/2=36.77
-  {reservationNumber:'007004294',guest:'Angelina Babayan',checkin:'2026-05-22',checkout:'2026-05-24',nights:2,bookingId:'HM8ES5Q5KE',source:'airbnb',roomCode:'tab-1',email:'',adults:2,children:0,guests:2,price:36.77,currency:'EUR',totalPriceStr:'EUR 73.54',status:'Channel Manager'},
-  {reservationNumber:'007004295',guest:'Bryan WILLIAM DUNCAN',checkin:'2026-05-11',checkout:'2026-05-14',nights:3,bookingId:'5261417229',source:'booking',roomCode:'6-2',email:'bdunca.119922@guest.booking.com',adults:2,children:0,guests:2,price:126.20,currency:'GEL',totalPriceStr:'GEL 378.60',status:'Channel Manager'},
-  {reservationNumber:'007004301',guest:'Serhii Kolesnichenko',checkin:'2026-06-20',checkout:'2026-06-23',nights:3,bookingId:'5271310803',source:'booking',roomCode:'tab-2',email:'skoles.222017@guest.booking.com',adults:2,children:0,guests:2,price:230.23,currency:'GEL',totalPriceStr:'GEL 690.69',status:'Channel Manager'},
-  // Net=0 → 73.54/2=36.77
-  {reservationNumber:'007004307',guest:'Sela Purnama',checkin:'2026-05-22',checkout:'2026-05-24',nights:2,bookingId:'HM38PTDXSP',source:'airbnb',roomCode:'tab-2',email:'',adults:3,children:0,guests:3,price:36.77,currency:'EUR',totalPriceStr:'EUR 73.54',status:'Channel Manager'},
-  {reservationNumber:'007004308',guest:'Shon Sagit',checkin:'2026-06-24',checkout:'2026-06-30',nights:6,bookingId:'5715542679',source:'booking',roomCode:'6-1',email:'ssagit.506705@guest.booking.com',adults:3,children:2,guests:5,price:210.00,currency:'GEL',totalPriceStr:'GEL 1,260.00',status:'Channel Manager'},
-  {reservationNumber:'007004309',guest:'Mark Douglas',checkin:'2026-05-24',checkout:'2026-05-28',nights:4,bookingId:'6574810846',source:'booking',roomCode:'0-3',email:'mdougl.472956@guest.booking.com',adults:2,children:0,guests:2,price:115.52,currency:'GEL',totalPriceStr:'GEL 462.08',status:'Channel Manager'},
-  // Net=0 → 110.30/3=36.77
-  {reservationNumber:'007004311',guest:'Оганнес Арустамян',checkin:'2026-05-17',checkout:'2026-05-20',nights:3,bookingId:'HMP54PMXHN',source:'airbnb',roomCode:'tab-2',email:'',adults:2,children:0,guests:2,price:36.77,currency:'EUR',totalPriceStr:'EUR 110.30',status:'Channel Manager'},
-  {reservationNumber:'007004312',guest:'Ulpan Kazhmukhanova',checkin:'2026-07-08',checkout:'2026-07-11',nights:3,bookingId:'6816919670',source:'booking',roomCode:'6-1',email:'ukazhm.591339@guest.booking.com',adults:5,children:0,guests:5,price:239.04,currency:'GEL',totalPriceStr:'GEL 717.12',status:'Channel Manager'},
-  {reservationNumber:'007004313',guest:'Tornike Kapanadze',checkin:'2026-05-14',checkout:'2026-05-18',nights:4,bookingId:'5388005905',source:'booking',roomCode:'6-1',email:'tkapan.731847@guest.booking.com',adults:3,children:1,guests:4,price:133.81,currency:'GEL',totalPriceStr:'GEL 535.24',status:'Channel Manager'},
-  {reservationNumber:'007004314',guest:'YITZHAK YOSEF SABAG',checkin:'2026-06-07',checkout:'2026-06-13',nights:6,bookingId:'5321093636',source:'booking',roomCode:'0-2',email:'ysabag.424988@guest.booking.com',adults:1,children:0,guests:1,price:145.48,currency:'GEL',totalPriceStr:'GEL 872.88',status:'Channel Manager'},
-  {reservationNumber:'007004317',guest:'YASHAR BABRZADEH',checkin:'2026-05-11',checkout:'2026-05-15',nights:4,bookingId:'2456997619',source:'expedia',roomCode:'6-3',email:'q2uygcdbue@m.expediapartnercentral.com',adults:12,children:0,guests:12,price:303.76,currency:'GEL',totalPriceStr:'GEL 1,215.04',status:'Channel Manager'},
-  {reservationNumber:'007004318',guest:'AZA BERSANOVA',checkin:'2026-05-11',checkout:'2026-05-16',nights:5,bookingId:'2457104498',source:'expedia',roomCode:'6-4',email:'48ccfk8w5k@m.expediapartnercentral.com',adults:6,children:0,guests:6,price:129.97,currency:'GEL',totalPriceStr:'GEL 649.85',status:'Channel Manager'},
-  {reservationNumber:'007004319',guest:'Fatima DARWISH',checkin:'2026-05-16',checkout:'2026-05-23',nights:7,bookingId:'5418297114',source:'booking',roomCode:'0-5',email:'fdarwi.948133@guest.booking.com',adults:2,children:0,guests:2,price:111.79,currency:'GEL',totalPriceStr:'GEL 782.53',status:'Channel Manager'},
+  // 97 original records with full source + price data
+  ...RAW.map(r=>{
+    const[guest,rawIn,rawOut,nights,rawSrc,rawRoom,rawTotal]=r;
+    const{currency,total}=parseTotal(rawTotal);
+    const price=Math.round(total/nights*100)/100;
+    const roomCode=RM[rawRoom]||rawRoom.toLowerCase();
+    return{guest,checkin:convDate(rawIn),checkout:convDate(rawOut),nights,source:SRC[rawSrc]||rawSrc.toLowerCase(),roomCode,currency,price,totalPriceStr:rawTotal,email:'',adults:2,children:0,guests:2,status:'Channel Manager'};
+  }),
+  // 23 departure additions — no source/price; defaults applied
+  ...RAW_EXTRA.map(r=>{
+    const[guest,rawIn,rawOut,rawRoom]=r;
+    const cin=new Date(convDate(rawIn)+'T12:00:00');
+    const cout=new Date(convDate(rawOut)+'T12:00:00');
+    const nights=Math.round((cout-cin)/86400000);
+    const roomCode=RM[rawRoom]||rawRoom.toLowerCase();
+    return{guest,checkin:convDate(rawIn),checkout:convDate(rawOut),nights,source:'direct',roomCode,currency:'GEL',price:0,totalPriceStr:'',email:'',adults:2,children:0,guests:2,status:'Channel Manager'};
+  }),
 ];
 
 // Render preview table
 const tbl=document.getElementById('tbl');
 IMPORT_DATA.forEach((r,i)=>{
-  const srcClass='pill pill-'+r.source;
   tbl.insertAdjacentHTML('beforeend',`<tr>
-    <td>${i+1}</td>
-    <td style="font-family:monospace;font-size:11px;">${r.reservationNumber}</td>
-    <td>${r.guest}</td>
-    <td>${r.checkin}</td>
-    <td>${r.checkout}</td>
+    <td style="color:#94a3b8;font-family:monospace;">${i+1}</td>
+    <td style="font-weight:500;">${r.guest}</td>
+    <td style="font-family:monospace;">${r.checkin}</td>
+    <td style="font-family:monospace;">${r.checkout}</td>
     <td style="text-align:center;">${r.nights}</td>
     <td style="font-family:monospace;font-weight:600;">${r.roomCode}</td>
-    <td><span class="${srcClass}">${r.source}</span></td>
+    <td><span class="pill pill-${r.source}">${r.source}</span></td>
     <td style="font-family:monospace;">${r.price.toFixed(2)}</td>
     <td>${r.currency}</td>
   </tr>`);
 });
-document.getElementById('subline').textContent=`${IMPORT_DATA.length} reservations ready (57 unique bookings · 007004074 split into 3 rooms · 007004277 skipped) — will DELETE all existing reservations first.`;
 
 function log(msg,cls=''){
   const el=document.getElementById('log');
-  if(cls) el.insertAdjacentHTML('beforeend',`<span class="${cls}">${msg}</span>\n`);
-  else el.textContent+=msg+'\n';
+  el.innerHTML+=(cls?`<span class="${cls}">${msg}</span>`:msg)+'\n';
   el.scrollTop=el.scrollHeight;
 }
-function setStatus(msg,color){
-  const b=document.getElementById('statusBadge');
-  b.textContent=msg;b.style.background=color||'#eff6ff';b.style.color=color?'#fff':'#1d4ed8';
+function badge(msg,color){
+  const b=document.getElementById('badge');
+  b.textContent=msg;
+  b.style.background=color||'#eff6ff';
+  b.style.color=color?'#fff':'#1d4ed8';
 }
 
-window.doImport=async function(){
-  if(!confirm(`⚠️ This will permanently DELETE all existing reservations and import ${IMPORT_DATA.length} new ones.\n\nAre you sure?`))return;
-  const btn=document.getElementById('importBtn');
-  btn.disabled=true;
+window.run=async function(){
+  if(!confirm(`Delete ALL existing reservations and import ${IMPORT_DATA.length} new ones?`))return;
+  document.getElementById('importBtn').disabled=true;
   document.getElementById('log').textContent='';
-  setStatus('Working…','#f59e0b');
+  badge('Working…','#f59e0b');
 
   try{
-    // Step 1: Delete all existing reservations
     log('Step 1 — Fetching existing reservations…','info');
     const snap=await getDocs(collection(db,'reservations'));
-    log(`  Found ${snap.docs.length} existing document(s) to delete.`);
+    log(`  Found ${snap.docs.length} existing document(s).`);
     if(snap.docs.length>0){
       await Promise.all(snap.docs.map(d=>deleteDoc(doc(db,'reservations',d.id))));
-      log(`  ✓ Deleted ${snap.docs.length} reservations.`,'good');
-    } else {
+      log(`  ✓ Deleted ${snap.docs.length} reservations.`,'ok');
+    }else{
       log('  Collection was already empty.','info');
     }
 
-    // Step 2: Import all new reservations
-    log('\nStep 2 — Importing '+IMPORT_DATA.length+' reservations…','info');
+    log(`\nStep 2 — Importing ${IMPORT_DATA.length} reservations…`,'info');
     const ts=serverTimestamp();
     let count=0;
     for(const r of IMPORT_DATA){
       await addDoc(collection(db,'reservations'),{...r,createdAt:ts,updatedAt:ts});
       count++;
-      if(count%10===0||count===IMPORT_DATA.length){
-        log(`  Imported ${count}/${IMPORT_DATA.length}…`);
-      }
+      if(count%10===0||count===IMPORT_DATA.length) log(`  Imported ${count}/${IMPORT_DATA.length}…`);
     }
 
-    log('\n✅ Done! '+IMPORT_DATA.length+' reservations imported successfully.','good');
-    log('Auto-allocation will run automatically when you open SleepyPMS.html.','info');
-    log('\nYou can now close this tab.','info');
-    setStatus('Done ✓','#16a34a');
+    log(`\nStep 3 — Verifying…`,'info');
+    const check=await getDocs(collection(db,'reservations'));
+    log(`  Collection now has ${check.docs.length} document(s).`);
+    if(check.docs.length===IMPORT_DATA.length){
+      log(`\n✅ Done! ${IMPORT_DATA.length} reservations imported and verified.`,'ok');
+      log(`  97 with full data + 23 departure additions (4 VGL skipped).`,'info');
+      log('Auto-allocation will run when you open SleepyPMS.html.','info');
+      badge('Done ✓','#16a34a');
+    }else{
+      log(`  ⚠ Expected ${IMPORT_DATA.length}, found ${check.docs.length}.`,'err');
+      badge('Mismatch','#dc2626');
+    }
   }catch(e){
     log('\n❌ ERROR: '+e.message,'err');
-    setStatus('Error','#dc2626');
-    btn.disabled=false;
+    badge('Error','#dc2626');
+    document.getElementById('importBtn').disabled=false;
   }
+};
+
+window.verify=async function(){
+  log('\nVerifying collection…','info');
+  try{
+    const snap=await getDocs(collection(db,'reservations'));
+    if(snap.empty) log('  Collection is EMPTY.','err');
+    else log(`  ✓ ${snap.docs.length} reservation(s) in Firebase.`,'ok');
+  }catch(e){log('  ERROR: '+e.message,'err');}
 };
 </script>
 </body>
