@@ -1135,7 +1135,7 @@ function renderGrid(){
         const checkinMarker=isTruncated?'':'<div class="checkin-marker"></div>';
 
         return `<td class="${cellClass}" ${attrs} onclick="window.cellClick('${prop.id}','${dayStr}','${res.id}')">
-          <div class="res-bar ${srcClass}" data-res-id="${res.id}" draggable="true" style="width:${barW};${isTruncated?'border-radius:0 4px 4px 0;':''}" ondragstart="window.onResDragStart(event,'${res.id}','${dayStr}')" onmouseenter="window._showResTooltip(event,'${res.id}')" onmousemove="window._moveResTooltip(event)" onmouseleave="window._hideResTooltip()" onclick="event.stopPropagation();window.onResBarClick(event,'${res.id}')">
+          <div class="res-bar ${srcClass}" data-res-id="${res.id}" draggable="true" style="width:${barW};${isTruncated?'border-radius:0 4px 4px 0;':''}" onmousedown="window.onResBarMouseDown(event)" ondragstart="window.onResDragStart(event,'${res.id}','${dayStr}')" ondragend="window.onResDragEnd()" onmouseenter="window._showResTooltip(event,'${res.id}')" onmousemove="window._moveResTooltip(event)" onmouseleave="window._hideResTooltip()" onclick="event.stopPropagation();window.onResBarClick(event,'${res.id}')">
             ${leftHandle}
             ${nameText?`<div class="res-bar-guest">${esc(nameText)}${guestBadge}</div>`:''}
             <div class="res-handle res-handle-right" onmousedown="window.onResHandleMouseDown(event,'${res.id}','right')"></div>
@@ -1186,9 +1186,28 @@ window.cellClick=function(propId,dateStr,resId){
 
 // ══════════════ DRAG TO MOVE (horizontal + vertical) ══════════════
 let _dragResId=null,_dragOriginDate=null,_didDrag=false;
+let _dragStartX=null,_dragStartY=null,_dragSnapDate=null;
+
+// Record exact mousedown position so we can enforce an 8px threshold in dragstart
+window.onResBarMouseDown=function(e){
+  _dragStartX=e.clientX;
+  _dragStartY=e.clientY;
+};
+
+function _clearDragHighlight(){
+  if(_dragSnapDate){
+    document.querySelectorAll(`td[data-date="${_dragSnapDate}"]`).forEach(td=>td.style.outline='');
+    _dragSnapDate=null;
+  }
+}
 
 window.onResDragStart=function(e,resId,dateStr){
   if(_resizeState){e.preventDefault();return;}
+  // 8px threshold: cancel drag if mouse hasn't moved far enough from mousedown position
+  if(_dragStartX!==null){
+    const dist=Math.hypot(e.clientX-_dragStartX,e.clientY-_dragStartY);
+    if(dist<8){e.preventDefault();return;}
+  }
   _dragResId=resId;_dragOriginDate=dateStr;_didDrag=false;
   const res=reservations.find(r=>r.id===resId);
   if(res){
@@ -1212,6 +1231,18 @@ window.onDayDragOver=function(e){
   if(!_dragResId)return;
   e.preventDefault();
   e.dataTransfer.dropEffect='move';
+  // Magnetic column highlight — only update DOM when snapped date changes
+  const snapped=_snapDateFromX(e.clientX,null);
+  if(snapped!==_dragSnapDate){
+    if(_dragSnapDate)document.querySelectorAll(`td[data-date="${_dragSnapDate}"]`).forEach(td=>td.style.outline='');
+    if(snapped)document.querySelectorAll(`td[data-date="${snapped}"]`).forEach(td=>td.style.outline='2px solid rgba(59,130,246,0.55)');
+    _dragSnapDate=snapped;
+  }
+};
+
+window.onResDragEnd=function(){
+  _clearDragHighlight();
+  _dragStartX=null;_dragStartY=null;
 };
 function _getRoomCategory(sc){
   const c=(sc||'').toLowerCase();
@@ -1244,6 +1275,8 @@ function _snapDateFromX(clientX,fallbackDateStr){
 
 window.onDayDrop=function(e,_rawDropDate,dropPropId){
   e.preventDefault();
+  _clearDragHighlight();
+  _dragStartX=null;_dragStartY=null;
   if(!_dragResId)return;
   const dropDateStr=_snapDateFromX(e.clientX,_rawDropDate);
   const res=reservations.find(r=>r.id===_dragResId);
@@ -1465,7 +1498,13 @@ window.openEditRes=function(resId){
   document.getElementById('res-price').value=res.price||'';
   document.getElementById('res-currency').value=res.currency||'USD';
   document.getElementById('res-delete-btn').classList.remove('hidden');
-  populatePropertySelect(res.propertyId);
+  // Resolve propertyId: use stored id first, then look up by roomCode for imported reservations
+  let propId=res.propertyId;
+  if(!propId&&res.roomCode){
+    const match=properties.find(p=>(p.shortCode||'').toLowerCase()===(res.roomCode||'').toLowerCase());
+    if(match)propId=match.id;
+  }
+  populatePropertySelect(propId);
   resSelectedSource=res.source||'airbnb';
   document.querySelectorAll('#res-source-btns .platform-toggle').forEach(b=>{
     const s=b.dataset.source;
@@ -1523,8 +1562,11 @@ window.saveReservation=async function(){
   if(!checkin||!checkout){alert('Dates are required');return;}
   if(parseDate(checkout)<=parseDate(checkin)){alert('Check-out must be after check-in');return;}
   if(!propertyId){alert('Please select a property');return;}
+  // Derive roomCode from selected property so both fields stay in sync
+  const selectedProp=properties.find(p=>p.id===propertyId);
+  const roomCode=selectedProp?.shortCode||'';
   const data={
-    guest,checkin,checkout,propertyId,
+    guest,checkin,checkout,propertyId,roomCode,
     source:resSelectedSource,
     guests:parseInt(document.getElementById('res-guests')?.value)||1,
     price:parseFloat(document.getElementById('res-price').value)||0,
@@ -2589,8 +2631,16 @@ try{
       else if(currentPage==='reservations')renderReservationsPage();
       else if(currentPage==='dashboard')renderDashboardPage();
       else if(currentPage==='invoices')renderInvoicesPage();
-    }catch(e){console.error('Reservations error:',e);}
-  },(err)=>console.error('Reservations listener error:',err));
+    }catch(e){
+      console.error('Reservations error:',e);
+      setSyncDot('error','Render error');
+      showToast('Calendar error: '+e.message);
+    }
+  },(err)=>{
+    console.error('Reservations listener error:',err);
+    setSyncDot('error','Offline');
+    showToast('Firebase error: '+err.message);
+  });
 
   onSnapshot(collection(db,'prices'),(snap)=>{
     try{

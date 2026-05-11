@@ -46,6 +46,9 @@ tr:last-child td{border-bottom:none;} tr:hover td{background:#fafbfc;}
   <button class="btn btn-fetch" id="fetchBtn" onclick="fetchAndPreview()">
     Fetch &amp; Preview from Google Sheets
   </button>
+  <button class="btn" style="background:#7c3aed;color:#fff;" onclick="diagnose()">
+    Diagnose Firebase
+  </button>
   <span id="badge">Ready — click Fetch to start</span>
 </div>
 
@@ -420,6 +423,73 @@ window.verify=async function(){
     if(snap.empty) log('  Collection is EMPTY.','err');
     else log(`  ✓ ${snap.docs.length} reservation(s) in Firebase.`,'ok');
   }catch(e){log('  ERROR: '+e.message,'err');}
+};
+
+window.diagnose=async function(){
+  document.getElementById('log').textContent='';
+  log('=== FIREBASE DIAGNOSIS ===\n','info');
+  try{
+    // 1. Check reservations
+    log('── Reservations ─────────────────────────','info');
+    const rSnap=await getDocs(collection(db,'reservations'));
+    if(rSnap.empty){
+      log('  ✗ reservations collection is EMPTY — import has not run yet or failed.','err');
+    } else {
+      log(`  ✓ ${rSnap.docs.length} reservation document(s) found.`,'ok');
+      // Inspect first document's fields
+      const first=rSnap.docs[0].data();
+      log('\n  Sample document fields:');
+      const required=['guest','checkin','checkout','roomCode','source','price','currency'];
+      required.forEach(f=>{
+        const val=first[f];
+        const ok=val!==undefined&&val!==null&&val!=='';
+        log(`    ${ok?'✓':'✗'} ${f}: ${JSON.stringify(val)}`,ok?'ok':'err');
+      });
+      // Date sanity check
+      const cin=first.checkin||'';
+      const cout=first.checkout||'';
+      const dateOk=/^\d{4}-\d{2}-\d{2}$/.test(cin)&&/^\d{4}-\d{2}-\d{2}$/.test(cout);
+      log(`    ${dateOk?'✓':'✗'} Date format (YYYY-MM-DD): checkin=${cin} checkout=${cout}`,dateOk?'ok':'err');
+      // Count how many have checkout >= today
+      const today=new Date().toISOString().slice(0,10);
+      const future=rSnap.docs.filter(d=>(d.data().checkout||'')<today);
+      const current=rSnap.docs.length-future.length;
+      log(`\n  ${current} reservation(s) with checkout >= ${today} (should appear in calendar)`);
+      if(current===0) log('  ✗ All reservations are past — nothing to show in calendar!','err');
+      // Unique room codes
+      const codes=[...new Set(rSnap.docs.map(d=>d.data().roomCode||'(empty)'))].sort();
+      log('\n  Room codes in Firebase: '+codes.join(', '));
+    }
+
+    // 2. Check properties
+    log('\n── Properties ───────────────────────────','info');
+    const pSnap=await getDocs(collection(db,'properties'));
+    if(pSnap.empty){
+      log('  ✗ properties collection is EMPTY!','err');
+      log('  This is the most likely reason the calendar shows nothing.','err');
+      log('  Fix: go to SleepyPMS.html → Properties page → click "Seed 18 rooms"','warn');
+    } else {
+      log(`  ✓ ${pSnap.docs.length} property document(s) found.`,'ok');
+      const shortCodes=pSnap.docs.map(d=>d.data().shortCode||'(no shortCode)').sort();
+      log('  shortCodes: '+shortCodes.join(', '));
+      // Cross-check room codes from reservations
+      if(!rSnap.empty){
+        const resCodes=[...new Set(rSnap.docs.map(d=>d.data().roomCode||''))].filter(Boolean);
+        const propCodes=new Set(shortCodes);
+        const orphans=resCodes.filter(rc=>!propCodes.has(rc));
+        if(orphans.length){
+          log('\n  ✗ These roomCodes have NO matching property (will not show in calendar):','warn');
+          orphans.forEach(rc=>log('    '+rc,'warn'));
+        } else {
+          log('  ✓ All reservation roomCodes have a matching property shortCode.','ok');
+        }
+      }
+    }
+
+    log('\n=== END DIAGNOSIS ===','info');
+  }catch(e){
+    log('ERROR: '+e.message+'\n(check browser console for details)','err');
+  }
 };
 </script>
 </body>
