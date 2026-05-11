@@ -172,12 +172,11 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 
 
 /* ── CALENDAR ── */
-/* overflow-y:clip avoids creating a scroll container (unlike overflow-y:auto which browsers
-   coerce onto any element that sets overflow-x). Without clip, position:sticky;top:0 on <th>
-   sticks relative to .cal-wrap (which never scrolls vertically) instead of .main. */
-.cal-wrap{overflow-x:auto;overflow-y:clip;-webkit-overflow-scrolling:touch;}
-/* belt-and-suspenders: sticky on thead as a whole as well as individual ths */
-/* corner cell (.room-header) inherits top:0 from th rule + left:0 from its own rule → z-index:11 beats both */
+/* .cal-wrap has no overflow — .main[data-calscroll] handles both x and y scroll for the
+   calendar page. This makes position:sticky work for BOTH the date header (top:0) and
+   the room column (left:0) relative to a single scroll container. */
+.cal-wrap{-webkit-overflow-scrolling:touch;}
+#main[data-calscroll]{overflow-x:auto;}
 .grid-table thead{position:sticky;top:0;z-index:10;}
 .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;}
 .cal-nav-title{font-size:18px;font-weight:600;letter-spacing:-0.02em;}
@@ -534,6 +533,8 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 // ── pages ─────────────────────────────────
 window.switchPage=function(page){
   currentPage=page;
+  // Clear calendar-specific overflow when leaving calendar
+  if(page!=='calendar')delete document.getElementById('main').dataset.calscroll;
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
   if(page==='properties'){
     document.getElementById('topbar-action-btn').textContent='+ Add property';
@@ -1043,8 +1044,9 @@ window._hideResTooltip=function(){const tt=_ttEl();if(tt)tt.style.display='none'
 
 function renderCalendarPage(){
   const today=toDay(new Date());
-  calStartDate=today; // start exactly on today
+  calStartDate=today;
   const main=document.getElementById('main');
+  main.dataset.calscroll='1'; // enables overflow-x:auto so .main is the single scroll container
   main.innerHTML=`
   <div class="page">
     <div class="cal-nav">
@@ -1195,6 +1197,7 @@ window.cellClick=function(propId,dateStr,resId){
 let _dragResId=null,_dragOriginDate=null,_didDrag=false;
 let _dragStartX=null,_dragStartY=null;
 let _dragHighlightCell=null; // single highlighted cell during drag
+let _dragCurrentSnapDate=null; // magnetic snap target (hysteresis)
 
 window.onResBarMouseDown=function(e){
   _dragStartX=e.clientX;
@@ -1202,23 +1205,63 @@ window.onResBarMouseDown=function(e){
 };
 
 function _clearDragHighlight(){
-  if(_dragHighlightCell){
-    _dragHighlightCell.style.outline='';
-    _dragHighlightCell=null;
+  if(_dragHighlightCell){_dragHighlightCell.style.outline='';_dragHighlightCell=null;}
+  _dragCurrentSnapDate=null;
+}
+
+// Magnetic snap: snaps to a new column only after mouse crosses 40% into it.
+// Creates a "click into place" feel — blocks jump rather than slide smoothly.
+function _snapWithResistance(clientX){
+  const RESIST=0.4*42; // 40% of 42px cell width = ~17px past edge before snapping
+  const seen=new Set(),cols=[];
+  document.querySelectorAll('td[data-date]').forEach(cell=>{
+    const date=cell.dataset.date;
+    if(!seen.has(date)){
+      seen.add(date);
+      const r=cell.getBoundingClientRect();
+      cols.push({date,left:r.left,right:r.right,cx:r.left+r.width/2});
+    }
+  });
+  if(!cols.length)return null;
+  // First call or lost current: snap to nearest center
+  if(!_dragCurrentSnapDate){
+    let best=cols[0],minD=Infinity;
+    for(const c of cols){const d=Math.abs(clientX-c.cx);if(d<minD){minD=d;best=c;}}
+    return best.date;
   }
+  const cur=cols.find(c=>c.date===_dragCurrentSnapDate);
+  if(!cur){
+    let best=cols[0],minD=Infinity;
+    for(const c of cols){const d=Math.abs(clientX-c.cx);if(d<minD){minD=d;best=c;}}
+    return best.date;
+  }
+  // Move right: snap to next when mouse is RESIST px past current right edge
+  if(clientX>cur.right+RESIST){
+    const sorted=[...cols].sort((a,b)=>a.left-b.left);
+    const next=sorted.find(c=>c.left>=cur.right);
+    if(next)return next.date;
+  }
+  // Move left: snap to prev when mouse is RESIST px past current left edge
+  if(clientX<cur.left-RESIST){
+    const sorted=[...cols].sort((a,b)=>b.right-a.right);
+    const prev=sorted.find(c=>c.right<=cur.left);
+    if(prev)return prev.date;
+  }
+  return _dragCurrentSnapDate; // stay on current
 }
 
 window.onResDragStart=function(e,resId,dateStr){
   if(_resizeState){e.preventDefault();return;}
-  // Snap to find which date column the mouse is actually in at drag start.
-  // This preserves grab offset: the grabbed column stays under the cursor on drop.
-  const grabDate=_snapDateFromX(e.clientX,dateStr);
-  _dragResId=resId;_dragOriginDate=grabDate;_didDrag=false;
+  // Always anchor to checkin date: when dropped on any column, checkin lands there.
+  // dateStr == res.checkin (the bar is always rendered starting from the checkin cell).
+  _dragResId=resId;_dragOriginDate=dateStr;_didDrag=false;
+  _dragCurrentSnapDate=null; // reset magnetic snap for this new drag
   const res=reservations.find(r=>r.id===resId);
   if(res){
     const CELL_W=42,H=62;
     const duration=Math.max(1,Math.round((parseDate(res.checkout)-parseDate(res.checkin))/86400000));
-    const grabIndex=Math.max(0,Math.round((parseDate(grabDate)-parseDate(res.checkin))/86400000));
+    // grabIndex for ghost image: which column in the bar the user grabbed
+    const grabIndex=Math.max(0,Math.round((parseDate(_snapDateFromX(e.clientX,dateStr))-parseDate(res.checkin))/86400000));
     const srcColors={airbnb:'#7c3aed',booking:'#1d4ed8',expedia:'#d97706',direct:'#15803d',other:'#475569'};
     const bg=srcColors[res.source||'other']||srcColors.other;
     const W=duration*CELL_W;
@@ -1236,7 +1279,10 @@ window.onDayDragOver=function(e){
   if(!_dragResId)return;
   e.preventDefault();
   e.dataTransfer.dropEffect='move';
-  // Highlight only the single cell being hovered (not the whole column)
+  // Update magnetic snap (40% resistance threshold)
+  const newSnap=_snapWithResistance(e.clientX);
+  if(newSnap)_dragCurrentSnapDate=newSnap;
+  // Highlight only the single hovered cell (visual feedback of where mouse is)
   const cell=e.target&&e.target.closest?e.target.closest('td[data-date]'):null;
   if(cell!==_dragHighlightCell){
     if(_dragHighlightCell)_dragHighlightCell.style.outline='';
@@ -1294,7 +1340,8 @@ window.onDayDrop=function(e,_rawDropDate,dropPropId){
     window.openEditRes(resId);
     return;
   }
-  const dropDateStr=_snapDateFromX(e.clientX,_rawDropDate);
+  // Prefer magnetic snap date (from drag-over hysteresis), fall back to nearest center
+  const dropDateStr=_dragCurrentSnapDate||_snapDateFromX(e.clientX,_rawDropDate);
   const res=reservations.find(r=>r.id===_dragResId);
   _dragResId=null;
   if(!res)return;
