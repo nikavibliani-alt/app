@@ -176,8 +176,9 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
    calendar page. This makes position:sticky work for BOTH the date header (top:0) and
    the room column (left:0) relative to a single scroll container. */
 .cal-wrap{-webkit-overflow-scrolling:touch;}
-#main[data-calscroll]{overflow-x:auto;}
-.grid-table thead{position:sticky;top:0;z-index:10;}
+#main[data-calscroll]{overflow-x:auto;padding-top:0;} /* remove padding so header sits flush */
+/* Navbar is 52px — sticky header uses top:52px so it pins directly under the navbar */
+.grid-table thead{position:sticky;top:52px;z-index:10;}
 .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;}
 .cal-nav-title{font-size:18px;font-weight:600;letter-spacing:-0.02em;}
 .cal-nav-btns{display:flex;gap:6px;align-items:center;}
@@ -192,11 +193,11 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 
 .grid-table{border-collapse:collapse;min-width:100%;}
 .grid-table th,.grid-table td{border:1px solid #e2e8f0;}
-.grid-table th{background:var(--surface);padding:0;position:sticky;top:0;z-index:10;}
+.grid-table th{background:var(--surface);padding:0;position:sticky;top:52px;z-index:10;}
 
 /* room column */
 .room-col{width:90px;min-width:90px;position:sticky;left:0;z-index:9;background:var(--surface);border-right:2px solid var(--border2)!important;}
-.room-header{width:90px;min-width:90px;position:sticky;top:0;left:0;z-index:11;background:var(--surface2);padding:8px 10px;font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;border-right:2px solid var(--border2)!important;}
+.room-header{width:90px;min-width:90px;position:sticky;top:52px;left:0;z-index:11;background:var(--surface2);padding:8px 10px;font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;border-right:2px solid var(--border2)!important;}
 
 /* date headers */
 .date-th{min-width:42px;width:42px;text-align:center;padding:4px 2px;cursor:default;}
@@ -1205,58 +1206,18 @@ window.onResBarMouseDown=function(e){
 };
 
 function _clearDragHighlight(){
-  if(_dragHighlightCell){_dragHighlightCell.style.outline='';_dragHighlightCell=null;}
+  if(_dragHighlightCell){_dragHighlightCell.style.background='';_dragHighlightCell=null;}
   _dragCurrentSnapDate=null;
-}
-
-// Magnetic snap: snaps to a new column only after mouse crosses 40% into it.
-// Creates a "click into place" feel — blocks jump rather than slide smoothly.
-function _snapWithResistance(clientX){
-  const RESIST=0.4*42; // 40% of 42px cell width = ~17px past edge before snapping
-  const seen=new Set(),cols=[];
-  document.querySelectorAll('td[data-date]').forEach(cell=>{
-    const date=cell.dataset.date;
-    if(!seen.has(date)){
-      seen.add(date);
-      const r=cell.getBoundingClientRect();
-      cols.push({date,left:r.left,right:r.right,cx:r.left+r.width/2});
-    }
-  });
-  if(!cols.length)return null;
-  // First call or lost current: snap to nearest center
-  if(!_dragCurrentSnapDate){
-    let best=cols[0],minD=Infinity;
-    for(const c of cols){const d=Math.abs(clientX-c.cx);if(d<minD){minD=d;best=c;}}
-    return best.date;
-  }
-  const cur=cols.find(c=>c.date===_dragCurrentSnapDate);
-  if(!cur){
-    let best=cols[0],minD=Infinity;
-    for(const c of cols){const d=Math.abs(clientX-c.cx);if(d<minD){minD=d;best=c;}}
-    return best.date;
-  }
-  // Move right: snap to next when mouse is RESIST px past current right edge
-  if(clientX>cur.right+RESIST){
-    const sorted=[...cols].sort((a,b)=>a.left-b.left);
-    const next=sorted.find(c=>c.left>=cur.right);
-    if(next)return next.date;
-  }
-  // Move left: snap to prev when mouse is RESIST px past current left edge
-  if(clientX<cur.left-RESIST){
-    const sorted=[...cols].sort((a,b)=>b.right-a.right);
-    const prev=sorted.find(c=>c.right<=cur.left);
-    if(prev)return prev.date;
-  }
-  return _dragCurrentSnapDate; // stay on current
 }
 
 window.onResDragStart=function(e,resId,dateStr){
   if(_resizeState){e.preventDefault();return;}
-  // Always anchor to checkin date: when dropped on any column, checkin lands there.
-  // dateStr == res.checkin (the bar is always rendered starting from the checkin cell).
-  _dragResId=resId;_dragOriginDate=dateStr;_didDrag=false;
-  _dragCurrentSnapDate=null; // reset magnetic snap for this new drag
+  _dragCurrentSnapDate=null;
+  _didDrag=false;
   const res=reservations.find(r=>r.id===resId);
+  // Anchor to checkin: _dragOriginDate = res.checkin so checkin always lands at the drop column
+  _dragResId=resId;
+  _dragOriginDate=res?res.checkin:dateStr;
   if(res){
     const CELL_W=42,H=62;
     const duration=Math.max(1,Math.round((parseDate(res.checkout)-parseDate(res.checkin))/86400000));
@@ -1279,15 +1240,16 @@ window.onDayDragOver=function(e){
   if(!_dragResId)return;
   e.preventDefault();
   e.dataTransfer.dropEffect='move';
-  // Update magnetic snap (40% resistance threshold)
-  const newSnap=_snapWithResistance(e.clientX);
+  // Column snap: nearest center = immediate jump as cursor crosses column midpoint
+  const newSnap=_snapDateFromX(e.clientX,null);
   if(newSnap)_dragCurrentSnapDate=newSnap;
-  // Highlight only the single hovered cell (visual feedback of where mouse is)
-  const cell=e.target&&e.target.closest?e.target.closest('td[data-date]'):null;
-  if(cell!==_dragHighlightCell){
-    if(_dragHighlightCell)_dragHighlightCell.style.outline='';
-    if(cell)cell.style.outline='2px solid rgba(59,130,246,0.5)';
-    _dragHighlightCell=cell;
+  // Room-row × column intersection highlight: shows exact cell where block will land
+  const row=e.target?.closest?.('tr');
+  const snapCell=row&&_dragCurrentSnapDate?row.querySelector(`td[data-date="${_dragCurrentSnapDate}"]`):null;
+  if(snapCell!==_dragHighlightCell){
+    if(_dragHighlightCell)_dragHighlightCell.style.background='';
+    if(snapCell)snapCell.style.background='rgba(59,130,246,0.18)';
+    _dragHighlightCell=snapCell;
   }
 };
 
