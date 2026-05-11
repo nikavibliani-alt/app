@@ -1209,11 +1209,8 @@ function _clearDragHighlight(){
 
 window.onResDragStart=function(e,resId,dateStr){
   if(_resizeState){e.preventDefault();return;}
-  // 8px threshold: cancel drag if mouse hasn't moved far enough from mousedown position
-  if(_dragStartX!==null){
-    const dist=Math.hypot(e.clientX-_dragStartX,e.clientY-_dragStartY);
-    if(dist<8){e.preventDefault();return;}
-  }
+  // Note: 8px threshold is enforced at DROP time (onDayDrop), not here.
+  // Cancelling dragstart with preventDefault kills the drag permanently for that gesture.
   _dragResId=resId;_dragOriginDate=dateStr;_didDrag=false;
   const res=reservations.find(r=>r.id===resId);
   if(res){
@@ -1282,8 +1279,18 @@ function _snapDateFromX(clientX,fallbackDateStr){
 window.onDayDrop=function(e,_rawDropDate,dropPropId){
   e.preventDefault();
   _clearDragHighlight();
+  // Read start position before clearing
+  const startX=_dragStartX,startY=_dragStartY;
   _dragStartX=null;_dragStartY=null;
   if(!_dragResId)return;
+  // 8px threshold: if mouse barely moved from mousedown, treat as a click not a drag
+  if(startX!==null&&Math.hypot(e.clientX-startX,e.clientY-startY)<8){
+    const resId=_dragResId;
+    _dragResId=null;
+    _didDrag=true; // suppress the click event that fires after drop
+    window.openEditRes(resId);
+    return;
+  }
   const dropDateStr=_snapDateFromX(e.clientX,_rawDropDate);
   const res=reservations.find(r=>r.id===_dragResId);
   _dragResId=null;
@@ -1496,6 +1503,8 @@ window.openNewReservationModal=function(propId,dateStr){
 
 window.openEditRes=function(resId){
   const res=reservations.find(r=>r.id===resId);if(!res)return;
+  // Debug log — check which room fields exist
+  console.log('[openEditRes]',{id:resId,guest:res.guest,roomCode:res.roomCode,propertyId:res.propertyId,allocatedRoom:displayAllocation[resId]});
   document.getElementById('res-id').value=resId;
   document.getElementById('res-modal-title').textContent='Edit Reservation';
   document.getElementById('res-guest').value=res.guest||'';
@@ -1506,9 +1515,13 @@ window.openEditRes=function(resId){
   document.getElementById('res-price').value=res.price||'';
   document.getElementById('res-currency').value=res.currency||'USD';
   document.getElementById('res-delete-btn').classList.remove('hidden');
-  // Resolve propertyId: use stored id first, then look up by roomCode for imported reservations
+  // Room priority: displayAllocation (what calendar actually shows) → roomCode → propertyId
   let propId=res.propertyId;
-  if(!propId&&res.roomCode){
+  const allocatedRoom=displayAllocation[resId];
+  if(allocatedRoom){
+    const match=properties.find(p=>(p.shortCode||'').toLowerCase()===allocatedRoom.toLowerCase());
+    if(match)propId=match.id;
+  } else if(!propId&&res.roomCode){
     const match=properties.find(p=>(p.shortCode||'').toLowerCase()===(res.roomCode||'').toLowerCase());
     if(match)propId=match.id;
   }
