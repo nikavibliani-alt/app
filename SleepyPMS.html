@@ -177,7 +177,8 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
    sticks relative to .cal-wrap (which never scrolls vertically) instead of .main. */
 .cal-wrap{overflow-x:auto;overflow-y:clip;-webkit-overflow-scrolling:touch;}
 /* belt-and-suspenders: sticky on thead as a whole as well as individual ths */
-.grid-table thead{position:sticky;top:0;z-index:11;}
+/* corner cell (.room-header) inherits top:0 from th rule + left:0 from its own rule → z-index:11 beats both */
+.grid-table thead{position:sticky;top:0;z-index:10;}
 .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px;}
 .cal-nav-title{font-size:18px;font-weight:600;letter-spacing:-0.02em;}
 .cal-nav-btns{display:flex;gap:6px;align-items:center;}
@@ -195,8 +196,8 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .grid-table th{background:var(--surface);padding:0;position:sticky;top:0;z-index:10;}
 
 /* room column */
-.room-col{width:90px;min-width:90px;position:sticky;left:0;z-index:20;background:var(--surface);border-right:2px solid var(--border2)!important;}
-.room-header{width:90px;min-width:90px;position:sticky;left:0;z-index:21;background:var(--surface2);padding:8px 10px;font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;border-right:2px solid var(--border2)!important;}
+.room-col{width:90px;min-width:90px;position:sticky;left:0;z-index:9;background:var(--surface);border-right:2px solid var(--border2)!important;}
+.room-header{width:90px;min-width:90px;position:sticky;top:0;left:0;z-index:11;background:var(--surface2);padding:8px 10px;font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;border-right:2px solid var(--border2)!important;}
 
 /* date headers */
 .date-th{min-width:42px;width:42px;text-align:center;padding:4px 2px;cursor:default;}
@@ -224,7 +225,7 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .res-bar{position:absolute;top:3px;left:2px;height:62px;border-radius:4px;display:flex;flex-direction:row;align-items:center;padding:0 10px;cursor:pointer;z-index:5;transition:filter 0.15s;overflow:hidden;user-select:none;}
 .res-bar:hover{filter:brightness(0.88);}
 .res-bar-guest{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;flex:1;min-width:0;}
-.res-handle{position:absolute;top:0;bottom:0;width:14px;z-index:10;cursor:col-resize;}
+.res-handle{position:absolute;top:0;bottom:0;width:8px;z-index:10;cursor:col-resize;}
 .res-handle-left{left:0;border-radius:4px 0 0 4px;}
 .res-handle-right{right:0;border-radius:0 4px 4px 0;}
 .res-airbnb{background:#FF385C;border-left:3px solid #e0213f;}
@@ -1130,11 +1131,11 @@ function renderGrid(){
         const cin=parseDate(res.checkin);
         const cout=parseDate(res.checkout);
         const isTruncated=!sameDay(effectiveStart,cin);
-        // +1 so the bar visually includes the checkout day (ends at its right edge, not left)
-        const duration=Math.max(1,Math.round((cout-effectiveStart)/86400000))+1;
+        // Bar extends 30% into the checkout day column (≈13px past last-night column right edge)
+        const nights=Math.max(1,Math.round((cout-effectiveStart)/86400000));
         const srcClass='res-'+(res.source||'other');
-        const barW=`calc(${duration} * 42px - 4px)`;
-        const nameText=guestLabel(res.guest,duration);
+        const barW=`calc(${nights} * 42px + 11px)`;
+        const nameText=guestLabel(res.guest,nights);
         const guestBadge=res.guests>1?` <span style="font-size:9px;opacity:0.85;flex-shrink:0;">👥${res.guests}</span>`:'';
         const leftHandle=isTruncated?'':`<div class="res-handle res-handle-left" onmousedown="window.onResHandleMouseDown(event,'${res.id}','left')"></div>`;
         // Bright marker on the left edge of every real check-in (not truncated)
@@ -1192,31 +1193,32 @@ window.cellClick=function(propId,dateStr,resId){
 
 // ══════════════ DRAG TO MOVE (horizontal + vertical) ══════════════
 let _dragResId=null,_dragOriginDate=null,_didDrag=false;
-let _dragStartX=null,_dragStartY=null,_dragSnapDate=null;
+let _dragStartX=null,_dragStartY=null;
+let _dragHighlightCell=null; // single highlighted cell during drag
 
-// Record exact mousedown position so we can enforce an 8px threshold in dragstart
 window.onResBarMouseDown=function(e){
   _dragStartX=e.clientX;
   _dragStartY=e.clientY;
 };
 
 function _clearDragHighlight(){
-  if(_dragSnapDate){
-    document.querySelectorAll(`td[data-date="${_dragSnapDate}"]`).forEach(td=>td.style.outline='');
-    _dragSnapDate=null;
+  if(_dragHighlightCell){
+    _dragHighlightCell.style.outline='';
+    _dragHighlightCell=null;
   }
 }
 
 window.onResDragStart=function(e,resId,dateStr){
   if(_resizeState){e.preventDefault();return;}
-  // Note: 8px threshold is enforced at DROP time (onDayDrop), not here.
-  // Cancelling dragstart with preventDefault kills the drag permanently for that gesture.
-  _dragResId=resId;_dragOriginDate=dateStr;_didDrag=false;
+  // Snap to find which date column the mouse is actually in at drag start.
+  // This preserves grab offset: the grabbed column stays under the cursor on drop.
+  const grabDate=_snapDateFromX(e.clientX,dateStr);
+  _dragResId=resId;_dragOriginDate=grabDate;_didDrag=false;
   const res=reservations.find(r=>r.id===resId);
   if(res){
     const CELL_W=42,H=62;
     const duration=Math.max(1,Math.round((parseDate(res.checkout)-parseDate(res.checkin))/86400000));
-    const grabIndex=Math.max(0,Math.round((parseDate(dateStr)-parseDate(res.checkin))/86400000));
+    const grabIndex=Math.max(0,Math.round((parseDate(grabDate)-parseDate(res.checkin))/86400000));
     const srcColors={airbnb:'#7c3aed',booking:'#1d4ed8',expedia:'#d97706',direct:'#15803d',other:'#475569'};
     const bg=srcColors[res.source||'other']||srcColors.other;
     const W=duration*CELL_W;
@@ -1234,18 +1236,19 @@ window.onDayDragOver=function(e){
   if(!_dragResId)return;
   e.preventDefault();
   e.dataTransfer.dropEffect='move';
-  // Magnetic column highlight — only update DOM when snapped date changes
-  const snapped=_snapDateFromX(e.clientX,null);
-  if(snapped!==_dragSnapDate){
-    if(_dragSnapDate)document.querySelectorAll(`td[data-date="${_dragSnapDate}"]`).forEach(td=>td.style.outline='');
-    if(snapped)document.querySelectorAll(`td[data-date="${snapped}"]`).forEach(td=>td.style.outline='2px solid rgba(59,130,246,0.55)');
-    _dragSnapDate=snapped;
+  // Highlight only the single cell being hovered (not the whole column)
+  const cell=e.target&&e.target.closest?e.target.closest('td[data-date]'):null;
+  if(cell!==_dragHighlightCell){
+    if(_dragHighlightCell)_dragHighlightCell.style.outline='';
+    if(cell)cell.style.outline='2px solid rgba(59,130,246,0.5)';
+    _dragHighlightCell=cell;
   }
 };
 
 window.onResDragEnd=function(){
   _clearDragHighlight();
-  _dragStartX=null;_dragStartY=null;
+  _dragStartX=null;
+  _dragStartY=null;
 };
 function _getRoomCategory(sc){
   const c=(sc||'').toLowerCase();
@@ -1399,15 +1402,15 @@ window.onResHandleMouseDown=function(e,resId,handle){
 
 document.addEventListener('mousemove',function(e){
   if(!_resizeState)return;
-  // elementsFromPoint returns all stacked elements — finds the <td> even when the bar is on top
-  const cell=(document.elementsFromPoint(e.clientX,e.clientY)||[]).find(el=>el.matches&&el.matches('td[data-date]'));
-  if(!cell||cell.dataset.date===_resizeState.hoverDate)return;
-  _resizeState.hoverDate=cell.dataset.date;
+  // Use _snapDateFromX for smooth column-center snapping (consistent with drag drop)
+  const snappedDate=_snapDateFromX(e.clientX,null);
+  if(!snappedDate||snappedDate===_resizeState.hoverDate)return;
+  _resizeState.hoverDate=snappedDate;
 
   const{bar,handle,origCheckin,origCheckout}=_resizeState;
   const cin=parseDate(origCheckin);
   const cout=parseDate(origCheckout);
-  const hoverDay=parseDate(_resizeState.hoverDate);
+  const hoverDay=parseDate(snappedDate);
 
   if(handle==='right'){
     // hoverDay = last occupied night → checkout = hoverDay+1
@@ -1415,16 +1418,15 @@ document.addEventListener('mousemove',function(e){
     if(newCout<=cin)return;
     const dur=Math.round((newCout-cin)/86400000);
     bar.style.left='2px';
-    // +1 to match renderBar: bar ends at right edge of checkout column
-    bar.style.width=`calc(${dur+1} * 42px - 4px)`;
+    // 30% into checkout column to match renderBar formula
+    bar.style.width=`calc(${dur} * 42px + 11px)`;
   }else{
     // hoverDay = new checkin — bar shifts left/right + width changes
     if(hoverDay>=cout)return;
-    const leftShift=Math.round((hoverDay-cin)/86400000); // negative=extend left, positive=shrink left
+    const leftShift=Math.round((hoverDay-cin)/86400000);
     const dur=Math.round((cout-hoverDay)/86400000);
     bar.style.left=`calc(${leftShift} * 42px + 2px)`;
-    // +1 to match renderBar: bar ends at right edge of checkout column
-    bar.style.width=`calc(${dur+1} * 42px - 4px)`;
+    bar.style.width=`calc(${dur} * 42px + 11px)`;
   }
 });
 
