@@ -284,6 +284,12 @@ ul,ol{margin:0;padding:0;list-style:none;}
 
 /* room column */
 .room-col{width:90px;min-width:90px;position:sticky;left:0;z-index:9;background:var(--surface);border-right:2px solid var(--hairline)!important;}
+.cal-location-sep td{height:26px;background:oklch(0.96 0.005 85);border:none!important;padding:0;}
+.cal-location-sep .loc-label{position:sticky;left:0;padding:0 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);display:flex;align-items:center;height:26px;gap:6px;background:oklch(0.96 0.005 85);white-space:nowrap;}
+.cal-location-sep .loc-label::after{content:'';flex:1;height:1px;background:var(--hairline);}
+.room-col.abashidze-loc{background:oklch(0.97 0.012 145)!important;}
+.ical-sync-btn{font-size:10px;padding:2px 7px;border-radius:4px;border:1px solid var(--hairline);background:var(--surface);color:var(--ink-3);cursor:pointer;margin-left:4px;}
+.ical-sync-btn:hover{background:var(--accent-soft);color:var(--accent);}
 .room-header{width:90px;min-width:90px;position:sticky;top:52px;left:0;z-index:11;background:var(--surface-2);padding:7px 10px;font-size:10.5px;font-weight:500;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);border-right:2px solid var(--hairline)!important;}
 
 /* date headers */
@@ -662,7 +668,7 @@ input.pcal-inline-input[type=number]::-webkit-outer-spin-button{-webkit-appearan
 
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,collection,doc,addDoc,updateDoc,deleteDoc,setDoc,getDoc,getDocs,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,collection,doc,addDoc,updateDoc,deleteDoc,setDoc,getDoc,getDocs,query,where,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -1018,6 +1024,7 @@ window.seedProperties=async function(){
     {name:'Orb 1',shortCode:'orb-1',location:'centre',rooms:1,order:16},
     {name:'Orb 2',shortCode:'orb-2',location:'centre',rooms:1,order:17},
     {name:'Orb 3',shortCode:'orb-3',location:'centre',rooms:1,order:18},
+    {name:'Abashidze',shortCode:'abashidze',location:'abashidze',rooms:1,order:99,standalone:true,icalUrl:'https://www.airbnb.com/calendar/ical/1548481536777653090.ics?t=2dfd324b2954463086c43421dc11ba7f'},
   ];
   try{
     setSyncDot('syncing','Seeding...');
@@ -1075,6 +1082,122 @@ window.closeDetailDrawer=function(){
   document.getElementById('drawer-overlay').classList.remove('open');
 }
 
+// ══════════════ ICAL SYNC (Abashidze) ══════════════
+const ICAL_URL = 'https://www.airbnb.com/calendar/ical/1548481536777653090.ics?t=2dfd324b2954463086c43421dc11ba7f';
+const ICAL_ROOM_CODE = 'abashidze';
+const ICAL_PROXY = 'https://corsproxy.io/?'; // free CORS proxy for browser-side iCal fetch
+let _icalSyncTimer = null;
+
+/** Parse iCal text → array of {uid, summary, checkin, checkout, source:'airbnb'} */
+function parseIcal(text) {
+  const events = [];
+  const blocks = text.split('BEGIN:VEVENT');
+  blocks.shift(); // remove header
+  for (const block of blocks) {
+    const get = key => {
+      const m = block.match(new RegExp(`${key}[^:]*:([^\\r\\n]+)`));
+      return m ? m[1].trim() : null;
+    };
+    const uid  = get('UID');
+    const summ = get('SUMMARY');
+    const dtstart = get('DTSTART');
+    const dtend   = get('DTEND');
+    if (!uid || !dtstart || !dtend) continue;
+    // Skip blocked/unavailable placeholders
+    if (summ && /not available|blocked/i.test(summ)) continue;
+    // Parse YYYYMMDD or YYYYMMDDTHHMMSSZ
+    const parseIcalDate = s => {
+      const d = s.replace(/T.*/, '');
+      return `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
+    };
+    events.push({
+      uid,
+      summary: summ || 'Guest',
+      checkin:  parseIcalDate(dtstart),
+      checkout: parseIcalDate(dtend),
+      source: 'airbnb',
+    });
+  }
+  return events;
+}
+
+/** Fetch iCal, diff against Firebase, write new reservations */
+async function runIcalSync(silent = false) {
+  if (!silent) showToast('Syncing Abashidze iCal…');
+  let text;
+  try {
+    const res = await fetch(ICAL_PROXY + encodeURIComponent(ICAL_URL));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    text = await res.text();
+  } catch (e) {
+    if (!silent) showToast('iCal fetch failed: ' + e.message);
+    return;
+  }
+
+  const events = parseIcal(text);
+  if (!events.length) { if (!silent) showToast('iCal: no events found'); return; }
+
+  // Load existing abashidze reservations from Firebase (by roomCode)
+  const snap = await getDocs(
+    query(collection(db, 'reservations'), where('roomCode', '==', ICAL_ROOM_CODE))
+  );
+  const existing = new Set(snap.docs.map(d => d.data().icalUid).filter(Boolean));
+
+  // Import only new events (by icalUid dedup)
+  const ts = serverTimestamp();
+  let added = 0;
+  for (const ev of events) {
+    if (existing.has(ev.uid)) continue;
+    // Find property record for abashidze
+    const prop = properties.find(p => (p.shortCode||'').toLowerCase() === ICAL_ROOM_CODE);
+    await addDoc(collection(db, 'reservations'), {
+      guest:      ev.summary,
+      checkin:    ev.checkin,
+      checkout:   ev.checkout,
+      roomCode:   ICAL_ROOM_CODE,
+      propertyId: prop?.id || '',
+      source:     'airbnb',
+      icalUid:    ev.uid,
+      currency:   'GEL',
+      price:      0,
+      manualRoom: true, // standalone — skip auto-allocation
+      createdAt:  ts,
+      updatedAt:  ts,
+    });
+    added++;
+  }
+  if (!silent) showToast(`iCal sync: ${added} new reservation${added===1?'':'s'} imported`);
+  else if (added > 0) showToast(`iCal: ${added} new reservation${added===1?'':'s'} from Abashidze`);
+}
+
+/** Called once on app load — runs sync immediately then every 30 min */
+function startIcalSync() {
+  runIcalSync(true);
+  _icalSyncTimer = setInterval(() => runIcalSync(true), 30 * 60 * 1000);
+}
+
+/** Button in calendar row triggers a manual sync */
+window.syncIcalNow = function() { runIcalSync(false); };
+
+/** Add Abashidze to Firebase properties if not already present */
+async function ensureAbashidzeProperty() {
+  const existing = properties.find(p => (p.shortCode||'').toLowerCase() === ICAL_ROOM_CODE);
+  if (existing) return;
+  const ts = serverTimestamp();
+  await addDoc(collection(db, 'properties'), {
+    name: 'Abashidze',
+    shortCode: 'abashidze',
+    location: 'abashidze',
+    rooms: 1,
+    order: 99,
+    standalone: true,
+    icalUrl: ICAL_URL,
+    createdAt: ts,
+    updatedAt: ts,
+  });
+  showToast('Abashidze property added');
+}
+
 // ══════════════ CALENDAR ══════════════
 let reservations=[];
 let displayAllocation={}; // display-only room assignments — never written to Firebase
@@ -1108,7 +1231,7 @@ const ROOM_GROUPS={
   'Apartments':['6-1','6-2','6-4','7-1','7-2','7-4'],
   'Tab Rooms':['tab-1','tab-2','tab-3'],
   'Orb Rooms':['orb-1','orb-2'],
-  'Standalone':['6-3','orb-3']
+  'Standalone':['6-3','orb-3','abashidze']
 };
 function conflicts(a,b){return a.checkIn<b.checkOut&&a.checkOut>b.checkIn;}
 function allocate(reservations){
@@ -1284,9 +1407,22 @@ function renderGrid(){
   if(!props.length){
     html+=`<tr><td colspan="${totalDays+1}" style="text-align:center;padding:3rem;color:var(--hint);font-size:13px;">No properties yet — add properties first</td></tr>`;
   }
+  // Group by location to insert separators
+  let _lastLocation = null;
   props.forEach(prop=>{
+    const loc = prop.location || 'shartava';
+    if (loc !== _lastLocation) {
+      if (_lastLocation !== null) {
+        // Separator row between locations
+        const locLabel = loc === 'abashidze' ? '📍 Abashidze' : loc === 'centre' ? '📍 Sleepy Centre' : '📍 Shartava';
+        html += `<tr class="cal-location-sep"><td colspan="${totalDays+1}"><div class="loc-label">${locLabel}</div></td></tr>`;
+      }
+      _lastLocation = loc;
+    }
     const code=(prop.shortCode||(prop.name||'').replace(/\s+/g,'').slice(0,6)).toUpperCase();
-    html+=`<tr><td class="room-col"><div class="room-cell"><div class="room-code">${esc(code)}</div><div class="room-name">${esc(prop.name||'')}</div></div></td>`;
+    const isAbashidze = loc === 'abashidze';
+    const icalBtn = isAbashidze ? `<button class="ical-sync-btn" title="Sync iCal now" onclick="syncIcalNow()">↻ iCal</button>` : '';
+    html+=`<tr><td class="room-col${isAbashidze?' abashidze-loc':''}"><div class="room-cell"><div class="room-code">${esc(code)}</div><div class="room-name">${esc(prop.name||'')}${icalBtn}</div></div></td>`;
     const scLower=(prop.shortCode||'').toLowerCase();
     const propRes=reservations.filter(r=>{
       const alloc=displayAllocation[r.id];
@@ -2916,6 +3052,9 @@ try{
       if(currentPage==='pricing')renderPricingPage();
     }catch(e){console.error('Prices error:',e);}
   },(err)=>console.error('Prices listener error:',err));
+
+  // Ensure Abashidze property exists, then start background iCal sync
+  ensureAbashidzeProperty().then(()=>startIcalSync()).catch(e=>console.warn('iCal init:',e));
 
 }catch(e){
   console.error('Firebase init error:',e);
