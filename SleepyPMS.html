@@ -325,8 +325,10 @@ ul,ol{margin:0;padding:0;list-style:none;}
 .resize-preview{outline:2px dashed rgba(74,100,198,.7)!important;outline-offset:-2px;background:rgba(74,100,198,.1)!important;}
 @keyframes resFlash{0%,100%{filter:brightness(1);}30%{filter:brightness(1.6);}65%{filter:brightness(.55);}90%{filter:brightness(1.3);}}
 .res-flash{animation:resFlash .55s ease!important;pointer-events:none;}
-.res-dragging{opacity:0.35!important;pointer-events:none!important;}
-.drag-preview{background:oklch(0.72 0.14 240 / 0.25)!important;outline:2px dashed oklch(0.52 0.18 240)!important;outline-offset:-2px!important;}
+.res-dragging{opacity:0.25!important;pointer-events:none!important;filter:grayscale(0.4);}
+.res-preview-block{position:absolute;top:4px;left:2px;height:calc(var(--row-h) - 8px);border-radius:7px;background:oklch(0.52 0.18 240 / 0.22);border:2px dashed oklch(0.52 0.18 240 / 0.8);pointer-events:none;z-index:50;display:flex;align-items:center;padding:0 10px;gap:6px;overflow:hidden;white-space:nowrap;}
+.res-preview-guest{font-size:11px;font-weight:700;color:oklch(0.30 0.18 240);}
+.res-preview-dates{font-size:10px;font-weight:600;color:oklch(0.42 0.16 240);opacity:.9;}
 .move-confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:600;display:flex;align-items:center;justify-content:center;padding:1rem;}
 .move-confirm-box{background:var(--surface);border-radius:var(--radius);width:min(420px,100%);padding:1.5rem 1.75rem;box-shadow:0 20px 60px rgba(0,0,0,.2);animation:fadeIn .18s ease;}
 .move-confirm-title{font-size:15px;font-weight:600;margin-bottom:.5rem;}
@@ -1372,27 +1374,27 @@ window.cellClick=function(propId,dateStr,resId){
 }
 
 // ══════════════ DRAG TO MOVE ══════════════
-// State
-let dragging = null;
 /*
   dragging = {
     resId, res,
-    nights,          // duration in nights
-    startX, startY,  // mousedown position
-    moved,           // true once 8px threshold crossed
-    previewEls,      // array of tds with preview class
+    nights,           // original duration in nights
+    startX, startY,   // mousedown position (for threshold)
+    moved,            // true once threshold crossed
   }
+  _previewEl / _previewParentTd — the single ghost block element
 */
+let dragging = null;
+let _previewEl = null, _previewParentTd = null;
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+const DRAG_THRESHOLD = 16; // px — deliberate, 'heavy' feel
 
+// ── Format a date string as "May 13" ────────────────────────────────────────
 function _fmtDay(ds) {
   const d = parseDate(ds);
-  if (!d) return ds || '';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : (ds || '');
 }
 
-/** Returns the date-string of the column whose center is nearest to clientX. */
+// ── Snap clientX → nearest date column ──────────────────────────────────────
 function getColumnFromX(clientX) {
   const seen = new Set();
   let best = null, minD = Infinity;
@@ -1401,29 +1403,14 @@ function getColumnFromX(clientX) {
     if (seen.has(dt)) return;
     seen.add(dt);
     const r = td.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const d = Math.abs(clientX - cx);
+    const d = Math.abs(clientX - (r.left + r.width / 2));
     if (d < minD) { minD = d; best = dt; }
   });
   return best;
 }
 
-/** Returns the propId of the row whose vertical center is nearest to clientY.
-    Falls back to closest tr[data-prop-id] via elementFromPoint. */
+// ── Snap clientY → nearest room row (propId) ─────────────────────────────────
 function getRowFromY(clientY) {
-  // Try direct hit first (fast path)
-  const el = document.elementFromPoint(0, clientY); // x=0 to hit room-col
-  const direct = document.elementFromPoint(
-    (document.querySelector('td[data-prop-id]')?.getBoundingClientRect().left || 100) + 10,
-    clientY
-  );
-  if (direct) {
-    const td = direct.closest('td[data-prop-id]');
-    if (td) return td.dataset.propId;
-    const tr = direct.closest('tr[data-prop-id]');
-    if (tr) return tr.dataset.propId;
-  }
-  // Fallback: scan all td[data-prop-id] cells and find nearest row by cy
   let best = null, minD = Infinity;
   const seen = new Set();
   document.querySelectorAll('td[data-prop-id]').forEach(td => {
@@ -1431,43 +1418,50 @@ function getRowFromY(clientY) {
     if (seen.has(pid)) return;
     seen.add(pid);
     const r = td.getBoundingClientRect();
-    const cy = r.top + r.height / 2;
-    const d = Math.abs(clientY - cy);
+    const d = Math.abs(clientY - (r.top + r.height / 2));
     if (d < minD) { minD = d; best = pid; }
   });
   return best;
 }
 
-/** Highlight cells from startDate for `nights` columns in the given row. */
+// ── Render the unified ghost block ───────────────────────────────────────────
 function showPreview(startDate, nights, propId) {
-  clearPreview();
-  if (!startDate || !nights) return;
-  const start = parseDate(startDate);
-  for (let i = 0; i < nights; i++) {
-    const ds = formatDate(addDays(start, i));
-    // Highlight every row if no propId given, else only the target row
-    const selector = propId
-      ? `td[data-date="${ds}"][data-prop-id="${propId}"]`
-      : `td[data-date="${ds}"]`;
-    document.querySelectorAll(selector).forEach(td => {
-      td.classList.add('drag-preview');
-      dragging.previewEls.push(td);
-    });
-  }
-  // Dim original bar
+  // Clear old preview
+  if (_previewEl) { _previewEl.remove(); _previewEl = null; _previewParentTd = null; }
+  if (!startDate || !nights || !dragging) return;
+
+  // Dim original bar(s)
   document.querySelectorAll(`[data-res-id="${dragging.resId}"]`).forEach(b => b.classList.add('res-dragging'));
+
+  // Target cell — first day of the preview in the target room row
+  const tdSel = propId
+    ? `td[data-date="${startDate}"][data-prop-id="${propId}"]`
+    : `td[data-date="${startDate}"]`;
+  const td = document.querySelector(tdSel);
+  if (!td) return;
+
+  const newCheckout = formatDate(addDays(parseDate(startDate), nights));
+  const guestName = (dragging.res.guest || 'Guest').toUpperCase();
+  const dateLabel = `${_fmtDay(startDate)} → ${_fmtDay(newCheckout)}`;
+
+  _previewEl = document.createElement('div');
+  _previewEl.className = 'res-preview-block';
+  // Width = same formula as real bars: nights * 42px + 11px (30% into checkout col)
+  _previewEl.style.width = `calc(${nights} * 42px + 11px)`;
+  _previewEl.innerHTML = `<span class="res-preview-guest">${guestName}</span>`
+                       + `<span class="res-preview-dates">${dateLabel}</span>`;
+  td.appendChild(_previewEl);
+  _previewParentTd = td;
 }
 
 function clearPreview() {
-  if (!dragging) return;
-  dragging.previewEls.forEach(td => td.classList.remove('drag-preview'));
-  dragging.previewEls = [];
-  document.querySelectorAll(`[data-res-id="${dragging.resId}"]`).forEach(b => b.classList.remove('res-dragging'));
+  if (_previewEl) { _previewEl.remove(); _previewEl = null; _previewParentTd = null; }
+  if (dragging) {
+    document.querySelectorAll(`[data-res-id="${dragging.resId}"]`).forEach(b => b.classList.remove('res-dragging'));
+  }
 }
 
-// ── Mousedown (delegated from calendar grid) ─────────────────────────────────
-// Attached in renderCalendarPage after grid render — see _attachDragListeners()
-
+// ── Mousedown — delegated on the grid container ──────────────────────────────
 function _attachDragListeners() {
   const grid = document.getElementById('cal-grid');
   if (!grid || grid._dragBound) return;
@@ -1483,7 +1477,7 @@ function _attachDragListeners() {
     e.preventDefault();
     e.stopPropagation();
     const nights = Math.max(1, Math.round((parseDate(res.checkout) - parseDate(res.checkin)) / 86400000));
-    dragging = { resId, res, nights, startX: e.clientX, startY: e.clientY, moved: false, previewEls: [] };
+    dragging = { resId, res, nights, startX: e.clientX, startY: e.clientY, moved: false };
   });
 }
 
@@ -1491,14 +1485,16 @@ function _attachDragListeners() {
 document.addEventListener('mousemove', function(e) {
   if (!dragging) return;
   if (!dragging.moved) {
-    if (Math.abs(e.clientX - dragging.startX) < 8 && Math.abs(e.clientY - dragging.startY) < 8) return;
+    const dx = Math.abs(e.clientX - dragging.startX);
+    const dy = Math.abs(e.clientY - dragging.startY);
+    if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) return; // still below threshold
     dragging.moved = true;
     window._hideResTooltip();
   }
+  // Snap to grid: column = nearest date, row = nearest room
   const col = getColumnFromX(e.clientX);
   const row = getRowFromY(e.clientY);
-  // Only repaint when column or row actually changed
-  if (col === dragging._lastCol && row === dragging._lastRow) return;
+  if (col === dragging._lastCol && row === dragging._lastRow) return; // nothing changed
   dragging._lastCol = col;
   dragging._lastRow = row;
   showPreview(col, dragging.nights, row);
@@ -1507,7 +1503,7 @@ document.addEventListener('mousemove', function(e) {
 // ── Mouseup ──────────────────────────────────────────────────────────────────
 document.addEventListener('mouseup', function(e) {
   if (!dragging) return;
-  const snap = dragging;
+  const snap = { ...dragging };
   if (!snap.moved) {
     dragging = null;
     window.openEditRes(snap.resId);
@@ -1520,7 +1516,7 @@ document.addEventListener('mouseup', function(e) {
   _showDragConfirm(snap.res, col, row);
 });
 
-// ── Drag confirm modal ────────────────────────────────────────────────────────
+// ── Confirmation modal ────────────────────────────────────────────────────────
 let _pendingDrag = null;
 
 function _showDragConfirm(res, newCheckin, newPropId) {
@@ -1528,44 +1524,49 @@ function _showDragConfirm(res, newCheckin, newPropId) {
   const nights = Math.max(1, Math.round((parseDate(res.checkout) - parseDate(res.checkin)) / 86400000));
   const newCheckout = formatDate(addDays(parseDate(newCheckin), nights));
 
-  const noChange = newCheckin === res.checkin && (!newPropId || newPropId === res.propertyId);
-  if (noChange) return;
+  // Resolve properties
+  const srcProp = properties.find(p => p.id === res.propertyId)
+               || properties.find(p => (p.shortCode||'').toLowerCase() === (res.roomCode||'').toLowerCase());
+  const newProp  = newPropId ? properties.find(p => p.id === newPropId) : null;
+
+  const dateUnchanged = newCheckin === res.checkin;
+  const roomUnchanged = !newProp || newProp.id === srcProp?.id;
+  if (dateUnchanged && roomUnchanged) return; // nothing actually moved
 
   const fromStr = `${_fmtDay(res.checkin)} – ${_fmtDay(res.checkout)}`;
   const toStr   = `${_fmtDay(newCheckin)} – ${_fmtDay(newCheckout)}`;
 
-  const newProp = newPropId ? properties.find(p => p.id === newPropId) : null;
-  const srcProp = properties.find(p => p.id === res.propertyId)
-               || properties.find(p => (p.shortCode||'').toLowerCase() === (res.roomCode||'').toLowerCase());
-  const roomLine = newProp && newProp.id !== (srcProp?.id)
+  const propChanged = !!(newProp && newProp.id !== srcProp?.id);
+  const roomLine = propChanged
     ? `<div style="margin-top:6px;font-size:13px;color:var(--ink-2);">Room: <b>${esc(srcProp?.name||res.roomCode||'—')}</b> → <b>${esc(newProp.name)}</b></div>`
     : '';
 
-  // Room-type cross-category warning
   const srcCat = _getRoomCategory(srcProp?.shortCode || res.roomCode);
   const dstCat = newProp ? _getRoomCategory(newProp.shortCode) : srcCat;
-  const typeWarning = (srcCat && dstCat && srcCat !== dstCat)
-    ? `<div style="margin-top:8px;padding:8px 10px;background:oklch(0.97 0.03 80);border-radius:6px;font-size:12px;color:oklch(0.45 0.09 60);">⚠️ This moves the reservation to a different room type.</div>`
+  const typeWarn = (srcCat && dstCat && srcCat !== dstCat)
+    ? `<div style="margin-top:8px;padding:8px 10px;background:oklch(0.97 0.03 80);border-radius:6px;font-size:12px;color:oklch(0.45 0.09 60);">⚠️ Moving to a different room type.</div>`
     : '';
 
-  _pendingDrag = { resId: res.id, newCheckin, newCheckout, newPropId, propChanged: !!(newProp && newProp.id !== srcProp?.id) };
+  _pendingDrag = { resId: res.id, newCheckin, newCheckout, newPropId, propChanged };
 
-  const el = document.createElement('div');
-  el.className = 'move-confirm-overlay';
-  el.id = 'drag-confirm-overlay';
-  el.innerHTML = `<div class="move-confirm-box">
+  const overlay = document.createElement('div');
+  overlay.className = 'move-confirm-overlay';
+  overlay.id = 'drag-confirm-overlay';
+  overlay.innerHTML = `<div class="move-confirm-box">
     <div class="move-confirm-title">Move reservation?</div>
     <div class="move-confirm-body">
       Move <span class="move-confirm-hl">${esc(res.guest || 'Guest')}</span><br>
-      <span style="font-size:13px;color:var(--ink-2);">Dates: <b>${fromStr}</b> → <b>${toStr}</b></span>
-      ${roomLine}${typeWarning}
+      <span style="font-size:13px;color:var(--ink-2);">
+        <b>${fromStr}</b>&nbsp;→&nbsp;<b>${toStr}</b>
+      </span>
+      ${roomLine}${typeWarn}
     </div>
     <div class="move-confirm-btns">
       <button class="btn" onclick="window.cancelDragMove()">Cancel</button>
       <button class="btn primary" onclick="window.confirmDragMove()">Move</button>
     </div>
   </div>`;
-  document.body.appendChild(el);
+  document.body.appendChild(overlay);
 }
 
 window.confirmDragMove = function() {
@@ -1588,18 +1589,19 @@ window.confirmDragMove = function() {
 window.cancelDragMove = function() {
   document.getElementById('drag-confirm-overlay')?.remove();
   _pendingDrag = null;
+  // Block snaps back automatically — Firebase never changed, onSnapshot re-renders grid as-is
 };
 
 function _getRoomCategory(sc) {
   const c = (sc || '').toLowerCase();
-  if (/^0-/.test(c)) return 'small-rooms';
+  if (/^0-/.test(c))  return 'small-rooms';
   if (/^[67]-/.test(c)) return 'apartments';
   if (/^orb-/.test(c)) return 'orb';
   if (/^tab-/.test(c)) return 'tab';
   return null;
 }
 
-// Snap util reused by resize
+// Alias used by resize handles
 function _snapDateFromX(clientX, fallback) { return getColumnFromX(clientX) || fallback; }
 
 // ══════════════ RESIZE HANDLES ══════════════
