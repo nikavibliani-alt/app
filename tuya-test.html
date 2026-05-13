@@ -279,6 +279,22 @@
     </div>
   </div>
 
+  <!-- jtmspro probe -->
+  <div class="card">
+    <div class="card-title">🔐 jtmspro Endpoints</div>
+    <div style="font-size:12px;color:var(--ink-3);margin-bottom:14px;">
+      Three-step flow for <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">jtmspro</code> category:
+      get ticket → create temp password using ticket → list existing passwords.
+      Steps run sequentially; ticket_id from step 1 is automatically injected into step 2.
+    </div>
+    <div class="btn-row" style="margin-bottom:0;">
+      <button class="btn-primary" id="btn-jtms" onclick="runJtmspro()" disabled>
+        <span>🔐</span> Run jtmspro Flow
+      </button>
+    </div>
+    <div id="jtms-rows" style="display:flex;flex-direction:column;gap:8px;margin-top:14px;"></div>
+  </div>
+
   <!-- Diagnostic probes -->
   <div class="card">
     <div class="card-title">🩺 Diagnostics</div>
@@ -513,6 +529,7 @@ async function runFetch() {
     document.getElementById('btn-tempcode').disabled = false;
     document.getElementById('btn-probe').disabled = false;
     document.getElementById('btn-diag').disabled = false;
+    document.getElementById('btn-jtms').disabled = false;
   } catch (e) {
     addStep('❌', 'err', 'Flow stopped', e.message);
   } finally {
@@ -543,6 +560,8 @@ function clearAll() {
   document.getElementById('probe-results').style.display = 'none';
   document.getElementById('probe-rows').innerHTML = '';
   document.getElementById('diag-rows').innerHTML = '';
+  document.getElementById('jtms-rows').innerHTML = '';
+  document.getElementById('btn-jtms').disabled = true;
   document.getElementById('btn-info').disabled = true;
   document.getElementById('btn-tempcode').disabled = true;
   document.getElementById('btn-probe').disabled = true;
@@ -782,6 +801,124 @@ async function runDiagnostics() {
 
   addStep('🩺', 'ok', 'Diagnostics complete — expand rows above to review');
   document.getElementById('btn-diag').disabled = false;
+}
+
+// ── jtmspro flow ──────────────────────────────────────────────────────────────
+async function runJtmspro() {
+  if (!_token) { addStep('⚠️', 'err', 'No token — Connect first'); return; }
+  document.getElementById('btn-jtms').disabled = true;
+  const container = document.getElementById('jtms-rows');
+  container.innerHTML = '';
+
+  const code     = document.getElementById('tmp-code').value.trim() || '12345678';
+  const name     = document.getElementById('tmp-name').value.trim() || 'SleepyTest';
+  const duration = parseInt(document.getElementById('tmp-duration').value, 10) || 3600;
+  const nowSec   = Math.floor(Date.now() / 1000);
+
+  // ── helper: render a collapsible result row ──────────────────────────────
+  function makeRow(label, note) {
+    const slug = label.replace(/[^a-z0-9]/gi, '_');
+    const row  = document.createElement('div');
+    row.className = 'probe-row';
+    row.innerHTML = `
+      <div class="probe-head" onclick="this.nextElementSibling.classList.toggle('open')">
+        <span class="probe-badge badge-wait" id="b-${slug}">⏳</span>
+        <div style="flex:1;min-width:0;">
+          <div class="probe-path">${label}</div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:1px;">${note}</div>
+        </div>
+        <span class="probe-code" id="c-${slug}"></span>
+      </div>
+      <div class="probe-body open">
+        <div class="json-box" id="j-${slug}">Requesting…</div>
+      </div>`;
+    container.appendChild(row);
+    return {
+      badge:  document.getElementById(`b-${slug}`),
+      codeEl: document.getElementById(`c-${slug}`),
+      jsonEl: document.getElementById(`j-${slug}`),
+    };
+  }
+
+  async function fire(method, path, body) {
+    const headers = { 'Content-Type': 'application/json', 'X-Tuya-Token': _token };
+    const opts    = { method, headers };
+    if (body) opts.body = typeof body === 'string' ? body : JSON.stringify(body);
+    const res  = await fetch(PROXY + path, opts);
+    return res.json();
+  }
+
+  function paint(els, data) {
+    const apiCode = data.code ?? (data.success ? 'ok' : '?');
+    els.codeEl.textContent = `code=${apiCode}${data.msg ? ' · ' + data.msg : ''}`;
+    els.jsonEl.innerHTML   = syntaxHL(JSON.stringify(data, null, 2));
+    if (data.success) {
+      els.badge.className   = 'probe-badge badge-ok';
+      els.badge.textContent = '✅';
+    } else {
+      els.badge.className   = 'probe-badge badge-err';
+      els.badge.textContent = `✗ ${apiCode}`;
+    }
+    return data;
+  }
+
+  // ── Step 1: GET password-ticket ──────────────────────────────────────────
+  const ticketPath = `/v1.0/jtmspro/devices/${DEVICE_ID}/password-ticket`;
+  const s1 = makeRow(`GET ${ticketPath}`, 'Request a ticket — ticket_id is required before creating a temp password');
+  let ticketId = null, ticketKey = null;
+  try {
+    const d1 = paint(s1, await fire('GET', ticketPath, null));
+    if (d1.success && d1.result) {
+      // ticket_id may be at result.ticket_id or result directly
+      ticketId  = d1.result.ticket_id ?? d1.result;
+      ticketKey = d1.result.ticket_key ?? null;
+      s1.codeEl.textContent = `ticket_id=${ticketId ?? '?'} | ticket_key=${ticketKey ?? 'none'}`;
+    }
+  } catch (e) {
+    s1.badge.className = 'probe-badge badge-err'; s1.badge.textContent = '✗';
+    s1.codeEl.textContent = e.message; s1.jsonEl.textContent = e.message;
+  }
+
+  // ── Step 2: POST temp-passwords (with ticket if we got one) ──────────────
+  const createPath = `/v1.0/jtmspro/devices/${DEVICE_ID}/temp-passwords`;
+  const body2 = {
+    name,
+    password:       code,
+    effective_time: nowSec,
+    invalid_time:   nowSec + duration,
+    password_type:  'ticket',
+    time_zone:      '+04:00',
+    ...(ticketId ? { ticket_id: ticketId } : {}),
+  };
+  const noteCreate = ticketId
+    ? `Creating temp password using ticket_id=${ticketId}`
+    : 'Creating temp password (no ticket — may fail if ticket is required)';
+  const s2 = makeRow(`POST ${createPath}`, noteCreate);
+  try {
+    const d2 = paint(s2, await fire('POST', createPath, body2));
+    if (d2.success) {
+      s2.codeEl.textContent = `password_id=${d2.result ?? '(see response)'}`;
+    }
+  } catch (e) {
+    s2.badge.className = 'probe-badge badge-err'; s2.badge.textContent = '✗';
+    s2.codeEl.textContent = e.message; s2.jsonEl.textContent = e.message;
+  }
+
+  // ── Step 3: GET temp-passwords — list existing ────────────────────────────
+  const listPath = `/v1.0/jtmspro/devices/${DEVICE_ID}/temp-passwords`;
+  const s3 = makeRow(`GET ${listPath}`, 'List all active temporary passwords on the device');
+  try {
+    const d3 = paint(s3, await fire('GET', listPath, null));
+    if (d3.success && Array.isArray(d3.result)) {
+      s3.codeEl.textContent = `${d3.result.length} password(s) found`;
+    }
+  } catch (e) {
+    s3.badge.className = 'probe-badge badge-err'; s3.badge.textContent = '✗';
+    s3.codeEl.textContent = e.message; s3.jsonEl.textContent = e.message;
+  }
+
+  addStep('🔐', 'ok', 'jtmspro flow complete — click any row above to expand');
+  document.getElementById('btn-jtms').disabled = false;
 }
 
 // Auto-check proxy on load
