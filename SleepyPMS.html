@@ -1390,22 +1390,22 @@ window.onResDragStart=function(e,resId,dateStr){
   _dragCurrentSnapDate=null;
   _didDrag=false;
   const res=reservations.find(r=>r.id===resId);
-  // Anchor to checkin: _dragOriginDate = res.checkin so checkin always lands at the drop column
   _dragResId=resId;
+  // _dragOriginDate is not used for date math (newCheckIn = cursor column directly),
+  // kept only for the 8px click-vs-drag threshold check in onDayDrop
   _dragOriginDate=res?res.checkin:dateStr;
   if(res){
     const CELL_W=42,H=62;
     const duration=Math.max(1,Math.round((parseDate(res.checkout)-parseDate(res.checkin))/86400000));
-    // grabIndex for ghost image: which column in the bar the user grabbed
-    const grabIndex=Math.max(0,Math.round((parseDate(_snapDateFromX(e.clientX,dateStr))-parseDate(res.checkin))/86400000));
     const srcColors={airbnb:'#7c3aed',booking:'#1d4ed8',expedia:'#d97706',direct:'#15803d',other:'#475569'};
     const bg=srcColors[res.source||'other']||srcColors.other;
-    const W=duration*CELL_W;
     const ghost=document.createElement('div');
-    ghost.style.cssText=`position:fixed;left:0;top:0;transform:translateX(-10000px);width:${W}px;height:${H}px;background:${bg};border-radius:4px;display:flex;align-items:center;padding:0 12px;color:#fff;font-weight:700;font-size:12px;font-family:'DM Sans',system-ui,sans-serif;white-space:nowrap;overflow:hidden;opacity:0.85;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.25);`;
+    ghost.style.cssText=`position:fixed;left:0;top:0;transform:translateX(-10000px);width:${duration*CELL_W}px;height:${H}px;background:${bg};border-radius:4px;display:flex;align-items:center;padding:0 12px;color:#fff;font-weight:700;font-size:12px;font-family:system-ui,sans-serif;white-space:nowrap;overflow:hidden;opacity:0.85;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.25);`;
     ghost.textContent=(res.guest||'Guest').toUpperCase();
     document.body.appendChild(ghost);
-    e.dataTransfer.setDragImage(ghost,grabIndex*CELL_W+CELL_W/2,H/2);
+    // Cursor at left-center of the FIRST day cell so the ghost visually shows
+    // checkIn under the cursor — no grab-point offset, no calculation
+    e.dataTransfer.setDragImage(ghost,0,H/2);
     setTimeout(()=>ghost.remove(),0);
   }
   e.dataTransfer.effectAllowed='move';
