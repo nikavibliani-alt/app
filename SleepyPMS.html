@@ -1477,7 +1477,11 @@ function _attachDragListeners() {
     e.preventDefault();
     e.stopPropagation();
     const nights = Math.max(1, Math.round((parseDate(res.checkout) - parseDate(res.checkin)) / 86400000));
-    dragging = { resId, res, nights, startX: e.clientX, startY: e.clientY, moved: false };
+    // offsetX = how far into the block the cursor landed.
+    // We subtract this from clientX during drag so snapping is based on the
+    // block's left edge (checkIn column), not the raw cursor position.
+    const offsetX = e.clientX - bar.getBoundingClientRect().left;
+    dragging = { resId, res, nights, startX: e.clientX, startY: e.clientY, offsetX, moved: false };
   });
 }
 
@@ -1491,8 +1495,8 @@ document.addEventListener('mousemove', function(e) {
     dragging.moved = true;
     window._hideResTooltip();
   }
-  // Snap to grid: column = nearest date, row = nearest room
-  const col = getColumnFromX(e.clientX);
+  // Snap based on where the block's left edge (checkIn) would land, not the raw cursor
+  const col = getColumnFromX(e.clientX - dragging.offsetX);
   const row = getRowFromY(e.clientY);
   if (col === dragging._lastCol && row === dragging._lastRow) return; // nothing changed
   dragging._lastCol = col;
@@ -1509,7 +1513,7 @@ document.addEventListener('mouseup', function(e) {
     window.openEditRes(snap.resId);
     return;
   }
-  const col = getColumnFromX(e.clientX);
+  const col = getColumnFromX(e.clientX - snap.offsetX);
   const row = getRowFromY(e.clientY);
   clearPreview();
   dragging = null;
