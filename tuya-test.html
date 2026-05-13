@@ -838,26 +838,30 @@ async function runJtmspro() {
   const stepDefs = [
     {
       key:   'step1_ticket',
-      label: 'Step 1 — POST /v1.0/devices/{id}/door-lock/password-ticket',
-      note:  'Get ticket_id and encrypted ticket_key from Tuya',
+      label: 'Step 1 — POST /v1.0/devices/{id}/door-lock/password-ticket (4 body variants tried)',
+      note:  'Tries {}, {ticket_type:0}, {ticket_type:1}, and empty body — shows all responses',
       ok:    d => d?.success,
-      summary: d => d?.result ? `ticket_id=${d.result.ticket_id}` : '',
+      summary: d => d?.success
+        ? `ticket_id=${d.ticket_id} | key=${d.ticket_key?.slice(0,12)}…`
+        : `All ${d?.attempts?.length ?? 0} variants failed`,
     },
     {
       key:   'step2_crypto',
       label: 'Step 2 — AES-128-ECB: decrypt ticket_key → encrypt password',
-      note:  `Key = ACCESS_SECRET[:16] | Input = ticket_key | Output = encrypted password`,
+      note:  'Key = ACCESS_SECRET[:16] as UTF-8 bytes',
       ok:    d => d && !d.error,
       summary: d => d?.encrypted_password_hex
-        ? `decrypted_key=${d.decrypted_key_hex?.slice(0,16)}… | enc_pwd=${d.encrypted_password_hex?.slice(0,16)}…`
+        ? `enc_pwd=${d.encrypted_password_hex.slice(0,16)}…`
         : (d?.error || ''),
     },
     {
       key:   'step3_create',
       label: 'Step 3 — POST /v1.0/devices/{id}/door-lock/temp-passwords',
-      note:  'Create temp password using encrypted password + ticket_id',
-      ok:    d => d?.success,
-      summary: d => d?.success ? `password_id=${d.result}` : `${d?.code}: ${d?.msg}`,
+      note:  'Create with encrypted password + ticket_id',
+      ok:    d => d?.response?.success,
+      summary: d => d?.response?.success
+        ? `password_id=${d.response.result}`
+        : `code=${d?.response?.code}: ${d?.response?.msg}`,
     },
   ];
 
