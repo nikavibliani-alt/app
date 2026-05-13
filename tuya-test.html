@@ -215,13 +215,11 @@
     </div>
   </div>
 
-  <!-- CORS warning (shown if CORS error detected) -->
-  <div class="cors-note" id="cors-note">
-    <strong>⚠️ CORS blocked by browser</strong>
-    Tuya's API may reject direct browser requests. To test from a browser, either:<br>
-    1. Open this file via a local server with a CORS proxy, or<br>
-    2. Use a browser extension that disables CORS (for dev only), or<br>
-    3. The API call worked fine — ignore this note.
+  <!-- Proxy status note -->
+  <div class="cors-note" id="proxy-note" style="display:none">
+    <strong>⚠️ Proxy not running</strong>
+    Start the proxy first: <code style="background:#fef3c7;padding:2px 6px;border-radius:4px;">bash start-tuya.sh</code>
+    (in the project folder), then reload this page.
   </div>
 
   <!-- Live Status KPIs -->
@@ -247,75 +245,22 @@
 </div>
 
 <script>
-// ── Config ───────────────────────────────────────────────────────────────────
-const ACCESS_ID     = 'wxd3afwrhewvh5p5tukc';
-const ACCESS_SECRET = '80edc016e2d84df886f500f38f5cc6b7';
-const DEVICE_ID     = 'bf70cd74974715b99cxmee';
-const BASE_URL      = 'https://openapi.tuyaeu.com';
+// ── Config — proxy handles all Tuya signing ───────────────────────────────────
+const PROXY     = 'http://localhost:3000';
+const DEVICE_ID = 'bf70cd74974715b99cxmee';
 
 let _token = null; // cached access token
 
-// ── HMAC-SHA256 via Web Crypto ────────────────────────────────────────────────
-async function hmacSHA256(message, secret) {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', enc.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false, ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
-  return Array.from(new Uint8Array(sig))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('').toUpperCase();
+// ── Fetch via proxy ────────────────────────────────────────────────────────────
+async function proxyGet(path, token) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['X-Tuya-Token'] = token;
+  const res = await fetch(PROXY + path, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status} from proxy`);
+  return res.json();
 }
 
-// ── SHA-256 of body (for full signing; empty body = hash of '') ──────────────
-async function sha256hex(str) {
-  const enc = new TextEncoder();
-  const buf = await crypto.subtle.digest('SHA-256', enc.encode(str));
-  return Array.from(new Uint8Array(buf))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-// ── Build signature ───────────────────────────────────────────────────────────
-// Tuya v1.0 signing:
-//   • Token request  : sign = HMAC-SHA256(client_id + t, secret)
-//   • Other requests : sign = HMAC-SHA256(client_id + token + t, secret)
-//
-// Tuya v2.0 (full) signing used as primary since it works with all endpoints:
-//   str = client_id + token + t + nonce + "\n"
-//         + METHOD + "\n" + sha256(body) + "\n" + "" + "\n" + path_with_query
-async function buildHeaders(method, path, token, body = '') {
-  const t     = Date.now().toString();
-  const nonce = crypto.randomUUID().replace(/-/g, '');
-  const bodyHash = await sha256hex(body);
-  const pathWithQuery = path; // path already includes query string
-
-  // Full sign string (v2.0 format)
-  const stringToSign = [
-    method.toUpperCase(),
-    bodyHash,
-    '',            // empty custom header string
-    pathWithQuery,
-  ].join('\n');
-
-  const signStr = ACCESS_ID + (token || '') + t + nonce + stringToSign;
-  const sign = await hmacSHA256(signStr, ACCESS_SECRET);
-
-  const headers = {
-    'client_id':   ACCESS_ID,
-    'sign':        sign,
-    't':           t,
-    'nonce':       nonce,
-    'sign_method': 'HMAC-SHA256',
-    'Content-Type':'application/json',
-  };
-  if (token) headers['access_token'] = token;
-  return { headers, t, nonce, signStr, sign };
-}
-
-// ── Step log helpers ─────────────────────────────────────────────────────────
+// ── Step log helpers ──────────────────────────────────────────────────────────
 function addStep(icon, cls, title, detail = '') {
   const el = document.getElementById('empty-state');
   if (el) el.remove();
@@ -357,53 +302,38 @@ function renderKPIs(deviceData, statusList) {
   card.style.display = '';
   row.innerHTML = '';
 
-  // Online / offline
   const online = deviceData?.online ?? null;
-  const onlineKPI = kpi('Connection',
+  row.appendChild(kpi('Connection',
     online === true ? '🟢 Online' : online === false ? '🔴 Offline' : '— Unknown',
     online === true ? 'online' : online === false ? 'offline' : 'unknown'
-  );
-  row.appendChild(onlineKPI);
+  ));
 
-  // Parse status codes
   const statusMap = {};
   (statusList || []).forEach(s => { statusMap[s.code] = s.value; });
 
-  // Lock state — common Tuya codes
   const lockCodes = ['lock_motor_state', 'lock_state', 'locked', 'alarm_lock'];
   let lockVal = null, lockCode = null;
   for (const c of lockCodes) {
     if (statusMap[c] !== undefined) { lockVal = statusMap[c]; lockCode = c; break; }
   }
-  const lockText = lockVal === true || lockVal === 'locked' ? '🔒 Locked'
-                 : lockVal === false || lockVal === 'unlocked' ? '🔓 Unlocked'
-                 : lockVal !== null ? `${lockVal}` : '— Unknown';
-  const lockClass = lockVal === true || lockVal === 'locked' ? 'locked'
+  const lockText  = lockVal === true || lockVal === 'locked'   ? '🔒 Locked'
+                  : lockVal === false || lockVal === 'unlocked' ? '🔓 Unlocked'
+                  : lockVal !== null ? `${lockVal}` : '— Unknown';
+  const lockClass = lockVal === true || lockVal === 'locked'   ? 'locked'
                   : lockVal === false || lockVal === 'unlocked' ? 'unlocked' : 'unknown';
-  const lockKPI = kpi('Lock State', lockText, lockClass, lockCode ? `code: ${lockCode}` : '');
-  row.appendChild(lockKPI);
+  row.appendChild(kpi('Lock State', lockText, lockClass, lockCode ? `code: ${lockCode}` : ''));
 
-  // Battery — common codes: battery_percentage, electricity, va_battery
   const battCodes = ['battery_percentage', 'electricity', 'va_battery', 'battery'];
   let battVal = null;
   for (const c of battCodes) {
     if (statusMap[c] !== undefined) { battVal = Number(statusMap[c]); break; }
   }
-  if (battVal !== null && !isNaN(battVal)) {
-    const battEl = batteryKPI(battVal);
-    row.appendChild(battEl);
-  } else {
-    row.appendChild(kpi('Battery', '— N/A', 'unknown'));
-  }
+  row.appendChild(battVal !== null && !isNaN(battVal) ? batteryKPI(battVal) : kpi('Battery', '— N/A', 'unknown'));
 
-  // Any extra codes
   const knownCodes = new Set([...lockCodes, ...battCodes]);
-  const extras = statusList?.filter(s => !knownCodes.has(s.code)) || [];
-  if (extras.length > 0) {
-    extras.slice(0, 2).forEach(s => {
-      row.appendChild(kpi(s.code, String(s.value), 'unknown'));
-    });
-  }
+  (statusList || []).filter(s => !knownCodes.has(s.code)).slice(0, 3).forEach(s => {
+    row.appendChild(kpi(s.code, String(s.value), 'unknown'));
+  });
 }
 
 function kpi(label, val, cls = '', sub = '') {
@@ -427,32 +357,19 @@ function batteryKPI(pct) {
   return el;
 }
 
-// ── API calls ─────────────────────────────────────────────────────────────────
-
-async function getAccessToken() {
-  const path = '/v1.0/token?grant_type=1';
-  const { headers, t, signStr, sign } = await buildHeaders('GET', path, null);
-
-  addStep('🔑', 'run', 'Requesting access token…',
-    `POST ${BASE_URL}${path}`);
-
-  const step = addStep('⏳', 'run', 'Waiting for token response…',
-    `sign_str (first 40): ${signStr.slice(0, 40)}…`);
-
-  let data;
+// ── Proxy health check ────────────────────────────────────────────────────────
+async function checkProxy() {
   try {
-    const res = await fetch(`${BASE_URL}${path}`, { method: 'GET', headers });
-    data = await res.json();
-  } catch (err) {
-    step.className = 'step err';
-    step.querySelector('strong').textContent = '✗ Network / CORS error';
-    step.querySelector('small').textContent = err.message;
-    if (err.message.includes('CORS') || err.message.includes('fetch') || err.message.includes('Failed')) {
-      document.getElementById('cors-note').style.display = '';
-    }
-    throw err;
-  }
+    const res = await fetch(PROXY + '/ping', { signal: AbortSignal.timeout(2000) });
+    return res.ok;
+  } catch { return false; }
+}
 
+// ── API calls (all via proxy — no signing in browser) ────────────────────────
+async function getAccessToken() {
+  const step = addStep('🔑', 'run', 'Requesting access token via proxy…',
+    `GET ${PROXY}/v1.0/token?grant_type=1`);
+  const data = await proxyGet('/v1.0/token?grant_type=1', null);
   if (!data.success) {
     step.className = 'step err';
     step.querySelector('strong').textContent = `✗ Token error: ${data.msg || data.code}`;
@@ -460,94 +377,67 @@ async function getAccessToken() {
     showRaw(data);
     throw new Error(data.msg || 'Token request failed');
   }
-
   step.className = 'step ok';
   step.querySelector('strong').textContent = '✓ Access token obtained';
-  step.querySelector('small').textContent = `expire_time: ${data.result?.expire_time}s | uid: ${data.result?.uid || '—'}`;
-
+  step.querySelector('small').textContent = `expire_time: ${data.result?.expire_time}s`;
   return data.result.access_token;
 }
 
 async function getDeviceStatus(token) {
   const path = `/v1.0/devices/${DEVICE_ID}/status`;
-  const { headers, signStr } = await buildHeaders('GET', path, token);
-
-  const step = addStep('⏳', 'run', 'Fetching device status…',
-    `GET ${BASE_URL}${path}`);
-
-  let data;
-  try {
-    const res = await fetch(`${BASE_URL}${path}`, { method: 'GET', headers });
-    data = await res.json();
-  } catch (err) {
-    step.className = 'step err';
-    step.querySelector('strong').textContent = '✗ Status fetch failed';
-    step.querySelector('small').textContent = err.message;
-    throw err;
-  }
-
+  const step = addStep('⏳', 'run', 'Fetching device status…', `GET ${PROXY}${path}`);
+  const data = await proxyGet(path, token);
   if (!data.success) {
     step.className = 'step err';
     step.querySelector('strong').textContent = `✗ Status error: ${data.msg || data.code}`;
     step.querySelector('small').textContent = JSON.stringify(data);
-    showRaw(data);
-    throw new Error(data.msg || 'Status request failed');
+    showRaw(data); throw new Error(data.msg || 'Status failed');
   }
-
   step.className = 'step ok';
-  step.querySelector('strong').textContent = `✓ Device status received (${data.result?.length || 0} fields)`;
+  step.querySelector('strong').textContent = `✓ Status received (${data.result?.length || 0} fields)`;
   step.querySelector('small').textContent = data.result?.map(s => `${s.code}=${JSON.stringify(s.value)}`).join(' · ');
-
   return data.result;
 }
 
 async function getDeviceInfo(token) {
   const path = `/v1.0/devices/${DEVICE_ID}`;
-  const { headers } = await buildHeaders('GET', path, token);
-
-  const step = addStep('⏳', 'run', 'Fetching device info…',
-    `GET ${BASE_URL}${path}`);
-
-  let data;
-  try {
-    const res = await fetch(`${BASE_URL}${path}`, { method: 'GET', headers });
-    data = await res.json();
-  } catch (err) {
-    step.className = 'step err';
-    step.querySelector('strong').textContent = '✗ Info fetch failed';
-    step.querySelector('small').textContent = err.message;
-    throw err;
-  }
-
+  const step = addStep('⏳', 'run', 'Fetching device info…', `GET ${PROXY}${path}`);
+  const data = await proxyGet(path, token);
   if (!data.success) {
     step.className = 'step err';
     step.querySelector('strong').textContent = `✗ Info error: ${data.msg || data.code}`;
     step.querySelector('small').textContent = JSON.stringify(data);
-    showRaw(data);
-    return null;
+    showRaw(data); return null;
   }
-
   step.className = 'step ok';
-  step.querySelector('strong').textContent = `✓ Device info: ${data.result?.name || data.result?.id}`;
-  step.querySelector('small').textContent = `model: ${data.result?.model || '—'} | active: ${data.result?.active_time ? new Date(data.result.active_time * 1000).toLocaleString() : '—'}`;
-
+  step.querySelector('strong').textContent = `✓ Device: ${data.result?.name || data.result?.id}`;
+  step.querySelector('small').textContent = `model: ${data.result?.model || '—'} | online: ${data.result?.online}`;
   return data.result;
 }
 
 // ── Main flows ────────────────────────────────────────────────────────────────
-
 async function runFetch() {
   document.getElementById('btn-fetch').disabled = true;
   document.getElementById('btn-info').disabled  = true;
+  document.getElementById('proxy-note').style.display = 'none';
+
+  const proxyUp = await checkProxy();
+  if (!proxyUp) {
+    addStep('❌', 'err', 'Proxy not reachable at localhost:3000',
+      'Run: bash start-tuya.sh — then click Connect again');
+    document.getElementById('proxy-note').style.display = '';
+    document.getElementById('btn-fetch').disabled = false;
+    return;
+  }
+  addStep('✅', 'ok', 'Proxy reachable', `http://localhost:3000`);
 
   try {
     _token = await getAccessToken();
     const statusList = await getDeviceStatus(_token);
-    // Also grab device info to get online status
     const deviceInfo = await getDeviceInfo(_token);
     renderKPIs(deviceInfo, statusList);
     showRaw({ device: deviceInfo, status: statusList });
-    addStep('✅', 'ok', 'All done — connection successful', `Token cached for subsequent requests`);
+    addStep('✅', 'ok', 'All done — lock data loaded');
     document.getElementById('btn-info').disabled = false;
   } catch (e) {
     addStep('❌', 'err', 'Flow stopped', e.message);
@@ -557,7 +447,7 @@ async function runFetch() {
 }
 
 async function runDeviceInfo() {
-  if (!_token) { addStep('⚠️', 'err', 'No token — run "Connect & Get Status" first'); return; }
+  if (!_token) { addStep('⚠️', 'err', 'No token — run Connect first'); return; }
   document.getElementById('btn-info').disabled = true;
   try {
     const info = await getDeviceInfo(_token);
@@ -574,9 +464,19 @@ function clearAll() {
   document.getElementById('step-log').innerHTML = '<div id="empty-state">No requests yet — click "Connect &amp; Get Status" to begin.</div>';
   document.getElementById('raw-card').style.display  = 'none';
   document.getElementById('kpi-card').style.display  = 'none';
-  document.getElementById('cors-note').style.display = 'none';
+  document.getElementById('proxy-note').style.display = 'none';
   document.getElementById('btn-info').disabled = true;
 }
+
+// Auto-check proxy on load
+window.addEventListener('load', async () => {
+  const up = await checkProxy();
+  if (!up) {
+    document.getElementById('proxy-note').style.display = '';
+  } else {
+    addStep('✅', 'ok', 'Proxy is running', 'http://localhost:3000 — ready');
+  }
+});
 </script>
 </body>
 </html>
