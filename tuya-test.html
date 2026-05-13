@@ -279,6 +279,20 @@
     </div>
   </div>
 
+  <!-- Diagnostic probes -->
+  <div class="card">
+    <div class="card-title">🩺 Diagnostics</div>
+    <div class="btn-row" style="margin-bottom:14px;">
+      <button class="btn-primary" id="btn-diag" onclick="runDiagnostics()" disabled>
+        <span>🩺</span> Run Diagnostics
+      </button>
+    </div>
+    <div style="font-size:12px;color:var(--ink-3);">
+      Fires three requests in sequence: device category check, list existing passwords, generic command attempt.
+    </div>
+    <div id="diag-rows" style="display:flex;flex-direction:column;gap:8px;margin-top:14px;"></div>
+  </div>
+
   <!-- Live Status KPIs -->
   <div class="card" id="kpi-card" style="display:none">
     <div class="card-title">Live Status</div>
@@ -498,6 +512,7 @@ async function runFetch() {
     document.getElementById('btn-info').disabled = false;
     document.getElementById('btn-tempcode').disabled = false;
     document.getElementById('btn-probe').disabled = false;
+    document.getElementById('btn-diag').disabled = false;
   } catch (e) {
     addStep('❌', 'err', 'Flow stopped', e.message);
   } finally {
@@ -527,9 +542,11 @@ function clearAll() {
   document.getElementById('tmp-result').style.display = 'none';
   document.getElementById('probe-results').style.display = 'none';
   document.getElementById('probe-rows').innerHTML = '';
+  document.getElementById('diag-rows').innerHTML = '';
   document.getElementById('btn-info').disabled = true;
   document.getElementById('btn-tempcode').disabled = true;
   document.getElementById('btn-probe').disabled = true;
+  document.getElementById('btn-diag').disabled = true;
 }
 
 // ── Temporary password ────────────────────────────────────────────────────────
@@ -677,6 +694,94 @@ async function probeAllEndpoints() {
 
   addStep('🔍', 'ok', 'Probe complete — expand any row to see full response');
   document.getElementById('btn-probe').disabled = false;
+}
+
+// ── Diagnostics ───────────────────────────────────────────────────────────────
+async function runDiagnostics() {
+  if (!_token) { addStep('⚠️', 'err', 'No token — Connect first'); return; }
+  document.getElementById('btn-diag').disabled = true;
+  const container = document.getElementById('diag-rows');
+  container.innerHTML = '';
+
+  const STEPS = [
+    {
+      label: '1. Device category — GET /v1.0/devices/{id}',
+      method: 'GET',
+      path:   `/v1.0/devices/${DEVICE_ID}`,
+      body:   null,
+      note:   'Shows category, model, and what API surface is available',
+    },
+    {
+      label: '2. List existing passwords — GET /v1.0/smart-lock/devices/{id}/temp-passwords',
+      method: 'GET',
+      path:   `/v1.0/smart-lock/devices/${DEVICE_ID}/temp-passwords`,
+      body:   null,
+      note:   'Lists currently active temp codes on the device',
+    },
+    {
+      label: '3. Generic command — POST /v1.0/devices/{id}/commands',
+      method: 'POST',
+      path:   `/v1.0/devices/${DEVICE_ID}/commands`,
+      body:   JSON.stringify({ commands: [{ code: 'unlock_temporary', value: '12345678' }] }),
+      note:   'Generic DP command — works for some lock categories',
+    },
+  ];
+
+  for (const step of STEPS) {
+    const row = document.createElement('div');
+    row.className = 'probe-row';
+    const slugId = step.label.replace(/[^a-z0-9]/gi, '_');
+    row.innerHTML = `
+      <div class="probe-head" onclick="this.nextElementSibling.classList.toggle('open')">
+        <span class="probe-badge badge-wait" id="badge-${slugId}">⏳</span>
+        <div style="flex:1;min-width:0;">
+          <div class="probe-path">${step.label}</div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:1px;">${step.note}</div>
+        </div>
+        <span class="probe-code" id="code-${slugId}"></span>
+      </div>
+      <div class="probe-body open">
+        <div class="json-box" id="json-${slugId}">Requesting…</div>
+      </div>`;
+    container.appendChild(row);
+
+    const badge  = document.getElementById(`badge-${slugId}`);
+    const codeEl = document.getElementById(`code-${slugId}`);
+    const jsonEl = document.getElementById(`json-${slugId}`);
+
+    try {
+      const headers = { 'Content-Type': 'application/json', 'X-Tuya-Token': _token };
+      const opts = { method: step.method, headers };
+      if (step.body) opts.body = step.body;
+
+      const res  = await fetch(PROXY + step.path, opts);
+      const data = await res.json();
+
+      const apiCode = data.code ?? (data.success ? 'ok' : '?');
+      codeEl.textContent = `code=${apiCode}${data.msg ? ' · ' + data.msg : ''}`;
+      jsonEl.innerHTML   = syntaxHL(JSON.stringify(data, null, 2));
+
+      if (data.success) {
+        badge.className   = 'probe-badge badge-ok';
+        badge.textContent = '✅';
+        // Pull out the category for humans
+        if (data.result?.category) {
+          codeEl.textContent = `category="${data.result.category}" | product="${data.result.product_name || '—'}" | online=${data.result.online}`;
+        }
+      } else {
+        badge.className   = 'probe-badge badge-err';
+        badge.textContent = `✗ ${apiCode}`;
+      }
+    } catch (e) {
+      badge.className   = 'probe-badge badge-err';
+      badge.textContent = '✗ ERR';
+      codeEl.textContent = e.message;
+      jsonEl.textContent = e.message;
+    }
+  }
+
+  addStep('🩺', 'ok', 'Diagnostics complete — expand rows above to review');
+  document.getElementById('btn-diag').disabled = false;
 }
 
 // Auto-check proxy on load
