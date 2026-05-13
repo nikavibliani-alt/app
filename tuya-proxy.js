@@ -96,6 +96,11 @@ const server = http.createServer((req, res) => {
   req.on('end', () => {
     const authHeaders = buildTuyaHeaders(req.method, req.url, token, body);
 
+    // For POST/PUT, include Content-Length so Tuya doesn't reject the body
+    if (body) {
+      authHeaders['Content-Length'] = Buffer.byteLength(body, 'utf8').toString();
+    }
+
     const options = {
       hostname: TUYA_HOST,
       port:     443,
