@@ -1302,7 +1302,7 @@ function renderGrid(){
         return day>cin&&day<cout;
       });
       const cellClass=`day-cell${isToday?' today-col':''}${isWknd?' weekend-col':''}`;
-      const attrs=`data-date="${dayStr}" data-prop-id="${prop.id}" ondragover="window.onDayDragOver(event)" ondrop="window.onDayDrop(event,'${dayStr}','${prop.id}')"`;
+      const attrs=`data-date="${dayStr}" data-prop-id="${prop.id}"`;
 
       function renderBar(res,effectiveStart){
         // effectiveStart: the cell this bar visually begins from (may differ from res.checkin if truncated)
@@ -1320,7 +1320,7 @@ function renderGrid(){
         const checkinMarker=isTruncated?'':'<div class="checkin-marker"></div>';
 
         return `<td class="${cellClass}" ${attrs} onclick="window.cellClick('${prop.id}','${dayStr}','${res.id}')">
-          <div class="res-bar ${srcClass}" data-res-id="${res.id}" draggable="true" style="width:${barW};${isTruncated?'border-radius:0 4px 4px 0;':''}" onmousedown="window.onResBarMouseDown(event)" ondragstart="window.onResDragStart(event,'${res.id}','${dayStr}')" ondragend="window.onResDragEnd()" onmouseenter="window._showResTooltip(event,'${res.id}')" onmousemove="window._moveResTooltip(event)" onmouseleave="window._hideResTooltip()" onclick="event.stopPropagation();window.onResBarClick(event,'${res.id}')">
+          <div class="res-bar ${srcClass}" data-res-id="${res.id}" style="width:${barW};${isTruncated?'border-radius:0 4px 4px 0;':''}" onmousedown="window.onResBarMouseDown(event,'${res.id}','${prop.id}')" onmouseenter="window._showResTooltip(event,'${res.id}')" onmousemove="window._moveResTooltip(event)" onmouseleave="window._hideResTooltip()" onclick="event.stopPropagation()">
             ${leftHandle}
             ${nameText?`<div class="res-bar-guest">${esc(nameText)}${guestBadge}</div>`:''}
             <div class="res-handle res-handle-right" onmousedown="window.onResHandleMouseDown(event,'${res.id}','right')"></div>
@@ -1369,70 +1369,118 @@ window.cellClick=function(propId,dateStr,resId){
   window.openNewReservationModal(propId,dateStr);
 }
 
-// ══════════════ DRAG TO MOVE (horizontal + vertical) ══════════════
-let _dragResId=null,_dragOriginDate=null,_didDrag=false;
-let _dragStartX=null,_dragStartY=null;
-let _dragHighlightCell=null; // single highlighted cell during drag
-let _dragCurrentSnapDate=null; // magnetic snap target (hysteresis)
+// ══════════════ DRAG TO MOVE (mouse-based) ══════════════
+let _mdResId=null,_mdPropId=null;
+let _mdStartX=null,_mdStartY=null,_mdDragging=false;
+let _mdGhost=null,_mdHighlightCell=null,_mdSnapDate=null;
 
-window.onResBarMouseDown=function(e){
-  _dragStartX=e.clientX;
-  _dragStartY=e.clientY;
+window.onResBarMouseDown=function(e,resId,propId){
+  if(_resizeState)return;
+  if(e.button!==0)return;
+  e.preventDefault();
+  e.stopPropagation();
+  _mdResId=resId;
+  _mdPropId=propId;
+  _mdStartX=e.clientX;
+  _mdStartY=e.clientY;
+  _mdDragging=false;
 };
 
-function _clearDragHighlight(){
-  if(_dragHighlightCell){_dragHighlightCell.style.background='';_dragHighlightCell=null;}
-  _dragCurrentSnapDate=null;
+function _mdBeginDrag(e){
+  _mdDragging=true;
+  window._hideResTooltip();
+  const res=reservations.find(r=>r.id===_mdResId);
+  if(!res)return;
+  const CELL_W=42,H=62;
+  const duration=Math.max(1,Math.round((parseDate(res.checkout)-parseDate(res.checkin))/86400000));
+  const srcColors={airbnb:'#7c3aed',booking:'#1d4ed8',expedia:'#d97706',direct:'#15803d',other:'#475569'};
+  const bg=srcColors[res.source||'other']||srcColors.other;
+  _mdGhost=document.createElement('div');
+  _mdGhost.style.cssText=`position:fixed;left:${e.clientX}px;top:${e.clientY-H/2}px;width:${duration*CELL_W}px;height:${H}px;background:${bg};border-radius:4px;display:flex;align-items:center;padding:0 12px;color:#fff;font-weight:700;font-size:12px;font-family:system-ui,sans-serif;white-space:nowrap;overflow:hidden;opacity:0.85;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.25);z-index:9999;`;
+  _mdGhost.textContent=(res.guest||'Guest').toUpperCase();
+  document.body.appendChild(_mdGhost);
 }
 
-window.onResDragStart=function(e,resId,dateStr){
-  if(_resizeState){e.preventDefault();return;}
-  _dragCurrentSnapDate=null;
-  _didDrag=false;
-  const res=reservations.find(r=>r.id===resId);
-  _dragResId=resId;
-  // _dragOriginDate is not used for date math (newCheckIn = cursor column directly),
-  // kept only for the 8px click-vs-drag threshold check in onDayDrop
-  _dragOriginDate=res?res.checkin:dateStr;
-  if(res){
-    const CELL_W=42,H=62;
-    const duration=Math.max(1,Math.round((parseDate(res.checkout)-parseDate(res.checkin))/86400000));
-    const srcColors={airbnb:'#7c3aed',booking:'#1d4ed8',expedia:'#d97706',direct:'#15803d',other:'#475569'};
-    const bg=srcColors[res.source||'other']||srcColors.other;
-    const ghost=document.createElement('div');
-    ghost.style.cssText=`position:fixed;left:0;top:0;transform:translateX(-10000px);width:${duration*CELL_W}px;height:${H}px;background:${bg};border-radius:4px;display:flex;align-items:center;padding:0 12px;color:#fff;font-weight:700;font-size:12px;font-family:system-ui,sans-serif;white-space:nowrap;overflow:hidden;opacity:0.85;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.25);`;
-    ghost.textContent=(res.guest||'Guest').toUpperCase();
-    document.body.appendChild(ghost);
-    // Cursor at left-center of the FIRST day cell so the ghost visually shows
-    // checkIn under the cursor — no grab-point offset, no calculation
-    e.dataTransfer.setDragImage(ghost,0,H/2);
-    setTimeout(()=>ghost.remove(),0);
-  }
-  e.dataTransfer.effectAllowed='move';
-  e.dataTransfer.setData('text/plain',resId);
-};
-window.onDayDragOver=function(e){
-  if(!_dragResId)return;
-  e.preventDefault();
-  e.dataTransfer.dropEffect='move';
-  // Column snap: nearest center = immediate jump as cursor crosses column midpoint
-  const newSnap=_snapDateFromX(e.clientX,null);
-  if(newSnap)_dragCurrentSnapDate=newSnap;
-  // Room-row × column intersection highlight: shows exact cell where block will land
-  const row=e.target?.closest?.('tr');
-  const snapCell=row&&_dragCurrentSnapDate?row.querySelector(`td[data-date="${_dragCurrentSnapDate}"]`):null;
-  if(snapCell!==_dragHighlightCell){
-    if(_dragHighlightCell)_dragHighlightCell.style.background='';
-    if(snapCell)snapCell.style.background='rgba(59,130,246,0.18)';
-    _dragHighlightCell=snapCell;
-  }
-};
+function _mdClearDrag(){
+  if(_mdGhost){_mdGhost.remove();_mdGhost=null;}
+  if(_mdHighlightCell){_mdHighlightCell.style.background='';_mdHighlightCell=null;}
+  _mdSnapDate=null;
+}
 
-window.onResDragEnd=function(){
-  _clearDragHighlight();
-  _dragStartX=null;
-  _dragStartY=null;
-};
+document.addEventListener('mousemove',function(e){
+  if(!_mdResId)return;
+  if(!_mdDragging){
+    if(Math.abs(e.clientX-_mdStartX)>8||Math.abs(e.clientY-_mdStartY)>8){
+      _mdBeginDrag(e);
+    } else return;
+  }
+  // Ghost follows cursor: left edge = cursor = checkIn position
+  if(_mdGhost){
+    const H=62;
+    _mdGhost.style.left=e.clientX+'px';
+    _mdGhost.style.top=(e.clientY-H/2)+'px';
+  }
+  // Column snap
+  const snap=_snapDateFromX(e.clientX,null);
+  if(snap)_mdSnapDate=snap;
+  // Highlight cell under cursor
+  const el=document.elementFromPoint(e.clientX,e.clientY);
+  const snapCell=el?.closest?.('tr')?.querySelector?.(`td[data-date="${_mdSnapDate}"]`);
+  if(snapCell!==_mdHighlightCell){
+    if(_mdHighlightCell)_mdHighlightCell.style.background='';
+    if(snapCell)snapCell.style.background='rgba(59,130,246,0.18)';
+    _mdHighlightCell=snapCell;
+  }
+});
+
+document.addEventListener('mouseup',function(e){
+  if(!_mdResId)return;
+  if(!_mdDragging){
+    // Pure click — no movement, open edit modal
+    const resId=_mdResId;
+    _mdResId=null;_mdPropId=null;_mdStartX=null;_mdStartY=null;
+    window.openEditRes(resId);
+    return;
+  }
+  const snapDate=_mdSnapDate; // read before _mdClearDrag nulls it
+  _mdClearDrag();
+  const dropDateStr=snapDate||_snapDateFromX(e.clientX,null);
+  const res=reservations.find(r=>r.id===_mdResId);
+  const resId=_mdResId;
+  // Detect drop room from cell under cursor
+  const el=document.elementFromPoint(e.clientX,e.clientY);
+  const dropCell=el?.closest?.('td[data-prop-id]');
+  const dropPropId=dropCell?dropCell.dataset.propId:null;
+  _mdResId=null;_mdPropId=null;_mdStartX=null;_mdStartY=null;_mdDragging=false;
+  if(!res||!dropDateStr)return;
+  const dateDiff=Math.round((parseDate(dropDateStr)-parseDate(res.checkin))/86400000);
+  const newCheckin=formatDate(addDays(parseDate(res.checkin),dateDiff));
+  const newCheckout=formatDate(addDays(parseDate(res.checkout),dateDiff));
+  const updates={checkin:newCheckin,checkout:newCheckout,updatedAt:serverTimestamp()};
+  const propChanged=dropPropId&&dropPropId!==res.propertyId;
+  if(propChanged){
+    updates.propertyId=dropPropId;
+    updates.manualRoom=true;
+    const newProp=properties.find(p=>p.id===dropPropId);
+    if(newProp)updates.roomCode=newProp.shortCode;
+    const srcProp=properties.find(p=>p.id===res.propertyId)
+                ||properties.find(p=>(p.shortCode||'').toLowerCase()===(res.roomCode||'').toLowerCase());
+    const srcCat=_getRoomCategory(srcProp?.shortCode||res.roomCode);
+    const dstCat=_getRoomCategory(newProp?.shortCode);
+    if(srcCat&&dstCat&&srcCat!==dstCat){
+      _pendingMove={resId,updates,
+        guest:res.guest||'Guest',
+        srcName:srcProp?.name||res.roomCode||'original room',
+        dstName:newProp?.name||'new room',
+        srcCat,dstCat};
+      _showMoveConfirm();
+      return;
+    }
+  }
+  if(!propChanged&&dateDiff===0)return;
+  _applyMove(resId,updates,propChanged);
+});
+
 function _getRoomCategory(sc){
   const c=(sc||'').toLowerCase();
   if(/^0-/.test(c))return 'small-rooms';
@@ -1444,7 +1492,7 @@ function _getRoomCategory(sc){
 const _CAT_LABELS={'small-rooms':'Small Rooms','apartments':'Apartments','orb':'Orb Rooms','tab':'Tab Rooms'};
 let _pendingMove=null;
 
-// Snap clientX to the nearest day-column center (50% snap zone = half cell width on each side)
+// Snap clientX to the nearest day-column center
 function _snapDateFromX(clientX,fallbackDateStr){
   const seen=new Set();
   const cols=[];
@@ -1462,56 +1510,6 @@ function _snapDateFromX(clientX,fallbackDateStr){
   return best;
 }
 
-window.onDayDrop=function(e,_rawDropDate,dropPropId){
-  e.preventDefault();
-  _clearDragHighlight();
-  // Read start position before clearing
-  const startX=_dragStartX,startY=_dragStartY;
-  _dragStartX=null;_dragStartY=null;
-  if(!_dragResId)return;
-  // 8px threshold: if mouse barely moved from mousedown, treat as a click not a drag
-  if(startX!==null&&Math.hypot(e.clientX-startX,e.clientY-startY)<8){
-    const resId=_dragResId;
-    _dragResId=null;
-    _didDrag=true; // suppress the click event that fires after drop
-    window.openEditRes(resId);
-    return;
-  }
-  // Prefer magnetic snap date (from drag-over hysteresis), fall back to nearest center
-  const dropDateStr=_dragCurrentSnapDate||_snapDateFromX(e.clientX,_rawDropDate);
-  const res=reservations.find(r=>r.id===_dragResId);
-  _dragResId=null;
-  if(!res)return;
-  const dateDiff=Math.round((parseDate(dropDateStr)-parseDate(_dragOriginDate))/86400000);
-  const newCheckin=formatDate(addDays(parseDate(res.checkin),dateDiff));
-  const newCheckout=formatDate(addDays(parseDate(res.checkout),dateDiff));
-  const updates={checkin:newCheckin,checkout:newCheckout,updatedAt:serverTimestamp()};
-  const propChanged=dropPropId&&dropPropId!==res.propertyId;
-  if(propChanged){
-    updates.propertyId=dropPropId;
-    updates.manualRoom=true; // prevent auto-allocation from overwriting this assignment
-    const newProp=properties.find(p=>p.id===dropPropId);
-    if(newProp)updates.roomCode=newProp.shortCode;
-    // Detect category change
-    const srcProp=properties.find(p=>p.id===res.propertyId)
-                ||properties.find(p=>(p.shortCode||'').toLowerCase()===(res.roomCode||'').toLowerCase());
-    const srcCat=_getRoomCategory(srcProp?.shortCode||res.roomCode);
-    const dstCat=_getRoomCategory(newProp?.shortCode);
-    if(srcCat&&dstCat&&srcCat!==dstCat){
-      _didDrag=true;
-      _pendingMove={resId:res.id,updates,
-        guest:res.guest||'Guest',
-        srcName:srcProp?.name||res.roomCode||'original room',
-        dstName:newProp?.name||'new room',
-        srcCat,dstCat};
-      _showMoveConfirm();
-      return;
-    }
-  }
-  if(!propChanged&&dateDiff===0)return;
-  _didDrag=true;
-  _applyMove(res.id,updates,propChanged);
-};
 function _applyMove(resId,updates,propChanged){
   updateDoc(doc(db,'reservations',resId),updates)
     .then(()=>showToast(propChanged?'Reservation moved to new room ✓':'Reservation moved ✓'))
@@ -1560,10 +1558,9 @@ window.cancelMove=function(){
   });
 };
 let _resizeDone=false;
+// Resize suppresses the click that fires after mouseup
 window.onResBarClick=function(e,resId){
-  if(_didDrag){_didDrag=false;return;}
-  if(_resizeDone){_resizeDone=false;return;} // resize just finished — suppress click
-  window.openEditRes(resId);
+  if(_resizeDone){_resizeDone=false;return;}
 };
 
 // ══════════════ RESIZE HANDLES ══════════════
