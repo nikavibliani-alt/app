@@ -130,6 +130,20 @@
   .step-text strong { display: block; }
   .step-text small { color: var(--ink-3); font-size: 12px; font-family: var(--mono); word-break: break-all; }
 
+  /* Probe rows */
+  .probe-row { border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  .probe-head { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer; background:var(--bg); user-select:none; }
+  .probe-head:hover { background:#f1f5f9; }
+  .probe-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; flex-shrink:0; }
+  .badge-ok   { background:#dcfce7; color:#15803d; }
+  .badge-err  { background:#fee2e2; color:#b91c1c; }
+  .badge-wait { background:#fef9c3; color:#92400e; }
+  .probe-path { font-family:var(--mono); font-size:12px; color:var(--ink); flex:1; }
+  .probe-code { font-family:var(--mono); font-size:11px; color:var(--ink-3); }
+  .probe-body { display:none; border-top:1px solid var(--border); }
+  .probe-body.open { display:block; }
+  .probe-body .json-box { border-radius:0; max-height:220px; }
+
   /* Raw JSON */
   .json-box {
     background: #1e2330;
@@ -247,14 +261,21 @@
       <button class="btn-primary" id="btn-tempcode" onclick="sendTempCode()" disabled style="margin-bottom:1px;">
         <span>📤</span> Send Temp Code
       </button>
+      <button class="btn-secondary" id="btn-probe" onclick="probeAllEndpoints()" disabled style="margin-bottom:1px;">
+        <span>🔍</span> Try All Endpoints
+      </button>
     </div>
     <div style="font-size:12px;color:var(--ink-3);">
-      Calls <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">POST /v1.0/devices/{id}/door-lock/temp-passwords</code>
-      — requires a live token (Connect first).
+      <b>Try All Endpoints</b> fires POST to every known Tuya lock path and shows which one accepts the request.
     </div>
     <div id="tmp-result" style="display:none;margin-top:14px;">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin-bottom:6px;">API Response</div>
       <div class="json-box" id="tmp-json"></div>
+    </div>
+    <!-- Endpoint probe results -->
+    <div id="probe-results" style="display:none;margin-top:16px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin-bottom:8px;">Endpoint Probe Results</div>
+      <div id="probe-rows" style="display:flex;flex-direction:column;gap:8px;"></div>
     </div>
   </div>
 
@@ -476,6 +497,7 @@ async function runFetch() {
     addStep('✅', 'ok', 'All done — lock data loaded');
     document.getElementById('btn-info').disabled = false;
     document.getElementById('btn-tempcode').disabled = false;
+    document.getElementById('btn-probe').disabled = false;
   } catch (e) {
     addStep('❌', 'err', 'Flow stopped', e.message);
   } finally {
@@ -503,8 +525,11 @@ function clearAll() {
   document.getElementById('kpi-card').style.display  = 'none';
   document.getElementById('proxy-note').style.display = 'none';
   document.getElementById('tmp-result').style.display = 'none';
+  document.getElementById('probe-results').style.display = 'none';
+  document.getElementById('probe-rows').innerHTML = '';
   document.getElementById('btn-info').disabled = true;
   document.getElementById('btn-tempcode').disabled = true;
+  document.getElementById('btn-probe').disabled = true;
 }
 
 // ── Temporary password ────────────────────────────────────────────────────────
@@ -568,6 +593,90 @@ async function sendTempCode() {
   }
 
   document.getElementById('btn-tempcode').disabled = false;
+}
+
+// ── Endpoint probe ─────────────────────────────────────────────────────────────
+async function probeAllEndpoints() {
+  if (!_token) { addStep('⚠️', 'err', 'No token — Connect first'); return; }
+
+  const code    = document.getElementById('tmp-code').value.trim() || '12345678';
+  const name    = document.getElementById('tmp-name').value.trim() || 'SleepyTest';
+  const nowSec  = Math.floor(Date.now() / 1000);
+  const duration = parseInt(document.getElementById('tmp-duration').value, 10) || 3600;
+
+  // Different body shapes — each endpoint may expect a slightly different schema
+  const bodies = {
+    default: { name, password: code, effective_time: nowSec, invalid_time: nowSec + duration, password_type: 'ticket', time_zone: '+04:00' },
+    v2:      { name, password: code, effective_time: nowSec * 1000, invalid_time: (nowSec + duration) * 1000, password_type: 'ticket', time_zone: '+04:00' },
+    smart:   { device_id: DEVICE_ID, name, password: code, effective_time: nowSec, invalid_time: nowSec + duration, type: 0, time_zone: '+04:00' },
+  };
+
+  const ENDPOINTS = [
+    { label: 'v1.0 /door-lock/password',        path: `/v1.0/devices/${DEVICE_ID}/door-lock/password`,       body: bodies.default },
+    { label: 'v1.1 /door-lock/temp-passwords',  path: `/v1.1/devices/${DEVICE_ID}/door-lock/temp-passwords`, body: bodies.default },
+    { label: 'v2.0 /door-lock/temp-passwords',  path: `/v2.0/devices/${DEVICE_ID}/door-lock/temp-passwords`, body: bodies.v2      },
+    { label: 'v1.0 smart-lock temp-passwords',  path: `/v1.0/smart-lock/devices/${DEVICE_ID}/temp-passwords`,body: bodies.smart   },
+  ];
+
+  document.getElementById('probe-results').style.display = '';
+  const container = document.getElementById('probe-rows');
+  container.innerHTML = '';
+  document.getElementById('btn-probe').disabled = true;
+
+  addStep('🔍', 'run', `Probing ${ENDPOINTS.length} endpoints…`, `code=${code} | duration=${duration/3600}h`);
+
+  for (const ep of ENDPOINTS) {
+    // Build the row element
+    const row = document.createElement('div');
+    row.className = 'probe-row';
+    row.innerHTML = `
+      <div class="probe-head" onclick="this.nextElementSibling.classList.toggle('open')">
+        <span class="probe-badge badge-wait">⏳</span>
+        <span class="probe-path">${ep.path}</span>
+        <span class="probe-code" id="code-${ep.label.replace(/\s/g,'_')}"></span>
+      </div>
+      <div class="probe-body">
+        <div class="json-box" id="json-${ep.label.replace(/\s/g,'_')}">Waiting…</div>
+      </div>`;
+    container.appendChild(row);
+
+    const badge   = row.querySelector('.probe-badge');
+    const codeEl  = row.querySelector('.probe-code');
+    const jsonEl  = row.querySelector('.json-box');
+    const bodyStr = JSON.stringify(ep.body);
+
+    try {
+      const res  = await fetch(PROXY + ep.path, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tuya-Token': _token },
+        body:    bodyStr,
+      });
+      const data = await res.json();
+
+      const apiCode = data.code ?? (data.success ? 0 : '?');
+      codeEl.textContent = `code=${apiCode} | ${data.msg || (data.success ? 'ok' : '')}`;
+      jsonEl.innerHTML   = syntaxHL(JSON.stringify(data, null, 2));
+
+      if (data.success) {
+        badge.className     = 'probe-badge badge-ok';
+        badge.textContent   = '✅ Works';
+        // Auto-expand working endpoint
+        row.querySelector('.probe-body').classList.add('open');
+        addStep('✅', 'ok', `Working endpoint: ${ep.path}`, `Tuya code=${apiCode}`);
+      } else {
+        badge.className   = 'probe-badge badge-err';
+        badge.textContent = `✗ ${apiCode}`;
+      }
+    } catch (e) {
+      badge.className   = 'probe-badge badge-err';
+      badge.textContent = '✗ ERR';
+      codeEl.textContent = e.message;
+      jsonEl.textContent = e.message;
+    }
+  }
+
+  addStep('🔍', 'ok', 'Probe complete — expand any row to see full response');
+  document.getElementById('btn-probe').disabled = false;
 }
 
 // Auto-check proxy on load
