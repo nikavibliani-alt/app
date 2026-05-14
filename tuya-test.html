@@ -1067,12 +1067,25 @@ async function runGetSpecs() {
 async function runGetLogs() {
   if (!_token) { addStep('⚠️', 'err', 'No token — Connect first'); return; }
   document.getElementById('btn-logs').disabled = true;
-  const path = `/v1.0/devices/${DEVICE_ID}/logs?page_no=1&page_size=20`;
-  addStep('⏳', 'run', `GET ${path}`);
-  const data = await proxyGet(path, _token);
-  showRaw(data);
-  addStep(data.success ? '✅' : '✗', data.success ? 'ok' : 'err',
-    data.success ? `Logs: ${data.result?.logs?.length ?? 0} entries` : `code=${data.code}: ${data.msg}`);
+
+  const endpoints = [
+    `/v1.0/devices/${DEVICE_ID}/door-lock/open-logs?page_no=1&page_size=20&start_time=1778700000&end_time=1778800000`,
+    `/v1.0/devices/${DEVICE_ID}/logs?page_no=1&page_size=20&start_time=1778700000&end_time=1778800000&type=13`,
+    `/v1.1/devices/${DEVICE_ID}/door-lock/open-logs?page_no=1&page_size=20&start_time=1778700000&end_time=1778800000`,
+  ];
+
+  for (const path of endpoints) {
+    addStep('⏳', 'run', `GET ${path}`);
+    const data = await proxyGet(path, _token);
+    showRaw(data);
+    if (data.success) {
+      const count = data.result?.logs?.length ?? data.result?.open_count ?? JSON.stringify(data.result).length;
+      addStep('✅', 'ok', `Logs received — ${count} entries`, path);
+      break;
+    }
+    addStep('✗', 'err', `code=${data.code}: ${data.msg}`, path + ' — trying next');
+  }
+
   document.getElementById('btn-logs').disabled = false;
 }
 
