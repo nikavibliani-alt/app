@@ -144,8 +144,9 @@ async function handleCreateTempPassword(req, res, body) {
     let params;
     try { params = JSON.parse(body || '{}'); } catch(e) { return respond(res, 400, { error: 'invalid JSON' }); }
 
-    // Generate a fresh random 7-digit code each run; caller can override via params.password
-    const password = String(params.password || Math.floor(1000000 + Math.random() * 9000000));
+    // Always generate a fresh random 7-digit code; ignore any caller-supplied password
+    const password = Math.floor(1000000 + Math.random() * 9000000).toString();
+    console.log('[/create-temp-password] Generated password:', password);
     const name     = params.name     || 'SleepyTest';
     const deviceId = params.deviceId || DEVICE_ID;
     const result   = { ok: false, steps: {} };
