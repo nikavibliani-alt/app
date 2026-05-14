@@ -20,6 +20,26 @@ const calcBodyHash = (body) => {
     return crypto.createHash('sha256').update(content).digest('hex');
 };
 
+// ── Keep the process alive no matter what ────────────────────────────────────
+process.on('uncaughtException', (err) => {
+    console.error('[uncaughtException]', err.message, err.stack);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[unhandledRejection]', reason);
+});
+
+// ── Safe response helper — never write to an already-finished socket ──────────
+function safeSend(res, status, body) {
+    try {
+        if (!res.headersSent) {
+            res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        }
+        if (!res.writableEnded) res.end(typeof body === 'string' ? body : JSON.stringify(body));
+    } catch (e) {
+        console.error('[safeSend]', e.message);
+    }
+}
+
 const server = http.createServer((req, res) => {
     // CORS headers for browser access
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -32,9 +52,14 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // Catch any sync throw inside the handler before body collection starts
+    res.on('error', (e) => console.error('[res error]', e.message));
+    req.on('error', (e) => { console.error('[req error]', e.message); safeSend(res, 400, { error: e.message }); });
+
     let body = '';
     req.on('data', chunk => { body += chunk; });
     req.on('end', async () => {
+    try {
         const timestamp = Date.now().toString();
         const nonce = ''; // Optional for most requests
         const httpMethod = req.method;
@@ -107,8 +132,15 @@ const server = http.createServer((req, res) => {
 
         tuyaReq.write(bodyBuf); // always write — empty buffer is a no-op, avoids chunked encoding
         tuyaReq.end();
-    });
+
+    } catch (err) {
+        console.error('[handler error]', err.message, err.stack);
+        safeSend(res, 500, { error: err.message });
+    }
+    }); // end req.on('end')
 });
+
+server.on('error', (err) => console.error('[server error]', err.message));
 
 server.listen(CONFIG.port, () => {
     console.log(`Tuya Proxy running at http://localhost:${CONFIG.port}`);
