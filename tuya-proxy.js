@@ -215,9 +215,17 @@ async function handleCreateTempPassword(req, res, body) {
     result.steps.step3 = { body_sent: bodyObj, endpoints: [] };
 
     for (const createPath of endpoints) {
-        console.log('[/create-temp-password] Step 3: POST', createPath);
+        const step3Headers = buildHeaders('POST', createPath, token, body3);
+        console.log('\n─── STEP 3 REQUEST ───────────────────────────────────────');
+        console.log('URL:    ', `https://${TUYA_HOST}${createPath}`);
+        console.log('HEADERS:', JSON.stringify(step3Headers, null, 2));
+        console.log('BODY:   ', body3);
+        console.log('──────────────────────────────────────────────────────────');
         const r = await tuyaCall('POST', createPath, token, body3);
-        console.log('[/create-temp-password] Result:', JSON.stringify(r.data));
+        console.log('─── STEP 3 RESPONSE ──────────────────────────────────────');
+        console.log('STATUS: ', r.status);
+        console.log('BODY:   ', JSON.stringify(r.data, null, 2));
+        console.log('──────────────────────────────────────────────────────────\n');
         const attempt = { endpoint: createPath, tuya_response: r.data };
         result.steps.step3.endpoints.push(attempt);
         if (r.data.success) {
