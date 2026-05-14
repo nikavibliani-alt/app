@@ -223,6 +223,15 @@
       <button class="btn-secondary" id="btn-info" onclick="runDeviceInfo()" disabled>
         <span>ℹ️</span> Get Lock Info
       </button>
+      <button class="btn-secondary" id="btn-functions" onclick="runGetFunctions()" disabled>
+        <span>🔧</span> Get Functions
+      </button>
+      <button class="btn-secondary" id="btn-specs" onclick="runGetSpecs()" disabled>
+        <span>📋</span> Get Specifications
+      </button>
+      <button class="btn-secondary" id="btn-logs" onclick="runGetLogs()" disabled>
+        <span>📜</span> Get Device Logs
+      </button>
       <button class="btn-secondary" onclick="clearAll()">
         <span>🗑</span> Clear
       </button>
@@ -533,6 +542,9 @@ async function runFetch() {
     document.getElementById('btn-tempcode').disabled = false;
     document.getElementById('btn-probe').disabled = false;
     document.getElementById('btn-diag').disabled = false;
+    document.getElementById('btn-functions').disabled = false;
+    document.getElementById('btn-specs').disabled = false;
+    document.getElementById('btn-logs').disabled = false;
   } catch (e) {
     addStep('❌', 'err', 'Flow stopped', e.message);
   } finally {
@@ -566,6 +578,9 @@ function clearAll() {
   document.getElementById('jtms-rows').innerHTML = '';
   document.getElementById('btn-jtms').disabled = true;
   document.getElementById('btn-oneclick').disabled = true;
+  document.getElementById('btn-functions').disabled = true;
+  document.getElementById('btn-specs').disabled = true;
+  document.getElementById('btn-logs').disabled = true;
   document.getElementById('btn-info').disabled = true;
   document.getElementById('btn-tempcode').disabled = true;
   document.getElementById('btn-probe').disabled = true;
@@ -1022,6 +1037,43 @@ async function runOneClick() {
   }
 
   document.getElementById('btn-oneclick').disabled = false;
+}
+
+// ── Get Functions / Specifications ───────────────────────────────────────────
+async function runGetFunctions() {
+  if (!_token) { addStep('⚠️', 'err', 'No token — Connect first'); return; }
+  document.getElementById('btn-functions').disabled = true;
+  const path = `/v1.0/devices/${DEVICE_ID}/functions`;
+  addStep('⏳', 'run', `GET ${path}`, 'Fetching supported functions…');
+  const data = await proxyGet(path, _token);
+  showRaw(data);
+  addStep(data.success ? '✅' : '✗', data.success ? 'ok' : 'err',
+    data.success ? `Functions: ${data.result?.functions?.length ?? 0} entries` : `code=${data.code}: ${data.msg}`);
+  document.getElementById('btn-functions').disabled = false;
+}
+
+async function runGetSpecs() {
+  if (!_token) { addStep('⚠️', 'err', 'No token — Connect first'); return; }
+  document.getElementById('btn-specs').disabled = true;
+  const path = `/v1.0/devices/${DEVICE_ID}/specifications`;
+  addStep('⏳', 'run', `GET ${path}`, 'Fetching device specifications…');
+  const data = await proxyGet(path, _token);
+  showRaw(data);
+  addStep(data.success ? '✅' : '✗', data.success ? 'ok' : 'err',
+    data.success ? `Specs received — ${Object.keys(data.result ?? {}).join(', ')}` : `code=${data.code}: ${data.msg}`);
+  document.getElementById('btn-specs').disabled = false;
+}
+
+async function runGetLogs() {
+  if (!_token) { addStep('⚠️', 'err', 'No token — Connect first'); return; }
+  document.getElementById('btn-logs').disabled = true;
+  const path = `/v1.0/devices/${DEVICE_ID}/logs?page_no=1&page_size=20`;
+  addStep('⏳', 'run', `GET ${path}`);
+  const data = await proxyGet(path, _token);
+  showRaw(data);
+  addStep(data.success ? '✅' : '✗', data.success ? 'ok' : 'err',
+    data.success ? `Logs: ${data.result?.logs?.length ?? 0} entries` : `code=${data.code}: ${data.msg}`);
+  document.getElementById('btn-logs').disabled = false;
 }
 
 // Auto-check proxy on load
