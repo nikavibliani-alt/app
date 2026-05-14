@@ -898,40 +898,27 @@ async function runJtmspro() {
   const encryptedPwd = dEnc.encrypted_hex;
 
   // ── Step 3: Create temp password — try two endpoints ─────────────────────
-  const nowSec = Math.floor(Date.now() / 1000);
-  const body3  = {
+  const nowSec    = Math.floor(Date.now() / 1000);
+  const createPath = `/v1.0/smart-lock/devices/${DEVICE_ID}/password`;
+  const body3 = {
     name,
     password:       encryptedPwd,
-    password_type:  0,           // integer 0, not string 'ticket'
+    password_type:  0,
     ticket_id,
-    effective_time: nowSec,
-    invalid_time:   nowSec + durationSec,
+    effective_time: nowSec - 60,
+    invalid_time:   nowSec + 7200,
   };
 
-  const step3Endpoints = [
-    `/v1.0/smart-lock/device/${DEVICE_ID}/template/temp-password`,
-    `/v1.0/smart-lock/devices/${DEVICE_ID}/password`,
-  ];
-
-  let step3Done = false;
-  for (const createPath of step3Endpoints) {
-    const rCreate = row(`Step 3 — POST ${createPath}`, JSON.stringify(body3));
-    const dCreate = await call('POST', createPath, token, body3);
-    rCreate.show(dCreate);
-    if (dCreate.success) {
-      rCreate.ok(`✅ result=${JSON.stringify(dCreate.result)}`);
-      addStep('✅', 'ok', `Temp password created — id=${dCreate.result}`,
-        `password="${PASSWORD}" | valid for ${durationSec/3600}h`);
-      step3Done = true;
-      break;
-    }
-    // 501 = endpoint not found for this device — try next
-    const tryNext = dCreate.code === 501 || dCreate.code === 1108;
-    rCreate.err(`code=${dCreate.code}: ${dCreate.msg}${tryNext ? ' — trying next endpoint' : ''}`);
-    if (!tryNext) break; // hard error, no point continuing
-  }
-  if (!step3Done) {
-    addStep('✗', 'err', 'Step 3 failed on all endpoints — expand rows above for details');
+  const rCreate = row(`Step 3 — POST ${createPath}`, JSON.stringify(body3));
+  const dCreate = await call('POST', createPath, token, body3);
+  rCreate.show(dCreate);
+  if (dCreate.success) {
+    rCreate.ok(`✅ result=${JSON.stringify(dCreate.result)}`);
+    addStep('✅', 'ok', `Temp password created — id=${dCreate.result}`,
+      `password="${PASSWORD}" | valid 2h`);
+  } else {
+    rCreate.err(`code=${dCreate.code}: ${dCreate.msg}`);
+    addStep('✗', 'err', `Step 3 failed — code=${dCreate.code}: ${dCreate.msg}`);
   }
 
   document.getElementById('btn-jtms').disabled = false;
