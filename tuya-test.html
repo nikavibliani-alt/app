@@ -342,7 +342,7 @@ let _token = null; // cached access token
 // ── Fetch via proxy ────────────────────────────────────────────────────────────
 async function proxyGet(path, token) {
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['X-Tuya-Token'] = token;
+  if (token) headers['access_token'] = token;
   const res = await fetch(PROXY + path, { headers });
   if (!res.ok) throw new Error(`HTTP ${res.status} from proxy`);
   return res.json();
@@ -604,7 +604,7 @@ async function sendTempCode() {
   try {
     const res = await fetch(PROXY + path, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Tuya-Token': _token },
+      headers: { 'Content-Type': 'application/json', 'access_token': _token },
       body,
     });
     data = await res.json();
@@ -685,7 +685,7 @@ async function probeAllEndpoints() {
     try {
       const res  = await fetch(PROXY + ep.path, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Tuya-Token': _token },
+        headers: { 'Content-Type': 'application/json', 'access_token': _token },
         body:    bodyStr,
       });
       const data = await res.json();
@@ -770,7 +770,7 @@ async function runDiagnostics() {
     const jsonEl = document.getElementById(`json-${slugId}`);
 
     try {
-      const headers = { 'Content-Type': 'application/json', 'X-Tuya-Token': _token };
+      const headers = { 'Content-Type': 'application/json', 'access_token': _token };
       const opts = { method: step.method, headers };
       if (step.body) opts.body = step.body;
 
@@ -839,7 +839,7 @@ async function runJtmspro() {
     const jsonEl = document.getElementById(`json_${slug}`);
 
     try {
-      const opts = { method, headers: { 'Content-Type': 'application/json', 'X-Tuya-Token': _token } };
+      const opts = { method, headers: { 'Content-Type': 'application/json', 'access_token': _token } };
       if (body) opts.body = body;
       const res  = await fetch(PROXY + path, opts);
       const text = await res.text();           // get raw text first
