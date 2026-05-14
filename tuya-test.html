@@ -1003,25 +1003,30 @@ async function runOneClick() {
     !!(s2 && !s2.error), s2
   );
 
-  // Step 3 — commands (multiple variants tried)
+  // Step 3 — create temp password
   const s3 = result.steps?.step3;
-  const s3winner = s3?.attempts?.find(a => a.tuya_response?.success);
-  const s3ok = !!s3winner;
+  const s3ok = s3?.tuya_response?.success;
   makeStepRow(
-    `Step 3 — POST /v1.0/devices/{id}/commands (${s3?.attempts?.length ?? 0} variant(s) tried)`,
-    s3ok ? `✅ ${s3winner.label}` : `all variants failed`,
-    s3ok, s3
+    'Step 3 — POST /v1.0/devices/{id}/door-lock/temp-password',
+    s3ok ? `✅ password_id=${s3.tuya_response?.result}` : `code=${s3?.tuya_response?.code}: ${s3?.tuya_response?.msg}`,
+    !!s3ok, s3
   );
 
-  // Step 4 — delivery status
+  // Step 4 — delivery status polls
   const s4 = result.steps?.step4_delivery;
-  const delivStatus = result.delivery_status ?? '?';
-  const delivColor  = delivStatus === 'SUCCESS' ? '#86efac' : delivStatus === 'ONGOING' ? '#fcd34d' : '#fca5a5';
-  makeStepRow(
-    `Step 4 — GET temp-passwords list  delivery=<span style="color:${delivColor};font-weight:900">${delivStatus}</span>`,
-    result.all_passwords ? `${result.all_passwords.length} password(s) on device` : 'list failed',
-    delivStatus === 'SUCCESS', s4
-  );
+  const polls = s4?.polls ?? [];
+  polls.forEach((poll, i) => {
+    const ds    = poll.delivery_status;
+    const color = ds === 'SUCCESS' ? '#86efac' : ds === 'ONGOING' ? '#fcd34d' : '#fca5a5';
+    makeStepRow(
+      `Step 4.${poll.poll} — GET temp-passwords (after ${poll.wait_sec}s)  <span style="color:${color};font-weight:900">${ds}</span>`,
+      poll.all_passwords?.length ? poll.all_passwords.map(p => `${p.name}:${p.delivery_status}`).join(' | ') : 'empty list',
+      ds === 'SUCCESS', poll
+    );
+  });
+  if (!polls.length) {
+    makeStepRow('Step 4 — delivery status check', 'no polls returned', false, s4);
+  }
 
   if (result.ok) {
     overallStep.className = 'step ok';
