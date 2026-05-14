@@ -203,8 +203,6 @@ async function handleCreateTempPassword(req, res, body) {
         ticket_id,
         effective_time: nowSec - 300,
         invalid_time:   nowSec + 86400,
-        time_zone:      'Asia/Tbilisi',
-        type:           0,
     };
     const body3 = JSON.stringify(bodyObj);
     console.log('PLAIN PASSWORD:', password);
