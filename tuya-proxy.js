@@ -13,7 +13,7 @@ const crypto = require('crypto');
 
 const ACCESS_ID     = 'wxd3afwrhewvh5p5tukc';
 const ACCESS_SECRET = '80edc016e2d84df886f500f38f5cc6b7';
-const DEVICE_ID     = 'bf70cd74974715b99cxmee';
+const DEVICE_ID     = 'bf5203cc457e805b7ekvmp';
 const TUYA_HOST     = 'openapi.tuyaeu.com';
 const PORT          = 3000;
 
@@ -194,6 +194,10 @@ async function handleCreateTempPassword(req, res, body) {
     const nowSec     = Math.floor(Date.now() / 1000);
     const endpoints  = [
         `/v1.0/devices/${deviceId}/door-lock/temp-password`,
+        `/v1.1/devices/${deviceId}/door-lock/temp-password`,
+        `/v1.0/devices/${deviceId}/door-lock/temp-passwords`,
+        `/v1.0/smart-lock/devices/${deviceId}/temp-password`,
+        `/v1.0/smart-lock/device/${deviceId}/temp-password`,
     ];
     const bodyObj = {
         name,
