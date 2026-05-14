@@ -803,17 +803,16 @@ async function runDiagnostics() {
   document.getElementById('btn-diag').disabled = false;
 }
 
-// ── jtmspro flow — self-contained: fetches its own fresh token ───────────────
+// ── jtmspro ticket flow — crypto handled in proxy (Node AES-128-ECB) ─────────
 async function runJtmspro() {
   document.getElementById('btn-jtms').disabled = true;
   const container = document.getElementById('jtms-rows');
   container.innerHTML = '';
 
-  const code        = document.getElementById('tmp-code').value.trim() || '12345678';
-  const name        = document.getElementById('tmp-name').value.trim() || 'Test';
+  const name        = document.getElementById('tmp-name').value.trim() || 'SleepyTest';
   const durationSec = parseInt(document.getElementById('tmp-duration').value, 10) || 3600;
 
-  // Render a collapsible result row, return the parsed response
+  // ── Render a collapsible row ──────────────────────────────────────────────
   function makeRow(label, note) {
     const id  = 'r' + Math.random().toString(36).slice(2);
     const row = document.createElement('div');
@@ -832,84 +831,85 @@ async function runJtmspro() {
       </div>`;
     container.appendChild(row);
     return {
-      ok(summary)  { document.getElementById(`b${id}`).className='probe-badge badge-ok';  document.getElementById(`b${id}`).textContent='✅'; document.getElementById(`c${id}`).textContent=summary; },
-      err(summary) { document.getElementById(`b${id}`).className='probe-badge badge-err'; document.getElementById(`b${id}`).textContent='✗';  document.getElementById(`c${id}`).textContent=summary; },
-      show(data)   { document.getElementById(`j${id}`).innerHTML=syntaxHL(JSON.stringify(data,null,2)); },
+      ok:   s  => { const b=document.getElementById(`b${id}`); b.className='probe-badge badge-ok';  b.textContent='✅'; document.getElementById(`c${id}`).textContent=s; },
+      err:  s  => { const b=document.getElementById(`b${id}`); b.className='probe-badge badge-err'; b.textContent='✗';  document.getElementById(`c${id}`).textContent=s; },
+      show: d  => { document.getElementById(`j${id}`).innerHTML=syntaxHL(JSON.stringify(d,null,2)); },
     };
   }
 
-  async function call(method, path, token, body) {
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['access_token'] = token;
-    const opts = { method, headers };
-    if (body)  opts.body = typeof body === 'string' ? body : JSON.stringify(body);
-    const res  = await fetch('http://localhost:3000' + path, opts);
-    const text = await res.text();
-    try { return JSON.parse(text); } catch { return { _raw: text }; }
-  }
-
-  // ── Step 1: Fetch token ───────────────────────────────────────────────────
-  const r1 = makeRow('GET /v1.0/token?grant_type=1', 'Fresh access token — no auth header needed');
+  // ── Step 0: get fresh token ───────────────────────────────────────────────
+  const rTok = makeRow('GET /v1.0/token?grant_type=1', 'Fresh access token');
   let token;
   try {
-    const d1 = await call('GET', '/v1.0/token?grant_type=1', null, null);
-    r1.show(d1);
-    if (d1.success && d1.result?.access_token) {
-      token = d1.result.access_token;
-      r1.ok(`access_token obtained (expire=${d1.result.expire_time}s)`);
+    const res  = await fetch('http://localhost:3000/v1.0/token?grant_type=1');
+    const data = await res.json();
+    rTok.show(data);
+    if (data.success && data.result?.access_token) {
+      token = data.result.access_token;
+      rTok.ok(`expire=${data.result.expire_time}s`);
     } else {
-      r1.err(`code=${d1.code}: ${d1.msg}`);
-      addStep('✗', 'err', 'Cannot continue — token fetch failed', JSON.stringify(d1));
+      rTok.err(`code=${data.code}: ${data.msg}`);
+      addStep('✗', 'err', 'Token fetch failed — cannot continue');
       document.getElementById('btn-jtms').disabled = false;
       return;
     }
   } catch (e) {
-    r1.err(e.message); r1.show({ error: e.message });
+    rTok.err(e.message);
     addStep('✗', 'err', 'Token fetch threw: ' + e.message);
     document.getElementById('btn-jtms').disabled = false;
     return;
   }
 
-  // ── Step 2: try two endpoints in order, show both responses ─────────────
-  const nowSec   = Math.floor(Date.now() / 1000);
-  const pwd6     = '123456'; // 6 digits as required by smart-lock API
-  const body2    = {
-    name:           name,
-    password:       pwd6,
-    password_type:  0,
-    effective_time: nowSec,
-    invalid_time:   nowSec + durationSec,
-  };
-  const bodyStr = JSON.stringify(body2);
-
-  const endpoints = [
-    `/v1.0/smart-lock/devices/${DEVICE_ID}/password`,
-    `/v1.0/smart-lock/devices/${DEVICE_ID}/temp-password`,
-  ];
-
-  let anySuccess = false;
-  for (const path2 of endpoints) {
-    const r2 = makeRow(`POST ${path2}`, `body: ${bodyStr}`);
-    try {
-      const d2 = await call('POST', path2, token, body2);
-      r2.show(d2);
-      if (d2.success) {
-        r2.ok(`✅ result=${JSON.stringify(d2.result)}`);
-        addStep('✅', 'ok', `Password created via ${path2.split('/').pop()} — id=${d2.result}`,
-          `code="${pwd6}" | valid for ${durationSec/3600}h`);
-        anySuccess = true;
-        break; // stop at first success
-      } else {
-        r2.err(`code=${d2.code}: ${d2.msg}`);
-      }
-    } catch (e) {
-      r2.err(e.message);
-      r2.show({ error: e.message });
-    }
+  // ── Steps 1–3: proxy handles ticket + AES + create ───────────────────────
+  const rFlow = makeRow('POST /api/ticket-flow  (proxy runs steps 1–3)', 'Ticket → AES decrypt/encrypt → create temp-password');
+  let result;
+  try {
+    const res = await fetch('http://localhost:3000/api/ticket-flow', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ token, name, durationSec, password: '123456', deviceId: DEVICE_ID }),
+    });
+    result = await res.json();
+  } catch (e) {
+    rFlow.err(e.message);
+    rFlow.show({ error: e.message });
+    addStep('✗', 'err', 'Ticket flow threw: ' + e.message);
+    document.getElementById('btn-jtms').disabled = false;
+    return;
   }
 
-  if (!anySuccess) {
-    addStep('✗', 'err', 'Both endpoints failed — expand rows above for Tuya error details');
+  // ── Render each sub-step from the proxy's response ────────────────────────
+  const subSteps = [
+    { key: 'step1', label: 'Step 1 — POST /v1.0/devices/{id}/door-lock/password-ticket  body: {}',
+      ok: d => d?.tuya_response?.success,
+      sum: d => d?.tuya_response?.success
+        ? `ticket_id=${d.tuya_response.result?.ticket_id}`
+        : `code=${d?.tuya_response?.code}: ${d?.tuya_response?.msg}` },
+    { key: 'step2', label: 'Step 2 — AES-128-ECB  (Node.js, proxy-side)',
+      ok: d => d && !d.error,
+      sum: d => d?.encrypted_hex ? `encrypted=${d.encrypted_hex.slice(0,20)}…` : d?.error },
+    { key: 'step3', label: 'Step 3 — POST /v1.0/devices/{id}/door-lock/temp-password',
+      ok: d => d?.tuya_response?.success,
+      sum: d => d?.tuya_response?.success
+        ? `✅ password_id=${d.tuya_response.result}`
+        : `code=${d?.tuya_response?.code}: ${d?.tuya_response?.msg}` },
+  ];
+
+  // hide the flow row placeholder — sub-step rows replace it
+  container.removeChild(container.lastChild);
+
+  for (const def of subSteps) {
+    const data = result.steps?.[def.key];
+    const r    = makeRow(def.label, '');
+    r.show(data ?? {});
+    def.ok(data) ? r.ok(def.sum(data)) : r.err(def.sum(data) ?? '—');
+  }
+
+  if (result.ok) {
+    addStep('✅', 'ok', `Temp password created — id=${result.password_id}`,
+      `password="123456" | valid ${result.valid_from?.slice(0,16)} → ${result.valid_until?.slice(0,16)} UTC`);
+  } else {
+    addStep('✗', 'err', `Flow failed: ${result.error}`, 'Expand rows above for details');
   }
 
   document.getElementById('btn-jtms').disabled = false;

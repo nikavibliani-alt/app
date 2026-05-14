@@ -14,11 +14,64 @@ const calcSign = (str, secret) => {
     return crypto.createHmac('sha256', secret).update(str).digest('hex').toUpperCase();
 };
 
-// Helper: Calculate MD5 of Body
+// Helper: SHA-256 of body string
 const calcBodyHash = (body) => {
     const content = body ? (typeof body === 'string' ? body : JSON.stringify(body)) : '';
     return crypto.createHash('sha256').update(content).digest('hex');
 };
+
+// ── AES-128-ECB helpers (PKCS7 padding via Node default) ─────────────────────
+const AES_KEY = Buffer.from(CONFIG.accessSecret.slice(0, 16), 'utf8');
+
+function aesEcbDecrypt(keyBuf, dataBuf) {
+    const d = crypto.createDecipheriv('aes-128-ecb', keyBuf, null);
+    d.setAutoPadding(true);
+    return Buffer.concat([d.update(dataBuf), d.final()]);
+}
+function aesEcbEncrypt(keyBuf, dataBuf) {
+    const c = crypto.createCipheriv('aes-128-ecb', keyBuf, null);
+    c.setAutoPadding(true);
+    return Buffer.concat([c.update(dataBuf), c.final()]);
+}
+
+// ── Internal Tuya HTTPS call (used by /api/ticket-flow) ──────────────────────
+function tuyaCall(method, path, token, bodyStr) {
+    bodyStr = bodyStr || '';
+    return new Promise((resolve) => {
+        const timestamp = Date.now().toString();
+        const nonce     = '';
+        const bodyHash  = calcBodyHash(bodyStr);
+        const sts       = [method, bodyHash, '', path].join('\n');
+        const signStr   = CONFIG.accessId + (token || '') + timestamp + nonce + sts;
+        const sign      = calcSign(signStr, CONFIG.accessSecret);
+        const bodyBuf   = Buffer.from(bodyStr, 'utf8');
+        const headers   = {
+            'client_id':      CONFIG.accessId,
+            'sign':           sign,
+            't':              timestamp,
+            'sign_method':    'HMAC-SHA256',
+            'Content-Type':   'application/json',
+            'Content-Length': bodyBuf.length,
+        };
+        if (token) headers['access_token'] = token;
+
+        console.log(`  [tuyaCall] ${method} ${path}  body=${bodyStr||'(empty)'}`);
+        const req = https.request({ hostname: CONFIG.endpoint, port: 443, method, path, headers, timeout: 10000 }, res => {
+            let raw = '';
+            res.on('data', c => { raw += c; });
+            res.on('end', () => {
+                console.log(`  [tuyaCall] ${res.statusCode}  ${raw}`);
+                let data;
+                try { data = JSON.parse(raw); } catch { data = { _raw: raw }; }
+                resolve({ status: res.statusCode, data, raw });
+            });
+        });
+        req.on('error', err => resolve({ status: 0, data: { error: err.message }, raw: '' }));
+        req.on('timeout', () => { req.destroy(); resolve({ status: 504, data: { error: 'timeout' }, raw: '' }); });
+        req.write(bodyBuf);
+        req.end();
+    });
+}
 
 // ── Keep the process alive no matter what ────────────────────────────────────
 process.on('uncaughtException', (err) => {
@@ -60,6 +113,86 @@ const server = http.createServer((req, res) => {
     req.on('data', chunk => { body += chunk; });
     req.on('end', async () => {
     try {
+
+        // ── Internal route: full ticket+encrypt+create flow ───────────────────
+        if (req.url === '/api/ticket-flow' && req.method === 'POST') {
+            const params     = JSON.parse(body || '{}');
+            const token      = params.token;
+            const plainPwd   = params.password   || '123456';
+            const name       = params.name        || 'SleepyTest';
+            const duration   = params.durationSec || 3600;
+            const deviceId   = params.deviceId    || 'bf70cd74974715b99cxmee';
+            const nowSec     = Math.floor(Date.now() / 1000);
+            const result     = { ok: false, steps: {} };
+
+            // Step 1 — get ticket
+            const ticketPath = `/v1.0/devices/${deviceId}/door-lock/password-ticket`;
+            console.log('\n[ticket-flow] Step 1 — POST', ticketPath);
+            const r1 = await tuyaCall('POST', ticketPath, token, '{}');
+            result.steps.step1 = { endpoint: ticketPath, body_sent: '{}', http_status: r1.status, tuya_response: r1.data };
+
+            if (!r1.data.success) {
+                result.error = `Step 1 failed: code=${r1.data.code} msg=${r1.data.msg}`;
+                return safeSend(res, 422, result);
+            }
+
+            const ticketId  = r1.data.result?.ticket_id;
+            const ticketKey = r1.data.result?.ticket_key;
+            if (!ticketId || !ticketKey) {
+                result.error = 'Step 1: ticket_id or ticket_key missing from response';
+                return safeSend(res, 422, result);
+            }
+
+            // Step 2 — AES crypto (Node.js)
+            console.log('[ticket-flow] Step 2 — AES decrypt ticket_key, encrypt password');
+            let encryptedPwd;
+            try {
+                const isHex    = /^[0-9a-fA-F]+$/.test(ticketKey) && ticketKey.length % 2 === 0;
+                const tkBuf    = Buffer.from(ticketKey, isHex ? 'hex' : 'base64');
+                const dk       = aesEcbDecrypt(AES_KEY, tkBuf);
+                const encBuf   = aesEcbEncrypt(dk, Buffer.from(plainPwd, 'utf8'));
+                encryptedPwd   = encBuf.toString('hex');
+                result.steps.step2 = {
+                    aes_key_hex:       AES_KEY.toString('hex'),
+                    ticket_key_raw:    ticketKey,
+                    ticket_key_enc:    isHex ? 'hex' : 'base64',
+                    decrypted_key_hex: dk.toString('hex'),
+                    plain_password:    plainPwd,
+                    encrypted_hex:     encryptedPwd,
+                };
+                console.log('[ticket-flow] encrypted_password:', encryptedPwd);
+            } catch (e) {
+                result.error = 'Step 2 crypto failed: ' + e.message;
+                result.steps.step2 = { error: e.message };
+                return safeSend(res, 500, result);
+            }
+
+            // Step 3 — create temp password
+            const createPath = `/v1.0/devices/${deviceId}/door-lock/temp-password`;
+            const body3 = JSON.stringify({
+                name,
+                password:       encryptedPwd,
+                password_type:  'ticket',
+                ticket_id:      ticketId,
+                effective_time: nowSec,
+                invalid_time:   nowSec + duration,
+            });
+            console.log('[ticket-flow] Step 3 — POST', createPath, body3);
+            const r3 = await tuyaCall('POST', createPath, token, body3);
+            result.steps.step3 = { endpoint: createPath, body_sent: JSON.parse(body3), http_status: r3.status, tuya_response: r3.data };
+
+            if (r3.data.success) {
+                result.ok          = true;
+                result.password_id = r3.data.result;
+                result.plain_pwd   = plainPwd;
+                result.valid_from  = new Date(nowSec * 1000).toISOString();
+                result.valid_until = new Date((nowSec + duration) * 1000).toISOString();
+            } else {
+                result.error = `Step 3 failed: code=${r3.data.code} msg=${r3.data.msg}`;
+            }
+            return safeSend(res, result.ok ? 200 : 422, result);
+        }
+
         const timestamp = Date.now().toString();
         const nonce = ''; // Optional for most requests
         const httpMethod = req.method;
