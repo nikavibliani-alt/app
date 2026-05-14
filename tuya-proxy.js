@@ -144,9 +144,12 @@ async function handleCreateTempPassword(req, res, body) {
     let params;
     try { params = JSON.parse(body || '{}'); } catch(e) { return respond(res, 400, { error: 'invalid JSON' }); }
 
-    // Always generate a fresh random 7-digit code; ignore any caller-supplied password
+    // Always generate a fresh random 7-digit code
     const password = Math.floor(1000000 + Math.random() * 9000000).toString();
-    console.log('[/create-temp-password] Generated password:', password);
+    if (password.length !== 7) throw new Error(`BUG: password is ${password.length} digits, expected 7`);
+    console.log('\n' + '★'.repeat(50));
+    console.log(`★  DOOR CODE TO TRY ON LOCK: ${password}  ★`);
+    console.log('★'.repeat(50) + '\n');
     const name     = params.name     || 'GuestCode';
     const deviceId = params.deviceId || DEVICE_ID;
     const result   = { ok: false, steps: {} };
@@ -181,9 +184,12 @@ async function handleCreateTempPassword(req, res, body) {
         const intermediateKey = ACCESS_SECRET.substring(0, 16);
         const decryptedTicket = aesDecrypt(intermediateKey, Buffer.from(ticket_key, 'hex'));
         const finalKey        = decryptedTicket.slice(0, 16);
-        encryptedHex          = aesEncrypt(finalKey, Buffer.from(password, 'utf8')).toString('hex').toUpperCase();
-        console.log('[/create-temp-password] Step 2 encrypted_hex:', encryptedHex);
-        result.steps.step2 = { ticket_key, decrypted_ticket_hex: decryptedTicket.toString('hex'), final_key_hex: finalKey.toString('hex'), plain_password: password, encrypted_hex: encryptedHex };
+        const encBuf      = aesEncrypt(finalKey, Buffer.from(password, 'utf8'));
+        encryptedHex      = encBuf.toString('hex').toUpperCase();
+        console.log(`[step2] plain_password="${password}" length=${password.length} chars`);
+        console.log(`[step2] encrypted_hex="${encryptedHex}" length=${encBuf.length} bytes / ${encryptedHex.length} hex chars`);
+        console.log(`[step2] PKCS7: cipher.final() included ✅ (setAutoPadding(true)) — expected ${Math.ceil((password.length+1)/16)*16} bytes`);
+        result.steps.step2 = { ticket_key, decrypted_ticket_hex: decryptedTicket.toString('hex'), final_key_hex: finalKey.toString('hex'), plain_password: password, plain_length: password.length, encrypted_hex: encryptedHex, encrypted_bytes: encBuf.length };
     } catch(e) {
         console.error('[/create-temp-password] Step 2 ERROR:', e.message);
         result.error = 'AES failed: ' + e.message;
@@ -191,58 +197,60 @@ async function handleCreateTempPassword(req, res, body) {
         return respond(res, 500, result);
     }
 
-    // Step 3 — flat body to /door-lock/temp-password
-    const nowSec      = Math.floor(Date.now() / 1000);
+    // Step 3 — create temp password
+    const nowSec       = Math.floor(Date.now() / 1000);
+    const effectiveSec = nowSec + 60;        // 1 min in future (avoids clock-skew rejection)
+    const invalidSec   = effectiveSec + 3600; // 1 hour window
     const ticketAgeSec = nowSec - Math.floor(r1.data.t / 1000);
-    console.log(`[timing] Ticket age: ${ticketAgeSec}s (expire_time=${r1.data.result.expire_time}s) — ${ticketAgeSec > r1.data.result.expire_time ? '⚠️ POSSIBLY EXPIRED' : '✅ within window'}`);
-    const endpoints = [
-        `/v1.0/devices/${deviceId}/door-lock/temp-password`,
-        `/v1.0/devices/${deviceId}/door-lock/temp-password`, // second attempt: password_type as integer
-    ];
-    const bodies = [
-        {
-            name:           'TestAlpha',
-            password:       encryptedHex,
-            password_type:  'ticket',
-            ticket_id,
-            effective_time: nowSec,
-            invalid_time:   nowSec + 3600,
-        },
-        {
-            name:           'TestAlpha',
-            password:       encryptedHex,
-            password_type:  1,
-            ticket_id,
-            effective_time: nowSec,
-            invalid_time:   nowSec + 3600,
-        },
-    ];
-    console.log('PLAIN PASSWORD:', password);
-    result.steps.step3 = { endpoints: [] };
+    console.log(`[timing] Ticket age: ${ticketAgeSec}s  expire_time=${r1.data.result.expire_time}s  ${ticketAgeSec > r1.data.result.expire_time ? '⚠️ POSSIBLY EXPIRED' : '✅ OK'}`);
+    console.log(`[timing] effective=${effectiveSec} (+60s)  invalid=${invalidSec} (+3660s)`);
 
-    for (let i = 0; i < endpoints.length; i++) {
-        const createPath = endpoints[i];
-        const bodyObj    = bodies[i];
-        const body3      = JSON.stringify(bodyObj);
-        console.log(`\n─── STEP 3.${i+1} (password_type=${JSON.stringify(bodyObj.password_type)}) ─────────────────`);
-        console.log('BODY:', body3);
-        const r = await tuyaCall('POST', createPath, token, body3);
-        console.log('RESPONSE:', JSON.stringify(r.data));
-        console.log('──────────────────────────────────────────────────────────\n');
-        const attempt = { endpoint: createPath, body_sent: bodyObj, tuya_response: r.data };
-        result.steps.step3.endpoints.push(attempt);
-        if (r.data.success) {
-            result.ok          = true;
-            result.password_id = r.data.result;
-            result.plain_pwd   = password;
-            result.winning_endpoint = createPath;
-            console.log('[/create-temp-password] ✅ SUCCESS at', createPath, ' password_id=' + result.password_id);
-            break;
-        }
-        console.log(`[/create-temp-password] ✗ code=${r.data.code} msg=${r.data.msg} — trying next`);
+    const createPath = `/v1.0/devices/${deviceId}/door-lock/temp-password`;
+    const bodyObj = {
+        name,
+        password:       encryptedHex,
+        password_type:  'ticket',
+        ticket_id,
+        effective_time: effectiveSec,
+        invalid_time:   invalidSec,
+    };
+    const body3 = JSON.stringify(bodyObj);
+    console.log('\n─── STEP 3 BODY ──────────────────────────────────────────');
+    console.log(body3);
+    console.log('──────────────────────────────────────────────────────────');
+
+    result.steps.step3 = { endpoint: createPath, body_sent: bodyObj };
+    const r3 = await tuyaCall('POST', createPath, token, body3);
+    result.steps.step3.tuya_response = r3.data;
+    console.log('─── STEP 3 RESPONSE:', JSON.stringify(r3.data));
+
+    if (!r3.data.success) {
+        result.error = `Step 3 failed: code=${r3.data.code} msg=${r3.data.msg}`;
+        return respond(res, 422, result);
     }
-    if (!result.ok) result.error = 'All 3 endpoints failed — see steps.step3.endpoints for details';
-    respond(res, result.ok ? 200 : 422, result);
+
+    result.ok          = true;
+    result.password_id = r3.data.result;
+    result.plain_pwd   = password;
+    console.log(`\n★  SUCCESS — code=${password}  password_id=${result.password_id}  ★`);
+
+    // Step 4 — check delivery status
+    const listPath = `/v1.0/devices/${deviceId}/door-lock/temp-passwords`;
+    console.log('[step4] GET', listPath);
+    const r4 = await tuyaCall('GET', listPath, token, '');
+    result.steps.step4_delivery = { endpoint: listPath, tuya_response: r4.data };
+    if (r4.data.success && Array.isArray(r4.data.result)) {
+        const match = r4.data.result.find(p => p.name === name || String(p.id) === String(result.password_id));
+        result.delivery_status = match?.delivery_status ?? 'NOT_FOUND_IN_LIST';
+        result.all_passwords   = r4.data.result.map(p => ({ id: p.id, name: p.name, delivery_status: p.delivery_status, effective_time: p.effective_time, invalid_time: p.invalid_time }));
+        console.log('[step4] delivery_status:', result.delivery_status);
+        console.log('[step4] all passwords:', JSON.stringify(result.all_passwords));
+    } else {
+        result.delivery_status = 'LIST_FAILED';
+        console.log('[step4] list failed:', JSON.stringify(r4.data));
+    }
+
+    respond(res, 200, result);
 }
 
 async function handleForward(req, res, body) {

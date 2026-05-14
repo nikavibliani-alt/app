@@ -232,6 +232,9 @@
       <button class="btn-secondary" id="btn-logs" onclick="runGetLogs()" disabled>
         <span>📜</span> Get Device Logs
       </button>
+      <button class="btn-secondary" id="btn-delivery" onclick="runCheckDelivery()" disabled>
+        <span>📡</span> Check Delivery Status
+      </button>
       <button class="btn-secondary" onclick="clearAll()">
         <span>🗑</span> Clear
       </button>
@@ -545,6 +548,7 @@ async function runFetch() {
     document.getElementById('btn-functions').disabled = false;
     document.getElementById('btn-specs').disabled = false;
     document.getElementById('btn-logs').disabled = false;
+    document.getElementById('btn-delivery').disabled = false;
   } catch (e) {
     addStep('❌', 'err', 'Flow stopped', e.message);
   } finally {
@@ -581,6 +585,7 @@ function clearAll() {
   document.getElementById('btn-functions').disabled = true;
   document.getElementById('btn-specs').disabled = true;
   document.getElementById('btn-logs').disabled = true;
+  document.getElementById('btn-delivery').disabled = true;
   document.getElementById('btn-info').disabled = true;
   document.getElementById('btn-tempcode').disabled = true;
   document.getElementById('btn-probe').disabled = true;
@@ -1011,8 +1016,8 @@ async function runOneClick() {
 
   if (result.ok) {
     overallStep.className = 'step ok';
-    overallStep.querySelector('strong').textContent = `✅ Done — password_id=${result.password_id}`;
-    overallStep.querySelector('small').textContent  = `password="${password}" | valid 2h`;
+    overallStep.querySelector('strong').textContent = `✅ Done — TRY CODE: ${result.plain_pwd} on the lock`;
+    overallStep.querySelector('small').textContent  = `delivery=${result.delivery_status ?? '?'} | password_id=${result.password_id} | valid 1h from +60s`;
   } else {
     overallStep.className = 'step err';
     overallStep.querySelector('strong').textContent = `✗ Failed: ${result.error}`;
@@ -1045,6 +1050,24 @@ async function runGetSpecs() {
   addStep(data.success ? '✅' : '✗', data.success ? 'ok' : 'err',
     data.success ? `Specs received — ${Object.keys(data.result ?? {}).join(', ')}` : `code=${data.code}: ${data.msg}`);
   document.getElementById('btn-specs').disabled = false;
+}
+
+async function runCheckDelivery() {
+  if (!_token) { addStep('⚠️', 'err', 'No token — Connect first'); return; }
+  document.getElementById('btn-delivery').disabled = true;
+  const path = `/v1.0/devices/${DEVICE_ID}/door-lock/temp-passwords`;
+  addStep('⏳', 'run', `📡 GET ${path}`, 'Checking delivery status of all temp passwords…');
+  const data = await proxyGet(path, _token);
+  showRaw(data);
+  if (data.success && Array.isArray(data.result)) {
+    const rows = data.result.map(p =>
+      `• [${p.delivery_status ?? '?'}] "${p.name}" id=${p.id} valid ${p.effective_time}→${p.invalid_time}`
+    ).join('\n');
+    addStep('✅', 'ok', `${data.result.length} temp password(s) on device`, rows || '(none)');
+  } else {
+    addStep('✗', 'err', `code=${data.code}: ${data.msg}`);
+  }
+  document.getElementById('btn-delivery').disabled = false;
 }
 
 async function runGetLogs() {
