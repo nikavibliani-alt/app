@@ -589,41 +589,25 @@ function clearAll() {
 
 // ── Temporary password ────────────────────────────────────────────────────────
 async function sendTempCode() {
-  if (!_token) { addStep('⚠️', 'err', 'No token — Connect first'); return; }
-
-  const code     = document.getElementById('tmp-code').value.trim();
-  const duration = parseInt(document.getElementById('tmp-duration').value, 10);
-  const name     = document.getElementById('tmp-name').value.trim() || 'SleepyTest';
+  // Uses the same /create-temp-password proxy route that confirmed working
+  // (remote_no_dp_key DP command via POST /v1.0/devices/{id}/commands)
+  const code = document.getElementById('tmp-code').value.trim();
+  const name = document.getElementById('tmp-name').value.trim() || 'SleepyTest';
 
   if (!/^\d{6,12}$/.test(code)) {
     addStep('⚠️', 'err', 'Invalid code — must be 6–12 digits'); return;
   }
 
-  // Tuya uses seconds (not ms) for temp password timestamps
-  const nowSec      = Math.floor(Date.now() / 1000);
-  const invalidSec  = nowSec + duration;
-
-  const body = JSON.stringify({
-    name,
-    password:       code,
-    effective_time: nowSec,
-    invalid_time:   invalidSec,
-    password_type:  'ticket',   // "ticket" = one-time-use style; try "time" if this fails
-    time_zone:      '+04:00',   // Tbilisi UTC+4
-  });
-
-  const path = `/v1.0/devices/${DEVICE_ID}/door-lock/temp-passwords`;
-  const step = addStep('⏳', 'run', 'Sending temporary password…',
-    `POST ${PROXY}${path}  code=${code}  valid=${duration/3600}h`);
-
   document.getElementById('btn-tempcode').disabled = true;
+  const step = addStep('⏳', 'run', 'Sending temp code via proxy…',
+    `POST /create-temp-password  code=${code}`);
 
   let data;
   try {
-    const res = await fetch(PROXY + path, {
+    const res = await fetch('http://localhost:3000/create-temp-password', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'access_token': _token },
-      body,
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name, password: code, deviceId: DEVICE_ID }),
     });
     data = await res.json();
   } catch (e) {
@@ -633,18 +617,17 @@ async function sendTempCode() {
     return;
   }
 
-  // Show raw response
   document.getElementById('tmp-result').style.display = '';
   document.getElementById('tmp-json').innerHTML = syntaxHL(JSON.stringify(data, null, 2));
 
-  if (data.success) {
+  if (data.ok) {
     step.className = 'step ok';
-    step.querySelector('strong').textContent = `✓ Temp password sent — result id: ${data.result ?? '(see response)'}`;
-    step.querySelector('small').textContent  = `code: ${code} | valid until: ${new Date(invalidSec * 1000).toLocaleString()}`;
+    step.querySelector('strong').textContent = `✓ Temp code sent — plain password: ${data.steps?.step2?.plain_password ?? code}`;
+    step.querySelector('small').textContent  = `id=${data.password_id} | valid ${data.valid_hours ?? 1}h`;
   } else {
     step.className = 'step err';
-    step.querySelector('strong').textContent = `✗ API error ${data.code}: ${data.msg}`;
-    step.querySelector('small').textContent  = 'See response panel below for details';
+    step.querySelector('strong').textContent = `✗ Failed: ${data.error}`;
+    step.querySelector('small').textContent  = 'See response below for Tuya error details';
   }
 
   document.getElementById('btn-tempcode').disabled = false;
