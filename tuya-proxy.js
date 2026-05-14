@@ -119,18 +119,41 @@ const server = http.createServer((req, res) => {
             const { ticket_key, password } = JSON.parse(body || '{}');
             if (!ticket_key || !password) return safeSend(res, 400, { error: 'ticket_key and password required' });
             try {
-                const isHex  = /^[0-9a-fA-F]+$/.test(ticket_key) && ticket_key.length % 2 === 0;
-                const tkBuf  = Buffer.from(ticket_key, isHex ? 'hex' : 'base64');
-                const dk     = aesEcbDecrypt(AES_KEY, tkBuf);
-                const encBuf = aesEcbEncrypt(dk, Buffer.from(String(password), 'utf8'));
-                const encrypted_hex = encBuf.toString('hex');
-                console.log(`[/encrypt] ticket_key=${ticket_key.slice(0,16)}… → encrypted=${encrypted_hex}`);
+                // Step A: decode ticket_key always as HEX (Tuya returns uppercase hex string)
+                const tkBuf = Buffer.from(ticket_key, 'hex');
+
+                // Step B: decrypt ticket_key with AES-128-ECB
+                //   key = first 16 bytes of Access Secret interpreted as UTF-8 characters
+                //   setAutoPadding(false) — Tuya does NOT PKCS7-pad the ticket_key,
+                //   so enabling auto-padding causes "bad decrypt" on the raw 32-byte blob
+                const secretKey = Buffer.from(CONFIG.accessSecret, 'utf8').slice(0, 16);
+                const dec = crypto.createDecipheriv('aes-128-ecb', secretKey, null);
+                dec.setAutoPadding(false);
+                const decryptedFull = Buffer.concat([dec.update(tkBuf), dec.final()]);
+
+                // Step C: use first 16 bytes of decrypted result as the password encryption key
+                const pwdKey = decryptedFull.slice(0, 16);
+
+                // Step D: encrypt password with AES-128-ECB + PKCS7
+                const enc    = crypto.createCipheriv('aes-128-ecb', pwdKey, null);
+                enc.setAutoPadding(true);
+                const encBuf = Buffer.concat([enc.update(Buffer.from(String(password), 'utf8')), enc.final()]);
+                const encrypted_hex = encBuf.toString('hex').toUpperCase();
+
+                console.log(`[/encrypt] secret_key_hex: ${secretKey.toString('hex')}`);
+                console.log(`[/encrypt] ticket_key_buf: ${tkBuf.toString('hex')}`);
+                console.log(`[/encrypt] decrypted_full: ${decryptedFull.toString('hex')}`);
+                console.log(`[/encrypt] pwd_key_hex:    ${pwdKey.toString('hex')}`);
+                console.log(`[/encrypt] encrypted_pwd:  ${encrypted_hex}`);
+
                 return safeSend(res, 200, {
-                    ok: true,
-                    aes_key_hex:       AES_KEY.toString('hex'),
-                    ticket_key_enc:    isHex ? 'hex' : 'base64',
-                    decrypted_key_hex: dk.toString('hex'),
-                    plain_password:    String(password),
+                    ok:                  true,
+                    secret_key_hex:      secretKey.toString('hex'),
+                    ticket_key_input:    ticket_key,
+                    ticket_key_buf_hex:  tkBuf.toString('hex'),
+                    decrypted_full_hex:  decryptedFull.toString('hex'),
+                    pwd_key_hex:         pwdKey.toString('hex'),
+                    plain_password:      String(password),
                     encrypted_hex,
                 });
             } catch (e) {
