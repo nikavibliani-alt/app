@@ -242,7 +242,7 @@
     <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
       <div style="display:flex;flex-direction:column;gap:4px;">
         <label style="font-size:11px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;">Code (digits)</label>
-        <input id="tmp-code" type="text" value="12345678" maxlength="12"
+        <input id="tmp-code" type="text" value="123456" maxlength="12"
           style="font-family:var(--mono);font-size:16px;font-weight:700;letter-spacing:.12em;padding:8px 14px;border:1.5px solid var(--border);border-radius:7px;width:160px;color:var(--ink);">
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
@@ -870,32 +870,46 @@ async function runJtmspro() {
     return;
   }
 
-  // ── Step 2: POST temporary-password ──────────────────────────────────────
-  const nowSec = Math.floor(Date.now() / 1000);
-  const body2  = {
-    name,
-    password:       code,
+  // ── Step 2: try two endpoints in order, show both responses ─────────────
+  const nowSec   = Math.floor(Date.now() / 1000);
+  const pwd6     = '123456'; // 6 digits as required by smart-lock API
+  const body2    = {
+    name:           name,
+    password:       pwd6,
     password_type:  0,
     effective_time: nowSec,
     invalid_time:   nowSec + durationSec,
   };
-  const path2 = `/v1.0/smart-lock/devices/${DEVICE_ID}/temporary-password`;
-  const r2 = makeRow(`POST ${path2}`, `body: ${JSON.stringify(body2)}`);
-  try {
-    const d2 = await call('POST', path2, token, body2);
-    r2.show(d2);
-    if (d2.success) {
-      r2.ok(`✅ password_id=${d2.result}`);
-      addStep('✅', 'ok', `Temp password created — id=${d2.result}`,
-        `code="${code}" | valid for ${durationSec/3600}h`);
-    } else {
-      r2.err(`code=${d2.code}: ${d2.msg}`);
-      addStep('✗', 'err', `Step 2 failed — Tuya code=${d2.code}: ${d2.msg}`,
-        'Full response in the row above');
+  const bodyStr = JSON.stringify(body2);
+
+  const endpoints = [
+    `/v1.0/smart-lock/devices/${DEVICE_ID}/password`,
+    `/v1.0/smart-lock/devices/${DEVICE_ID}/temp-password`,
+  ];
+
+  let anySuccess = false;
+  for (const path2 of endpoints) {
+    const r2 = makeRow(`POST ${path2}`, `body: ${bodyStr}`);
+    try {
+      const d2 = await call('POST', path2, token, body2);
+      r2.show(d2);
+      if (d2.success) {
+        r2.ok(`✅ result=${JSON.stringify(d2.result)}`);
+        addStep('✅', 'ok', `Password created via ${path2.split('/').pop()} — id=${d2.result}`,
+          `code="${pwd6}" | valid for ${durationSec/3600}h`);
+        anySuccess = true;
+        break; // stop at first success
+      } else {
+        r2.err(`code=${d2.code}: ${d2.msg}`);
+      }
+    } catch (e) {
+      r2.err(e.message);
+      r2.show({ error: e.message });
     }
-  } catch (e) {
-    r2.err(e.message); r2.show({ error: e.message });
-    addStep('✗', 'err', 'Step 2 threw: ' + e.message);
+  }
+
+  if (!anySuccess) {
+    addStep('✗', 'err', 'Both endpoints failed — expand rows above for Tuya error details');
   }
 
   document.getElementById('btn-jtms').disabled = false;
