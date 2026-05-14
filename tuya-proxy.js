@@ -59,37 +59,53 @@ const server = http.createServer((req, res) => {
         const signStr = CONFIG.accessId + accessToken + timestamp + nonce + stringToSign;
         const sign = calcSign(signStr, CONFIG.accessSecret);
 
+        const bodyBuf = Buffer.from(body, 'utf8');
+
         const options = {
             hostname: CONFIG.endpoint,
+            port: 443,
             method: httpMethod,
             path: urlPath,
+            timeout: 10000, // 10 s — prevents silent hang → "Failed to fetch"
             headers: {
-                'client_id': CONFIG.accessId,
-                'sign': sign,
-                't': timestamp,
-                'sign_method': 'HMAC-SHA256',
-                'access_token': accessToken,
-                'Content-Type': 'application/json'
+                'client_id':      CONFIG.accessId,
+                'sign':           sign,
+                't':              timestamp,
+                'sign_method':    'HMAC-SHA256',
+                'access_token':   accessToken,
+                'Content-Type':   'application/json',
+                'Content-Length': bodyBuf.length  // required — without this Tuya hangs on POST
             }
         };
+
+        const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
 
         const tuyaReq = https.request(options, (tuyaRes) => {
             let responseData = '';
             tuyaRes.on('data', (d) => { responseData += d; });
             tuyaRes.on('end', () => {
-                console.log(`[${tuyaRes.statusCode}] ${urlPath}`);
+                console.log(`[${tuyaRes.statusCode}] ${httpMethod} ${urlPath}`);
                 console.log('TUYA RESPONSE:', responseData);
-                res.writeHead(tuyaRes.statusCode, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.writeHead(tuyaRes.statusCode, CORS);
                 res.end(responseData);
             });
         });
 
-        tuyaReq.on('error', (e) => {
-            res.writeHead(500);
-            res.end(JSON.stringify({ error: e.message }));
+        tuyaReq.on('timeout', () => {
+            tuyaReq.destroy();
+            res.writeHead(504, CORS);
+            res.end(JSON.stringify({ error: 'Tuya request timed out after 10s' }));
         });
 
-        if (body) tuyaReq.write(body);
+        tuyaReq.on('error', (e) => {
+            console.error('Tuya request error:', e.message);
+            if (!res.headersSent) {
+                res.writeHead(502, CORS);
+                res.end(JSON.stringify({ error: e.message }));
+            }
+        });
+
+        tuyaReq.write(bodyBuf); // always write — empty buffer is a no-op, avoids chunked encoding
         tuyaReq.end();
     });
 });
