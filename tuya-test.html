@@ -899,7 +899,7 @@ async function runJtmspro() {
 
   // ── Step 3: Create temp password — try two endpoints ─────────────────────
   const nowSec    = Math.floor(Date.now() / 1000);
-  const createPath = `/v1.0/devices/${DEVICE_ID}/door-lock/temp-password`;
+  const createPath = `/v1.0/smart-lock/devices/${DEVICE_ID}/password`;
   const body3 = {
     name,
     password:       encryptedPwd,
