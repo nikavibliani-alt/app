@@ -194,18 +194,16 @@ async function handleCreateTempPassword(req, res, body) {
     const nowSec     = Math.floor(Date.now() / 1000);
     const endpoints  = [
         `/v1.0/devices/${deviceId}/door-lock/temp-password`,
-        `/v1.1/devices/${deviceId}/door-lock/temp-password`,
-        `/v1.0/devices/${deviceId}/door-lock/temp-passwords`,
-        `/v1.0/smart-lock/devices/${deviceId}/temp-password`,
-        `/v1.0/smart-lock/device/${deviceId}/temp-password`,
     ];
     const bodyObj = {
-        name,
-        password:       encryptedHex,
-        password_type:  1,
+        password_list: [{
+            name,
+            password:       encryptedHex,
+            effective_time: nowSec,
+            invalid_time:   nowSec + 3600,
+        }],
+        password_type: 1,
         ticket_id,
-        effective_time: nowSec,
-        invalid_time:   nowSec + 3600,
     };
     const body3 = JSON.stringify(bodyObj);
     result.steps.step3 = { body_sent: bodyObj, endpoints: [] };
