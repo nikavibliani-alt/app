@@ -292,6 +292,9 @@
       <button class="btn-primary" id="btn-jtms" onclick="runJtmspro()" disabled>
         <span>🔐</span> Run jtmspro Flow
       </button>
+      <button class="btn-primary" id="btn-oneclick" onclick="runOneClick()" disabled style="background:oklch(0.46 0.14 155);">
+        <span>⚡</span> One Click Test
+      </button>
     </div>
     <div id="jtms-rows" style="display:flex;flex-direction:column;gap:8px;margin-top:14px;"></div>
   </div>
@@ -562,6 +565,7 @@ function clearAll() {
   document.getElementById('diag-rows').innerHTML = '';
   document.getElementById('jtms-rows').innerHTML = '';
   document.getElementById('btn-jtms').disabled = true;
+  document.getElementById('btn-oneclick').disabled = true;
   document.getElementById('btn-info').disabled = true;
   document.getElementById('btn-tempcode').disabled = true;
   document.getElementById('btn-probe').disabled = true;
@@ -925,13 +929,89 @@ async function runJtmspro() {
   document.getElementById('btn-jtms').disabled = false;
 }
 
+// ── One Click Test ────────────────────────────────────────────────────────────
+async function runOneClick() {
+  document.getElementById('btn-oneclick').disabled = true;
+  const container = document.getElementById('jtms-rows');
+  container.innerHTML = '';
+
+  const name     = document.getElementById('tmp-name').value.trim() || 'SleepyTest';
+  const password = '1234567';
+
+  const overallStep = addStep('⏳', 'run', '⚡ One Click Test — running full flow via proxy…',
+    `POST /create-temp-password  password="${password}"`);
+
+  let result;
+  try {
+    const res = await fetch('http://localhost:3000/create-temp-password', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name, password, deviceId: DEVICE_ID }),
+    });
+    result = await res.json();
+  } catch (e) {
+    overallStep.className = 'step err';
+    overallStep.querySelector('strong').textContent = '✗ Fetch failed: ' + e.message;
+    document.getElementById('btn-oneclick').disabled = false;
+    return;
+  }
+
+  // Render each step as a collapsible row
+  const defs = [
+    { key: 'token',  label: 'Step 0 — GET /v1.0/token',
+      ok: d => d?.tuya_response?.success,
+      sum: d => d?.tuya_response?.success ? `token obtained` : `code=${d?.tuya_response?.code}: ${d?.tuya_response?.msg}` },
+    { key: 'step1',  label: 'Step 1 — POST /v1.0/devices/{id}/door-lock/password-ticket',
+      ok: d => d?.tuya_response?.success,
+      sum: d => d?.tuya_response?.success ? `ticket_id=${d.tuya_response.result?.ticket_id}` : `code=${d?.tuya_response?.code}: ${d?.tuya_response?.msg}` },
+    { key: 'step2',  label: 'Step 2 — AES-128-ECB encrypt (proxy)',
+      ok: d => d && !d.error,
+      sum: d => d?.encrypted_hex ? `encrypted=${d.encrypted_hex.slice(0,20)}…` : d?.error },
+    { key: 'step3',  label: 'Step 3 — POST /v1.0/devices/{id}/door-lock/temp-password',
+      ok: d => d?.tuya_response?.success,
+      sum: d => d?.tuya_response?.success ? `✅ password_id=${d.tuya_response.result}` : `code=${d?.tuya_response?.code}: ${d?.tuya_response?.msg}` },
+  ];
+
+  for (const def of defs) {
+    const data = result.steps?.[def.key];
+    const isOk = def.ok(data);
+    const el   = document.createElement('div');
+    el.className = 'probe-row';
+    el.innerHTML = `
+      <div class="probe-head" onclick="this.nextElementSibling.classList.toggle('open')">
+        <span class="probe-badge ${isOk ? 'badge-ok' : 'badge-err'}">${isOk ? '✅' : '✗'}</span>
+        <div style="flex:1;min-width:0;">
+          <div class="probe-path">${def.label}</div>
+        </div>
+        <span class="probe-code">${def.sum(data) || ''}</span>
+      </div>
+      <div class="probe-body open">
+        <div class="json-box">${syntaxHL(JSON.stringify(data ?? {}, null, 2))}</div>
+      </div>`;
+    container.appendChild(el);
+  }
+
+  if (result.ok) {
+    overallStep.className = 'step ok';
+    overallStep.querySelector('strong').textContent = `✅ Done — password_id=${result.password_id}`;
+    overallStep.querySelector('small').textContent  = `password="${password}" | valid 2h`;
+  } else {
+    overallStep.className = 'step err';
+    overallStep.querySelector('strong').textContent = `✗ Failed: ${result.error}`;
+    overallStep.querySelector('small').textContent  = 'Expand rows above for details';
+  }
+
+  document.getElementById('btn-oneclick').disabled = false;
+}
+
 // Auto-check proxy on load
 window.addEventListener('load', async () => {
   const up = await checkProxy();
   if (!up) {
     document.getElementById('proxy-note').style.display = '';
   } else {
-    document.getElementById('btn-jtms').disabled = false; // no global token needed
+    document.getElementById('btn-jtms').disabled = false;
+    document.getElementById('btn-oneclick').disabled = false;
     addStep('✅', 'ok', 'Proxy is running', 'http://localhost:3000 — ready');
   }
 });

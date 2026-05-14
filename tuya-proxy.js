@@ -153,6 +153,93 @@ const server = http.createServer((req, res) => {
             }
         }
 
+        // ── /create-temp-password — full 3-step flow, one call ───────────────
+        if (req.url === '/create-temp-password' && req.method === 'POST') {
+            const params   = JSON.parse(body || '{}');
+            const password = String(params.password || '1234567');
+            const name     = params.name       || 'SleepyTest';
+            const deviceId = params.deviceId   || 'bf70cd74974715b99cxmee';
+            const result   = { ok: false, steps: {} };
+
+            // Step 0: fresh token
+            console.log('\n[create-temp-password] Step 0 — get token');
+            const rTok = await tuyaCall('GET', '/v1.0/token?grant_type=1', null, '');
+            result.steps.token = { tuya_response: rTok.data };
+            if (!rTok.data.success || !rTok.data.result?.access_token) {
+                result.error = `Token failed: ${rTok.data.msg}`;
+                return safeSend(res, 422, result);
+            }
+            const token = rTok.data.result.access_token;
+
+            // Step 1: get ticket
+            const ticketPath = `/v1.0/devices/${deviceId}/door-lock/password-ticket`;
+            console.log('[create-temp-password] Step 1 — POST', ticketPath);
+            const r1 = await tuyaCall('POST', ticketPath, token, '{}');
+            result.steps.step1 = { endpoint: ticketPath, tuya_response: r1.data };
+            if (!r1.data.success || !r1.data.result?.ticket_id) {
+                result.error = `Step 1 failed: code=${r1.data.code} msg=${r1.data.msg}`;
+                return safeSend(res, 422, result);
+            }
+            const { ticket_id, ticket_key } = r1.data.result;
+
+            // Step 2: AES encrypt
+            console.log('[create-temp-password] Step 2 — AES encrypt');
+            let encryptedHex;
+            try {
+                const intermediateKey = '80edc016e2d84df886f500f38f5cc6b7'.substring(0, 16);
+                const decipher = crypto.createDecipheriv('aes-128-ecb', intermediateKey, null);
+                decipher.setAutoPadding(false);
+                const decryptedTicket = Buffer.concat([
+                    decipher.update(Buffer.from(ticket_key, 'hex')),
+                    decipher.final()
+                ]);
+                const finalKey = decryptedTicket.slice(0, 16);
+                const cipher   = crypto.createCipheriv('aes-128-ecb', finalKey, null);
+                encryptedHex   = Buffer.concat([
+                    cipher.update(password, 'utf8'),
+                    cipher.final()
+                ]).toString('hex').toUpperCase();
+                result.steps.step2 = {
+                    ticket_key, decrypted_ticket_hex: decryptedTicket.toString('hex'),
+                    final_key_hex: finalKey.toString('hex'),
+                    plain_password: password, encrypted_hex: encryptedHex
+                };
+                console.log('[create-temp-password] encrypted_hex:', encryptedHex);
+            } catch (e) {
+                result.error = 'Step 2 crypto failed: ' + e.message;
+                result.steps.step2 = { error: e.message };
+                return safeSend(res, 500, result);
+            }
+
+            // Step 3: create temp password
+            const nowSec     = Math.floor(Date.now() / 1000);
+            const createPath = `/v1.0/devices/${deviceId}/door-lock/temp-password`;
+            const body3      = {
+                name,
+                password:         encryptedHex,
+                password_type:    0,
+                encryption_type:  'ticket',
+                ticket_id,
+                effective_time:   nowSec - 60,
+                invalid_time:     nowSec + 7200,
+                schedule_list: [{ effective_time: 0, invalid_time: 1439, working_day: 127 }]
+            };
+            console.log('[create-temp-password] Step 3 — POST', createPath);
+            console.log('[create-temp-password] body:', JSON.stringify(body3));
+            const r3 = await tuyaCall('POST', createPath, token, JSON.stringify(body3));
+            result.steps.step3 = { endpoint: createPath, body_sent: body3, tuya_response: r3.data };
+
+            if (r3.data.success) {
+                result.ok          = true;
+                result.password_id = r3.data.result;
+                result.plain_pwd   = password;
+                result.valid_hours = 2;
+            } else {
+                result.error = `Step 3 failed: code=${r3.data.code} msg=${r3.data.msg}`;
+            }
+            return safeSend(res, result.ok ? 200 : 422, result);
+        }
+
         // ── Internal route: full ticket+encrypt+create flow ───────────────────
         if (req.url === '/api/ticket-flow' && req.method === 'POST') {
             const params     = JSON.parse(body || '{}');
