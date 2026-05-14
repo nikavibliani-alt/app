@@ -147,7 +147,7 @@ async function handleCreateTempPassword(req, res, body) {
     // Always generate a fresh random 7-digit code; ignore any caller-supplied password
     const password = Math.floor(1000000 + Math.random() * 9000000).toString();
     console.log('[/create-temp-password] Generated password:', password);
-    const name     = params.name     || 'SleepyTest';
+    const name     = params.name     || 'GuestCode';
     const deviceId = params.deviceId || DEVICE_ID;
     const result   = { ok: false, steps: {} };
 
@@ -201,8 +201,8 @@ async function handleCreateTempPassword(req, res, body) {
     const dpPayload = Buffer.from(JSON.stringify({
         ticket_id,
         password:       encryptedHex,
-        effective_time: nowSec,
-        invalid_time:   nowSec + 3600,
+        effective_time: nowSec - 300,
+        invalid_time:   nowSec + 86400,
     })).toString('base64');
     const bodyObj = {
         commands: [
