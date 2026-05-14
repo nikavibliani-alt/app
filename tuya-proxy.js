@@ -197,12 +197,14 @@ async function handleCreateTempPassword(req, res, body) {
         `/v1.0/devices/${deviceId}/door-lock/temp-password`,
     ];
     const bodyObj = {
-        name,
-        password:       encryptedHex,
-        password_type:  'ticket',
+        name:            'SleepyTest',
+        password:        encryptedHex,
+        password_type:   'ticket',
         ticket_id,
-        effective_time: nowSec - 300,
-        invalid_time:   nowSec + 86400,
+        effective_time:  nowSec,
+        invalid_time:    nowSec + 3600,
+        type:            0,
+        relate_dev_list: [deviceId],
     };
     const body3 = JSON.stringify(bodyObj);
     console.log('PLAIN PASSWORD:', password);
