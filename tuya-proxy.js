@@ -128,7 +128,7 @@ async function handleCreateTempPassword(req, res, body) {
     let params;
     try { params = JSON.parse(body || '{}'); } catch(e) { return respond(res, 400, { error: 'invalid JSON' }); }
 
-    const password = String(params.password || '1234567');
+    const password = String(params.password || '123456');
     const name     = params.name     || 'SleepyTest';
     const deviceId = params.deviceId || DEVICE_ID;
     const result   = { ok: false, steps: {} };
