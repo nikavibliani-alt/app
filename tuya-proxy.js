@@ -206,6 +206,7 @@ async function handleCreateTempPassword(req, res, body) {
         ticket_id,
     };
     const body3 = JSON.stringify(bodyObj);
+    console.log('STEP 3 BODY:', JSON.stringify(bodyObj, null, 2));
     result.steps.step3 = { body_sent: bodyObj, endpoints: [] };
 
     for (const createPath of endpoints) {
