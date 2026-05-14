@@ -197,35 +197,39 @@ async function handleCreateTempPassword(req, res, body) {
     console.log(`[timing] Ticket age: ${ticketAgeSec}s (expire_time=${r1.data.result.expire_time}s) — ${ticketAgeSec > r1.data.result.expire_time ? '⚠️ POSSIBLY EXPIRED' : '✅ within window'}`);
     const endpoints = [
         `/v1.0/devices/${deviceId}/door-lock/temp-password`,
+        `/v1.0/devices/${deviceId}/door-lock/temp-password`, // second attempt: password_type as integer
     ];
-    const bodyObj = {
-        name:            'SleepyTest',
-        password:        encryptedHex,
-        password_type:   'ticket',
-        ticket_id,
-        effective_time:  nowSec,
-        invalid_time:    nowSec + 3600,
-        type:            0,
-        relate_dev_list: [deviceId],
-    };
-    const body3 = JSON.stringify(bodyObj);
+    const bodies = [
+        {
+            name:           'TestAlpha',
+            password:       encryptedHex,
+            password_type:  'ticket',
+            ticket_id,
+            effective_time: nowSec,
+            invalid_time:   nowSec + 3600,
+        },
+        {
+            name:           'TestAlpha',
+            password:       encryptedHex,
+            password_type:  1,
+            ticket_id,
+            effective_time: nowSec,
+            invalid_time:   nowSec + 3600,
+        },
+    ];
     console.log('PLAIN PASSWORD:', password);
-    console.log('STEP 3 BODY:', JSON.stringify(bodyObj, null, 2));
-    result.steps.step3 = { body_sent: bodyObj, endpoints: [] };
+    result.steps.step3 = { endpoints: [] };
 
-    for (const createPath of endpoints) {
-        const step3Headers = buildHeaders('POST', createPath, token, body3);
-        console.log('\n─── STEP 3 REQUEST ───────────────────────────────────────');
-        console.log('URL:    ', `https://${TUYA_HOST}${createPath}`);
-        console.log('HEADERS:', JSON.stringify(step3Headers, null, 2));
-        console.log('BODY:   ', body3);
-        console.log('──────────────────────────────────────────────────────────');
+    for (let i = 0; i < endpoints.length; i++) {
+        const createPath = endpoints[i];
+        const bodyObj    = bodies[i];
+        const body3      = JSON.stringify(bodyObj);
+        console.log(`\n─── STEP 3.${i+1} (password_type=${JSON.stringify(bodyObj.password_type)}) ─────────────────`);
+        console.log('BODY:', body3);
         const r = await tuyaCall('POST', createPath, token, body3);
-        console.log('─── STEP 3 RESPONSE ──────────────────────────────────────');
-        console.log('STATUS: ', r.status);
-        console.log('BODY:   ', JSON.stringify(r.data, null, 2));
+        console.log('RESPONSE:', JSON.stringify(r.data));
         console.log('──────────────────────────────────────────────────────────\n');
-        const attempt = { endpoint: createPath, tuya_response: r.data };
+        const attempt = { endpoint: createPath, body_sent: bodyObj, tuya_response: r.data };
         result.steps.step3.endpoints.push(attempt);
         if (r.data.success) {
             result.ok          = true;
