@@ -25,11 +25,27 @@ process.on('unhandledRejection', e => console.error('[unhandled]', e));
 function sha256(s) { return crypto.createHash('sha256').update(s,'utf8').digest('hex'); }
 function hmac(s,k) { return crypto.createHmac('sha256',k).update(s,'utf8').digest('hex').toUpperCase(); }
 
+// Tuya signing requires query params sorted alphabetically by key.
+// Returns the pathname + sorted query string used in the signature.
+function signPath(rawPath) {
+    const qIdx = rawPath.indexOf('?');
+    if (qIdx === -1) return rawPath;
+    const pathname = rawPath.slice(0, qIdx);
+    const qs       = rawPath.slice(qIdx + 1);
+    const sorted   = qs.split('&')
+        .filter(Boolean)
+        .sort()                          // sort alphabetically by "key=value" string
+        .join('&');
+    return pathname + '?' + sorted;
+}
+
 function buildHeaders(method, path, token, body) {
-    const t     = Date.now().toString();
-    const nonce = '';
-    const sts   = [method, sha256(body), '', path].join('\n');
-    const str   = ACCESS_ID + (token||'') + t + nonce + sts;
+    const t        = Date.now().toString();
+    const nonce    = '';
+    const signable = signPath(path);     // use sorted query string for signing
+    const sts      = [method, sha256(body), '', signable].join('\n');
+    const str      = ACCESS_ID + (token||'') + t + nonce + sts;
+    console.log(`  [sign] path="${signable}" t=${t}`);
     const h = {
         'client_id':      ACCESS_ID,
         'sign':           hmac(str, ACCESS_SECRET),
@@ -128,7 +144,8 @@ async function handleCreateTempPassword(req, res, body) {
     let params;
     try { params = JSON.parse(body || '{}'); } catch(e) { return respond(res, 400, { error: 'invalid JSON' }); }
 
-    const password = String(params.password || '839174');
+    // Generate a fresh random 7-digit code each run; caller can override via params.password
+    const password = String(params.password || Math.floor(1000000 + Math.random() * 9000000));
     const name     = params.name     || 'SleepyTest';
     const deviceId = params.deviceId || DEVICE_ID;
     const result   = { ok: false, steps: {} };
