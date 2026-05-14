@@ -175,15 +175,15 @@ async function handleCreateTempPassword(req, res, body) {
 
     // Step 3 — create temp password
     const nowSec     = Math.floor(Date.now() / 1000);
-    const createPath = `/v1.0/devices/${deviceId}/door-lock/temp-password`;
+    const createPath = `/v1.0/smart-lock/devices/${deviceId}/password`;
     const body3      = JSON.stringify({
         name,
         password:        encryptedHex,
         password_type:   0,
         encryption_type: 'ticket',
         ticket_id,
-        effective_time:  nowSec - 60,
-        invalid_time:    nowSec + 7200,
+        effective_time:  nowSec,
+        invalid_time:    nowSec + 3600,
         schedule_list:   [{ effective_time: 0, invalid_time: 1439, working_day: 127 }],
     });
     console.log('[/create-temp-password] Step 3: POST', createPath);
