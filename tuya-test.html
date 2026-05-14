@@ -804,89 +804,101 @@ async function runDiagnostics() {
   document.getElementById('btn-diag').disabled = false;
 }
 
-// ── jtmspro ticket + encrypt + create (proxy handles all crypto) ──────────────
+// ── jtmspro flow (browser-side, proxy is a generic forwarder) ────────────────
 async function runJtmspro() {
   if (!_token) { addStep('⚠️', 'err', 'No token — Connect first'); return; }
   document.getElementById('btn-jtms').disabled = true;
   const container = document.getElementById('jtms-rows');
   container.innerHTML = '';
 
-  const code       = document.getElementById('tmp-code').value.trim() || '12345678';
-  const name       = document.getElementById('tmp-name').value.trim() || 'SleepyTest';
+  const code        = document.getElementById('tmp-code').value.trim() || '12345678';
+  const name        = document.getElementById('tmp-name').value.trim() || 'SleepyTest';
   const durationSec = parseInt(document.getElementById('tmp-duration').value, 10) || 3600;
+  const nowSec      = Math.floor(Date.now() / 1000);
 
-  const overallStep = addStep('⏳', 'run', 'Running jtmspro 3-step flow via proxy…',
-    `code=${code} | name="${name}" | duration=${durationSec/3600}h`);
-
-  let result;
-  try {
-    const res = await fetch(PROXY + '/api/create-temp-code', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Tuya-Token': _token },
-      body:    JSON.stringify({ code, name, durationSec, deviceId: DEVICE_ID }),
-    });
-    result = await res.json();
-  } catch (e) {
-    overallStep.className = 'step err';
-    overallStep.querySelector('strong').textContent = '✗ Request failed: ' + e.message;
-    document.getElementById('btn-jtms').disabled = false;
-    return;
-  }
-
-  // ── Render each step as a collapsible row ─────────────────────────────────
-  const stepDefs = [
-    {
-      key:   'step1',
-      label: 'Step 1 — GET /v1.0/smart-lock/devices/{id}/password-ticket',
-      note:  'Check if a ticket is required; ticket_id injected into Step 2 if returned',
-      ok:    d => d?.tuya_response?.success,
-      summary: d => d?.tuya_response?.success
-        ? `ticket_id=${d.tuya_response.result?.ticket_id ?? '—'}`
-        : `code=${d?.tuya_response?.code}: ${d?.tuya_response?.msg}`,
-    },
-    {
-      key:   'step2',
-      label: 'Step 2 — POST /v1.0/smart-lock/devices/{id}/temporary-password',
-      note:  'Plaintext password, password_type=0, effective_time / invalid_time in seconds',
-      ok:    d => d?.tuya_response?.success,
-      summary: d => d?.tuya_response?.success
-        ? `✅ password_id=${d.tuya_response.result}`
-        : `code=${d?.tuya_response?.code}: ${d?.tuya_response?.msg}`,
-    },
-  ];
-
-  for (const def of stepDefs) {
-    const data = result.steps?.[def.key];
-    const isOk = def.ok(data);
-    const slug  = def.key;
-
+  // ── helper: fire a request through the proxy and render a result row ──────
+  async function fireAndRender(method, path, body, label, note) {
     const row = document.createElement('div');
     row.className = 'probe-row';
+    const slug = path.replace(/[^a-z0-9]/gi, '_');
     row.innerHTML = `
       <div class="probe-head" onclick="this.nextElementSibling.classList.toggle('open')">
-        <span class="probe-badge ${isOk ? 'badge-ok' : 'badge-err'}">${isOk ? '✅' : '✗'}</span>
+        <span class="probe-badge badge-wait" id="badge_${slug}">⏳</span>
         <div style="flex:1;min-width:0;">
-          <div class="probe-path">${def.label}</div>
-          <div style="font-size:11px;color:var(--ink-3);margin-top:1px;">${def.note}</div>
+          <div class="probe-path">${method} ${path}</div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:1px;">${note}</div>
         </div>
-        <span class="probe-code">${def.summary(data) || ''}</span>
+        <span class="probe-code" id="code_${slug}"></span>
       </div>
       <div class="probe-body open">
-        <div class="json-box">${syntaxHL(JSON.stringify(data ?? {}, null, 2))}</div>
+        <div class="json-box" id="json_${slug}">Waiting…</div>
       </div>`;
     container.appendChild(row);
+    const badge  = document.getElementById(`badge_${slug}`);
+    const codeEl = document.getElementById(`code_${slug}`);
+    const jsonEl = document.getElementById(`json_${slug}`);
+
+    try {
+      const opts = { method, headers: { 'Content-Type': 'application/json', 'X-Tuya-Token': _token } };
+      if (body) opts.body = body;
+      const res  = await fetch(PROXY + path, opts);
+      const text = await res.text();           // get raw text first
+      let data;
+      try { data = JSON.parse(text); } catch { data = { _raw: text }; }
+
+      jsonEl.innerHTML = syntaxHL(JSON.stringify(data, null, 2));
+      const apiCode = data.code ?? (data.success ? 'ok' : '?');
+      codeEl.textContent = `HTTP ${res.status} | Tuya code=${apiCode}${data.msg ? ' · ' + data.msg : ''}`;
+
+      if (data.success) {
+        badge.className = 'probe-badge badge-ok'; badge.textContent = '✅';
+      } else {
+        badge.className = 'probe-badge badge-err'; badge.textContent = `✗ ${apiCode}`;
+      }
+      return data;
+    } catch (e) {
+      badge.className = 'probe-badge badge-err'; badge.textContent = '✗ ERR';
+      codeEl.textContent = e.message;
+      jsonEl.textContent = e.message;
+      return null;
+    }
   }
 
-  // ── Overall result ─────────────────────────────────────────────────────────
-  if (result.ok) {
-    overallStep.className = 'step ok';
-    overallStep.querySelector('strong').textContent = `✅ Temp password created — id=${result.password_id}`;
-    overallStep.querySelector('small').textContent =
-      `code=${code} | valid ${result.valid_from?.slice(0,16)} → ${result.valid_until?.slice(0,16)} UTC`;
+  // ── Step 1: GET password-ticket (informational) ───────────────────────────
+  const d1 = await fireAndRender(
+    'GET',
+    `/v1.0/smart-lock/devices/${DEVICE_ID}/password-ticket`,
+    null,
+    'Step 1 — password-ticket',
+    'Check if ticket is required; ticket_id auto-passed to Step 2 if returned'
+  );
+  const ticketId = d1?.result?.ticket_id ?? null;
+
+  // ── Step 2: POST temporary-password ──────────────────────────────────────
+  const body2 = JSON.stringify({
+    name,
+    password:       code,
+    password_type:  0,
+    effective_time: nowSec,
+    invalid_time:   nowSec + durationSec,
+    ...(ticketId ? { ticket_id: ticketId } : {}),
+  });
+
+  const d2 = await fireAndRender(
+    'POST',
+    `/v1.0/smart-lock/devices/${DEVICE_ID}/temporary-password`,
+    body2,
+    'Step 2 — temporary-password',
+    `body: ${body2}`
+  );
+
+  // ── Overall summary ───────────────────────────────────────────────────────
+  if (d2?.success) {
+    addStep('✅', 'ok', `Temp password created — id=${d2.result}`,
+      `code="${code}" | valid for ${durationSec/3600}h from now`);
   } else {
-    overallStep.className = 'step err';
-    overallStep.querySelector('strong').textContent = `✗ Flow failed: ${result.error}`;
-    overallStep.querySelector('small').textContent = 'See step rows above for details';
+    addStep('✗', 'err', `Flow finished — Step 2 code=${d2?.code}: ${d2?.msg || '(no message)'}`,
+      'Expand rows above to see full Tuya responses');
   }
 
   document.getElementById('btn-jtms').disabled = false;
