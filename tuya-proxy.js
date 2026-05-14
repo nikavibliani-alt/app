@@ -179,12 +179,14 @@ async function handleCreateTempPassword(req, res, body) {
         `/v1.0/devices/${deviceId}/door-lock/temp-password`,
     ];
     const bodyObj = {
-        name,
-        password:       encryptedHex,
-        password_type:  1,
+        password_list: [{
+            name,
+            password:       encryptedHex,
+            effective_time: nowSec,
+            invalid_time:   nowSec + 3600,
+        }],
+        password_type: 1,
         ticket_id,
-        effective_time: nowSec,
-        invalid_time:   nowSec + 3600,
     };
     const body3 = JSON.stringify(bodyObj);
     result.steps.step3 = { body_sent: bodyObj, endpoints: [] };
