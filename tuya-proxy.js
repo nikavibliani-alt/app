@@ -13,7 +13,7 @@ const crypto = require('crypto');
 
 const ACCESS_ID     = 'wxd3afwrhewvh5p5tukc';
 const ACCESS_SECRET = '80edc016e2d84df886f500f38f5cc6b7';
-const DEVICE_ID     = 'bf5203cc457e805b7ekvmp';
+const DEVICE_ID     = 'bf4a5ba093e5e561d5mt2r';
 const TUYA_HOST     = 'openapi.tuyaeu.com';
 const PORT          = 3000;
 
