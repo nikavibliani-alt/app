@@ -197,35 +197,55 @@ async function handleCreateTempPassword(req, res, body) {
         return respond(res, 500, result);
     }
 
-    // Step 3 — create temp password
+    // Step 3 — /door-lock/temp-password returns 1109 for jtmspro category.
+    // Use POST /v1.0/devices/{id}/commands with remote_no_dp_key DP instead —
+    // the only endpoint confirmed to return success:true for this device type.
     const nowSec       = Math.floor(Date.now() / 1000);
-    const effectiveSec = nowSec + 60;        // 1 min in future (avoids clock-skew rejection)
-    const invalidSec   = effectiveSec + 3600; // 1 hour window
+    const effectiveSec = nowSec + 60;
+    const invalidSec   = effectiveSec + 3600;
     const ticketAgeSec = nowSec - Math.floor(r1.data.t / 1000);
-    console.log(`[timing] Ticket age: ${ticketAgeSec}s  expire_time=${r1.data.result.expire_time}s  ${ticketAgeSec > r1.data.result.expire_time ? '⚠️ POSSIBLY EXPIRED' : '✅ OK'}`);
-    console.log(`[timing] effective=${effectiveSec} (+60s)  invalid=${invalidSec} (+3660s)`);
+    console.log(`[timing] Ticket age: ${ticketAgeSec}s  expire_time=${r1.data.result.expire_time}s  ${ticketAgeSec > r1.data.result.expire_time ? '⚠️ EXPIRED' : '✅ OK'}`);
 
-    const createPath = `/v1.0/devices/${deviceId}/door-lock/temp-password`;
-    const bodyObj = {
-        name,
-        password:       encryptedHex,
-        password_type:  'ticket',
+    // Build two payload variants and try both — different firmware versions expect different formats
+    const dpJsonPayload  = Buffer.from(JSON.stringify({
         ticket_id,
+        password:       encryptedHex,
         effective_time: effectiveSec,
         invalid_time:   invalidSec,
-    };
-    const body3 = JSON.stringify(bodyObj);
-    console.log('\n─── STEP 3 BODY ──────────────────────────────────────────');
-    console.log(body3);
-    console.log('──────────────────────────────────────────────────────────');
+    })).toString('base64');
 
-    result.steps.step3 = { endpoint: createPath, body_sent: bodyObj };
-    const r3 = await tuyaCall('POST', createPath, token, body3);
-    result.steps.step3.tuya_response = r3.data;
-    console.log('─── STEP 3 RESPONSE:', JSON.stringify(r3.data));
+    // Binary payload: [type(1B)] + [effective(4B BE)] + [invalid(4B BE)] + [password digits as ASCII]
+    const pwdBytes = Buffer.from(password, 'utf8');
+    const binBuf   = Buffer.alloc(1 + 4 + 4 + pwdBytes.length);
+    binBuf.writeUInt8(1, 0);                        // type = 1 (temp)
+    binBuf.writeUInt32BE(effectiveSec, 1);
+    binBuf.writeUInt32BE(invalidSec,   5);
+    pwdBytes.copy(binBuf, 9);
+    const dpBinPayload = binBuf.toString('base64');
 
-    if (!r3.data.success) {
-        result.error = `Step 3 failed: code=${r3.data.code} msg=${r3.data.msg}`;
+    const dpVariants = [
+        { code: 'remote_no_dp_key',    value: dpJsonPayload, label: 'remote_no_dp_key (JSON base64)' },
+        { code: 'remote_no_dp_key',    value: dpBinPayload,  label: 'remote_no_dp_key (binary base64)' },
+        { code: 'remote_no_pd_setkey', value: dpJsonPayload, label: 'remote_no_pd_setkey (JSON base64)' },
+    ];
+
+    const createPath = `/v1.0/devices/${deviceId}/commands`;
+    result.steps.step3 = { endpoint: createPath, attempts: [] };
+
+    let r3ok = false;
+    for (const variant of dpVariants) {
+        const bodyObj = { commands: [{ code: variant.code, value: variant.value }] };
+        const body3   = JSON.stringify(bodyObj);
+        console.log(`\n─── STEP 3 (${variant.label}) ───────────────────────────`);
+        console.log('BODY:', body3);
+        const r3 = await tuyaCall('POST', createPath, token, body3);
+        console.log('RESPONSE:', JSON.stringify(r3.data));
+        result.steps.step3.attempts.push({ label: variant.label, body_sent: bodyObj, tuya_response: r3.data });
+        if (r3.data.success) { r3ok = true; break; }
+    }
+
+    if (!r3ok) {
+        result.error = 'Step 3: all command variants failed — see steps.step3.attempts';
         return respond(res, 422, result);
     }
 
