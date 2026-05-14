@@ -903,10 +903,11 @@ async function runJtmspro() {
   const body3 = {
     name,
     password:       encryptedPwd,
-    password_type:  0,
+    password_type:    0,
+    encryption_type:  'ticket',
     ticket_id,
-    effective_time: Math.floor(nowSec - 60),
-    invalid_time:   Math.floor(nowSec + 7200),
+    effective_time:   Math.floor(nowSec - 60),
+    invalid_time:     Math.floor(nowSec + 7200),
   };
 
   const rCreate = row(`Step 3 — POST ${createPath}`, JSON.stringify(body3));
