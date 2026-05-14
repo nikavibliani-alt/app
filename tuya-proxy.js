@@ -114,6 +114,31 @@ const server = http.createServer((req, res) => {
     req.on('end', async () => {
     try {
 
+        // ── /encrypt — AES-128-ECB only, no Tuya calls ───────────────────────
+        if (req.url === '/encrypt' && req.method === 'POST') {
+            const { ticket_key, password } = JSON.parse(body || '{}');
+            if (!ticket_key || !password) return safeSend(res, 400, { error: 'ticket_key and password required' });
+            try {
+                const isHex  = /^[0-9a-fA-F]+$/.test(ticket_key) && ticket_key.length % 2 === 0;
+                const tkBuf  = Buffer.from(ticket_key, isHex ? 'hex' : 'base64');
+                const dk     = aesEcbDecrypt(AES_KEY, tkBuf);
+                const encBuf = aesEcbEncrypt(dk, Buffer.from(String(password), 'utf8'));
+                const encrypted_hex = encBuf.toString('hex');
+                console.log(`[/encrypt] ticket_key=${ticket_key.slice(0,16)}… → encrypted=${encrypted_hex}`);
+                return safeSend(res, 200, {
+                    ok: true,
+                    aes_key_hex:       AES_KEY.toString('hex'),
+                    ticket_key_enc:    isHex ? 'hex' : 'base64',
+                    decrypted_key_hex: dk.toString('hex'),
+                    plain_password:    String(password),
+                    encrypted_hex,
+                });
+            } catch (e) {
+                console.error('[/encrypt] error:', e.message);
+                return safeSend(res, 500, { ok: false, error: e.message });
+            }
+        }
+
         // ── Internal route: full ticket+encrypt+create flow ───────────────────
         if (req.url === '/api/ticket-flow' && req.method === 'POST') {
             const params     = JSON.parse(body || '{}');

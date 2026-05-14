@@ -803,7 +803,7 @@ async function runDiagnostics() {
   document.getElementById('btn-diag').disabled = false;
 }
 
-// ── jtmspro ticket flow — crypto handled in proxy (Node AES-128-ECB) ─────────
+// ── jtmspro 3-step flow ───────────────────────────────────────────────────────
 async function runJtmspro() {
   document.getElementById('btn-jtms').disabled = true;
   const container = document.getElementById('jtms-rows');
@@ -811,13 +811,14 @@ async function runJtmspro() {
 
   const name        = document.getElementById('tmp-name').value.trim() || 'SleepyTest';
   const durationSec = parseInt(document.getElementById('tmp-duration').value, 10) || 3600;
+  const PASSWORD    = '1234567'; // 7 digits for Wi-Fi lock
 
-  // ── Render a collapsible row ──────────────────────────────────────────────
-  function makeRow(label, note) {
-    const id  = 'r' + Math.random().toString(36).slice(2);
-    const row = document.createElement('div');
-    row.className = 'probe-row';
-    row.innerHTML = `
+  // ── Collapsible row helper ────────────────────────────────────────────────
+  function row(label, note) {
+    const id = 'x' + Math.random().toString(36).slice(2);
+    const el = document.createElement('div');
+    el.className = 'probe-row';
+    el.innerHTML = `
       <div class="probe-head" onclick="this.nextElementSibling.classList.toggle('open')">
         <span class="probe-badge badge-wait" id="b${id}">⏳</span>
         <div style="flex:1;min-width:0;">
@@ -826,90 +827,98 @@ async function runJtmspro() {
         </div>
         <span class="probe-code" id="c${id}"></span>
       </div>
-      <div class="probe-body open">
-        <div class="json-box" id="j${id}">Waiting…</div>
-      </div>`;
-    container.appendChild(row);
+      <div class="probe-body open"><div class="json-box" id="j${id}">…</div></div>`;
+    container.appendChild(el);
+    const b = () => document.getElementById(`b${id}`);
+    const c = () => document.getElementById(`c${id}`);
+    const j = () => document.getElementById(`j${id}`);
     return {
-      ok:   s  => { const b=document.getElementById(`b${id}`); b.className='probe-badge badge-ok';  b.textContent='✅'; document.getElementById(`c${id}`).textContent=s; },
-      err:  s  => { const b=document.getElementById(`b${id}`); b.className='probe-badge badge-err'; b.textContent='✗';  document.getElementById(`c${id}`).textContent=s; },
-      show: d  => { document.getElementById(`j${id}`).innerHTML=syntaxHL(JSON.stringify(d,null,2)); },
+      ok:   s => { b().className='probe-badge badge-ok';  b().textContent='✅'; c().textContent=s; },
+      err:  s => { b().className='probe-badge badge-err'; b().textContent='✗';  c().textContent=s; },
+      show: d => { j().innerHTML=syntaxHL(JSON.stringify(d,null,2)); },
     };
   }
 
-  // ── Step 0: get fresh token ───────────────────────────────────────────────
-  const rTok = makeRow('GET /v1.0/token?grant_type=1', 'Fresh access token');
-  let token;
-  try {
-    const res  = await fetch('http://localhost:3000/v1.0/token?grant_type=1');
-    const data = await res.json();
-    rTok.show(data);
-    if (data.success && data.result?.access_token) {
-      token = data.result.access_token;
-      rTok.ok(`expire=${data.result.expire_time}s`);
-    } else {
-      rTok.err(`code=${data.code}: ${data.msg}`);
-      addStep('✗', 'err', 'Token fetch failed — cannot continue');
-      document.getElementById('btn-jtms').disabled = false;
-      return;
-    }
-  } catch (e) {
-    rTok.err(e.message);
-    addStep('✗', 'err', 'Token fetch threw: ' + e.message);
+  // ── Fetch helper — returns parsed JSON, never throws ─────────────────────
+  async function call(method, path, token, body) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['access_token'] = token;
+    const opts = { method, headers };
+    if (body != null) opts.body = JSON.stringify(body);
+    try {
+      const res  = await fetch('http://localhost:3000' + path, opts);
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return { _raw: text }; }
+    } catch (e) { return { _fetch_error: e.message }; }
+  }
+
+  // ── Token ─────────────────────────────────────────────────────────────────
+  const rTok = row('GET /v1.0/token?grant_type=1', 'Fresh access token — no auth header');
+  const dTok = await call('GET', '/v1.0/token?grant_type=1', null, null);
+  rTok.show(dTok);
+  if (!dTok.success || !dTok.result?.access_token) {
+    rTok.err(`code=${dTok.code}: ${dTok.msg || dTok._fetch_error}`);
+    addStep('✗', 'err', 'Token failed — cannot continue');
     document.getElementById('btn-jtms').disabled = false;
     return;
   }
+  const token = dTok.result.access_token;
+  rTok.ok(`expire=${dTok.result.expire_time}s`);
 
-  // ── Steps 1–3: proxy handles ticket + AES + create ───────────────────────
-  const rFlow = makeRow('POST /api/ticket-flow  (proxy runs steps 1–3)', 'Ticket → AES decrypt/encrypt → create temp-password');
-  let result;
-  try {
-    const res = await fetch('http://localhost:3000/api/ticket-flow', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ token, name, durationSec, password: '123456', deviceId: DEVICE_ID }),
-    });
-    result = await res.json();
-  } catch (e) {
-    rFlow.err(e.message);
-    rFlow.show({ error: e.message });
-    addStep('✗', 'err', 'Ticket flow threw: ' + e.message);
+  // ── Step 1: Get ticket ────────────────────────────────────────────────────
+  const rTix = row(
+    'Step 1 — POST /v1.0/devices/{id}/door-lock/password-ticket',
+    'body: {}'
+  );
+  const dTix = await call('POST', `/v1.0/devices/${DEVICE_ID}/door-lock/password-ticket`, token, {});
+  rTix.show(dTix);
+  if (!dTix.success || !dTix.result?.ticket_id) {
+    rTix.err(`code=${dTix.code}: ${dTix.msg}`);
+    addStep('✗', 'err', `Step 1 failed: ${dTix.msg}`);
     document.getElementById('btn-jtms').disabled = false;
     return;
   }
+  const { ticket_id, ticket_key } = dTix.result;
+  rTix.ok(`ticket_id=${ticket_id}`);
 
-  // ── Render each sub-step from the proxy's response ────────────────────────
-  const subSteps = [
-    { key: 'step1', label: 'Step 1 — POST /v1.0/devices/{id}/door-lock/password-ticket  body: {}',
-      ok: d => d?.tuya_response?.success,
-      sum: d => d?.tuya_response?.success
-        ? `ticket_id=${d.tuya_response.result?.ticket_id}`
-        : `code=${d?.tuya_response?.code}: ${d?.tuya_response?.msg}` },
-    { key: 'step2', label: 'Step 2 — AES-128-ECB  (Node.js, proxy-side)',
-      ok: d => d && !d.error,
-      sum: d => d?.encrypted_hex ? `encrypted=${d.encrypted_hex.slice(0,20)}…` : d?.error },
-    { key: 'step3', label: 'Step 3 — POST /v1.0/devices/{id}/door-lock/temp-password',
-      ok: d => d?.tuya_response?.success,
-      sum: d => d?.tuya_response?.success
-        ? `✅ password_id=${d.tuya_response.result}`
-        : `code=${d?.tuya_response?.code}: ${d?.tuya_response?.msg}` },
-  ];
-
-  // hide the flow row placeholder — sub-step rows replace it
-  container.removeChild(container.lastChild);
-
-  for (const def of subSteps) {
-    const data = result.steps?.[def.key];
-    const r    = makeRow(def.label, '');
-    r.show(data ?? {});
-    def.ok(data) ? r.ok(def.sum(data)) : r.err(def.sum(data) ?? '—');
+  // ── Step 2: AES encrypt (proxy /encrypt endpoint) ─────────────────────────
+  const rEnc = row(
+    'Step 2 — POST /encrypt  (AES-128-ECB in proxy)',
+    `decrypt ticket_key → encrypt "${PASSWORD}" → return hex`
+  );
+  const dEnc = await call('POST', '/encrypt', null, { ticket_key, password: PASSWORD });
+  rEnc.show(dEnc);
+  if (!dEnc.ok || !dEnc.encrypted_hex) {
+    rEnc.err(dEnc.error || 'encrypt failed');
+    addStep('✗', 'err', `Step 2 failed: ${dEnc.error}`);
+    document.getElementById('btn-jtms').disabled = false;
+    return;
   }
+  rEnc.ok(`encrypted=${dEnc.encrypted_hex.slice(0,20)}…`);
+  const encryptedPwd = dEnc.encrypted_hex;
 
-  if (result.ok) {
-    addStep('✅', 'ok', `Temp password created — id=${result.password_id}`,
-      `password="123456" | valid ${result.valid_from?.slice(0,16)} → ${result.valid_until?.slice(0,16)} UTC`);
+  // ── Step 3: Create temp password ──────────────────────────────────────────
+  const nowSec  = Math.floor(Date.now() / 1000);
+  const body3   = {
+    name,
+    password:       encryptedPwd,
+    password_type:  'ticket',
+    ticket_id,
+    effective_time: nowSec,
+    invalid_time:   nowSec + durationSec,
+    type:           0,
+  };
+  const createPath = `/v1.0/smart-lock/device/${DEVICE_ID}/template/temp-password`;
+  const rCreate = row(`Step 3 — POST ${createPath}`, JSON.stringify(body3));
+  const dCreate = await call('POST', createPath, token, body3);
+  rCreate.show(dCreate);
+  if (dCreate.success) {
+    rCreate.ok(`✅ result=${JSON.stringify(dCreate.result)}`);
+    addStep('✅', 'ok', `Temp password created — id=${dCreate.result}`,
+      `password="${PASSWORD}" | valid for ${durationSec/3600}h`);
   } else {
-    addStep('✗', 'err', `Flow failed: ${result.error}`, 'Expand rows above for details');
+    rCreate.err(`code=${dCreate.code}: ${dCreate.msg}`);
+    addStep('✗', 'err', `Step 3 failed — code=${dCreate.code}: ${dCreate.msg}`);
   }
 
   document.getElementById('btn-jtms').disabled = false;
