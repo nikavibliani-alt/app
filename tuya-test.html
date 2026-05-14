@@ -283,11 +283,10 @@
   <div class="card">
     <div class="card-title">🔐 jtmspro — Ticket + Encrypt + Create</div>
     <div style="font-size:12px;color:var(--ink-3);margin-bottom:14px;line-height:1.6;">
-      Full 3-step flow handled by the proxy (Node.js AES-128-ECB):<br>
-      <b>1.</b> <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">POST /v1.0/devices/{id}/door-lock/password-ticket</code> → get ticket<br>
-      <b>2.</b> Decrypt <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">ticket_key</code> with ACCESS_SECRET[:16] via AES-128-ECB,
-               then encrypt password with decrypted key<br>
-      <b>3.</b> <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">POST /v1.0/devices/{id}/door-lock/temp-passwords</code> with encrypted password
+      2-step flow for <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">jtmspro</code>:<br>
+      <b>1.</b> <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">GET /v1.0/smart-lock/devices/{id}/password-ticket</code> — check if ticket required (informational)<br>
+      <b>2.</b> <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">POST /v1.0/smart-lock/devices/{id}/temporary-password</code>
+               with <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">{ name, password, password_type:0, effective_time, invalid_time }</code>
     </div>
     <div class="btn-row" style="margin-bottom:0;">
       <button class="btn-primary" id="btn-jtms" onclick="runJtmspro()" disabled>
@@ -838,29 +837,20 @@ async function runJtmspro() {
   const stepDefs = [
     {
       key:   'step1',
-      label: 'Step 1 — POST /v1.0/devices/{id}/door-lock/password-ticket',
-      note:  'Tried 4 body variants: {}, {ticket_type:0}, {ticket_type:1}, empty — first success wins',
-      ok:    d => !!d?.ticket?.ticket_id,
-      summary: d => d?.ticket?.ticket_id
-        ? `ticket_id=${d.ticket.ticket_id} | key=${String(d.ticket.ticket_key||'').slice(0,16)}…`
-        : `All ${d?.attempts?.length ?? 0} variants failed — expand for Tuya error codes`,
+      label: 'Step 1 — GET /v1.0/smart-lock/devices/{id}/password-ticket',
+      note:  'Check if a ticket is required; ticket_id injected into Step 2 if returned',
+      ok:    d => d?.tuya_response?.success,
+      summary: d => d?.tuya_response?.success
+        ? `ticket_id=${d.tuya_response.result?.ticket_id ?? '—'}`
+        : `code=${d?.tuya_response?.code}: ${d?.tuya_response?.msg}`,
     },
     {
       key:   'step2',
-      label: 'Step 2 — AES-128-ECB decrypt ticket_key → encrypt password',
-      note:  'Key = first 16 bytes of ACCESS_SECRET (UTF-8)',
-      ok:    d => d && !d.error,
-      summary: d => d?.encrypted_hex
-        ? `encrypted=${d.encrypted_hex.slice(0,20)}…`
-        : (d?.error || ''),
-    },
-    {
-      key:   'step3',
-      label: 'Step 3 — POST /v1.0/devices/{id}/door-lock/temp-passwords',
-      note:  'Create temp password with encrypted value + ticket_id',
+      label: 'Step 2 — POST /v1.0/smart-lock/devices/{id}/temporary-password',
+      note:  'Plaintext password, password_type=0, effective_time / invalid_time in seconds',
       ok:    d => d?.tuya_response?.success,
       summary: d => d?.tuya_response?.success
-        ? `password_id=${d.tuya_response.result}`
+        ? `✅ password_id=${d.tuya_response.result}`
         : `code=${d?.tuya_response?.code}: ${d?.tuya_response?.msg}`,
     },
   ];

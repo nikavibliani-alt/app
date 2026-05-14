@@ -91,91 +91,60 @@ function tuyaCall(method, path, token, body) {
   });
 }
 
-// ── jtmspro 3-step flow ───────────────────────────────────────────────────────
+// ── jtmspro flow ──────────────────────────────────────────────────────────────
+// Step 1: GET password-ticket (check if required)
+// Step 2: POST /v1.0/smart-lock/devices/{id}/temporary-password (plaintext, no encryption)
 async function jtmsproFlow({ token, deviceId, code, name, durationSec }) {
-  const nowSec  = Math.floor(Date.now() / 1000);
-  const result  = { ok: false, steps: {} };
+  const nowSec = Math.floor(Date.now() / 1000);
+  const result = { ok: false, steps: {} };
 
-  // Step 1: try four body variants for password-ticket
-  const ticketPath = `/v1.0/devices/${deviceId}/door-lock/password-ticket`;
-  const variants   = [
-    '{}',
-    JSON.stringify({ ticket_type: 0 }),
-    JSON.stringify({ ticket_type: 1 }),
-    '',
-  ];
+  // ── Step 1: GET password-ticket — check if required ──────────────────────
+  const ticketPath = `/v1.0/smart-lock/devices/${deviceId}/password-ticket`;
+  console.log('\n── STEP 1: GET password-ticket (informational)');
+  const r1 = await tuyaCall('GET', ticketPath, token, '');
+  result.steps.step1 = {
+    endpoint:      ticketPath,
+    http_status:   r1.status,
+    tuya_response: r1.data,
+    note:          r1.ok
+      ? 'Ticket available — may be required for some firmware'
+      : `code=${r1.data?.code}: ${r1.data?.msg}`,
+  };
+  // Extract ticket_id if present (used in step 2 body if returned)
+  const ticketId = r1.data?.result?.ticket_id ?? null;
+  if (ticketId) console.log(`   ticket_id: ${ticketId}`);
 
-  const attempts = [];
-  let ticket = null;
-
-  for (const body of variants) {
-    console.log(`\n── STEP 1 variant: ${body || '(empty string)'}`);
-    const r = await tuyaCall('POST', ticketPath, token, body);
-    attempts.push({ body_sent: body, http_status: r.status, tuya_response: r.data });
-    if (r.ok) {
-      ticket = r.data.result;
-      console.log('   ✅ ticket obtained:', JSON.stringify(ticket));
-      break;
-    }
-    console.log(`   ✗ code=${r.data?.code} msg=${r.data?.msg}`);
-  }
-
-  result.steps.step1 = { attempts, ticket };
-
-  if (!ticket?.ticket_id || !ticket?.ticket_key) {
-    result.error = 'Step 1 failed — no ticket from any variant';
-    return result;
-  }
-
-  // Step 2: crypto
-  let encPwd;
-  try {
-    const isHex = /^[0-9a-fA-F]+$/.test(ticket.ticket_key) && ticket.ticket_key.length % 2 === 0;
-    const tkBuf = Buffer.from(ticket.ticket_key, isHex ? 'hex' : 'base64');
-    const dk    = aesDecrypt(AES_KEY, tkBuf);
-    const epBuf = aesEncrypt(dk, Buffer.from(code, 'utf8'));
-    encPwd      = epBuf.toString('hex');
-
-    result.steps.step2 = {
-      aes_key_hex:        AES_KEY.toString('hex'),
-      ticket_key:         ticket.ticket_key,
-      ticket_key_enc:     isHex ? 'hex' : 'base64',
-      decrypted_key_hex:  dk.toString('hex'),
-      plaintext:          code,
-      encrypted_hex:      encPwd,
-    };
-    console.log('\n── STEP 2 crypto OK, encrypted_password:', encPwd);
-  } catch (e) {
-    result.steps.step2 = { error: e.message };
-    result.error = 'Step 2 crypto failed: ' + e.message;
-    console.error('── STEP 2 ERROR:', e.message);
-    return result;
-  }
-
-  // Step 3: create temp password
-  const createPath = `/v1.0/devices/${deviceId}/door-lock/temp-passwords`;
-  const body3 = JSON.stringify({
+  // ── Step 2: POST temporary-password (plaintext password, no AES) ─────────
+  const createPath = `/v1.0/smart-lock/devices/${deviceId}/temporary-password`;
+  const body2 = JSON.stringify({
     name,
-    password:       encPwd,
+    password:       code,         // plaintext — no encryption for this endpoint
+    password_type:  0,            // 0 = one-time, 1 = time-limited recurring
     effective_time: nowSec,
     invalid_time:   nowSec + durationSec,
-    ticket_id:      ticket.ticket_id,
+    ...(ticketId ? { ticket_id: ticketId } : {}),
   });
 
-  console.log('\n── STEP 3');
-  const r3 = await tuyaCall('POST', createPath, token, body3);
-  result.steps.step3 = { body_sent: JSON.parse(body3), http_status: r3.status, tuya_response: r3.data };
+  console.log('\n── STEP 2: POST temporary-password');
+  console.log('   body:', body2);
+  const r2 = await tuyaCall('POST', createPath, token, body2);
+  result.steps.step2 = {
+    endpoint:      createPath,
+    body_sent:     JSON.parse(body2),
+    http_status:   r2.status,
+    tuya_response: r2.data,
+  };
 
-  if (r3.ok) {
+  if (r2.ok) {
     result.ok          = true;
-    result.password_id = r3.data.result;
+    result.password_id = r2.data.result;
     result.plaintext   = code;
     result.valid_from  = new Date(nowSec * 1000).toISOString();
     result.valid_until = new Date((nowSec + durationSec) * 1000).toISOString();
-    console.log('── ✅ DONE, password_id:', result.password_id);
+    console.log('── ✅ DONE  password_id:', result.password_id);
   } else {
-    result.error = `Step 3 failed: code=${r3.data?.code} msg=${r3.data?.msg}`;
-    console.log('── ✗ Step 3 failed:', result.error);
+    result.error = `Step 2 failed: code=${r2.data?.code} msg=${r2.data?.msg}`;
+    console.log('── ✗', result.error);
   }
 
   return result;
