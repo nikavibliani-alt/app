@@ -191,23 +191,22 @@ async function handleCreateTempPassword(req, res, body) {
         return respond(res, 500, result);
     }
 
-    // Step 3 — send via generic device commands DP (jtmspro uses Raw DP, not REST endpoint)
+    // Step 3 — flat body to /door-lock/temp-password
     const nowSec    = Math.floor(Date.now() / 1000);
     const endpoints = [
-        `/v1.0/devices/${deviceId}/commands`,
+        `/v1.0/devices/${deviceId}/door-lock/temp-password`,
     ];
-    // remote_no_dp_key and remote_no_pd_setkey are the Raw DPs exposed in specifications
-    // Encode as base64: ticket_id + encrypted_password + timestamps
-    const dpPayload = Buffer.from(JSON.stringify({
-        ticket_id,
-        password:       encryptedHex,
-        effective_time: nowSec - 300,
-        invalid_time:   nowSec + 86400,
-    })).toString('base64');
     const bodyObj = {
-        commands: [
-            { code: 'remote_no_dp_key', value: dpPayload },
-        ],
+        name,
+        password:        encryptedHex,
+        password_type:   'ticket',
+        ticket_id,
+        effective_time:  nowSec - 300,
+        invalid_time:    nowSec + 86400,
+        time_zone:       'Asia/Tbilisi',
+        type:            0,
+        sn:              910,
+        relate_dev_list: [deviceId],
     };
     const body3 = JSON.stringify(bodyObj);
     console.log('PLAIN PASSWORD:', password);
