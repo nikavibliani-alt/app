@@ -967,9 +967,9 @@ async function runOneClick() {
     { key: 'step2',  label: 'Step 2 — AES-128-ECB encrypt (proxy)',
       ok: d => d && !d.error,
       sum: d => d?.encrypted_hex ? `encrypted=${d.encrypted_hex.slice(0,20)}…` : d?.error },
-    { key: 'step3',  label: 'Step 3 — POST /v1.0/devices/{id}/door-lock/temp-password',
-      ok: d => d?.tuya_response?.success,
-      sum: d => d?.tuya_response?.success ? `✅ password_id=${d.tuya_response.result}` : `code=${d?.tuya_response?.code}: ${d?.tuya_response?.msg}` },
+    { key: 'step2',  label: 'Step 2 — AES-128-ECB encrypt (proxy)',
+      ok: d => d && !d.error,
+      sum: d => d?.encrypted_hex ? `encrypted=${d.encrypted_hex.slice(0,20)}…` : d?.error },
   ];
 
   for (const def of defs) {
@@ -990,6 +990,26 @@ async function runOneClick() {
       </div>`;
     container.appendChild(el);
   }
+
+  // Step 3 — render each endpoint attempt separately
+  const attempts = result.steps?.step3?.endpoints || [];
+  attempts.forEach((attempt, i) => {
+    const isOk = attempt.tuya_response?.success;
+    const el   = document.createElement('div');
+    el.className = 'probe-row';
+    el.innerHTML = `
+      <div class="probe-head" onclick="this.nextElementSibling.classList.toggle('open')">
+        <span class="probe-badge ${isOk ? 'badge-ok' : 'badge-err'}">${isOk ? '✅' : '✗'}</span>
+        <div style="flex:1;min-width:0;">
+          <div class="probe-path">Step 3.${i+1} — POST ${attempt.endpoint}</div>
+        </div>
+        <span class="probe-code">code=${attempt.tuya_response?.code ?? '?'}: ${attempt.tuya_response?.msg || ''}</span>
+      </div>
+      <div class="probe-body open">
+        <div class="json-box">${syntaxHL(JSON.stringify(attempt.tuya_response, null, 2))}</div>
+      </div>`;
+    container.appendChild(el);
+  });
 
   if (result.ok) {
     overallStep.className = 'step ok';

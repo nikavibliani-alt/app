@@ -173,10 +173,13 @@ async function handleCreateTempPassword(req, res, body) {
         return respond(res, 500, result);
     }
 
-    // Step 3 — create temp password
+    // Step 3 — try all 3 endpoints, collect all responses
     const nowSec     = Math.floor(Date.now() / 1000);
-    const createPath = `/v1.0/smart-lock/devices/${deviceId}/password`;
-    const body3      = JSON.stringify({
+    const endpoints  = [
+        `/v1.0/smart-lock/devices/${deviceId}/temporary-password`,
+        `/v1.0/smart-lock/devices/${deviceId}/password-ticket/create`,
+    ];
+    const bodyObj = {
         name,
         password:        encryptedHex,
         password_type:   0,
@@ -185,23 +188,27 @@ async function handleCreateTempPassword(req, res, body) {
         effective_time:  nowSec,
         invalid_time:    nowSec + 3600,
         schedule_list:   [{ effective_time: 0, invalid_time: 1439, working_day: 127 }],
-    });
-    console.log('[/create-temp-password] Step 3: POST', createPath);
-    console.log('[/create-temp-password] Step 3 body:', body3);
-    const r3 = await tuyaCall('POST', createPath, token, body3);
-    console.log('[/create-temp-password] Step 3 result:', JSON.stringify(r3.data));
-    result.steps.step3 = { endpoint: createPath, body_sent: JSON.parse(body3), tuya_response: r3.data };
+    };
+    const body3 = JSON.stringify(bodyObj);
+    result.steps.step3 = { body_sent: bodyObj, endpoints: [] };
 
-    if (r3.data.success) {
-        result.ok          = true;
-        result.password_id = r3.data.result;
-        result.plain_pwd   = password;
-        result.valid_hours = 2;
-        console.log('[/create-temp-password] ✅ SUCCESS  password_id=' + result.password_id);
-    } else {
-        result.error = `Create failed: code=${r3.data.code} msg=${r3.data.msg}`;
-        console.log('[/create-temp-password] ✗ FAILED:', result.error);
+    for (const createPath of endpoints) {
+        console.log('[/create-temp-password] Step 3: POST', createPath);
+        const r = await tuyaCall('POST', createPath, token, body3);
+        console.log('[/create-temp-password] Result:', JSON.stringify(r.data));
+        const attempt = { endpoint: createPath, tuya_response: r.data };
+        result.steps.step3.endpoints.push(attempt);
+        if (r.data.success) {
+            result.ok          = true;
+            result.password_id = r.data.result;
+            result.plain_pwd   = password;
+            result.winning_endpoint = createPath;
+            console.log('[/create-temp-password] ✅ SUCCESS at', createPath, ' password_id=' + result.password_id);
+            break;
+        }
+        console.log(`[/create-temp-password] ✗ code=${r.data.code} msg=${r.data.msg} — trying next`);
     }
+    if (!result.ok) result.error = 'All 3 endpoints failed — see steps.step3.endpoints for details';
     respond(res, result.ok ? 200 : 422, result);
 }
 
