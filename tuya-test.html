@@ -530,7 +530,6 @@ async function runFetch() {
     document.getElementById('btn-tempcode').disabled = false;
     document.getElementById('btn-probe').disabled = false;
     document.getElementById('btn-diag').disabled = false;
-    document.getElementById('btn-jtms').disabled = false;
   } catch (e) {
     addStep('❌', 'err', 'Flow stopped', e.message);
   } finally {
@@ -804,101 +803,99 @@ async function runDiagnostics() {
   document.getElementById('btn-diag').disabled = false;
 }
 
-// ── jtmspro flow (browser-side, proxy is a generic forwarder) ────────────────
+// ── jtmspro flow — self-contained: fetches its own fresh token ───────────────
 async function runJtmspro() {
-  if (!_token) { addStep('⚠️', 'err', 'No token — Connect first'); return; }
   document.getElementById('btn-jtms').disabled = true;
   const container = document.getElementById('jtms-rows');
   container.innerHTML = '';
 
   const code        = document.getElementById('tmp-code').value.trim() || '12345678';
-  const name        = document.getElementById('tmp-name').value.trim() || 'SleepyTest';
+  const name        = document.getElementById('tmp-name').value.trim() || 'Test';
   const durationSec = parseInt(document.getElementById('tmp-duration').value, 10) || 3600;
-  const nowSec      = Math.floor(Date.now() / 1000);
 
-  // ── helper: fire a request through the proxy and render a result row ──────
-  async function fireAndRender(method, path, body, label, note) {
+  // Render a collapsible result row, return the parsed response
+  function makeRow(label, note) {
+    const id  = 'r' + Math.random().toString(36).slice(2);
     const row = document.createElement('div');
     row.className = 'probe-row';
-    const slug = path.replace(/[^a-z0-9]/gi, '_');
     row.innerHTML = `
       <div class="probe-head" onclick="this.nextElementSibling.classList.toggle('open')">
-        <span class="probe-badge badge-wait" id="badge_${slug}">⏳</span>
+        <span class="probe-badge badge-wait" id="b${id}">⏳</span>
         <div style="flex:1;min-width:0;">
-          <div class="probe-path">${method} ${path}</div>
+          <div class="probe-path">${label}</div>
           <div style="font-size:11px;color:var(--ink-3);margin-top:1px;">${note}</div>
         </div>
-        <span class="probe-code" id="code_${slug}"></span>
+        <span class="probe-code" id="c${id}"></span>
       </div>
       <div class="probe-body open">
-        <div class="json-box" id="json_${slug}">Waiting…</div>
+        <div class="json-box" id="j${id}">Waiting…</div>
       </div>`;
     container.appendChild(row);
-    const badge  = document.getElementById(`badge_${slug}`);
-    const codeEl = document.getElementById(`code_${slug}`);
-    const jsonEl = document.getElementById(`json_${slug}`);
-
-    try {
-      const opts = { method, headers: { 'Content-Type': 'application/json', 'access_token': _token } };
-      if (body) opts.body = body;
-      const res  = await fetch(PROXY + path, opts);
-      const text = await res.text();           // get raw text first
-      let data;
-      try { data = JSON.parse(text); } catch { data = { _raw: text }; }
-
-      jsonEl.innerHTML = syntaxHL(JSON.stringify(data, null, 2));
-      const apiCode = data.code ?? (data.success ? 'ok' : '?');
-      codeEl.textContent = `HTTP ${res.status} | Tuya code=${apiCode}${data.msg ? ' · ' + data.msg : ''}`;
-
-      if (data.success) {
-        badge.className = 'probe-badge badge-ok'; badge.textContent = '✅';
-      } else {
-        badge.className = 'probe-badge badge-err'; badge.textContent = `✗ ${apiCode}`;
-      }
-      return data;
-    } catch (e) {
-      badge.className = 'probe-badge badge-err'; badge.textContent = '✗ ERR';
-      codeEl.textContent = e.message;
-      jsonEl.textContent = e.message;
-      return null;
-    }
+    return {
+      ok(summary)  { document.getElementById(`b${id}`).className='probe-badge badge-ok';  document.getElementById(`b${id}`).textContent='✅'; document.getElementById(`c${id}`).textContent=summary; },
+      err(summary) { document.getElementById(`b${id}`).className='probe-badge badge-err'; document.getElementById(`b${id}`).textContent='✗';  document.getElementById(`c${id}`).textContent=summary; },
+      show(data)   { document.getElementById(`j${id}`).innerHTML=syntaxHL(JSON.stringify(data,null,2)); },
+    };
   }
 
-  // ── Step 1: GET password-ticket (informational) ───────────────────────────
-  const d1 = await fireAndRender(
-    'GET',
-    `/v1.0/smart-lock/devices/${DEVICE_ID}/password-ticket`,
-    null,
-    'Step 1 — password-ticket',
-    'Check if ticket is required; ticket_id auto-passed to Step 2 if returned'
-  );
-  const ticketId = d1?.result?.ticket_id ?? null;
+  async function call(method, path, token, body) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['access_token'] = token;
+    const opts = { method, headers };
+    if (body)  opts.body = typeof body === 'string' ? body : JSON.stringify(body);
+    const res  = await fetch('http://localhost:3000' + path, opts);
+    const text = await res.text();
+    try { return JSON.parse(text); } catch { return { _raw: text }; }
+  }
+
+  // ── Step 1: Fetch token ───────────────────────────────────────────────────
+  const r1 = makeRow('GET /v1.0/token?grant_type=1', 'Fresh access token — no auth header needed');
+  let token;
+  try {
+    const d1 = await call('GET', '/v1.0/token?grant_type=1', null, null);
+    r1.show(d1);
+    if (d1.success && d1.result?.access_token) {
+      token = d1.result.access_token;
+      r1.ok(`access_token obtained (expire=${d1.result.expire_time}s)`);
+    } else {
+      r1.err(`code=${d1.code}: ${d1.msg}`);
+      addStep('✗', 'err', 'Cannot continue — token fetch failed', JSON.stringify(d1));
+      document.getElementById('btn-jtms').disabled = false;
+      return;
+    }
+  } catch (e) {
+    r1.err(e.message); r1.show({ error: e.message });
+    addStep('✗', 'err', 'Token fetch threw: ' + e.message);
+    document.getElementById('btn-jtms').disabled = false;
+    return;
+  }
 
   // ── Step 2: POST temporary-password ──────────────────────────────────────
-  const body2 = JSON.stringify({
+  const nowSec = Math.floor(Date.now() / 1000);
+  const body2  = {
     name,
     password:       code,
     password_type:  0,
     effective_time: nowSec,
     invalid_time:   nowSec + durationSec,
-    ...(ticketId ? { ticket_id: ticketId } : {}),
-  });
-
-  const d2 = await fireAndRender(
-    'POST',
-    `/v1.0/smart-lock/devices/${DEVICE_ID}/temporary-password`,
-    body2,
-    'Step 2 — temporary-password',
-    `body: ${body2}`
-  );
-
-  // ── Overall summary ───────────────────────────────────────────────────────
-  if (d2?.success) {
-    addStep('✅', 'ok', `Temp password created — id=${d2.result}`,
-      `code="${code}" | valid for ${durationSec/3600}h from now`);
-  } else {
-    addStep('✗', 'err', `Flow finished — Step 2 code=${d2?.code}: ${d2?.msg || '(no message)'}`,
-      'Expand rows above to see full Tuya responses');
+  };
+  const path2 = `/v1.0/smart-lock/devices/${DEVICE_ID}/temporary-password`;
+  const r2 = makeRow(`POST ${path2}`, `body: ${JSON.stringify(body2)}`);
+  try {
+    const d2 = await call('POST', path2, token, body2);
+    r2.show(d2);
+    if (d2.success) {
+      r2.ok(`✅ password_id=${d2.result}`);
+      addStep('✅', 'ok', `Temp password created — id=${d2.result}`,
+        `code="${code}" | valid for ${durationSec/3600}h`);
+    } else {
+      r2.err(`code=${d2.code}: ${d2.msg}`);
+      addStep('✗', 'err', `Step 2 failed — Tuya code=${d2.code}: ${d2.msg}`,
+        'Full response in the row above');
+    }
+  } catch (e) {
+    r2.err(e.message); r2.show({ error: e.message });
+    addStep('✗', 'err', 'Step 2 threw: ' + e.message);
   }
 
   document.getElementById('btn-jtms').disabled = false;
@@ -910,6 +907,7 @@ window.addEventListener('load', async () => {
   if (!up) {
     document.getElementById('proxy-note').style.display = '';
   } else {
+    document.getElementById('btn-jtms').disabled = false; // no global token needed
     addStep('✅', 'ok', 'Proxy is running', 'http://localhost:3000 — ready');
   }
 });
