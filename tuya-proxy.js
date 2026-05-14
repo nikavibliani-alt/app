@@ -161,21 +161,52 @@ async function handleCreateTempPassword(req, res, body) {
     }
     const token = rTok.data.result.access_token;
 
-    // Steps 1+2 skipped — sending plain password without encryption or ticket
-    result.steps.step1 = { skipped: 'no ticket — plain password mode' };
-    result.steps.step2 = { skipped: 'no AES — plain password mode', plain_password: password };
+    // Step 1 — ticket
+    const ticketPath = `/v1.0/devices/${deviceId}/door-lock/password-ticket`;
+    console.log('[/create-temp-password] Step 1: POST', ticketPath);
+    const r1 = await tuyaCall('POST', ticketPath, token, '{}');
+    console.log('[/create-temp-password] Step 1 result:', JSON.stringify(r1.data));
+    result.steps.step1 = { endpoint: ticketPath, body_sent: '{}', tuya_response: r1.data };
+    if (!r1.data.success || !r1.data.result?.ticket_id) {
+        result.error = `Ticket failed: code=${r1.data.code} msg=${r1.data.msg}`;
+        return respond(res, 422, result);
+    }
+    const { ticket_id, ticket_key } = r1.data.result;
 
-    // Step 3 — plain password, no ticket_id, no encryption
+    // Step 2 — AES encrypt
+    console.log('[/create-temp-password] Step 2: AES encrypt  ticket_key=' + ticket_key);
+    let encryptedHex;
+    try {
+        const intermediateKey = ACCESS_SECRET.substring(0, 16);
+        const decryptedTicket = aesDecrypt(intermediateKey, Buffer.from(ticket_key, 'hex'));
+        const finalKey        = decryptedTicket.slice(0, 16);
+        encryptedHex          = aesEncrypt(finalKey, Buffer.from(password, 'utf8')).toString('hex').toUpperCase();
+        console.log('[/create-temp-password] Step 2 encrypted_hex:', encryptedHex);
+        result.steps.step2 = { ticket_key, decrypted_ticket_hex: decryptedTicket.toString('hex'), final_key_hex: finalKey.toString('hex'), plain_password: password, encrypted_hex: encryptedHex };
+    } catch(e) {
+        console.error('[/create-temp-password] Step 2 ERROR:', e.message);
+        result.error = 'AES failed: ' + e.message;
+        result.steps.step2 = { error: e.message };
+        return respond(res, 500, result);
+    }
+
+    // Step 3 — send via generic device commands DP (jtmspro uses Raw DP, not REST endpoint)
     const nowSec    = Math.floor(Date.now() / 1000);
     const endpoints = [
-        `/v1.0/devices/${deviceId}/door-lock/temp-password`,
+        `/v1.0/devices/${deviceId}/commands`,
     ];
-    const bodyObj = {
-        name,
-        password:       password,   // plain 7-digit number, no encryption
-        password_type:  0,
+    // remote_no_dp_key and remote_no_pd_setkey are the Raw DPs exposed in specifications
+    // Encode as base64: ticket_id + encrypted_password + timestamps
+    const dpPayload = Buffer.from(JSON.stringify({
+        ticket_id,
+        password:       encryptedHex,
         effective_time: nowSec,
         invalid_time:   nowSec + 3600,
+    })).toString('base64');
+    const bodyObj = {
+        commands: [
+            { code: 'remote_no_dp_key', value: dpPayload },
+        ],
     };
     const body3 = JSON.stringify(bodyObj);
     console.log('PLAIN PASSWORD:', password);
