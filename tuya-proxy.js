@@ -198,15 +198,13 @@ async function handleCreateTempPassword(req, res, body) {
     ];
     const bodyObj = {
         name,
-        password:        encryptedHex,
-        password_type:   'ticket',
+        password:       encryptedHex,
+        password_type:  'ticket',
         ticket_id,
-        effective_time:  nowSec - 300,
-        invalid_time:    nowSec + 86400,
-        time_zone:       'Asia/Tbilisi',
-        type:            0,
-        sn:              910,
-        relate_dev_list: [deviceId],
+        effective_time: nowSec - 300,
+        invalid_time:   nowSec + 86400,
+        time_zone:      'Asia/Tbilisi',
+        type:           0,
     };
     const body3 = JSON.stringify(bodyObj);
     console.log('PLAIN PASSWORD:', password);
