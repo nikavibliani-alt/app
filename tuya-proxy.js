@@ -192,7 +192,9 @@ async function handleCreateTempPassword(req, res, body) {
     }
 
     // Step 3 — flat body to /door-lock/temp-password
-    const nowSec    = Math.floor(Date.now() / 1000);
+    const nowSec      = Math.floor(Date.now() / 1000);
+    const ticketAgeSec = nowSec - Math.floor(r1.data.t / 1000);
+    console.log(`[timing] Ticket age: ${ticketAgeSec}s (expire_time=${r1.data.result.expire_time}s) — ${ticketAgeSec > r1.data.result.expire_time ? '⚠️ POSSIBLY EXPIRED' : '✅ within window'}`);
     const endpoints = [
         `/v1.0/devices/${deviceId}/door-lock/temp-password`,
     ];
