@@ -198,7 +198,7 @@ async function handleCreateTempPassword(req, res, body) {
     const bodyObj = {
         name,
         password:       encryptedHex,
-        password_type:  1,
+        password_type:  0,
         ticket_id,
         effective_time: nowSec,
         invalid_time:   nowSec + 3600,
