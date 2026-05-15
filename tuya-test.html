@@ -998,9 +998,9 @@ async function runOneClick() {
   const s1ok   = !!s1?.ticket_id;
   const s1best = s1?.attempts?.find(a => a.tuya_response?.success);
   makeStepRow(
-    `Step 1 — POST password-ticket (${s1?.attempts?.length ?? 1} attempt(s))`,
+    `Step 1 — POST ${s1?.endpoint ?? '(endpoint unknown)'}`,
     s1ok
-      ? `ticket_id=${s1.ticket_id}  expire_time=${s1.expire_time}s`
+      ? `✅ ticket_id=${s1.ticket_id}  expire_time=${s1.expire_time}s`
       : `code=${s1best?.tuya_response?.code ?? '?'}: ${s1best?.tuya_response?.msg ?? 'failed'}`,
     s1ok, s1
   );
