@@ -366,6 +366,53 @@ async function handleCreateTempPassword(req, res, body) {
     respond(res, 200, result);
 }
 
+async function handleGetCredentials(req, res, body) {
+    const params   = JSON.parse(body || '{}');
+    const deviceId = params.deviceId || DEVICE_ID;
+
+    // Token
+    const rTok = await tuyaCall('GET', '/v1.0/token?grant_type=1', null, '');
+    if (!rTok.data.success) return respond(res, 422, { error: 'token failed', detail: rTok.data });
+    const token = rTok.data.result.access_token;
+
+    // Ticket (retry until expire_time >= 300s)
+    const ticketPath = `/v1.0/devices/${deviceId}/door-lock/password-ticket`;
+    let r1, attempts = 0;
+    while (attempts < 3) {
+        attempts++;
+        r1 = await tuyaCall('POST', ticketPath, token, '{}');
+        if (!r1.data.success) return respond(res, 422, { error: 'ticket failed', detail: r1.data });
+        if (r1.data.result.expire_time >= 300) break;
+        console.log(`[get-credentials] stale ticket (${r1.data.result.expire_time}s) — retrying`);
+        await new Promise(r => setTimeout(r, 2000));
+    }
+    const { ticket_id, ticket_key, expire_time } = r1.data.result;
+
+    // Generate random 7-digit password
+    const password = Math.floor(1000000 + Math.random() * 9000000).toString();
+
+    // AES encrypt
+    const intermediateKey = ACCESS_SECRET.substring(0, 16);
+    const decryptedTicket = aesDecrypt(intermediateKey, Buffer.from(ticket_key, 'hex'));
+    const finalKey        = decryptedTicket.slice(0, 16);
+    const encrypted_hex   = aesEncrypt(finalKey, Buffer.from(password, 'utf8')).toString('hex').toUpperCase();
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    console.log(`\n★  CREDENTIALS — plain=${password}  ticket_id=${ticket_id}  ★`);
+
+    respond(res, 200, {
+        ok:              true,
+        device_id:       deviceId,
+        ticket_id,
+        ticket_key,
+        expire_time,
+        plain_password:  password,
+        encrypted_hex,
+        effective_time:  nowSec + 60,
+        invalid_time:    nowSec + 3660,
+    });
+}
+
 async function handleDeleteTestPasswords(req, res, body) {
     console.log('\n[delete-test-passwords] START');
     // Step 0: fresh token
@@ -451,6 +498,7 @@ http.createServer((req, res) => {
         if (req.url === '/encrypt'              && req.method === 'POST') return handleEncrypt(req, res, body);
         if (req.url === '/create-temp-password' && req.method === 'POST') return handleCreateTempPassword(req, res, body);
         if (req.url === '/delete-test-passwords'&& req.method === 'POST') return handleDeleteTestPasswords(req, res, body);
+        if (req.url === '/get-credentials'      && req.method === 'POST') return handleGetCredentials(req, res, body);
 
         // ── Everything else → signed forward to Tuya ─────────────────────────
         handleForward(req, res, body);

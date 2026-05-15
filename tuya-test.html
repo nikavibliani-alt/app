@@ -238,6 +238,9 @@
       <button class="btn-secondary" id="btn-delete-test" onclick="runDeleteTestPasswords()">
         <span>🗑</span> Delete Test Passwords
       </button>
+      <button class="btn-secondary" id="btn-get-creds" onclick="runGetCredentials()">
+        <span>🔑</span> Get Credentials Only
+      </button>
       <button class="btn-secondary" onclick="clearAll()">
         <span>🗑</span> Clear
       </button>
@@ -1183,6 +1186,60 @@ function renderPwdTable(passwords) {
       </tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
+}
+
+async function runGetCredentials() {
+  document.getElementById('btn-get-creds').disabled = true;
+
+  // Show/create credential display panel
+  let panel = document.getElementById('creds-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'creds-panel';
+    panel.style.cssText = 'background:#052e16;color:#86efac;border-radius:10px;padding:20px 24px;font-family:var(--mono);margin-top:8px;display:none;';
+    document.querySelector('.page').insertBefore(panel, document.querySelector('.page').children[2]);
+  }
+  panel.style.display = 'block';
+  panel.innerHTML = '<div style="font-size:14px;opacity:.7;">Fetching…</div>';
+
+  try {
+    const res  = await fetch('http://localhost:3000/get-credentials', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId: DEVICE_ID }),
+    });
+    const d = await res.json();
+    if (!d.ok) { panel.innerHTML = `<div style="color:#fca5a5;">Error: ${d.error}</div>`; return; }
+
+    panel.innerHTML = `
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;opacity:.6;margin-bottom:14px;">
+        Credentials (ticket valid ~${d.expire_time}s) — copy and paste below
+      </div>
+      <div style="display:grid;grid-template-columns:160px 1fr;gap:10px 16px;align-items:start;">
+        <span style="opacity:.6;font-size:12px;">Device ID</span>
+        <span style="font-size:14px;word-break:break-all;">${d.device_id}</span>
+
+        <span style="opacity:.6;font-size:12px;">Ticket ID</span>
+        <span style="font-size:14px;word-break:break-all;">${d.ticket_id}</span>
+
+        <span style="opacity:.6;font-size:12px;">Encrypted Password</span>
+        <span style="font-size:13px;word-break:break-all;color:#fcd34d;">${d.encrypted_hex}</span>
+
+        <span style="opacity:.6;font-size:12px;">Plain Password</span>
+        <span style="font-size:36px;font-weight:900;letter-spacing:.15em;color:#4ade80;">${d.plain_password}</span>
+
+        <span style="opacity:.6;font-size:12px;">Effective Time</span>
+        <span style="font-size:13px;">${d.effective_time} (${new Date(d.effective_time*1000).toLocaleTimeString()})</span>
+
+        <span style="opacity:.6;font-size:12px;">Invalid Time</span>
+        <span style="font-size:13px;">${d.invalid_time} (${new Date(d.invalid_time*1000).toLocaleTimeString()})</span>
+      </div>`;
+    addStep('✅', 'ok', `Credentials ready — plain code: ${d.plain_password}`,
+      `ticket_id=${d.ticket_id}  expire=${d.expire_time}s`);
+  } catch(e) {
+    panel.innerHTML = `<div style="color:#fca5a5;">Fetch failed: ${e.message}</div>`;
+    addStep('✗', 'err', 'Credentials fetch failed: ' + e.message);
+  }
+  document.getElementById('btn-get-creds').disabled = false;
 }
 
 async function runDeleteTestPasswords() {
