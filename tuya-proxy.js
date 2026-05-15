@@ -218,8 +218,6 @@ async function handleCreateTempPassword(req, res, body) {
     const ticketAgeSec = nowSec - Math.floor(r1.data.t / 1000);
     console.log(`[timing] Ticket age: ${ticketAgeSec}s  expire_time=${r1.data.result.expire_time}s  ${ticketAgeSec > r1.data.result.expire_time ? '⚠️ EXPIRED' : '✅ OK'}`);
 
-    // Try two body variants: official sample (phone/time_zone as empty strings) first,
-    // then with phone as "0" if 1109 persists.
     const bodyVariants = [
         {
             name:           name,
@@ -228,21 +226,9 @@ async function handleCreateTempPassword(req, res, body) {
             ticket_id,
             effective_time: effectiveSec,
             invalid_time:   invalidSec,
-            phone:          '',
-            time_zone:      '',
-        },
-        {
-            name:           name,
-            password:       encryptedHex,
-            password_type:  'ticket',
-            ticket_id,
-            effective_time: effectiveSec,
-            invalid_time:   invalidSec,
-            phone:          '0',
-            time_zone:      '',
         },
     ];
-    const createPath = `/v1.0/devices/${deviceId}/door-lock/temp-password`;
+    const createPath = `/v1.0/smart-lock/device/${deviceId}/template/temp-password`;
 
     console.log('\n─── STEP 3 ───────────────────────────────────────────────');
     console.log('URL:', `POST https://${TUYA_HOST}${createPath}`);
