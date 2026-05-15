@@ -211,93 +211,117 @@ async function handleCreateTempPassword(req, res, body) {
         return respond(res, 500, result);
     }
 
-    // Step 3 — POST /door-lock/temp-password (your specified body)
+    // Step 3 — remote_no_dp_key DP via POST /commands
+    // /door-lock/temp-password always returns 1109 for jtmspro — this lock has no
+    // temp_password in its instruction set, only remote_no_dp_key (Raw DP).
     const nowSec       = Math.floor(Date.now() / 1000);
     const effectiveSec = nowSec + 60;
     const invalidSec   = effectiveSec + 3600;
     const ticketAgeSec = nowSec - Math.floor(r1.data.t / 1000);
     console.log(`[timing] Ticket age: ${ticketAgeSec}s  expire_time=${r1.data.result.expire_time}s  ${ticketAgeSec > r1.data.result.expire_time ? '⚠️ EXPIRED' : '✅ OK'}`);
 
-    const createPath = `/v1.0/devices/${deviceId}/door-lock/temp-password`;
-    const bodyObj = {
-        name,
-        password:        encryptedHex,
-        password_type:   'ticket',
+    const dpPayload = {
         ticket_id,
-        effective_time:  effectiveSec,
-        invalid_time:    invalidSec,
-        type:            0,
-        relate_dev_list: [deviceId],
+        password:       encryptedHex,
+        effective_time: effectiveSec,
+        invalid_time:   invalidSec,
     };
-    const body3 = JSON.stringify(bodyObj);
-    console.log('\n─── STEP 3 BODY ──────────────────────────────────────────');
-    console.log(body3);
+    const dpBase64   = Buffer.from(JSON.stringify(dpPayload)).toString('base64');
+    const createPath = `/v1.0/devices/${deviceId}/commands`;
+    const body3Obj   = { commands: [{ code: 'remote_no_dp_key', value: dpBase64 }] };
+    const body3      = JSON.stringify(body3Obj);
+
+    console.log('\n─── STEP 3 ───────────────────────────────────────────────');
+    console.log('URL:', `POST https://${TUYA_HOST}${createPath}`);
+    console.log('dp_payload (before base64):', JSON.stringify(dpPayload));
+    console.log('body3:', body3);
     console.log('──────────────────────────────────────────────────────────');
 
-    result.steps.step3 = { endpoint: createPath, body_sent: bodyObj };
-    const r3 = await tuyaCall('POST', createPath, token, body3);
+    result.steps.step3 = { endpoint: createPath, dp_payload: dpPayload, body_sent: body3Obj };
+    const r3 = await tuyaCall('POST', createPath, token, body3);   // r3 always defined here
     result.steps.step3.tuya_response = r3.data;
     console.log('─── STEP 3 RESPONSE:', JSON.stringify(r3.data));
 
+    // Always set plain_pwd so browser can show the code regardless of success/fail
+    result.plain_pwd = password;
+
     if (!r3.data.success) {
-        // Still return the result so browser can see the full response
-        result.error    = `Step 3 failed: code=${r3.data.code} msg=${r3.data.msg}`;
-        result.plain_pwd = password;
+        result.error = `Step 3 failed: code=${r3.data.code} msg=${r3.data.msg}`;
         return respond(res, 422, result);
     }
 
     result.ok          = true;
     result.password_id = r3.data.result;
-    result.plain_pwd   = password;
-    console.log(`\n★  SUCCESS — code=${password}  password_id=${result.password_id}  ★`);
+    console.log(`\n★  SUCCESS — code=${password}  result=${result.password_id}  ★`);
 
-    // Step 4 — poll delivery status (wait 5s, retry if ONGOING, wait 10s more)
-    const listPath = `/v1.0/devices/${deviceId}/door-lock/temp-passwords`;
-    result.steps.step4_delivery = { endpoint: listPath, polls: [] };
+    // Step 4 — poll delivery status, try 2 endpoints per poll
+    const listEndpoints = [
+        `/v1.0/devices/${deviceId}/door-lock/temp-passwords`,
+        `/v1.0/smart-lock/devices/${deviceId}/stand-by-lock-temp-passwords?valid=true&page_size=10`,
+    ];
+    result.steps.step4_delivery = { endpoints_tried: listEndpoints, polls: [] };
 
     const pollDelivery = async (waitMs, pollIndex) => {
-        console.log(`[step4] poll ${pollIndex}: waiting ${waitMs/1000}s then GET ${listPath}`);
+        console.log(`[step4] poll ${pollIndex}: waiting ${waitMs/1000}s`);
         await new Promise(r => setTimeout(r, waitMs));
-        const r4 = await tuyaCall('GET', listPath, token, '');
-        console.log(`[step4] poll ${pollIndex} raw response:`, JSON.stringify(r4.data));
 
-        let status = 'LIST_FAILED';
-        let allPasswords = [];
-        if (r4.data.success && Array.isArray(r4.data.result)) {
-            allPasswords = r4.data.result.map(p => ({
-                id:              p.id,
-                name:            p.name,
-                delivery_status: p.delivery_status,
-                effective_time:  p.effective_time,
-                invalid_time:    p.invalid_time,
-            }));
-            const match = r4.data.result.find(p =>
-                p.name === name ||
-                String(p.id) === String(result.password_id)
-            );
-            status = match?.delivery_status ?? 'NOT_FOUND_IN_LIST';
-            console.log(`[step4] poll ${pollIndex} — delivery_status=${status}  all:`, JSON.stringify(allPasswords));
-        } else {
-            console.log(`[step4] poll ${pollIndex} failed:`, JSON.stringify(r4.data));
+        const epResults = [];
+        let status = 'LIST_FAILED', allPasswords = [];
+
+        for (const ep of listEndpoints) {
+            console.log(`[step4] poll ${pollIndex} GET ${ep}`);
+            const r4 = await tuyaCall('GET', ep, token, '');
+            console.log(`[step4] poll ${pollIndex} [${ep}]:`, JSON.stringify(r4.data));
+            epResults.push({ endpoint: ep, tuya_response: r4.data });
+
+            if (r4.data.success) {
+                const arr = Array.isArray(r4.data.result) ? r4.data.result
+                          : Array.isArray(r4.data.result?.list) ? r4.data.result.list
+                          : [];
+                if (arr.length > 0) {
+                    allPasswords = arr.map(p => ({
+                        id: p.id, name: p.name,
+                        delivery_status: p.delivery_status,
+                        effective_time: p.effective_time,
+                        invalid_time: p.invalid_time,
+                    }));
+                    const match = arr.find(p => p.name === name || String(p.id) === String(result.password_id));
+                    status = match?.delivery_status ?? 'NOT_FOUND_IN_LIST';
+                    console.log(`[step4] ✅ poll ${pollIndex} status=${status}  passwords:`, JSON.stringify(allPasswords));
+                    break;
+                }
+                console.log(`[step4] poll ${pollIndex} success but empty array`);
+            }
         }
 
-        result.steps.step4_delivery.polls.push({
-            poll: pollIndex, wait_sec: waitMs / 1000,
-            delivery_status: status,
-            all_passwords:   allPasswords,
-            tuya_response:   r4.data,
-        });
+        const pollData = { poll: pollIndex, wait_sec: waitMs/1000, delivery_status: status, all_passwords: allPasswords, endpoint_results: epResults };
+        result.steps.step4_delivery.polls.push(pollData);
         return status;
     };
 
-    const status1 = await pollDelivery(5000, 1);
-    result.delivery_status = status1;
+    const s4s1 = await pollDelivery(5000, 1);
+    result.delivery_status = s4s1;
     result.all_passwords   = result.steps.step4_delivery.polls[0]?.all_passwords ?? [];
 
-    if (status1 === 'ONGOING') {
-        const status2 = await pollDelivery(10000, 2);
-        result.delivery_status = status2;
+    if (s4s1 === 'ONGOING') {
+        const s4s2 = await pollDelivery(10000, 2);
+        result.delivery_status = s4s2;
         result.all_passwords   = result.steps.step4_delivery.polls[1]?.all_passwords ?? result.all_passwords;
+    }
+
+    // Step 5 — auto-diagnostics
+    console.log('\n[step5] Running diagnostics');
+    const diagChecks = [
+        { label: 'device category',  method: 'GET',  path: `/v1.0/devices/${deviceId}` },
+        { label: 'list temp-passwords (v1.0)', method: 'GET',  path: `/v1.0/devices/${deviceId}/door-lock/temp-passwords` },
+        { label: 'generic command (remote_no_dp_key)', method: 'POST', path: `/v1.0/devices/${deviceId}/commands`,
+          body: JSON.stringify({ commands: [{ code: 'remote_no_dp_key', value: 'test' }] }) },
+    ];
+    result.steps.step5_diag = { checks: [] };
+    for (const chk of diagChecks) {
+        const r = await tuyaCall(chk.method, chk.path, token, chk.body || '');
+        console.log(`[step5] ${chk.label}:`, JSON.stringify(r.data));
+        result.steps.step5_diag.checks.push({ label: chk.label, endpoint: chk.path, tuya_response: r.data });
     }
 
     console.log(`\n★  FINAL — code=${password}  delivery=${result.delivery_status}  ★`);

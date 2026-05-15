@@ -987,12 +987,16 @@ async function runOneClick() {
   const tok = result.steps?.token;
   makeStepRow('Step 0 — GET /v1.0/token', tok?.success ? 'token obtained' : `code=${tok?.code}`, !!tok?.success, tok);
 
-  // Step 1 — ticket
-  const s1 = result.steps?.step1;
+  // Step 1 — ticket (new shape: attempts[] + ticket_id at top level)
+  const s1     = result.steps?.step1;
+  const s1ok   = !!s1?.ticket_id;
+  const s1best = s1?.attempts?.find(a => a.tuya_response?.success);
   makeStepRow(
-    'Step 1 — POST /v1.0/devices/{id}/door-lock/password-ticket',
-    s1?.tuya_response?.success ? `ticket_id=${s1.tuya_response.result?.ticket_id}` : `code=${s1?.tuya_response?.code}: ${s1?.tuya_response?.msg}`,
-    !!s1?.tuya_response?.success, s1
+    `Step 1 — POST password-ticket (${s1?.attempts?.length ?? 1} attempt(s))`,
+    s1ok
+      ? `ticket_id=${s1.ticket_id}  expire_time=${s1.expire_time}s`
+      : `code=${s1best?.tuya_response?.code ?? '?'}: ${s1best?.tuya_response?.msg ?? 'failed'}`,
+    s1ok, s1
   );
 
   // Step 2 — AES encrypt (once, not twice)
@@ -1012,30 +1016,51 @@ async function runOneClick() {
     !!s3ok, s3
   );
 
-  // Step 4 — delivery status polls
+  // Step 4 — delivery polls (each poll tried 2 endpoints)
   const s4 = result.steps?.step4_delivery;
   const polls = s4?.polls ?? [];
-  polls.forEach((poll, i) => {
-    const ds    = poll.delivery_status;
-    const color = ds === 'SUCCESS' ? '#86efac' : ds === 'ONGOING' ? '#fcd34d' : '#fca5a5';
-    makeStepRow(
-      `Step 4.${poll.poll} — GET temp-passwords (after ${poll.wait_sec}s)  <span style="color:${color};font-weight:900">${ds}</span>`,
-      poll.all_passwords?.length ? poll.all_passwords.map(p => `${p.name}:${p.delivery_status}`).join(' | ') : 'empty list',
-      ds === 'SUCCESS', poll
-    );
-  });
-  if (!polls.length) {
-    makeStepRow('Step 4 — delivery status check', 'no polls returned', false, s4);
+  if (polls.length) {
+    polls.forEach(poll => {
+      const ds    = poll.delivery_status;
+      const color = ds === 'SUCCESS' ? '#86efac' : ds === 'ONGOING' ? '#fcd34d' : '#fca5a5';
+      // Show each endpoint tried within this poll
+      (poll.endpoint_results ?? [{ endpoint_result: poll.tuya_response, delivery_status: ds }]).forEach(ep => {
+        makeStepRow(
+          `Step 4.${poll.poll} — ${ep.endpoint ?? s4.endpoint} (after ${poll.wait_sec}s)`,
+          `<span style="color:${color};font-weight:900">${ds}</span>  ${poll.all_passwords?.map(p=>`${p.name}:${p.delivery_status}`).join(' | ') || 'empty'}`,
+          ds === 'SUCCESS', { delivery_status: ds, all_passwords: poll.all_passwords, raw: ep }
+        );
+      });
+    });
+  } else {
+    makeStepRow('Step 4 — delivery status check', 'no polls returned — step4 did not run', false, s4);
   }
 
-  if (result.ok) {
-    overallStep.className = 'step ok';
-    overallStep.querySelector('strong').textContent = `✅ Done — TRY CODE: ${result.plain_pwd} on the lock`;
-    overallStep.querySelector('small').textContent  = `delivery=${result.delivery_status ?? '?'} | password_id=${result.password_id} | valid 1h from +60s`;
+  // Step 5 — auto-diagnostics (device info + list passwords + generic command)
+  if (result.steps?.step5_diag) {
+    const diag = result.steps.step5_diag;
+    (diag.checks ?? []).forEach(chk => {
+      const ok = chk.tuya_response?.success;
+      makeStepRow(
+        `Step 5 — Diag: ${chk.label}`,
+        ok ? `success — ${JSON.stringify(chk.tuya_response?.result ?? {}).slice(0,60)}` : `code=${chk.tuya_response?.code}: ${chk.tuya_response?.msg}`,
+        ok, chk
+      );
+    });
+  }
+
+  if (result.plain_pwd) {
+    overallStep.className = result.ok ? 'step ok' : 'step err';
+    overallStep.querySelector('strong').textContent = result.ok
+      ? `✅ TRY CODE: ${result.plain_pwd} on the lock — delivery=${result.delivery_status ?? '?'}`
+      : `✗ Step 3 failed (code=${result.steps?.step3?.tuya_response?.code}) — plain code was ${result.plain_pwd}`;
+    overallStep.querySelector('small').textContent = result.ok
+      ? `password_id=${result.password_id} | valid 1h from now+60s`
+      : result.error ?? '';
   } else {
     overallStep.className = 'step err';
     overallStep.querySelector('strong').textContent = `✗ Failed: ${result.error}`;
-    overallStep.querySelector('small').textContent  = 'Expand rows above for details';
+    overallStep.querySelector('small').textContent = 'Expand rows above for details';
   }
 
   document.getElementById('btn-oneclick').disabled = false;
