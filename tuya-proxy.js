@@ -348,6 +348,45 @@ async function handleCreateTempPassword(req, res, body) {
     respond(res, 200, result);
 }
 
+async function handleDeleteTestPasswords(req, res, body) {
+    console.log('\n[delete-test-passwords] START');
+    // Step 0: fresh token
+    const rTok = await tuyaCall('GET', '/v1.0/token?grant_type=1', null, '');
+    if (!rTok.data.success) return respond(res, 422, { error: 'token failed', detail: rTok.data });
+    const token    = rTok.data.result.access_token;
+    const params   = JSON.parse(body || '{}');
+    const deviceId = params.deviceId || DEVICE_ID;
+
+    // Step 1: list all temp passwords
+    const listPath = `/v1.0/devices/${deviceId}/door-lock/temp-passwords`;
+    const rList    = await tuyaCall('GET', listPath, token, '');
+    if (!rList.data.success) return respond(res, 422, { error: 'list failed', detail: rList.data });
+
+    const all = Array.isArray(rList.data.result) ? rList.data.result
+              : Array.isArray(rList.data.result?.list) ? rList.data.result.list : [];
+
+    console.log(`[delete] ${all.length} total passwords`);
+
+    // Filter: name contains SleepyTest, GuestCode, Test, or TestAlpha (case-insensitive)
+    const PATTERN = /sleepytest|guestcode|testalpha|\btest\b/i;
+    const toDelete = all.filter(p => PATTERN.test(p.name || p.lock_name || ''));
+    console.log(`[delete] ${toDelete.length} match filter`);
+
+    const deleted = [], failed = [], skipped = [];
+    for (const p of toDelete) {
+        const delPath = `/v1.0/devices/${deviceId}/door-lock/temp-passwords/${p.id}`;
+        const r = await tuyaCall('DELETE', delPath, token, '');
+        console.log(`[delete] id=${p.id} name="${p.name ?? p.lock_name}"  result:`, JSON.stringify(r.data));
+        if (r.data.success) deleted.push({ id: p.id, name: p.name ?? p.lock_name });
+        else failed.push({ id: p.id, name: p.name ?? p.lock_name, error: r.data.msg });
+    }
+    all.filter(p => !PATTERN.test(p.name || p.lock_name || '')).forEach(p =>
+        skipped.push({ id: p.id, name: p.name ?? p.lock_name })
+    );
+
+    respond(res, 200, { ok: true, total: all.length, deleted, failed, skipped });
+}
+
 async function handleForward(req, res, body) {
     const token   = req.headers['access_token'] || '';
     const headers = buildHeaders(req.method, req.url, token, body);
@@ -393,6 +432,7 @@ http.createServer((req, res) => {
         if (req.url === '/ping')                                          return handlePing(req, res);
         if (req.url === '/encrypt'              && req.method === 'POST') return handleEncrypt(req, res, body);
         if (req.url === '/create-temp-password' && req.method === 'POST') return handleCreateTempPassword(req, res, body);
+        if (req.url === '/delete-test-passwords'&& req.method === 'POST') return handleDeleteTestPasswords(req, res, body);
 
         // ── Everything else → signed forward to Tuya ─────────────────────────
         handleForward(req, res, body);

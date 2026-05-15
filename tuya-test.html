@@ -235,6 +235,9 @@
       <button class="btn-secondary" id="btn-delivery" onclick="runCheckDelivery()" disabled>
         <span>📡</span> Check Delivery Status
       </button>
+      <button class="btn-secondary" id="btn-delete-test" onclick="runDeleteTestPasswords()">
+        <span>🗑</span> Delete Test Passwords
+      </button>
       <button class="btn-secondary" onclick="clearAll()">
         <span>🗑</span> Clear
       </button>
@@ -1023,16 +1026,29 @@ async function runOneClick() {
     polls.forEach(poll => {
       const ds = poll.delivery_status ?? 'UNKNOWN';
       (poll.endpoint_results ?? []).forEach(ep => {
-        const count  = ep.total_count ?? '?';
-        const match  = ep.match_found ? `match found` : `no match — searched name="${ep.searched_for?.name}" id=${ep.searched_for?.password_id}`;
-        const isOk   = ds === 'SUCCESS';
-        makeStepRow(
-          `Step 4.${poll.poll} — GET ${ep.endpoint} (after ${poll.wait_sec}s)`,
-          `${ds}  |  ${count} password(s)  |  ${match}`,
-          isOk,
-          { delivery_status: ds, total_count: count, match_found: ep.match_found,
-            searched_for: ep.searched_for, raw_all: poll.all_passwords, tuya_response: ep.tuya_response }
-        );
+        const count = ep.total_count ?? poll.all_passwords?.length ?? '?';
+        const matchTxt = ep.match_found
+          ? `matched id=${ep.match_found.id} phase=${ep.match_found.phase}`
+          : `no match — searched name="${ep.searched_for?.name}" id=${ep.searched_for?.password_id}`;
+        const isOk = ds === 'SUCCESS';
+
+        // Custom row with table instead of JSON box
+        const rowEl = document.createElement('div');
+        rowEl.className = 'probe-row';
+        const tableHtml = renderPwdTable(poll.all_passwords);
+        rowEl.innerHTML = `
+          <div class="probe-head" onclick="this.nextElementSibling.classList.toggle('open')">
+            <span class="probe-badge ${isOk ? 'badge-ok' : 'badge-err'}">${isOk ? '✅' : '✗'}</span>
+            <div style="flex:1;min-width:0;">
+              <div class="probe-path">Step 4.${poll.poll} — ${ep.endpoint} (after ${poll.wait_sec}s)</div>
+              <div style="font-size:11px;color:var(--ink-3);">${count} passwords | ${matchTxt}</div>
+            </div>
+            <span class="probe-code">${ds}</span>
+          </div>
+          <div class="probe-body open" style="padding:12px 16px;background:#0f172a;">
+            ${tableHtml}
+          </div>`;
+        container.appendChild(rowEl);
       });
     });
   } else {
@@ -1124,6 +1140,63 @@ async function runCheckDelivery() {
     addStep('✗', 'err', `code=${data.code}: ${data.msg}`);
   }
   document.getElementById('btn-delivery').disabled = false;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function formatTs(sec) {
+  if (!sec) return '—';
+  return new Date(sec * 1000).toLocaleString('en-GB', { dateStyle:'short', timeStyle:'short' });
+}
+
+const PHASE_LABEL = { 0:'⏳ Pending', 1:'✅ Success', 2:'🗑 Expired', 3:'❌ Failed' };
+
+function renderPwdTable(passwords) {
+  if (!passwords?.length) return '<div style="color:var(--ink-3);font-size:12px;">No passwords</div>';
+  const sorted = [...passwords].sort((a,b) => (b.gmt_create ?? b.time ?? 0) - (a.gmt_create ?? a.time ?? 0));
+  const rows = sorted.map((p,i) => `
+    <tr style="border-bottom:1px solid #1e2a3a;font-size:11px;">
+      <td style="padding:4px 8px;color:#93c5fd;">${i+1}</td>
+      <td style="padding:4px 8px;color:#fcd34d;">${p.id ?? '—'}</td>
+      <td style="padding:4px 8px;color:#86efac;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${p.name ?? p.lock_name ?? ''}">${p.name ?? p.lock_name ?? '—'}</td>
+      <td style="padding:4px 8px;">${PHASE_LABEL[p.phase] ?? `phase=${p.phase ?? '?'}`}</td>
+      <td style="padding:4px 8px;color:#e2e8f0;">${p.password_type ?? '—'}</td>
+      <td style="padding:4px 8px;color:#a5b4fc;">${formatTs(p.effective_time)}</td>
+      <td style="padding:4px 8px;color:#fca5a5;">${formatTs(p.invalid_time)}</td>
+      <td style="padding:4px 8px;color:#94a3b8;">${formatTs(p.gmt_create ?? p.time)}</td>
+    </tr>`).join('');
+  return `<div style="overflow-x:auto;">
+    <table style="border-collapse:collapse;width:100%;background:#0f172a;color:#e2e8f0;font-family:var(--mono);">
+      <thead><tr style="background:#1e293b;font-size:10px;text-transform:uppercase;letter-spacing:.06em;">
+        <th style="padding:6px 8px;text-align:left;">#</th>
+        <th style="padding:6px 8px;text-align:left;">ID</th>
+        <th style="padding:6px 8px;text-align:left;">Name</th>
+        <th style="padding:6px 8px;text-align:left;">Phase</th>
+        <th style="padding:6px 8px;text-align:left;">Type</th>
+        <th style="padding:6px 8px;text-align:left;">Effective</th>
+        <th style="padding:6px 8px;text-align:left;">Invalid</th>
+        <th style="padding:6px 8px;text-align:left;">Created</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+async function runDeleteTestPasswords() {
+  document.getElementById('btn-delete-test').disabled = true;
+  addStep('⏳', 'run', 'Deleting test passwords matching SleepyTest / GuestCode / Test…');
+  try {
+    const res  = await fetch('http://localhost:3000/delete-test-passwords', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId: DEVICE_ID }),
+    });
+    const data = await res.json();
+    showRaw(data);
+    addStep(data.ok ? '✅' : '✗', data.ok ? 'ok' : 'err',
+      `Deleted ${data.deleted?.length ?? 0} | Failed ${data.failed?.length ?? 0} | Skipped ${data.skipped?.length ?? 0}`,
+      data.deleted?.map(p => `${p.name} (${p.id})`).join(', ') || 'none deleted');
+  } catch(e) {
+    addStep('✗', 'err', 'Delete failed: ' + e.message);
+  }
+  document.getElementById('btn-delete-test').disabled = false;
 }
 
 async function runGetLogs() {
