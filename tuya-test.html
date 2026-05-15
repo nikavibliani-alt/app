@@ -1035,7 +1035,10 @@ async function runOneClick() {
         // Custom row with table instead of JSON box
         const rowEl = document.createElement('div');
         rowEl.className = 'probe-row';
-        const tableHtml = renderPwdTable(poll.all_passwords);
+        const pwds = poll.all_passwords ?? [];
+        const tableHtml = pwds.length
+          ? renderPwdTable(pwds)
+          : '<div style="color:#86efac;font-size:13px;padding:8px 0;">✅ No temp passwords on lock (empty list)</div>';
         rowEl.innerHTML = `
           <div class="probe-head" onclick="this.nextElementSibling.classList.toggle('open')">
             <span class="probe-badge ${isOk ? 'badge-ok' : 'badge-err'}">${isOk ? '✅' : '✗'}</span>
@@ -1046,6 +1049,7 @@ async function runOneClick() {
             <span class="probe-code">${ds}</span>
           </div>
           <div class="probe-body open" style="padding:12px 16px;background:#0f172a;">
+            <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">Endpoint: GET ${ep.endpoint}</div>
             ${tableHtml}
           </div>`;
         container.appendChild(rowEl);

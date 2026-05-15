@@ -274,7 +274,6 @@ async function handleCreateTempPassword(req, res, body) {
     // Step 4 — poll delivery status, try 2 endpoints per poll
     const listEndpoints = [
         `/v1.0/devices/${deviceId}/door-lock/temp-passwords`,
-        `/v1.0/devices/${deviceId}/status`,   // check unlock_temporary counter
     ];
     result.steps.step4_delivery = { endpoints_tried: listEndpoints, polls: [] };
 
@@ -309,8 +308,9 @@ async function handleCreateTempPassword(req, res, body) {
                 epResults[epResults.length - 1].match_found  = match ?? null;
                 epResults[epResults.length - 1].total_count  = arr.length;
                 console.log(`[step4] poll ${pollIndex} searched_for=${JSON.stringify(searchedFor)}  match=${JSON.stringify(match)}  status=${status}`);
-                if (arr.length > 0) break;
-                console.log(`[step4] poll ${pollIndex} [${ep}] success but empty array`);
+                // Stop at this endpoint whether array is empty or not — it's the correct source
+                if (arr.length === 0) status = 'EMPTY_LIST';
+                break;
             }
         }
 
