@@ -211,45 +211,63 @@ async function handleCreateTempPassword(req, res, body) {
         return respond(res, 500, result);
     }
 
-    // Step 3 — remote_no_dp_key DP via POST /commands
-    // /door-lock/temp-password always returns 1109 for jtmspro — this lock has no
-    // temp_password in its instruction set, only remote_no_dp_key (Raw DP).
+    // Step 3 — POST /door-lock/temp-password (official Tuya sample body, no extras)
     const nowSec       = Math.floor(Date.now() / 1000);
     const effectiveSec = nowSec + 60;
     const invalidSec   = effectiveSec + 3600;
     const ticketAgeSec = nowSec - Math.floor(r1.data.t / 1000);
     console.log(`[timing] Ticket age: ${ticketAgeSec}s  expire_time=${r1.data.result.expire_time}s  ${ticketAgeSec > r1.data.result.expire_time ? '⚠️ EXPIRED' : '✅ OK'}`);
 
-    const dpPayload = {
-        ticket_id,
-        password:       encryptedHex,
-        effective_time: effectiveSec,
-        invalid_time:   invalidSec,
-    };
-    const dpBase64   = Buffer.from(JSON.stringify(dpPayload)).toString('base64');
-    const createPath = `/v1.0/devices/${deviceId}/commands`;
-    const body3Obj   = { commands: [{ code: 'remote_no_dp_key', value: dpBase64 }] };
-    const body3      = JSON.stringify(body3Obj);
+    // Try two body variants: official sample (phone/time_zone as empty strings) first,
+    // then with phone as "0" if 1109 persists.
+    const bodyVariants = [
+        {
+            name:           name,
+            password:       encryptedHex,
+            password_type:  'ticket',
+            ticket_id,
+            effective_time: effectiveSec,
+            invalid_time:   invalidSec,
+            phone:          '',
+            time_zone:      '',
+        },
+        {
+            name:           name,
+            password:       encryptedHex,
+            password_type:  'ticket',
+            ticket_id,
+            effective_time: effectiveSec,
+            invalid_time:   invalidSec,
+            phone:          '0',
+            time_zone:      '',
+        },
+    ];
+    const createPath = `/v1.0/devices/${deviceId}/door-lock/temp-password`;
 
     console.log('\n─── STEP 3 ───────────────────────────────────────────────');
     console.log('URL:', `POST https://${TUYA_HOST}${createPath}`);
-    console.log('dp_payload (before base64):', JSON.stringify(dpPayload));
-    console.log('body3:', body3);
-    console.log('──────────────────────────────────────────────────────────');
 
     // Capture unlock_temporary BEFORE sending the command
-    const statusPath   = `/v1.0/devices/${deviceId}/status`;
+    const statusPath    = `/v1.0/devices/${deviceId}/status`;
     const rStatusBefore = await tuyaCall('GET', statusPath, token, '');
     const unlockBefore  = rStatusBefore.data?.result?.find?.(dp => dp.code === 'unlock_temporary');
     console.log('[step3-pre] unlock_temporary BEFORE:', JSON.stringify(unlockBefore));
 
-    result.steps.step3 = { endpoint: createPath, dp_payload: dpPayload, body_sent: body3Obj,
-                            unlock_temporary_before: unlockBefore };
-    const r3 = await tuyaCall('POST', createPath, token, body3);   // r3 always in scope
-    result.steps.step3.tuya_response = r3.data;
-    console.log('─── STEP 3 RESPONSE:', JSON.stringify(r3.data));
+    result.steps.step3 = { endpoint: createPath, variants_tried: [], unlock_temporary_before: unlockBefore };
+    result.plain_pwd   = password;   // always set so browser shows the code
 
-    result.plain_pwd = password;   // always set so browser shows the code
+    let r3;   // declared here — always in scope after loop
+    for (const bodyObj of bodyVariants) {
+        const body3 = JSON.stringify(bodyObj);
+        console.log(`\n─── STEP 3 variant (phone="${bodyObj.phone}") ─────────────`);
+        console.log('body:', body3);
+        r3 = await tuyaCall('POST', createPath, token, body3);
+        console.log('response:', JSON.stringify(r3.data));
+        result.steps.step3.variants_tried.push({ body_sent: bodyObj, tuya_response: r3.data });
+        if (r3.data.success) break;
+        if (r3.data.code !== 1109) break;   // unexpected error — don't retry
+    }
+    result.steps.step3.tuya_response = r3.data;   // final attempt's response
 
     if (!r3.data.success) {
         result.error = `Step 3 failed: code=${r3.data.code} msg=${r3.data.msg}`;
