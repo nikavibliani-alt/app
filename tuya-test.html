@@ -1021,19 +1021,36 @@ async function runOneClick() {
   const polls = s4?.polls ?? [];
   if (polls.length) {
     polls.forEach(poll => {
-      const ds    = poll.delivery_status;
-      const color = ds === 'SUCCESS' ? '#86efac' : ds === 'ONGOING' ? '#fcd34d' : '#fca5a5';
-      // Show each endpoint tried within this poll
-      (poll.endpoint_results ?? [{ endpoint_result: poll.tuya_response, delivery_status: ds }]).forEach(ep => {
+      const ds = poll.delivery_status ?? 'UNKNOWN';
+      (poll.endpoint_results ?? []).forEach(ep => {
+        const count  = ep.total_count ?? '?';
+        const match  = ep.match_found ? `match found` : `no match — searched name="${ep.searched_for?.name}" id=${ep.searched_for?.password_id}`;
+        const isOk   = ds === 'SUCCESS';
         makeStepRow(
-          `Step 4.${poll.poll} — ${ep.endpoint ?? s4.endpoint} (after ${poll.wait_sec}s)`,
-          `<span style="color:${color};font-weight:900">${ds}</span>  ${poll.all_passwords?.map(p=>`${p.name}:${p.delivery_status}`).join(' | ') || 'empty'}`,
-          ds === 'SUCCESS', { delivery_status: ds, all_passwords: poll.all_passwords, raw: ep }
+          `Step 4.${poll.poll} — GET ${ep.endpoint} (after ${poll.wait_sec}s)`,
+          `${ds}  |  ${count} password(s)  |  ${match}`,
+          isOk,
+          { delivery_status: ds, total_count: count, match_found: ep.match_found,
+            searched_for: ep.searched_for, raw_all: poll.all_passwords, tuya_response: ep.tuya_response }
         );
       });
     });
   } else {
-    makeStepRow('Step 4 — delivery status check', 'no polls returned — step4 did not run', false, s4);
+    makeStepRow('Step 4 — delivery status check', 'no polls returned', false, s4);
+  }
+
+  // Step 3 unlock_temporary delta
+  const s3u = result.steps?.step3;
+  if (s3u?.unlock_temporary_before !== undefined || s3u?.unlock_temporary_after !== undefined) {
+    const before = s3u.unlock_temporary_before?.value ?? 'n/a';
+    const after  = s3u.unlock_temporary_after?.value  ?? 'n/a';
+    const changed = s3u.unlock_temporary_changed;
+    makeStepRow(
+      'Step 3b — unlock_temporary counter (before → after 5s)',
+      `before=${before}  after=${after}  ${changed ? '⬆️ INCREMENTED — password stored!' : '— unchanged'}`,
+      !!changed,
+      { unlock_temporary_before: s3u.unlock_temporary_before, unlock_temporary_after: s3u.unlock_temporary_after, status_after_raw: s3u.status_after_raw }
+    );
   }
 
   // Step 5 — auto-diagnostics (device info + list passwords + generic command)

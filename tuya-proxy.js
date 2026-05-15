@@ -237,13 +237,19 @@ async function handleCreateTempPassword(req, res, body) {
     console.log('body3:', body3);
     console.log('──────────────────────────────────────────────────────────');
 
-    result.steps.step3 = { endpoint: createPath, dp_payload: dpPayload, body_sent: body3Obj };
-    const r3 = await tuyaCall('POST', createPath, token, body3);   // r3 always defined here
+    // Capture unlock_temporary BEFORE sending the command
+    const statusPath   = `/v1.0/devices/${deviceId}/status`;
+    const rStatusBefore = await tuyaCall('GET', statusPath, token, '');
+    const unlockBefore  = rStatusBefore.data?.result?.find?.(dp => dp.code === 'unlock_temporary');
+    console.log('[step3-pre] unlock_temporary BEFORE:', JSON.stringify(unlockBefore));
+
+    result.steps.step3 = { endpoint: createPath, dp_payload: dpPayload, body_sent: body3Obj,
+                            unlock_temporary_before: unlockBefore };
+    const r3 = await tuyaCall('POST', createPath, token, body3);   // r3 always in scope
     result.steps.step3.tuya_response = r3.data;
     console.log('─── STEP 3 RESPONSE:', JSON.stringify(r3.data));
 
-    // Always set plain_pwd so browser can show the code regardless of success/fail
-    result.plain_pwd = password;
+    result.plain_pwd = password;   // always set so browser shows the code
 
     if (!r3.data.success) {
         result.error = `Step 3 failed: code=${r3.data.code} msg=${r3.data.msg}`;
@@ -253,6 +259,17 @@ async function handleCreateTempPassword(req, res, body) {
     result.ok          = true;
     result.password_id = r3.data.result;
     console.log(`\n★  SUCCESS — code=${password}  result=${result.password_id}  ★`);
+
+    // Wait 5s then check unlock_temporary AFTER
+    console.log('[step3-post] waiting 5s to check unlock_temporary...');
+    await new Promise(r => setTimeout(r, 5000));
+    const rStatusAfter  = await tuyaCall('GET', statusPath, token, '');
+    const unlockAfter   = rStatusAfter.data?.result?.find?.(dp => dp.code === 'unlock_temporary');
+    result.steps.step3.unlock_temporary_after  = unlockAfter;
+    result.steps.step3.status_after_raw        = rStatusAfter.data;
+    const changed = (unlockAfter?.value ?? -1) !== (unlockBefore?.value ?? -1);
+    result.steps.step3.unlock_temporary_changed = changed;
+    console.log('[step3-post] unlock_temporary AFTER:', JSON.stringify(unlockAfter), changed ? '⬆️ CHANGED' : '— unchanged');
 
     // Step 4 — poll delivery status, try 2 endpoints per poll
     const listEndpoints = [
@@ -275,22 +292,25 @@ async function handleCreateTempPassword(req, res, body) {
             epResults.push({ endpoint: ep, tuya_response: r4.data });
 
             if (r4.data.success) {
+                // Return raw objects — no field mapping — so we see actual keys from Tuya
                 const arr = Array.isArray(r4.data.result) ? r4.data.result
                           : Array.isArray(r4.data.result?.list) ? r4.data.result.list
                           : [];
-                if (arr.length > 0) {
-                    allPasswords = arr.map(p => ({
-                        id: p.id, name: p.name,
-                        delivery_status: p.delivery_status,
-                        effective_time: p.effective_time,
-                        invalid_time: p.invalid_time,
-                    }));
-                    const match = arr.find(p => p.name === name || String(p.id) === String(result.password_id));
-                    status = match?.delivery_status ?? 'NOT_FOUND_IN_LIST';
-                    console.log(`[step4] ✅ poll ${pollIndex} status=${status}  passwords:`, JSON.stringify(allPasswords));
-                    break;
-                }
-                console.log(`[step4] poll ${pollIndex} success but empty array`);
+                allPasswords = arr;   // raw, unmodified
+                console.log(`[step4] poll ${pollIndex} [${ep}] count=${arr.length}  raw:`, JSON.stringify(arr));
+                const searchedFor = { name, password_id: result.password_id };
+                const match = arr.find(p =>
+                    p.name === name || p.lock_name === name ||
+                    String(p.id) === String(result.password_id) ||
+                    String(p.password_id) === String(result.password_id)
+                );
+                status = match?.delivery_status ?? match?.phase ?? (arr.length > 0 ? 'NO_MATCH' : 'EMPTY_LIST');
+                epResults[epResults.length - 1].searched_for = searchedFor;
+                epResults[epResults.length - 1].match_found  = match ?? null;
+                epResults[epResults.length - 1].total_count  = arr.length;
+                console.log(`[step4] poll ${pollIndex} searched_for=${JSON.stringify(searchedFor)}  match=${JSON.stringify(match)}  status=${status}`);
+                if (arr.length > 0) break;
+                console.log(`[step4] poll ${pollIndex} [${ep}] success but empty array`);
             }
         }
 
