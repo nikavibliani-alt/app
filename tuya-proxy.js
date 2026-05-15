@@ -166,7 +166,7 @@ async function handleCreateTempPassword(req, res, body) {
     const token = rTok.data.result.access_token;
 
     // Step 1 — fresh ticket (retry until expire_time >= 300s)
-    const ticketPath = `/v1.0/devices/${deviceId}/door-lock/password-ticket`;
+    const ticketPath = `/v1.0/smart-lock/devices/${deviceId}/password-ticket`;
     const MIN_EXPIRE = 300; // seconds — reject stale/cached tickets below this
     let r1, ticketAttempts = 0;
     result.steps.step1 = { endpoint: ticketPath, attempts: [] };
@@ -277,7 +277,7 @@ async function handleCreateTempPassword(req, res, body) {
 
     // Step 4 — poll delivery status, try 2 endpoints per poll
     const listEndpoints = [
-        `/v1.0/devices/${deviceId}/door-lock/temp-passwords`,
+        `/v1.0/devices/${deviceId}/door-lock/template/temp-password`,
     ];
     result.steps.step4_delivery = { endpoints_tried: listEndpoints, polls: [] };
 
@@ -337,7 +337,7 @@ async function handleCreateTempPassword(req, res, body) {
     console.log('\n[step5] Running diagnostics');
     const diagChecks = [
         { label: 'device category',           method: 'GET', path: `/v1.0/devices/${deviceId}` },
-        { label: 'list temp-passwords (v1.0)', method: 'GET', path: `/v1.0/devices/${deviceId}/door-lock/temp-passwords` },
+        { label: 'list temp-passwords (v1.0)', method: 'GET', path: `/v1.0/devices/${deviceId}/door-lock/template/temp-password` },
         // NOTE: removed the "test" remote_no_dp_key command — it was firing 10s after
         // Step 3 and overwriting the real password payload on the lock.
     ];
@@ -362,7 +362,7 @@ async function handleGetCredentials(req, res, body) {
     const token = rTok.data.result.access_token;
 
     // Ticket (retry until expire_time >= 300s)
-    const ticketPath = `/v1.0/devices/${deviceId}/door-lock/password-ticket`;
+    const ticketPath = `/v1.0/smart-lock/devices/${deviceId}/password-ticket`;
     let r1, attempts = 0;
     while (attempts < 3) {
         attempts++;
@@ -409,7 +409,7 @@ async function handleDeleteTestPasswords(req, res, body) {
     const deviceId = params.deviceId || DEVICE_ID;
 
     // Step 1: list all temp passwords
-    const listPath = `/v1.0/devices/${deviceId}/door-lock/temp-passwords`;
+    const listPath = `/v1.0/devices/${deviceId}/door-lock/template/temp-password`;
     const rList    = await tuyaCall('GET', listPath, token, '');
     if (!rList.data.success) return respond(res, 422, { error: 'list failed', detail: rList.data });
 
