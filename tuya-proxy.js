@@ -257,7 +257,7 @@ async function handleCreateTempPassword(req, res, body) {
     // Step 4 — poll delivery status, try 2 endpoints per poll
     const listEndpoints = [
         `/v1.0/devices/${deviceId}/door-lock/temp-passwords`,
-        `/v1.0/smart-lock/devices/${deviceId}/stand-by-lock-temp-passwords?valid=true&page_size=10`,
+        `/v1.0/devices/${deviceId}/status`,   // check unlock_temporary counter
     ];
     result.steps.step4_delivery = { endpoints_tried: listEndpoints, polls: [] };
 

@@ -1007,12 +1007,12 @@ async function runOneClick() {
     !!(s2 && !s2.error), s2
   );
 
-  // Step 3 — create temp password
-  const s3 = result.steps?.step3;
+  // Step 3 — remote_no_dp_key command
+  const s3  = result.steps?.step3;
   const s3ok = s3?.tuya_response?.success;
   makeStepRow(
-    'Step 3 — POST /v1.0/devices/{id}/door-lock/temp-password',
-    s3ok ? `✅ password_id=${s3.tuya_response?.result}` : `code=${s3?.tuya_response?.code}: ${s3?.tuya_response?.msg}`,
+    'Step 3 — POST /v1.0/devices/{id}/commands  (remote_no_dp_key)',
+    s3ok ? `✅ result=${JSON.stringify(s3.tuya_response?.result)}` : `code=${s3?.tuya_response?.code}: ${s3?.tuya_response?.msg}`,
     !!s3ok, s3
   );
 
