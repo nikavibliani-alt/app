@@ -332,10 +332,10 @@ async function handleCreateTempPassword(req, res, body) {
     // Step 5 — auto-diagnostics
     console.log('\n[step5] Running diagnostics');
     const diagChecks = [
-        { label: 'device category',  method: 'GET',  path: `/v1.0/devices/${deviceId}` },
-        { label: 'list temp-passwords (v1.0)', method: 'GET',  path: `/v1.0/devices/${deviceId}/door-lock/temp-passwords` },
-        { label: 'generic command (remote_no_dp_key)', method: 'POST', path: `/v1.0/devices/${deviceId}/commands`,
-          body: JSON.stringify({ commands: [{ code: 'remote_no_dp_key', value: 'test' }] }) },
+        { label: 'device category',           method: 'GET', path: `/v1.0/devices/${deviceId}` },
+        { label: 'list temp-passwords (v1.0)', method: 'GET', path: `/v1.0/devices/${deviceId}/door-lock/temp-passwords` },
+        // NOTE: removed the "test" remote_no_dp_key command — it was firing 10s after
+        // Step 3 and overwriting the real password payload on the lock.
     ];
     result.steps.step5_diag = { checks: [] };
     for (const chk of diagChecks) {
