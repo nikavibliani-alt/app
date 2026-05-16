@@ -1,0 +1,4 @@
+
+# Firebase Cloud Functions — contains hardcoded Tuya credentials
+tuya-functions/
+firebase-debug.log
