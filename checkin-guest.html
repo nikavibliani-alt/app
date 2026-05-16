@@ -274,7 +274,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,doc,setDoc,getDoc,collection,addDoc,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,doc,setDoc,getDoc,collection,addDoc,onSnapshot,serverTimestamp,query,where}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 // Cloudinary for uploads
 const CLOUD='dlkjizhya';
 const PRESET='maxela_uploads';
@@ -321,19 +321,45 @@ let passportFile=null;
 let guestId=null;
 let guestData=null;
 let aptData=null;
+let activeReservation=null; // reservation matching this apt with tuyaPassword
 let myRequests=[];
 let currentSvcId=null;
 let currentSvcName=null;
 let cdInterval=null;
 
 const T={
-  en:{ws:'Welcome — please complete your check-in',yi:'Your information',fn:'Full name',gu:'Guests',na:'Nationality',ct:'Contact',cnu:'Your number / username',pt:'Passport / ID photo',ph:'Tap to take a photo or upload from gallery',sb:'Complete registration',gl:'Welcome back',tc:'Check-in Details',tcs:'Instructions, door code & photos',tw:'WiFi & Internet',tws:'Network name & password',tsv:'Services',tsvs:'Cleaning, laundry, tours & more',tr:'Recommendations',trs:'Best places nearby',tru:'House Rules',trus:'Please read before your stay',tco:'Contact Us',tcos:"We're here 24/7",lt:'Not available yet',ls:'Your room is being prepared. Instructions will unlock automatically at 2:00 PM.',cl:'Available in',dc:'Door code',wn:'WiFi name',wp:'Password',cp:'Copy',cpd:'Copied!',hi:'How to check in',hr:'House rules',rs:'Request sent!',rf:'Failed to send',sn:'Notes (optional)',snh:'Any special instructions...',sr:'Send request',ca:'Cancel',mr:'My requests',nr:'No requests yet',pe:'Pending',dn:'Done',cwa:'WhatsApp',cwas:'Chat with us directly on WhatsApp',rg:'Registered! Loading your stay...',},
-  ka:{ws:'კეთილი იყოს — გთხოვთ შეავსოთ ჩეკინი',yi:'თქვენი ინფორმაცია',fn:'სრული სახელი',gu:'სტუმრები',na:'ეროვნება',ct:'კონტაქტი',cnu:'ნომერი ან username',pt:'პასპორტის ფოტო',ph:'შეეხეთ გადასაღებად',sb:'რეგისტრაციის დასრულება',gl:'კეთილი იყოს თქვენი მობრძანება',tc:'ჩეკინის დეტალები',tcs:'ინსტრუქცია, კარის კოდი და ფოტოები',tw:'WiFi',tws:'ქსელის სახელი და პაროლი',tsv:'სერვისები',tsvs:'დასუფთავება, სამრეცხაო, ტური',tr:'რეკომენდაციები',trs:'საუკეთესო ადგილები',tru:'სახლის წესები',trus:'გთხოვთ წაიკითხოთ',tco:'დაგვიკავშირდით',tcos:'ჩვენ ყოველთვის აქ ვართ',lt:'ჯერ მიუწვდომელია',ls:'ოთახი მზადდება. ინსტრუქცია გამოჩნდება 14:00 საათზე.',cl:'დარჩა',dc:'კარის კოდი',wn:'WiFi სახელი',wp:'პაროლი',cp:'კოპირება',cpd:'დაკოპირდა!',hi:'როგორ შეხვიდეთ',hr:'სახლის წესები',rs:'მოთხოვნა გაიგზავნა!',rf:'გაგზავნა ვერ მოხერხდა',sn:'შენიშვნები',snh:'სპეციალური მოთხოვნები...',sr:'გაგზავნა',ca:'გაუქმება',mr:'ჩემი მოთხოვნები',nr:'მოთხოვნები არ არის',pe:'განხილვაში',dn:'შესრულდა',cwa:'WhatsApp',cwas:'დაგვიკავშირდით WhatsApp-ით',rg:'დარეგისტრირდით! იტვირთება...'},
-  ru:{ws:'Добро пожаловать — завершите регистрацию',yi:'Ваши данные',fn:'Полное имя',gu:'Гостей',na:'Гражданство',ct:'Контакт',cnu:'Ваш номер или username',pt:'Фото паспорта',ph:'Нажмите для фото или загрузки',sb:'Завершить регистрацию',gl:'С возвращением',tc:'Детали заезда',tcs:'Инструкции, код двери и фото',tw:'WiFi',tws:'Имя сети и пароль',tsv:'Услуги',tsvs:'Уборка, стирка, туры и другое',tr:'Рекомендации',trs:'Лучшие места рядом',tru:'Правила проживания',trus:'Пожалуйста прочитайте',tco:'Связаться с нами',tcos:'Мы здесь круглосуточно',lt:'Пока недоступно',ls:'Номер готовится. Инструкции откроются в 14:00.',cl:'Доступно через',dc:'Код двери',wn:'Имя сети',wp:'Пароль',cp:'Копировать',cpd:'Скопировано!',hi:'Как заселиться',hr:'Правила проживания',rs:'Запрос отправлен!',rf:'Ошибка',sn:'Примечания',snh:'Особые пожелания...',sr:'Отправить',ca:'Отмена',mr:'Мои запросы',nr:'Запросов нет',pe:'В обработке',dn:'Выполнено',cwa:'WhatsApp',cwas:'Напишите нам в WhatsApp',rg:'Зарегистрировано! Загрузка...'},
-  ar:{ws:'مرحباً — يرجى إكمال تسجيل الوصول',yi:'معلوماتك',fn:'الاسم الكامل',gu:'الضيوف',na:'الجنسية',ct:'التواصل',cnu:'رقمك أو اسم المستخدم',pt:'صورة جواز السفر',ph:'انقر للتصوير أو الرفع',sb:'إتمام التسجيل',gl:'مرحباً بعودتك',tc:'تفاصيل الوصول',tcs:'التعليمات ورمز الباب والصور',tw:'واي فاي',tws:'اسم الشبكة وكلمة المرور',tsv:'الخدمات',tsvs:'تنظيف وغسيل وجولات',tr:'التوصيات',trs:'أفضل الأماكن القريبة',tru:'قواعد المنزل',trus:'يرجى القراءة قبل إقامتك',tco:'تواصل معنا',tcos:'نحن هنا على مدار الساعة',lt:'غير متاح بعد',ls:'غرفتك قيد التجهيز. ستظهر التعليمات في الساعة 2:00 مساءً.',cl:'متاح في',dc:'رمز الباب',wn:'اسم الشبكة',wp:'كلمة المرور',cp:'نسخ',cpd:'تم النسخ!',hi:'كيفية تسجيل الوصول',hr:'قواعد المنزل',rs:'تم إرسال الطلب!',rf:'فشل الإرسال',sn:'ملاحظات',snh:'تعليمات خاصة...',sr:'إرسال الطلب',ca:'إلغاء',mr:'طلباتي',nr:'لا توجد طلبات',pe:'قيد الانتظار',dn:'تم',cwa:'واتساب',cwas:'تواصل معنا على واتساب',rg:'تم التسجيل! جارٍ التحميل...'}
+  en:{ac:'Access Code',vf:'Valid from',vt:'to',ttp:'Tap to copy',cp2:'Code generation pending — please contact host',chc:'Please contact host for your access code',
+ws:'Welcome — please complete your check-in',yi:'Your information',fn:'Full name',gu:'Guests',na:'Nationality',ct:'Contact',cnu:'Your number / username',pt:'Passport / ID photo',ph:'Tap to take a photo or upload from gallery',sb:'Complete registration',gl:'Welcome back',tc:'Check-in Details',tcs:'Instructions, door code & photos',tw:'WiFi & Internet',tws:'Network name & password',tsv:'Services',tsvs:'Cleaning, laundry, tours & more',tr:'Recommendations',trs:'Best places nearby',tru:'House Rules',trus:'Please read before your stay',tco:'Contact Us',tcos:"We're here 24/7",lt:'Not available yet',ls:'Your room is being prepared. Instructions will unlock automatically at 2:00 PM.',cl:'Available in',dc:'Door code',wn:'WiFi name',wp:'Password',cp:'Copy',cpd:'Copied!',hi:'How to check in',hr:'House rules',rs:'Request sent!',rf:'Failed to send',sn:'Notes (optional)',snh:'Any special instructions...',sr:'Send request',ca:'Cancel',mr:'My requests',nr:'No requests yet',pe:'Pending',dn:'Done',cwa:'WhatsApp',cwas:'Chat with us directly on WhatsApp',rg:'Registered! Loading your stay...',},
+  ka:{ac:'კარის კოდი',vf:'მოქმედია',vt:'–',ttp:'შეეხეთ კოპირებისთვის',cp2:'კოდი მუშავდება — დაუკავშირდით ჰოსტს',chc:'კოდისთვის დაუკავშირდით ჰოსტს',
+ws:'კეთილი იყოს — გთხოვთ შეავსოთ ჩეკინი',yi:'თქვენი ინფორმაცია',fn:'სრული სახელი',gu:'სტუმრები',na:'ეროვნება',ct:'კონტაქტი',cnu:'ნომერი ან username',pt:'პასპორტის ფოტო',ph:'შეეხეთ გადასაღებად',sb:'რეგისტრაციის დასრულება',gl:'კეთილი იყოს თქვენი მობრძანება',tc:'ჩეკინის დეტალები',tcs:'ინსტრუქცია, კარის კოდი და ფოტოები',tw:'WiFi',tws:'ქსელის სახელი და პაროლი',tsv:'სერვისები',tsvs:'დასუფთავება, სამრეცხაო, ტური',tr:'რეკომენდაციები',trs:'საუკეთესო ადგილები',tru:'სახლის წესები',trus:'გთხოვთ წაიკითხოთ',tco:'დაგვიკავშირდით',tcos:'ჩვენ ყოველთვის აქ ვართ',lt:'ჯერ მიუწვდომელია',ls:'ოთახი მზადდება. ინსტრუქცია გამოჩნდება 14:00 საათზე.',cl:'დარჩა',dc:'კარის კოდი',wn:'WiFi სახელი',wp:'პაროლი',cp:'კოპირება',cpd:'დაკოპირდა!',hi:'როგორ შეხვიდეთ',hr:'სახლის წესები',rs:'მოთხოვნა გაიგზავნა!',rf:'გაგზავნა ვერ მოხერხდა',sn:'შენიშვნები',snh:'სპეციალური მოთხოვნები...',sr:'გაგზავნა',ca:'გაუქმება',mr:'ჩემი მოთხოვნები',nr:'მოთხოვნები არ არის',pe:'განხილვაში',dn:'შესრულდა',cwa:'WhatsApp',cwas:'დაგვიკავშირდით WhatsApp-ით',rg:'დარეგისტრირდით! იტვირთება...'},
+  ru:{ac:'Код доступа',vf:'Действует с',vt:'по',ttp:'Нажмите для копирования',cp2:'Код генерируется — свяжитесь с хозяином',chc:'Свяжитесь с хозяином для получения кода',
+ws:'Добро пожаловать — завершите регистрацию',yi:'Ваши данные',fn:'Полное имя',gu:'Гостей',na:'Гражданство',ct:'Контакт',cnu:'Ваш номер или username',pt:'Фото паспорта',ph:'Нажмите для фото или загрузки',sb:'Завершить регистрацию',gl:'С возвращением',tc:'Детали заезда',tcs:'Инструкции, код двери и фото',tw:'WiFi',tws:'Имя сети и пароль',tsv:'Услуги',tsvs:'Уборка, стирка, туры и другое',tr:'Рекомендации',trs:'Лучшие места рядом',tru:'Правила проживания',trus:'Пожалуйста прочитайте',tco:'Связаться с нами',tcos:'Мы здесь круглосуточно',lt:'Пока недоступно',ls:'Номер готовится. Инструкции откроются в 14:00.',cl:'Доступно через',dc:'Код двери',wn:'Имя сети',wp:'Пароль',cp:'Копировать',cpd:'Скопировано!',hi:'Как заселиться',hr:'Правила проживания',rs:'Запрос отправлен!',rf:'Ошибка',sn:'Примечания',snh:'Особые пожелания...',sr:'Отправить',ca:'Отмена',mr:'Мои запросы',nr:'Запросов нет',pe:'В обработке',dn:'Выполнено',cwa:'WhatsApp',cwas:'Напишите нам в WhatsApp',rg:'Зарегистрировано! Загрузка...'},
+  ar:{ac:'رمز الوصول',vf:'صالح من',vt:'إلى',ttp:'انقر للنسخ',cp2:'جارٍ إنشاء الرمز — تواصل مع المضيف',chc:'تواصل مع المضيف للحصول على رمز الوصول',
+ws:'مرحباً — يرجى إكمال تسجيل الوصول',yi:'معلوماتك',fn:'الاسم الكامل',gu:'الضيوف',na:'الجنسية',ct:'التواصل',cnu:'رقمك أو اسم المستخدم',pt:'صورة جواز السفر',ph:'انقر للتصوير أو الرفع',sb:'إتمام التسجيل',gl:'مرحباً بعودتك',tc:'تفاصيل الوصول',tcs:'التعليمات ورمز الباب والصور',tw:'واي فاي',tws:'اسم الشبكة وكلمة المرور',tsv:'الخدمات',tsvs:'تنظيف وغسيل وجولات',tr:'التوصيات',trs:'أفضل الأماكن القريبة',tru:'قواعد المنزل',trus:'يرجى القراءة قبل إقامتك',tco:'تواصل معنا',tcos:'نحن هنا على مدار الساعة',lt:'غير متاح بعد',ls:'غرفتك قيد التجهيز. ستظهر التعليمات في الساعة 2:00 مساءً.',cl:'متاح في',dc:'رمز الباب',wn:'اسم الشبكة',wp:'كلمة المرور',cp:'نسخ',cpd:'تم النسخ!',hi:'كيفية تسجيل الوصول',hr:'قواعد المنزل',rs:'تم إرسال الطلب!',rf:'فشل الإرسال',sn:'ملاحظات',snh:'تعليمات خاصة...',sr:'إرسال الطلب',ca:'إلغاء',mr:'طلباتي',nr:'لا توجد طلبات',pe:'قيد الانتظار',dn:'تم',cwa:'واتساب',cwas:'تواصل معنا على واتساب',rg:'تم التسجيل! جارٍ التحميل...'}
 };
 
 function t(k){return T[lang]?.[k]||T.en?.[k]||k;}
+
+// Format a unix-seconds timestamp as a human-readable date in Tbilisi time (UTC+4)
+function formatTbilisiTime(unixSec){
+  if(!unixSec)return '';
+  const d=new Date(unixSec*1000);
+  const MONTHS={
+    en:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    ka:['იანვ','თებ','მარ','აპრ','მაი','ივნ','ივლ','აგვ','სექ','ოქტ','ნოე','დეკ'],
+    ru:['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'],
+    ar:['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'],
+  };
+  // Tbilisi UTC+4 — add 4 hours to UTC
+  const tb=new Date(d.getTime()+4*60*60*1000);
+  const day=tb.getUTCDate();
+  const mon=(MONTHS[lang]||MONTHS.en)[tb.getUTCMonth()];
+  const hh=String(tb.getUTCHours()).padStart(2,'0');
+  const mm=String(tb.getUTCMinutes()).padStart(2,'0');
+  const at={en:'at',ka:',',ru:'в',ar:'الساعة'}[lang]||'at';
+  return lang==='ka'?`${day} ${mon}, ${hh}:${mm}`:`${day} ${mon} ${at} ${hh}:${mm}`;
+}
+
 function toast(msg,dur=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),dur);}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
@@ -451,6 +477,26 @@ function showHome(){
       myRequests=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.guestId===guestId);
     });
   }
+  // Subscribe to reservations for this apartment — find the active one with a Tuya password
+  if(aptId){
+    const today=new Date().toISOString().slice(0,10);
+    onSnapshot(
+      query(collection(db,'reservations'),where('roomCode','==',aptId)),
+      snap=>{
+        // Filter to reservations that are active (checkIn <= today < checkOut)
+        const matches=snap.docs
+          .map(d=>({id:d.id,...d.data()}))
+          .filter(r=>{
+            const ci=r.checkin||r.checkIn||'';
+            const co=r.checkout||r.checkOut||'';
+            return ci&&co&&ci<=today&&co>today;
+          })
+          .sort((a,b)=>((a.checkin||a.checkIn||'')<(b.checkin||b.checkIn||''))?-1:1);
+        activeReservation=matches[0]||null;
+        renderTiles();
+      }
+    );
+  }
 }
 
 function renderTiles(){
@@ -498,9 +544,46 @@ window.openPage=function(type){
 
   if(type==='checkin'){
     const embed=ytEmbed(d.videoUrl||'');
-    body=(d.doorCode?`<div class="section-title">${t('dc')}</div>
-    <div class="code-box"><div class="code-lbl">${t('dc')}</div><div class="code-val" id="door-code-val">${esc(d.doorCode)}</div>
-    <button class="code-copy" onclick="copySth('${esc(d.doorCode)}',this)">${t('cp')}</button></div>`:'')
+    // ── Access code: Tuya password > legacy doorCode > contact host ──────────
+    const r=activeReservation;
+    let codeBlock='';
+    if(r&&r.tuyaPassword){
+      const validFrom=formatTbilisiTime(r.tuyaEffectiveTime);
+      const validTo  =formatTbilisiTime(r.tuyaInvalidTime);
+      codeBlock=`<div class="section-title">${t('ac')}</div>
+      <div class="code-box">
+        <div class="code-lbl">${t('ac')}</div>
+        <div class="code-val" id="door-code-val" style="font-size:2rem;letter-spacing:.15em;">${esc(r.tuyaPassword)}</div>
+        <button class="code-copy" onclick="copySth('${esc(r.tuyaPassword)}',this)">${t('cp')}</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);text-align:center;margin-top:6px;padding-bottom:4px;">
+        ${t('vf')} ${validFrom} ${t('vt')} ${validTo}
+      </div>`;
+    }else if(r&&r.tuyaError){
+      codeBlock=`<div class="section-title">${t('ac')}</div>
+      <div class="code-box" style="flex-direction:column;gap:12px;padding:1.25rem;">
+        <div style="font-size:14px;color:var(--text);text-align:center;line-height:1.5;">${t('cp2')}</div>
+        <a class="contact-btn" href="https://wa.me/${WA}" target="_blank" style="width:100%;justify-content:center;">
+          <div class="cb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div>
+          <div><div class="cb-title">WhatsApp</div></div>
+        </a>
+      </div>`;
+    }else if(d.doorCode){
+      // Legacy fallback: static door code stored in checkin_apartments
+      codeBlock=`<div class="section-title">${t('dc')}</div>
+      <div class="code-box"><div class="code-lbl">${t('dc')}</div><div class="code-val" id="door-code-val">${esc(d.doorCode)}</div>
+      <button class="code-copy" onclick="copySth('${esc(d.doorCode)}',this)">${t('cp')}</button></div>`;
+    }else{
+      codeBlock=`<div class="section-title">${t('ac')}</div>
+      <div class="code-box" style="flex-direction:column;gap:12px;padding:1.25rem;">
+        <div style="font-size:14px;color:var(--text);text-align:center;line-height:1.5;">${t('chc')}</div>
+        <a class="contact-btn" href="https://wa.me/${WA}" target="_blank" style="width:100%;justify-content:center;">
+          <div class="cb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div>
+          <div><div class="cb-title">WhatsApp</div></div>
+        </a>
+      </div>`;
+    }
+    body=codeBlock
     +(d.instructions?`<div class="section-title">${t('hi')}</div><div class="instr-text">${esc(d.instructions)}</div>`:'')
     +(()=>{if(!(d.photos||[]).length)return'';window._lbPhotos=d.photos;const caps=d.photoCaptions||[];return`<div class="section-title">Photos</div><div class="photos-scroll">${d.photos.map((u,i)=>{const cap=(caps[i]||'').trim();return cap?`<div style="border-radius:var(--rs);overflow:hidden;border:1px solid var(--border);margin-bottom:0;"><img src="${u}" onclick="window.openLightbox(window._lbPhotos,${i})" style="border-radius:0;display:block;width:100%;max-height:300px;object-fit:cover;cursor:pointer;"><div style="background:var(--surface2);padding:10px 12px;border-top:1px solid var(--border);"><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);display:block;margin-bottom:4px;">Instructions</span><div style="font-size:13px;color:var(--text);line-height:1.6;">${esc(cap)}</div></div></div>`:`<img src="${u}" onclick="window.openLightbox(window._lbPhotos,${i})">`;}).join('')}</div>`;})()
     +(embed?`<div class="section-title">Video</div><div class="video-wrap">${
