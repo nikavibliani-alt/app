@@ -327,9 +327,21 @@ window.openAptDrawer=function(aptId){
   document.getElementById('drawer-body').innerHTML=`
     <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;">Check-in details</div>
 
+    ${d.doorCode?`<!-- legacy doorCode preserved in Firestore but hidden from UI -->`:''}
+
     <div class="form-group">
-      <label class="form-label">Door / Smart lock code</label>
-      <input type="text" class="form-input" id="apt-doorcode" value="${esc(d.doorCode||'')}" placeholder="e.g. 1234 or #1234*">
+      <label class="form-label" style="display:flex;align-items:center;gap:8px;">
+        Tuya Device ID
+        <span style="font-size:12px;font-weight:400;">${d.tuyaDeviceId?'🟢 Tuya connected':'⚪ No lock linked'}</span>
+      </label>
+      <input type="text" class="form-input" id="apt-tuya-device-id"
+        value="${esc(d.tuyaDeviceId||'')}"
+        placeholder="e.g. bf9f9b096af5eb1043fik2">
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <button type="button" class="btn btn-sm" style="flex:1;"
+          onclick="window.testTuyaDevice('${aptId}')">🔓 Test offline code</button>
+      </div>
+      <div id="tuya-test-result-${aptId}" style="margin-top:6px;display:none;font-family:monospace;font-size:12px;padding:8px 10px;border-radius:6px;background:var(--surface2);"></div>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -442,6 +454,44 @@ window.uploadVideo=async function(aptId,input){
   }catch(e){toast('Video upload failed: '+e.message);}
 }
 
+window.testTuyaDevice=async function(aptId){
+  const deviceId=document.getElementById('apt-tuya-device-id')?.value.trim();
+  const resultEl=document.getElementById('tuya-test-result-'+aptId);
+  if(!deviceId){toast('Enter a Tuya Device ID first');return;}
+  if(!resultEl)return;
+  resultEl.style.display='block';
+  resultEl.style.background='var(--surface2)';
+  resultEl.textContent='⏳ Generating offline code…';
+  try{
+    // Get token via local proxy (must be running on localhost:3000)
+    const tr=await fetch('http://localhost:3000/v1.0/token?grant_type=1');
+    const td=await tr.json();
+    if(!td.success)throw new Error('Token failed: '+td.msg);
+    const token=td.result.access_token;
+    const nowSec=Math.floor(Date.now()/1000);
+    const pr=await fetch(`http://localhost:3000/v1.1/devices/${deviceId}/door-lock/offline-temp-password`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','access_token':token},
+      body:JSON.stringify({name:'AdminTest',type:'multiple',effective_time:nowSec,invalid_time:nowSec+3600})
+    });
+    const pd=await pr.json();
+    if(pd.success){
+      const code=pd.result?.offline_temp_password||pd.result?.password||'(see response)';
+      resultEl.style.background='#052e16';
+      resultEl.style.color='#86efac';
+      resultEl.innerHTML=`✅ Code: <strong style="font-size:18px;letter-spacing:.1em;">${code}</strong><br><span style="opacity:.7;font-size:11px;">valid 1h · device connected</span>`;
+    }else{
+      resultEl.style.background='#450a0a';
+      resultEl.style.color='#fca5a5';
+      resultEl.textContent=`✗ code=${pd.code}: ${pd.msg}`;
+    }
+  }catch(e){
+    resultEl.style.background='#450a0a';
+    resultEl.style.color='#fca5a5';
+    resultEl.textContent='✗ '+e.message+' (is local proxy running on :3000?)';
+  }
+};
+
 window.deletePhoto=async function(aptId,idx){
   if(!confirm('Delete this photo?'))return;
   const photos=(aptData[aptId]?.photos||[]).filter((_,i)=>i!==idx);
@@ -472,7 +522,8 @@ window.saveAptData=async function(aptId){
   });
 
   const data={
-    doorCode:document.getElementById('apt-doorcode')?.value.trim()||'',
+    tuyaDeviceId:document.getElementById('apt-tuya-device-id')?.value.trim()||'',
+    doorCode:aptData[aptId]?.doorCode||'', // preserve legacy value, no longer editable in UI
     wifiName:document.getElementById('apt-wifi-name')?.value.trim()||'',
     wifiPass:document.getElementById('apt-wifi-pass')?.value.trim()||'',
     instructions:document.getElementById('apt-instructions')?.value.trim()||'',
@@ -592,6 +643,11 @@ function checkLoaded(){loaded++;if(loaded>=2){document.getElementById('loading')
 onSnapshot(collection(db,'checkin_apartments'),snap=>{
   aptData={};
   snap.docs.forEach(d=>{aptData[d.id]=d.data();});
+  // Pre-fill tuyaDeviceId for apartment 0-4 if not already set
+  if(!aptData['0-4']?.tuyaDeviceId){
+    setDoc(doc(db,'checkin_apartments','0-4'),{tuyaDeviceId:'bf9f9b096af5eb1043fik2'},{merge:true})
+      .catch(()=>{});
+  }
   if(loaded>=2)render();else checkLoaded();
 });
 
