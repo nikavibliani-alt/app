@@ -483,15 +483,20 @@ function showHome(){
     onSnapshot(
       query(collection(db,'reservations'),where('roomCode','==',aptId)),
       snap=>{
+        console.log('[DEBUG] reservations snap size:', snap.size, 'aptId:', aptId);
+        console.log('[DEBUG] today:', today);
         // Filter to reservations that are active (checkIn <= today < checkOut)
         const matches=snap.docs
           .map(d=>({id:d.id,...d.data()}))
           .filter(r=>{
             const ci=r.checkin||r.checkIn||'';
             const co=r.checkout||r.checkOut||'';
-            return ci&&co&&ci<=today&&co>today;
+            const ok=ci&&co&&ci<=today&&co>today;
+            console.log('[DEBUG] reservation', r.id, 'ci=', ci, 'co=', co, 'tuyaPassword=', r.tuyaPassword, 'match=', ok);
+            return ok;
           })
           .sort((a,b)=>((a.checkin||a.checkIn||'')<(b.checkin||b.checkIn||''))?-1:1);
+        console.log('[DEBUG] activeReservation set to:', matches[0]||null);
         activeReservation=matches[0]||null;
         renderTiles();
       }
