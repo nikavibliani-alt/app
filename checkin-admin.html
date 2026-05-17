@@ -345,6 +345,16 @@ window.openAptDrawer=function(aptId){
     </div>
     <div class="form-row">
       <div class="form-group">
+        <label class="form-label">Check-in time</label>
+        <input type="time" class="form-input" id="apt-checkin-time" value="${esc(d.checkInTime||'14:00')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Check-out time</label>
+        <input type="time" class="form-input" id="apt-checkout-time" value="${esc(d.checkOutTime||'12:00')}">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
         <label class="form-label">WiFi name</label>
         <input type="text" class="form-input" id="apt-wifi-name" value="${esc(d.wifiName||'')}" placeholder="Network name">
       </div>
@@ -523,6 +533,8 @@ window.saveAptData=async function(aptId){
 
   const data={
     tuyaDeviceId:document.getElementById('apt-tuya-device-id')?.value.trim()||'',
+    checkInTime:document.getElementById('apt-checkin-time')?.value||'14:00',
+    checkOutTime:document.getElementById('apt-checkout-time')?.value||'12:00',
     doorCode:aptData[aptId]?.doorCode||'', // preserve legacy value, no longer editable in UI
     wifiName:document.getElementById('apt-wifi-name')?.value.trim()||'',
     wifiPass:document.getElementById('apt-wifi-pass')?.value.trim()||'',

@@ -239,6 +239,10 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
           <label class="form-label" id="t-contact-num">Your number / username <span style="color:var(--red);">*</span></label>
           <input type="tel" class="form-input" id="r-contact" placeholder="+995...">
         </div>
+        <div class="form-group">
+          <label class="form-label">Arrival date <span style="color:var(--red);">*</span></label>
+          <input type="date" class="form-input" id="r-arrival">
+        </div>
       </div>
 
       <div class="form-card">
@@ -363,20 +367,28 @@ function formatTbilisiTime(unixSec){
 function toast(msg,dur=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),dur);}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
+function checkInHour(){
+  // Read configured check-in hour from apt data (default 14)
+  const t=(aptData?.checkInTime||'14:00').split(':');
+  return parseInt(t[0],10)||14;
+}
+
 function isUnlocked(){
   if(!guestData)return false;
   if(guestData.manualUnlock)return true;
   const now=new Date();
   const tb=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Tbilisi'}));
-  return tb.getHours()>=14;
+  return tb.getHours()>=checkInHour();
 }
 
-function timeUntil2pm(){
+function timeUntilCheckin(){
   const now=new Date();
   const tb=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Tbilisi'}));
-  const target=new Date(tb);target.setHours(14,0,0,0);
+  const target=new Date(tb);target.setHours(checkInHour(),0,0,0);
   return Math.max(0,target-tb);
 }
+// Alias kept for any existing references
+const timeUntil2pm=timeUntilCheckin;
 
 function fmtCD(ms){
   const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=s%60;
@@ -435,21 +447,87 @@ window.handlePassport=function(input){
   reader.readAsDataURL(file);
 }
 
+// ── Reservation matching helpers ──────────────────────────────────────────────
+function levenshtein(a,b){
+  const m=[];
+  for(let i=0;i<=b.length;i++)m[i]=[i];
+  for(let j=0;j<=a.length;j++)m[0][j]=j;
+  for(let i=1;i<=b.length;i++){
+    for(let j=1;j<=a.length;j++){
+      m[i][j]=b.charAt(i-1)===a.charAt(j-1)?m[i-1][j-1]:Math.min(m[i-1][j-1]+1,m[i][j-1]+1,m[i-1][j]+1);
+    }
+  }
+  return m[b.length][a.length];
+}
+function normalizePhone(p){return(p||'').replace(/\D/g,'').slice(-7);}
+function nameMatch(input,resGuest){
+  const iw=(input||'').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const rw=(resGuest||'').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if(!iw.length||!rw.length)return false;
+  let exact=0,fuzzy=0;
+  for(const a of iw){for(const b of rw){if(a===b){exact++;break;}else if(levenshtein(a,b)<=2){fuzzy++;break;}}}
+  return exact>=2||(exact+fuzzy>=2);
+}
+
 window.submitRegistration=async function(){
-  const name=document.getElementById('r-name')?.value.trim();
-  const guests=parseInt(document.getElementById('r-guests')?.value)||1;
+  const name    =document.getElementById('r-name')?.value.trim();
+  const guests  =parseInt(document.getElementById('r-guests')?.value)||1;
   const nationality=document.getElementById('r-nationality')?.value.trim()||'';
-  const contact=document.getElementById('r-contact')?.value.trim()||'';
-  if(!name){alert('Please enter your full name');return;}
+  const contact =document.getElementById('r-contact')?.value.trim()||'';
+  const arrival =document.getElementById('r-arrival')?.value||'';
+  if(!name)   {alert('Please enter your full name');return;}
   if(!contact){alert('Please enter your WhatsApp or Telegram number');return;}
+  if(!arrival){alert('Please enter your arrival date');return;}
   if(!passportFile){alert('Please upload your passport or ID photo');return;}
+
   const btn=document.getElementById('submit-btn');
   btn.disabled=true;
-  document.getElementById('t-submit-btn').textContent='Uploading...';
+  document.getElementById('t-submit-btn').textContent='Verifying...';
+
   try{
+    // ── Match against reservations for this apt ──────────────────────────────
+    const {getDocs:_getDocs}=await import('https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js');
+    const resSnap=await _getDocs(query(collection(db,'reservations'),where('roomCode','==',aptId)));
+    let bestScore=0,bestRes=null;
+    resSnap.forEach(d=>{
+      const r={id:d.id,...d.data()};
+      const ci=r.checkin||r.checkIn||'';
+      const co=r.checkout||r.checkOut||'';
+      if(!ci||!co)return;
+      let score=0;
+      if(normalizePhone(contact)&&normalizePhone(r.phone||r.contact||'')&&
+         normalizePhone(contact)===normalizePhone(r.phone||r.contact||''))score++;
+      if(nameMatch(name,r.guest||r.guestName||''))score++;
+      if(arrival&&ci&&arrival===ci)score++;
+      if(score>bestScore){bestScore=score;bestRes=r;}
+    });
+
+    if(bestScore<2){
+      btn.disabled=false;
+      document.getElementById('t-submit-btn').textContent=t('sb');
+      // Show "can't verify" message with WhatsApp button
+      const errDiv=document.getElementById('reg-verify-error');
+      if(errDiv){errDiv.style.display='';return;}
+      const wrap=document.querySelector('.form-wrap');
+      const errEl=document.createElement('div');
+      errEl.id='reg-verify-error';
+      errEl.style.cssText='background:#450a0a;color:#fca5a5;border-radius:10px;padding:16px 20px;text-align:center;margin:12px 0;font-size:14px;line-height:1.6;';
+      errEl.innerHTML=`We couldn't verify your booking.<br><a href="https://wa.me/${WA}" target="_blank" style="color:#86efac;font-weight:600;display:inline-block;margin-top:8px;">Contact host on WhatsApp →</a>`;
+      wrap.appendChild(errEl);
+      return;
+    }
+
+    document.getElementById('t-submit-btn').textContent='Uploading...';
     const passportUrl=await uploadToCloudinary(passportFile,'maxela/guests/'+aptId);
     guestId=`${aptId}_${Date.now()}`;
-    const data={aptId,name,guests,nationality,contact,contactType,passportUrl,manualUnlock:false,submittedAt:serverTimestamp()};
+    const data={
+      aptId,name,guests,nationality,contact,contactType,passportUrl,
+      arrivalDate:arrival,
+      matchedReservationId:bestRes?.id||null,
+      matchScore:bestScore,
+      manualUnlock:false,
+      submittedAt:serverTimestamp()
+    };
     await setDoc(doc(db,'checkin_guests',guestId),data);
     guestData={...data,id:guestId};
     localStorage.setItem('maxela_g_'+aptId,guestId);
@@ -458,7 +536,7 @@ window.submitRegistration=async function(){
   }catch(e){
     btn.disabled=false;
     document.getElementById('t-submit-btn').textContent=t('sb');
-    alert('Failed. Please check your connection and try again.');
+    alert('Failed. Please check your connection and try again.\n'+e.message);
   }
 }
 
@@ -483,18 +561,23 @@ function showHome(){
     onSnapshot(
       query(collection(db,'reservations'),where('roomCode','==',aptId)),
       snap=>{
-        const matches=snap.docs
-          .map(d=>({id:d.id,...d.data()}))
-          .filter(r=>{
+        const all=snap.docs.map(d=>({id:d.id,...d.data()}));
+        // If guest has a matchedReservationId, pin to that reservation
+        const matchedId=guestData?.matchedReservationId;
+        if(matchedId){
+          activeReservation=all.find(r=>r.id===matchedId)||null;
+        }else{
+          // Fall back: active reservation preferring one with tuyaPassword
+          const matches=all.filter(r=>{
             const ci=r.checkin||r.checkIn||'';
             const co=r.checkout||r.checkOut||'';
             return ci&&co&&ci<=today&&co>today;
           });
-        // Prefer reservations with tuyaPassword; fall back to earliest checkIn
-        const withPassword=matches.filter(r=>r.tuyaPassword);
-        const sorted=(withPassword.length?withPassword:matches)
-          .sort((a,b)=>((a.checkin||a.checkIn||'')<(b.checkin||b.checkIn||''))?-1:1);
-        activeReservation=sorted[0]||null;
+          const withPassword=matches.filter(r=>r.tuyaPassword);
+          const sorted=(withPassword.length?withPassword:matches)
+            .sort((a,b)=>((a.checkin||a.checkIn||'')<(b.checkin||b.checkIn||''))?-1:1);
+          activeReservation=sorted[0]||null;
+        }
         renderTiles();
       }
     );
@@ -661,18 +744,18 @@ window.openPage=function(type){
 }
 
 function openLocked(){
-  const rem=timeUntil2pm();
+  const rem=timeUntilCheckin();
   openSubpage(t('tc'),`<div class="locked-card">
     <div class="lc-icon">🔒</div>
     <div class="lc-title">${t('lt')}</div>
-    <div class="lc-sub">${t('ls')}</div>
+    <div class="lc-sub">${t('ls').replace('2:00 PM',checkInHour()+':00').replace('14:00',checkInHour()+':00')}</div>
     <div style="font-size:11px;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">${t('cl')}</div>
     <div class="countdown" id="cd">${fmtCD(rem)}</div>
   </div>`);
   if(cdInterval)clearInterval(cdInterval);
   cdInterval=setInterval(()=>{
     const el=document.getElementById('cd');if(!el){clearInterval(cdInterval);return;}
-    const r=timeUntil2pm();el.textContent=fmtCD(r);
+    const r=timeUntilCheckin();el.textContent=fmtCD(r);
     if(r<=0||isUnlocked()){clearInterval(cdInterval);closeSP();window.openPage('checkin');}
   },1000);
 }
