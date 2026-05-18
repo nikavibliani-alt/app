@@ -367,27 +367,44 @@ function formatTbilisiTime(unixSec){
 function toast(msg,dur=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),dur);}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-function checkInHour(){
+function getCheckInHour(){
   // Read configured check-in hour from apt data (default 14)
-  const t=(aptData?.checkInTime||'14:00').split(':');
-  return parseInt(t[0],10)||14;
+  return parseInt((aptData?.checkInTime||'14:00').split(':')[0],10)||14;
 }
+// Alias used in locked-tile subtitle replacement
+const checkInHour=getCheckInHour;
 
 function isUnlocked(){
   if(!guestData)return false;
   if(guestData.manualUnlock)return true;
+
+  // Use active reservation dates so unlock persists for the full stay
+  const ci=activeReservation?.checkin||activeReservation?.checkIn||'';
+  const co=activeReservation?.checkout||activeReservation?.checkOut||'';
+  if(!ci||!co)return false;
+
   const now=new Date();
   const tb=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Tbilisi'}));
-  return tb.getHours()>=checkInHour();
+  const today=tb.toISOString().slice(0,10);
+  const hour=tb.getHours();
+  const ciHour=getCheckInHour();
+
+  if(today<ci)return false;                   // before check-in date — locked
+  if(today===ci&&hour<ciHour)return false;    // check-in day but before check-in hour
+  if(today>co)return false;                   // after checkout date — locked
+  return true;
 }
 
 function timeUntilCheckin(){
+  // Only meaningful on the check-in date itself; returns 0 on subsequent days
+  const ci=activeReservation?.checkin||activeReservation?.checkIn||'';
   const now=new Date();
   const tb=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Tbilisi'}));
-  const target=new Date(tb);target.setHours(checkInHour(),0,0,0);
+  const today=tb.toISOString().slice(0,10);
+  if(ci&&today!==ci)return 0;  // not check-in day — no countdown needed
+  const target=new Date(tb);target.setHours(getCheckInHour(),0,0,0);
   return Math.max(0,target-tb);
 }
-// Alias kept for any existing references
 const timeUntil2pm=timeUntilCheckin;
 
 function fmtCD(ms){
