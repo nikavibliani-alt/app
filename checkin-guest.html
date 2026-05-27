@@ -374,6 +374,25 @@ function getCheckInHour(){
 // Alias used in locked-tile subtitle replacement
 const checkInHour=getCheckInHour;
 
+function tbilisiToday(){
+  const parts=new Intl.DateTimeFormat('en-CA',{
+    timeZone:'Asia/Tbilisi',
+    year:'numeric',month:'2-digit',day:'2-digit'
+  }).formatToParts(new Date());
+  const y=parts.find(p=>p.type==='year').value;
+  const m=parts.find(p=>p.type==='month').value;
+  const d=parts.find(p=>p.type==='day').value;
+  return`${y}-${m}-${d}`;
+}
+
+function tbilisiHour(){
+  return parseInt(new Intl.DateTimeFormat('en-US',{
+    timeZone:'Asia/Tbilisi',
+    hour:'2-digit',
+    hour12:false
+  }).format(new Date()),10);
+}
+
 function isUnlocked(){
   if(!guestData)return false;
   if(guestData.manualUnlock)return true;
@@ -383,10 +402,8 @@ function isUnlocked(){
   const co=activeReservation?.checkout||activeReservation?.checkOut||'';
   if(!ci||!co)return false;
 
-  const now=new Date();
-  const tb=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Tbilisi'}));
-  const today=tb.toISOString().slice(0,10);
-  const hour=tb.getHours();
+  const today=tbilisiToday();
+  const hour=tbilisiHour();
   const ciHour=getCheckInHour();
 
   if(today<ci)return false;                   // before check-in date — locked
@@ -398,10 +415,10 @@ function isUnlocked(){
 function timeUntilCheckin(){
   // Only meaningful on the check-in date itself; returns 0 on subsequent days
   const ci=activeReservation?.checkin||activeReservation?.checkIn||'';
+  const today=tbilisiToday();
+  if(ci&&today!==ci)return 0;  // not check-in day — no countdown needed
   const now=new Date();
   const tb=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Tbilisi'}));
-  const today=tb.toISOString().slice(0,10);
-  if(ci&&today!==ci)return 0;  // not check-in day — no countdown needed
   const target=new Date(tb);target.setHours(getCheckInHour(),0,0,0);
   return Math.max(0,target-tb);
 }
