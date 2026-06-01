@@ -669,6 +669,7 @@ input.pcal-inline-input[type=number]::-webkit-outer-spin-button{-webkit-appearan
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,collection,doc,addDoc,updateDoc,deleteDoc,setDoc,getDoc,getDocs,query,where,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFunctions,httpsCallable}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -679,6 +680,8 @@ const fb=initializeApp({
   appId:"1:152940098906:web:bf245230d705c0a62c2f63"
 });
 const db=getFirestore(fb);
+const _fns=getFunctions(fb,'europe-west1');
+const _regenerateTuya=httpsCallable(_fns,'regenerateTuyaPassword');
 
 let properties=[];
 let currentPage='calendar';
@@ -1298,8 +1301,58 @@ function buildDisplayAllocation(){
       toAllocate.push({_firebaseId:res.id,checkIn:res.checkin||'',checkOut:res.checkout||'',room});
     }
   });
-  allocate(toAllocate).forEach(r=>{if(r._firebaseId)map[r._firebaseId]=r.assignedRoom;});
+  const overflowIds=new Set();
+  allocate(toAllocate).forEach(r=>{
+    if(r._firebaseId){
+      map[r._firebaseId]=r.assignedRoom;
+      if(r.overflow)overflowIds.add(r._firebaseId);
+    }
+  });
+  schedulePersistAllocations(map,overflowIds);
   return map;
+}
+
+// ── Persist auto-allocation results back to Firestore ────────────────────────
+let _persistAllocTimer=null;
+function schedulePersistAllocations(map,overflowIds){
+  clearTimeout(_persistAllocTimer);
+  _persistAllocTimer=setTimeout(()=>persistAllocations(map,overflowIds),1500);
+}
+async function persistAllocations(map,overflowIds){
+  if(!properties.length||!reservations.length)return;
+  const today=new Date().toISOString().slice(0,10);
+  let persisted=0,total=0;
+  for(const [resId,allocatedRoom] of Object.entries(map)){
+    const res=reservations.find(r=>r.id===resId);
+    if(!res)continue;
+    if(res.manualRoom===true)continue;
+    if(overflowIds.has(resId))continue;
+    if(!res.checkin)continue;
+    const existing=(res.roomCode||'').trim().toLowerCase();
+    if(existing===allocatedRoom)continue;
+    total++;
+    const prop=properties.find(p=>(p.shortCode||'').toLowerCase()===allocatedRoom);
+    const update={
+      roomCode:allocatedRoom,
+      propertyId:prop?.id||'',
+      manualRoom:false,
+      autoAllocated:true,
+      updatedAt:serverTimestamp()
+    };
+    console.log('[allocator] persisting',resId,'roomCode:',existing,'→',allocatedRoom);
+    try{
+      await updateDoc(doc(db,'reservations',resId),update);
+      persisted++;
+      if(res.checkin>=today){
+        _regenerateTuya({reservationId:resId})
+          .then(r=>console.log('[tuya] regenerated',resId,r))
+          .catch(e=>console.warn('[tuya] regen failed',resId,e.message));
+      }
+    }catch(e){
+      console.warn('[allocator] failed to persist',resId,':',e.message);
+    }
+  }
+  console.log('[allocator] persisted',persisted,'of',total,'allocations to Firestore');
 }
 
 const DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
