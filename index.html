@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Profit Split Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f5f5f7;--surface:#fff;--border:#e8e8ed;--border2:#d1d1d6;
+  --text:#1c1c1e;--muted:#6e6e73;--hint:#aeaeb2;
+  --green:#1a7f4b;--green-bg:#f0faf5;--green-border:#b7e8cc;
+  --red:#c0392b;--red-bg:#fff5f5;
+  --blue:#0071e3;--blue-bg:#f0f6ff;
+  --orange:#b35c00;--orange-bg:#fff8f0;--orange-border:#ffd6a0;
+  --purple:#5b4bbd;--purple-bg:#f1f0fc;--purple-border:#d6d2f5;
+  --teal:#0a7d68;--teal-bg:#e8f6f2;--teal-border:#b3e3d8;
+  --eur:#3c3489;--usd:#0071e3;--gel:#b35c00;
+  --r:12px;--rs:9px;--rsm:6px;
+}
+html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.loading-overlay{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:999;}
+.loading-logo{font-size:22px;font-weight:600;letter-spacing:-0.02em;}
+.loading-logo span{color:var(--green);}
+.spinner{width:22px;height:22px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.8s linear infinite;}
+.toast{position:fixed;bottom:1.75rem;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;font-size:13px;padding:8px 18px;border-radius:20px;z-index:9999;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;max-width:90vw;}
+.toast.show{opacity:1;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--hint);transition:background 0.3s;flex-shrink:0;}
+.sync-dot.synced{background:var(--green);}
+.sync-dot.syncing{background:#f0a500;animation:pulse 1s infinite;}
+.sync-dot.error{background:var(--red);}
+.sync-dot.local{background:var(--blue);}
+
+input[type=number],input[type=text],select{width:100%;border:1px solid var(--border);border-radius:var(--rs);font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--text);background:var(--bg);outline:none;-webkit-appearance:none;appearance:none;transition:border-color 0.15s;padding:7px 10px;height:38px;}
+input[type=text]{font-family:'Inter',sans-serif;}
+input:focus,select:focus{border-color:var(--green);background:#fff;}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23aeaeb2' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:26px;}
+
+.cur-tag{font-size:9px;font-family:'JetBrains Mono',monospace;font-weight:700;padding:2px 6px;border-radius:var(--rsm);}
+.cur-tag.eur{background:var(--purple-bg);color:var(--eur);}
+.cur-tag.usd{background:var(--blue-bg);color:var(--usd);}
+.cur-tag.gel{background:var(--orange-bg);color:var(--gel);}
+.hidden{display:none!important;}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;}
+.card-header{padding:0.6rem 1rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+.card-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;}
+.card-badge{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;}
+.card-body{padding:0.9rem 1rem;}
+
+/* 6 rate fields */
+.rate6{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;}
+.rate6 .ri{display:flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);}
+.rate6 .ri input{flex:1;min-width:0;height:34px;font-size:13px;}
+.rate6 .ri .lhs{white-space:nowrap;}
+.rate6 .ri .rhs{font-weight:600;color:var(--text);min-width:24px;}
+.rate-live-btn{font-size:11px;font-weight:600;padding:6px 13px;border:1.5px solid var(--green);border-radius:20px;background:transparent;color:var(--green);cursor:pointer;font-family:'Inter',sans-serif;margin-top:12px;}
+.rate-live-btn:hover{background:var(--green);color:#fff;}
+
+/* per-currency income */
+.inc-block{margin-bottom:14px;}
+.inc-block:last-child{margin-bottom:0;}
+.inc-label{font-size:13px;color:var(--text);font-weight:600;margin-bottom:7px;}
+.inc-label small{color:var(--hint);font-weight:400;font-size:11px;}
+.cur3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.cur3 .c3{display:flex;flex-direction:column;gap:4px;}
+.cur3 .c3 .t{font-size:9px;font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:0.04em;padding-left:2px;}
+.cur3 .c3 .t.eur{color:var(--eur);}.cur3 .c3 .t.usd{color:var(--usd);}.cur3 .c3 .t.gel{color:var(--gel);}
+.inc-sub{font-size:11px;color:var(--green);font-family:'JetBrains Mono',monospace;margin-top:6px;font-weight:500;}
+
+/* list items: expenses, advances */
+.item-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid var(--border);}
+.item-row:last-child{border-bottom:none;}
+.cat-badge{font-size:10px;font-weight:600;background:var(--bg);border:1px solid var(--border);border-radius:var(--rsm);padding:2px 7px;color:var(--muted);white-space:nowrap;}
+.tag-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0;}
+.tag-sh{background:var(--teal-bg);color:var(--teal);}
+.tag-fs{background:var(--purple-bg);color:var(--purple);}
+.tag-guja{background:var(--teal-bg);color:var(--teal);}
+.tag-devi{background:var(--purple-bg);color:var(--purple);}
+.tag-us{background:var(--orange-bg);color:var(--orange);}
+.tag-business{background:#ececec;color:#555;}
+.amt-cell{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;flex:1;text-align:right;}
+.note-cell{font-size:11px;color:var(--hint);font-style:italic;flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.del-btn{border:1px solid var(--border);border-radius:var(--rsm);cursor:pointer;font-size:13px;padding:2px 7px;line-height:1;background:var(--red-bg);color:var(--red);}
+.empty-msg{font-size:12px;color:var(--hint);text-align:center;padding:0.75rem 0;}
+.total-row{display:flex;justify-content:space-between;padding:6px 0 0;margin-top:3px;border-top:1px solid var(--border);font-size:12px;}
+.total-row .lbl{color:var(--muted);font-weight:500;}
+.total-row .val{font-family:'JetBrains Mono',monospace;font-weight:600;}
+
+.add-r1{display:grid;grid-template-columns:1fr 96px 1fr;gap:8px;margin-bottom:8px;}
+.add-r2{display:grid;grid-template-columns:1fr 1fr 110px;gap:8px;margin-bottom:8px;}
+.add-adv1{display:grid;grid-template-columns:1fr 96px 1fr 1fr;gap:8px;margin-bottom:8px;}
+.add-adv2{display:grid;grid-template-columns:1fr 110px;gap:8px;margin-bottom:8px;}
+.add-btn{height:38px;background:var(--green);color:#fff;border:none;border-radius:var(--rs);font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.add-btn:hover{opacity:0.9;}
+
+/* breakdown */
+.bk-row{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--border);gap:12px;}
+.bk-row:last-child{border-bottom:none;}
+.bk-row.section{padding-top:10px;border-top:1.5px solid var(--border2);margin-top:4px;}
+.bk-row.section .bk-l{font-weight:600;color:var(--text);}
+.bk-l{font-size:12px;color:var(--muted);flex:1;}
+.bk-v{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;text-align:right;white-space:nowrap;}
+.bk-v.pos{color:var(--green);}
+.bk-v.neg{color:var(--red);}
+.bk-v .gel-amt{color:var(--gel);}
+.bk-v .eur-amt{color:var(--eur);}
+.bk-v .usd-amt{color:var(--usd);}
+.bk-note{font-size:10.5px;color:var(--hint);padding:4px 0 2px 6px;font-style:italic;line-height:1.4;}
+
+/* person cards: native EUR + GEL split */
+.people-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;}
+.person-card{border-radius:var(--rs);padding:0.85rem 0.9rem;border:1px solid var(--border);}
+.pc-devi{background:var(--purple-bg);border-color:var(--purple-border);}
+.pc-guja{background:var(--teal-bg);border-color:var(--teal-border);}
+.pc-us{background:var(--orange-bg);border-color:var(--orange-border);}
+.pc-name{font-size:11px;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em;}
+.pc-devi .pc-name{color:var(--purple);}
+.pc-guja .pc-name{color:var(--teal);}
+.pc-us .pc-name{color:var(--orange);}
+.pc-amt{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;line-height:1.45;}
+.pc-amt .plus{color:var(--muted);font-weight:400;margin:0 2px;font-size:13px;}
+.pc-amt .eur-amt{color:var(--eur);}
+.pc-amt .gel-amt{color:var(--gel);}
+
+.tpl-header{padding:0.6rem 1rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.tpl-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;}
+.copy-btn{font-size:12px;font-weight:600;padding:5px 14px;border:1.5px solid var(--green);border-radius:20px;background:transparent;color:var(--green);cursor:pointer;font-family:'Inter',sans-serif;}
+.copy-btn:hover{background:var(--green);color:#fff;}
+.tpl-content{padding:0.85rem 1rem;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.85;color:var(--text);white-space:pre-wrap;word-break:break-word;}
+
+.sc-grid{display:grid;grid-template-columns:1fr 1fr;}
+.sc-item{padding:0.75rem 1rem;border-right:1px solid var(--border);}
+.sc-item:nth-child(even){border-right:none;}
+.sc-item:nth-child(n+3){border-top:1px solid var(--border);}
+.sc-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--hint);margin-bottom:3px;}
+.sc-val{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;}
+.sc-val.purple{color:var(--purple);}.sc-val.teal{color:var(--teal);}.sc-val.orange{color:var(--orange);}.sc-val.green{color:var(--green);}
+.sc-val .gel-amt{color:var(--gel);font-size:13px;font-weight:500;}
+.sc-val .plus{color:var(--muted);font-weight:400;font-size:12px;margin:0 1px;}
+.sc-footer{padding:0.55rem 1rem;border-top:1px solid var(--border);font-size:12px;color:var(--hint);text-align:center;}
+
+/* MOBILE */
+@media (max-width:767px){
+  html,body{overflow:hidden;}
+  .screen{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);will-change:transform;}
+  .screen.off-right{transform:translateX(100%);}
+  .screen.off-left{transform:translateX(-28%);}
+  .app-header{background:rgba(255,255,255,0.94);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 1rem;display:flex;align-items:center;gap:10px;flex-shrink:0;height:52px;}
+  .back-btn{width:48px;height:48px;display:flex;align-items:center;justify-content:center;margin-left:-12px;cursor:pointer;color:var(--green);font-size:26px;flex-shrink:0;-webkit-tap-highlight-color:transparent;}
+  .header-title{font-size:16px;font-weight:600;letter-spacing:-0.02em;flex:1;}
+  .header-title span{color:var(--green);}
+  .header-action{min-width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--green);font-size:14px;font-weight:600;-webkit-tap-highlight-color:transparent;}
+  .year-bar-m{background:var(--surface);border-bottom:1px solid var(--border);padding:0.5rem 1rem;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;-webkit-overflow-scrolling:touch;}
+  .year-bar-m::-webkit-scrollbar{display:none;}
+  .year-pill{flex-shrink:0;padding:6px 18px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .year-pill.active{background:var(--text);color:#fff;border-color:var(--text);}
+  .add-year-pill{flex-shrink:0;padding:6px 14px;border-radius:20px;border:1.5px dashed var(--border2);background:transparent;color:var(--hint);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;}
+  .scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:2rem;}
+  .summary-tap{margin:0.75rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .summary-tap-header{padding:0.7rem 1rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+  .summary-tap-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;}
+  .month-list-hdr{padding:0.85rem 1rem 0.4rem;font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.07em;}
+  .month-item{background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1rem;min-height:62px;cursor:pointer;-webkit-tap-highlight-color:transparent;gap:12px;}
+  .month-item:active{background:var(--bg);}
+  .mi-dot{width:10px;height:10px;border-radius:50%;background:var(--border2);flex-shrink:0;}
+  .mi-dot.done{background:var(--green);}
+  .mi-dot.current{background:var(--blue);box-shadow:0 0 0 3px rgba(0,113,227,0.15);}
+  .mi-body{flex:1;min-width:0;}
+  .mi-name{font-size:15px;font-weight:500;}
+  .mi-name.current-month{color:var(--blue);font-weight:600;}
+  .mi-sub{font-size:11px;color:var(--hint);margin-top:1px;}
+  .mi-profits{display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0;}
+  .mi-us{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--orange);}
+  .mi-dg{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--hint);}
+  .mi-chevron{color:var(--hint);font-size:18px;flex-shrink:0;}
+  .card{margin:0 1rem 12px;}
+  .card:first-child{margin-top:1rem;}
+  .calc-btn{display:block;width:calc(100% - 2rem);margin:0 1rem 12px;height:50px;background:var(--green);color:#fff;border:none;border-radius:var(--r);font-family:'Inter',sans-serif;font-size:15px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .calc-btn:active{opacity:0.85;}
+  input[type=number],input[type=text],select{height:46px;font-size:15px;padding:10px 12px;}
+  .cur3 .c3 select,.cur3 .c3 input{height:46px;}
+  .add-btn{height:46px;font-size:14px;}
+  .add-r1{grid-template-columns:1fr 90px;}
+  .add-r1 #f-exp-cat{grid-column:1/3;}
+  .add-adv1{grid-template-columns:1fr 90px;}
+  .add-adv1 #f-adv-rec,.add-adv1 #f-adv-src{grid-column:auto;}
+  .rate6{grid-template-columns:1fr;}
+  .rate6 .ri input{height:46px;font-size:15px;}
+  .desktop-only{display:none!important;}
+  .people-grid{grid-template-columns:1fr;}
+  .person-card{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
+  .pc-name{margin-bottom:0;}
+  .pc-amt{font-size:15px;text-align:right;}
+}
+/* DESKTOP */
+@media (min-width:768px){
+  html,body{overflow:hidden;}
+  .mobile-only{display:none!important;}
+  .screen{display:none!important;}
+  .topbar{height:50px;background:rgba(255,255,255,0.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.25rem;gap:14px;position:sticky;top:0;z-index:100;}
+  .logo{font-size:15px;font-weight:600;letter-spacing:-0.02em;}
+  .logo span{color:var(--green);}
+  .year-bar-d{display:flex;gap:6px;flex:1;overflow-x:auto;scrollbar-width:none;}
+  .year-bar-d::-webkit-scrollbar{display:none;}
+  .year-pill{flex-shrink:0;padding:5px 16px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;}
+  .year-pill.active{background:var(--text);color:#fff;border-color:var(--text);}
+  .add-year-pill{flex-shrink:0;padding:5px 14px;border-radius:20px;border:1.5px dashed var(--border2);background:transparent;color:var(--hint);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;}
+  .sync-wrap{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--hint);flex-shrink:0;}
+  .d-layout{display:flex;height:calc(100vh - 50px);}
+  .d-sidebar{width:180px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+  .d-sidebar-year{font-size:10px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:0.07em;padding:0.75rem 0.875rem 0.4rem;}
+  .d-sidebar-scroll{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+  .d-month-pill{display:flex;align-items:center;gap:8px;padding:0.55rem 0.875rem;cursor:pointer;border-left:2px solid transparent;transition:background 0.1s;}
+  .d-month-pill:hover{background:var(--bg);}
+  .d-month-pill.active{background:var(--green-bg);border-left-color:var(--green);}
+  .d-month-pill.done{border-left-color:var(--green-border);}
+  .d-month-pill.active.done{border-left-color:var(--green);}
+  .d-month-pill.current-month{border-left-color:var(--blue);}
+  .d-month-pill.active.current-month{border-left-color:var(--green);}
+  .d-mp-dot{width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0;}
+  .d-month-pill.done .d-mp-dot{background:var(--green-border);}
+  .d-month-pill.active .d-mp-dot{background:var(--green);}
+  .d-month-pill.current-month .d-mp-dot{background:var(--blue);}
+  .d-mp-name{font-size:13px;font-weight:500;color:var(--text);}
+  .d-month-pill.active .d-mp-name{color:var(--green);font-weight:600;}
+  .d-month-pill.current-month .d-mp-name{color:var(--blue);}
+  .d-month-pill.active.current-month .d-mp-name{color:var(--green);}
+  .d-mp-us{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--orange);margin-left:auto;flex-shrink:0;}
+  .d-sidebar-divider{height:1px;background:var(--border);margin:0.4rem 0;}
+  .d-summary-pill{display:flex;align-items:center;gap:8px;padding:0.55rem 0.875rem;cursor:pointer;border-left:2px solid transparent;transition:background 0.1s;}
+  .d-summary-pill:hover{background:var(--bg);}
+  .d-summary-pill.active{background:var(--blue-bg);border-left-color:var(--blue);}
+  .d-summary-pill .d-mp-name{font-size:12px;color:var(--blue);font-weight:600;}
+  .d-panel{flex:1;overflow-y:auto;padding:1.5rem;background:var(--bg);}
+  .d-panel-inner{max-width:780px;margin:0 auto;}
+  .d-panel-title{font-size:20px;font-weight:600;letter-spacing:-0.02em;margin-bottom:1.1rem;display:flex;align-items:center;gap:10px;}
+  .current-badge{font-size:11px;font-weight:600;background:var(--blue-bg);color:var(--blue);padding:3px 10px;border-radius:20px;}
+  .empty-panel{display:flex;align-items:center;justify-content:center;height:300px;color:var(--hint);font-size:14px;}
+  .calc-btn{width:100%;height:46px;background:var(--green);color:#fff;border:none;border-radius:var(--r);font-family:'Inter',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:12px;}
+  .calc-btn:hover{opacity:0.92;}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}
+  .two-col .card{margin-bottom:0;}
+  .two-col-wrap{margin-bottom:12px;}
+  .month-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .month-row:last-child{border-bottom:none;}
+  .month-row.current-row{background:var(--blue-bg);margin:0 -1rem;padding:8px 1rem;border-radius:var(--rsm);}
+}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading">
+  <div class="loading-logo">Profit <span>Split</span></div>
+  <div class="spinner"></div>
+  <div style="font-size:13px;color:var(--hint);">Loading...</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- MOBILE -->
+<div class="mobile-only">
+  <div class="screen off-right" id="m-screen-list">
+    <div class="app-header"><div class="header-title">Profit <span>Split</span></div><div class="sync-dot" id="m-sdot"></div><div class="header-action" id="m-btn-add-year">+ Year</div></div>
+    <div class="year-bar-m" id="m-year-bar"></div>
+    <div class="scroll-area" id="m-list-area"></div>
+  </div>
+  <div class="screen off-right" id="m-screen-detail">
+    <div class="app-header"><div class="back-btn" id="m-btn-back">&lsaquo;</div><div class="header-title" id="m-detail-title"></div><div class="sync-dot" id="m-sdot2"></div></div>
+    <div class="scroll-area" id="m-detail-area"></div>
+  </div>
+  <div class="screen off-right" id="m-screen-summary">
+    <div class="app-header"><div class="back-btn" id="m-btn-back2">&lsaquo;</div><div class="header-title" id="m-summary-title"></div></div>
+    <div class="scroll-area" id="m-summary-area"></div>
+  </div>
+</div>
+
+<!-- DESKTOP -->
+<div class="desktop-only" id="d-root">
+  <div class="topbar"><div class="logo">Profit <span>Split</span></div><div class="year-bar-d" id="d-year-bar"></div><div class="sync-wrap"><div class="sync-dot" id="d-sdot"></div><span id="d-sync-label">Loading</span></div></div>
+  <div class="d-layout">
+    <div class="d-sidebar"><div class="d-sidebar-year" id="d-sidebar-year"></div><div class="d-sidebar-scroll" id="d-sidebar-months"></div></div>
+    <div class="d-panel" id="d-panel"><div class="empty-panel">Loading...</div></div>
+  </div>
+</div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import{getFirestore,doc,setDoc,collection,getDocs,onSnapshot}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+/* ════ FIREBASE — syncs across devices.
+   Using your existing venu-tracker project, but Profit Split data lives
+   in its own collection ('profit-months') — never touches Venu data.    */
+const FB_CONFIG={
+  apiKey:"AIzaSyAgjH8GtMKoZCEWFDKhoI5wBDbWHh3tyEA",
+  authDomain:"venu-tracker.firebaseapp.com",
+  projectId:"venu-tracker",
+  storageBucket:"venu-tracker.firebasestorage.app",
+  messagingSenderId:"965938879237",
+  appId:"1:965938879237:web:0e8861e3124bd3878af56c"
+};
+let db=null, useFB=false;
+try{ if(!String(FB_CONFIG.apiKey).includes("PASTE")){ const fb=initializeApp(FB_CONFIG); db=getFirestore(fb); useFB=true; } }catch(e){useFB=false;}
+
+const COLL='profit-months';
+const LS_PREFIX='psplit_';
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const NOW=new Date();
+const CUR_MONTH=MONTHS[NOW.getMonth()];
+const CUR_YEAR=String(NOW.getFullYear());
+const IS_MOBILE=window.innerWidth<768;
+
+let activeYear=CUR_YEAR, activeView=null, mScreen='list', mKey=null;
+let cache={}, saveTimer=null, pendingSaves={};
+
+/* ── format ── */
+function n2(x){return Math.abs(x).toFixed(2);}
+function feur(x){return(x<0?'-':'')+'€'+n2(x);}
+function fusd(x){return(x<0?'-':'')+'$'+n2(x);}
+function fgel(x){return(x<0?'-':'')+n2(x)+' ₾';}
+function famt(x,c){return c==='EUR'?feur(x):c==='USD'?fusd(x):fgel(x);}
+function mkey(y,m){return m+'_'+y;}
+
+/* ── default + migration ── */
+const DEFAULT_RATES={ usdToEur:0.93, eurToUsd:1.08, usdToGel:2.67, gelToUsd:0.375, eurToGel:3.10, gelToEur:0.323 };
+function normalize(m){
+  if(!m)m={};
+  if(!m.rates){
+    // migrate from old gelPerEur / gelPerUsd if present
+    const oldEG=m.gelPerEur||DEFAULT_RATES.eurToGel;
+    const oldUG=m.gelPerUsd||DEFAULT_RATES.usdToGel;
+    m.rates={
+      usdToEur: +(oldUG/oldEG).toFixed(4),
+      eurToUsd: +(oldEG/oldUG).toFixed(4),
+      usdToGel: oldUG,
+      gelToUsd: +(1/oldUG).toFixed(4),
+      eurToGel: oldEG,
+      gelToEur: +(1/oldEG).toFixed(4)
+    };
+    delete m.gelPerEur; delete m.gelPerUsd; delete m.rateUsd; delete m.rateGel;
+  }
+  // ensure all 6 rates present
+  for(const k in DEFAULT_RATES){ if(m.rates[k]==null) m.rates[k]=DEFAULT_RATES[k]; }
+  ['shEur','shGel','shUsd','fsEur','fsGel','fsUsd'].forEach(k=>{if(m[k]==null)m[k]=0;});
+  // migrate old shAmt/fsAmt
+  if(m.shAmt){const c=(m.shCur||'EUR');m['sh'+c[0]+c.slice(1).toLowerCase()]=(m['sh'+c[0]+c.slice(1).toLowerCase()]||0)+m.shAmt;delete m.shAmt;delete m.shCur;}
+  if(m.fsAmt){const c=(m.fsCur||'EUR');m['fs'+c[0]+c.slice(1).toLowerCase()]=(m['fs'+c[0]+c.slice(1).toLowerCase()]||0)+m.fsAmt;delete m.fsAmt;delete m.fsCur;}
+  if(!m.expenses)m.expenses=[];
+  if(!m.advances)m.advances=[];
+  if(m.snapshot===undefined)m.snapshot=null;
+  return m;
+}
+function getM(k){return normalize(cache[k]?{...cache[k]}:{});}
+
+/* ── currency conversion using stored rates ── */
+function conv(amt, from, to, rates){
+  if(!amt)return 0;
+  if(from===to)return amt;
+  const key = from.toLowerCase()+'To'+to.charAt(0)+to.slice(1).toLowerCase();
+  return amt * (rates[key]||1);
+}
+/* ── shortfall resolution: if a bucket goes negative, cover from the other.
+   GEL short → spend EUR at eurToGel rate. EUR short → spend GEL at gelToEur. */
+function resolveShortfall(p, rates, log){
+  if(p.gel < -0.001){
+    const gelShort = -p.gel;
+    const eurCost = gelShort / rates.eurToGel;
+    p.eur -= eurCost;
+    p.gel = 0;
+    if(log) log.push({type:'gel-from-eur', gel: gelShort, eur: eurCost});
+  }
+  if(p.eur < -0.001){
+    const eurShort = -p.eur;
+    const gelCost = eurShort / rates.gelToEur;
+    p.gel -= gelCost;
+    p.eur = 0;
+    if(log) log.push({type:'eur-from-gel', eur: eurShort, gel: gelCost});
+  }
+}
+
+/* ── storage ── */
+function lsLoadAll(){try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith(LS_PREFIX)){try{cache[k.slice(LS_PREFIX.length)]=JSON.parse(localStorage.getItem(k));}catch(e){}}}}catch(e){}}
+function saveM(k,m){
+  cache[k]=m;
+  try{localStorage.setItem(LS_PREFIX+k,JSON.stringify(m));}catch(e){}
+  if(useFB){pendingSaves[k]=true;clearTimeout(saveTimer);setSyncDot('syncing');saveTimer=setTimeout(flush,1000);}
+  else setSyncDot('local');
+}
+async function flush(){const keys=Object.keys(pendingSaves);pendingSaves={};try{await Promise.all(keys.map(k=>setDoc(doc(db,COLL,k),cache[k])));setSyncDot('synced');}catch(e){setSyncDot('error');showToast('Sync failed — saved locally');}}
+function setSyncDot(s){document.querySelectorAll('.sync-dot').forEach(d=>d.className='sync-dot '+s);const lbl=document.getElementById('d-sync-label');if(lbl)lbl.textContent=s==='synced'?'Synced':s==='syncing'?'Saving…':s==='local'?'Local only':'Offline';}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+function getYears(){const s=new Set(Object.keys(cache).map(k=>k.split('_')[1]).filter(Boolean));s.add(CUR_YEAR);return Array.from(s).sort().reverse();}
+function isCurMonth(mon,yr){return mon===CUR_MONTH&&yr===CUR_YEAR;}
+
+/* ── rates UI ── */
+const RATE_IDS=[
+  ['r-ue','usdToEur','1 USD','EUR'],
+  ['r-eu','eurToUsd','1 EUR','USD'],
+  ['r-ug','usdToGel','1 USD','GEL'],
+  ['r-gu','gelToUsd','1 GEL','USD'],
+  ['r-eg','eurToGel','1 EUR','GEL'],
+  ['r-ge','gelToEur','1 GEL','EUR']
+];
+function wireRates(key,onSave){
+  RATE_IDS.forEach(([id,prop])=>{
+    const el=document.getElementById(id); if(!el)return;
+    el.oninput=()=>{
+      const v=parseFloat(el.value);
+      if(isNaN(v)||v<=0)return;
+      const m=getM(key); m.rates[prop]=v; saveM(key,m);
+      updateIncSubs(key);
+      if(onSave)onSave();
+    };
+  });
+  const lb=document.getElementById('r-live'); if(lb)lb.onclick=()=>fetchLiveRates(key);
+}
+
+/* ── income (per currency, like before) ── */
+function wireIncome(key){
+  ['sh-eur','sh-gel','sh-usd','fs-eur','fs-gel','fs-usd'].forEach(id=>{
+    const el=document.getElementById('f-'+id); if(el)el.oninput=()=>saveIncome(key);
+  });
+}
+function saveIncome(key){
+  const m=getM(key);
+  m.shEur=parseFloat(document.getElementById('f-sh-eur')?.value)||0;
+  m.shGel=parseFloat(document.getElementById('f-sh-gel')?.value)||0;
+  m.shUsd=parseFloat(document.getElementById('f-sh-usd')?.value)||0;
+  m.fsEur=parseFloat(document.getElementById('f-fs-eur')?.value)||0;
+  m.fsGel=parseFloat(document.getElementById('f-fs-gel')?.value)||0;
+  m.fsUsd=parseFloat(document.getElementById('f-fs-usd')?.value)||0;
+  saveM(key,m); updateIncSubs(key);
+}
+function updateIncSubs(key){
+  const m=getM(key); const r=m.rates;
+  const sh=document.getElementById('f-sh-sub'); const fs=document.getElementById('f-fs-sub');
+  const shEur=(m.shEur||0)+(m.shUsd||0)*r.usdToEur;
+  const fsEur=(m.fsEur||0)+(m.fsUsd||0)*r.usdToEur;
+  if(sh) sh.textContent = (m.shEur||m.shGel||m.shUsd) ? `→ €${(shEur).toFixed(2)} + ${(m.shGel||0).toFixed(2)}₾` : '';
+  if(fs) fs.textContent = (m.fsEur||m.fsGel||m.fsUsd) ? `→ €${(fsEur).toFixed(2)} + ${(m.fsGel||0).toFixed(2)}₾` : '';
+}
+
+/* ── expenses (unchanged) ── */
+const EXP_CATS=['Loan','Bills','Cleaning','Maintenance','Supplies','Commission','Other'];
+function addExp(key,onRender){
+  const amt=parseFloat(document.getElementById('f-exp-amt').value);
+  const cur=document.getElementById('f-exp-cur').value;
+  const pool=document.getElementById('f-exp-pool').value;
+  const catSel=document.getElementById('f-exp-cat').value;
+  const customEl=document.getElementById('f-exp-custom');
+  const custom=customEl?customEl.value.trim():'';
+  const cat=catSel==='Other'&&custom?custom:catSel;
+  const paidBy=document.getElementById('f-exp-paid')?.value||'guja';
+  if(!amt||amt<=0){alert('Enter a valid amount');return;}
+  if(catSel==='Other'&&!custom){alert('Type a category name');return;}
+  const m=getM(key); m.expenses.push({amt,cur,cat,pool,paidBy,id:Date.now()}); saveM(key,m);
+  document.getElementById('f-exp-amt').value='';
+  if(customEl){customEl.value='';const w=document.getElementById('f-exp-custom-wrap');if(w)w.style.display='none';}
+  onRender(key);
+}
+function delExp(key,id,onRender){const m=getM(key); m.expenses=m.expenses.filter(e=>e.id!==id); saveM(key,m); onRender(key);}
+function renderExpList(key,onDel){
+  const m=getM(key); const list=document.getElementById('f-exp-list'); const tot=document.getElementById('f-exp-total'); if(!list)return;
+  const exps=m.expenses||[];
+  // total in EUR-equivalent (USD→EUR)
+  const totalEur = exps.reduce((s,e)=>{const c=e.cur||'EUR'; const a=e.amt||0; if(c==='EUR')return s+a; if(c==='USD')return s+a*m.rates.usdToEur; return s;},0);
+  const totalGel = exps.filter(e=>(e.cur||'EUR')==='GEL').reduce((s,e)=>s+e.amt,0);
+  if(tot) tot.textContent = `€${totalEur.toFixed(2)} + ${totalGel.toFixed(2)}₾`;
+  if(!exps.length){list.innerHTML='<div class="empty-msg">No expenses yet</div>';return;}
+  list.innerHTML='';
+  exps.forEach(e=>{
+    const cur=e.cur||'EUR'; const pool=e.pool||'freedom'; const paidBy=e.paidBy||'guja';
+    const poolLbl=pool==='shartava'?'Shartava':'Freedom·Devi';
+    const poolCls=pool==='shartava'?'tag-sh':'tag-fs';
+    const paidLbl={guja:'Guja paid',devi:'Devi paid',us:'We paid',business:'Business'}[paidBy]||'Guja paid';
+    const paidCls={guja:'tag-guja',devi:'tag-devi',us:'tag-us',business:'tag-business'}[paidBy]||'tag-guja';
+    const row=document.createElement('div'); row.className='item-row';
+    row.innerHTML=`<span class="cat-badge">${e.cat}</span><span class="tag-badge ${poolCls}">${poolLbl}</span><span class="cur-tag ${cur.toLowerCase()}">${cur}</span><span class="amt-cell">${famt(e.amt,cur)}</span><span class="tag-badge ${paidCls}">${paidLbl}</span>`;
+    const del=document.createElement('button'); del.className='del-btn'; del.textContent='×'; del.onclick=()=>onDel(key,e.id);
+    row.appendChild(del); list.appendChild(row);
+  });
+  const tr=document.createElement('div'); tr.className='total-row';
+  tr.innerHTML=`<span class="lbl">Total</span><span class="val">€${totalEur.toFixed(2)} + ${totalGel.toFixed(2)}₾</span>`;
+  list.appendChild(tr);
+}
+
+/* ── advances/adjustments ── */
+function addAdv(key,onRender){
+  const amt=parseFloat(document.getElementById('f-adv-amt').value);
+  const cur=document.getElementById('f-adv-cur').value;
+  const rec=document.getElementById('f-adv-rec').value;
+  const src=document.getElementById('f-adv-src').value;
+  const note=document.getElementById('f-adv-note').value.trim();
+  if(!amt||amt<=0){alert('Enter a valid amount');return;}
+  if(rec===src){alert('Recipient and source must differ');return;}
+  const m=getM(key); m.advances.push({amt,cur,recipient:rec,source:src,note,id:Date.now()}); saveM(key,m);
+  document.getElementById('f-adv-amt').value='';
+  document.getElementById('f-adv-note').value='';
+  onRender(key);
+}
+function delAdv(key,id,onRender){const m=getM(key); m.advances=m.advances.filter(a=>a.id!==id); saveM(key,m); onRender(key);}
+function renderAdvList(key,onDel){
+  const m=getM(key); const list=document.getElementById('f-adv-list'); if(!list)return;
+  const advs=m.advances||[];
+  if(!advs.length){list.innerHTML='<div class="empty-msg">No advances or adjustments</div>';return;}
+  list.innerHTML='';
+  const nm={devi:'Devi',guja:'Guja',us:'Us',business:'Business'};
+  const cls={devi:'tag-devi',guja:'tag-guja',us:'tag-us',business:'tag-business'};
+  advs.forEach(a=>{
+    const cur=a.cur||'EUR';
+    const row=document.createElement('div'); row.className='item-row';
+    row.innerHTML=`<span class="tag-badge ${cls[a.source]||'tag-business'}">${nm[a.source]||a.source}</span><span style="font-size:11px;color:var(--hint);">→</span><span class="tag-badge ${cls[a.recipient]||'tag-devi'}">${nm[a.recipient]||a.recipient}</span><span class="cur-tag ${cur.toLowerCase()}">${cur}</span><span class="amt-cell">${famt(a.amt,cur)}</span><span class="note-cell">${a.note||''}</span>`;
+    const del=document.createElement('button'); del.className='del-btn'; del.textContent='×'; del.onclick=()=>onDel(key,a.id);
+    row.appendChild(del); list.appendChild(row);
+  });
+}
+function refreshLists(key){
+  renderExpList(key,(k,id)=>delExp(k,id,()=>refreshLists(k)));
+  renderAdvList(key,(k,id)=>delAdv(k,id,()=>refreshLists(k)));
+}
+window.toggleCustomExp=function(sel){const w=document.getElementById('f-exp-custom-wrap'); if(w)w.style.display=sel.value==='Other'?'block':'none';};
+
+/* ════ CORE CALC: per-currency settlement (EUR bucket + GEL bucket) ════ */
+function doCalc(key, saveSnap){
+  const m=getM(key); const r=m.rates;
+  const log=[]; // record conversion events for breakdown
+
+  // Income, USD folded into EUR
+  const sh={ eur:(m.shEur||0)+(m.shUsd||0)*r.usdToEur, gel:m.shGel||0 };
+  const fs={ eur:(m.fsEur||0)+(m.fsUsd||0)*r.usdToEur, gel:m.fsGel||0 };
+
+  // Expenses sorted by pool, currency folded USD→EUR
+  const ePool={ shartava:{eur:0,gel:0}, freedom:{eur:0,gel:0} };
+  for(const e of m.expenses){
+    const p=e.pool||'freedom'; const c=e.cur||'EUR'; const a=e.amt||0;
+    if(!ePool[p]) continue;
+    if(c==='GEL') ePool[p].gel += a;
+    else if(c==='USD') ePool[p].eur += a*r.usdToEur;
+    else ePool[p].eur += a;
+  }
+
+  // Shartava net (resolve any internal shortfall)
+  const shNet={ eur: sh.eur - ePool.shartava.eur, gel: sh.gel - ePool.shartava.gel };
+  resolveShortfall(shNet, r, log.shNet=[]);
+  // Split 50/50
+  const deviSh={ eur: shNet.eur/2, gel: shNet.gel/2 };
+  const gujaSh={ eur: shNet.eur/2, gel: shNet.gel/2 };
+
+  // Devi combined: + Freedom income, − Freedom expenses, resolve shortfall
+  const devi={ eur: deviSh.eur + fs.eur - ePool.freedom.eur, gel: deviSh.gel + fs.gel - ePool.freedom.gel };
+  log.devi=[]; resolveShortfall(devi, r, log.devi);
+  // Guja (no Freedom)
+  const guja={ eur: gujaSh.eur, gel: gujaSh.gel };
+  log.guja=[]; resolveShortfall(guja, r, log.guja);
+
+  // Our cuts (50% of Devi, 20% of Guja)
+  const usFromDevi={ eur: devi.eur*0.5, gel: devi.gel*0.5 };
+  const deviKeep={ eur: devi.eur*0.5, gel: devi.gel*0.5 };
+  const usFromGuja={ eur: guja.eur*0.2, gel: guja.gel*0.2 };
+  const gujaKeep={ eur: guja.eur*0.8, gel: guja.gel*0.8 };
+
+  // Person totals (post-split, pre-reimbursement)
+  const people={
+    devi:{ eur:deviKeep.eur, gel:deviKeep.gel },
+    guja:{ eur:gujaKeep.eur, gel:gujaKeep.gel },
+    us:  { eur:usFromDevi.eur+usFromGuja.eur, gel:usFromDevi.gel+usFromGuja.gel }
+  };
+
+  // Reimburse whoever paid each expense (GEL stays GEL; USD/EUR → EUR)
+  const reimb={ devi:{eur:0,gel:0}, guja:{eur:0,gel:0}, us:{eur:0,gel:0} };
+  for(const e of m.expenses){
+    const who=e.paidBy||'guja'; if(who==='business'||!reimb[who]) continue;
+    const c=e.cur||'EUR'; const a=e.amt||0;
+    if(c==='GEL') reimb[who].gel += a;
+    else if(c==='USD') reimb[who].eur += a*r.usdToEur;
+    else reimb[who].eur += a;
+  }
+  for(const w of ['devi','guja','us']){ people[w].eur+=reimb[w].eur; people[w].gel+=reimb[w].gel; }
+
+  // Advances/adjustments: deduct from recipient, credit source (Business credits nobody).
+  // If recipient's native currency is short, pay the deficit by converting the OTHER bucket;
+  // source receives in the bucket actually used to pay.
+  const advLog=[];
+  for(const a of (m.advances||[])){
+    const rec=a.recipient; const src=a.source;
+    if(!people[rec] && rec!=='business') continue;
+    let amt=a.amt||0; let cur=a.cur||'EUR';
+    if(amt<=0) continue;
+    if(cur==='USD'){ amt = amt*r.usdToEur; cur='EUR'; } // USD becomes EUR in buckets
+    if(rec==='business') continue;
+    const recPerson=people[rec];
+    if(cur==='EUR'){
+      const pay=Math.max(0, Math.min(recPerson.eur, amt));
+      recPerson.eur -= pay;
+      if(src!=='business' && people[src]) people[src].eur += pay;
+      const left = amt - pay;
+      if(left > 0.001){
+        const gelCost = left / r.gelToEur;
+        recPerson.gel -= gelCost;
+        if(src!=='business' && people[src]) people[src].gel += gelCost;
+        advLog.push({...a, paid:{eur:pay, gelConv:{eur:left, gel:gelCost}}});
+      } else {
+        advLog.push({...a, paid:{eur:pay}});
+      }
+    } else { // GEL
+      const pay=Math.max(0, Math.min(recPerson.gel, amt));
+      recPerson.gel -= pay;
+      if(src!=='business' && people[src]) people[src].gel += pay;
+      const left = amt - pay;
+      if(left > 0.001){
+        const eurCost = left / r.eurToGel;
+        recPerson.eur -= eurCost;
+        if(src!=='business' && people[src]) people[src].eur += eurCost;
+        advLog.push({...a, paid:{gel:pay, eurConv:{gel:left, eur:eurCost}}});
+      } else {
+        advLog.push({...a, paid:{gel:pay}});
+      }
+    }
+  }
+
+  // Final cleanup: tiny negatives from floating point → 0
+  for(const w in people){ if(Math.abs(people[w].eur)<0.005) people[w].eur=0; if(Math.abs(people[w].gel)<0.005) people[w].gel=0; }
+
+  // ── render person cards ──
+  function pcAmt(p){
+    const e=p.eur, g=p.gel;
+    if(Math.abs(e)<0.005 && Math.abs(g)<0.005) return '<span style="color:var(--hint);font-size:13px;">—</span>';
+    if(Math.abs(g)<0.005) return `<span class="eur-amt">${feur(e)}</span>`;
+    if(Math.abs(e)<0.005) return `<span class="gel-amt">${fgel(g)}</span>`;
+    return `<span class="eur-amt">${feur(e)}</span><span class="plus">+</span><span class="gel-amt">${fgel(g)}</span>`;
+  }
+  const ppl=document.getElementById('f-people');
+  if(ppl) ppl.innerHTML=`
+    <div class="person-card pc-devi"><div class="pc-name">Devi</div><div class="pc-amt">${pcAmt(people.devi)}</div></div>
+    <div class="person-card pc-guja"><div class="pc-name">Guja</div><div class="pc-amt">${pcAmt(people.guja)}</div></div>
+    <div class="person-card pc-us"><div class="pc-name">Our share</div><div class="pc-amt">${pcAmt(people.us)}</div></div>`;
+
+  // ── breakdown ──
+  const bc=document.getElementById('f-breakdown');
+  if(bc){
+    bc.innerHTML='';
+    const addR=(label,html,extraCls)=>{const d=document.createElement('div'); d.className='bk-row'+(extraCls?' '+extraCls:''); d.innerHTML=`<span class="bk-l">${label}</span><span class="bk-v">${html}</span>`; bc.appendChild(d);};
+    const addNote=(t)=>{const d=document.createElement('div'); d.className='bk-note'; d.textContent=t; bc.appendChild(d);};
+    const eg=(e,g,cls)=>{
+      const parts=[];
+      if(Math.abs(e)>=0.005) parts.push(`<span class="eur-amt${cls==='neg'?' neg':''}">${feur(e)}</span>`);
+      if(Math.abs(g)>=0.005) parts.push(`<span class="gel-amt${cls==='neg'?' neg':''}">${fgel(g)}</span>`);
+      if(!parts.length) return '<span style="color:var(--hint)">—</span>';
+      return parts.join(' <span style="color:var(--hint)">·</span> ');
+    };
+    addR('Shartava income', eg(sh.eur, sh.gel), 'section');
+    if(ePool.shartava.eur>0 || ePool.shartava.gel>0) addR('Shartava expenses', eg(-ePool.shartava.eur, -ePool.shartava.gel, 'neg'));
+    addR('Shartava net (after shortfall)', eg(shNet.eur, shNet.gel));
+    for(const c of (log.shNet||[])) addNote(c.type==='gel-from-eur' ? `GEL shortfall ${fgel(c.gel)} covered by ${feur(c.eur)} EUR (at 1€=${r.eurToGel}₾)` : `EUR shortfall ${feur(c.eur)} covered by ${fgel(c.gel)} GEL (at 1₾=${r.gelToEur}€)`);
+    addR('→ Devi ½', eg(deviSh.eur, deviSh.gel));
+    addR('→ Guja ½', eg(gujaSh.eur, gujaSh.gel));
+    addR('Freedom Square (Devi 100%)', eg(fs.eur, fs.gel), 'section');
+    if(ePool.freedom.eur>0 || ePool.freedom.gel>0) addR('Freedom Sq expenses', eg(-ePool.freedom.eur, -ePool.freedom.gel, 'neg'));
+    addR('Devi position before shortfall', eg(deviSh.eur+fs.eur-ePool.freedom.eur, deviSh.gel+fs.gel-ePool.freedom.gel));
+    for(const c of log.devi) addNote(c.type==='gel-from-eur' ? `Devi GEL short ${fgel(c.gel)} → covered by ${feur(c.eur)} (at 1€=${r.eurToGel}₾)` : `Devi EUR short ${feur(c.eur)} → covered by ${fgel(c.gel)} (at 1₾=${r.gelToEur}€)`);
+    addR('Devi resolved (before our cut)', eg(devi.eur, devi.gel));
+    addR('Our 50% of Devi', eg(usFromDevi.eur, usFromDevi.gel, 'pos'));
+    addR('Devi keeps (50%)', eg(deviKeep.eur, deviKeep.gel));
+    addR('Guja resolved', eg(guja.eur, guja.gel), 'section');
+    addR('Our 20% of Guja', eg(usFromGuja.eur, usFromGuja.gel, 'pos'));
+    addR('Guja keeps (80%)', eg(gujaKeep.eur, gujaKeep.gel));
+    if(reimb.guja.eur>0||reimb.guja.gel>0) addR('Guja reimbursed (fronted cash)', eg(reimb.guja.eur, reimb.guja.gel, 'pos'));
+    if(reimb.devi.eur>0||reimb.devi.gel>0) addR('Devi reimbursed (fronted cash)', eg(reimb.devi.eur, reimb.devi.gel, 'pos'));
+    if(reimb.us.eur>0||reimb.us.gel>0) addR('We reimbursed (fronted cash)', eg(reimb.us.eur, reimb.us.gel, 'pos'));
+    for(const a of advLog){
+      const nm={devi:'Devi',guja:'Guja',us:'Us',business:'Business'}[a.recipient];
+      const srcNm={devi:'Devi',guja:'Guja',us:'Us',business:'Business'}[a.source];
+      const note = a.note ? ` — ${a.note}` : '';
+      addR(`Adjustment: ${srcNm} → ${nm} (${famt(a.amt,a.cur||'EUR')})${note}`, '');
+      if(a.paid.eur) addNote(`  ${nm} -${feur(a.paid.eur)}, ${srcNm} +${feur(a.paid.eur)}`);
+      if(a.paid.gel) addNote(`  ${nm} -${fgel(a.paid.gel)}, ${srcNm} +${fgel(a.paid.gel)}`);
+      if(a.paid.gelConv) addNote(`  Shortfall: converted ${feur(a.paid.gelConv.eur)} → ${fgel(a.paid.gelConv.gel)}`);
+      if(a.paid.eurConv) addNote(`  Shortfall: converted ${fgel(a.paid.eurConv.gel)} → ${feur(a.paid.eurConv.eur)}`);
+    }
+    addR('Devi final', eg(people.devi.eur, people.devi.gel), 'section');
+    addR('Guja final', eg(people.guja.eur, people.guja.gel));
+    addR('Our final', eg(people.us.eur, people.us.gel));
+  }
+
+  // ── email/share template ──
+  let t=key.replace('_',' ')+' — Profit Split\n──────────────────────\n';
+  t+=`Rates: 1USD=${r.usdToEur}€ · 1EUR=${r.eurToGel}₾ · 1GEL=${r.gelToEur}€\n\n`;
+  const fmt=(p)=>`${Math.abs(p.eur)>=0.005?feur(p.eur):''}${(Math.abs(p.eur)>=0.005&&Math.abs(p.gel)>=0.005)?' + ':''}${Math.abs(p.gel)>=0.005?fgel(p.gel):''}`||'€0.00';
+  t+='SHARTAVA — '+feur(sh.eur)+(sh.gel?' + '+fgel(sh.gel):'')+'\n';
+  if(ePool.shartava.eur||ePool.shartava.gel) t+='  expenses: '+(ePool.shartava.eur?'-'+feur(ePool.shartava.eur):'')+(ePool.shartava.eur&&ePool.shartava.gel?' / ':'')+(ePool.shartava.gel?'-'+fgel(ePool.shartava.gel):'')+'\n';
+  t+='  net (50/50): each gets '+fmt(deviSh)+'\n\n';
+  t+='FREEDOM SQ (Devi) — '+feur(fs.eur)+(fs.gel?' + '+fgel(fs.gel):'')+'\n';
+  if(ePool.freedom.eur||ePool.freedom.gel) t+='  expenses: '+(ePool.freedom.eur?'-'+feur(ePool.freedom.eur):'')+(ePool.freedom.eur&&ePool.freedom.gel?' / ':'')+(ePool.freedom.gel?'-'+fgel(ePool.freedom.gel):'')+'\n';
+  t+='\nDevi resolved: '+fmt(devi)+'\n  − our 50%: '+fmt(usFromDevi)+'\n';
+  t+='Guja resolved: '+fmt(guja)+'\n  − our 20%: '+fmt(usFromGuja)+'\n';
+  if(reimb.guja.eur||reimb.guja.gel) t+='Guja reimbursed: '+fmt(reimb.guja)+'\n';
+  if(reimb.devi.eur||reimb.devi.gel) t+='Devi reimbursed: '+fmt(reimb.devi)+'\n';
+  if(reimb.us.eur||reimb.us.gel) t+='We reimbursed: '+fmt(reimb.us)+'\n';
+  if((m.advances||[]).length){
+    t+='\nADJUSTMENTS:\n';
+    for(const a of m.advances){
+      const nm={devi:'Devi',guja:'Guja',us:'Us',business:'Business'};
+      t+=`  ${nm[a.source]} → ${nm[a.recipient]}: ${famt(a.amt,a.cur||'EUR')}${a.note?' ('+a.note+')':''}\n`;
+    }
+  }
+  t+='\n══════════════════════\nDevi keeps: '+fmt(people.devi)+'\n';
+  t+='Guja gets: '+fmt(people.guja)+'\n';
+  t+='Our share: '+fmt(people.us)+'\n';
+  const tpl=document.getElementById('f-tpl'); if(tpl) tpl.textContent=t;
+
+  if(saveSnap){
+    m.snapshot={ deviEur:people.devi.eur, deviGel:people.devi.gel, gujaEur:people.guja.eur, gujaGel:people.guja.gel, usEur:people.us.eur, usGel:people.us.gel };
+    saveM(key,m); showToast('Calculated & saved ✓');
+  }
+}
+
+/* ── summary aggregation ── */
+function summaryData(yr){
+  let de=0,dg=0,ge=0,gg=0,ue=0,ug=0,done=0,rows='';
+  MONTHS.forEach(mon=>{
+    const s=getM(mkey(yr,mon)).snapshot;
+    if(s){ de+=s.deviEur||0; dg+=s.deviGel||0; ge+=s.gujaEur||0; gg+=s.gujaGel||0; ue+=s.usEur||0; ug+=s.usGel||0; done++; }
+  });
+  const fmtPair=(e,g)=>{
+    const p=[];
+    if(Math.abs(e)>=0.005) p.push(`<span style="color:var(--eur);">${feur(e)}</span>`);
+    if(Math.abs(g)>=0.005) p.push(`<span style="color:var(--gel);">${fgel(g)}</span>`);
+    return p.join(' <span style="color:var(--hint);">+</span> ')||'<span style="color:var(--hint);">—</span>';
+  };
+  MONTHS.forEach(mon=>{
+    const s=getM(mkey(yr,mon)).snapshot; const isCur=isCurMonth(mon,yr);
+    rows += s
+      ? `<div class="month-row${isCur?' current-row':''}"><span style="color:var(--muted);font-weight:500;min-width:80px;">${mon}${isCur?' 📍':''}</span><div style="display:flex;gap:12px;font-family:'JetBrains Mono',monospace;font-size:11.5px;align-items:center;flex-wrap:wrap;justify-content:flex-end;"><span style="color:var(--purple);">${fmtPair(s.deviEur,s.deviGel)}</span><span style="color:var(--hint)">·</span><span style="color:var(--teal);">${fmtPair(s.gujaEur,s.gujaGel)}</span><span style="color:var(--hint)">·</span><span style="font-weight:600;">${fmtPair(s.usEur,s.usGel)}</span></div></div>`
+      : `<div class="month-row${isCur?' current-row':''}"><span style="color:var(--muted);">${mon}${isCur?' 📍':''}</span><span style="color:var(--hint);font-size:12px;">No data yet</span></div>`;
+  });
+  return{de,dg,ge,gg,ue,ug,done,rows};
+}
+
+/* ── markup builders ── */
+function ratesCardHTML(m){
+  const r=m.rates;
+  const inputs=RATE_IDS.map(([id,prop,lhs,rhsCur])=>{
+    return `<div class="ri"><span class="lhs">${lhs} =</span><input type="number" id="${id}" value="${r[prop]}" step="0.0001" min="0.0001" inputmode="decimal"><span class="rhs">${rhsCur}</span></div>`;
+  }).join('');
+  return `<div class="rate6">${inputs}</div><button class="rate-live-btn" id="r-live">↻ Use live rates as starting point</button>`;
+}
+function curRow(prefix,m){
+  return `<div class="cur3">
+    <div class="c3"><span class="t eur">EUR</span><input type="number" id="f-${prefix}-eur" value="${m[prefix+'Eur']||''}" min="0" inputmode="decimal" placeholder="0.00"></div>
+    <div class="c3"><span class="t gel">GEL</span><input type="number" id="f-${prefix}-gel" value="${m[prefix+'Gel']||''}" min="0" inputmode="decimal" placeholder="0.00"></div>
+    <div class="c3"><span class="t usd">USD</span><input type="number" id="f-${prefix}-usd" value="${m[prefix+'Usd']||''}" min="0" inputmode="decimal" placeholder="0.00"></div>
+  </div>`;
+}
+function incomeCardHTML(m){
+  return `
+    <div class="inc-block"><div class="inc-label">Shartava income <small>— split 50/50 Devi &amp; Guja</small></div>${curRow('sh',m)}<div class="inc-sub" id="f-sh-sub"></div></div>
+    <div class="inc-block"><div class="inc-label">Freedom Square income <small>— Devi 100%</small></div>${curRow('fs',m)}<div class="inc-sub" id="f-fs-sub"></div></div>`;
+}
+function expBodyHTML(){
+  return `<div class="add-r1">
+      <input type="number" id="f-exp-amt" min="0" inputmode="decimal" placeholder="Amount">
+      <select id="f-exp-cur"><option>EUR</option><option>GEL</option><option>USD</option></select>
+      <select id="f-exp-cat" onchange="toggleCustomExp(this)">${EXP_CATS.map(c=>`<option>${c}</option>`).join('')}</select>
+    </div>
+    <div id="f-exp-custom-wrap" style="display:none;margin-bottom:8px;"><input type="text" id="f-exp-custom" placeholder="Type category name"></div>
+    <div class="add-r2">
+      <select id="f-exp-pool"><option value="freedom">Freedom·Devi</option><option value="shartava">Shartava</option></select>
+      <select id="f-exp-paid"><option value="guja">Guja paid</option><option value="devi">Devi paid</option><option value="us">We paid</option><option value="business">Business</option></select>
+      <button class="add-btn" id="btn-add-exp">+ Add</button>
+    </div>
+    <div id="f-exp-list"></div>`;
+}
+function advBodyHTML(){
+  return `<div class="add-adv1">
+      <input type="number" id="f-adv-amt" min="0" inputmode="decimal" placeholder="Amount">
+      <select id="f-adv-cur"><option>EUR</option><option>GEL</option><option>USD</option></select>
+      <select id="f-adv-rec"><option value="devi">→ Devi</option><option value="guja">→ Guja</option><option value="us">→ Us</option></select>
+      <select id="f-adv-src"><option value="us">From: Us</option><option value="business">From: Business</option><option value="devi">From: Devi</option><option value="guja">From: Guja</option></select>
+    </div>
+    <div class="add-adv2">
+      <input type="text" id="f-adv-note" placeholder="Note (e.g. advance, debt settlement)">
+      <button class="add-btn" id="btn-add-adv">+ Add</button>
+    </div>
+    <div id="f-adv-list"></div>`;
+}
+function resultsHTML(m,copyBtnId){
+  return `<div id="f-results" class="${m.snapshot?'':'hidden'}">
+    <div class="people-grid" id="f-people"></div>
+    <div class="card"><div class="card-header"><span class="card-title">Breakdown — native EUR + GEL settlement</span></div><div class="card-body" id="f-breakdown"></div></div>
+    <div class="card"><div class="tpl-header"><span class="tpl-title">Share / message</span><button class="copy-btn" id="${copyBtnId}">Copy</button></div><div class="tpl-content" id="f-tpl"></div></div>
+  </div>`;
+}
+function wireCommon(key,calcBtnId,copyBtnId,afterCalc){
+  wireRates(key,()=>{if(getM(key).snapshot)doCalc(key,false);});
+  wireIncome(key);
+  document.getElementById('btn-add-exp').onclick=()=>addExp(key,()=>refreshLists(key));
+  document.getElementById('btn-add-adv').onclick=()=>addAdv(key,()=>refreshLists(key));
+  document.getElementById(calcBtnId).onclick=()=>{doCalc(key,true);document.getElementById('f-results').classList.remove('hidden');if(afterCalc)afterCalc();};
+  document.getElementById(copyBtnId).onclick=()=>navigator.clipboard.writeText(document.getElementById('f-tpl').textContent).then(()=>showToast('Copied!')).catch(()=>showToast('Copy failed'));
+  updateIncSubs(key); refreshLists(key);
+  if(getM(key).snapshot) doCalc(key,false);
+}
+
+/* ════ MOBILE ════ */
+function mShowScreen(name){const s=['list','detail','summary'];const nxt=s.indexOf(name);s.forEach((x,i)=>{document.getElementById('m-screen-'+x).className='screen'+(i<nxt?' off-left':i>nxt?' off-right':'');});mScreen=name;}
+function mGoBack(){mShowScreen('list');mRenderList();}
+function mAddYear(){const y=parseInt(prompt('Enter year:',parseInt(CUR_YEAR)+1));if(isNaN(y)||y<2000||y>2100){alert('Invalid year');return;}activeYear=String(y);mRenderYearBar();mRenderList();}
+function mRenderYearBar(){const bar=document.getElementById('m-year-bar');bar.innerHTML='';getYears().forEach(y=>{const b=document.createElement('button');b.className='year-pill'+(y===activeYear?' active':'');b.textContent=y;b.onclick=()=>{activeYear=y;mRenderYearBar();mRenderList();};bar.appendChild(b);});const a=document.createElement('button');a.className='add-year-pill';a.textContent='+ Year';a.onclick=mAddYear;bar.appendChild(a);}
+function mRenderList(){
+  const area=document.getElementById('m-list-area');area.innerHTML='';
+  const{de,dg,ge,gg,ue,ug,done}=summaryData(activeYear);
+  const sc=document.createElement('div');sc.className='summary-tap';
+  const usDisp = (Math.abs(ug)<0.005?feur(ue):feur(ue)+' + '+fgel(ug));
+  sc.innerHTML=`<div class="summary-tap-header"><span class="summary-tap-title">${activeYear} — tap for summary</span><span style="color:var(--hint);font-size:18px;">›</span></div>
+    <div class="sc-grid"><div class="sc-item"><div class="sc-label">Our total</div><div class="sc-val orange" style="font-size:14px;">${usDisp}</div></div><div class="sc-item"><div class="sc-label">Devi · Guja</div><div class="sc-val purple" style="font-size:12px;">${feur(de)}${dg?' + '+fgel(dg):''}<span style="color:var(--teal);"> · ${feur(ge)}${gg?' + '+fgel(gg):''}</span></div></div></div>
+    <div class="sc-footer">${done} of 12 months calculated</div>`;
+  sc.onclick=mOpenSummary;area.appendChild(sc);
+  const lbl=document.createElement('div');lbl.className='month-list-hdr';lbl.textContent='Months';area.appendChild(lbl);
+  const wrap=document.createElement('div');wrap.style='background:var(--surface);border-top:1px solid var(--border);';
+  MONTHS.forEach(mon=>{
+    const key=mkey(activeYear,mon);const s=getM(key).snapshot;const isCur=isCurMonth(mon,activeYear);
+    const row=document.createElement('div');row.className='month-item';
+    const usDisp=s?(Math.abs(s.usGel||0)<0.005?feur(s.usEur):feur(s.usEur)+' + '+fgel(s.usGel)):'';
+    row.innerHTML=`<div class="mi-dot${s?' done':isCur?' current':''}"></div><div class="mi-body"><div class="mi-name${isCur?' current-month':''}">${mon}${isCur?' 📍':''}</div><div class="mi-sub">${s?'Calculated':isCur?'Current month':'No data yet'}</div></div>${s?`<div class="mi-profits"><div class="mi-us">${usDisp}</div></div>`:''}<div class="mi-chevron">›</div>`;
+    row.onclick=()=>mOpenMonth(key,mon);wrap.appendChild(row);
+  });
+  area.appendChild(wrap);
+}
+function mOpenSummary(){
+  document.getElementById('m-summary-title').textContent=activeYear+' Summary';
+  const{de,dg,ge,gg,ue,ug,done,rows}=summaryData(activeYear);
+  const totEur=de+ge+ue, totGel=dg+gg+ug;
+  document.getElementById('m-summary-area').innerHTML=`
+    <div class="card" style="margin:1rem;"><div class="sc-grid">
+      <div class="sc-item"><div class="sc-label">Our total</div><div class="sc-val orange">${feur(ue)}${ug?'<span class="plus">+</span><span class="gel-amt">'+fgel(ug)+'</span>':''}</div></div>
+      <div class="sc-item"><div class="sc-label">Distributed</div><div class="sc-val green">${feur(totEur)}${totGel?'<span class="plus">+</span><span class="gel-amt">'+fgel(totGel)+'</span>':''}</div></div>
+      <div class="sc-item"><div class="sc-label">Devi total</div><div class="sc-val purple">${feur(de)}${dg?'<span class="plus">+</span><span class="gel-amt">'+fgel(dg)+'</span>':''}</div></div>
+      <div class="sc-item"><div class="sc-label">Guja total</div><div class="sc-val teal">${feur(ge)}${gg?'<span class="plus">+</span><span class="gel-amt">'+fgel(gg)+'</span>':''}</div></div>
+    </div><div class="sc-footer">${done} of 12 months calculated</div></div>
+    <div class="card" style="margin:0 1rem;"><div class="card-header"><span class="card-title">Month by month</span><span style="font-size:11px;color:var(--hint);">Devi · Guja · Us</span></div><div class="card-body">${rows}</div></div>`;
+  mShowScreen('summary');
+}
+function mOpenMonth(key,mon){
+  mKey=key;document.getElementById('m-detail-title').textContent=mon+(activeYear!==CUR_YEAR?' '+activeYear:'');
+  const m=getM(key);const isCur=key===mkey(CUR_YEAR,CUR_MONTH);
+  document.getElementById('m-detail-area').innerHTML=`
+    ${isCur?'<div style="background:var(--blue-bg);padding:8px 1rem;font-size:12px;font-weight:600;color:var(--blue);">📍 Current month</div>':''}
+    <div class="card"><div class="card-header"><span class="card-title">Conversion rates (all 6 directions)</span></div><div class="card-body">${ratesCardHTML(m)}</div></div>
+    <div class="card"><div class="card-header"><span class="card-title">Income</span></div><div class="card-body">${incomeCardHTML(m)}</div></div>
+    <div class="card"><div class="card-header"><span class="card-title">Expenses</span><span class="card-badge" id="f-exp-total" style="color:var(--red);">€0.00</span></div><div class="card-body">${expBodyHTML()}</div></div>
+    <div class="card"><div class="card-header"><span class="card-title">Advances &amp; adjustments</span></div><div class="card-body">${advBodyHTML()}</div></div>
+    <button class="calc-btn" id="m-btn-calc">Calculate profit split</button>
+    <div style="margin:0 1rem;">${resultsHTML(m,'m-btn-copy')}</div>
+    <div style="height:1.5rem;"></div>`;
+  wireCommon(key,'m-btn-calc','m-btn-copy',()=>{setTimeout(()=>document.getElementById('f-results').scrollIntoView({behavior:'smooth',block:'start'}),50);mRenderList();});
+  mShowScreen('detail');document.getElementById('m-detail-area').scrollTop=0;
+}
+
+/* ════ DESKTOP ════ */
+function dAddYear(){const y=parseInt(prompt('Enter year:',parseInt(CUR_YEAR)+1));if(isNaN(y)||y<2000||y>2100){alert('Invalid year');return;}activeYear=String(y);activeView=null;dRenderAll();document.getElementById('d-panel').innerHTML='<div class="empty-panel">Select a month</div>';}
+function dRenderAll(){dRenderYearBar();dRenderSidebar();}
+function dRenderYearBar(){const bar=document.getElementById('d-year-bar');bar.innerHTML='';getYears().forEach(y=>{const b=document.createElement('button');b.className='year-pill'+(y===activeYear?' active':'');b.textContent=y;b.onclick=()=>{activeYear=y;activeView=null;dRenderAll();dOpenCurrentMonth();};bar.appendChild(b);});const a=document.createElement('button');a.className='add-year-pill';a.textContent='+ Year';a.onclick=dAddYear;bar.appendChild(a);}
+function dRenderSidebar(){
+  document.getElementById('d-sidebar-year').textContent=activeYear;
+  const sb=document.getElementById('d-sidebar-months');sb.innerHTML='';
+  MONTHS.forEach(mon=>{
+    const key=mkey(activeYear,mon);const s=getM(key).snapshot;const isCur=isCurMonth(mon,activeYear);
+    const p=document.createElement('div');p.className='d-month-pill'+(s?' done':'')+(isCur?' current-month':'')+(activeView===key?' active':'');
+    const usShort = s ? (Math.abs(s.usGel||0)<0.005?feur(s.usEur):feur(s.usEur)+'+'+fgel(s.usGel).replace(' ','')) : '';
+    p.innerHTML=`<div class="d-mp-dot"></div><span class="d-mp-name">${mon.slice(0,3)}${isCur?' 📍':''}</span>${s?`<span class="d-mp-us">${usShort}</span>`:''}`;
+    p.onclick=()=>{activeView=key;dRenderSidebar();dRenderMonthPanel(key,mon);};sb.appendChild(p);
+  });
+  const div=document.createElement('div');div.className='d-sidebar-divider';sb.appendChild(div);
+  const sp=document.createElement('div');sp.className='d-summary-pill'+(activeView==='__sum'?' active':'');
+  sp.innerHTML='<div class="d-mp-dot" style="background:var(--blue-bg);border:1px solid var(--blue);"></div><span class="d-mp-name">Summary</span>';
+  sp.onclick=()=>{activeView='__sum';dRenderSidebar();dRenderSummary();};sb.appendChild(sp);
+}
+function dRenderSummary(){
+  const{de,dg,ge,gg,ue,ug,done,rows}=summaryData(activeYear);
+  const totEur=de+ge+ue, totGel=dg+gg+ug;
+  document.getElementById('d-panel').innerHTML=`<div class="d-panel-inner">
+    <div class="d-panel-title">${activeYear} — Summary</div>
+    <div class="card"><div class="sc-grid">
+      <div class="sc-item"><div class="sc-label">Our total</div><div class="sc-val orange">${feur(ue)}${ug?'<span class="plus">+</span><span class="gel-amt">'+fgel(ug)+'</span>':''}</div></div>
+      <div class="sc-item"><div class="sc-label">Distributed</div><div class="sc-val green">${feur(totEur)}${totGel?'<span class="plus">+</span><span class="gel-amt">'+fgel(totGel)+'</span>':''}</div></div>
+      <div class="sc-item"><div class="sc-label">Devi total</div><div class="sc-val purple">${feur(de)}${dg?'<span class="plus">+</span><span class="gel-amt">'+fgel(dg)+'</span>':''}</div></div>
+      <div class="sc-item"><div class="sc-label">Guja total</div><div class="sc-val teal">${feur(ge)}${gg?'<span class="plus">+</span><span class="gel-amt">'+fgel(gg)+'</span>':''}</div></div>
+    </div><div class="sc-footer">${done} of 12 months calculated</div></div>
+    <div class="card"><div class="card-header"><span class="card-title">Month by month</span><span style="font-size:11px;color:var(--hint);">Devi · Guja · Us</span></div><div class="card-body">${rows}</div></div>
+  </div>`;
+}
+function dRenderMonthPanel(key,mon){
+  const m=getM(key);const isCur=isCurMonth(mon,activeYear);
+  document.getElementById('d-panel').innerHTML=`<div class="d-panel-inner">
+    <div class="d-panel-title">${mon} ${activeYear}${isCur?'<span class="current-badge">Current month</span>':''}</div>
+    <div class="card"><div class="card-header"><span class="card-title">Conversion rates (all 6 directions — edit any)</span></div><div class="card-body">${ratesCardHTML(m)}</div></div>
+    <div class="card"><div class="card-header"><span class="card-title">Income (enter any currencies)</span></div><div class="card-body">${incomeCardHTML(m)}</div></div>
+    <div class="card"><div class="card-header"><span class="card-title">Expenses</span><span class="card-badge" id="f-exp-total" style="color:var(--red);">€0.00</span></div><div class="card-body">${expBodyHTML()}</div></div>
+    <div class="card"><div class="card-header"><span class="card-title">Advances &amp; adjustments</span></div><div class="card-body">${advBodyHTML()}</div></div>
+    <button class="calc-btn" id="d-btn-calc">Calculate profit split</button>
+    ${resultsHTML(m,'d-btn-copy')}
+  </div>`;
+  wireCommon(key,'d-btn-calc','d-btn-copy',()=>dRenderSidebar());
+}
+function dOpenCurrentMonth(){const key=mkey(CUR_YEAR,CUR_MONTH);activeView=key;dRenderSidebar();dRenderMonthPanel(key,CUR_MONTH);}
+
+/* ════ LIVE RATES — populate all 6 ════ */
+async function fetchLiveRates(key){
+  showToast('Fetching live rates…');
+  let eurToUsd=null, eurToGel=null;
+  try{
+    const res=await fetch('https://open.er-api.com/v6/latest/EUR'); const data=await res.json();
+    if(data.rates){ eurToUsd=data.rates.USD; eurToGel=data.rates.GEL; }
+  }catch(e){}
+  if(!eurToGel||!eurToUsd){
+    try{
+      const res=await fetch('https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json'); const data=await res.json();
+      const arr=data&&data[0]&&data[0].currencies;
+      const u=arr&&arr.find(c=>c.code==='USD'), e=arr&&arr.find(c=>c.code==='EUR');
+      if(u&&e){ const usdGel=u.rate/u.quantity, eurGel=e.rate/e.quantity; eurToGel=eurGel; eurToUsd=eurGel/usdGel; }
+    }catch(e){}
+  }
+  if(!eurToGel||!eurToUsd){ showToast('Could not fetch — enter rates manually'); return; }
+  const usdToGel = eurToGel/eurToUsd;
+  const m=getM(key);
+  m.rates={
+    usdToEur: +(1/eurToUsd).toFixed(4),
+    eurToUsd: +eurToUsd.toFixed(4),
+    usdToGel: +usdToGel.toFixed(4),
+    gelToUsd: +(1/usdToGel).toFixed(4),
+    eurToGel: +eurToGel.toFixed(4),
+    gelToEur: +(1/eurToGel).toFixed(4)
+  };
+  saveM(key,m);
+  RATE_IDS.forEach(([id,prop])=>{const el=document.getElementById(id); if(el)el.value=m.rates[prop];});
+  updateIncSubs(key);
+  if(m.snapshot) doCalc(key,false);
+  showToast('Live rates loaded — edit any to your exact bank rate');
+}
+
+/* ════ INIT ════ */
+async function init(){
+  lsLoadAll();
+  if(useFB){
+    setSyncDot('syncing');
+    try{const snap=await getDocs(collection(db,COLL));snap.forEach(d=>{cache[d.id]=d.data();});setSyncDot('synced');}
+    catch(e){setSyncDot('error');showToast('Cloud unavailable — using local data');}
+  }else{setSyncDot('local');}
+  document.getElementById('loading').style.display='none';
+  if(IS_MOBILE){
+    document.getElementById('m-btn-back').addEventListener('click',mGoBack);
+    document.getElementById('m-btn-back2').addEventListener('click',()=>mShowScreen('list'));
+    document.getElementById('m-btn-add-year').addEventListener('click',mAddYear);
+    mRenderYearBar();mRenderList();mOpenMonth(mkey(CUR_YEAR,CUR_MONTH),CUR_MONTH);mShowScreen('list');
+  }else{dRenderAll();dOpenCurrentMonth();}
+  if(useFB){
+    onSnapshot(collection(db,COLL),snap=>{
+      snap.docChanges().forEach(ch=>{if(ch.type==='modified'||ch.type==='added')cache[ch.doc.id]=ch.doc.data();});
+      if(IS_MOBILE)mRenderList();else dRenderSidebar();
+    });
+  }
+}
+init();
+</script>
+</body>
+</html>
