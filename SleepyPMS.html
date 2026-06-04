@@ -1344,9 +1344,15 @@ async function persistAllocations(map,overflowIds){
       await updateDoc(doc(db,'reservations',resId),update);
       persisted++;
       if(res.checkin>=today){
-        _regenerateTuya({reservationId:resId})
-          .then(r=>console.log('[tuya] regenerated',resId,r))
-          .catch(e=>console.warn('[tuya] regen failed',resId,e.message));
+        getDoc(doc(db,'checkin_apartments',allocatedRoom)).then(aptDoc=>{
+          if(!aptDoc.exists()||!(aptDoc.data()?.tuyaDeviceId)){
+            console.log('[tuya] skipped (no tuyaDeviceId for room)',allocatedRoom);
+            return;
+          }
+          _regenerateTuya({reservationId:resId})
+            .then(r=>console.log('[tuya] regenerated',resId,r))
+            .catch(e=>console.warn('[tuya] regen failed',resId,e.message));
+        }).catch(e=>console.warn('[tuya] apt lookup failed',allocatedRoom,e.message));
       }
     }catch(e){
       console.warn('[allocator] failed to persist',resId,':',e.message);
