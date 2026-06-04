@@ -72,10 +72,11 @@ DOWNLOAD_DIR = os.path.expanduser("~/minihotel_exports")
 # ---- Email (Gmail SMTP) ----------------------------------------
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 465                                       # SSL port
-SMTP_USER = "info@maxelaapartments.com"               # the sender's Gmail address
-SMTP_PASS = "jiup dyrf famd uapa"                     # Gmail APP PASSWORD (not your normal password!)
+SMTP_USER = os.environ.get('SMTP_USER', 'info@maxelaapartments.com')
+SMTP_PASS = os.environ.get('SMTP_PASS', '')
+EMAIL_TO  = os.environ.get('EMAIL_TO', 'info@maxelaapartments.com')
 SMTP_FROM = "info@maxelaapartments.com"
-SMTP_TO   = "info@maxelaapartments.com"               # where the report should land
+SMTP_TO   = EMAIL_TO
 
 # ---- Browser behavior ------------------------------------------
 HEADLESS = True
