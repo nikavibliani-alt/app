@@ -3062,6 +3062,7 @@ setTimeout(()=>{
   else if(currentPage==='properties')renderPropertiesPage();
 },5000);
 
+let pricingPropId;
 try{
   onSnapshot(collection(db,'properties'),(snap)=>{
     try{
