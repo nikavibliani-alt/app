@@ -60,7 +60,7 @@ tr:last-child td{border-bottom:none;} tr:hover td{background:#fafbfc;}
 
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js';
-import{getFirestore,collection,doc,addDoc,deleteDoc,getDocs,serverTimestamp}from'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
+import{getFirestore,collection,doc,setDoc,deleteDoc,getDocs,serverTimestamp}from'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
 
 const db=getFirestore(initializeApp({
   apiKey:'AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk',
@@ -390,15 +390,30 @@ window.doImport=async function(){
       log(`  ✓ Deleted ${snap.docs.length} reservations.`,'ok');
     }
 
+    log(`\nStep 1b — Loading properties for propertyId resolution…`,'info');
+    const propSnap=await getDocs(collection(db,'properties'));
+    const propByCode={};
+    propSnap.docs.forEach(d=>{
+      const sc=(d.data().shortCode||'').toLowerCase();
+      if(sc)propByCode[sc]=d.id;
+    });
+    log(`  Loaded ${propSnap.docs.length} properties (${Object.keys(propByCode).length} with shortCodes).`);
+
     log(`\nStep 2 — Importing ${READY_DATA.length} reservations…`,'info');
     const ts=serverTimestamp();
-    let count=0;
+    let count=0, propMissed=0, noId=0;
     for(const r of READY_DATA){
       const{_isMultiRoom,_rawRoom,...data}=r; // strip internal fields
-      await addDoc(collection(db,'reservations'),{...data,createdAt:ts,updatedAt:ts});
+      const docId=(data.reservationNumber||'').trim();
+      if(!docId){noId++;continue;}
+      const resolvedPropId=propByCode[(data.roomCode||'').toLowerCase()]||'';
+      if(!resolvedPropId)propMissed++;
+      await setDoc(doc(db,'reservations',docId),{...data,propertyId:resolvedPropId,updatedAt:ts},{merge:true});
       count++;
       if(count%15===0||count===READY_DATA.length) log(`  Imported ${count}/${READY_DATA.length}…`);
     }
+    if(noId>0)    log(`  ⚠ ${noId} reservation(s) skipped — missing reservationNumber.`,'warn');
+    if(propMissed>0) log(`  ⚠ ${propMissed} reservation(s) had no matching property shortCode — propertyId left empty.`,'warn');
 
     log(`\nStep 3 — Verifying…`,'info');
     const check=await getDocs(collection(db,'reservations'));
