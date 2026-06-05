@@ -30,5 +30,5 @@ jobs:
           python-version: '3.11'
       - run: pip install requests beautifulsoup4 cryptography
       - name: Setup service account
-        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/service_account.json
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' | base64 -d > /tmp/service_account.json
       - run: python3 housekeeper_sync.py
