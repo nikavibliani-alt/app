@@ -2,81 +2,83 @@
 MiniHotel Monthly Report Automation
 ====================================
 
-Logs into MiniHotel using requests + BeautifulSoup, navigates to the
-Reservations Query page, submits the export form, downloads the Excel
-file, and emails it via Gmail SMTP.
+Logs into MiniHotel, opens the date-range modal, enters target dates,
+triggers the report export, downloads the file, and emails it as an
+attachment via Gmail SMTP.
 
-No browser required — runs headless anywhere Python + pip work.
-SMTP_PASS must be set as an environment variable (Gmail App Password).
+Designed to run headless on Android Termux, triggered by MacroDroid.
+
+Setup steps are in setup.sh — read those first.
+
+Configure all CAPS variables below before running.
 """
 
-import os
+import asyncio
 import smtplib
 import ssl
 import sys
 import traceback
 from datetime import datetime, timedelta
 from email.message import EmailMessage
-from typing import Optional
+from pathlib import Path
 
-import requests
-from bs4 import BeautifulSoup
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
 
 
 # ================================================================
-# CONFIG
+# CONFIG — edit everything in this block
 # ================================================================
 
-PMS_BASE_URL  = "https://login.minihotel.cloud"
-PMS_LOGIN_URL = f"{PMS_BASE_URL}/login.aspx"
-HOTEL_CODE    = "freedo45"
-USERNAME      = "komp"
-PASSWORD      = "Katleti1"
+# ---- MiniHotel credentials -------------------------------------
+PMS_LOGIN_URL = "https://login.minihotel.cloud/login.aspx"
+HOTEL_CODE = "freedo45"
+USERNAME = "komp"
+PASSWORD = "Katleti1"
 
-# ---- Login form field names (from page source) -----------------
-LOGIN_HOTEL_FIELD    = "txt_hotel_code"
-LOGIN_USERNAME_FIELD = "txt_username"
-LOGIN_PASSWORD_FIELD = "txt_password"
-LOGIN_SUBMIT_FIELD   = "LoginButton"
+# ---- Login form selectors (inspect the login page) -------------
+LOGIN_USERNAME_SELECTOR = 'input[name="username"]'    # adjust to actual selector
+LOGIN_PASSWORD_SELECTOR = 'input[name="password"]'
+LOGIN_SUBMIT_SELECTOR   = 'button[type="submit"]'
 
-# ---- Reservations Query page -----------------------------------
-# Adjust path if MiniHotel redirects elsewhere after login
-QUERY_PATH = "/ReservationsQuery/ReservationsQuery.aspx"
+# ---- After login: how to get to the report page ----------------
+# Option A: URL is known
+REPORT_PAGE_URL = ""                                  # leave empty if you have to click through
 
-# ---- Export form field names (inspect Network tab to confirm) --
-# These are the POST body fields sent when clicking "Export to excel"
-EXPORT_DATE_FROM_FIELD = "dateFrom"
-EXPORT_DATE_TO_FIELD   = "dateTo"
-EXPORT_SUBMIT_FIELD    = "btnExportExcel"
-EXPORT_SUBMIT_VALUE    = "Export to excel"
+# Option B: click a menu item (used only if REPORT_PAGE_URL is empty)
+NAVIGATE_TO_REPORT_SELECTOR = 'a:has-text("Reports")' # menu item to click
 
-DATE_FORMAT  = "%d.%m.%Y"
-DAYS_FORWARD = 14
+# ---- The modal that needs to open ------------------------------
+TRIGGER_BUTTON_SELECTOR = 'button:has-text("Reservations Report")'  # button that opens the modal
+MODAL_CONTAINER_SELECTOR = '.modal.show, [role="dialog"]'           # the popup container
+
+# ---- Inside the modal ------------------------------------------
+START_DATE_INPUT = 'input[name="dateFrom"]'           # date inputs INSIDE the modal
+END_DATE_INPUT   = 'input[name="dateTo"]'
+SAVE_BUTTON_SELECTOR = 'button:has-text("Export")'    # the export/download button INSIDE the modal
+
+# Date format MiniHotel expects in those inputs.
+# Common formats: "%Y-%m-%d" (2026-06-30), "%d/%m/%Y" (30/06/2026), "%d.%m.%Y"
+DATE_FORMAT = "%d.%m.%Y"
+
+# How many days the export should cover
+DAYS_BACK    = 0       # include today (set to e.g. 7 if you want last week too)
+DAYS_FORWARD = 30      # 30 days into the future
 
 # ---- File download ---------------------------------------------
-DOWNLOAD_DIR = os.path.expanduser("~/minihotel_exports")
+DOWNLOAD_DIR = "/data/data/com.termux/files/home/minihotel-downloads"  # Termux home subdir
+# On a regular Linux/Mac: use something like "/tmp/minihotel" or "./downloads"
 
 # ---- Email (Gmail SMTP) ----------------------------------------
 SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 465
-SMTP_USER = os.environ.get("SMTP_USER", "info@maxelaapartments.com")
-SMTP_PASS = os.environ.get("SMTP_PASS", "")
-EMAIL_TO  = os.environ.get("EMAIL_TO", "info@maxelaapartments.com")
+SMTP_PORT = 465                                       # SSL port
+SMTP_USER = "info@maxelaapartments.com"               # the sender's Gmail address
+SMTP_PASS = "abcd efgh ijkl mnop"                     # Gmail APP PASSWORD (not your normal password!)
 SMTP_FROM = "info@maxelaapartments.com"
-SMTP_TO   = EMAIL_TO
+SMTP_TO   = "info@maxelaapartments.com"               # where the report should land
 
-
-# ================================================================
-# Helpers
-# ================================================================
-
-def hidden_fields(soup: BeautifulSoup) -> dict:
-    """Return all hidden <input> fields from the page (ASP.NET ViewState etc.)."""
-    return {
-        inp["name"]: inp.get("value", "")
-        for inp in soup.find_all("input", type="hidden")
-        if inp.get("name")
-    }
+# ---- Browser behavior ------------------------------------------
+HEADLESS = True
+DEFAULT_TIMEOUT_MS = 15_000                           # 15s for any single action
 
 
 # ================================================================
@@ -153,37 +155,39 @@ def run() -> dict:
 # Email
 # ================================================================
 
-def send_email(result: dict, error: Optional[str] = None) -> None:
+def send_email(result: dict, error: str | None = None) -> None:
     msg = EmailMessage()
 
     if error:
         msg["Subject"] = "[MiniHotel Sync] ❌ FAILED"
-        msg.set_content(
-            f"MiniHotel report automation failed.\n\nError:\n{error}\n"
+        body = (
+            f"MiniHotel monthly report automation failed.\n\n"
+            f"Error:\n{error}\n"
         )
+        msg.set_content(body)
     else:
-        msg["Subject"] = (
-            f"[MiniHotel Sync] ✅ Report "
-            f"{result['start']} → {result['end']}"
-        )
-        msg.set_content(
-            f"MiniHotel report exported successfully.\n\n"
+        msg["Subject"] = f"[MiniHotel Sync] ✅ Report {result['start']} → {result['end']}"
+        body = (
+            f"MiniHotel monthly report exported successfully.\n\n"
             f"Date range: {result['start']} → {result['end']}\n"
             f"File size:  {result['size_bytes']:,} bytes\n"
             f"Saved to:   {result['file']}\n"
         )
-        file_path = result["file"]
-        with open(file_path, "rb") as f:
+        msg.set_content(body)
+
+        # Attach the downloaded file
+        file_path = Path(result["file"])
+        with file_path.open("rb") as f:
             data = f.read()
         msg.add_attachment(
             data,
             maintype="application",
             subtype="octet-stream",
-            filename=os.path.basename(file_path),
+            filename=file_path.name,
         )
 
     msg["From"] = SMTP_FROM
-    msg["To"]   = SMTP_TO
+    msg["To"] = SMTP_TO
 
     ctx = ssl.create_default_context()
     with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx) as server:
@@ -197,7 +201,7 @@ def send_email(result: dict, error: Optional[str] = None) -> None:
 
 if __name__ == "__main__":
     try:
-        result = run()
+        result = asyncio.run(run())
         send_email(result)
         print(f"OK: {result}")
         sys.exit(0)
