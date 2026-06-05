@@ -1298,7 +1298,13 @@ function buildDisplayAllocation(){
       // Manually placed by drag-and-drop — skip allocation, lock to assigned room
       map[res.id]=room;
     }else{
-      toAllocate.push({_firebaseId:res.id,checkIn:res.checkin||'',checkOut:res.checkout||'',room});
+      const rc=(res.roomCode||'').trim().toLowerCase();
+      if(rc&&rc!=='unassigned'){
+        // Already has a roomCode — lock to it, don't re-allocate
+        map[res.id]=rc;
+      }else{
+        toAllocate.push({_firebaseId:res.id,checkIn:res.checkin||'',checkOut:res.checkout||'',room});
+      }
     }
   });
   const overflowIds=new Set();
