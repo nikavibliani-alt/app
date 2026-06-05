@@ -89,11 +89,9 @@ def run() -> dict:
     session = requests.Session()
     session.headers.update({"User-Agent": "Mozilla/5.0"})
 
-    # ---- 1. Load login page, grab hidden ASP.NET fields ------------
+    # Login
     resp = session.get(PMS_LOGIN_URL, timeout=30)
-    resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
-
     payload = hidden_fields(soup)
     payload.update({
         LOGIN_HOTEL_FIELD:    HOTEL_CODE,
@@ -101,74 +99,52 @@ def run() -> dict:
         LOGIN_PASSWORD_FIELD: PASSWORD,
         LOGIN_SUBMIT_FIELD:   "Login",
     })
-
-    # ---- 2. POST login ---------------------------------------------
     resp = session.post(PMS_LOGIN_URL, data=payload, timeout=30)
-    resp.raise_for_status()
-
     if "login.aspx" in resp.url.lower():
-        raise RuntimeError(
-            f"Login failed — still on login page. "
-            f"Check credentials or field names. URL: {resp.url}"
-        )
-
+        raise RuntimeError("Login failed")
     print("✅ Logged in")
-    logged_in_base = resp.url.rsplit("/", 1)[0]
 
-    # ---- 3. Navigate to Reservations Query -------------------------
-    query_url = logged_in_base + QUERY_PATH
-    resp = session.get(query_url, timeout=30)
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "html.parser")
-    print(f"✅ On Reservations Query page ({resp.url})")
+    # Export via API
+    date_from = datetime.now() - timedelta(days=30)
+    date_to   = datetime.now() + timedelta(days=14)
+    from_str  = date_from.strftime("%Y-%m-%d")
+    to_str    = date_to.strftime("%Y-%m-%d")
 
-    # ---- 4. Build export payload -----------------------------------
-    date_from = datetime.now()
-    date_to   = date_from + timedelta(days=DAYS_FORWARD)
-    from_str  = date_from.strftime(DATE_FORMAT)
-    to_str    = date_to.strftime(DATE_FORMAT)
+    export_payload = {
+        "searchBy": "Arrivals",
+        "from": from_str,
+        "to": to_str,
+        "reservationId": "",
+        "status": [],
+        "additionalFilters": [
+            {"id": "firstName", "value": ""},
+            {"id": "lastName", "value": ""},
+            {"id": "portalId", "value": ""},
+        ],
+        "additionalFields": {"user": True, "customFields": []}
+    }
 
-    payload = hidden_fields(soup)
-    payload.update({
-        EXPORT_DATE_FROM_FIELD: from_str,
-        EXPORT_DATE_TO_FIELD:   to_str,
-        EXPORT_SUBMIT_FIELD:    EXPORT_SUBMIT_VALUE,
-    })
-
-    print(f"⏳ Exporting {from_str} → {to_str} ...")
-
-    # ---- 5. POST export, stream download ---------------------------
-    resp = session.post(resp.url, data=payload, timeout=60, stream=True)
-    resp.raise_for_status()
-
-    content_type = resp.headers.get("Content-Type", "")
-    if "html" in content_type.lower():
-        snippet = BeautifulSoup(resp.text[:2000], "html.parser").get_text(" ", strip=True)
-        raise RuntimeError(
-            f"Export returned HTML instead of a file. "
-            f"Form field names may need updating.\n"
-            f"Page snippet: {snippet[:400]}"
-        )
-
-    filename = (
-        f"minihotel_{date_from.strftime('%Y%m%d')}"
-        f"_{date_to.strftime('%Y%m%d')}.xlsx"
+    resp = session.post(
+        "https://ssl20.minihotelpms.com/api/ReservationsQuery/Excel",
+        json=export_payload,
+        headers={"Content-Type": "application/json"},
+        timeout=60
     )
-    filepath = os.path.join(DOWNLOAD_DIR, filename)
+    resp.raise_for_status()
 
+    filename = f"minihotel_{date_from.strftime('%Y%m%d')}_{date_to.strftime('%Y%m%d')}.xlsx"
+    filepath = os.path.join(DOWNLOAD_DIR, filename)
     with open(filepath, "wb") as f:
-        for chunk in resp.iter_content(chunk_size=8192):
-            if chunk:
-                f.write(chunk)
+        f.write(resp.content)
 
     size = os.path.getsize(filepath)
     print(f"✅ Downloaded: {filepath} ({size:,} bytes)")
 
     return {
-        "ok":         True,
-        "start":      from_str,
-        "end":        to_str,
-        "file":       filepath,
+        "ok": True,
+        "start": from_str,
+        "end": to_str,
+        "file": filepath,
         "size_bytes": size,
     }
 
