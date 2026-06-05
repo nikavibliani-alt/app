@@ -237,6 +237,12 @@ body{
 .submit-btn{width:100%;height:52px;background:var(--ink);color:#fff;border:none;border-radius:var(--rs);font-family:var(--sans);font-size:15px;font-weight:600;cursor:pointer;transition:opacity 0.15s;}
 .submit-btn:hover{opacity:0.88;}
 .submit-btn:disabled{opacity:0.45;cursor:not-allowed;}
+.scan-status{margin-top:10px;padding:10px 14px;border-radius:10px;font-size:13px;font-weight:500;line-height:1.5;}
+.scan-status.scanning{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.04);color:#6e6b66;}
+.scan-status.scan-ok{display:flex;align-items:center;gap:8px;background:#f0fdf4;color:#166534;border:1px solid #86efac;}
+.scan-status.scan-warn{display:block;background:#fffbeb;color:#92400e;border:1px solid #fcd34d;}
+@keyframes scanSpin{to{transform:rotate(360deg);}}
+.scan-spinner{width:14px;height:14px;border:2px solid rgba(0,0,0,0.12);border-top-color:#3d6b5a;border-radius:50%;animation:scanSpin 0.8s linear infinite;flex-shrink:0;}
 
 /* ── LOCKED SCREEN ── */
 .locked-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:2.5rem 1.5rem;text-align:center;margin-bottom:1rem;}
@@ -402,6 +408,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         <img id="passport-preview">
       </div>
       <input type="file" id="passport-input" accept="image/*" capture="environment" style="display:none;" onchange="handlePassport(this)">
+      <div id="passport-scan-status" style="display:none;" class="scan-status"></div>
     </div>
 
     <button class="auth-cta" id="submit-btn" onclick="submitRegistration()">
@@ -496,6 +503,8 @@ const fb=initializeApp({
 });
 const db=getFirestore(fb);
 
+// Load Anthropic key from Firestore globals/config (set via Firebase console: anthropicKey field)
+(async function(){try{const cfg=await getDoc(doc(db,'globals','config'));if(cfg.exists())_anthropicKey=cfg.data().anthropicKey||'';}catch(e){})();
 
 const WA='995593000724';
 
@@ -515,6 +524,8 @@ const IS_CENTRE=['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3'].includes(aptId
 let lang='en';
 let contactType='wa';
 let passportFile=null;
+let passportScanResult=null;
+let _anthropicKey='';
 let guestId=null;
 let guestData=null;
 let aptData=null;
@@ -665,14 +676,80 @@ window.setContact=function(type){
 window.handlePassport=function(input){
   const file=input.files[0];if(!file)return;
   passportFile=file;
+  passportScanResult=null;
   const reader=new FileReader();
   reader.onload=e=>{
     const p=document.getElementById('passport-preview');
     p.src=e.target.result;p.style.display='block';
     document.getElementById('passport-zone').classList.add('has-photo');
     document.getElementById('t-passport-hint').textContent='Photo selected ✓';
+    scanPassport(file);
   };
   reader.readAsDataURL(file);
+}
+
+async function scanPassport(file){
+  const statusEl=document.getElementById('passport-scan-status');
+  if(!statusEl)return;
+  statusEl.style.display='';
+  statusEl.className='scan-status scanning';
+  statusEl.innerHTML='<span class="scan-spinner"></span><span>Verifying document...</span>';
+  try{
+    // Convert to base64
+    const base64=await new Promise((res,rej)=>{
+      const r=new FileReader();
+      r.onload=e=>res(e.target.result.split(',')[1]);
+      r.onerror=rej;
+      r.readAsDataURL(file);
+    });
+    // Fetch API key if not already loaded
+    let apiKey=_anthropicKey;
+    if(!apiKey){
+      const cfg=await getDoc(doc(db,'globals','config'));
+      if(cfg.exists())apiKey=cfg.data().anthropicKey||'';
+      if(apiKey)_anthropicKey=apiKey;
+    }
+    if(!apiKey){statusEl.style.display='none';return;} // key not configured — skip silently
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'x-api-key':apiKey,
+        'anthropic-version':'2023-06-01',
+        'content-type':'application/json',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:300,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:file.type||'image/jpeg',data:base64}},
+          {type:'text',text:'Look at this image. Is this a valid passport or government-issued ID document? Check: 1) Is it actually a passport/ID? 2) Are all expected fields visible (name, DOB, expiry, MRZ)? 3) Does it look unaltered? Reply in JSON: {"valid": true/false, "confidence": "high/medium/low", "reason": "...", "isPassport": true/false}'}
+        ]}]
+      })
+    });
+    const rdata=await resp.json();
+    const raw=rdata.content?.[0]?.text||'';
+    let result;
+    try{const m=raw.match(/\{[\s\S]*?\}/);result=JSON.parse(m?.[0]||'{}');}
+    catch(pe){result={valid:false,confidence:'low',reason:'Unable to parse result',isPassport:false};}
+    passportScanResult=result;
+    if(result.valid){
+      statusEl.className='scan-status scan-ok';
+      statusEl.innerHTML='<span>✓</span><span>Document looks good</span>';
+    }else{
+      statusEl.className='scan-status scan-warn';
+      const msgs={
+        en:"This doesn't look like a valid passport. Please upload a clear photo of your passport or national ID.",
+        ka:'ეს არ გამოიყურება ვალიდური პასპორტი. გთხოვთ ატვირთოთ პასპორტის ან პირადობის ფოტო.',
+        ru:'Это не похоже на действительный паспорт. Загрузите фото паспорта или удостоверения личности.',
+        ar:'هذا لا يبدو وثيقة سفر صالحة. يرجى تحميل صورة جواز سفرك أو بطاقة هوية.'
+      };
+      statusEl.textContent='⚠ '+(msgs[lang]||msgs.en);
+    }
+  }catch(e){
+    statusEl.style.display='none';
+    passportScanResult=null;
+  }
 }
 
 // ── Reservation matching helpers ──────────────────────────────────────────────
@@ -751,6 +828,7 @@ window.submitRegistration=async function(){
     guestId=`${aptId}_${Date.now()}`;
     const data={
       aptId,name,guests,nationality,contact,contactType,passportUrl,
+      passportScanResult:passportScanResult||null,
       arrivalDate:arrival,
       matchedReservationId:bestRes?.id||null,
       matchScore:bestScore,
