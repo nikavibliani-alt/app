@@ -1,0 +1,25 @@
+name: MiniHotel Sync
+
+on:
+  schedule:
+    - cron: '0 5,10,15,20 * * *'  # 9am, 2pm, 7pm, midnight Tbilisi (UTC+4)
+  workflow_dispatch:  # manual trigger
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Run export
+        env:
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+        run: python3 minihotel_monthly_report.py
