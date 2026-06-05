@@ -1288,6 +1288,7 @@ function buildDisplayAllocation(){
   const map={};
   const toAllocate=[];
   reservations.forEach(res=>{
+    if(res.manualRoom===true||res.manualRoom==='true')return;
     let room=(res.roomCode||'').trim().toLowerCase();
     if(!room&&res.propertyId){
       const prop=properties.find(p=>p.id===res.propertyId);
@@ -1341,7 +1342,6 @@ async function persistAllocations(map,overflowIds){
     const update={
       roomCode:allocatedRoom,
       propertyId:prop?.id||'',
-      manualRoom:false,
       autoAllocated:true,
       updatedAt:serverTimestamp()
     };
