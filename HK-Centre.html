@@ -231,15 +231,22 @@ function getNextCheckin(roomCode,afterDate){
 }
 
 function getDeferredRooms(date){
-  const prevDate=addDays(date,-1);
-  const prevDs=fmtDate(prevDate);
+  const ds=fmtDate(date);
   const result=[];
   ROOMS.forEach(room=>{
-    if(getCheckoutToday(room.code,date))return; // already in today's list
-    const prevCo=getCheckoutToday(room.code,prevDate);
-    if(!prevCo)return;
-    if(cleaningStatus[room.code+'_'+prevDs])return; // already done
-    result.push({room,checkout:prevCo,dateStr:prevDs});
+    if(getCheckoutToday(room.code,date))return; // has actual checkout today — in main list
+    if(getResForRoom(room.code,date).length)return; // occupied — new guest checked in, room was cleaned
+    // Most recent checkout strictly before today
+    const recent=reservations
+      .filter(r=>r.roomCode===room.code&&r.checkout<ds)
+      .sort((a,b)=>b.checkout.localeCompare(a.checkout))[0];
+    if(!recent)return;
+    // Only carry within a 14-day window
+    const daysAgo=(new Date(ds+'T00:00:00')-new Date(recent.checkout+'T00:00:00'))/86400000;
+    if(daysAgo<1||daysAgo>14)return;
+    // Skip if already marked done on the checkout date
+    if(cleaningStatus[room.code+'_'+recent.checkout])return;
+    result.push({room,checkout:recent,dateStr:recent.checkout});
   });
   return result;
 }
