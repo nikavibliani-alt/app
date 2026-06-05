@@ -1331,7 +1331,7 @@ async function persistAllocations(map,overflowIds){
   for(const [resId,allocatedRoom] of Object.entries(map)){
     const res=reservations.find(r=>r.id===resId);
     if(!res)continue;
-    if(res.manualRoom===true)continue;
+    if(res.manualRoom===true||res.manualRoom==='true')continue;
     if(overflowIds.has(resId))continue;
     if(!res.checkin)continue;
     const existing=(res.roomCode||'').trim().toLowerCase();
