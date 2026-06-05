@@ -394,8 +394,10 @@ function render(){
 
       let inBox='';
       if(nextRes){
+        const _cDateLabel=new Date(nextRes.checkin+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
         inBox=`<div class="time-box tb-in">
           <div class="tb-label">Check-in ${nextCheckinSameDay?'today':nextCheckinNextDay?'tomorrow':nextRes.checkin}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${_cDateLabel}</div>
           <div class="tb-time">${nextRes.checkinTime||'14:00'}</div>
           <div class="tb-guest">${nextRes.guest||'Guest'}</div>
         </div>`;
@@ -452,8 +454,10 @@ function render(){
       </div>`;
       let inBox='';
       if(nextRes){
+        const _cDateLabel=new Date(nextRes.checkin+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
         inBox=`<div class="time-box tb-in">
           <div class="tb-label">Check-in ${nextCheckinSameDay?'today':nextCheckinNextDay?'tomorrow':nextRes.checkin}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${_cDateLabel}</div>
           <div class="tb-time">${nextRes.checkinTime||'14:00'}</div>
           <div class="tb-guest">${nextRes.guest||'Guest'}</div>
         </div>`;

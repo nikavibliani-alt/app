@@ -526,9 +526,11 @@ function render(){
     let inBox='';
     if(nextRes){
       const whenLabel=nextCheckinSameDay?'TODAY':nextCheckinNextDay?'TOMORROW':nextRes.checkin;
+      const checkinDateLabel=new Date(nextRes.checkin+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
       inBox=`<div class="time-box tb-in${nextCheckinSameDay?' tb-urgent':''}">
         <div class="tb-label">Check-in</div>
         <div class="tb-when">${whenLabel}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${checkinDateLabel}</div>
         <div class="tb-time">${nextRes.checkinTime||'14:00'}</div>
         ${inGuests>0?`<div class="tb-count">👥 ${inGuests} arriving</div>`:''}
       </div>`;
@@ -581,9 +583,11 @@ function render(){
       let inBox='';
       if(nextRes){
         const whenLabel=nextCheckinSameDay?'TODAY':nextCheckinNextDay?'TOMORROW':nextRes.checkin;
+        const checkinDateLabel=new Date(nextRes.checkin+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
         inBox=`<div class="time-box tb-in${nextCheckinSameDay?' tb-urgent':''}">
           <div class="tb-label">Check-in</div>
           <div class="tb-when">${whenLabel}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${checkinDateLabel}</div>
           <div class="tb-time">${nextRes.checkinTime||'14:00'}</div>
           ${inGuests>0?`<div class="tb-count">👥 ${inGuests} arriving</div>`:''}
         </div>`;
