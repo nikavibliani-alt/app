@@ -74,7 +74,7 @@ def run():
     msg["From"] = SMTP_USER
     msg["To"] = EMAIL_TO
     msg["Subject"] = f"[MiniHotel Sync] Report {date_from} to {date_to}"
-    msg.attach(MIMEText(f"MiniHotel export.\n\nDate range: {date_from} to {date_to}\nFile size: {len(r3.content):,} bytes", "plain"))
+    msg.attach(MIMEText(f"MiniHotel export. Date range: {date_from} to {date_to}", "plain"))
 
     part = MIMEBase("application", "octet-stream")
     part.set_payload(r3.content)
