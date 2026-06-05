@@ -2,24 +2,33 @@ name: MiniHotel Sync
 
 on:
   schedule:
-    - cron: '0 5,10,15,20 * * *'  # 9am, 2pm, 7pm, midnight Tbilisi (UTC+4)
-  workflow_dispatch:  # manual trigger
+    - cron: '0 5,10,15,20 * * *'  # Export: 9am, 2pm, 7pm, midnight Tbilisi
+    - cron: '0 */3 * * *'          # Housekeeping: every 3 hours
+  workflow_dispatch:
 
 jobs:
   export:
+    if: github.event.schedule == '0 5,10,15,20 * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install requests beautifulsoup4 openpyxl
-
-      - name: Run export
-        env:
+      - run: pip install requests beautifulsoup4
+      - env:
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
         run: python3 minihotel_monthly_report.py
+
+  housekeeping:
+    if: github.event.schedule == '0 */3 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: pip install requests beautifulsoup4 cryptography
+      - name: Setup service account
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/service_account.json
+      - run: python3 housekeeper_sync.py
