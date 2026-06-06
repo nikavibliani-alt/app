@@ -146,6 +146,7 @@ textarea.form-input{height:auto;padding:10px;resize:vertical;line-height:1.5;}
   <button class="tab active" data-tab="apartments" onclick="switchTab('apartments')">Apartments</button>
   <button class="tab" data-tab="guests" onclick="switchTab('guests')">Guests</button>
   <button class="tab" data-tab="hkpins" onclick="switchTab('hkpins')">HK Pins</button>
+  <button class="tab" data-tab="hkschedule" onclick="switchTab('hkschedule')">HK Schedule</button>
 </div>
 
 <div class="main" id="main"></div>
@@ -207,6 +208,7 @@ const APARTMENTS=[
 
 let aptData={}; // Firebase data per apartment
 let guestData=[]; // All guest registrations
+let hkStatusData=[]; // hk_status entries
 let currentTab='apartments';
 let hkPinsData={shartava:'',centre:'',admin:''};
 let currentDrawerApt=null;
@@ -238,6 +240,7 @@ window.switchTab=function(tab){
 function render(){
   if(currentTab==='apartments') renderApartments();
   else if(currentTab==='hkpins') renderHkPins();
+  else if(currentTab==='hkschedule') renderHkSchedule();
   else renderGuests();
 }
 
@@ -678,6 +681,126 @@ window.viewGuest=function(guestId){
   openDrawer();
 }
 
+// ── HK SCHEDULE ──────────────────────────────────
+function renderHkSchedule(){
+  const todayStr=new Date().toISOString().split('T')[0];
+
+  // Build room lookup: id → display label
+  const roomLabel={};
+  APARTMENTS.forEach(a=>{roomLabel[a.id]=a.code+(a.name?' — '+a.name:'');});
+
+  // All known room IDs for the add-form dropdown
+  const roomOptions=APARTMENTS.map(a=>
+    `<option value="${esc(a.id)}">${esc(a.code+' — '+a.name)}</option>`
+  ).join('');
+
+  // Group hkStatusData by date, newest date first
+  const byDate={};
+  hkStatusData.forEach(entry=>{
+    const d=entry.date||entry.id?.split('_').slice(-1)[0]||'';
+    if(!d)return;
+    if(!byDate[d])byDate[d]=[];
+    byDate[d].push(entry);
+  });
+  const sortedDates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+
+  let html=`<div class="page">
+    <!-- Add entry form -->
+    <div class="card" style="margin-bottom:1.25rem;">
+      <div class="card-header">
+        <div class="card-title">➕ Add / Update Entry</div>
+      </div>
+      <div class="card-body">
+        <div class="form-row" style="grid-template-columns:1fr 1fr auto;align-items:end;gap:10px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Room</label>
+            <select class="form-input" id="hks-room">${roomOptions}</select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Date</label>
+            <input type="date" class="form-input" id="hks-date" value="${todayStr}">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <button class="btn btn-green" onclick="window.addHkEntry(true)" title="Mark this room as Done for the selected date">✓ Mark Done</button>
+            <button class="btn" onclick="window.addHkEntry(false)" title="Mark as pending/not yet cleaned">⬜ Mark Pending</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Entries list -->
+    <div class="section-title">hk_status entries (${hkStatusData.length} total)</div>`;
+
+  if(!hkStatusData.length){
+    html+=`<div style="text-align:center;padding:3rem;color:var(--hint);">
+      <div style="font-size:28px;margin-bottom:10px;">🧹</div>
+      <div style="font-size:14px;color:var(--muted);">No hk_status entries yet</div>
+    </div>`;
+  } else {
+    sortedDates.forEach(date=>{
+      const entries=byDate[date].sort((a,b)=>(a.roomCode||'').localeCompare(b.roomCode||''));
+      const isToday=date===todayStr;
+      const dateObj=new Date(date+'T00:00:00');
+      const dateLabel=dateObj.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+      html+=`<div class="card" style="margin-bottom:10px;">
+        <div class="card-header" style="background:${isToday?'var(--accent-bg)':'var(--surface2)'};border-bottom:1px solid var(--border);">
+          <div style="font-size:13px;font-weight:600;color:${isToday?'var(--accent)':'var(--text)'};">
+            ${isToday?'📅 Today — ':''}${dateLabel}
+          </div>
+          <div style="font-size:11px;color:var(--muted);">${entries.length} room${entries.length!==1?'s':''}</div>
+        </div>
+        <div style="padding:0;">`;
+      entries.forEach((entry,i)=>{
+        const rc=entry.roomCode||entry.id?.split('_')[0]||'?';
+        const label=roomLabel[rc]||rc;
+        const done=entry.done===true;
+        const cleaner=entry.cleaner||'';
+        const updatedAt=entry.updatedAt?.toDate?entry.updatedAt.toDate():null;
+        const updatedStr=updatedAt?updatedAt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'';
+        html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;${i>0?'border-top:1px solid var(--border);':''}">
+          <div style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;min-width:52px;">${esc(rc)}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(label)}</div>
+            ${cleaner||updatedStr?`<div style="font-size:11px;color:var(--hint);">${esc(cleaner)}${cleaner&&updatedStr?' · ':''}${updatedStr}</div>`:''}
+          </div>
+          <span style="font-size:12px;font-weight:600;padding:2px 10px;border-radius:10px;white-space:nowrap;
+            ${done?'background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);':'background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);'}">
+            ${done?'✓ Done':'⬜ Pending'}
+          </span>
+          <button class="btn btn-sm btn-red" onclick="window.deleteHkEntry('${esc(entry.id)}','${esc(rc)}','${esc(date)}')">Delete</button>
+        </div>`;
+      });
+      html+='</div></div>';
+    });
+  }
+
+  html+='</div>';
+  document.getElementById('main').innerHTML=html;
+}
+
+window.addHkEntry=async function(done){
+  const roomCode=(document.getElementById('hks-room')?.value||'').trim();
+  const date=(document.getElementById('hks-date')?.value||'').trim();
+  if(!roomCode||!date){toast('Select a room and date');return;}
+  const key=roomCode+'_'+date;
+  try{
+    await setDoc(doc(db,'hk_status',key),{
+      done,roomCode,date,
+      cleaner:'admin',
+      updatedAt:serverTimestamp()
+    });
+    toast(done?'Marked as Done ✓':'Marked as Pending');
+  }catch(e){toast('Failed: '+e.message);}
+};
+
+window.deleteHkEntry=async function(entryId,roomCode,date){
+  if(!confirm(`Delete hk_status entry for ${roomCode} on ${date}?\n\nThis will remove the cleaning record for this room/date.`))return;
+  try{
+    await deleteDoc(doc(db,'hk_status',entryId));
+    toast('Entry deleted ✓');
+  }catch(e){toast('Delete failed: '+e.message);}
+};
+
 // ── HK PINS ───────────────────────────────────────
 function renderHkPins(){
   const main=document.getElementById('main');
@@ -746,6 +869,11 @@ onSnapshot(collection(db,'checkin_guests'),snap=>{
 onSnapshot(collection(db,'hk_pins'),snap=>{
   snap.docs.forEach(d=>{if(d.id in hkPinsData)hkPinsData[d.id]=d.data().pin||'';});
   if(currentTab==='hkpins')render();
+});
+
+onSnapshot(collection(db,'hk_status'),snap=>{
+  hkStatusData=snap.docs.map(d=>({id:d.id,...d.data()}));
+  if(currentTab==='hkschedule')render();
 });
 
 setTimeout(()=>{document.getElementById('loading').style.display='none';render();},5000);
