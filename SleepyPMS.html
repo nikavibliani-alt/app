@@ -1140,20 +1140,15 @@ async function runIcalSync(silent = false) {
   const events = parseIcal(text);
   if (!events.length) { if (!silent) showToast('iCal: no events found'); return; }
 
-  // Load existing abashidze reservations from Firebase (by roomCode)
-  const snap = await getDocs(
-    query(collection(db, 'reservations'), where('roomCode', '==', ICAL_ROOM_CODE))
-  );
-  const existing = new Set(snap.docs.map(d => d.data().icalUid).filter(Boolean));
-
-  // Import only new events (by icalUid dedup)
+  // Import events — doc ID is "ical_<uid>" so re-runs are idempotent (setDoc with merge)
   const ts = serverTimestamp();
   let added = 0;
   for (const ev of events) {
-    if (existing.has(ev.uid)) continue;
     // Find property record for abashidze
     const prop = properties.find(p => (p.shortCode||'').toLowerCase() === ICAL_ROOM_CODE);
-    await addDoc(collection(db, 'reservations'), {
+    const docId = 'ical_' + ev.uid.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const isNew = !reservations.find(r => r.icalUid === ev.uid);
+    await setDoc(doc(db, 'reservations', docId), {
       guest:      ev.summary,
       checkin:    ev.checkin,
       checkout:   ev.checkout,
@@ -1164,9 +1159,11 @@ async function runIcalSync(silent = false) {
       currency:   'GEL',
       price:      0,
       manualRoom: true, // standalone — skip auto-allocation
-      createdAt:  ts,
       updatedAt:  ts,
-    });
+    }, { merge: true });
+    if (isNew) {
+      await setDoc(doc(db, 'reservations', docId), { createdAt: ts }, { merge: true });
+    }
     added++;
   }
   if (!silent) showToast(`iCal sync: ${added} new reservation${added===1?'':'s'} imported`);
@@ -1912,6 +1909,7 @@ window.openNewReservationModal=function(propId,dateStr){
   document.getElementById('res-modal-title').textContent='New Reservation';
   document.getElementById('res-guest').value='';
   document.getElementById('res-guests').value=1;
+  document.getElementById('res-resnum').value='';
   document.getElementById('res-notes').value='';
   document.getElementById('res-price').value='';
   document.getElementById('res-delete-btn').classList.add('hidden');
@@ -1940,6 +1938,7 @@ window.openEditRes=function(resId){
   document.getElementById('res-checkin').value=res.checkin||'';
   document.getElementById('res-checkout').value=res.checkout||'';
   document.getElementById('res-guests').value=res.guests||1;
+  document.getElementById('res-resnum').value=res.reservationNumber||'';
   document.getElementById('res-notes').value=res.notes||'';
   document.getElementById('res-price').value=res.price||'';
   document.getElementById('res-currency').value=res.currency||'USD';
@@ -2015,6 +2014,7 @@ window.saveReservation=async function(){
   // Derive roomCode from selected property so both fields stay in sync
   const selectedProp=properties.find(p=>p.id===propertyId);
   const roomCode=selectedProp?.shortCode||'';
+  const reservationNumber=(document.getElementById('res-resnum')?.value||'').trim();
   const data={
     guest,checkin,checkout,propertyId,roomCode,
     source:resSelectedSource,
@@ -2024,12 +2024,18 @@ window.saveReservation=async function(){
     notes:document.getElementById('res-notes').value.trim(),
     updatedAt:serverTimestamp()
   };
+  if(reservationNumber)data.reservationNumber=reservationNumber;
   const editId=document.getElementById('res-id').value;
   try{
     setSyncDot('syncing','Saving...');
     if(editId){
       await updateDoc(doc(db,'reservations',editId),data);
       showToast('Reservation updated ✓');
+    } else if(reservationNumber){
+      // Use reservationNumber as doc ID so it merges with email-parser / import docs
+      data.createdAt=serverTimestamp();
+      await setDoc(doc(db,'reservations',reservationNumber),data,{merge:true});
+      showToast('Reservation saved ✓');
     } else {
       data.createdAt=serverTimestamp();
       await addDoc(collection(db,'reservations'),data);
@@ -3184,6 +3190,10 @@ try{
             <option value="EUR">EUR</option>
           </select>
         </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reservation # <span style="font-weight:400;color:var(--muted);font-size:11px;">(from PMS — used as document ID)</span></label>
+        <input type="text" class="form-input" id="res-resnum" placeholder="e.g. 12345">
       </div>
       <div class="form-group">
         <label class="form-label">Notes</label>
