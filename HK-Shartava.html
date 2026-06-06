@@ -571,7 +571,7 @@ function render(){
 
   // Deferred (overdue) rooms from yesterday
   if(deferredRooms.length){
-    html+=`<div class="group-label" style="color:var(--red);">⚠ Overdue — not cleaned yesterday</div>`;
+    html+=`<div class="group-label">⚠ Deferred — not yet cleaned</div>`;
     deferredRooms.forEach(({room,checkout,dateStr})=>{
       const key=room.code+'_'+dateStr;
       const isDone=cleaningStatus[key]||false;
@@ -581,7 +581,11 @@ function render(){
       const outGuests=getGuestCount(checkout);
       const nextCheckinSameDay=nextRes&&nextRes.checkin===ds;
       const nextCheckinNextDay=nextRes&&nextRes.checkin===fmtDate(addDays(date,1));
-      if(isDone)sumDone++;else sumRed++;
+      const isUrgent=nextCheckinSameDay||nextCheckinNextDay;
+      const deferPriority=isUrgent?'red':'yellow';
+      const deferChip=isUrgent?'chip-red':'chip-yellow';
+      const deferLabel=isUrgent?'OVERDUE':'TODAY';
+      if(isDone)sumDone++;else if(isUrgent)sumRed++;else sumYellow++;
       const outBox=`<div class="time-box tb-out">
         <div class="tb-label">Checkout (${dateStr})</div>
         <div class="tb-time">${checkout?.checkoutTime||'12:00'}</div>
@@ -605,14 +609,14 @@ function render(){
         </div>`;
       }
       const beddingHtml=beddingAlert?`<div class="bedding-alert">${beddingAlert}</div>`:'';
-      html+=`<div class="task-card priority-red${isDone?' done-card':''}" data-key="${key}">
+      html+=`<div class="task-card priority-${isDone?'green':deferPriority}${isDone?' done-card':''}" data-key="${key}">
         <div class="card-top">
           <div class="priority-bar"></div>
           <div class="room-info">
             <div class="room-code">${room.code}</div>
             <div class="room-name">${room.name}</div>
           </div>
-          <div class="priority-chip ${isDone?'chip-done':'chip-red'}">${isDone?'Done ✓':'OVERDUE'}</div>
+          <div class="priority-chip ${isDone?'chip-done':deferChip}">${isDone?'Done ✓':deferLabel}</div>
         </div>
         <div class="times-row">${outBox}${inBox}</div>
         ${beddingHtml}

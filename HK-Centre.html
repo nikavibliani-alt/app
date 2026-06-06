@@ -445,7 +445,7 @@ function render(){
 
   // Deferred (overdue) rooms from yesterday
   if(deferredRooms.length){
-    html+=`<div class="group-label" style="color:var(--red);">⚠ Overdue — not cleaned yesterday</div>`;
+    html+=`<div class="group-label">⚠ Deferred — not yet cleaned</div>`;
     deferredRooms.forEach(({room,checkout,dateStr})=>{
       const key=room.code+'_'+dateStr;
       const done=cleaningStatus[key]||false;
@@ -453,7 +453,11 @@ function render(){
       const nextRes=getNextCheckin(room.code,date);
       const nextCheckinSameDay=nextRes&&nextRes.checkin===ds;
       const nextCheckinNextDay=nextRes&&nextRes.checkin===fmtDate(addDays(date,1));
-      if(done)sumDone++;else sumRed++;
+      const isUrgent=nextCheckinSameDay||nextCheckinNextDay;
+      const deferPriority=isUrgent?'red':'yellow';
+      const deferChip=isUrgent?'chip-red':'chip-yellow';
+      const deferLabel=isUrgent?'OVERDUE':'TODAY';
+      if(done)sumDone++;else if(isUrgent)sumRed++;else sumYellow++;
       const outBox=`<div class="time-box tb-out">
         <div class="tb-label">Checkout (${dateStr})</div>
         <div class="tb-time">${checkout?.checkoutTime||'12:00'}</div>
@@ -475,14 +479,14 @@ function render(){
         </div>`;
       }
       const cleanerOptions=CLEANERS.map(c=>`<option value="${c}"${assignedCleaner===c?' selected':''}>${c}</option>`).join('');
-      html+=`<div class="task-card priority-red${done?' done-card':''}">
+      html+=`<div class="task-card priority-${done?'green':deferPriority}${done?' done-card':''}">
         <div class="card-top">
           <div class="priority-bar"></div>
           <div class="room-info">
             <div class="room-code">${room.code}</div>
             <div class="room-name">${room.name}</div>
           </div>
-          <div class="priority-chip ${done?'chip-done':'chip-red'}">${done?'Done ✓':'OVERDUE'}</div>
+          <div class="priority-chip ${done?'chip-done':deferChip}">${done?'Done ✓':deferLabel}</div>
         </div>
         <div class="times-row">${outBox}${inBox}</div>
         <div class="card-footer">
