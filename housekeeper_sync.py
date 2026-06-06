@@ -124,8 +124,15 @@ room_data = json.loads(decoded[start:end])
 print(f'Got {len(room_data)} rooms')
 
 token = get_token()
-docs = fetch_reservations(token)
-print(f'Loaded {len(docs)} reservations')
+docs_raw = fetch_reservations(token)
+seen_ids = set()
+docs = []
+for d in docs_raw:
+    doc_id = d['name'].split('/')[-1]
+    if doc_id not in seen_ids:
+        seen_ids.add(doc_id)
+        docs.append(d)
+print(f'Loaded {len(docs_raw)} reservations ({len(docs)} unique)')
 
 today_str = datetime.now().strftime('%Y-%m-%d')
 name_index = {}
