@@ -220,7 +220,16 @@ function getResForRoom(roomCode,date){
 
 function getCheckoutToday(roomCode,date){
   const ds=fmtDate(date);
-  return reservations.find(r=>r.roomCode===roomCode&&r.checkout===ds);
+  const co=reservations.find(r=>r.roomCode===roomCode&&r.checkout===ds);
+  if(!co)return null;
+  // If another doc for the same stay (same check-in) has a later checkout, this one is stale
+  if(co.checkin&&reservations.some(r=>
+    r.id!==co.id&&
+    r.roomCode===roomCode&&
+    (r.checkin||'').slice(0,10)===co.checkin.slice(0,10)&&
+    r.checkout>ds
+  ))return null;
+  return co;
 }
 
 function getNextCheckin(roomCode,afterDate){
@@ -244,6 +253,13 @@ function getDeferredRooms(date){
       .filter(r=>r.roomCode===room.code&&r.checkout<todayDs)
       .sort((a,b)=>b.checkout.localeCompare(a.checkout))[0];
     if(!recent)return;
+    // Skip if this past checkout was superseded by an extension of the same stay
+    if(recent.checkin&&reservations.some(r=>
+      r.id!==recent.id&&
+      r.roomCode===room.code&&
+      (r.checkin||'').slice(0,10)===recent.checkin.slice(0,10)&&
+      r.checkout>recent.checkout
+    ))return;
     // Already cleaned on the checkout date — done, no rollover needed
     if(cleaningStatus[room.code+'_'+recent.checkout])return;
     result.push({room,checkout:recent,dateStr:recent.checkout});
