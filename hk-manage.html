@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>HK Schedule Manager</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242834;
+    --border: #2e3344;
+    --text: #e8eaf0;
+    --text2: #8b90a0;
+    --accent: #6c8cff;
+    --accent2: #4a6aef;
+    --green: #34d399;
+    --green-bg: rgba(52,211,153,0.12);
+    --red: #f87171;
+    --red-bg: rgba(248,113,113,0.12);
+    --orange: #fbbf24;
+    --orange-bg: rgba(251,191,36,0.12);
+    --today: #6c8cff;
+    --today-bg: rgba(108,140,255,0.08);
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+
+  .header h1 span { color: var(--accent); }
+
+  .location-toggle {
+    display: flex;
+    gap: 4px;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 3px;
+  }
+
+  .location-toggle button {
+    background: none;
+    border: none;
+    color: var(--text2);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .location-toggle button.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .days-container {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .day-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: border-color 0.2s;
+  }
+
+  .day-card.is-today {
+    border-color: var(--accent);
+    background: var(--today-bg);
+  }
+
+  .day-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .day-label {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .day-name {
+    font-size: 15px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .day-card.is-today .day-name { color: var(--accent); }
+
+  .day-date {
+    font-size: 13px;
+    color: var(--text2);
+    font-weight: 500;
+  }
+
+  .day-count {
+    font-size: 12px;
+    color: var(--text2);
+    background: var(--surface2);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+
+  .day-body {
+    padding: 10px 12px;
+    min-height: 48px;
+  }
+
+  .day-empty {
+    color: var(--text2);
+    font-size: 13px;
+    text-align: center;
+    padding: 14px 0;
+    font-style: italic;
+  }
+
+  .rooms-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .room-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 8px 7px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    position: relative;
+    transition: all 0.15s;
+    cursor: default;
+  }
+
+  .room-chip.done {
+    background: var(--green-bg);
+    border-color: rgba(52,211,153,0.25);
+    color: var(--green);
+  }
+
+  .room-chip .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--orange);
+    flex-shrink: 0;
+  }
+
+  .room-chip.done .status-dot { background: var(--green); }
+
+  .chip-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 4px;
+  }
+
+  .chip-btn {
+    background: none;
+    border: none;
+    color: var(--text2);
+    cursor: pointer;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    font-size: 14px;
+    transition: all 0.15s;
+  }
+
+  .chip-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+  .chip-btn.delete:hover { background: var(--red-bg); color: var(--red); }
+  .chip-btn.move:hover { background: rgba(108,140,255,0.15); color: var(--accent); }
+
+  .day-footer {
+    padding: 6px 12px 10px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .add-room-btn {
+    background: none;
+    border: 1px dashed var(--border);
+    color: var(--text2);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .add-room-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(108,140,255,0.06);
+  }
+
+  /* Move dropdown */
+  .move-dropdown {
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    z-index: 500;
+    min-width: 200px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+
+  .move-dropdown button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .move-dropdown button:hover { background: var(--surface2); }
+  .move-dropdown button.current { color: var(--text2); pointer-events: none; }
+
+  /* Add room modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 200;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .modal-overlay.show { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border-radius: 16px 16px 0 0;
+    width: 100%;
+    max-width: 480px;
+    padding: 20px;
+    max-height: 70vh;
+    overflow-y: auto;
+    animation: slideUp 0.25s ease;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .modal-subtitle {
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 16px;
+  }
+
+  .modal-rooms {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .modal-room-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 12px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .modal-room-btn:hover {
+    border-color: var(--accent);
+    background: rgba(108,140,255,0.1);
+  }
+
+  .modal-room-btn.already {
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  .modal-cancel {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    background: var(--bg);
+    border: none;
+    color: var(--text2);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 20px;
+    border-radius: 10px;
+    z-index: 300;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    opacity: 0;
+    transition: all 0.3s ease;
+    pointer-events: none;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .spinner {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 250;
+  }
+
+  .spinner.show { display: block; }
+
+  .spinner::after {
+    content: '';
+    display: block;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text2);
+    padding: 4px 4px 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>HK</span> Schedule</h1>
+  <div class="location-toggle">
+    <button class="active" onclick="setLocation('shartava')">Shartava</button>
+    <button onclick="setLocation('centre')">Centre</button>
+    <button onclick="setLocation('all')">All</button>
+  </div>
+</div>
+
+<div class="days-container" id="daysContainer">
+  <!-- Generated by JS -->
+</div>
+
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-title">Add Room</div>
+    <div class="modal-subtitle" id="addModalDate"></div>
+    <div class="modal-rooms" id="addModalRooms"></div>
+    <button class="modal-cancel" onclick="closeAddModal()">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="spinner" id="spinner"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
+  authDomain: "sleepy-5c962.firebaseapp.com",
+  projectId: "sleepy-5c962",
+  storageBucket: "sleepy-5c962.firebasestorage.app",
+  messagingSenderId: "152940098906",
+  appId: "1:152940098906:web:bf245230d705c0a62c2f63"
+});
+
+const db = firebase.firestore();
+
+const ROOMS = {
+  shartava: ['0-1','0-2','0-3','0-4','0-5','6-1','6-2','6-3','6-4','7-1','7-2','7-4'],
+  centre: ['tab-1','tab-2','tab-3','orb-1','orb-2','orb-3']
+};
+
+let currentLocation = 'all';
+let hkData = {}; // { "2026-06-06": { "0-1": { done, cleaner, docId }, ... } }
+let openMoveDropdown = null;
+let addModalTargetDate = null;
+
+// ── Date helpers ──
+function today() {
+  const d = new Date();
+  return formatDate(d);
+}
+
+function formatDate(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function getDays(n = 7) {
+  const days = [];
+  const now = new Date();
+  for (let i = 0; i < n; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+    const dateStr = formatDate(d);
+    let label;
+    if (i === 0) label = 'TODAY';
+    else if (i === 1) label = 'TOMORROW';
+    else label = d.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+
+    const dateDisplay = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    days.push({ dateStr, label, dateDisplay });
+  }
+  return days;
+}
+
+function visibleRooms() {
+  if (currentLocation === 'all') return [...ROOMS.shartava, ...ROOMS.centre];
+  return ROOMS[currentLocation] || [];
+}
+
+// ── Firestore ──
+async function loadHKStatus() {
+  showSpinner(true);
+  const days = getDays(7);
+  const startDate = days[0].dateStr;
+  const endDate = days[6].dateStr;
+
+  hkData = {};
+  days.forEach(d => hkData[d.dateStr] = {});
+
+  try {
+    const snap = await db.collection('hk_status')
+      .where('date', '>=', startDate)
+      .where('date', '<=', endDate)
+      .get();
+
+    snap.forEach(doc => {
+      const d = doc.data();
+      if (!hkData[d.date]) hkData[d.date] = {};
+      hkData[d.date][d.roomCode] = {
+        done: d.done || false,
+        cleaner: d.cleaner || '',
+        docId: doc.id,
+        updatedAt: d.updatedAt
+      };
+    });
+  } catch (e) {
+    console.error('Load error:', e);
+    toast('Error loading data');
+  }
+
+  showSpinner(false);
+  render();
+}
+
+async function addRoom(dateStr, roomCode) {
+  const docId = `${roomCode}_${dateStr}`;
+  showSpinner(true);
+  try {
+    await db.collection('hk_status').doc(docId).set({
+      roomCode: roomCode,
+      date: dateStr,
+      done: false,
+      cleaner: roomCode.startsWith('tab') || roomCode.startsWith('orb') ? 'Centre Team' : 'Shartava Team',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    if (!hkData[dateStr]) hkData[dateStr] = {};
+    hkData[dateStr][roomCode] = { done: false, cleaner: '', docId };
+
+    toast(`Added ${roomCode} → ${dateStr}`);
+  } catch (e) {
+    console.error('Add error:', e);
+    toast('Error adding room');
+  }
+  showSpinner(false);
+  render();
+}
+
+async function deleteRoom(dateStr, roomCode) {
+  const entry = hkData[dateStr]?.[roomCode];
+  if (!entry) return;
+
+  showSpinner(true);
+  try {
+    await db.collection('hk_status').doc(entry.docId).delete();
+    delete hkData[dateStr][roomCode];
+    toast(`Deleted ${roomCode} from ${dateStr}`);
+  } catch (e) {
+    console.error('Delete error:', e);
+    toast('Error deleting');
+  }
+  showSpinner(false);
+  render();
+}
+
+async function moveRoom(fromDate, toDate, roomCode) {
+  if (fromDate === toDate) return;
+  const entry = hkData[fromDate]?.[roomCode];
+  if (!entry) return;
+
+  showSpinner(true);
+  try {
+    // Delete from old date
+    await db.collection('hk_status').doc(entry.docId).delete();
+    delete hkData[fromDate][roomCode];
+
+    // Create on new date
+    const newDocId = `${roomCode}_${toDate}`;
+    await db.collection('hk_status').doc(newDocId).set({
+      roomCode: roomCode,
+      date: toDate,
+      done: false,
+      cleaner: roomCode.startsWith('tab') || roomCode.startsWith('orb') ? 'Centre Team' : 'Shartava Team',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    if (!hkData[toDate]) hkData[toDate] = {};
+    hkData[toDate][roomCode] = { done: false, cleaner: '', docId: newDocId };
+
+    toast(`Moved ${roomCode}: ${fromDate} → ${toDate}`);
+  } catch (e) {
+    console.error('Move error:', e);
+    toast('Error moving room');
+  }
+  showSpinner(false);
+  closeMoveDropdown();
+  render();
+}
+
+async function toggleDone(dateStr, roomCode) {
+  const entry = hkData[dateStr]?.[roomCode];
+  if (!entry) return;
+
+  const newDone = !entry.done;
+  try {
+    await db.collection('hk_status').doc(entry.docId).update({
+      done: newDone,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    entry.done = newDone;
+    toast(`${roomCode} → ${newDone ? 'Done ✓' : 'Not done'}`);
+  } catch (e) {
+    console.error('Toggle error:', e);
+    toast('Error updating');
+  }
+  render();
+}
+
+// ── Render ──
+function render() {
+  const container = document.getElementById('daysContainer');
+  const days = getDays(7);
+  const rooms = visibleRooms();
+
+  container.innerHTML = days.map((day, idx) => {
+    const dateRooms = hkData[day.dateStr] || {};
+    const filteredRooms = Object.keys(dateRooms).filter(r => rooms.includes(r)).sort(roomSort);
+    const isToday = idx === 0;
+    const pendingCount = filteredRooms.filter(r => !dateRooms[r].done).length;
+    const doneCount = filteredRooms.filter(r => dateRooms[r].done).length;
+
+    return `
+      <div class="day-card ${isToday ? 'is-today' : ''}">
+        <div class="day-header">
+          <div class="day-label">
+            <span class="day-name">${day.label}</span>
+            <span class="day-date">${day.dateDisplay}</span>
+          </div>
+          <span class="day-count">${pendingCount} pending · ${doneCount} done</span>
+        </div>
+        <div class="day-body">
+          ${filteredRooms.length === 0
+            ? '<div class="day-empty">No rooms scheduled</div>'
+            : `<div class="rooms-list">${filteredRooms.map(r => renderChip(day.dateStr, r, dateRooms[r])).join('')}</div>`
+          }
+        </div>
+        <div class="day-footer">
+          <button class="add-room-btn" onclick="openAddModal('${day.dateStr}', '${day.label} — ${day.dateDisplay}')">
+            + Add room
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderChip(dateStr, roomCode, info) {
+  const doneClass = info.done ? 'done' : '';
+  return `
+    <div class="room-chip ${doneClass}" style="position:relative">
+      <span class="status-dot"></span>
+      <span>${roomCode}</span>
+      <div class="chip-actions">
+        <button class="chip-btn" onclick="toggleDone('${dateStr}','${roomCode}')" title="${info.done ? 'Mark not done' : 'Mark done'}">
+          ${info.done ? '↩' : '✓'}
+        </button>
+        <button class="chip-btn move" onclick="showMoveDropdown(event,'${dateStr}','${roomCode}')" title="Move to another day">
+          ↗
+        </button>
+        <button class="chip-btn delete" onclick="confirmDelete('${dateStr}','${roomCode}')" title="Remove">
+          ✕
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function roomSort(a, b) {
+  const pa = a.replace(/[^0-9]/g, '') || a;
+  const pb = b.replace(/[^0-9]/g, '') || b;
+  if (a.startsWith('tab') && !b.startsWith('tab')) return -1;
+  if (a.startsWith('orb') && !b.startsWith('orb')) return 1;
+  return a.localeCompare(b, undefined, { numeric: true });
+}
+
+// ── Move dropdown ──
+function showMoveDropdown(event, fromDate, roomCode) {
+  event.stopPropagation();
+  closeMoveDropdown();
+
+  const days = getDays(7);
+  const btn = event.target.closest('.chip-btn');
+  const rect = btn.getBoundingClientRect();
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'move-dropdown';
+  dropdown.onclick = e => e.stopPropagation();
+
+  // Position below the button, align left
+  let top = rect.bottom + 6;
+  let left = rect.left;
+
+  // If it would overflow right, flip
+  if (left + 200 > window.innerWidth) left = window.innerWidth - 210;
+  // If it would overflow bottom, show above
+  if (top + 300 > window.innerHeight) top = rect.top - 310;
+
+  dropdown.style.top = top + 'px';
+  dropdown.style.left = left + 'px';
+
+  dropdown.innerHTML = `<div class="section-label" style="padding:6px 12px 4px">Move to</div>` +
+    days.map(d => {
+      const isCurrent = d.dateStr === fromDate;
+      return `<button class="${isCurrent ? 'current' : ''}" onclick="moveRoom('${fromDate}','${d.dateStr}','${roomCode}')">
+        ${d.label} — ${d.dateDisplay} ${isCurrent ? '(current)' : ''}
+      </button>`;
+    }).join('');
+
+  document.body.appendChild(dropdown);
+  openMoveDropdown = dropdown;
+}
+
+function closeMoveDropdown() {
+  if (openMoveDropdown) {
+    openMoveDropdown.remove();
+    openMoveDropdown = null;
+  }
+}
+
+document.addEventListener('click', closeMoveDropdown);
+
+// ── Add modal ──
+function openAddModal(dateStr, label) {
+  addModalTargetDate = dateStr;
+  document.getElementById('addModalDate').textContent = label;
+
+  const rooms = visibleRooms();
+  const existing = hkData[dateStr] || {};
+
+  document.getElementById('addModalRooms').innerHTML = rooms.map(r => {
+    const already = existing[r] ? 'already' : '';
+    return `<button class="modal-room-btn ${already}" onclick="addRoomFromModal('${r}')">${r}${already ? ' ✓' : ''}</button>`;
+  }).join('');
+
+  document.getElementById('addModal').classList.add('show');
+}
+
+function closeAddModal() {
+  document.getElementById('addModal').classList.remove('show');
+  addModalTargetDate = null;
+}
+
+function addRoomFromModal(roomCode) {
+  if (!addModalTargetDate) return;
+  addRoom(addModalTargetDate, roomCode);
+  closeAddModal();
+}
+
+document.getElementById('addModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeAddModal();
+});
+
+// ── Delete confirm ──
+function confirmDelete(dateStr, roomCode) {
+  if (confirm(`Remove ${roomCode} from ${dateStr}?`)) {
+    deleteRoom(dateStr, roomCode);
+  }
+}
+
+// ── Location toggle ──
+function setLocation(loc) {
+  currentLocation = loc;
+  document.querySelectorAll('.location-toggle button').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim().toLowerCase() === loc);
+  });
+  render();
+}
+
+// ── UI helpers ──
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function showSpinner(on) {
+  document.getElementById('spinner').classList.toggle('show', on);
+}
+
+// ── Init ──
+loadHKStatus();
+</script>
+</body>
+</html>
