@@ -361,6 +361,6 @@ Key = `bookingId + "|" + roomCode + "|" + checkin`. All three must match for a p
 
 ## GitHub Pages
 
-Hosted at: `https://nikavibliani-alt.github.io/profit-calculator/`
+Hosted at: `https://app.maxelaapartments.com/`
 
 Main entry: `SleepyPMS.html` (direct link used in production)
