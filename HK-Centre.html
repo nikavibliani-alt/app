@@ -233,19 +233,18 @@ function getNextCheckin(roomCode,afterDate){
 function getDeferredRooms(date){
   const ds=fmtDate(date);
   const todayDs=fmtDate(today());
+  // Rollovers only ever appear on today's tab — never on future tabs
+  if(ds!==todayDs)return[];
   const result=[];
   ROOMS.forEach(room=>{
-    if(getCheckoutToday(room.code,date))return; // has actual checkout today — in main list
-    if(getResForRoom(room.code,date).length)return; // occupied — new guest checked in, room was cleaned
-    // Most recent checkout strictly before today AND strictly before the viewed date
+    if(getCheckoutToday(room.code,date))return; // checking out today — already in main list
+    if(getResForRoom(room.code,date).length)return; // occupied — new guest is in, room was cleaned
+    // Most recent past checkout (strictly before today)
     const recent=reservations
-      .filter(r=>r.roomCode===room.code&&r.checkout<ds&&r.checkout<todayDs)
+      .filter(r=>r.roomCode===room.code&&r.checkout<todayDs)
       .sort((a,b)=>b.checkout.localeCompare(a.checkout))[0];
     if(!recent)return;
-    // Only carry within a 14-day window
-    const daysAgo=(new Date(ds+'T00:00:00')-new Date(recent.checkout+'T00:00:00'))/86400000;
-    if(daysAgo<1||daysAgo>14)return;
-    // Skip if already marked done on the checkout date
+    // Already cleaned on the checkout date — done, no rollover needed
     if(cleaningStatus[room.code+'_'+recent.checkout])return;
     result.push({room,checkout:recent,dateStr:recent.checkout});
   });
