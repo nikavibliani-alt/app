@@ -164,9 +164,44 @@ for room in room_data:
         no_match += 1
         continue
     if len(candidates) > 1:
-        print(f'Ambiguous: {combined}')
-        skipped += 1
-        continue
+        def _fv(doc, key):
+            return doc.get('fields', {}).get(key, {}).get('stringValue', '')
+        print(f'Ambiguous: {combined!r} — {len(candidates)} active reservations:')
+        for c in candidates:
+            cid = c['name'].split('/')[-1]
+            print(f'  [{cid}] checkin={_fv(c,"checkin")} checkout={_fv(c,"checkout")} roomCode={_fv(c,"roomCode") or "—"}')
+
+        # Tiebreaker 1: exactly one checking out today (most relevant for HK report)
+        checking_out = [c for c in candidates if _fv(c, 'checkout') == today_str]
+        if len(checking_out) == 1:
+            candidates = checking_out
+            print(f'  → Resolved via checkout==today: [{candidates[0]["name"].split("/")[-1]}]')
+        elif len(checking_out) > 1:
+            print(f'  → Truly ambiguous: {len(checking_out)} both checking out today — skipping')
+            skipped += 1
+            continue
+        else:
+            # Tiebreaker 2: exactly one checking in today
+            checking_in = [c for c in candidates if _fv(c, 'checkin') == today_str]
+            if len(checking_in) == 1:
+                candidates = checking_in
+                print(f'  → Resolved via checkin==today: [{candidates[0]["name"].split("/")[-1]}]')
+            elif len(checking_in) > 1:
+                print(f'  → Truly ambiguous: {len(checking_in)} both checking in today — skipping')
+                skipped += 1
+                continue
+            else:
+                # Tiebreaker 3: all mid-stay — pick duplicate if dates are identical
+                unique_spans = {(_fv(c,'checkin'), _fv(c,'checkout')) for c in candidates}
+                if len(unique_spans) == 1:
+                    # All duplicates (same dates) — pick lexicographically smallest doc ID
+                    candidates = [min(candidates, key=lambda c: c['name'].split('/')[-1])]
+                    print(f'  → Resolved as duplicate entries (same dates): [{candidates[0]["name"].split("/")[-1]}]')
+                else:
+                    print(f'  → Truly ambiguous: multiple mid-stay reservations with different date ranges — skipping')
+                    skipped += 1
+                    continue
+
     doc = candidates[0]
     res_id = doc['name'].split('/')[-1]
     status = update_firestore(token, res_id, {'roomCode': room_code})
