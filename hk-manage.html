@@ -189,6 +189,32 @@
 
   .room-chip.done .status-dot { background: var(--green); }
 
+  .room-chip.auto {
+    border-style: dashed;
+    border-color: rgba(108,140,255,0.3);
+  }
+
+  .room-chip .guest-name {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text2);
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .room-chip .turnover-badge {
+    font-size: 9px;
+    font-weight: 700;
+    background: var(--red-bg);
+    color: var(--red);
+    padding: 1px 5px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
   .chip-actions {
     display: flex;
     align-items: center;
@@ -466,7 +492,8 @@ const ROOMS = {
 };
 
 let currentLocation = 'all';
-let hkData = {}; // { "2026-06-06": { "0-1": { done, cleaner, docId }, ... } }
+let hkData = {}; // { "2026-06-06": { "0-1": { done, cleaner, docId, auto, guest }, ... } }
+let reservations = []; // raw reservation docs
 let openMoveDropdown = null;
 let addModalTargetDate = null;
 
@@ -514,21 +541,70 @@ async function loadHKStatus() {
   days.forEach(d => hkData[d.dateStr] = {});
 
   try {
-    const snap = await db.collection('hk_status')
+    // 1. Load existing hk_status entries
+    const hkSnap = await db.collection('hk_status')
       .where('date', '>=', startDate)
       .where('date', '<=', endDate)
       .get();
 
-    snap.forEach(doc => {
+    hkSnap.forEach(doc => {
       const d = doc.data();
       if (!hkData[d.date]) hkData[d.date] = {};
       hkData[d.date][d.roomCode] = {
         done: d.done || false,
         cleaner: d.cleaner || '',
         docId: doc.id,
-        updatedAt: d.updatedAt
+        updatedAt: d.updatedAt,
+        auto: false,
+        guest: ''
       };
     });
+
+    // 2. Load reservations with checkouts in range
+    const resSnap = await db.collection('reservations')
+      .where('checkOut', '>=', startDate)
+      .where('checkOut', '<=', endDate)
+      .get();
+
+    resSnap.forEach(doc => {
+      const r = doc.data();
+      const coDate = r.checkOut;
+      const room = r.roomCode;
+      if (!coDate || !room) return;
+      if (!hkData[coDate]) hkData[coDate] = {};
+
+      // Only add if no hk_status entry exists for this room+date
+      if (!hkData[coDate][room]) {
+        hkData[coDate][room] = {
+          done: false,
+          cleaner: '',
+          docId: null, // no hk_status doc yet
+          auto: true,  // auto-detected from reservation
+          guest: r.guestName || r.guest || ''
+        };
+      } else {
+        // hk_status exists, just add guest name
+        hkData[coDate][room].guest = r.guestName || r.guest || '';
+      }
+    });
+
+    // 3. Also check for same-day check-ins (turnover rooms = higher priority)
+    const ciSnap = await db.collection('reservations')
+      .where('checkIn', '>=', startDate)
+      .where('checkIn', '<=', endDate)
+      .get();
+
+    ciSnap.forEach(doc => {
+      const r = doc.data();
+      const ciDate = r.checkIn;
+      const room = r.roomCode;
+      if (!ciDate || !room) return;
+      if (hkData[ciDate]?.[room]) {
+        hkData[ciDate][room].sameDayCheckin = true;
+        hkData[ciDate][room].nextGuest = r.guestName || r.guest || '';
+      }
+    });
+
   } catch (e) {
     console.error('Load error:', e);
     toast('Error loading data');
@@ -568,7 +644,9 @@ async function deleteRoom(dateStr, roomCode) {
 
   showSpinner(true);
   try {
-    await db.collection('hk_status').doc(entry.docId).delete();
+    if (entry.docId) {
+      await db.collection('hk_status').doc(entry.docId).delete();
+    }
     delete hkData[dateStr][roomCode];
     toast(`Deleted ${roomCode} from ${dateStr}`);
   } catch (e) {
@@ -586,8 +664,10 @@ async function moveRoom(fromDate, toDate, roomCode) {
 
   showSpinner(true);
   try {
-    // Delete from old date
-    await db.collection('hk_status').doc(entry.docId).delete();
+    // Delete from old date (if hk_status doc exists)
+    if (entry.docId) {
+      await db.collection('hk_status').doc(entry.docId).delete();
+    }
     delete hkData[fromDate][roomCode];
 
     // Create on new date
@@ -601,7 +681,7 @@ async function moveRoom(fromDate, toDate, roomCode) {
     });
 
     if (!hkData[toDate]) hkData[toDate] = {};
-    hkData[toDate][roomCode] = { done: false, cleaner: '', docId: newDocId };
+    hkData[toDate][roomCode] = { done: false, cleaner: '', docId: newDocId, auto: false, guest: entry.guest || '' };
 
     toast(`Moved ${roomCode}: ${fromDate} → ${toDate}`);
   } catch (e) {
@@ -618,11 +698,26 @@ async function toggleDone(dateStr, roomCode) {
   if (!entry) return;
 
   const newDone = !entry.done;
+
   try {
-    await db.collection('hk_status').doc(entry.docId).update({
-      done: newDone,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    if (!entry.docId) {
+      // Auto-detected entry — create hk_status doc first
+      const docId = `${roomCode}_${dateStr}`;
+      await db.collection('hk_status').doc(docId).set({
+        roomCode: roomCode,
+        date: dateStr,
+        done: newDone,
+        cleaner: roomCode.startsWith('tab') || roomCode.startsWith('orb') ? 'Centre Team' : 'Shartava Team',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      entry.docId = docId;
+      entry.auto = false;
+    } else {
+      await db.collection('hk_status').doc(entry.docId).update({
+        done: newDone,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
     entry.done = newDone;
     toast(`${roomCode} → ${newDone ? 'Done ✓' : 'Not done'}`);
   } catch (e) {
@@ -672,10 +767,16 @@ function render() {
 
 function renderChip(dateStr, roomCode, info) {
   const doneClass = info.done ? 'done' : '';
+  const autoClass = info.auto ? 'auto' : '';
+  const guestDisplay = info.guest ? `<span class="guest-name" title="${info.guest}">${info.guest.split(' ')[0]}</span>` : '';
+  const turnoverBadge = info.sameDayCheckin ? '<span class="turnover-badge">turnover</span>' : '';
+
   return `
-    <div class="room-chip ${doneClass}" style="position:relative">
+    <div class="room-chip ${doneClass} ${autoClass}" style="position:relative">
       <span class="status-dot"></span>
       <span>${roomCode}</span>
+      ${guestDisplay}
+      ${turnoverBadge}
       <div class="chip-actions">
         <button class="chip-btn" onclick="toggleDone('${dateStr}','${roomCode}')" title="${info.done ? 'Mark not done' : 'Mark done'}">
           ${info.done ? '↩' : '✓'}
