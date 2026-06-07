@@ -364,9 +364,9 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
       </button>
     </div>
     <div class="auth-greet">
-      <div class="kicker"><span class="pip"></span> <span id="t-welcome-sub">First time here</span></div>
-      <h1>Welcome to<br>your apartment.</h1>
-      <p>A few quick details so we can match you against your booking.</p>
+      <div class="kicker"><span class="pip"></span> <span id="t-welcome-sub">GUEST CHECK-IN</span></div>
+      <h1>Let's get you<br>checked in.</h1>
+      <p>Just a few details and you'll have everything you need for your stay.</p>
     </div>
     <div class="auth-apt" id="auth-apt">
       <span class="sw"></span>
@@ -446,6 +446,10 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         <button class="lang-pill" onclick="window.cycleLang()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"/></svg>
           <span id="lang-pill-label-home">EN</span>
+        </button>
+        <button class="lang-pill" onclick="window.logout()" style="gap:5px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>Sign out</span>
         </button>
       </div>
     </div>
@@ -847,7 +851,9 @@ window.submitRegistration=async function(){
     };
     await setDoc(doc(db,'checkin_guests',guestId),data);
     guestData={...data,id:guestId};
-    localStorage.setItem('maxela_g_'+aptId,guestId);
+    localStorage.setItem('maxela_apt_id',aptId);
+    localStorage.setItem('maxela_guest_id',guestId);
+    localStorage.setItem('maxela_g_'+aptId,guestId); // compat
     toast(t('rg'),3000);
     showHome();
   }catch(e){
@@ -1286,25 +1292,57 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape')window.closeLightbox();
 });
 
-async function init(){
+window.logout=function(){
+  localStorage.removeItem('maxela_apt_id');
+  localStorage.removeItem('maxela_guest_id');
+  if(aptId)localStorage.removeItem('maxela_g_'+aptId);
+  guestId=null;guestData=null;aptData=null;activeReservation=null;
+  aptId=params.get('apt')||'';
+  document.getElementById('page-home').classList.remove('active');
+  const reg=document.getElementById('page-register');
+  reg.classList.add('active');
+  document.getElementById('reg-verify-error')?.remove();
+  ['r-name','r-contact','r-arrival'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   if(!aptId){
     document.getElementById('auth-apt').style.display='none';
-    document.getElementById('loading').style.display='none';
-    document.getElementById('app').style.display='block';
-    return;
+  }else{
+    document.getElementById('auth-apt').style.display='';
+    document.getElementById('t-apt-name-reg').textContent=APT_NAMES[aptId]||aptId;
   }
-  try{const snap=await getDoc(doc(db,'checkin_apartments',aptId));if(snap.exists())aptData=snap.data();}catch(e){}
-  document.getElementById('t-apt-name-reg').textContent=APT_NAMES[aptId]||aptId;
-  const saved=localStorage.getItem('maxela_g_'+aptId);
-  if(saved){
+}
+
+async function init(){
+  // Try to restore session from localStorage (works with or without ?apt= in URL)
+  const savedApt=localStorage.getItem('maxela_apt_id');
+  const savedGuest=localStorage.getItem('maxela_guest_id')
+    ||(aptId?localStorage.getItem('maxela_g_'+aptId):null);
+  if(savedGuest&&savedApt&&(!aptId||aptId===savedApt)){
+    aptId=aptId||savedApt;
     try{
-      const snap=await getDoc(doc(db,'checkin_guests',saved));
-      if(snap.exists()){guestId=saved;guestData={...snap.data(),id:saved};}
+      const snap=await getDoc(doc(db,'checkin_guests',savedGuest));
+      if(snap.exists()){
+        guestId=savedGuest;guestData={...snap.data(),id:savedGuest};
+        try{const as=await getDoc(doc(db,'checkin_apartments',aptId));if(as.exists())aptData=as.data();}catch(e){}
+        document.getElementById('loading').style.display='none';
+        document.getElementById('app').style.display='block';
+        showHome();
+        return;
+      }
     }catch(e){}
+    // Guest doc gone — clear stale session and fall through
+    localStorage.removeItem('maxela_apt_id');
+    localStorage.removeItem('maxela_guest_id');
+    if(aptId)localStorage.removeItem('maxela_g_'+aptId);
+  }
+  // No valid session — show register page
+  if(aptId){
+    try{const snap=await getDoc(doc(db,'checkin_apartments',aptId));if(snap.exists())aptData=snap.data();}catch(e){}
+    document.getElementById('t-apt-name-reg').textContent=APT_NAMES[aptId]||aptId;
+  }else{
+    document.getElementById('auth-apt').style.display='none';
   }
   document.getElementById('loading').style.display='none';
   document.getElementById('app').style.display='block';
-  if(guestData)showHome();
 }
 
 init();
