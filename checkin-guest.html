@@ -288,6 +288,20 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 .rule-title{font-size:13.5px;font-weight:500;color:var(--ink);line-height:1.3;}
 .rule-item.smoking .rule-title{color:var(--red);font-weight:600;}
 .rule-sub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;}
+#r-arrival{color:var(--muted);}
+#r-arrival.has-value{color:var(--ink);}
+.passport-banner{margin:0 16px 8px;padding:14px 16px;border-radius:14px;display:flex;gap:12px;align-items:flex-start;}
+.passport-banner.warn{background:#fff3cd;border:1.5px solid #ffc107;}
+.passport-banner.info{background:var(--blue-bg);border:1.5px solid var(--blue-border);}
+.passport-banner__icon{font-size:22px;flex:none;line-height:1.2;}
+.passport-banner__body{flex:1;}
+.passport-banner__title{font-size:13.5px;font-weight:600;line-height:1.3;margin-bottom:3px;}
+.passport-banner.warn .passport-banner__title{color:#7c4300;}
+.passport-banner.info .passport-banner__title{color:var(--blue);}
+.passport-banner__sub{font-size:12px;color:var(--muted);line-height:1.4;margin-bottom:8px;}
+.passport-banner__btn{height:34px;padding:0 16px;border:none;border-radius:999px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;display:inline-block;}
+.passport-banner.warn .passport-banner__btn{background:#ffc107;color:#333;}
+.passport-banner.info .passport-banner__btn{background:var(--blue);color:#fff;}
 .photos-scroll{display:flex;flex-direction:column;gap:8px;margin-bottom:1rem;max-width:480px;}
 .photos-scroll img{width:100%;border-radius:var(--rs);object-fit:cover;cursor:pointer;max-height:300px;}
 .video-wrap{border-radius:var(--r);overflow:hidden;margin-bottom:1rem;aspect-ratio:16/9;background:var(--surface2);}
@@ -408,12 +422,17 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
       <div class="auth-section__label"><span id="t-your-info">Your details</span><span class="count">4 FIELDS</span></div>
       <div class="auth-form">
         <div class="auth-row">
-          <span class="auth-row__label" id="t-full-name">Full name</span>
-          <input type="text" class="form-input" id="r-name" placeholder="As on your passport" autocomplete="name">
+          <span class="auth-row__label">Booking ID <span style="color:var(--muted);font-weight:400;">(optional)</span></span>
+          <input type="text" class="form-input" id="r-booking-id" placeholder="Booking.com, Airbnb or Expedia confirmation number" autocomplete="off" style="font-size:13px;">
+        </div>
+        <div class="auth-row">
+          <span class="auth-row__label" id="t-full-name">Full name (as on your booking)</span>
+          <input type="text" class="form-input" id="r-name" placeholder="As on your booking" autocomplete="name">
         </div>
         <div class="auth-row">
           <span class="auth-row__label">Arrival date <span style="color:var(--red)">*</span></span>
-          <input type="date" class="form-input" id="r-arrival" placeholder="Select date">
+          <span style="font-size:11.5px;color:var(--muted);font-family:var(--mono);letter-spacing:0.02em;margin-bottom:4px;display:block;">When do you arrive?</span>
+          <input type="date" class="form-input" id="r-arrival" placeholder="Select date" onchange="this.classList.toggle('has-value',!!this.value)">
           <div class="arrival-fallback" id="r-arrival-fallback"></div>
         </div>
         <div class="auth-row">
@@ -423,7 +442,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         </div>
         <div class="auth-row" style="flex-direction:row;align-items:center;gap:12px;justify-content:space-between;">
           <span class="auth-row__label" id="t-guests">Guests</span>
-          <input type="number" class="form-input" id="r-guests" value="1" min="1" max="20" style="width:70px;height:36px;padding:0 10px;text-align:center;">
+          <select class="form-input" id="r-guests" style="height:40px;width:auto;padding:0 14px;cursor:pointer;"><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select>
         </div>
       </div>
     </div>
@@ -519,6 +538,8 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         <span>Maxela · Tbilisi</span>
       </div>
     </div>
+    <div id="passport-warn-banner"></div>
+    <input type="file" id="passport-reupload-input" accept="image/*" style="display:none;" onchange="window.handlePassportReupload(this)">
     <div class="menu-label"><h3>Your stay</h3></div>
     <div class="tiles" id="tiles-grid"></div>
     <div class="foot">
@@ -832,13 +853,17 @@ function levenshtein(a,b){
   return m[b.length][a.length];
 }
 function normalizePhone(p){return(p||'').replace(/\D/g,'').slice(-7);}
+function _nameWords(s){return(s||'').toLowerCase().trim().replace(/\s+/g,' ').split(' ').filter(w=>w.length>1);}
 function nameMatch(input,resGuest){
-  const iw=(input||'').toLowerCase().trim().split(/\s+/).filter(Boolean);
-  const rw=(resGuest||'').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const iw=_nameWords(input),rw=_nameWords(resGuest);
   if(!iw.length||!rw.length)return false;
-  let exact=0,fuzzy=0;
-  for(const a of iw){for(const b of rw){if(a===b){exact++;break;}else if(levenshtein(a,b)<=2){fuzzy++;break;}}}
-  return exact>=2||(exact+fuzzy>=2);
+  let matched=0;
+  for(const a of iw){if(rw.some(b=>levenshtein(a,b)<=2)){matched++;if(matched>=2)return true;}}
+  return false;
+}
+function partialNameMatch(input,resGuest){
+  const iw=_nameWords(input),rw=_nameWords(resGuest);
+  return iw.some(a=>rw.some(b=>levenshtein(a,b)<=2));
 }
 
 function normGuestId(n){return(n||'').toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'').slice(0,40);}
