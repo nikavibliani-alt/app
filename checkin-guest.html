@@ -504,7 +504,7 @@ const fb=initializeApp({
 const db=getFirestore(fb);
 
 // Load Anthropic key from Firestore globals/config (set via Firebase console: anthropicKey field)
-(async function(){try{const cfg=await getDoc(doc(db,'globals','config'));if(cfg.exists())_anthropicKey=cfg.data().anthropicKey||'';}catch(e){})();
+(async function(){try{const cfg=await getDoc(doc(db,'globals','config'));if(cfg.exists())_anthropicKey=cfg.data().anthropicKey||'';}catch(e){}})();
 
 const WA='995593000724';
 
