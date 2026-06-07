@@ -96,7 +96,7 @@ def fetch_reservations(session, from_date, to_date):
     )
     print(f"Fetching reservations: {from_date} → {to_date}")
 
-    r = session.get(url, headers={'Content-Type': 'application/json'})
+    r = session.get(url, headers={'Accept': 'application/json', 'Content-Type': 'application/json'})
 
     if r.status_code != 200:
         print(f"ERROR: API returned {r.status_code}")
