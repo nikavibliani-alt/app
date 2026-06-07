@@ -1,9 +1,6 @@
 name: MiniHotel Sync
 
 on:
-  schedule:
-    - cron: '0 5,10,15,20 * * *'  # Export: 9am, 2pm, 7pm, midnight Tbilisi
-    - cron: '0 */3 * * *'          # Housekeeping: every 3 hours
   workflow_dispatch:
 
 jobs:
