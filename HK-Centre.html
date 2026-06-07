@@ -239,34 +239,6 @@ function getNextCheckin(roomCode,afterDate){
     .sort((a,b)=>a.checkin.localeCompare(b.checkin))[0]||null;
 }
 
-function getDeferredRooms(date){
-  const ds=fmtDate(date);
-  const todayDs=fmtDate(today());
-  // Rollovers only ever appear on today's tab — never on future tabs
-  if(ds!==todayDs)return[];
-  const result=[];
-  ROOMS.forEach(room=>{
-    if(getCheckoutToday(room.code,date))return; // checking out today — already in main list
-    if(getResForRoom(room.code,date).length)return; // occupied — new guest is in, room was cleaned
-    // Most recent past checkout (strictly before today)
-    const recent=reservations
-      .filter(r=>r.roomCode===room.code&&r.checkout<todayDs)
-      .sort((a,b)=>b.checkout.localeCompare(a.checkout))[0];
-    if(!recent)return;
-    // Skip if this past checkout was superseded by an extension of the same stay
-    if(recent.checkin&&reservations.some(r=>
-      r.id!==recent.id&&
-      r.roomCode===room.code&&
-      (r.checkin||'').slice(0,10)===recent.checkin.slice(0,10)&&
-      r.checkout>recent.checkout
-    ))return;
-    // Already cleaned on the checkout date — done, no rollover needed
-    if(cleaningStatus[room.code+'_'+recent.checkout])return;
-    result.push({room,checkout:recent,dateStr:recent.checkout});
-  });
-  return result;
-}
-
 function getPriority(roomCode,date){
   const co=getCheckoutToday(roomCode,date);
   if(!co)return null; // no checkout = nothing to clean
@@ -306,7 +278,7 @@ function renderTabs(){
     const dayName=isToday?'Today':isTomorrow?'Tomorrow':d.toLocaleDateString('en-GB',{weekday:'short'});
     const dayNum=d.getDate();
     const mon=d.toLocaleDateString('en-GB',{month:'short'});
-    const count=ROOMS.filter(r=>getCheckoutToday(r.code,d)).length+getDeferredRooms(d).length;
+    const count=ROOMS.filter(r=>getCheckoutToday(r.code,d)).length;
     const isActive=activeDay===ds;
     html+=`<button class="day-tab${isActive?' active':''}" onclick="window.switchDay('${ds}')">
       <div style="text-align:center;">
@@ -352,10 +324,9 @@ function render(){
 
   // get rooms with checkouts
   const checkoutRooms=ROOMS.filter(r=>getCheckoutToday(r.code,date));
-  const deferredRooms=getDeferredRooms(date);
 
   const main=document.getElementById('main-list');
-  if(!checkoutRooms.length&&!deferredRooms.length){
+  if(!checkoutRooms.length){
     main.innerHTML=`<div class="empty">
       <div class="empty-icon">✨</div>
       <div class="empty-title">Nothing to clean today</div>
@@ -384,7 +355,7 @@ function render(){
   const _isToday=ds===fmtDate(today());
   const _isTomorrow=ds===fmtDate(tomorrow());
   const dateLabel=_isToday?'Today':_isTomorrow?'Tomorrow':date.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'});
-  const totalCount=checkoutRooms.length+deferredRooms.length;
+  const totalCount=checkoutRooms.length;
   let html=`<div class="group-label" style="font-size:13px;color:var(--text);font-weight:600;text-transform:none;letter-spacing:0;">${dateLabel} — ${totalCount} room${totalCount!==1?'s':''} to clean</div>`;
   let sumRed=0,sumYellow=0,sumGreen=0,sumDone=0;
 
@@ -458,65 +429,6 @@ function render(){
       </div>`;
     });
   });
-
-  // Deferred (overdue) rooms from yesterday
-  if(deferredRooms.length){
-    html+=`<div class="group-label">⚠ Deferred — not yet cleaned</div>`;
-    deferredRooms.forEach(({room,checkout,dateStr})=>{
-      const key=room.code+'_'+dateStr;
-      const done=cleaningStatus[key]||false;
-      const assignedCleaner=cleanerAssign[key]||'';
-      const nextRes=getNextCheckin(room.code,date);
-      const nextCheckinSameDay=nextRes&&nextRes.checkin===ds;
-      const nextCheckinNextDay=nextRes&&nextRes.checkin===fmtDate(addDays(date,1));
-      const isUrgent=nextCheckinSameDay||nextCheckinNextDay;
-      const deferPriority=isUrgent?'red':'yellow';
-      const deferChip=isUrgent?'chip-red':'chip-yellow';
-      const deferLabel=isUrgent?'OVERDUE':'TODAY';
-      if(done)sumDone++;else if(isUrgent)sumRed++;else sumYellow++;
-      const outBox=`<div class="time-box tb-out">
-        <div class="tb-label">Checkout (${dateStr})</div>
-        <div class="tb-time">${checkout?.checkoutTime||'12:00'}</div>
-        <div class="tb-guest">${checkout?.guest||'Guest'}</div>
-      </div>`;
-      let inBox='';
-      if(nextRes){
-        const _cDateLabel=new Date(nextRes.checkin+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
-        inBox=`<div class="time-box tb-in">
-          <div class="tb-label">Check-in ${nextCheckinSameDay?'today':nextCheckinNextDay?'tomorrow':nextRes.checkin}</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${_cDateLabel}</div>
-          <div class="tb-time">${nextRes.checkinTime||'14:00'}</div>
-          <div class="tb-guest">${nextRes.guest||'Guest'}</div>
-        </div>`;
-      }else{
-        inBox=`<div class="time-box tb-free">
-          <div class="tb-label">Next check-in</div>
-          <div class="tb-time" style="color:var(--hint);font-size:13px;">No reservation</div>
-        </div>`;
-      }
-      const cleanerOptions=CLEANERS.map(c=>`<option value="${c}"${assignedCleaner===c?' selected':''}>${c}</option>`).join('');
-      html+=`<div class="task-card priority-${done?'green':deferPriority}${done?' done-card':''}">
-        <div class="card-top">
-          <div class="priority-bar"></div>
-          <div class="room-info">
-            <div class="room-code">${room.code}</div>
-            <div class="room-name">${room.name}</div>
-          </div>
-          <div class="priority-chip ${done?'chip-done':deferChip}">${done?'Done ✓':deferLabel}</div>
-        </div>
-        <div class="times-row">${outBox}${inBox}</div>
-        <div class="card-footer">
-          <select class="cleaner-sel" id="sel-${key}" onchange="window.saveCleaner('${room.code}','${dateStr}',this.value)">
-            <option value="">Assign cleaner...</option>
-            ${cleanerOptions}
-          </select>
-          <button class="done-btn ${done?'btn-undo':'btn-mark'}" onclick="window.toggleDone('${room.code}','${dateStr}')">
-            ${done?'Undo':'✓ Done'}
-          </button>
-        </div>
-      </div>`;
-    });
-  }
 
   main.innerHTML=html;
   document.getElementById('sum-bar').style.display='flex';

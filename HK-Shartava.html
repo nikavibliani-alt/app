@@ -322,34 +322,6 @@ function getNextCheckin(roomCode,afterDate){
     .sort((a,b)=>a.checkin.localeCompare(b.checkin))[0]||null;
 }
 
-function getDeferredRooms(date){
-  const ds=fmtDate(date);
-  const todayDs=fmtDate(today());
-  // Rollovers only ever appear on today's tab — never on future tabs
-  if(ds!==todayDs)return[];
-  const result=[];
-  getActiveRooms().forEach(room=>{
-    if(getCheckoutToday(room.code,date))return; // checking out today — already in main list
-    if(getResForRoom(room.code,date).length)return; // occupied — new guest is in, room was cleaned
-    // Most recent past checkout (strictly before today)
-    const recent=reservations
-      .filter(r=>r.roomCode===room.code&&r.checkout<todayDs)
-      .sort((a,b)=>b.checkout.localeCompare(a.checkout))[0];
-    if(!recent)return;
-    // Skip if this past checkout was superseded by an extension of the same stay
-    if(recent.checkin&&reservations.some(r=>
-      r.id!==recent.id&&
-      r.roomCode===room.code&&
-      (r.checkin||'').slice(0,10)===recent.checkin.slice(0,10)&&
-      r.checkout>recent.checkout
-    ))return;
-    // Already cleaned on the checkout date — done, no rollover needed
-    if(cleaningStatus[room.code+'_'+recent.checkout])return;
-    result.push({room,checkout:recent,dateStr:recent.checkout});
-  });
-  return result;
-}
-
 function getPriority(roomCode,date){
   const co=getCheckoutToday(roomCode,date);
   if(!co)return null; // no checkout = nothing to clean
@@ -386,9 +358,7 @@ function renderTabs(){
   let html='';
   for(let i=0;i<7;i++){
     const d=addDays(today(),i);
-    const coCount=getActiveRooms().filter(r=>getCheckoutToday(r.code,d)).length;
-    const defCount=getDeferredRooms(d).length;
-    const count=coCount+defCount;
+    const count=getActiveRooms().filter(r=>getCheckoutToday(r.code,d)).length;
     const label=i===0?'Today':i===1?'Tomorrow':DAY[d.getDay()]+' '+d.getDate();
     html+=`<button class="day-tab${activeDay===i?' active':''}" onclick="window.switchDay(${i})">${label} <span class="tab-count${count?'':' zero'}">${count||''}</span></button>`;
   }
@@ -497,11 +467,10 @@ function render(){
 
   // get rooms with checkouts
   const checkoutRooms=getActiveRooms().filter(r=>getCheckoutToday(r.code,date));
-  const deferredRooms=getDeferredRooms(date);
   console.log(`[HK] checkouts on ${ds}:`, checkoutRooms.map(r=>r.code));
 
   const main=document.getElementById('main-list');
-  if(!checkoutRooms.length&&!deferredRooms.length){
+  if(!checkoutRooms.length){
     main.innerHTML=`<div class="empty">
       <div class="empty-icon">✨</div>
       <div class="empty-title">Nothing to clean today</div>
@@ -583,67 +552,6 @@ function render(){
         </button>
       </div>
     </div>`;
-  }
-
-  // Deferred (overdue) rooms from yesterday
-  if(deferredRooms.length){
-    html+=`<div class="group-label">⚠ Deferred — not yet cleaned</div>`;
-    deferredRooms.forEach(({room,checkout,dateStr})=>{
-      const key=room.code+'_'+dateStr;
-      const isDone=cleaningStatus[key]||false;
-      const nextRes=getNextCheckin(room.code,date);
-      const inGuests=getGuestCount(nextRes);
-      const beddingAlert=nextRes?getBeddingAlert(room.code,inGuests):null;
-      const outGuests=getGuestCount(checkout);
-      const nextCheckinSameDay=nextRes&&nextRes.checkin===ds;
-      const nextCheckinNextDay=nextRes&&nextRes.checkin===fmtDate(addDays(date,1));
-      const isUrgent=nextCheckinSameDay||nextCheckinNextDay;
-      const deferPriority=isUrgent?'red':'yellow';
-      const deferChip=isUrgent?'chip-red':'chip-yellow';
-      const deferLabel=isUrgent?'OVERDUE':'TODAY';
-      if(isDone)sumDone++;else if(isUrgent)sumRed++;else sumYellow++;
-      const outBox=`<div class="time-box tb-out">
-        <div class="tb-label">Checkout (${dateStr})</div>
-        <div class="tb-time">${checkout?.checkoutTime||'12:00'}</div>
-        ${outGuests>0?`<div class="tb-count">👥 ${outGuests} leaving</div>`:''}
-      </div>`;
-      let inBox='';
-      if(nextRes){
-        const whenLabel=nextCheckinSameDay?'TODAY':nextCheckinNextDay?'TOMORROW':nextRes.checkin;
-        const checkinDateLabel=new Date(nextRes.checkin+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
-        inBox=`<div class="time-box tb-in${nextCheckinSameDay?' tb-urgent':''}">
-          <div class="tb-label">Check-in</div>
-          <div class="tb-when">${whenLabel}</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${checkinDateLabel}</div>
-          <div class="tb-time">${nextRes.checkinTime||'14:00'}</div>
-          ${inGuests>0?`<div class="tb-count">👥 ${inGuests} arriving</div>`:''}
-        </div>`;
-      }else{
-        inBox=`<div class="time-box tb-free">
-          <div class="tb-label">Next check-in</div>
-          <div class="tb-time" style="color:var(--hint);font-size:13px;">No reservation</div>
-        </div>`;
-      }
-      const beddingHtml=beddingAlert?`<div class="bedding-alert">${beddingAlert}</div>`:'';
-      html+=`<div class="task-card priority-${isDone?'green':deferPriority}${isDone?' done-card':''}" data-key="${key}">
-        <div class="card-top">
-          <div class="priority-bar"></div>
-          <div class="room-info">
-            <div class="room-code">${room.code}</div>
-            <div class="room-name">${room.name}</div>
-          </div>
-          <div class="priority-chip ${isDone?'chip-done':deferChip}">${isDone?'Done ✓':deferLabel}</div>
-        </div>
-        <div class="times-row">${outBox}${inBox}</div>
-        ${beddingHtml}
-        <div class="card-footer">
-          <span class="cleaner-label">🧹 ${getCleanerName()}</span>
-          <button class="done-btn ${isDone?'btn-undo':'btn-mark'}" onclick="window.toggleDone('${room.code}','${dateStr}')">
-            ${isDone?'Undo':'✓ Done'}
-          </button>
-        </div>
-      </div>`;
-    });
   }
 
   // Pending rooms grouped by building
