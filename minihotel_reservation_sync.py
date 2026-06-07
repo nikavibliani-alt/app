@@ -9,7 +9,7 @@ Runs as a GitHub Action on schedule (every 30 min).
 Requires: FIREBASE_SERVICE_ACCOUNT, MINIHOTEL_USER, MINIHOTEL_PASS, MINIHOTEL_HOTEL secrets.
 """
 
-import os, sys, json, base64, datetime
+import os, sys, json, base64, datetime, time
 import requests
 from bs4 import BeautifulSoup
 import firebase_admin
@@ -282,6 +282,90 @@ def cleanup_old_duplicates(db):
     print(f"Cleaned up {deleted} old duplicate docs")
 
 
+def fetch_guest_details(session, db, reservations):
+    """Fetch phone/email/country for reservations checking in within 7 days."""
+    now = datetime.datetime.utcnow()
+    cutoff = (now + datetime.timedelta(days=7)).strftime('%Y-%m-%d')
+    today = now.strftime('%Y-%m-%d')
+
+    # Only reservations checking in today or within 7 days, in a known room
+    targets = [
+        r for r in reservations
+        if ROOM_MAP.get(r.get('roomNumber', ''))
+        and r.get('status', '') in VALID_STATUSES
+        and r.get('roomNumber', '') not in SKIP_ROOMS
+        and today <= (parse_date(r.get('checkIn')) or '') <= cutoff
+    ]
+    print(f"Fetching guest details for {len(targets)} reservations (checkin within 7 days)")
+
+    coll = db.collection('reservations')
+    updated = skipped = errors = 0
+
+    for r in targets:
+        res_num = str(r.get('reservationNumber', '')).strip()
+        member_id = r.get('memberId', '')
+        doc_id = f"{res_num}_{member_id}" if member_id else res_num
+        if not doc_id:
+            continue
+
+        # Skip if phone already stored
+        doc_ref = coll.document(doc_id)
+        try:
+            snap = doc_ref.get()
+            if snap.exists and snap.to_dict().get('phone'):
+                skipped += 1
+                continue
+        except Exception as e:
+            print(f"  Firestore read error for {doc_id}: {e}")
+            errors += 1
+            continue
+
+        # Call MiniHotel detail endpoint
+        try:
+            resp = session.post(
+                'https://ssl20.minihotelpms.com/ajax/request_reservation_info.aspx/get_reservation_info',
+                json={'reservation_id': res_num},
+                headers={'Content-Type': 'application/json', 'Accept': 'application/json'},
+            )
+            if resp.status_code != 200:
+                print(f"  Detail API error {resp.status_code} for {doc_id}")
+                errors += 1
+                time.sleep(1)
+                continue
+
+            outer = resp.json()
+            inner_raw = outer.get('d', '{}')
+            inner = json.loads(inner_raw) if isinstance(inner_raw, str) else inner_raw
+            guest_info = inner.get('reservation', {}).get('PrimaryGuest', {})
+
+            phone   = (guest_info.get('phone') or '').strip()
+            email   = (guest_info.get('email') or '').strip()
+            country = (guest_info.get('Country_iso2') or '').strip()
+            guest_count = inner.get('reservation', {}).get('guestsCounts')
+
+            update = {}
+            if phone:   update['phone'] = phone
+            if email:   update['email'] = email
+            if country: update['country'] = country
+            if guest_count is not None: update['guestCount'] = guest_count
+
+            if update:
+                doc_ref.set(update, merge=True)
+                print(f"  {doc_id}: phone={phone or '—'} email={email or '—'} country={country or '—'}")
+                updated += 1
+            else:
+                print(f"  {doc_id}: no contact details returned")
+                skipped += 1
+
+        except Exception as e:
+            print(f"  Error fetching details for {doc_id}: {e}")
+            errors += 1
+
+        time.sleep(1)
+
+    print(f"Guest details: {updated} updated, {skipped} skipped, {errors} errors")
+
+
 def main():
     now = datetime.datetime.utcnow()
     print(f"Starting MiniHotel reservation sync at {now.isoformat()}")
@@ -296,6 +380,9 @@ def main():
     session = login_minihotel()
     reservations = fetch_reservations(session, from_date, to_date)
     synced = sync_to_firestore(db, reservations)
+
+    # Fetch phone/email/country for upcoming check-ins
+    fetch_guest_details(session, db, reservations)
 
     # Detect cancellations
     detect_cancellations(db, reservations, from_date, to_date)
