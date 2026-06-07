@@ -158,8 +158,8 @@ for room in room_data:
     if not room_code:
         skipped += 1
         continue
-    first = room.get('FirstName', '').strip()
-    last  = room.get('LastName', '').strip()
+    first = (room.get('FirstName') or '').strip()
+    last  = (room.get('LastName') or '').strip()
     combined = f'{first} {last}'.strip()
     if any(p in combined.lower() for p in PLACEHOLDER_NAMES):
         skipped += 1
