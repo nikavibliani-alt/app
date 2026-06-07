@@ -368,7 +368,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
       <h1>Welcome to<br>your apartment.</h1>
       <p>A few quick details so we can match you against your booking.</p>
     </div>
-    <div class="auth-apt">
+    <div class="auth-apt" id="auth-apt">
       <span class="sw"></span>
       <div>
         <div class="nm"><b id="t-apt-name-reg">Apartment</b></div>
@@ -509,7 +509,7 @@ const db=getFirestore(fb);
 const WA='995593000724';
 
 const params=new URLSearchParams(window.location.search);
-const aptId=params.get('apt')||'';
+let aptId=params.get('apt')||'';
 
 const APT_NAMES={
   '0-1':'Room 0-1','0-2':'Room 0-2','0-3':'Room 0-3','0-4':'Room 0-4','0-5':'Room 0-5',
@@ -518,8 +518,6 @@ const APT_NAMES={
   'orb-1':'Orb 1','orb-2':'Orb 2','orb-3':'Orb 3',
   'tab-1':'Tab 1','tab-2':'Tab 2','tab-3':'Tab 3',
 };
-const IS_SMALL_ROOM=['0-1','0-2','0-3','0-4','0-5'].includes(aptId);
-const IS_CENTRE=['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3'].includes(aptId);
 
 let lang='en';
 let contactType='wa';
@@ -790,20 +788,24 @@ window.submitRegistration=async function(){
   document.getElementById('t-submit-btn').textContent='Verifying...';
 
   try{
-    // ── Match against reservations for this apt ──────────────────────────────
+    // ── Match against reservations ───────────────────────────────────────────
     const {getDocs:_getDocs}=await import('https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js');
-    const resSnap=await _getDocs(query(collection(db,'reservations'),where('roomCode','==',aptId)));
+    const resSnap=aptId
+      ?await _getDocs(query(collection(db,'reservations'),where('roomCode','==',aptId)))
+      :await _getDocs(collection(db,'reservations'));
     let bestScore=0,bestRes=null;
     resSnap.forEach(d=>{
       const r={id:d.id,...d.data()};
       const ci=r.checkin||r.checkIn||'';
-      const co=r.checkout||r.checkOut||'';
-      if(!ci||!co)return;
+      if(!ci)return;
+      const nm=nameMatch(name,r.guest||r.guestName||'');
+      const dateOk=arrival&&arrival===ci;
+      if(!aptId&&(!nm||!dateOk))return; // no-apt mode: both name+date required
       let score=0;
       if(normalizePhone(contact)&&normalizePhone(r.phone||r.contact||'')&&
          normalizePhone(contact)===normalizePhone(r.phone||r.contact||''))score++;
-      if(nameMatch(name,r.guest||r.guestName||''))score++;
-      if(arrival&&ci&&arrival===ci)score++;
+      if(nm)score++;
+      if(dateOk)score++;
       if(score>bestScore){bestScore=score;bestRes=r;}
     });
 
@@ -823,6 +825,14 @@ window.submitRegistration=async function(){
       return;
     }
 
+    // Resolve aptId from matched reservation if not in URL
+    if(!aptId){
+      aptId=bestRes.roomCode||'';
+      if(aptId){
+        try{const s=await getDoc(doc(db,'checkin_apartments',aptId));if(s.exists())aptData=s.data();}catch(e){}
+        document.getElementById('home-apt-name').textContent=APT_NAMES[aptId]||aptId;
+      }
+    }
     document.getElementById('t-submit-btn').textContent='Uploading...';
     const passportUrl=await uploadToCloudinary(passportFile,'maxela/guests/'+aptId);
     guestId=`${aptId}_${Date.now()}`;
@@ -1087,7 +1097,7 @@ window.openPage=function(type){
   }
 
   if(type==='recs'){
-    const loc=IS_CENTRE?'centre':'shartava';
+    const loc=['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3'].includes(aptId)?'centre':'shartava';
     const recs=(d.recommendations&&d.recommendations[loc])||[];
     body=recs.length?recs.map(r=>`<div class="rec-card">
       <div class="rec-type">${esc(r.type||'Place')}</div>
@@ -1099,7 +1109,7 @@ window.openPage=function(type){
   }
 
   if(type==='rules'){
-    const key=IS_SMALL_ROOM?'small':'apartment';
+    const key=['0-1','0-2','0-3','0-4','0-5'].includes(aptId)?'small':'apartment';
     const rules=(d.rules&&(d.rules[key]||d.rules))||'';
     body=rules?`<div class="rules-box"><div class="rules-lbl">${t('hr')}</div><div class="rules-text">${esc(rules)}</div></div>`
       :`<div style="text-align:center;padding:3rem;color:var(--hint);font-size:14px;">House rules not added yet</div>`;
@@ -1278,12 +1288,13 @@ document.addEventListener('keydown',e=>{
 
 async function init(){
   if(!aptId){
+    document.getElementById('auth-apt').style.display='none';
     document.getElementById('loading').style.display='none';
     document.getElementById('app').style.display='block';
-    document.getElementById('page-register').innerHTML=`<div style="text-align:center;padding:4rem 2rem;"><div style="font-size:40px;margin-bottom:16px;">⚠️</div><div style="font-family:'Fraunces',serif;font-size:20px;margin-bottom:8px;">Invalid link</div><div style="font-size:14px;color:var(--muted);">Please use the link provided by Maxela Apartments.</div></div>`;
     return;
   }
   try{const snap=await getDoc(doc(db,'checkin_apartments',aptId));if(snap.exists())aptData=snap.data();}catch(e){}
+  document.getElementById('t-apt-name-reg').textContent=APT_NAMES[aptId]||aptId;
   const saved=localStorage.getItem('maxela_g_'+aptId);
   if(saved){
     try{
