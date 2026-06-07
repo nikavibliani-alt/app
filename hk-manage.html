@@ -562,13 +562,13 @@ async function loadHKStatus() {
 
     // 2. Load reservations with checkouts in range
     const resSnap = await db.collection('reservations')
-      .where('checkOut', '>=', startDate)
-      .where('checkOut', '<=', endDate)
+      .where('checkout', '>=', startDate)
+      .where('checkout', '<=', endDate)
       .get();
 
     resSnap.forEach(doc => {
       const r = doc.data();
-      const coDate = r.checkOut;
+      const coDate = r.checkout;
       const room = r.roomCode;
       if (!coDate || !room) return;
       if (!hkData[coDate]) hkData[coDate] = {};
@@ -580,28 +580,28 @@ async function loadHKStatus() {
           cleaner: '',
           docId: null, // no hk_status doc yet
           auto: true,  // auto-detected from reservation
-          guest: r.guestName || r.guest || ''
+          guest: r.guest || r.firstName || ''
         };
       } else {
         // hk_status exists, just add guest name
-        hkData[coDate][room].guest = r.guestName || r.guest || '';
+        hkData[coDate][room].guest = r.guest || r.firstName || '';
       }
     });
 
     // 3. Also check for same-day check-ins (turnover rooms = higher priority)
     const ciSnap = await db.collection('reservations')
-      .where('checkIn', '>=', startDate)
-      .where('checkIn', '<=', endDate)
+      .where('checkin', '>=', startDate)
+      .where('checkin', '<=', endDate)
       .get();
 
     ciSnap.forEach(doc => {
       const r = doc.data();
-      const ciDate = r.checkIn;
+      const ciDate = r.checkin;
       const room = r.roomCode;
       if (!ciDate || !room) return;
       if (hkData[ciDate]?.[room]) {
         hkData[ciDate][room].sameDayCheckin = true;
-        hkData[ciDate][room].nextGuest = r.guestName || r.guest || '';
+        hkData[ciDate][room].nextGuest = r.guest || r.firstName || '';
       }
     });
 
