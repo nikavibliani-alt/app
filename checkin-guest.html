@@ -512,8 +512,8 @@ const fb=initializeApp({
 });
 const db=getFirestore(fb);
 
-// Load Anthropic key from Firestore globals/config (set via Firebase console: anthropicKey field)
-(async function(){try{const cfg=await getDoc(doc(db,'globals','config'));if(cfg.exists())_anthropicKey=cfg.data().anthropicKey||'';}catch(e){}})();
+// Load Gemini key from Firestore globals/config (set via Firebase console: geminiKey field)
+(async function(){try{const cfg=await getDoc(doc(db,'globals','config'));if(cfg.exists())_geminiKey=cfg.data().geminiKey||'';}catch(e){}})();
 
 const WA='995593000724';
 
@@ -532,7 +532,7 @@ let lang='en';
 let contactType='wa';
 let passportFile=null;
 let passportScanResult=null;
-let _anthropicKey='';
+let _geminiKey='';
 let guestId=null;
 let guestData=null;
 let aptData=null;
@@ -712,32 +712,25 @@ async function scanPassport(file){
       r.readAsDataURL(file);
     });
     // Fetch API key if not already loaded
-    let apiKey=_anthropicKey;
+    let apiKey=_geminiKey;
     if(!apiKey){
       const cfg=await getDoc(doc(db,'globals','config'));
-      if(cfg.exists())apiKey=cfg.data().anthropicKey||'';
-      if(apiKey)_anthropicKey=apiKey;
+      if(cfg.exists())apiKey=cfg.data().geminiKey||'';
+      if(apiKey)_geminiKey=apiKey;
     }
     if(!apiKey){statusEl.style.display='none';return;} // key not configured — skip silently
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
       method:'POST',
-      headers:{
-        'x-api-key':apiKey,
-        'anthropic-version':'2023-06-01',
-        'content-type':'application/json',
-        'anthropic-dangerous-direct-browser-access':'true'
-      },
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:300,
-        messages:[{role:'user',content:[
-          {type:'image',source:{type:'base64',media_type:file.type||'image/jpeg',data:base64}},
-          {type:'text',text:'Look at this image. Is this a valid passport or government-issued ID document? Check: 1) Is it actually a passport/ID? 2) Are all expected fields visible (name, DOB, expiry, MRZ)? 3) Does it look unaltered? Reply in JSON: {"valid": true/false, "confidence": "high/medium/low", "reason": "...", "isPassport": true/false}'}
+        contents:[{parts:[
+          {inlineData:{mimeType:file.type||'image/jpeg',data:base64}},
+          {text:'Look at this image. Is this a valid passport or government-issued ID document? Check: 1) Is it actually a passport/ID? 2) Are all expected fields visible (name, DOB, expiry, MRZ)? 3) Does it look unaltered? Reply ONLY in JSON: {"valid": true/false, "confidence": "high/medium/low", "reason": "...", "isPassport": true/false}'}
         ]}]
       })
     });
     const rdata=await resp.json();
-    const raw=rdata.content?.[0]?.text||'';
+    const raw=rdata.candidates?.[0]?.content?.parts?.[0]?.text||'';
     let result;
     try{const m=raw.match(/\{[\s\S]*?\}/);result=JSON.parse(m?.[0]||'{}');}
     catch(pe){result={valid:false,confidence:'low',reason:'Unable to parse result',isPassport:false};}
