@@ -100,7 +100,7 @@ def fetch_reservations(session, from_date, to_date):
     )
     print(f"Fetching reservations: {from_date} → {to_date}")
 
-    r = session.get(url, headers={'Content-Type': 'application/json'})
+    r = session.get(url, headers={'Accept': 'application/json', 'Content-Type': 'application/json'})
     print(f"Status: {r.status_code}, Length: {len(r.text)}, First 200 chars: {r.text[:200]}")
 
     if r.status_code != 200:
