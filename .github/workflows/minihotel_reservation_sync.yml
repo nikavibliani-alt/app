@@ -1,0 +1,34 @@
+name: MiniHotel Reservation Sync
+
+on:
+  schedule:
+    # Every 30 minutes (UTC)
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install playwright firebase-admin
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Run reservation sync
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          MINIHOTEL_HOTEL: ${{ secrets.MINIHOTEL_HOTEL }}
+          MINIHOTEL_USER: ${{ secrets.MINIHOTEL_USER }}
+          MINIHOTEL_PASS: ${{ secrets.MINIHOTEL_PASS }}
+        run: python minihotel_reservation_sync.py
