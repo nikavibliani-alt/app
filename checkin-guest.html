@@ -272,6 +272,22 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 .rules-box{background:var(--accent-soft);border:1px solid var(--gold-border);border-radius:var(--rs);padding:1rem 1.1rem;margin-bottom:1rem;}
 .rules-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--accent);margin-bottom:6px;font-family:var(--mono);}
 .rules-text{font-size:13px;color:var(--ink);line-height:1.75;white-space:pre-wrap;}
+.auth-lang-bar{padding:12px 22px 0;}
+.lang-switcher-full{display:flex;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px;gap:3px;}
+.lang-switcher-full .lang-btn{flex:1;height:42px;font-size:12px;border-radius:10px;letter-spacing:0.02em;}
+.rules-checks{margin:20px 16px 0;display:flex;flex-direction:column;gap:10px;}
+.rule-item{display:flex;align-items:flex-start;gap:12px;padding:14px;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent;}
+.rule-item.smoking{background:#fff5f5;border-color:#f8c4c4;}
+.rule-item.checked{border-color:var(--green-border);background:var(--green-bg);}
+.rule-item.smoking.checked{border-color:var(--green-border);background:var(--green-bg);}
+.rule-cb{width:22px;height:22px;border:2px solid var(--line);border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px;background:var(--surface);}
+.rule-item.checked .rule-cb{background:var(--green);border-color:var(--green);}
+.rule-cb svg{display:none;}
+.rule-item.checked .rule-cb svg{display:block;}
+.rule-em{font-size:20px;flex:none;}
+.rule-title{font-size:13.5px;font-weight:500;color:var(--ink);line-height:1.3;}
+.rule-item.smoking .rule-title{color:var(--red);font-weight:600;}
+.rule-sub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;}
 .photos-scroll{display:flex;flex-direction:column;gap:8px;margin-bottom:1rem;max-width:480px;}
 .photos-scroll img{width:100%;border-radius:var(--rs);object-fit:cover;cursor:pointer;max-height:300px;}
 .video-wrap{border-radius:var(--r);overflow:hidden;margin-bottom:1rem;aspect-ratio:16/9;background:var(--surface2);}
@@ -367,6 +383,14 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         <span id="lang-pill-label">EN</span>
       </button>
     </div>
+    <div class="auth-lang-bar">
+      <div class="lang-switcher-full">
+        <button class="lang-btn active" onclick="setLang('en')">English</button>
+        <button class="lang-btn ka" onclick="setLang('ka')">ქართული</button>
+        <button class="lang-btn" onclick="setLang('ru')">Русский</button>
+        <button class="lang-btn ar" onclick="setLang('ar')">العربية</button>
+      </div>
+    </div>
     <div class="auth-greet">
       <div class="kicker"><span class="pip"></span> <span id="t-welcome-sub">GUEST CHECK-IN</span></div>
       <h1>Let's get you<br>checked in.</h1>
@@ -412,11 +436,38 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         <div class="s">PHOTO OF ID PAGE · ANY ANGLE</div>
         <img id="passport-preview">
       </div>
-      <input type="file" id="passport-input" accept="image/*" capture="environment" style="display:none;" onchange="handlePassport(this)">
+      <input type="file" id="passport-input" accept="image/*" style="display:none;" onchange="handlePassport(this)">
       <div id="passport-scan-status" style="display:none;" class="scan-status"></div>
     </div>
 
-    <button class="auth-cta" id="submit-btn" onclick="submitRegistration()">
+    <div class="rules-checks">
+      <div class="rule-item" id="rule-noise" onclick="toggleRule('noise')">
+        <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="rule-em">🔇</div>
+        <div class="rule-body">
+          <div class="rule-title">No parties or excessive noise</div>
+          <div class="rule-sub" id="rule-noise-sub">Quiet hours after 10 PM.</div>
+        </div>
+      </div>
+      <div class="rule-item smoking" id="rule-smoke" onclick="toggleRule('smoke')">
+        <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="rule-em">🚭</div>
+        <div class="rule-body">
+          <div class="rule-title">No smoking inside the apartment</div>
+          <div class="rule-sub">Strictly prohibited indoors. Fine applies.</div>
+        </div>
+      </div>
+      <div class="rule-item" id="rule-care" onclick="toggleRule('care')">
+        <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="rule-em">🏠</div>
+        <div class="rule-body">
+          <div class="rule-title">Take care of the apartment</div>
+          <div class="rule-sub">Don't damage property or lose entrance cards. Replacement fees apply.</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="auth-cta" id="submit-btn" onclick="submitRegistration()" disabled>
       <span id="t-submit-btn">Verify booking</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M9 6l6 6-6 6"/></svg>
     </button>
@@ -579,6 +630,20 @@ function formatTbilisiTime(unixSec){
 }
 
 function toast(msg,dur=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),dur);}
+
+const _rules={noise:false,smoke:false,care:false};
+window.toggleRule=function(id){
+  _rules[id]=!_rules[id];
+  document.getElementById('rule-'+id)?.classList.toggle('checked',_rules[id]);
+  const ok=_rules.noise&&_rules.smoke&&_rules.care;
+  const btn=document.getElementById('submit-btn');
+  if(btn)btn.disabled=!ok;
+};
+function _updateRulesForApt(){
+  const sub=document.getElementById('rule-noise-sub');
+  if(sub&&['6-3','6-4'].includes(aptId))
+    sub.textContent='Quiet hours after 10 PM. No running or jumping inside.';
+}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 function getCheckInHour(){
@@ -811,7 +876,10 @@ async function finishRegistration_(bestRes,formData){
   }
   document.getElementById('t-submit-btn').textContent='Uploading...';
   const passportUrl=await uploadToCloudinary(passportFile,'maxela/guests/'+aptId);
-  const docId=`${aptId}_${normGuestId(name)}`;
+  if(passportScanResult?.valid===false){
+    try{await setDoc(doc(db,'passport_alerts',`${aptId}_${Date.now()}`),{aptId,guestName:name,passportUrl,scanResult:passportScanResult,reason:passportScanResult.reason||'',createdAt:serverTimestamp()});}catch(e){}
+  }
+  const docId=`${aptId}_${arrival}`;
   const data={aptId,name,guests,nationality,contact,contactType:ct,passportUrl,
     passportScanResult:passportScanResult||null,arrivalDate:arrival,
     matchedReservationId:bestRes?.id||null,manualUnlock:false};
@@ -1370,6 +1438,7 @@ async function init(){
   if(aptId){
     try{const snap=await getDoc(doc(db,'checkin_apartments',aptId));if(snap.exists())aptData=snap.data();}catch(e){}
     document.getElementById('t-apt-name-reg').textContent=APT_NAMES[aptId]||aptId;
+    _updateRulesForApt();
   }else{
     document.getElementById('auth-apt').style.display='none';
   }
