@@ -67,7 +67,7 @@ def login_minihotel():
     soup = BeautifulSoup(r.text, 'html.parser')
 
     # POST login form
-    login_resp = session.post('https://login.minihotel.cloud/login.aspx', data={
+    session.post('https://login.minihotel.cloud/login.aspx', data={
         '__EVENTTARGET': 'LoginButton',
         '__EVENTARGUMENT': '',
         '__VIEWSTATE': soup.find('input', {'id': '__VIEWSTATE'})['value'],
@@ -80,10 +80,6 @@ def login_minihotel():
         'txt_agent_username': '',
         'txt_agent_password': '',
     })
-    print(f"Login response: status={login_resp.status_code}, url={login_resp.url}")
-
-    # Establish session cookies on ssl20
-    session.get('https://ssl20.minihotelpms.com/Home/room-grid.aspx')
 
     print("Logged in")
     return session
@@ -100,8 +96,7 @@ def fetch_reservations(session, from_date, to_date):
     )
     print(f"Fetching reservations: {from_date} → {to_date}")
 
-    r = session.get(url, headers={'Accept': 'application/json', 'Content-Type': 'application/json'})
-    print(f"Status: {r.status_code}, Length: {len(r.text)}, First 200 chars: {r.text[:200]}")
+    r = session.get(url, headers={'Content-Type': 'application/json'})
 
     if r.status_code != 200:
         print(f"ERROR: API returned {r.status_code}")
@@ -206,6 +201,87 @@ def sync_to_firestore(db, reservations):
     return count
 
 
+def detect_cancellations(db, api_reservations, from_date, to_date):
+    """Mark Firestore reservations as cancelled if they're not in the API response."""
+    coll = db.collection('reservations')
+
+    # Build set of active reservation keys from API
+    active_keys = set()
+    for r in api_reservations:
+        room_mh = r.get('roomNumber', '')
+        room_code = ROOM_MAP.get(room_mh)
+        checkout = parse_date(r.get('checkOut'))
+        if room_code and checkout:
+            active_keys.add(f"{room_code}_{checkout}")
+
+    # Query Firestore for reservations in the same date range
+    snap = coll \
+        .where('checkout', '>=', from_date) \
+        .where('checkout', '<=', to_date) \
+        .where('syncSource', '==', 'minihotel_api') \
+        .get()
+
+    batch = db.batch()
+    cancelled = 0
+
+    for doc in snap:
+        data = doc.to_dict()
+        key = f"{data.get('roomCode')}_{data.get('checkout')}"
+        if key not in active_keys and data.get('status') != 'CANCELLED':
+            batch.update(doc.reference, {
+                'status': 'CANCELLED',
+                'statusDescription': 'Cancelled (not in MiniHotel)',
+                'syncedAt': firestore.SERVER_TIMESTAMP,
+            })
+            cancelled += 1
+            print(f"  Cancelled: {data.get('guest')} | {data.get('roomCode')} | {data.get('checkout')}")
+
+    if cancelled > 0:
+        batch.commit()
+    print(f"Detected {cancelled} cancellations")
+
+
+def cleanup_old_duplicates(db):
+    """Remove old parser/query docs that have a matching minihotel_api doc."""
+    coll = db.collection('reservations')
+
+    # Get all API-synced reservations
+    api_snap = coll.where('syncSource', '==', 'minihotel_api').get()
+    api_keys = {}
+    for doc in api_snap:
+        d = doc.to_dict()
+        key = f"{d.get('roomCode')}_{d.get('checkin')}_{d.get('checkout')}"
+        api_keys[key] = True
+
+    # Find old docs that have a matching API doc
+    old_sources = ['old_parser', 'reservations_query', None]
+    batch = db.batch()
+    deleted = 0
+
+    for source in ['old_parser', 'reservations_query']:
+        snap = coll.where('syncSource', '==', source).get()
+        for doc in snap:
+            d = doc.to_dict()
+            key = f"{d.get('roomCode')}_{d.get('checkin')}_{d.get('checkout')}"
+            if key in api_keys:
+                batch.delete(doc.reference)
+                deleted += 1
+
+    # Also check docs without syncSource field
+    all_snap = coll.get()
+    for doc in all_snap:
+        d = doc.to_dict()
+        if 'syncSource' not in d:
+            key = f"{d.get('roomCode')}_{d.get('checkin')}_{d.get('checkout')}"
+            if key in api_keys:
+                batch.delete(doc.reference)
+                deleted += 1
+
+    if deleted > 0:
+        batch.commit()
+    print(f"Cleaned up {deleted} old duplicate docs")
+
+
 def main():
     now = datetime.datetime.utcnow()
     print(f"Starting MiniHotel reservation sync at {now.isoformat()}")
@@ -220,6 +296,12 @@ def main():
     session = login_minihotel()
     reservations = fetch_reservations(session, from_date, to_date)
     synced = sync_to_firestore(db, reservations)
+
+    # Detect cancellations
+    detect_cancellations(db, reservations, from_date, to_date)
+
+    # Clean up old duplicates (run once, then can be removed)
+    cleanup_old_duplicates(db)
 
     print(f"Done. {synced} reservations synced.")
 
