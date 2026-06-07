@@ -6,13 +6,19 @@ Syncs reservations from MiniHotel Calendar API directly to Firestore.
 Replaces the email parsing + XLSX scraping pipeline.
 
 Runs as a GitHub Action on schedule (every 30 min).
-Requires: FIREBASE_SERVICE_ACCOUNT, MINIHOTEL_USER, MINIHOTEL_PASS secrets.
+Requires: FIREBASE_SERVICE_ACCOUNT, MINIHOTEL_USER, MINIHOTEL_PASS, MINIHOTEL_HOTEL secrets.
 """
 
 import os, sys, json, base64, datetime
-from playwright.sync_api import sync_playwright
+import requests
+from bs4 import BeautifulSoup
 import firebase_admin
 from firebase_admin import credentials, firestore
+
+# ── Config ──
+HOTEL_CODE = os.environ.get('MINIHOTEL_HOTEL', 'freedo45')
+USERNAME = os.environ.get('MINIHOTEL_USER', '')
+PASSWORD = os.environ.get('MINIHOTEL_PASS', '')
 
 # ── Room name mapping: MiniHotel → Firestore ──
 ROOM_MAP = {
@@ -21,15 +27,11 @@ ROOM_MAP = {
     'M-7-1': '7-1', 'M-7-2': '7-2', 'M-7-4': '7-4',
     'T-1': 'tab-1', 'T-2': 'tab-2', 'T-3': 'tab-3',
     'Midamo 1': 'orb-1', 'Midamo 2': 'orb-2', 'Midamo 3': 'orb-3',
-    # Venu properties
     'VGL_ST1': 'vgl-st1', 'VGL_ST2': 'vgl-st2',
     'VGL_AP3': 'vgl-ap3', 'VGL_AP4': 'vgl-ap4',
 }
 
-# Properties to exclude from sync (Venu = separate business)
 SKIP_ROOMS = {'VGL_ST1', 'VGL_ST2', 'VGL_AP3', 'VGL_AP4'}
-
-# Statuses to skip (cancelled, no-show, etc.)
 VALID_STATUSES = {'OK', 'OK2', 'CL', 'WL'}
 
 
@@ -51,62 +53,60 @@ def init_firestore():
     return firestore.client()
 
 
-def login_minihotel(page):
-    """Log into MiniHotel via Playwright, matching housekeeper_sync.py login flow."""
-    hotel_code = os.environ.get('MINIHOTEL_HOTEL')
-    username   = os.environ.get('MINIHOTEL_USER')
-    password   = os.environ.get('MINIHOTEL_PASS')
-
-    if not hotel_code or not username or not password:
-        print("ERROR: MINIHOTEL_HOTEL, MINIHOTEL_USER, or MINIHOTEL_PASS not set")
+def login_minihotel():
+    """Log into MiniHotel using requests session (same as housekeeper_sync.py)."""
+    if not USERNAME or not PASSWORD:
+        print("ERROR: MINIHOTEL_USER or MINIHOTEL_PASS not set")
         sys.exit(1)
 
     print("Logging into MiniHotel...")
-    page.goto('https://login.minihotel.cloud/login.aspx')
-    page.wait_for_load_state('networkidle')
+    session = requests.Session()
 
-    page.fill('[name="txt_hotel_code"]', hotel_code)
-    page.fill('[name="txt_username"]', username)
-    page.fill('[name="txt_password"]', password)
-    page.click('[name="LoginButton"]')
-    page.wait_for_load_state('networkidle')
+    # GET login page to scrape ASP.NET hidden fields
+    r = session.get('https://login.minihotel.cloud/login.aspx')
+    soup = BeautifulSoup(r.text, 'html.parser')
 
-    if 'login' in page.url.lower():
-        print("ERROR: Login failed — check credentials or selectors")
-        sys.exit(1)
+    # POST login form
+    session.post('https://login.minihotel.cloud/login.aspx', data={
+        '__EVENTTARGET': 'LoginButton',
+        '__EVENTARGUMENT': '',
+        '__VIEWSTATE': soup.find('input', {'id': '__VIEWSTATE'})['value'],
+        '__VIEWSTATEGENERATOR': soup.find('input', {'id': '__VIEWSTATEGENERATOR'})['value'],
+        '__EVENTVALIDATION': soup.find('input', {'id': '__EVENTVALIDATION'})['value'],
+        'txt_hotel_code': HOTEL_CODE,
+        'txt_username': USERNAME,
+        'txt_password': PASSWORD,
+        'hdd_language': 'en',
+        'txt_agent_username': '',
+        'txt_agent_password': '',
+    })
 
-    print("Logged in successfully")
+    print("Logged in")
+    return session
 
 
-def fetch_reservations(page, from_date, to_date):
-    """Call the MiniHotel Reservations API using the authenticated browser session."""
-    # MiniHotel uses T20:00:00.000Z (midnight Tbilisi = UTC+4)
+def fetch_reservations(session, from_date, to_date):
+    """Call the MiniHotel Reservations API."""
     from_iso = f"{from_date}T20:00:00.000Z"
     to_iso = f"{to_date}T20:00:00.000Z"
 
-    api_url = (
+    url = (
         f"https://ssl20.minihotelpms.com/api/Reservations"
         f"?FromDate={from_iso}&ToDate={to_iso}"
     )
-    print(f"Fetching: {api_url}")
+    print(f"Fetching reservations: {from_date} → {to_date}")
 
-    result = page.evaluate('''
-        async (url) => {
-            const res = await fetch(url, {
-                method: "GET",
-                headers: { "Content-Type": "application/json" }
-            });
-            if (!res.ok) return { error: res.status };
-            return await res.json();
-        }
-    ''', api_url)
+    r = session.get(url, headers={'Content-Type': 'application/json'})
 
-    if isinstance(result, dict) and 'error' in result:
-        print(f"ERROR: API returned status {result['error']}")
+    if r.status_code != 200:
+        print(f"ERROR: API returned {r.status_code}")
+        print(r.text[:500])
         sys.exit(1)
 
-    reservations = result.get('reservations', [])
-    print(f"Got {len(reservations)} reservations from API")
+    data = r.json()
+    reservations = data.get('reservations', [])
+    rooms = data.get('rooms', [])
+    print(f"Got {len(reservations)} reservations, {len(rooms)} rooms")
     return reservations
 
 
@@ -115,7 +115,7 @@ def transform_reservation(r):
     room_mh = r.get('roomNumber', '')
     room_code = ROOM_MAP.get(room_mh)
     if not room_code:
-        return None  # Unknown room
+        return None
 
     checkin = parse_date(r.get('checkIn'))
     checkout = parse_date(r.get('checkOut'))
@@ -126,7 +126,6 @@ def transform_reservation(r):
     last = (r.get('lastName') or '').strip()
     guest = f"{first} {last}".strip()
 
-    # Calculate nights
     try:
         ci = datetime.datetime.strptime(checkin, '%Y-%m-%d')
         co = datetime.datetime.strptime(checkout, '%Y-%m-%d')
@@ -167,12 +166,10 @@ def sync_to_firestore(db, reservations):
     skipped = 0
 
     for r in reservations:
-        # Skip excluded rooms
         if r.get('roomNumber', '') in SKIP_ROOMS:
             skipped += 1
             continue
 
-        # Skip invalid statuses (cancelled, no-show)
         if r.get('status', '') not in VALID_STATUSES:
             skipped += 1
             continue
@@ -182,18 +179,16 @@ def sync_to_firestore(db, reservations):
             skipped += 1
             continue
 
-        # Use reservationNumber as doc ID
-        # For multi-room bookings (same reservationNumber), append memberId
+        # Doc ID: reservationNumber, append memberId for multi-room bookings
         doc_id = doc['reservationNumber']
         member_id = r.get('memberId', '')
         if member_id:
             doc_id = f"{doc_id}_{member_id}"
 
         ref = coll.document(doc_id)
-        batch.set(ref, doc, merge=True)  # merge=True preserves manual fields
+        batch.set(ref, doc, merge=True)
         count += 1
 
-        # Firestore batch limit is 500
         if count % 450 == 0:
             batch.commit()
             batch = db.batch()
@@ -210,29 +205,17 @@ def main():
     now = datetime.datetime.utcnow()
     print(f"Starting MiniHotel reservation sync at {now.isoformat()}")
 
-    # Date range: 7 days back → 60 days forward
     from_dt = now - datetime.timedelta(days=7)
     to_dt = now + datetime.timedelta(days=60)
     from_date = from_dt.strftime('%Y-%m-%d')
     to_date = to_dt.strftime('%Y-%m-%d')
     print(f"Date range: {from_date} → {to_date}")
 
-    # Init Firestore
     db = init_firestore()
-
-    # Login and fetch via Playwright
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
-
-        login_minihotel(page)
-        reservations = fetch_reservations(page, from_date, to_date)
-
-        browser.close()
-
-    # Sync to Firestore
+    session = login_minihotel()
+    reservations = fetch_reservations(session, from_date, to_date)
     synced = sync_to_firestore(db, reservations)
+
     print(f"Done. {synced} reservations synced.")
 
 

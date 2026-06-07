@@ -20,10 +20,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install playwright firebase-admin
-          playwright install chromium
-          playwright install-deps chromium
+        run: pip install requests beautifulsoup4 firebase-admin cryptography
 
       - name: Run reservation sync
         env:
