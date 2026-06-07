@@ -197,8 +197,12 @@ body{
 .auth-row{padding:12px 18px;border-bottom:1px solid var(--line-2);display:flex;flex-direction:column;gap:6px;position:relative;}
 .auth-row:last-child{border-bottom:0;}
 .auth-row__label{font-family:var(--mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);}
-.auth-row .form-input{border:none;border-radius:0;background:transparent;padding:0;height:auto;font-size:16px;color:var(--ink);}
+.auth-row .form-input{border:none;border-radius:0;background:transparent;padding:0;height:auto;font-size:16px;color:var(--ink);min-height:44px;}
 .auth-row .form-input:focus{border:none;background:transparent;outline:none;}
+input[type="date"].form-input{-webkit-appearance:none;appearance:none;font-size:16px;min-height:44px;cursor:pointer;}
+input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;padding:0;}
+.arrival-fallback{display:none;gap:6px;}
+.arrival-fallback select{flex:1;-webkit-appearance:none;appearance:none;font-size:16px;min-height:44px;padding:0 10px;background:transparent;border:none;color:var(--ink);cursor:pointer;}
 .auth-photo{margin:0 0 0;background:var(--surface);border:1.5px dashed var(--line);border-radius:18px;padding:24px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;cursor:pointer;}
 .auth-photo:hover{border-color:var(--accent);}
 .auth-photo.has-photo{border-style:solid;border-color:var(--green-border);background:var(--green-bg);}
@@ -385,7 +389,8 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         </div>
         <div class="auth-row">
           <span class="auth-row__label">Arrival date <span style="color:var(--red)">*</span></span>
-          <input type="date" class="form-input" id="r-arrival">
+          <input type="date" class="form-input" id="r-arrival" placeholder="Select date">
+          <div class="arrival-fallback" id="r-arrival-fallback"></div>
         </div>
         <div class="auth-row">
           <span class="auth-row__label" id="t-contact-num">Phone / username <span style="color:var(--red)">*</span></span>
@@ -1336,7 +1341,7 @@ window.logout=function(){
   const reg=document.getElementById('page-register');
   reg.classList.add('active');
   document.getElementById('reg-verify-error')?.remove();
-  ['r-name','r-contact','r-arrival'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['r-name','r-contact','r-arrival','r-arrival-day','r-arrival-month','r-arrival-year'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   if(!aptId){
     document.getElementById('auth-apt').style.display='none';
   }else{
@@ -1379,7 +1384,45 @@ async function init(){
   document.getElementById('app').style.display='block';
 }
 
+window.syncArrivalDate=function(){
+  const d=document.getElementById('r-arrival-day')?.value;
+  const m=document.getElementById('r-arrival-month')?.value;
+  const y=document.getElementById('r-arrival-year')?.value;
+  const inp=document.getElementById('r-arrival');
+  if(inp)inp.value=(d&&m&&y)?`${y}-${m}-${d}`:'';
+}
+
+function setupDateInput(){
+  const today=tbilisiToday();
+  const tp=today.split('-').map(Number);
+  const maxDt=new Date(tp[0],tp[1]-1,tp[2]+90);
+  const maxStr=`${maxDt.getFullYear()}-${String(maxDt.getMonth()+1).padStart(2,'0')}-${String(maxDt.getDate()).padStart(2,'0')}`;
+  const inp=document.getElementById('r-arrival');
+  if(inp){inp.min=today;inp.max=maxStr;}
+
+  // Feature-detect native date picker support
+  const test=document.createElement('input');
+  test.setAttribute('type','date');
+  if(test.type!=='date'){
+    // No native support (old browsers) — show dropdown fallback
+    if(inp)inp.style.display='none';
+    const fb=document.getElementById('r-arrival-fallback');
+    if(!fb)return;
+    fb.style.display='flex';
+    const todayY=tp[0];
+    const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dayOpts=[...Array(31)].map((_,i)=>`<option value="${String(i+1).padStart(2,'0')}">${i+1}</option>`).join('');
+    const monOpts=MONTHS.map((mn,i)=>`<option value="${String(i+1).padStart(2,'0')}">${mn}</option>`).join('');
+    const yrOpts=[todayY,todayY+1].map(y=>`<option value="${y}">${y}</option>`).join('');
+    fb.innerHTML=
+      `<select class="form-input" id="r-arrival-day" onchange="window.syncArrivalDate()" style="flex:1;"><option value="">Day</option>${dayOpts}</select>`+
+      `<select class="form-input" id="r-arrival-month" onchange="window.syncArrivalDate()" style="flex:1.5;"><option value="">Month</option>${monOpts}</select>`+
+      `<select class="form-input" id="r-arrival-year" onchange="window.syncArrivalDate()" style="flex:1.2;"><option value="">Year</option>${yrOpts}</select>`;
+  }
+}
+
 init();
+setupDateInput();
 </script>
 
 <div class="lightbox hidden" id="lightbox" onclick="if(event.target===this)window.closeLightbox()">
