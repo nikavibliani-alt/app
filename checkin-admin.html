@@ -320,22 +320,29 @@ function renderGuests(){
     html+=`<div class="card"><div class="card-body" style="padding:0;">`;
     recent.forEach(g=>{
       const apt=APARTMENTS.find(a=>a.id===g.aptId);
-      const now=new Date();
-      const checkinTime=new Date();
-      checkinTime.setHours(14,0,0,0);
-      const isUnlocked=g.manualUnlock||now>=checkinTime;
       const statusLabel=g.manualUnlock?'Unlocked':'Waiting 2pm';
       const statusCls=g.manualUnlock?'unlocked':'waiting';
-      const submittedAt=g.submittedAt?.toDate?g.submittedAt.toDate():new Date();
-      const timeStr=submittedAt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+submittedAt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-
-      const scanBadge=buildScanBadge(g.passportScanResult);
-      html+=`<div class="guest-row">
-        <div class="guest-apt">${esc(apt?.code||g.aptId)}</div>
+      const submittedAt=g.submittedAt?.toDate?g.submittedAt.toDate():null;
+      const timeStr=submittedAt?submittedAt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+submittedAt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
+      const sr=g.passportScanResult;
+      const badPassport=sr&&sr.valid===false;
+      const ctIcon=g.contactType==='tg'
+        ?`<span style="font-size:9px;font-weight:700;color:#0088cc;background:#e8f5fe;border:1px solid #90cdf4;padding:1px 5px;border-radius:4px;">TG</span>`
+        :`<span style="font-size:9px;font-weight:700;color:#25D366;background:#f0fff4;border:1px solid #86efac;padding:1px 5px;border-radius:4px;">WA</span>`;
+      const passportThumb=g.passportUrl
+        ?`<a href="${esc(g.passportUrl)}" target="_blank" title="View passport" style="flex-shrink:0;"><img src="${esc(g.passportUrl)}" style="width:38px;height:38px;object-fit:cover;border-radius:6px;border:1px solid var(--border);display:block;"></a>`
+        :`<div style="width:38px;height:38px;border-radius:6px;background:var(--surface2);flex-shrink:0;border:1px solid var(--border);"></div>`;
+      const resNumShort=g.matchedReservationId?(g.matchedReservationId.length>8?'…'+g.matchedReservationId.slice(-6):g.matchedReservationId):'';
+      html+=`<div class="guest-row"${badPassport?' style="background:var(--red-bg);border-left:3px solid var(--red);"':''}>
         <div style="flex:1;min-width:0;">
-          <div class="guest-name">${esc(g.name||'—')}</div>
-          <div class="guest-meta">${g.guests||1} guest${(g.guests||1)>1?'s':''} · ${timeStr}${scanBadge?` · ${scanBadge}`:''}</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
+            <span class="guest-apt">${esc(apt?.code||g.aptId)}</span>
+            <span class="guest-name">${esc(g.name||'—')}</span>
+            ${badPassport?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">⚠ PASSPORT</span>`:''}
+          </div>
+          <div class="guest-meta">${g.guests||1} guest${(g.guests||1)>1?'s':''} · ${ctIcon} ${esc(g.contact||'—')} · ${esc(g.arrivalDate||'—')} · ${timeStr}${resNumShort?' · #'+esc(resNumShort):''}</div>
         </div>
+        ${passportThumb}
         <span class="unlock-badge ${statusCls}">${statusLabel}</span>
         <div class="guest-actions">
           ${!g.manualUnlock?`<button class="btn btn-sm btn-green" onclick="window.unlockGuest('${g.id}')">Unlock</button>`:''}
