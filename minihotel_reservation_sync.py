@@ -67,7 +67,7 @@ def login_minihotel():
     soup = BeautifulSoup(r.text, 'html.parser')
 
     # POST login form
-    session.post('https://login.minihotel.cloud/login.aspx', data={
+    login_resp = session.post('https://login.minihotel.cloud/login.aspx', data={
         '__EVENTTARGET': 'LoginButton',
         '__EVENTARGUMENT': '',
         '__VIEWSTATE': soup.find('input', {'id': '__VIEWSTATE'})['value'],
@@ -80,6 +80,10 @@ def login_minihotel():
         'txt_agent_username': '',
         'txt_agent_password': '',
     })
+    print(f"Login response: status={login_resp.status_code}, url={login_resp.url}")
+
+    # Establish session cookies on ssl20
+    session.get('https://ssl20.minihotelpms.com/Home/room-grid.aspx')
 
     print("Logged in")
     return session
@@ -97,6 +101,7 @@ def fetch_reservations(session, from_date, to_date):
     print(f"Fetching reservations: {from_date} → {to_date}")
 
     r = session.get(url, headers={'Content-Type': 'application/json'})
+    print(f"Status: {r.status_code}, Length: {len(r.text)}, First 200 chars: {r.text[:200]}")
 
     if r.status_code != 200:
         print(f"ERROR: API returned {r.status_code}")
