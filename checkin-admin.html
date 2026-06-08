@@ -283,6 +283,27 @@ window.deleteGuest=async function(guestId,guestName){
   }catch(e){toast('Delete failed: '+e.message);}
 };
 
+window.cleanDuplicateGuests=async function(){
+  const groups={};
+  guestData.forEach(g=>{
+    const key=`${g.aptId||''}_${(g.name||'').toLowerCase().trim().replace(/\s+/g,'_')}`;
+    if(!groups[key])groups[key]=[];
+    groups[key].push(g);
+  });
+  const toDelete=[];
+  Object.values(groups).forEach(dups=>{
+    if(dups.length<2)return;
+    dups.sort((a,b)=>(b.submittedAt?.seconds||0)-(a.submittedAt?.seconds||0));
+    toDelete.push(...dups.slice(1));
+  });
+  if(!toDelete.length){toast('No duplicates found');return;}
+  if(!confirm(`Delete ${toDelete.length} duplicate record${toDelete.length!==1?'s':''}? Newest copy of each guest will be kept.`))return;
+  try{
+    await Promise.all(toDelete.map(g=>deleteDoc(doc(db,'checkin_guests',g.id))));
+    toast(`Deleted ${toDelete.length} duplicate${toDelete.length!==1?'s':''} ✓`);
+  }catch(e){toast('Delete failed: '+e.message);}
+};
+
 window.deleteOldGuests=async function(){
   const cutoff=new Date();
   cutoff.setDate(cutoff.getDate()-7);
@@ -312,10 +333,9 @@ function renderGuests(){
     </div>`;
   } else {
     const oldCount=guestData.filter(g=>{const sub=g.submittedAt?.toDate?g.submittedAt.toDate():null;return sub&&(new Date()-sub)>7*24*60*60*1000;}).length;
-    html+=`<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-      <button class="btn btn-red btn-sm" onclick="window.deleteOldGuests()"${!oldCount?' disabled':''}>
-        🗑 Delete old (${oldCount})
-      </button>
+    html+=`<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;">
+      <button class="btn btn-sm" onclick="window.cleanDuplicateGuests()">🔁 Clean duplicates</button>
+      <button class="btn btn-red btn-sm" onclick="window.deleteOldGuests()"${!oldCount?' disabled':''}>🗑 Delete old (${oldCount})</button>
     </div>`;
     html+=`<div class="card"><div class="card-body" style="padding:0;">`;
     recent.forEach(g=>{
@@ -326,19 +346,24 @@ function renderGuests(){
       const timeStr=submittedAt?submittedAt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+submittedAt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
       const sr=g.passportScanResult;
       const badPassport=sr&&sr.valid===false;
+      const passportBadge=sr
+        ?(sr.valid===false
+          ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);" title="${esc(sr.reason||'')}">⚠ BAD ID</span>`
+          :`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">✓ ID OK</span>`)
+        :`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);">NO SCAN</span>`;
       const ctIcon=g.contactType==='tg'
         ?`<span style="font-size:9px;font-weight:700;color:#0088cc;background:#e8f5fe;border:1px solid #90cdf4;padding:1px 5px;border-radius:4px;">TG</span>`
         :`<span style="font-size:9px;font-weight:700;color:#25D366;background:#f0fff4;border:1px solid #86efac;padding:1px 5px;border-radius:4px;">WA</span>`;
       const passportThumb=g.passportUrl
-        ?`<a href="${esc(g.passportUrl)}" target="_blank" title="View passport" style="flex-shrink:0;"><img src="${esc(g.passportUrl)}" style="width:38px;height:38px;object-fit:cover;border-radius:6px;border:1px solid var(--border);display:block;"></a>`
-        :`<div style="width:38px;height:38px;border-radius:6px;background:var(--surface2);flex-shrink:0;border:1px solid var(--border);"></div>`;
+        ?`<a href="${esc(g.passportUrl)}" target="_blank" title="View passport" style="flex-shrink:0;cursor:pointer;"><img src="${esc(g.passportUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:2px solid ${badPassport?'var(--red)':'var(--border)'};display:block;"></a>`
+        :`<div style="width:48px;height:48px;border-radius:6px;background:var(--surface2);flex-shrink:0;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;">📷</div>`;
       const resNumShort=g.matchedReservationId?(g.matchedReservationId.length>8?'…'+g.matchedReservationId.slice(-6):g.matchedReservationId):'';
       html+=`<div class="guest-row"${badPassport?' style="background:var(--red-bg);border-left:3px solid var(--red);"':''}>
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
             <span class="guest-apt">${esc(apt?.code||g.aptId)}</span>
             <span class="guest-name">${esc(g.name||'—')}</span>
-            ${badPassport?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">⚠ PASSPORT</span>`:''}
+            ${passportBadge}
           </div>
           <div class="guest-meta">${g.guests||1} guest${(g.guests||1)>1?'s':''} · ${ctIcon} ${esc(g.contact||'—')} · ${esc(g.arrivalDate||'—')} · ${timeStr}${resNumShort?' · #'+esc(resNumShort):''}</div>
         </div>

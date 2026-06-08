@@ -988,6 +988,47 @@ window.submitRegistration=async function(){
   }
 }
 
+function renderPassportBanner(){
+  const el=document.getElementById('passport-warn-banner');
+  if(!el)return;
+  const sr=guestData?.passportScanResult;
+  if(sr===undefined||sr===null){
+    el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon">📋</div><div class="passport-banner__body"><div class="passport-banner__title">Please upload your passport photo</div><div class="passport-banner__sub">Required for identity verification.</div><button class="passport-banner__btn" onclick="document.getElementById('passport-reupload-input').click()">Upload now</button></div></div>`;
+  }else if(sr.valid===false){
+    el.innerHTML=`<div class="passport-banner warn"><div class="passport-banner__icon">⚠️</div><div class="passport-banner__body"><div class="passport-banner__title">Your ID document wasn't verified</div><div class="passport-banner__sub">Please upload a valid passport or national ID.</div><button class="passport-banner__btn" onclick="document.getElementById('passport-reupload-input').click()">Re-upload</button></div></div>`;
+  }else{
+    el.innerHTML='';
+  }
+}
+
+window.handlePassportReupload=async function(input){
+  const file=input.files[0];
+  if(!file)return;
+  input.value='';
+  const el=document.getElementById('passport-warn-banner');
+  if(el)el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon">⏳</div><div class="passport-banner__body"><div class="passport-banner__title">Verifying document...</div></div></div>`;
+  const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
+  let scanResult=null;
+  let apiKey=_geminiKey;
+  if(!apiKey){try{const cfg=await getDoc(doc(db,'globals','config'));if(cfg.exists()){apiKey=cfg.data().geminiKey||'';_geminiKey=apiKey;}}catch(e){}}
+  if(apiKey){try{
+    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{inlineData:{mimeType:file.type||'image/jpeg',data:base64}},{text:'Look at this image. Is this a valid passport or government-issued ID document? Check: 1) Is it actually a passport/ID? 2) Are all expected fields visible (name, DOB, expiry, MRZ)? 3) Does it look unaltered? Reply ONLY in JSON: {"valid": true/false, "confidence": "high/medium/low", "reason": "...", "isPassport": true/false}'}]}]})});
+    const rdata=await resp.json();
+    const raw=rdata.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    try{const m=raw.match(/\{[\s\S]*?\}/);scanResult=JSON.parse(m?.[0]||'{}');}catch(pe){}
+  }catch(e){}}
+  passportScanResult=scanResult;
+  if(el)el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon">⏳</div><div class="passport-banner__body"><div class="passport-banner__title">Uploading...</div></div></div>`;
+  let newUrl=guestData?.passportUrl||null;
+  try{newUrl=await uploadToCloudinary(file,'maxela/guests/'+aptId);}catch(e){}
+  if(guestId&&newUrl){
+    const update={passportUrl:newUrl,passportScanResult:scanResult,passportUpdatedAt:serverTimestamp()};
+    try{await setDoc(doc(db,'checkin_guests',guestId),update,{merge:true});}catch(e){}
+    guestData={...guestData,...update};
+  }
+  renderPassportBanner();
+};
+
 function needsElevatorCode(){
   const elevatorRooms=['6-1','6-2','6-3','6-4','7-1','7-2','7-4'];
   return elevatorRooms.includes(aptId);
@@ -1000,9 +1041,10 @@ function showHome(){
   document.getElementById('home-apt-name').textContent=APT_NAMES[aptId]||aptId;
   document.getElementById('t-greeting-label').textContent=t('gl');
   renderTiles();
+  renderPassportBanner();
   if(guestId){
     onSnapshot(doc(db,'checkin_guests',guestId),snap=>{
-      if(snap.exists()){guestData={...snap.data(),id:guestId};renderTiles();}
+      if(snap.exists()){guestData={...snap.data(),id:guestId};renderTiles();renderPassportBanner();}
     });
     onSnapshot(collection(db,'checkin_requests'),snap=>{
       myRequests=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.guestId===guestId);
