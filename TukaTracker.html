@@ -61,6 +61,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .exp-cat-badge{font-size:10px;font-weight:600;background:var(--bg);border:1px solid var(--border);border-radius:var(--rsm);padding:2px 7px;color:var(--muted);white-space:nowrap;}
 .exp-amt{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;flex:1;text-align:right;}
 .exp-del{background:none;border:1px solid var(--border);border-radius:var(--rsm);cursor:pointer;color:var(--hint);font-size:13px;padding:2px 7px;line-height:1;background:var(--red-bg);color:var(--red);}
+.paid-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0;}
+.paid-biz{background:#f0f0f0;color:#555;}
+.paid-nika{background:#eff4ff;color:#1d4ed8;}
+.paid-tuka{background:#f0fdf4;color:#166534;}
 .exp-total-row{display:flex;justify-content:space-between;padding:6px 0 0;margin-top:3px;border-top:1px solid var(--border);font-size:12px;}
 .exp-total-row .lbl{color:var(--muted);font-weight:500;}
 .exp-total-row .val{font-family:'JetBrains Mono',monospace;font-weight:600;}
@@ -388,7 +392,8 @@ function addExp(key,onRender){
   if(!amt||amt<=0){alert('Enter a valid amount');return;}
   if(catSel==='Other'&&!catCustom){alert('Please enter a custom category name');return;}
   const m=getM(key);if(!m.expenses)m.expenses=[];
-  m.expenses.push({amt,cat,cur,id:Date.now()});saveM(key,m);
+  const paidBy=document.getElementById('f-exp-paid')?.value||'business';
+  m.expenses.push({amt,cat,cur,paidBy,id:Date.now()});saveM(key,m);
   document.getElementById('f-exp-amt').value='';
   if(catCustomEl)catCustomEl.value='';
   onRender(key);
@@ -405,7 +410,10 @@ function renderExpList(key,onDel){
   exps.forEach(e=>{
     const cur=e.cur||'GEL';const r=document.createElement('div');r.className='exp-item';
     const del=document.createElement('button');del.className='exp-del';del.textContent='×';del.onclick=()=>onDel(key,e.id);
-    r.innerHTML=`<span class="exp-cat-badge">${e.cat}</span><span class="cur-tag ${cur==='USD'?'usd':'gel'}" style="flex-shrink:0;">${cur}</span><span class="exp-amt">${famt(e.amt,cur)}</span>`;
+    const pb=e.paidBy||'business';
+    const pbLabel={business:'💼 Biz',nika:'👤 Nika',tuka:'👤 Tuka'}[pb]||'💼 Biz';
+    const pbCls={business:'paid-biz',nika:'paid-nika',tuka:'paid-tuka'}[pb]||'paid-biz';
+    r.innerHTML=`<span class="exp-cat-badge">${e.cat}</span><span class="cur-tag ${cur==='USD'?'usd':'gel'}" style="flex-shrink:0;">${cur}</span><span class="exp-amt">${famt(e.amt,cur)}</span><span class="paid-badge ${pbCls}">${pbLabel}</span>`;
     r.appendChild(del);list.appendChild(r);
   });
   const tr=document.createElement('div');tr.className='exp-total-row';
@@ -453,15 +461,19 @@ function doCalc(key,saveSnap){
   const totalInc=airbnb+bookNetUsd+directUsd;
   const bizGel=(m.expenses||[]).reduce((s,e)=>s+toGel(e.amt,e.cur||'GEL',rate),0);
   const bizUsd=bizGel/rate;
+  const nikaPaidGel=(m.expenses||[]).filter(e=>(e.paidBy||'business')==='nika').reduce((s,e)=>s+toGel(e.amt,e.cur||'GEL',rate),0);
+  const tukaPaidGel=(m.expenses||[]).filter(e=>(e.paidBy||'business')==='tuka').reduce((s,e)=>s+toGel(e.amt,e.cur||'GEL',rate),0);
+  const nikaPaidUsd=nikaPaidGel/rate;const tukaPaidUsd=tukaPaidGel/rate;
   const netUsd=totalInc-bizUsd;const netGel=netUsd*rate;
   const perGel=(m.personal||[]).reduce((s,e)=>s+toGel(e.amt,e.cur||'GEL',rate),0);
   const ourUsd=netUsd*0.2;const ourGel=ourUsd*rate;
   const tukaUsd=netUsd*0.8;const tukaGel=tukaUsd*rate;
-  const tFUsd=tukaUsd-perGel/rate;const tFGel=tukaGel-perGel;
+  const tFUsd=tukaUsd-perGel/rate+tukaPaidUsd;const tFGel=tukaGel-perGel+tukaPaidGel;
+  const ourFinalUsd=ourUsd+nikaPaidUsd;const ourFinalGel=ourGel+nikaPaidGel;
   const ppl=document.getElementById('f-people');
   if(ppl)ppl.innerHTML=`
     <div class="person-card pc-tuka"><div class="pc-name">Tuka (80%)</div><div class="pc-usd">${fusd(tFUsd)}</div><div class="pc-gel">${fgel(tFGel)}</div></div>
-    <div class="person-card pc-us"><div class="pc-name">Our share (20%)</div><div class="pc-usd">${fusd(ourUsd)}</div><div class="pc-gel">${fgel(ourGel)}</div></div>`;
+    <div class="person-card pc-us"><div class="pc-name">Our share (20%)</div><div class="pc-usd">${fusd(ourFinalUsd)}</div><div class="pc-gel">${fgel(ourFinalGel)}</div></div>`;
   const bc=document.getElementById('f-breakdown');
   if(bc){
     bc.innerHTML='';
@@ -473,21 +485,26 @@ function doCalc(key,saveSnap){
     addStep(bc,'Net profit',netUsd,'usd');
     addStep(bc,'Our 20%',ourUsd,'usd','pos');
     addStep(bc,'Tuka 80%',tukaUsd,'usd','pos');
-    if(perGel>0)addStep(bc,'Venu personal',-perGel/rate,'usd','neg');
+    if(perGel>0)addStep(bc,'Tuka personal',-perGel/rate,'usd','neg');
+    if(nikaPaidUsd>0)addStep(bc,'Nika reimbursement (+)',nikaPaidUsd,'usd','pos');
+    if(tukaPaidUsd>0)addStep(bc,'Tuka reimbursement (+)',tukaPaidUsd,'usd','pos');
   }
   let t=key.replace('_',' ')+' — Income Distribution\n─────────────────────────\n\n';
   t+='Airbnb Income: '+fusd(airbnb)+'\n';
   if(bookRaw>0)t+='Booking Income: '+fgel(bookRaw)+' - '+fgel(bookTax)+' (7.5% Tax) = '+fgel(bookNet)+' ('+fusd(bookNetUsd)+')\n';
   if(directRaw>0)t+='Direct Reservation: '+(directCur==='USD'?fusd(directRaw):fgel(directRaw))+' = '+fusd(directUsd)+'\n';
   t+='Total Income: '+fusd(totalInc)+'\n\n';
-  if((m.expenses||[]).length){t+='Business Expenses:\n';m.expenses.forEach(e=>{t+='  '+e.cat+': '+famt(e.amt,e.cur||'GEL')+'\n';});t+='Total: '+fgel(bizGel)+' = '+fusd(bizUsd)+'\n\n';}
+  if((m.expenses||[]).length){const paidLabels={business:'',nika:' [Nika paid]',tuka:' [Tuka paid]'};t+='Business Expenses:\n';m.expenses.forEach(e=>{t+='  '+e.cat+': '+famt(e.amt,e.cur||'GEL')+(paidLabels[e.paidBy||'business']||'')+'\n';});t+='Total: '+fgel(bizGel)+' = '+fusd(bizUsd)+'\n\n';}
   if(perGel>0){t+='Tuka Personal Expenses:\n';(m.personal||[]).forEach(e=>{t+='  '+e.note+': '+famt(e.amt,e.cur||'GEL')+'\n';});t+='Total: '+fgel(perGel)+'\n\n';}
   t+='Net Income: '+fusd(netUsd)+' / '+fgel(netGel)+'\n\n─────────────────────────\nDistribution\n\n';
   t+='Tuka (80%): '+fusd(tukaUsd)+' / '+fgel(tukaGel)+'\n';
   if(perGel>0)t+='Personal Expenses: -'+fgel(perGel)+'\n';
-  t+='Tuka Net: '+fusd(tFUsd)+' / '+fgel(tFGel)+'\n\nOur Share (20%): '+fusd(ourUsd)+' / '+fgel(ourGel)+'\n\nRate: 1 USD = '+rate.toFixed(2)+' GEL';
+  if(tukaPaidGel>0)t+='Tuka reimbursement: +'+fgel(tukaPaidGel)+'\n';
+  t+='Tuka Net: '+fusd(tFUsd)+' / '+fgel(tFGel)+'\n\nOur Share (20%): '+fusd(ourUsd)+' / '+fgel(ourGel)+'\n';
+  if(nikaPaidGel>0)t+='Nika reimbursement: +'+fgel(nikaPaidGel)+'\n';
+  t+='Our Net: '+fusd(ourFinalUsd)+' / '+fgel(ourFinalGel)+'\n\nRate: 1 USD = '+rate.toFixed(2)+' GEL';
   const tpl=document.getElementById('f-tpl');if(tpl)tpl.textContent=t;
-  if(saveSnap){m.snapshot={tukaUsd:tFUsd,tukaGel:tFGel,ourUsd,ourGel};saveM(key,m);showToast('Saved & synced ✓');}
+  if(saveSnap){m.snapshot={tukaUsd:tFUsd,tukaGel:tFGel,ourUsd:ourFinalUsd,ourGel:ourFinalGel};saveM(key,m);showToast('Saved & synced ✓');}
   return{tFUsd,tFGel,ourUsd,ourGel};
 }
 
@@ -618,7 +635,8 @@ function mBuildDetail(key){
       <div class="m-ds-header"><span class="m-ds-title">Business expenses</span><span class="card-badge" id="f-exp-total" style="color:var(--red);">0.00</span></div>
       <div class="m-ds-body">
         <div class="m-add-row"><input type="number" id="f-exp-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-exp-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select></div>
-        <div class="m-add-row2"><select id="f-exp-cat" onchange="toggleCustomExp(this)"><option>Cleaning</option><option>Laundry</option><option>Maintenance</option><option>Bills</option><option>Supplies</option><option>Commission</option><option>Other</option></select><button class="m-add-btn" id="m-btn-add-exp">+ Add</button></div>
+        <div class="m-add-row2"><select id="f-exp-cat" onchange="toggleCustomExp(this)"><option>Cleaning</option><option>Laundry</option><option>Maintenance</option><option>Bills</option><option>Supplies</option><option>Commission</option><option>Other</option></select></div>
+        <div class="m-add-row2"><select id="f-exp-paid" style="width:100%;height:46px;padding:0 12px;border:1px solid var(--border);border-radius:var(--rs);font-family:Inter,sans-serif;font-size:14px;background:var(--bg);outline:none;"><option value="business">💼 Business paid</option><option value="nika">👤 Nika paid (reimbursed from profit)</option><option value="tuka">👤 Tuka paid (reimbursed from profit)</option></select><button class="m-add-btn" id="m-btn-add-exp">+ Add</button></div>
         <div id="f-exp-custom-wrap" style="display:none;margin-bottom:8px;"><input type="text" id="f-exp-custom" placeholder="Type category name"></div>
         <div id="f-exp-list"></div>
       </div>
@@ -728,7 +746,7 @@ function dRenderMonthPanel(key,mon){
     <div class="card">
       <div class="card-header"><span class="card-title">Business expenses</span><span class="card-badge" id="f-exp-total" style="color:var(--red);">0.00</span></div>
       <div class="card-body">
-        <div class="d-add-exp-row"><input type="number" id="f-exp-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-exp-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select><select id="f-exp-cat" onchange="toggleCustomExp(this)"><option>Cleaning</option><option>Laundry</option><option>Maintenance</option><option>Bills</option><option>Supplies</option><option>Commission</option><option>Other</option></select><button class="d-add-exp-btn" id="d-btn-add-exp">+ Add</button></div>
+        <div class="d-add-exp-row"><input type="number" id="f-exp-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-exp-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select><select id="f-exp-cat" onchange="toggleCustomExp(this)"><option>Cleaning</option><option>Laundry</option><option>Maintenance</option><option>Bills</option><option>Supplies</option><option>Commission</option><option>Other</option></select><select id="f-exp-paid"><option value="business">💼 Business</option><option value="nika">👤 Nika</option><option value="tuka">👤 Tuka</option></select><button class="d-add-exp-btn" id="d-btn-add-exp">+ Add</button></div>
         <div id="f-exp-custom-wrap" style="display:none;margin-bottom:8px;"><input type="text" id="f-exp-custom" placeholder="Type category name"></div>
         <div id="f-exp-list"></div>
       </div>
