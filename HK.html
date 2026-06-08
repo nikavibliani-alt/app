@@ -341,6 +341,16 @@ function getBeddingAlert(roomCode,guests){
   if(['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3'].includes(c))return guests>=3?'⚠️ Extra sheets needed':null;
   return null;
 }
+function getTaskRooms(date){
+  const ds=fmtDate(date);
+  const active=getActiveRooms();
+  const coRooms=active.filter(r=>getCheckoutToday(r.code,date));
+  // Include rooms manually added via admin (hk_status entry but no checkout reservation)
+  const statusCodes=Object.keys(cleaningStatus).filter(k=>k.endsWith('_'+ds)).map(k=>k.slice(0,-(ds.length+1)));
+  const manualRooms=active.filter(r=>statusCodes.includes(r.code)&&!coRooms.find(c=>c.code===r.code));
+  return [...coRooms,...manualRooms];
+}
+
 function renderTabs(){
   const el=document.getElementById('day-tabs');
   if(!el)return;
@@ -348,7 +358,7 @@ function renderTabs(){
   let html='';
   for(let i=0;i<7;i++){
     const d=addDays(today(),i);
-    const count=getActiveRooms().filter(r=>getCheckoutToday(r.code,d)).length;
+    const count=getTaskRooms(d).length;
     if(!count&&i>0)continue; // Today always shown even with 0 checkouts
     const label=i===0?'Today':i===1?'Tomorrow':DAY[d.getDay()]+' '+d.getDate();
     html+=`<button class="day-tab${activeDay===i?' active':''}" onclick="window.switchDay(${i})">${label} <span class="tab-count${count?'':' zero'}">${count||''}</span></button>`;
@@ -456,8 +466,8 @@ function render(){
 
   renderTabs();
 
-  // get rooms with checkouts
-  const checkoutRooms=getActiveRooms().filter(r=>getCheckoutToday(r.code,date));
+  // get rooms with checkouts + manually-added admin rooms
+  const checkoutRooms=getTaskRooms(date);
   console.log(`[HK] checkouts on ${ds}:`, checkoutRooms.map(r=>r.code));
 
   const main=document.getElementById('main-list');

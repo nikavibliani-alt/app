@@ -351,6 +351,16 @@ function getBeddingAlert(roomCode,guests){
   if(['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3'].includes(c))return guests>=3?'⚠️ Extra sheets needed':null;
   return null;
 }
+function getTaskRooms(date){
+  const ds=fmtDate(date);
+  const active=getActiveRooms();
+  const coRooms=active.filter(r=>getCheckoutToday(r.code,date));
+  // Include rooms manually added via admin (hk_status entry but no checkout reservation)
+  const statusCodes=Object.keys(cleaningStatus).filter(k=>k.endsWith('_'+ds)).map(k=>k.slice(0,-(ds.length+1)));
+  const manualRooms=active.filter(r=>statusCodes.includes(r.code)&&!coRooms.find(c=>c.code===r.code));
+  return [...coRooms,...manualRooms];
+}
+
 function renderTabs(){
   const el=document.getElementById('day-tabs');
   if(!el)return;
@@ -358,7 +368,7 @@ function renderTabs(){
   let html='';
   for(let i=0;i<7;i++){
     const d=addDays(today(),i);
-    const count=getActiveRooms().filter(r=>getCheckoutToday(r.code,d)).length;
+    const count=getTaskRooms(d).length;
     const label=i===0?'Today':i===1?'Tomorrow':DAY[d.getDay()]+' '+d.getDate();
     html+=`<button class="day-tab${activeDay===i?' active':''}" onclick="window.switchDay(${i})">${label} <span class="tab-count${count?'':' zero'}">${count||''}</span></button>`;
   }
@@ -371,7 +381,7 @@ const ROLE_LABELS={shartava:'📍 Shartava',centre:'📍 Centre',admin:'📍 All
 let _pinBuf='';
 
 function getActiveRooms(){
-  const role=localStorage.getItem('hk_role')||'';
+  const role=localStorage.getItem('hk_shartava_role')||'';
   if(role==='shartava')return ROOMS.filter(r=>r.location==='shartava');
   if(role==='centre')return ROOMS.filter(r=>r.location==='centre');
   return ROOMS;
@@ -397,7 +407,7 @@ function _submitPin(){
   else if(_pinBuf&&_pinBuf===_hkPins.centre)matchedRole='centre';
   else if(_pinBuf&&_pinBuf===_hkPins.admin)matchedRole='admin';
   if(matchedRole){
-    localStorage.setItem('hk_role',matchedRole);
+    localStorage.setItem('hk_shartava_role',matchedRole);
     document.getElementById('pin-screen').style.display='none';
     document.getElementById('app').style.display='';
     const lb=document.getElementById('loc-badge');if(lb)lb.textContent=ROLE_LABELS[matchedRole];
@@ -409,14 +419,14 @@ function _submitPin(){
   }
 }
 window.logout=function(){
-  localStorage.removeItem('hk_role');
+  localStorage.removeItem('hk_shartava_role');
   document.getElementById('app').style.display='none';
   document.getElementById('pin-screen').style.display='flex';
   _pinBuf='';_updateDots();
 };
 // Restore session from localStorage on load
 (function(){
-  const role=localStorage.getItem('hk_role');
+  const role=localStorage.getItem('hk_shartava_role');
   if(role&&ROLE_LABELS[role]){
     document.getElementById('app').style.display='';
     const lb=document.getElementById('loc-badge');if(lb)lb.textContent=ROLE_LABELS[role];
@@ -426,7 +436,7 @@ window.logout=function(){
 })();
 
 function getCleanerName(){
-  const role=localStorage.getItem('hk_role')||'';
+  const role=localStorage.getItem('hk_shartava_role')||'';
   if(role==='shartava')return 'Shartava Team';
   if(role==='centre')return 'Centre Team';
   if(role==='admin')return 'Admin';
@@ -465,8 +475,8 @@ function render(){
 
   renderTabs();
 
-  // get rooms with checkouts
-  const checkoutRooms=getActiveRooms().filter(r=>getCheckoutToday(r.code,date));
+  // get rooms with checkouts + manually-added admin rooms
+  const checkoutRooms=getTaskRooms(date);
   console.log(`[HK] checkouts on ${ds}:`, checkoutRooms.map(r=>r.code));
 
   const main=document.getElementById('main-list');
