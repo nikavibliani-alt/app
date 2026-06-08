@@ -290,7 +290,8 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 .rule-sub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;}
 .date-wrap{position:relative;}
 .date-wrap .date-icon{position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted);display:flex;align-items:center;}
-#r-arrival{color:var(--muted);padding-right:44px;cursor:pointer;width:100%;}
+.date-ph{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;pointer-events:none;white-space:nowrap;}
+#r-arrival{color:transparent;padding-right:44px;cursor:pointer;width:100%;}
 #r-arrival.has-value{color:var(--ink);}
 .passport-banner{margin:0 16px 8px;padding:14px 16px;border-radius:14px;display:flex;gap:12px;align-items:flex-start;}
 .passport-banner.warn{background:#fff3cd;border:1.5px solid #ffc107;}
@@ -424,8 +425,9 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
       <div class="auth-section__label"><span id="t-your-info">Your details</span><span class="count">4 FIELDS</span></div>
       <div class="auth-form">
         <div class="auth-row">
-          <span class="auth-row__label">Booking ID <span style="color:var(--muted);font-weight:400;">(optional)</span></span>
-          <input type="text" class="form-input" id="r-booking-id" placeholder="Booking.com, Airbnb or Expedia confirmation number" autocomplete="off" style="font-size:13px;">
+          <span class="auth-row__label">Find your booking</span>
+          <input type="text" class="form-input" id="r-booking-id" placeholder="Enter your name or booking confirmation number" autocomplete="off" style="font-size:13px;">
+          <span style="font-size:11.5px;color:var(--muted);margin-top:5px;display:block;line-height:1.5;">You can use your full name, booking number from Airbnb / Booking.com / Expedia, or both.</span>
         </div>
         <div class="auth-row">
           <span class="auth-row__label" id="t-full-name">Full name (as on your booking)</span>
@@ -434,7 +436,8 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         <div class="auth-row">
           <span class="auth-row__label">Arrival date <span style="color:var(--red)">*</span></span>
           <div class="date-wrap">
-            <input type="date" class="form-input" id="r-arrival" placeholder="Select date" onchange="this.classList.toggle('has-value',!!this.value)">
+            <input type="date" class="form-input" id="r-arrival" onchange="this.classList.toggle('has-value',!!this.value);document.getElementById('r-arrival-ph').style.display=this.value?'none':'block';">
+            <span class="date-ph" id="r-arrival-ph">Select your arrival date</span>
             <span class="date-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 9h18"/></svg></span>
           </div>
           <div class="arrival-fallback" id="r-arrival-fallback"></div>
@@ -532,6 +535,8 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         </button>
       </div>
     </div>
+    <div id="passport-warn-banner"></div>
+    <input type="file" id="reupload-input" accept="image/*" style="display:none;" onchange="window.handlePassportReupload(this)">
     <div class="greeting">
       <p class="greeting__hello" id="t-greeting-label">Welcome back</p>
       <h2 class="greeting__name" id="home-guest-name">Guest</h2>
@@ -542,8 +547,6 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         <span>Maxela · Tbilisi</span>
       </div>
     </div>
-    <div id="passport-warn-banner"></div>
-    <input type="file" id="passport-reupload-input" accept="image/*" style="display:none;" onchange="window.handlePassportReupload(this)">
     <div class="menu-label"><h3>Your stay</h3></div>
     <div class="tiles" id="tiles-grid"></div>
     <div class="foot">
@@ -930,12 +933,13 @@ async function finishRegistration_(bestRes,formData){
 }
 
 window.submitRegistration=async function(){
-  const name    =document.getElementById('r-name')?.value.trim();
+  const bookingRef=(document.getElementById('r-booking-id')?.value||'').trim();
+  const name    =(document.getElementById('r-name')?.value||'').trim();
   const guests  =parseInt(document.getElementById('r-guests')?.value)||1;
   const nationality=document.getElementById('r-nationality')?.value.trim()||'';
   const contact =document.getElementById('r-contact')?.value.trim()||'';
   const arrival =document.getElementById('r-arrival')?.value||'';
-  if(!name)   {alert('Please enter your full name');return;}
+  if(!bookingRef&&!name){alert('Please enter your name or booking reference');return;}
   if(!contact){alert('Please enter your WhatsApp or Telegram number');return;}
   if(!arrival){alert('Please enter your arrival date');return;}
   if(!passportFile){alert('Please upload your passport or ID photo');return;}
@@ -952,13 +956,28 @@ window.submitRegistration=async function(){
       const r={id:d.id,...d.data()};
       const ci=r.checkin||r.checkIn||'';
       if(!ci)return;
-      const nm=nameMatch(name,r.guest||r.guestName||'');
-      const dateOk=arrival&&arrival===ci;
-      if(!aptId&&(!nm||!dateOk))return;
       let score=0;
-      if(normalizePhone(contact)&&normalizePhone(r.phone||r.contact||'')&&normalizePhone(contact)===normalizePhone(r.phone||r.contact||''))score++;
-      if(nm)score++;
-      if(dateOk)score++;
+      // Booking reference exact match (reservation number, OTA ID, or portal ID)
+      if(bookingRef){
+        const ref=bookingRef.toUpperCase();
+        if(ref===(r.bookingId||'').toUpperCase()||
+           ref===(r.otaReservationId||'').toUpperCase()||
+           ref===String(r.reservationNumber||'').toUpperCase()) score=10;
+      }
+      if(score<10){
+        const nm=name?nameMatch(name,r.guest||r.guestName||''):false;
+        const dateOk=arrival&&arrival===ci;
+        const partial=name?partialNameMatch(name,r.guest||r.guestName||''):false;
+        if(nm&&dateOk)score=3;
+        else if(nm)score=2;
+        else if(dateOk&&partial)score=2;
+        // Also try the bookingRef as a name if no name provided
+        if(!name&&bookingRef&&score===0){
+          const refNm=nameMatch(bookingRef,r.guest||r.guestName||'');
+          if(refNm&&dateOk)score=3;
+          else if(refNm)score=2;
+        }
+      }
       if(score>=2)allMatches.push({res:r,score});
     });
     if(!allMatches.length){
@@ -976,7 +995,7 @@ window.submitRegistration=async function(){
       return;
     }
     if(!aptId&&allMatches.length>1){
-      _pendingReg={name,guests,nationality,contact,contactType,arrival};
+      _pendingReg={name:name||bookingRef,guests,nationality,contact,contactType,arrival};
       _pendingMatches=allMatches;
       btn.disabled=false;
       document.getElementById('t-submit-btn').textContent=t('sb');
@@ -984,7 +1003,7 @@ window.submitRegistration=async function(){
       return;
     }
     allMatches.sort((a,b)=>b.score-a.score);
-    await finishRegistration_(allMatches[0].res,{name,guests,nationality,contact,contactType,arrival});
+    await finishRegistration_(allMatches[0].res,{name:name||bookingRef,guests,nationality,contact,contactType,arrival});
   }catch(e){
     btn.disabled=false;
     document.getElementById('t-submit-btn').textContent=t('sb');
@@ -996,10 +1015,11 @@ function renderPassportBanner(){
   const el=document.getElementById('passport-warn-banner');
   if(!el)return;
   const sr=guestData?.passportScanResult;
-  if(sr===undefined||sr===null){
-    el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon">📋</div><div class="passport-banner__body"><div class="passport-banner__title">Please upload your passport photo</div><div class="passport-banner__sub">Required for identity verification.</div><button class="passport-banner__btn" onclick="document.getElementById('passport-reupload-input').click()">Upload now</button></div></div>`;
-  }else if(sr.valid===false){
-    el.innerHTML=`<div class="passport-banner warn"><div class="passport-banner__icon">⚠️</div><div class="passport-banner__body"><div class="passport-banner__title">Your ID document wasn't verified</div><div class="passport-banner__sub">Please upload a valid passport or national ID.</div><button class="passport-banner__btn" onclick="document.getElementById('passport-reupload-input').click()">Re-upload</button></div></div>`;
+  console.log('passport status:',sr);
+  if(sr?.valid===false){
+    el.innerHTML=`<div style="margin:12px 16px;padding:14px 18px;background:#450a0a;color:#fca5a5;border-radius:14px;display:flex;align-items:center;gap:12px;font-size:14px;"><span>⚠️</span><div><b>Your ID wasn't verified.</b><br>Please upload a valid passport or ID.<br><button onclick="document.getElementById('reupload-input').click()" style="margin-top:8px;background:#fca5a5;color:#450a0a;border:none;padding:6px 16px;border-radius:8px;font-weight:600;cursor:pointer;">Re-upload</button></div></div>`;
+  }else if(!sr){
+    el.innerHTML=`<div style="margin:12px 16px;padding:14px 18px;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);border-radius:14px;display:flex;align-items:center;gap:12px;font-size:14px;"><span>📋</span><div><b>Please upload your passport photo.</b><br>Required for identity verification.<br><button onclick="document.getElementById('reupload-input').click()" style="margin-top:8px;background:var(--blue);color:#fff;border:none;padding:6px 16px;border-radius:8px;font-weight:600;cursor:pointer;">Upload now</button></div></div>`;
   }else{
     el.innerHTML='';
   }
