@@ -191,18 +191,18 @@ body{
 .auth-apt .nm b{font-weight:500;}
 .auth-apt .meta{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-top:2px;}
 .auth-section{margin:24px 16px 0;}
-.auth-section__label{padding:0 6px 8px;font-family:var(--mono);font-size:10.5px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);font-weight:500;display:flex;align-items:baseline;justify-content:space-between;}
+.auth-section__label{padding:0 6px 8px;font-family:var(--mono);font-size:13px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:500;display:flex;align-items:baseline;justify-content:space-between;}
 .auth-section__label .count{color:var(--line);}
 .auth-form{background:var(--surface);border:1px solid var(--line-2);border-radius:20px;overflow:hidden;}
 .auth-row{padding:12px 18px;border-bottom:1px solid var(--line-2);display:flex;flex-direction:column;gap:6px;position:relative;}
 .auth-row:last-child{border-bottom:0;}
-.auth-row__label{font-family:var(--mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);}
-.auth-row .form-input{border:none;border-radius:0;background:transparent;padding:0;height:auto;font-size:16px;color:var(--ink);min-height:44px;}
+.auth-row__label{font-family:var(--mono);font-size:12px;letter-spacing:0.10em;text-transform:uppercase;color:var(--muted);}
+.auth-row .form-input{border:none;border-radius:0;background:transparent;padding:0;height:auto;font-size:17px;color:var(--ink);min-height:44px;}
 .auth-row .form-input:focus{border:none;background:transparent;outline:none;}
-input[type="date"].form-input{-webkit-appearance:none;appearance:none;font-size:16px;min-height:44px;cursor:pointer;}
+input[type="date"].form-input{-webkit-appearance:none;appearance:none;font-size:17px;min-height:44px;cursor:pointer;}
 input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;padding:0;}
 .arrival-fallback{display:none;gap:6px;}
-.arrival-fallback select{flex:1;-webkit-appearance:none;appearance:none;font-size:16px;min-height:44px;padding:0 10px;background:transparent;border:none;color:var(--ink);cursor:pointer;}
+.arrival-fallback select{flex:1;-webkit-appearance:none;appearance:none;font-size:17px;min-height:44px;padding:0 10px;background:transparent;border:none;color:var(--ink);cursor:pointer;}
 .auth-photo{margin:0 0 0;background:var(--surface);border:1.5px dashed var(--line);border-radius:18px;padding:24px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;cursor:pointer;}
 .auth-photo:hover{border-color:var(--accent);}
 .auth-photo.has-photo{border-style:solid;border-color:var(--green-border);background:var(--green-bg);}
@@ -290,7 +290,7 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 .rule-sub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;}
 .date-wrap{position:relative;}
 .date-wrap .date-icon{position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted);display:flex;align-items:center;}
-.date-ph{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;pointer-events:none;white-space:nowrap;}
+.date-ph{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:17px;pointer-events:none;white-space:nowrap;}
 #r-arrival{color:transparent;padding-right:44px;cursor:pointer;width:100%;}
 #r-arrival.has-value{color:var(--ink);}
 .passport-banner{margin:0 16px 8px;padding:14px 16px;border-radius:14px;display:flex;gap:12px;align-items:flex-start;}
@@ -421,17 +421,20 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
       </div>
     </div>
 
+    <div style="margin:16px 16px 0;padding:14px 18px;background:var(--surface);border:1px solid var(--line-2);border-radius:16px;font-size:15px;color:var(--ink-2);line-height:1.55;">
+      Enter your <b>reservation number</b> OR your <b>full name</b> to find your booking. You can enter both for faster matching.
+    </div>
+
     <div class="auth-section">
       <div class="auth-section__label"><span id="t-your-info">Your details</span><span class="count">4 FIELDS</span></div>
       <div class="auth-form">
         <div class="auth-row">
-          <span class="auth-row__label">Find your booking</span>
-          <input type="text" class="form-input" id="r-booking-id" placeholder="Enter your name or booking confirmation number" autocomplete="off" style="font-size:13px;">
-          <span style="font-size:11.5px;color:var(--muted);margin-top:5px;display:block;line-height:1.5;">You can use your full name, booking number from Airbnb / Booking.com / Expedia, or both.</span>
+          <span class="auth-row__label">Reservation number</span>
+          <input type="text" class="form-input" id="r-booking-id" placeholder="Your confirmation number" autocomplete="off">
         </div>
         <div class="auth-row">
-          <span class="auth-row__label" id="t-full-name">Full name (as on your booking)</span>
-          <input type="text" class="form-input" id="r-name" placeholder="As on your booking" autocomplete="name">
+          <span class="auth-row__label" id="t-full-name">Full name</span>
+          <input type="text" class="form-input" id="r-name" placeholder="As shown on your booking" autocomplete="name">
         </div>
         <div class="auth-row">
           <span class="auth-row__label">Arrival date <span style="color:var(--red)">*</span></span>
@@ -535,8 +538,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         </button>
       </div>
     </div>
-    <div id="passport-warn-banner"></div>
-    <input type="file" id="reupload-input" accept="image/*" style="display:none;" onchange="window.handlePassportReupload(this)">
+    <input type="file" id="reupload-passport" accept="image/*" style="display:none;" onchange="window.reuploadPassport(this)">
     <div class="greeting">
       <p class="greeting__hello" id="t-greeting-label">Welcome back</p>
       <h2 class="greeting__name" id="home-guest-name">Guest</h2>
@@ -1012,18 +1014,18 @@ window.submitRegistration=async function(){
 }
 
 function renderPassportBanner(){
-  const el=document.getElementById('passport-warn-banner');
-  if(!el)return;
-  const sr=guestData?.passportScanResult;
-  console.log('passport status:',sr);
-  if(sr?.valid===false){
-    el.innerHTML=`<div style="margin:12px 16px;padding:14px 18px;background:#450a0a;color:#fca5a5;border-radius:14px;display:flex;align-items:center;gap:12px;font-size:14px;"><span>⚠️</span><div><b>Your ID wasn't verified.</b><br>Please upload a valid passport or ID.<br><button onclick="document.getElementById('reupload-input').click()" style="margin-top:8px;background:#fca5a5;color:#450a0a;border:none;padding:6px 16px;border-radius:8px;font-weight:600;cursor:pointer;">Re-upload</button></div></div>`;
-  }else if(!sr){
-    el.innerHTML=`<div style="margin:12px 16px;padding:14px 18px;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);border-radius:14px;display:flex;align-items:center;gap:12px;font-size:14px;"><span>📋</span><div><b>Please upload your passport photo.</b><br>Required for identity verification.<br><button onclick="document.getElementById('reupload-input').click()" style="margin-top:8px;background:var(--blue);color:#fff;border:none;padding:6px 16px;border-radius:8px;font-weight:600;cursor:pointer;">Upload now</button></div></div>`;
-  }else{
-    el.innerHTML='';
+  document.getElementById('passport-warning-banner')?.remove();
+  if(guestData?.passportScanResult?.valid===false){
+    const banner=document.createElement('div');
+    banner.id='passport-warning-banner';
+    banner.innerHTML=`<div style="margin:0 16px 16px;padding:16px 20px;background:#dc2626;color:#fff;border-radius:16px;font-size:15px;line-height:1.5;"><b>⚠️ Your ID document wasn't verified.</b><br>Please upload a valid passport or national ID.<div style="margin-top:10px;"><button onclick="document.getElementById('reupload-passport').click()" style="background:#fff;color:#dc2626;border:none;padding:8px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Upload again</button></div></div>`;
+    const greeting=document.querySelector('#page-home .greeting');
+    if(greeting)greeting.parentNode.insertBefore(banner,greeting.nextSibling);
   }
 }
+window.reuploadPassport=async function(input){
+  await window.handlePassportReupload(input);
+};
 
 window.handlePassportReupload=async function(input){
   const file=input.files[0];
@@ -1065,6 +1067,7 @@ function showHome(){
   document.getElementById('home-apt-name').textContent=APT_NAMES[aptId]||aptId;
   document.getElementById('t-greeting-label').textContent=t('gl');
   renderTiles();
+  console.log('DEBUG passport result:',JSON.stringify(guestData?.passportScanResult));
   renderPassportBanner();
   if(guestId){
     onSnapshot(doc(db,'checkin_guests',guestId),snap=>{
