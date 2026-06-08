@@ -1027,6 +1027,20 @@ window.reuploadPassport=async function(input){
   await window.handlePassportReupload(input);
 };
 
+window.handleReupload = async function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const url = await uploadToCloudinary(file, 'maxela/guests/' + aptId);
+    await setDoc(doc(db, 'checkin_guests', guestId), { passportUrl: url, passportScanResult: null }, { merge: true });
+    await scanPassport(file);
+    if (passportScanResult) {
+      await setDoc(doc(db, 'checkin_guests', guestId), { passportScanResult: passportScanResult }, { merge: true });
+    }
+    toast(passportScanResult?.valid ? 'Document verified ✓' : 'Document not accepted');
+  } catch(e) { toast('Upload failed'); }
+};
+
 window.handlePassportReupload=async function(input){
   const file=input.files[0];
   if(!file)return;
@@ -1064,6 +1078,20 @@ function showHome(){
   document.getElementById('page-register').classList.remove('active');
   document.getElementById('page-home').classList.add('active');
   document.getElementById('home-guest-name').textContent=guestData?.name||'Guest';
+  console.log('PASSPORT DEBUG:', guestData?.passportScanResult, 'valid:', guestData?.passportScanResult?.valid);
+  const warningTarget = document.querySelector('#page-home .greeting');
+  if (warningTarget) {
+    const old = document.getElementById('pp-warn');
+    if (old) old.remove();
+    const sr = guestData?.passportScanResult;
+    if (sr && sr.valid === false) {
+      const div = document.createElement('div');
+      div.id = 'pp-warn';
+      div.style.cssText = 'margin:16px;padding:16px 20px;background:#dc2626;color:white;border-radius:16px;font-size:15px;line-height:1.6;';
+      div.innerHTML = '<b>⚠️ Your ID document was not accepted.</b><br>Please upload a valid passport or national ID photo.<br><input type="file" id="pp-reupload" accept="image/*" style="display:none" onchange="window.handleReupload(this)"><button onclick="document.getElementById(\'pp-reupload\').click()" style="margin-top:10px;background:white;color:#dc2626;border:none;padding:8px 20px;border-radius:10px;font-weight:600;cursor:pointer;font-size:14px;">Upload new photo</button>';
+      warningTarget.after(div);
+    }
+  }
   document.getElementById('home-apt-name').textContent=APT_NAMES[aptId]||aptId;
   document.getElementById('t-greeting-label').textContent=t('gl');
   renderTiles();
@@ -1151,6 +1179,19 @@ function renderTiles(){
       <div class="tile__sub">${t('tcos')}</div>
       <div class="tile__arrow">${_ARR}</div>
     </div>`;
+  const warningTarget2 = document.querySelector('#page-home .greeting');
+  if (warningTarget2) {
+    const old2 = document.getElementById('pp-warn');
+    if (old2) old2.remove();
+    const sr2 = guestData?.passportScanResult;
+    if (sr2 && sr2.valid === false) {
+      const div2 = document.createElement('div');
+      div2.id = 'pp-warn';
+      div2.style.cssText = 'margin:16px;padding:16px 20px;background:#dc2626;color:white;border-radius:16px;font-size:15px;line-height:1.6;';
+      div2.innerHTML = '<b>⚠️ Your ID document was not accepted.</b><br>Please upload a valid passport or national ID photo.<br><input type="file" id="pp-reupload" accept="image/*" style="display:none" onchange="window.handleReupload(this)"><button onclick="document.getElementById(\'pp-reupload\').click()" style="margin-top:10px;background:white;color:#dc2626;border:none;padding:8px 20px;border-radius:10px;font-weight:600;cursor:pointer;font-size:14px;">Upload new photo</button>';
+      warningTarget2.after(div2);
+    }
+  }
 }
 
 // ── Code hero card builder ────────────────────────────────────────────────────
