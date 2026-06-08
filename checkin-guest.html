@@ -845,7 +845,7 @@ async function scanPassport(file){
     }
   }catch(e){
     statusEl.style.display='none';
-    passportScanResult=null;
+    passportScanResult={valid:false,reason:'Scan failed',confidence:'low'};
   }
 }
 
@@ -909,6 +909,10 @@ async function finishRegistration_(bestRes,formData){
     document.getElementById('home-apt-name').textContent=APT_NAMES[aptId]||aptId;
   }
   document.getElementById('t-submit-btn').textContent='Uploading...';
+  if (passportFile && !passportScanResult) {
+    await scanPassport(passportFile);
+  }
+  console.log('Saving to Firestore, passportScanResult:', JSON.stringify(passportScanResult));
   const passportUrl=await uploadToCloudinary(passportFile,'maxela/guests/'+aptId);
   if(passportScanResult?.valid===false){
     try{await setDoc(doc(db,'passport_alerts',`${aptId}_${Date.now()}`),{aptId,guestName:name,passportUrl,scanResult:passportScanResult,reason:passportScanResult.reason||'',createdAt:serverTimestamp()});}catch(e){}
@@ -1078,13 +1082,15 @@ function showHome(){
   document.getElementById('page-register').classList.remove('active');
   document.getElementById('page-home').classList.add('active');
   document.getElementById('home-guest-name').textContent=guestData?.name||'Guest';
-  console.log('PASSPORT DEBUG:', guestData?.passportScanResult, 'valid:', guestData?.passportScanResult?.valid);
+  console.log('HOME PAGE - passportScanResult:', JSON.stringify(guestData?.passportScanResult));
+  console.log('Has keys:', Object.keys(guestData?.passportScanResult || {}).length);
   const warningTarget = document.querySelector('#page-home .greeting');
   if (warningTarget) {
     const old = document.getElementById('pp-warn');
     if (old) old.remove();
     const sr = guestData?.passportScanResult;
-    if (sr && sr.valid === false) {
+    const needsWarning = sr && (Object.keys(sr).length === 0 || sr.valid === false);
+    if (needsWarning) {
       const div = document.createElement('div');
       div.id = 'pp-warn';
       div.style.cssText = 'margin:16px;padding:16px 20px;background:#dc2626;color:white;border-radius:16px;font-size:15px;line-height:1.6;';
@@ -1184,7 +1190,8 @@ function renderTiles(){
     const old2 = document.getElementById('pp-warn');
     if (old2) old2.remove();
     const sr2 = guestData?.passportScanResult;
-    if (sr2 && sr2.valid === false) {
+    const needsWarning2 = sr2 && (Object.keys(sr2).length === 0 || sr2.valid === false);
+    if (needsWarning2) {
       const div2 = document.createElement('div');
       div2.id = 'pp-warn';
       div2.style.cssText = 'margin:16px;padding:16px 20px;background:#dc2626;color:white;border-radius:16px;font-size:15px;line-height:1.6;';
