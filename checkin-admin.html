@@ -471,7 +471,7 @@ window.openAptDrawer=function(aptId){
     <div style="font-size:12px;color:var(--hint);margin-bottom:8px;">Upload photos of each step — write instructions that guests will see below each photo.</div>
     <input type="file" id="apt-photo-input" accept="image/*" multiple style="display:none;" onchange="window.uploadPhotos('${aptId}',this)">
     <div id="photo-grid">
-      ${(d.photos||[]).map((url,i)=>`
+      ${(d.photos||[]).map((url,i,arr)=>`
         <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--rs);overflow:hidden;">
           <div style="position:relative;">
             <img src="${url}" style="width:100%;height:160px;object-fit:cover;display:block;">
@@ -479,6 +479,12 @@ window.openAptDrawer=function(aptId){
             <div style="position:absolute;bottom:6px;left:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.9);background:rgba(0,0,0,0.45);padding:2px 7px;border-radius:4px;">Step ${i+1}</div>
           </div>
           <div style="padding:8px 10px;background:var(--bg);">
+            <div style="display:flex;gap:6px;margin-bottom:8px;">
+              <button type="button" onclick="window.movePhoto('${aptId}',${i},-1)" ${i===0?'disabled':''} style="flex:1;padding:5px 0;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:13px;cursor:${i===0?'default':'pointer'};opacity:${i===0?'0.35':'1'};">↑ Up</button>
+              <button type="button" onclick="window.movePhoto('${aptId}',${i},1)" ${i===arr.length-1?'disabled':''} style="flex:1;padding:5px 0;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:13px;cursor:${i===arr.length-1?'default':'pointer'};opacity:${i===arr.length-1?'0.35':'1'};">↓ Down</button>
+              <input type="file" id="replace-input-${i}" accept="image/*,video/*" style="display:none;" onchange="window.doReplacePhoto('${aptId}',${i},this)">
+              <button type="button" onclick="document.getElementById('replace-input-${i}').click()" style="flex:1;padding:5px 0;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:13px;cursor:pointer;">↺ Replace</button>
+            </div>
             <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:4px;">Instructions for this photo</div>
             <textarea class="form-input" id="photo-cap-${i}" rows="2" placeholder="e.g. Enter the code on the keypad to unlock the door..." style="font-size:13px;min-height:60px;">${esc((d.photoCaptions||[])[i]||'')}</textarea>
           </div>
@@ -571,10 +577,49 @@ window.testTuyaDevice=async function(aptId){
 window.deletePhoto=async function(aptId,idx){
   if(!confirm('Delete this photo?'))return;
   const photos=(aptData[aptId]?.photos||[]).filter((_,i)=>i!==idx);
-  await setDoc(doc(db,'checkin_apartments',aptId),{photos},{merge:true});
-  aptData[aptId]={...aptData[aptId],photos};
+  const photoCaptions=(aptData[aptId]?.photoCaptions||[]).filter((_,i)=>i!==idx);
+  await setDoc(doc(db,'checkin_apartments',aptId),{photos,photoCaptions},{merge:true});
+  aptData[aptId]={...aptData[aptId],photos,photoCaptions};
   toast('Photo deleted');
   window.openAptDrawer(aptId);
+}
+
+window.movePhoto=async function(aptId,idx,dir){
+  const photos=[...(aptData[aptId]?.photos||[])];
+  const newIdx=idx+dir;
+  if(newIdx<0||newIdx>=photos.length)return;
+  // Capture any unsaved caption edits from the DOM before re-rendering
+  const photoCaptions=photos.map((_,i)=>{
+    const el=document.getElementById('photo-cap-'+i);
+    return el?el.value.trim():(aptData[aptId]?.photoCaptions||[])[i]||'';
+  });
+  [photos[idx],photos[newIdx]]=[photos[newIdx],photos[idx]];
+  [photoCaptions[idx],photoCaptions[newIdx]]=[photoCaptions[newIdx],photoCaptions[idx]];
+  try{
+    await setDoc(doc(db,'checkin_apartments',aptId),{photos,photoCaptions},{merge:true});
+    aptData[aptId]={...aptData[aptId],photos,photoCaptions};
+    window.openAptDrawer(aptId);
+  }catch(e){toast('Move failed');}
+}
+
+window.doReplacePhoto=async function(aptId,idx,input){
+  const file=input.files[0];
+  if(!file)return;
+  const photos=[...(aptData[aptId]?.photos||[])];
+  // Capture any unsaved caption edits before re-rendering
+  const photoCaptions=photos.map((_,i)=>{
+    const el=document.getElementById('photo-cap-'+i);
+    return el?el.value.trim():(aptData[aptId]?.photoCaptions||[])[i]||'';
+  });
+  try{
+    toast('Uploading replacement...',15000);
+    const url=await uploadToCloudinary(file,'maxela/'+aptId+'/photos');
+    photos[idx]=url;
+    await setDoc(doc(db,'checkin_apartments',aptId),{photos,photoCaptions},{merge:true});
+    aptData[aptId]={...aptData[aptId],photos,photoCaptions};
+    toast('✓ Step '+(idx+1)+' replaced!');
+    window.openAptDrawer(aptId);
+  }catch(e){toast('Replace failed: '+e.message);}
 }
 
 window.saveAptData=async function(aptId){
