@@ -154,6 +154,26 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .pin-key:active{background:var(--blue-bg);}
 .logout-btn{height:28px;padding:0 10px;border:1px solid var(--border);border-radius:20px;background:transparent;font-size:12px;font-weight:500;cursor:pointer;color:var(--muted);font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;}
 .logout-btn:active{background:var(--border);}
+
+/* Admin add-room button */
+.admin-add-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px 16px;background:var(--blue);color:#fff;border:none;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;margin-bottom:14px;-webkit-tap-highlight-color:transparent;}
+.admin-add-btn:active{opacity:0.85;}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:3000;display:none;align-items:center;justify-content:center;padding:1rem;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:var(--surface);border-radius:var(--r);padding:1.5rem;width:min(340px,100%);box-shadow:0 8px 40px rgba(0,0,0,0.2);animation:pop 0.18s ease;}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:1rem;}
+.modal-sub{font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:1rem;}
+.modal-field{margin-bottom:12px;}
+.modal-label{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;}
+.modal-select,.modal-input{width:100%;height:42px;border:1px solid var(--border);border-radius:var(--rs);font-size:14px;background:var(--bg);padding:0 10px;font-family:'Inter',sans-serif;outline:none;-webkit-appearance:none;}
+.modal-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23aeaeb2' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;}
+.modal-select:focus,.modal-input:focus{border-color:var(--blue);}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.modal-btns{display:flex;gap:10px;margin-top:1.25rem;}
+.modal-cancel{flex:1;height:44px;border:1px solid var(--border);border-radius:var(--rs);background:transparent;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
+.modal-save{flex:1;height:44px;border:none;border-radius:var(--rs);background:var(--blue);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
 </style>
 </head>
 <body>
@@ -194,6 +214,96 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
   </div>
 </div>
 
+<!-- Add Room Modal -->
+<div class="modal-overlay" id="add-room-modal">
+  <div class="modal-box">
+    <div class="modal-title">+ Add Room to Schedule</div>
+    <div class="modal-field">
+      <div class="modal-label">Room</div>
+      <select id="ar-room" class="modal-select">
+        <optgroup label="0- Rooms">
+          <option value="0-1">0-1 — Small room 1</option>
+          <option value="0-2">0-2 — Small room 2</option>
+          <option value="0-3">0-3 — Small room 3</option>
+          <option value="0-4">0-4 — Small room 4</option>
+          <option value="0-5">0-5 — Small room 5</option>
+        </optgroup>
+        <optgroup label="6- Apartments">
+          <option value="6-1">6-1 — Apartment 6-1</option>
+          <option value="6-2">6-2 — Apartment 6-2</option>
+          <option value="6-3">6-3 — Apartment 6-3</option>
+          <option value="6-4">6-4 — Apartment 6-4</option>
+        </optgroup>
+        <optgroup label="7- Apartments">
+          <option value="7-1">7-1 — Apartment 7-1</option>
+          <option value="7-2">7-2 — Apartment 7-2</option>
+          <option value="7-4">7-4 — Apartment 7-4</option>
+        </optgroup>
+        <optgroup label="Centre — Orb">
+          <option value="orb-1">Orb 1</option>
+          <option value="orb-2">Orb 2</option>
+          <option value="orb-3">Orb 3</option>
+        </optgroup>
+        <optgroup label="Centre — Tab">
+          <option value="tab-1">Tab 1</option>
+          <option value="tab-2">Tab 2</option>
+          <option value="tab-3">Tab 3</option>
+        </optgroup>
+        <optgroup label="Other">
+          <option value="abashidze">Abashidze</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">Date</div>
+      <input type="date" id="ar-date" class="modal-input">
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">Cleaner Team</div>
+      <select id="ar-cleaner" class="modal-select">
+        <option value="Shartava Team">Shartava Team</option>
+        <option value="Centre Team">Centre Team</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="window.closeAddRoom()">Cancel</button>
+      <button class="modal-save" onclick="window.saveAddRoom()">Add Room</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Room Modal -->
+<div class="modal-overlay" id="edit-room-modal">
+  <div class="modal-box">
+    <div class="modal-title">✏️ Edit Room Details</div>
+    <div id="er-label" class="modal-sub"></div>
+    <input type="hidden" id="er-room-code">
+    <input type="hidden" id="er-date-val">
+    <div class="modal-grid modal-field">
+      <div>
+        <div class="modal-label">Check-out time</div>
+        <select id="er-checkout" class="modal-select">
+          <option>10:00</option><option>11:00</option><option>12:00</option><option>13:00</option>
+        </select>
+      </div>
+      <div>
+        <div class="modal-label">Check-in time</div>
+        <select id="er-checkin" class="modal-select">
+          <option>12:00</option><option>13:00</option><option>14:00</option><option>15:00</option><option>16:00</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">Guest count</div>
+      <input type="number" id="er-guests" min="1" max="12" placeholder="e.g. 2" class="modal-input">
+    </div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="window.closeEditRoom()">Cancel</button>
+      <button class="modal-save" onclick="window.saveEditRoom()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- App (hidden until PIN entered) -->
 <div id="app" style="display:none;">
 <header>
@@ -228,7 +338,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,collection,doc,setDoc,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,collection,doc,setDoc,deleteDoc,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -273,6 +383,7 @@ const ROOMS=[
 
 let reservations=[];
 let cleaningStatus={};
+let statusData={};
 
 let activeDay=0;
 let loadCount=0;
@@ -443,6 +554,7 @@ function getCleanerName(){
   if(role==='admin')return 'Admin';
   return '';
 }
+function isAdmin(){return localStorage.getItem('hk_shartava_role')==='admin';}
 function statusKey(roomCode,date){return roomCode+'_'+(typeof date==='string'?date.slice(0,10):fmtDate(date));}
 
 window.switchDay=function(day){activeDay=day;render();}
@@ -481,8 +593,9 @@ function render(){
   console.log(`[HK] checkouts on ${ds}:`, checkoutRooms.map(r=>r.code));
 
   const main=document.getElementById('main-list');
+  const adminToolbar=isAdmin()?`<button class="admin-add-btn" onclick="window.addRoom()">+ Add Room</button>`:'';
   if(!checkoutRooms.length){
-    main.innerHTML=`<div class="empty">
+    main.innerHTML=adminToolbar+`<div class="empty">
       <div class="empty-icon">✨</div>
       <div class="empty-title">Nothing to clean today</div>
       <div class="empty-sub">No checkouts or overdue rooms — have a great day!</div>
@@ -506,7 +619,7 @@ function render(){
   const pendingGroups={};
   pendingRooms.forEach(r=>{if(!pendingGroups[r.group])pendingGroups[r.group]=[];pendingGroups[r.group].push(r);});
 
-  let html='';
+  let html=adminToolbar;
   let sumRed=0,sumYellow=0,sumGreen=0,sumDone=0;
 
   function buildCard(room,isDone){
@@ -517,25 +630,33 @@ function render(){
     const inGuests=getGuestCount(nextRes);
     const beddingAlert=nextRes?getBeddingAlert(room.code,inGuests):null;
     const key=statusKey(room.code,ds);
+    const sData=statusData[key]||{};
+    const admin=isAdmin();
     const chipLabel={red:'Urgent',yellow:'Today',green:'Free'}[priority];
     const chipCls={red:'chip-red',yellow:'chip-yellow',green:'chip-green'}[priority];
     const nextCheckinSameDay=nextRes&&nextRes.checkin===ds;
     const nextCheckinNextDay=nextRes&&nextRes.checkin===fmtDate(addDays(date,1));
+    // Admin-set values override reservation data
+    const coTime=sData.checkOutTime||co?.checkoutTime||'12:00';
+    const ciTime=sData.checkInTime||(nextRes?nextRes.checkinTime||'14:00':'14:00');
+    const guestOverride=parseInt(sData.guestCount)||0;
+    const outGuestsDisplay=guestOverride||outGuests;
+    const inGuestsDisplay=guestOverride||inGuests;
     const outBox=`<div class="time-box tb-out">
       <div class="tb-label">Checkout</div>
-      <div class="tb-time">${co?.checkoutTime||'12:00'}</div>
-      ${outGuests>0?`<div class="tb-count">👥 ${outGuests} leaving</div>`:'<div class="tb-count" style="color:var(--hint);">👥 —</div>'}
+      <div class="tb-time">${coTime}</div>
+      ${outGuestsDisplay>0?`<div class="tb-count">👥 ${outGuestsDisplay} leaving</div>`:'<div class="tb-count" style="color:var(--hint);">👥 —</div>'}
     </div>`;
     let inBox='';
-    if(nextRes){
-      const whenLabel=nextCheckinSameDay?'TODAY':nextCheckinNextDay?'TOMORROW':nextRes.checkin;
-      const checkinDateLabel=new Date(nextRes.checkin+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+    if(nextRes||sData.checkInTime){
+      const whenLabel=nextCheckinSameDay?'TODAY':nextCheckinNextDay?'TOMORROW':(nextRes?nextRes.checkin:'');
+      const checkinDateLabel=nextRes?new Date(nextRes.checkin+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}):'';
       inBox=`<div class="time-box tb-in${nextCheckinSameDay?' tb-urgent':''}">
         <div class="tb-label">Check-in</div>
-        <div class="tb-when">${whenLabel}</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${checkinDateLabel}</div>
-        <div class="tb-time">${nextRes.checkinTime||'14:00'}</div>
-        ${inGuests>0?`<div class="tb-count">👥 ${inGuests} arriving</div>`:''}
+        ${whenLabel?`<div class="tb-when">${whenLabel}</div>`:''}
+        ${checkinDateLabel?`<div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${checkinDateLabel}</div>`:''}
+        <div class="tb-time">${ciTime}</div>
+        ${inGuestsDisplay>0?`<div class="tb-count">👥 ${inGuestsDisplay} arriving</div>`:''}
       </div>`;
     } else {
       inBox=`<div class="time-box tb-free">
@@ -545,6 +666,7 @@ function render(){
     }
     const notesHtml=co?.notes?`<div class="notes-box"><div class="notes-lbl">📝 Notes</div><div class="notes-txt">${co.notes}</div></div>`:'';
     const beddingHtml=beddingAlert?`<div class="bedding-alert">${beddingAlert}</div>`:'';
+    const adminCtrl=admin?`<button onclick="window.editRoom('${room.code}','${ds}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Edit details">✏️</button><button onclick="window.removeRoom('${room.code}','${ds}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--red-border);background:var(--red-bg);cursor:pointer;font-size:13px;font-weight:700;color:var(--red);display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Remove">✕</button>`:'';
     return `<div class="task-card priority-${priority}${isDone?' done-card':''}" data-key="${key}">
       <div class="card-top">
         <div class="priority-bar"></div>
@@ -552,7 +674,10 @@ function render(){
           <div class="room-code">${room.code}</div>
           <div class="room-name">${room.name}</div>
         </div>
-        <div class="priority-chip ${isDone?'chip-done':chipCls}">${isDone?'Done ✓':chipLabel}</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          ${adminCtrl}
+          <div class="priority-chip ${isDone?'chip-done':chipCls}">${isDone?'Done ✓':chipLabel}</div>
+        </div>
       </div>
       <div class="times-row">${outBox}${inBox}</div>
       ${notesHtml}${beddingHtml}
@@ -609,7 +734,7 @@ onSnapshot(collection(db,'properties'),snap=>{
 },(e)=>console.error('properties listener error:',e));
 
 onSnapshot(collection(db,'hk_status'),snap=>{
-  snap.docs.forEach(d=>{cleaningStatus[d.id]=d.data().done||false;});
+  snap.docs.forEach(d=>{const dd=d.data();cleaningStatus[d.id]=dd.done||false;statusData[d.id]=dd;});
   render();
 });
 
@@ -632,6 +757,81 @@ setTimeout(()=>{
   document.getElementById('loading').style.display='none';
   render();
 },5000);
+
+// ── ADMIN: ADD ROOM ──────────────────────────────────────────────────────────
+window.addRoom=function(){
+  const ds=fmtDate(targetDate());
+  const dateInput=document.getElementById('ar-date');
+  if(dateInput)dateInput.value=ds;
+  document.getElementById('add-room-modal').classList.add('open');
+};
+window.closeAddRoom=function(){
+  document.getElementById('add-room-modal').classList.remove('open');
+};
+window.saveAddRoom=async function(){
+  const roomCode=document.getElementById('ar-room').value;
+  const date=document.getElementById('ar-date').value;
+  const cleaner=document.getElementById('ar-cleaner').value;
+  if(!roomCode||!date){toast('Please fill all fields');return;}
+  const key=roomCode+'_'+date;
+  try{
+    await setDoc(doc(db,'hk_status',key),{
+      roomCode,date,cleaner,done:false,
+      manuallyAdded:true,updatedAt:serverTimestamp()
+    },{merge:true});
+    toast('Room added to schedule');
+    window.closeAddRoom();
+  }catch(e){toast('Failed to add room');}
+};
+
+// ── ADMIN: REMOVE ROOM ───────────────────────────────────────────────────────
+window.removeRoom=async function(roomCode,dateStr){
+  const co=getCheckoutToday(roomCode,new Date(dateStr+'T00:00:00'));
+  if(co){toast('Cannot remove — this room has a real checkout');return;}
+  if(!confirm(`Remove ${roomCode} from the ${dateStr} schedule?`))return;
+  const key=roomCode+'_'+dateStr;
+  try{
+    await deleteDoc(doc(db,'hk_status',key));
+    toast('Room removed from schedule');
+  }catch(e){toast('Failed to remove room');}
+};
+
+// ── ADMIN: EDIT ROOM ─────────────────────────────────────────────────────────
+window.editRoom=function(roomCode,dateStr){
+  const key=roomCode+'_'+dateStr;
+  const sData=statusData[key]||{};
+  document.getElementById('er-room-code').value=roomCode;
+  document.getElementById('er-date-val').value=dateStr;
+  document.getElementById('er-label').textContent=roomCode+' — '+dateStr;
+  const coSel=document.getElementById('er-checkout');
+  const ciSel=document.getElementById('er-checkin');
+  const guestInp=document.getElementById('er-guests');
+  if(coSel)coSel.value=sData.checkOutTime||'12:00';
+  if(ciSel)ciSel.value=sData.checkInTime||'14:00';
+  if(guestInp)guestInp.value=sData.guestCount||'';
+  document.getElementById('edit-room-modal').classList.add('open');
+};
+window.closeEditRoom=function(){
+  document.getElementById('edit-room-modal').classList.remove('open');
+};
+window.saveEditRoom=async function(){
+  const roomCode=document.getElementById('er-room-code').value;
+  const dateStr=document.getElementById('er-date-val').value;
+  const checkOutTime=document.getElementById('er-checkout').value;
+  const checkInTime=document.getElementById('er-checkin').value;
+  const guestCount=document.getElementById('er-guests').value;
+  if(!roomCode||!dateStr)return;
+  const key=roomCode+'_'+dateStr;
+  try{
+    await setDoc(doc(db,'hk_status',key),{
+      roomCode,date:dateStr,checkOutTime,checkInTime,
+      guestCount:guestCount?parseInt(guestCount):null,
+      updatedAt:serverTimestamp()
+    },{merge:true});
+    toast('Room details updated');
+    window.closeEditRoom();
+  }catch(e){toast('Failed to save changes');}
+};
 </script>
 </body>
 </html>
