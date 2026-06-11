@@ -399,35 +399,47 @@ async function handleGetCredentials(req, res, body) {
     });
 }
 
-async function handleProbeTicketPaths(req, res, _body) {
+const TICKET_PROBE_PATHS = [
+    `/v1.0/devices/video/${DEVICE_ID}/door-lock/password-ticket`,
+    `/v1.1/devices/video/${DEVICE_ID}/door-lock/password-ticket`,
+    `/v1.0/devices/${DEVICE_ID}/door-lock/password-ticket`,
+    `/v1.1/devices/${DEVICE_ID}/door-lock/password-ticket`,
+    `/v1.0/smart-lock/devices/${DEVICE_ID}/door-lock/password-ticket`,
+    `/v1.1/smart-lock/devices/${DEVICE_ID}/door-lock/password-ticket`,
+];
+
+async function runTicketProbe() {
+    console.log('\n[probe-ticket-paths] ── starting probe ──────────────────────');
     const rTok = await tuyaCall('GET', '/v1.0/token?grant_type=1', null, '');
     if (!rTok.data.success || !rTok.data.result?.access_token) {
-        return respond(res, 422, { error: `Token failed: code=${rTok.data.code} msg=${rTok.data.msg}` });
+        console.error('[probe-ticket-paths] token failed:', rTok.data.code, rTok.data.msg);
+        return null;
     }
     const token = rTok.data.result.access_token;
-
-    const paths = [
-        `/v1.0/devices/video/${DEVICE_ID}/door-lock/password-ticket`,
-        `/v1.1/devices/video/${DEVICE_ID}/door-lock/password-ticket`,
-        `/v1.0/devices/${DEVICE_ID}/door-lock/password-ticket`,
-        `/v1.1/devices/${DEVICE_ID}/door-lock/password-ticket`,
-        `/v1.0/smart-lock/devices/${DEVICE_ID}/door-lock/password-ticket`,
-        `/v1.1/smart-lock/devices/${DEVICE_ID}/door-lock/password-ticket`,
-    ];
-
     const results = [];
-    for (const path of paths) {
+    for (const path of TICKET_PROBE_PATHS) {
         const r = await tuyaCall('POST', path, token, '{}');
-        results.push({
+        const row = {
             path,
             success:   r.data.success  ?? false,
             code:      r.data.code     ?? null,
             msg:       r.data.msg      ?? null,
             ticket_id: r.data.result?.ticket_id ?? null,
             full:      r.data,
-        });
-        console.log(`[probe-ticket-paths] ${path} → success=${r.data.success} code=${r.data.code}`);
+        };
+        results.push(row);
+        console.log(`[probe-ticket-paths] ${row.success ? '✅' : '✗ '} ${path}`
+            + `  code=${row.code}  msg=${row.msg}`
+            + (row.ticket_id ? `  ticket_id=${row.ticket_id}` : ''));
     }
+    console.log('[probe-ticket-paths] ── probe complete ────────────────────\n');
+    return results;
+}
+
+async function handleProbeTicketPaths(req, res, _body) {
+    console.log('[probe-ticket-paths] probe started');
+    const results = await runTicketProbe();
+    if (!results) return respond(res, 422, { error: 'Token request failed — check server logs' });
     respond(res, 200, { results });
 }
 
@@ -605,6 +617,8 @@ http.createServer((req, res) => {
 
 }).listen(PORT, '127.0.0.1', () => {
     console.log(`\nTuya proxy → http://localhost:${PORT}`);
-    console.log(`Local routes: /ping  /encrypt  /create-temp-password`);
+    console.log(`Local routes: /ping  /encrypt  /create-temp-password  /probe-ticket-paths`);
     console.log(`All other paths forwarded to ${TUYA_HOST}\n`);
+    // Run ticket probe on startup so results appear in terminal without needing the UI
+    runTicketProbe().catch(e => console.error('[startup probe] error:', e.message));
 });
