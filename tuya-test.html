@@ -241,6 +241,9 @@
       <button class="btn-secondary" id="btn-get-creds" onclick="runGetCredentials()">
         <span>🔑</span> Get Credentials Only
       </button>
+      <button class="btn-secondary" id="btn-probe-tickets" onclick="runProbeTicketPaths()">
+        <span>🔍</span> Probe All Ticket Paths
+      </button>
       <button class="btn-secondary" id="btn-video-lock" onclick="runVideoLockTest()">
         <span>🎥</span> Video Lock Test (Home)
       </button>
@@ -318,6 +321,12 @@
       </button>
     </div>
     <div id="jtms-rows" style="display:flex;flex-direction:column;gap:8px;margin-top:14px;"></div>
+  </div>
+
+  <!-- Ticket Path Probe -->
+  <div class="card" id="ticket-probe-card" style="display:none;">
+    <div class="card-title">🔍 Ticket Path Probe — bf62ffc818f1ba80d1acz7</div>
+    <div id="ticket-probe-table"></div>
   </div>
 
   <!-- Video Lock Test -->
@@ -1420,6 +1429,59 @@ async function runOfflinePasswordTest() {
   } catch(e) { offlineRow('Step B — Offline password', e.message, false, {}); }
 
   document.getElementById('btn-offline').disabled = false;
+}
+
+// ── Probe All Ticket Paths ────────────────────────────────────────────────────
+async function runProbeTicketPaths() {
+  const btn  = document.getElementById('btn-probe-tickets');
+  const card = document.getElementById('ticket-probe-card');
+  const tbl  = document.getElementById('ticket-probe-table');
+  btn.disabled = true;
+  card.style.display = '';
+  tbl.innerHTML = '<div style="color:var(--ink-3);font-size:13px;">Running — probing 6 endpoints…</div>';
+
+  let data;
+  try {
+    const res = await fetch('http://localhost:3000/probe-ticket-paths', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    data = await res.json();
+  } catch (e) {
+    tbl.innerHTML = `<div style="color:var(--red);font-size:13px;">✗ ${e.message}</div>`;
+    btn.disabled = false;
+    return;
+  }
+
+  const rows = (data.results ?? []).map((r, i) => {
+    const ok   = r.success;
+    const bg   = ok ? '#052e16' : '#1e2330';
+    const col  = ok ? '#86efac' : '#e2e8f0';
+    const code = r.code !== null ? r.code : '—';
+    const msg  = r.msg  ?? '—';
+    const tick = r.ticket_id ? `<span style="color:#86efac;">ticket_id=${r.ticket_id}</span>` : '';
+    return `<tr style="border-bottom:1px solid #1e2a3a;background:${bg};">
+      <td style="padding:6px 10px;color:#94a3b8;font-family:var(--mono);font-size:11px;">${i+1}</td>
+      <td style="padding:6px 10px;color:${col};font-family:var(--mono);font-size:12px;word-break:break-all;">${r.path}</td>
+      <td style="padding:6px 10px;text-align:center;">${ok ? '✅' : '✗'}</td>
+      <td style="padding:6px 10px;color:#fcd34d;font-family:var(--mono);font-size:12px;">${code}</td>
+      <td style="padding:6px 10px;color:#fca5a5;font-size:12px;">${msg} ${tick}</td>
+    </tr>`;
+  }).join('');
+
+  tbl.innerHTML = `<div style="overflow-x:auto;border-radius:8px;overflow:hidden;">
+    <table style="border-collapse:collapse;width:100%;background:#0f172a;color:#e2e8f0;font-family:var(--mono);">
+      <thead><tr style="background:#1e293b;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;">
+        <th style="padding:8px 10px;text-align:left;">#</th>
+        <th style="padding:8px 10px;text-align:left;">Path</th>
+        <th style="padding:8px 10px;text-align:center;">OK</th>
+        <th style="padding:8px 10px;text-align:left;">Code</th>
+        <th style="padding:8px 10px;text-align:left;">Msg / Ticket</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  btn.disabled = false;
 }
 
 // ── Video Lock Test ───────────────────────────────────────────────────────────

@@ -399,6 +399,38 @@ async function handleGetCredentials(req, res, body) {
     });
 }
 
+async function handleProbeTicketPaths(req, res, _body) {
+    const rTok = await tuyaCall('GET', '/v1.0/token?grant_type=1', null, '');
+    if (!rTok.data.success || !rTok.data.result?.access_token) {
+        return respond(res, 422, { error: `Token failed: code=${rTok.data.code} msg=${rTok.data.msg}` });
+    }
+    const token = rTok.data.result.access_token;
+
+    const paths = [
+        `/v1.0/devices/video/${DEVICE_ID}/door-lock/password-ticket`,
+        `/v1.1/devices/video/${DEVICE_ID}/door-lock/password-ticket`,
+        `/v1.0/devices/${DEVICE_ID}/door-lock/password-ticket`,
+        `/v1.1/devices/${DEVICE_ID}/door-lock/password-ticket`,
+        `/v1.0/smart-lock/devices/${DEVICE_ID}/door-lock/password-ticket`,
+        `/v1.1/smart-lock/devices/${DEVICE_ID}/door-lock/password-ticket`,
+    ];
+
+    const results = [];
+    for (const path of paths) {
+        const r = await tuyaCall('POST', path, token, '{}');
+        results.push({
+            path,
+            success:   r.data.success  ?? false,
+            code:      r.data.code     ?? null,
+            msg:       r.data.msg      ?? null,
+            ticket_id: r.data.result?.ticket_id ?? null,
+            full:      r.data,
+        });
+        console.log(`[probe-ticket-paths] ${path} → success=${r.data.success} code=${r.data.code}`);
+    }
+    respond(res, 200, { results });
+}
+
 async function handleTestVideoLock(req, res, _body) {
     console.log('\n' + '='.repeat(60));
     console.log('[/test-video-lock] START');
@@ -564,6 +596,7 @@ http.createServer((req, res) => {
         if (req.url === '/create-temp-password' && req.method === 'POST') return handleCreateTempPassword(req, res, body);
         if (req.url === '/delete-test-passwords'&& req.method === 'POST') return handleDeleteTestPasswords(req, res, body);
         if (req.url === '/test-video-lock'       && req.method === 'POST') return handleTestVideoLock(req, res, body);
+        if (req.url === '/probe-ticket-paths'    && req.method === 'POST') return handleProbeTicketPaths(req, res, body);
         if (req.url === '/get-credentials'      && req.method === 'POST') return handleGetCredentials(req, res, body);
 
         // ── Everything else → signed forward to Tuya ─────────────────────────
