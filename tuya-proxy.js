@@ -399,6 +399,64 @@ async function handleGetCredentials(req, res, body) {
     });
 }
 
+async function handleTestVideoLock(req, res, _body) {
+    console.log('\n' + '='.repeat(60));
+    console.log('[/test-video-lock] START');
+
+    const VID_DEV = DEVICE_ID;
+    const result  = { step1_ticket: null, step2_encryption: null, step3_result: null };
+
+    // Token
+    const rTok = await tuyaCall('GET', '/v1.0/token?grant_type=1', null, '');
+    console.log('[test-video-lock] token:', JSON.stringify(rTok.data));
+    if (!rTok.data.success || !rTok.data.result?.access_token) {
+        return respond(res, 422, { ...result, error: `Token failed: code=${rTok.data.code} msg=${rTok.data.msg}` });
+    }
+    const token = rTok.data.result.access_token;
+
+    // ── Step 1: Get ticket ────────────────────────────────────────────────────
+    const ticketPath = `/v1.0/devices/video/${VID_DEV}/door-lock/password-ticket`;
+    console.log(`[test-video-lock] Step 1: POST ${ticketPath}`);
+    const r1 = await tuyaCall('POST', ticketPath, token, '{}');
+    console.log('[test-video-lock] Step 1 full response:', JSON.stringify(r1.data));
+    result.step1_ticket = r1.data;
+
+    if (!r1.data.success || !r1.data.result?.ticket_id) {
+        return respond(res, 422, { ...result, error: `Step 1 failed: code=${r1.data.code} msg=${r1.data.msg}` });
+    }
+    const { ticket_id, ticket_key } = r1.data.result;
+
+    // ── Step 2: AES-128-ECB encrypt ───────────────────────────────────────────
+    const plain_password = Math.floor(1000000 + Math.random() * 9000000).toString();
+    const intermediateKey = ACCESS_SECRET.substring(0, 16);
+    const decryptedTicket = aesDecrypt(intermediateKey, Buffer.from(ticket_key, 'hex'));
+    const real_key        = decryptedTicket.slice(0, 16);
+    const encrypted_hex   = aesEncrypt(real_key, Buffer.from(plain_password, 'utf8')).toString('hex').toUpperCase();
+    console.log(`[test-video-lock] Step 2: plain=${plain_password}  ticket_id=${ticket_id}  encrypted=${encrypted_hex}`);
+    result.step2_encryption = { plain_password, ticket_id, encrypted_hex };
+
+    // ── Step 3: Create temp password ──────────────────────────────────────────
+    const nowSec   = Math.floor(Date.now() / 1000);
+    const body3    = JSON.stringify({
+        password:       encrypted_hex,
+        password_type:  'ticket',
+        ticket_id,
+        effective_time: nowSec,
+        invalid_time:   nowSec + 3600,
+        name:           'SleepyTest',
+        time_zone:      '+04:00',
+        schedule_list:  '',
+    });
+    const createPath = `/v1.0/devices/video/${VID_DEV}/door-lock/temp-password`;
+    console.log(`[test-video-lock] Step 3: POST ${createPath}`);
+    console.log('[test-video-lock] body3:', body3);
+    const r3 = await tuyaCall('POST', createPath, token, body3);
+    console.log('[test-video-lock] Step 3 full response:', JSON.stringify(r3.data));
+    result.step3_result = r3.data;
+
+    respond(res, 200, result);
+}
+
 async function handleDeleteTestPasswords(req, res, body) {
     console.log('\n[delete-test-passwords] START');
     // Step 0: fresh token
@@ -484,6 +542,7 @@ http.createServer((req, res) => {
         if (req.url === '/encrypt'              && req.method === 'POST') return handleEncrypt(req, res, body);
         if (req.url === '/create-temp-password' && req.method === 'POST') return handleCreateTempPassword(req, res, body);
         if (req.url === '/delete-test-passwords'&& req.method === 'POST') return handleDeleteTestPasswords(req, res, body);
+        if (req.url === '/test-video-lock'       && req.method === 'POST') return handleTestVideoLock(req, res, body);
         if (req.url === '/get-credentials'      && req.method === 'POST') return handleGetCredentials(req, res, body);
 
         // ── Everything else → signed forward to Tuya ─────────────────────────

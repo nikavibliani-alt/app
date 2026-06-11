@@ -241,6 +241,9 @@
       <button class="btn-secondary" id="btn-get-creds" onclick="runGetCredentials()">
         <span>🔑</span> Get Credentials Only
       </button>
+      <button class="btn-secondary" id="btn-video-lock" onclick="runVideoLockTest()">
+        <span>🎥</span> Video Lock Test (Home)
+      </button>
       <button class="btn-secondary" onclick="clearAll()">
         <span>🗑</span> Clear
       </button>
@@ -315,6 +318,20 @@
       </button>
     </div>
     <div id="jtms-rows" style="display:flex;flex-direction:column;gap:8px;margin-top:14px;"></div>
+  </div>
+
+  <!-- Video Lock Test -->
+  <div class="card" id="video-lock-card" style="display:none;">
+    <div class="card-title">🎥 Video Lock Test — Home Device</div>
+    <div style="font-size:12px;color:var(--ink-3);margin-bottom:14px;line-height:1.6;">
+      3-step flow for <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">jtmspro</code> video lock
+      (<code style="background:var(--bg);padding:1px 5px;border-radius:3px;">bf62ffc818f1ba80d1acz7</code>):<br>
+      <b>1.</b> POST <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">/v1.0/devices/video/{id}/door-lock/password-ticket</code><br>
+      <b>2.</b> AES-128-ECB decrypt ticket_key → encrypt 7-digit code → 32-char hex<br>
+      <b>3.</b> POST <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">/v1.0/devices/video/{id}/door-lock/temp-password</code>
+    </div>
+    <div id="video-lock-banner"></div>
+    <div id="video-lock-rows" style="display:flex;flex-direction:column;gap:8px;margin-top:8px;"></div>
   </div>
 
   <!-- Offline Password Test -->
@@ -1403,6 +1420,100 @@ async function runOfflinePasswordTest() {
   } catch(e) { offlineRow('Step B — Offline password', e.message, false, {}); }
 
   document.getElementById('btn-offline').disabled = false;
+}
+
+// ── Video Lock Test ───────────────────────────────────────────────────────────
+async function runVideoLockTest() {
+  document.getElementById('btn-video-lock').disabled = true;
+  const card = document.getElementById('video-lock-card');
+  card.style.display = '';
+  document.getElementById('video-lock-banner').innerHTML = '';
+  const rows = document.getElementById('video-lock-rows');
+  rows.innerHTML = '';
+
+  function vRow(label, note, isOk, data) {
+    const el = document.createElement('div');
+    el.className = 'probe-row';
+    el.innerHTML = `
+      <div class="probe-head" onclick="this.nextElementSibling.classList.toggle('open')">
+        <span class="probe-badge ${isOk ? 'badge-ok' : 'badge-err'}">${isOk ? '✅' : '✗'}</span>
+        <div style="flex:1;min-width:0;">
+          <div class="probe-path">${label}</div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:1px;">${note}</div>
+        </div>
+      </div>
+      <div class="probe-body open">
+        <div class="json-box">${syntaxHL(JSON.stringify(data ?? {}, null, 2))}</div>
+      </div>`;
+    rows.appendChild(el);
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  let data;
+  try {
+    const res = await fetch('http://localhost:3000/test-video-lock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    data = await res.json();
+  } catch (e) {
+    document.getElementById('video-lock-banner').innerHTML =
+      `<div style="background:#450a0a;color:#fca5a5;padding:12px 16px;border-radius:8px;font-family:var(--mono);font-size:13px;">✗ Fetch failed: ${e.message}</div>`;
+    document.getElementById('btn-video-lock').disabled = false;
+    return;
+  }
+
+  // Step 1 — ticket
+  const s1     = data.step1_ticket;
+  const s1ok   = s1?.success && s1?.result?.ticket_id;
+  vRow(
+    'Step 1 — POST /v1.0/devices/video/{id}/door-lock/password-ticket',
+    s1ok ? `ticket_id=${s1.result.ticket_id}  expire_time=${s1.result.expire_time ?? '?'}s` : `code=${s1?.code}: ${s1?.msg}`,
+    !!s1ok, s1
+  );
+
+  if (data.error) {
+    document.getElementById('video-lock-banner').innerHTML =
+      `<div style="background:#450a0a;color:#fca5a5;padding:12px 16px;border-radius:8px;font-family:var(--mono);font-size:13px;margin-bottom:8px;">✗ ${data.error}</div>`;
+    document.getElementById('btn-video-lock').disabled = false;
+    return;
+  }
+
+  // Step 2 — encryption
+  const s2 = data.step2_encryption;
+  vRow(
+    'Step 2 — AES-128-ECB encrypt (proxy)',
+    s2 ? `plain="${s2.plain_password}"  encrypted=${s2.encrypted_hex?.slice(0,20)}…  (${s2.encrypted_hex?.length ?? 0} chars)` : 'no data',
+    !!(s2?.encrypted_hex),
+    s2
+  );
+
+  // Step 3 — create temp password
+  const s3   = data.step3_result;
+  const s3ok = s3?.success;
+  vRow(
+    'Step 3 — POST /v1.0/devices/video/{id}/door-lock/temp-password',
+    s3ok ? `✅ result=${JSON.stringify(s3.result)}` : `code=${s3?.code}: ${s3?.msg}`,
+    !!s3ok, s3
+  );
+
+  // Summary banner
+  if (s2?.plain_password) {
+    const bannerStyle = s3ok
+      ? 'background:#052e16;color:#86efac;'
+      : 'background:#1c1917;color:#fcd34d;';
+    document.getElementById('video-lock-banner').innerHTML = `
+      <div style="${bannerStyle}border-radius:10px;padding:16px 20px;font-family:var(--mono);text-align:center;margin-bottom:12px;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;opacity:.6;margin-bottom:8px;">
+          ${s3ok ? 'Code sent — try on keypad' : 'Step 3 failed — code was'}
+        </div>
+        <div style="font-size:42px;font-weight:900;letter-spacing:.18em;">${s2.plain_password}</div>
+        <div style="font-size:11px;opacity:.6;margin-top:8px;">ticket_id=${s2.ticket_id}  |  valid 1h from now</div>
+      </div>`;
+  }
+
+  document.getElementById('btn-video-lock').disabled = false;
 }
 
 // Auto-check proxy on load
