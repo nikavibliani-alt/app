@@ -404,40 +404,63 @@ async function handleTestVideoLock(req, res, _body) {
     console.log('[/test-video-lock] START');
 
     const VID_DEV = DEVICE_ID;
-    const result  = { step1_ticket: null, step2_encryption: null, step3_result: null };
 
     // Token
     const rTok = await tuyaCall('GET', '/v1.0/token?grant_type=1', null, '');
     console.log('[test-video-lock] token:', JSON.stringify(rTok.data));
     if (!rTok.data.success || !rTok.data.result?.access_token) {
-        return respond(res, 422, { ...result, error: `Token failed: code=${rTok.data.code} msg=${rTok.data.msg}` });
+        return respond(res, 422, { error: `Token failed: code=${rTok.data.code} msg=${rTok.data.msg}` });
     }
     const token = rTok.data.result.access_token;
 
-    // ── Step 1: Get ticket ────────────────────────────────────────────────────
-    const ticketPath = `/v1.0/devices/video/${VID_DEV}/door-lock/password-ticket`;
-    console.log(`[test-video-lock] Step 1: POST ${ticketPath}`);
-    const r1 = await tuyaCall('POST', ticketPath, token, '{}');
-    console.log('[test-video-lock] Step 1 full response:', JSON.stringify(r1.data));
-    result.step1_ticket = r1.data;
+    // ── Step 1: Try ticket endpoints in sequence ──────────────────────────────
+    const TICKET_ENDPOINTS = [
+        `/v1.0/devices/video/${VID_DEV}/door-lock/password-ticket`,
+        `/v1.1/devices/video/${VID_DEV}/door-lock/password-ticket`,
+        `/v1.0/devices/${VID_DEV}/door-lock/password-ticket`,
+        `/v1.1/devices/${VID_DEV}/door-lock/password-ticket`,
+        `/v1.0/smart-lock/devices/${VID_DEV}/door-lock/password-ticket`,
+    ];
 
-    if (!r1.data.success || !r1.data.result?.ticket_id) {
-        return respond(res, 422, { ...result, error: `Step 1 failed: code=${r1.data.code} msg=${r1.data.msg}` });
+    const ticket_probes = [];
+    let winning_ticket = null;
+
+    for (let i = 0; i < TICKET_ENDPOINTS.length; i++) {
+        const path = TICKET_ENDPOINTS[i];
+        console.log(`[test-video-lock] ticket probe ${i+1}/${TICKET_ENDPOINTS.length}: POST ${path}`);
+        const r = await tuyaCall('POST', path, token, '{}');
+        console.log(`[test-video-lock] probe ${i+1} response:`, JSON.stringify(r.data));
+        ticket_probes.push({ label: `${i+1}. POST ${path}`, path, response: r.data });
+        if (r.data.success && r.data.result?.ticket_id) {
+            winning_ticket = { path, data: r.data };
+            console.log(`[test-video-lock] ✅ winning ticket from probe ${i+1}`);
+            break;
+        }
     }
-    const { ticket_id, ticket_key } = r1.data.result;
+
+    if (!winning_ticket) {
+        return respond(res, 422, {
+            error:         'All ticket endpoints failed — no success:true with ticket_id',
+            ticket_probes,
+            step2_encryption: null,
+            step3_result:     null,
+        });
+    }
+
+    const { ticket_id, ticket_key } = winning_ticket.data.result;
 
     // ── Step 2: AES-128-ECB encrypt ───────────────────────────────────────────
-    const plain_password = Math.floor(1000000 + Math.random() * 9000000).toString();
+    const plain_password  = Math.floor(1000000 + Math.random() * 9000000).toString();
     const intermediateKey = ACCESS_SECRET.substring(0, 16);
     const decryptedTicket = aesDecrypt(intermediateKey, Buffer.from(ticket_key, 'hex'));
     const real_key        = decryptedTicket.slice(0, 16);
     const encrypted_hex   = aesEncrypt(real_key, Buffer.from(plain_password, 'utf8')).toString('hex').toUpperCase();
     console.log(`[test-video-lock] Step 2: plain=${plain_password}  ticket_id=${ticket_id}  encrypted=${encrypted_hex}`);
-    result.step2_encryption = { plain_password, ticket_id, encrypted_hex };
+    const step2_encryption = { plain_password, ticket_id, encrypted_hex, winning_ticket_path: winning_ticket.path };
 
     // ── Step 3: Create temp password ──────────────────────────────────────────
-    const nowSec   = Math.floor(Date.now() / 1000);
-    const body3    = JSON.stringify({
+    const nowSec = Math.floor(Date.now() / 1000);
+    const body3  = JSON.stringify({
         password:       encrypted_hex,
         password_type:  'ticket',
         ticket_id,
@@ -449,12 +472,10 @@ async function handleTestVideoLock(req, res, _body) {
     });
     const createPath = `/v1.0/devices/video/${VID_DEV}/door-lock/temp-password`;
     console.log(`[test-video-lock] Step 3: POST ${createPath}`);
-    console.log('[test-video-lock] body3:', body3);
     const r3 = await tuyaCall('POST', createPath, token, body3);
     console.log('[test-video-lock] Step 3 full response:', JSON.stringify(r3.data));
-    result.step3_result = r3.data;
 
-    respond(res, 200, result);
+    respond(res, 200, { ticket_probes, step2_encryption, step3_result: r3.data });
 }
 
 async function handleDeleteTestPasswords(req, res, body) {

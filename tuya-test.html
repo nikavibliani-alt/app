@@ -1464,14 +1464,19 @@ async function runVideoLockTest() {
     return;
   }
 
-  // Step 1 — ticket
-  const s1     = data.step1_ticket;
-  const s1ok   = s1?.success && s1?.result?.ticket_id;
-  vRow(
-    'Step 1 — POST /v1.0/devices/video/{id}/door-lock/password-ticket',
-    s1ok ? `ticket_id=${s1.result.ticket_id}  expire_time=${s1.result.expire_time ?? '?'}s` : `code=${s1?.code}: ${s1?.msg}`,
-    !!s1ok, s1
-  );
+  // Step 1 — all ticket probes
+  const probes = data.ticket_probes ?? [];
+  probes.forEach((p, i) => {
+    const ok = p.response?.success && p.response?.result?.ticket_id;
+    const isWinner = ok; // first success stops the loop server-side
+    vRow(
+      `Ticket probe ${i+1} — POST ${p.path}`,
+      ok
+        ? `✅ WINNER — ticket_id=${p.response.result.ticket_id}  expire_time=${p.response.result.expire_time ?? '?'}s`
+        : `✗ code=${p.response?.code}  msg=${p.response?.msg}`,
+      !!ok, p.response
+    );
+  });
 
   if (data.error) {
     document.getElementById('video-lock-banner').innerHTML =
@@ -1483,7 +1488,7 @@ async function runVideoLockTest() {
   // Step 2 — encryption
   const s2 = data.step2_encryption;
   vRow(
-    'Step 2 — AES-128-ECB encrypt (proxy)',
+    `Step 2 — AES-128-ECB encrypt  (winning path: ${s2?.winning_ticket_path ?? '?'})`,
     s2 ? `plain="${s2.plain_password}"  encrypted=${s2.encrypted_hex?.slice(0,20)}…  (${s2.encrypted_hex?.length ?? 0} chars)` : 'no data',
     !!(s2?.encrypted_hex),
     s2
