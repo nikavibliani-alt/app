@@ -202,19 +202,23 @@ def sync_to_firestore(db, reservations):
 
 
 def detect_cancellations(db, api_reservations, from_date, to_date):
-    """Mark Firestore reservations as cancelled if they're not in the API response."""
+    """Mark Firestore reservations as cancelled if they're not in the API response.
+    Also deletes old non-API docs that have no matching API reservation (one-time cleanup)."""
     coll = db.collection('reservations')
 
-    # Build set of active reservation keys from API
-    active_keys = set()
+    # Build lookup sets from the API response
+    active_checkout_keys = set()   # roomCode_checkout — for cancellation detection
+    active_checkin_keys = set()    # roomCode_checkin  — for old-doc cleanup
     for r in api_reservations:
-        room_mh = r.get('roomNumber', '')
-        room_code = ROOM_MAP.get(room_mh)
+        room_code = ROOM_MAP.get(r.get('roomNumber', ''))
+        checkin = parse_date(r.get('checkIn'))
         checkout = parse_date(r.get('checkOut'))
         if room_code and checkout:
-            active_keys.add(f"{room_code}_{checkout}")
+            active_checkout_keys.add(f"{room_code}_{checkout}")
+        if room_code and checkin:
+            active_checkin_keys.add(f"{room_code}_{checkin}")
 
-    # Query Firestore for reservations in the same date range
+    # ── Cancellation check: API docs no longer in MiniHotel ──────────────────
     snap = coll \
         .where('checkout', '>=', from_date) \
         .where('checkout', '<=', to_date) \
@@ -227,7 +231,7 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
     for doc in snap:
         data = doc.to_dict()
         key = f"{data.get('roomCode')}_{data.get('checkout')}"
-        if key not in active_keys and data.get('status') != 'CANCELLED':
+        if key not in active_checkout_keys and data.get('status') != 'CANCELLED':
             batch.update(doc.reference, {
                 'status': 'CANCELLED',
                 'statusDescription': 'Cancelled (not in MiniHotel)',
@@ -239,6 +243,42 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
     if cancelled > 0:
         batch.commit()
     print(f"Detected {cancelled} cancellations")
+
+    # ── Old-doc cleanup: non-API docs with no API equivalent ─────────────────
+    # Collect old docs in the date window from known legacy syncSource values
+    old_docs = []
+    for old_src in ['reservations_query', 'old_parser']:
+        old_snap = coll \
+            .where('checkout', '>=', from_date) \
+            .where('checkout', '<=', to_date) \
+            .where('syncSource', '==', old_src) \
+            .get()
+        old_docs.extend(old_snap)
+
+    # Also pick up docs with no syncSource field (can't query directly, so
+    # fetch all in range and filter client-side)
+    seen_ids = {d.id for d in old_docs}
+    all_range = coll \
+        .where('checkout', '>=', from_date) \
+        .where('checkout', '<=', to_date) \
+        .get()
+    for doc in all_range:
+        if doc.id not in seen_ids and 'syncSource' not in doc.to_dict():
+            old_docs.append(doc)
+
+    batch2 = db.batch()
+    deleted = 0
+    for doc in old_docs:
+        d = doc.to_dict()
+        key = f"{d.get('roomCode')}_{d.get('checkin')}"
+        if key not in active_checkin_keys:
+            batch2.delete(doc.reference)
+            deleted += 1
+            print(f"  Deleted old doc (no API match): {doc.id} | {d.get('guest')} | {d.get('roomCode')} | {d.get('checkin')}→{d.get('checkout')}")
+
+    if deleted > 0:
+        batch2.commit()
+    print(f"Cleaned {deleted} old non-API docs with no API equivalent")
 
 
 def cleanup_old_duplicates(db):

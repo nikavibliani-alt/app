@@ -410,15 +410,16 @@ function targetDate(){return addDays(today(),activeDay);}
 
 function getResForRoom(roomCode,date){
   const ds=fmtDate(date);
-  return reservations.filter(r=>r.roomCode===roomCode&&r.checkin<=ds&&r.checkout>ds);
+  return reservations.filter(r=>r.syncSource==='minihotel_api'&&r.roomCode===roomCode&&r.checkin<=ds&&r.checkout>ds);
 }
 
 function getCheckoutToday(roomCode,date){
   const ds=fmtDate(date);
-  const co=reservations.find(r=>r.roomCode===roomCode&&r.checkout===ds);
+  const co=reservations.find(r=>r.syncSource==='minihotel_api'&&r.roomCode===roomCode&&r.checkout===ds);
   if(!co)return null;
   // If another doc for the same stay (same check-in) has a later checkout, this one is stale
   if(co.checkin&&reservations.some(r=>
+    r.syncSource==='minihotel_api'&&
     r.id!==co.id&&
     r.roomCode===roomCode&&
     (r.checkin||'').slice(0,10)===co.checkin.slice(0,10)&&
@@ -430,7 +431,7 @@ function getCheckoutToday(roomCode,date){
 function getNextCheckin(roomCode,afterDate){
   const ds=fmtDate(afterDate);
   return reservations
-    .filter(r=>r.roomCode===roomCode&&r.checkin>=ds)
+    .filter(r=>r.syncSource==='minihotel_api'&&r.roomCode===roomCode&&r.checkin>=ds)
     .sort((a,b)=>a.checkin.localeCompare(b.checkin))[0]||null;
 }
 
