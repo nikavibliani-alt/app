@@ -87,7 +87,13 @@ def get_occupancy_adjustment(occupancy_pct: float, config: dict) -> float:
     return 0.0
 
 
-def get_lead_time_limits(days_ahead: int, config: dict) -> tuple:
+def get_lead_time_limits(days_ahead: int, config: dict, season: str = None) -> tuple:
+    # Season-level override takes highest priority (e.g. new_year, peak)
+    if season:
+        season_override = config.get("season_lead_time_overrides", {}).get(season)
+        if season_override:
+            return season_override["max_drop_pct"], season_override["max_raise_pct"]
+    # Lead time modifiers
     default = config.get("max_daily_change_pct", 0.15)
     for lt in config.get("lead_time_modifiers", []):
         if lt["days_min"] <= days_ahead <= lt["days_max"]:
@@ -228,7 +234,7 @@ def compute_prices(raw_data: list, config: dict) -> dict:
 
                 elif base_gel > 0:
                     adj               = get_occupancy_adjustment(occupancy_pct, config)
-                    max_drop, max_raise = get_lead_time_limits(days, config)
+                    max_drop, max_raise = get_lead_time_limits(days, config, season)
 
                     if prices["gel"] == 0:
                         proposed_gel = base_gel * event_mult
@@ -258,7 +264,7 @@ def compute_prices(raw_data: list, config: dict) -> dict:
 
                 if base_eur > 0:
                     adj               = get_occupancy_adjustment(occupancy_pct, config)
-                    max_drop, max_raise = get_lead_time_limits(days, config)
+                    max_drop, max_raise = get_lead_time_limits(days, config, season)
 
                     if prices["eur"] == 0:
                         proposed_eur = base_eur * event_mult
