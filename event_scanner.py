@@ -36,7 +36,7 @@ SEARCH_QUERIES = [
 ]
 
 # 6+ ticket sources = major event
-MIN_TICKET_SOURCES = 6
+MIN_TICKET_SOURCES = 2
 
 SKIP_KEYWORDS = [
     "free", "weekly", "every tuesday", "every friday", "every saturday",
