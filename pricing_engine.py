@@ -355,6 +355,91 @@ def sync_channels(results: dict):
         time.sleep(2)
 
 
+
+# ---------------------------------------------------------------------------
+# FIRESTORE LOG
+# ---------------------------------------------------------------------------
+
+def write_firestore_log(results: dict, dry_run: bool, error: str = None):
+    """Write run summary to Firestore pricing_log collection."""
+    try:
+        import firebase_admin
+        from firebase_admin import credentials, firestore as fs
+        import base64, json as _json, os
+
+        if not firebase_admin._apps:
+            sa = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
+            if not sa:
+                return
+            cred_dict = _json.loads(base64.b64decode(sa).decode())
+            cred = credentials.Certificate(cred_dict)
+            firebase_admin.initialize_app(cred)
+
+        db = fs.client()
+
+        total_changes = sum(
+            len([d for d in dates if not d.get("skip") and d.get("changed")])
+            for dates in results.values()
+        ) if results else 0
+
+        entry = {
+            "timestamp":     fs.SERVER_TIMESTAMP,
+            "dry_run":       dry_run,
+            "changes_count": total_changes,
+            "message":       f"{'DRY RUN' if dry_run else 'LIVE'}: {total_changes} price updates",
+        }
+        if error:
+            entry["error"] = error
+
+        db.collection("pricing_log").add(entry)
+        print("  Log written to Firestore.")
+    except Exception as e:
+        print(f"  Firestore log error: {e}", file=sys.stderr)
+
+
+def load_approved_events(config: dict) -> dict:
+    """Load approved events from Firestore and merge into config event_premiums."""
+    try:
+        import firebase_admin
+        from firebase_admin import credentials, firestore as fs
+        import base64, json as _json, os
+
+        if not firebase_admin._apps:
+            sa = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
+            if not sa:
+                return config
+            cred_dict = _json.loads(base64.b64decode(sa).decode())
+            cred = credentials.Certificate(cred_dict)
+            firebase_admin.initialize_app(cred)
+
+        db = fs.client()
+        docs = db.collection("pricing_events").where("status", "in", ["approved", "manual"]).stream()
+
+        premiums = {k: v for k, v in config.get("event_premiums", {}).items() if not k.startswith("_")}
+        count = 0
+        for doc in docs:
+            data = doc.to_dict()
+            # Doc ID is event_YYYY-MM-DD
+            date_str = doc.id.replace("event_", "")
+            if not date_str or len(date_str) != 10:
+                # fallback to date field
+                date_str = data.get("date", "")
+            if date_str:
+                premiums[date_str] = {
+                    "label":      data.get("label", "Event"),
+                    "multiplier": data.get("multiplier", 1.30),
+                }
+                count += 1
+
+        if count:
+            print(f"  Loaded {count} approved events from Firestore.")
+        config["event_premiums"] = premiums
+        return config
+    except Exception as e:
+        print(f"  Firestore events error: {e}", file=sys.stderr)
+        return config
+
+
 # ---------------------------------------------------------------------------
 # REPORT
 # ---------------------------------------------------------------------------
@@ -426,6 +511,10 @@ def main():
     print(f"Fetching data {date_from} → {date_to} ({window} days)...")
     raw = fetch_data(date_from, date_to)
 
+    # Load approved events from Firestore into config
+    print("Loading approved events...")
+    config = load_approved_events(config)
+
     print("Computing prices...")
     results = compute_prices(raw, config)
 
@@ -433,6 +522,7 @@ def main():
 
     if dry_run:
         print("DRY RUN — run with --apply to write changes to MiniHotel")
+        write_firestore_log(results, dry_run=True)
         return
 
     payload = build_write_payload(results)
@@ -448,6 +538,7 @@ def main():
     print("Syncing channels...")
     sync_channels(results)
     print("Done.")
+    write_firestore_log(results, dry_run=False)
 
 
 if __name__ == "__main__":

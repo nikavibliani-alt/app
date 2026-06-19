@@ -1,13 +1,9 @@
 """
 Tbilisi Event Scanner
 ======================
-Uses SerpAPI Google Events to find upcoming major events in Tbilisi
-and updates config.json event_premiums automatically.
-
-Only flags events that look significant (concerts, festivals, sports).
-Small/regular events are ignored.
-
-Runs as part of the pricing engine workflow.
+Uses SerpAPI Google Events to find upcoming major events in Tbilisi/Rustavi.
+Saves pending events to Firestore for approval in SleepyPMS.
+Sends email notification for newly found events.
 """
 
 import json
@@ -22,34 +18,79 @@ import requests
 # CONFIG
 # ---------------------------------------------------------------------------
 
-SERP_API_KEY = os.environ.get("SERPAPI_KEY", "866181d84d5f19fae9a7db5c0488b3f30afe4710f8d886a14e11836dc1eccc87")
-SERPAPI_URL  = "https://serpapi.com/search.json"
+SERP_API_KEY   = os.environ.get("SERPAPI_KEY", "")
+SENDGRID_KEY   = os.environ.get("SENDGRID_KEY", "")
+NOTIFY_EMAIL   = "nikavibliani@gmail.com"
+FROM_EMAIL     = "nikavibliani@gmail.com"
 
-# Search queries to run
+SERPAPI_URL    = "https://serpapi.com/search.json"
+SENDGRID_URL   = "https://api.sendgrid.com/v3/mail/send"
+
 SEARCH_QUERIES = [
-    "concerts in Tbilisi",
-    "festivals in Tbilisi",
-    "events in Tbilisi Georgia",
+    "concerts in Tbilisi Georgia",
+    "festivals in Tbilisi Georgia",
+    "concerts in Rustavi Georgia",
+    "major events Tbilisi",
 ]
 
-# Keywords that suggest a MAJOR event worth a price premium
-MAJOR_KEYWORDS = [
-    "concert", "festival", "show", "tour", "live", "performance",
-    "championship", "match", "final", "gala", "opening",
-    "კონცერტი", "ფესტივალი",  # Georgian
-]
+# 6+ ticket sources = major event
+MIN_TICKET_SOURCES = 6
 
-# Keywords that suggest a SMALL/regular event — skip these
 SKIP_KEYWORDS = [
-    "comedy open mic", "free", "weekly", "every tuesday", "every friday",
+    "free", "weekly", "every tuesday", "every friday", "every saturday",
     "workshop", "class", "meetup", "networking", "webinar", "online",
-    "yoga", "meditation", "guided tour", "walking tour",
+    "yoga", "meditation", "guided tour", "walking tour", "comedy open mic",
+    "open mic", "karaoke", "trivia",
 ]
 
-# Price multiplier based on estimated event size
-# We use number of ticket sources as a proxy for event size
-DEFAULT_MULTIPLIER = 1.25
-LARGE_EVENT_MULTIPLIER = 1.40  # 4+ ticket sources = probably big
+DEFAULT_MULTIPLIER     = 1.30
+LARGE_EVENT_MULTIPLIER = 1.45  # 10+ ticket sources
+
+
+# ---------------------------------------------------------------------------
+# FIRESTORE
+# ---------------------------------------------------------------------------
+
+def get_firestore_client():
+    import firebase_admin
+    from firebase_admin import credentials, firestore
+
+    if not firebase_admin._apps:
+        sa = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
+        if sa:
+            import base64, json as _json
+            cred_dict = _json.loads(base64.b64decode(sa).decode())
+            cred = credentials.Certificate(cred_dict)
+        else:
+            cred = credentials.ApplicationDefault()
+        firebase_admin.initialize_app(cred)
+
+    return firestore.client()
+
+
+# ---------------------------------------------------------------------------
+# EMAIL
+# ---------------------------------------------------------------------------
+
+def send_email(subject: str, body: str):
+    payload = {
+        "personalizations": [{"to": [{"email": NOTIFY_EMAIL}]}],
+        "from": {"email": FROM_EMAIL, "name": "Maxela Pricing"},
+        "subject": subject,
+        "content": [{"type": "text/plain", "value": body}],
+    }
+    headers = {
+        "Authorization": f"Bearer {SENDGRID_KEY}",
+        "Content-Type": "application/json",
+    }
+    try:
+        resp = requests.post(SENDGRID_URL, json=payload, headers=headers, timeout=15)
+        if resp.status_code in (200, 202):
+            print(f"  Email sent: {subject}")
+        else:
+            print(f"  Email failed ({resp.status_code}): {resp.text[:200]}", file=sys.stderr)
+    except Exception as e:
+        print(f"  Email error: {e}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -58,19 +99,17 @@ LARGE_EVENT_MULTIPLIER = 1.40  # 4+ ticket sources = probably big
 
 def fetch_events(query: str) -> list:
     params = {
-        "engine": "google_events",
-        "q": query,
-        "hl": "en",
+        "engine":  "google_events",
+        "q":       query,
+        "hl":      "en",
         "api_key": SERP_API_KEY,
-        "num": 10,
     }
     try:
         resp = requests.get(SERPAPI_URL, params=params, timeout=15)
         resp.raise_for_status()
-        data = resp.json()
-        return data.get("events_results", [])
+        return resp.json().get("events_results", [])
     except Exception as e:
-        print(f"  Warning: SerpAPI query '{query}' failed: {e}", file=sys.stderr)
+        print(f"  Warning: SerpAPI '{query}' failed: {e}", file=sys.stderr)
         return []
 
 
@@ -79,83 +118,52 @@ def fetch_events(query: str) -> list:
 # ---------------------------------------------------------------------------
 
 def parse_event_date(date_info: dict) -> str | None:
-    """
-    Try to extract a YYYY-MM-DD date from the event date info.
-    SerpAPI returns dates like 'Jan 3', 'Sat, 03 Jan', 'Jun 21' etc.
-    """
     when = date_info.get("when", "") or date_info.get("start_date", "")
     if not when:
         return None
-
-    current_year = datetime.now().year
-
-    # Try common patterns
-    patterns = [
-        r"(\w{3})\s+(\d{1,2}),\s+(\d{4})",   # Jan 3, 2026
-        r"(\w{3,}),\s+\d{1,2}\s+(\w{3}),?\s+(\d{4})?",  # Sat, 21 Jun, 2026
-        r"(\w{3})\s+(\d{1,2})",               # Jun 21
-        r"(\d{1,2})\s+(\w{3})",               # 21 Jun
-    ]
 
     months = {
         "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
         "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12
     }
 
-    # Try "Jun 21" or "Jan 3" style
     m = re.search(r"(\b\w{3,9}\b)\s+(\d{1,2})", when, re.IGNORECASE)
     if m:
         month_str = m.group(1).lower()[:3]
-        day = int(m.group(2))
-        month = months.get(month_str)
+        day       = int(m.group(2))
+        month     = months.get(month_str)
         if month:
-            # Determine year — if month is before current month, assume next year
             today = datetime.now()
-            year = current_year
+            year  = today.year
             if month < today.month or (month == today.month and day < today.day):
-                year = current_year + 1
+                year = today.year + 1
             try:
                 return datetime(year, month, day).strftime("%Y-%m-%d")
             except ValueError:
                 pass
-
     return None
 
 
 # ---------------------------------------------------------------------------
-# CLASSIFY EVENT
+# CLASSIFY
 # ---------------------------------------------------------------------------
 
 def is_major_event(event: dict) -> bool:
-    """Return True if this looks like a significant event worth a price bump."""
-    title       = (event.get("title") or "").lower()
-    description = (event.get("description") or "").lower()
-    text        = title + " " + description
+    title = (event.get("title") or "").lower()
+    desc  = (event.get("description") or "").lower()
+    text  = title + " " + desc
 
-    # Skip small/regular events
     for kw in SKIP_KEYWORDS:
         if kw in text:
             return False
 
-    # Must have at least one major keyword
-    has_major = any(kw in text for kw in MAJOR_KEYWORDS)
-    if not has_major:
-        return False
-
-    # Must have at least 2 ticket sources (proxy for real event)
     ticket_sources = len(event.get("ticket_info", []))
-    if ticket_sources < 2:
-        return False
-
-    return True
+    return ticket_sources >= MIN_TICKET_SOURCES
 
 
 def get_multiplier(event: dict) -> float:
-    """Determine price multiplier based on estimated event size."""
     ticket_sources = len(event.get("ticket_info", []))
-    if ticket_sources >= 4:
-        return LARGE_EVENT_MULTIPLIER
-    return DEFAULT_MULTIPLIER
+    return LARGE_EVENT_MULTIPLIER if ticket_sources >= 10 else DEFAULT_MULTIPLIER
 
 
 # ---------------------------------------------------------------------------
@@ -163,92 +171,100 @@ def get_multiplier(event: dict) -> float:
 # ---------------------------------------------------------------------------
 
 def scan_and_update(config_path: str = "config.json", dry_run: bool = False) -> dict:
-    """
-    Scan for Tbilisi events and update config event_premiums.
-    Returns dict of newly found events.
-    """
-    print("Scanning for Tbilisi events via SerpAPI...")
+    print("Scanning for Tbilisi/Rustavi events via SerpAPI...")
 
     today    = datetime.now().date()
     max_date = today + timedelta(days=90)
 
-    found_events = {}  # date_str -> event info
+    found_events = {}
 
     for query in SEARCH_QUERIES:
         print(f"  Searching: '{query}'...")
         events = fetch_events(query)
-        print(f"  Found {len(events)} results")
-
         for event in events:
             if not is_major_event(event):
                 continue
-
             date_str = parse_event_date(event.get("date", {}))
             if not date_str:
                 continue
-
             event_date = datetime.strptime(date_str, "%Y-%m-%d").date()
             if event_date < today or event_date > max_date:
                 continue
-
             multiplier = get_multiplier(event)
-            title      = event.get("title", "Unknown event")
+            title      = event.get("title", "Unknown")
+            venue      = ""
+            if event.get("venue"):
+                venue = event["venue"].get("name", "")
+            ticket_count = len(event.get("ticket_info", []))
 
-            # Keep highest multiplier if date already found
             if date_str not in found_events or multiplier > found_events[date_str]["multiplier"]:
                 found_events[date_str] = {
-                    "label":      title[:60],
-                    "multiplier": multiplier,
+                    "label":        title[:80],
+                    "venue":        venue,
+                    "multiplier":   multiplier,
+                    "ticket_count": ticket_count,
+                    "status":       "pending",
+                    "source":       "serpapi",
+                    "found_at":     datetime.now().isoformat(),
                 }
-                print(f"  ✓ {date_str}: {title[:50]} (×{multiplier})")
+                print(f"  ✓ {date_str}: {title[:50]} ({ticket_count} ticket sources, ×{multiplier})")
 
     if not found_events:
         print("  No major events found.")
         return {}
 
-    # Update config.json
-    if not dry_run:
-        with open(config_path) as f:
-            config = json.load(f)
+    if dry_run:
+        print(f"  DRY RUN — {len(found_events)} events found, not saved.")
+        return found_events
 
-        existing = config.get("event_premiums", {})
-        # Remove _comment key before merging
-        existing = {k: v for k, v in existing.items() if not k.startswith("_")}
+    # Save to Firestore
+    try:
+        db         = get_firestore_client()
+        collection = db.collection("pricing_events")
+        new_events = []
 
-        # Merge — keep manual overrides, add/update scanned events
-        merged = {**existing}
         for date_str, info in found_events.items():
-            if date_str not in merged:
-                merged[date_str] = info
-                print(f"  Added: {date_str} → {info['label']}")
-            else:
-                # Update multiplier if scanned one is higher
-                if info["multiplier"] > merged[date_str].get("multiplier", 1.0):
-                    merged[date_str]["multiplier"] = info["multiplier"]
+            doc_id  = f"event_{date_str}"
+            doc_ref = collection.document(doc_id)
+            existing = doc_ref.get()
 
-        merged["_comment"] = (
-            "Auto-updated by event_scanner.py + manual entries. "
-            "Add events manually: '2026-07-15': {'label': 'Big Concert', 'multiplier': 1.35}"
-        )
-        config["event_premiums"] = merged
+            if existing.exists:
+                print(f"  Already in Firestore: {date_str} (skipping)")
+                continue
 
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=2)
+            doc_ref.set(info)
+            new_events.append((date_str, info))
+            print(f"  Saved to Firestore: {date_str} → {info['label']}")
 
-        print(f"  config.json updated with {len(found_events)} events.")
-    else:
-        print("  DRY RUN — config.json not updated.")
+        # Send email for new events
+        if new_events:
+            lines = []
+            for date_str, info in sorted(new_events):
+                lines.append(f"• {date_str}: {info['label']} @ {info['venue']} (×{info['multiplier']})")
+
+            send_email(
+                subject=f"🎵 {len(new_events)} major event(s) detected near Tbilisi — review in SleepyPMS",
+                body=(
+                    f"Hi Nika,\n\n"
+                    f"The pricing engine found {len(new_events)} major upcoming event(s) near Tbilisi:\n\n"
+                    + "\n".join(lines) +
+                    f"\n\nLogin to SleepyPMS → Pricing to approve or dismiss:\n"
+                    f"https://app.maxelaapartments.com/pricing.html\n\n"
+                    f"Approved events will automatically raise prices on those dates.\n\n"
+                    f"— Maxela Pricing Engine"
+                )
+            )
+
+    except Exception as e:
+        print(f"  Firestore error: {e}", file=sys.stderr)
 
     return found_events
 
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Scan Tbilisi events and update config")
+    parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-
     events = scan_and_update(dry_run=args.dry_run)
-    print(f"\nTotal major events found: {len(events)}")
-    for date, info in sorted(events.items()):
-        print(f"  {date}: {info['label']} (×{info['multiplier']})")
+    print(f"\nTotal: {len(events)} major events found")

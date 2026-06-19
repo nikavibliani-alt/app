@@ -3,9 +3,9 @@ name: Maxela Pricing Engine
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 5 * * *'   # 09:00 Tbilisi time
-    - cron: '0 11 * * *'  # 15:00 Tbilisi time
-    - cron: '0 17 * * *'  # 21:00 Tbilisi time
+    - cron: '0 5 * * *'    # 09:00 Tbilisi time
+    - cron: '0 11 * * *'   # 15:00 Tbilisi time
+    - cron: '0 17 * * *'   # 21:00 Tbilisi time
 
 jobs:
   pricing:
@@ -21,12 +21,14 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests firebase-admin
 
       - name: Run pricing engine
         env:
-          MINIHOTEL_HOTEL: ${{ secrets.MINIHOTEL_HOTEL }}
-          MINIHOTEL_USER: ${{ secrets.MINIHOTEL_USER }}
-          MINIHOTEL_PASS: ${{ secrets.MINIHOTEL_PASS }}
-          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          MINIHOTEL_HOTEL:          ${{ secrets.MINIHOTEL_HOTEL }}
+          MINIHOTEL_USER:           ${{ secrets.MINIHOTEL_USER }}
+          MINIHOTEL_PASS:           ${{ secrets.MINIHOTEL_PASS }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          SERPAPI_KEY:              ${{ secrets.SERPAPI_KEY }}
+          SENDGRID_KEY:             ${{ secrets.SENDGRID_KEY }}
         run: python pricing_engine.py --apply

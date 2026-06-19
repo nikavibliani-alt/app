@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing — Maxela</title>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #222;
+    --border: #2a2a2a;
+    --text: #f0f0f0;
+    --muted: #888;
+    --accent: #c8a96e;
+    --accent-dim: rgba(200,169,110,0.12);
+    --green: #4caf7d;
+    --green-dim: rgba(76,175,125,0.12);
+    --red: #e05c5c;
+    --red-dim: rgba(224,92,92,0.12);
+    --yellow: #e0b84a;
+    --yellow-dim: rgba(224,184,74,0.12);
+    --font: 'Inter', system-ui, sans-serif;
+    --mono: 'JetBrains Mono', 'Fira Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .back-btn {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.15s;
+  }
+  .back-btn:hover { color: var(--text); }
+  .page-title { font-size: 15px; font-weight: 600; color: var(--accent); }
+  .run-btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .run-btn:hover { opacity: 0.85; }
+  .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* LAYOUT */
+  .main { max-width: 1100px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; }
+
+  /* STATUS BAR */
+  .status-bar {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 20px;
+    flex: 1;
+    min-width: 140px;
+  }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 4px; }
+  .stat-value { font-size: 22px; font-weight: 700; font-family: var(--mono); color: var(--accent); }
+  .stat-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* SECTION */
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .section-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .section-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .section-count { font-size: 12px; color: var(--muted); background: var(--surface2); padding: 2px 8px; border-radius: 10px; }
+
+  /* EVENTS */
+  .event-row {
+    display: flex;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    gap: 16px;
+    transition: background 0.1s;
+  }
+  .event-row:last-child { border-bottom: none; }
+  .event-row:hover { background: var(--surface2); }
+
+  .event-date {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    min-width: 90px;
+    font-weight: 600;
+  }
+  .event-info { flex: 1; }
+  .event-title { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+  .event-venue { font-size: 12px; color: var(--muted); }
+  .event-meta { display: flex; align-items: center; gap: 8px; }
+
+  .badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-family: var(--mono);
+  }
+  .badge-pending  { background: var(--yellow-dim); color: var(--yellow); }
+  .badge-approved { background: var(--green-dim);  color: var(--green);  }
+  .badge-manual   { background: var(--accent-dim); color: var(--accent); }
+  .badge-dismissed{ background: var(--border);     color: var(--muted);  }
+
+  .multiplier-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-family: var(--mono);
+    font-size: 13px;
+    width: 72px;
+    text-align: center;
+  }
+  .multiplier-input:focus { outline: none; border-color: var(--accent); }
+
+  .action-btns { display: flex; gap: 6px; }
+  .btn-approve {
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid rgba(76,175,125,0.3);
+    padding: 5px 12px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-approve:hover { background: rgba(76,175,125,0.25); }
+  .btn-dismiss {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-dismiss:hover { color: var(--red); border-color: var(--red); }
+  .btn-remove {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-remove:hover { color: var(--red); border-color: var(--red); }
+
+  /* ADD MANUAL EVENT */
+  .add-form {
+    padding: 20px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .form-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: var(--font);
+  }
+  .form-input:focus { outline: none; border-color: var(--accent); }
+  .btn-add {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    height: 36px;
+    transition: opacity 0.15s;
+  }
+  .btn-add:hover { opacity: 0.85; }
+
+  /* LOG */
+  .log-row {
+    display: flex;
+    align-items: baseline;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+    font-size: 13px;
+  }
+  .log-row:last-child { border-bottom: none; }
+  .log-time { font-family: var(--mono); font-size: 12px; color: var(--muted); min-width: 140px; }
+  .log-msg { color: var(--text); flex: 1; }
+  .log-changes { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+  .log-error { color: var(--red); }
+
+  /* EMPTY STATE */
+  .empty { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 13px; }
+  .empty-icon { font-size: 28px; margin-bottom: 8px; }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.25s;
+    z-index: 100;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: var(--green); color: var(--green); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+
+  /* LOADING */
+  .loading { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(200,169,110,0.3); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <a href="index.html" class="back-btn">← Dashboard</a>
+    <span class="page-title">Pricing Engine</span>
+  </div>
+  <button class="run-btn" id="runBtn" onclick="triggerRun()">
+    <span>▶ Run Now</span>
+  </button>
+</div>
+
+<div class="main">
+
+  <!-- STATUS -->
+  <div class="status-bar" id="statusBar">
+    <div class="stat-card">
+      <div class="stat-label">Last Run</div>
+      <div class="stat-value" id="lastRunTime">—</div>
+      <div class="stat-sub" id="lastRunStatus">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Price Updates</div>
+      <div class="stat-value" id="lastRunChanges">—</div>
+      <div class="stat-sub">last run</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pending Events</div>
+      <div class="stat-value" id="pendingCount">—</div>
+      <div class="stat-sub">need review</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active Premiums</div>
+      <div class="stat-value" id="activeCount">—</div>
+      <div class="stat-sub">upcoming dates</div>
+    </div>
+  </div>
+
+  <!-- PENDING EVENTS -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">🔔 Suggested Events</span>
+      <span class="section-count" id="pendingBadge">0 pending</span>
+    </div>
+    <div id="pendingList">
+      <div class="empty"><div class="empty-icon">🎵</div>No pending events. The engine scans 3× daily.</div>
+    </div>
+  </div>
+
+  <!-- APPROVED / MANUAL EVENTS -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">✅ Active Event Premiums</span>
+      <span class="section-count" id="activeBadge">0 active</span>
+    </div>
+    <div id="activeList">
+      <div class="empty"><div class="empty-icon">📅</div>No active event premiums.</div>
+    </div>
+    <!-- Add manual event -->
+    <div style="border-top: 1px solid var(--border);">
+      <div style="padding: 14px 20px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);">Add manually</div>
+      <div class="add-form">
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-input" id="manualDate" style="width:150px;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Event Name</label>
+          <input type="text" class="form-input" id="manualLabel" placeholder="e.g. Kanye West Concert" style="width:240px;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Multiplier</label>
+          <input type="number" class="form-input multiplier-input" id="manualMultiplier" value="1.35" min="1.0" max="2.0" step="0.05">
+        </div>
+        <button class="btn-add" onclick="addManualEvent()">+ Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ENGINE LOG -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">📋 Engine Log</span>
+      <span class="section-count">last 10 runs</span>
+    </div>
+    <div id="logList">
+      <div class="empty"><div class="empty-icon">📊</div>No runs recorded yet.</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, query, orderBy, limit, onSnapshot, doc, updateDoc, addDoc, deleteDoc, serverTimestamp, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCzQdERi2bJcPsHPpBsemRJoS8bKAWCZ7U",
+  authDomain: "sleepy-5c962.firebaseapp.com",
+  projectId: "sleepy-5c962",
+  storageBucket: "sleepy-5c962.appspot.com",
+  messagingSenderId: "1028795918434",
+  appId: "1:1028795918434:web:9b5b5b5b5b5b5b5b5b5b5b"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const auth = getAuth(app);
+
+// Auth check
+onAuthStateChanged(auth, user => {
+  if (!user) window.location.href = 'index.html';
+});
+
+// ---- HELPERS ----
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show ${type}`;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+function formatDate(str) {
+  if (!str) return '—';
+  const d = new Date(str + 'T12:00:00');
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatTs(ts) {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+// ---- PENDING EVENTS ----
+const pendingQ = query(collection(db, 'pricing_events'), where('status', '==', 'pending'), orderBy('label'));
+onSnapshot(pendingQ, snap => {
+  const list = document.getElementById('pendingList');
+  const badge = document.getElementById('pendingBadge');
+  const countEl = document.getElementById('pendingCount');
+  const count = snap.docs.length;
+  badge.textContent = `${count} pending`;
+  countEl.textContent = count;
+
+  if (count === 0) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">🎵</div>No pending events. Engine scans 3× daily.</div>';
+    return;
+  }
+
+  list.innerHTML = snap.docs.map(d => {
+    const e = d.data();
+    const docId = d.id;
+    return `
+    <div class="event-row" id="row-${docId}">
+      <div class="event-date">${formatDate(e.label?.match(/\d{4}-\d{2}-\d{2}/)?.[0] || docId.replace('event_',''))}</div>
+      <div class="event-info">
+        <div class="event-title">${e.label || 'Unknown event'}</div>
+        <div class="event-venue">${e.venue || ''} ${e.ticket_count ? `· ${e.ticket_count} ticket sources` : ''}</div>
+      </div>
+      <div class="event-meta">
+        <span class="badge badge-pending">Pending</span>
+        <input class="multiplier-input" type="number" value="${e.multiplier || 1.35}" min="1.0" max="2.0" step="0.05" id="mult-${docId}">
+        <div class="action-btns">
+          <button class="btn-approve" onclick="approveEvent('${docId}')">Approve</button>
+          <button class="btn-dismiss" onclick="dismissEvent('${docId}')">Dismiss</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+});
+
+// ---- ACTIVE EVENTS ----
+const activeQ = query(collection(db, 'pricing_events'), where('status', 'in', ['approved', 'manual']), orderBy('label'));
+onSnapshot(activeQ, snap => {
+  const list = document.getElementById('activeList');
+  const badge = document.getElementById('activeBadge');
+  const countEl = document.getElementById('activeCount');
+  const count = snap.docs.length;
+  badge.textContent = `${count} active`;
+  countEl.textContent = count;
+
+  if (count === 0) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>No active event premiums.</div>';
+    return;
+  }
+
+  list.innerHTML = snap.docs.map(d => {
+    const e = d.data();
+    const docId = d.id;
+    const badgeClass = e.status === 'manual' ? 'badge-manual' : 'badge-approved';
+    const badgeText  = e.status === 'manual' ? 'Manual' : 'Approved';
+    return `
+    <div class="event-row">
+      <div class="event-date">${formatDate(docId.replace('event_',''))}</div>
+      <div class="event-info">
+        <div class="event-title">${e.label || 'Event'}</div>
+        <div class="event-venue">${e.venue || ''}</div>
+      </div>
+      <div class="event-meta">
+        <span class="badge ${badgeClass}">${badgeText}</span>
+        <span style="font-family:var(--mono);font-size:13px;color:var(--accent)">×${e.multiplier}</span>
+        <button class="btn-remove" onclick="removeEvent('${docId}')">Remove</button>
+      </div>
+    </div>`;
+  }).join('');
+});
+
+// ---- ENGINE LOG ----
+const logQ = query(collection(db, 'pricing_log'), orderBy('timestamp', 'desc'), limit(10));
+onSnapshot(logQ, snap => {
+  const list = document.getElementById('logList');
+  if (snap.empty) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">📊</div>No runs recorded yet.</div>';
+    return;
+  }
+
+  // Update last run stat
+  const latest = snap.docs[0].data();
+  document.getElementById('lastRunTime').textContent = formatTs(latest.timestamp);
+  document.getElementById('lastRunStatus').textContent = latest.error ? 'Failed' : 'Success';
+  document.getElementById('lastRunChanges').textContent = latest.changes_count ?? '—';
+
+  list.innerHTML = snap.docs.map(d => {
+    const r = d.data();
+    const isError = !!r.error;
+    return `
+    <div class="log-row">
+      <span class="log-time">${formatTs(r.timestamp)}</span>
+      <span class="log-msg ${isError ? 'log-error' : ''}">${isError ? '⚠ ' + r.error : r.message || 'Run completed'}</span>
+      <span class="log-changes">${r.changes_count != null ? r.changes_count + ' updates' : ''}</span>
+    </div>`;
+  }).join('');
+});
+
+// ---- ACTIONS ----
+window.approveEvent = async (docId) => {
+  const mult = parseFloat(document.getElementById(`mult-${docId}`)?.value || 1.35);
+  try {
+    await updateDoc(doc(db, 'pricing_events', docId), { status: 'approved', multiplier: mult });
+    showToast('Event approved — will apply on next run');
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+};
+
+window.dismissEvent = async (docId) => {
+  try {
+    await updateDoc(doc(db, 'pricing_events', docId), { status: 'dismissed' });
+    showToast('Event dismissed');
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+};
+
+window.removeEvent = async (docId) => {
+  if (!confirm('Remove this event premium?')) return;
+  try {
+    await deleteDoc(doc(db, 'pricing_events', docId));
+    showToast('Event removed');
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+};
+
+window.addManualEvent = async () => {
+  const date  = document.getElementById('manualDate').value;
+  const label = document.getElementById('manualLabel').value.trim();
+  const mult  = parseFloat(document.getElementById('manualMultiplier').value);
+
+  if (!date || !label) { showToast('Enter date and event name', 'error'); return; }
+  if (isNaN(mult) || mult < 1 || mult > 2) { showToast('Multiplier must be between 1.0 and 2.0', 'error'); return; }
+
+  try {
+    const docId = `event_${date}`;
+    await updateDoc(doc(db, 'pricing_events', docId), {
+      label, multiplier: mult, status: 'manual',
+      venue: '', source: 'manual', found_at: new Date().toISOString()
+    }).catch(async () => {
+      // Doc doesn't exist — create it
+      await addDoc(collection(db, 'pricing_events'), {
+        label, multiplier: mult, status: 'manual',
+        venue: '', source: 'manual', found_at: new Date().toISOString(),
+        date
+      });
+    });
+    document.getElementById('manualDate').value = '';
+    document.getElementById('manualLabel').value = '';
+    document.getElementById('manualMultiplier').value = '1.35';
+    showToast('Event added');
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+};
+
+// ---- RUN NOW ----
+window.triggerRun = async () => {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span> Running...';
+
+  try {
+    // Trigger GitHub Actions workflow dispatch
+    const GITHUB_TOKEN = await getGithubToken();
+    const resp = await fetch(
+      'https://api.github.com/repos/nikavibliani-alt/app/actions/workflows/pricing_engine.yml/dispatches',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ref: 'main' })
+      }
+    );
+    if (resp.status === 204) {
+      showToast('Engine triggered — check log in ~2 minutes');
+    } else {
+      throw new Error(`GitHub API returned ${resp.status}`);
+    }
+  } catch(e) {
+    showToast('Could not trigger run: ' + e.message, 'error');
+  } finally {
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.innerHTML = '▶ Run Now';
+    }, 5000);
+  }
+};
+
+async function getGithubToken() {
+  // Read from Firestore globals/config
+  const { getDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
+  const snap = await getDoc(doc(db, 'globals', 'config'));
+  return snap.data()?.githubToken || '';
+}
+
+</script>
+</body>
+</html>
