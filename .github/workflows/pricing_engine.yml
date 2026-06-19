@@ -28,4 +28,5 @@ jobs:
           MINIHOTEL_HOTEL: ${{ secrets.MINIHOTEL_HOTEL }}
           MINIHOTEL_USER: ${{ secrets.MINIHOTEL_USER }}
           MINIHOTEL_PASS: ${{ secrets.MINIHOTEL_PASS }}
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
         run: python pricing_engine.py --apply

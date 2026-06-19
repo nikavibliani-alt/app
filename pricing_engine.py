@@ -28,6 +28,7 @@ from datetime import datetime, timedelta
 
 import requests
 from minihotel_auth import get_session_cookie
+from event_scanner import scan_and_update as scan_events
 
 # ---------------------------------------------------------------------------
 # CONFIG
@@ -407,6 +408,11 @@ def main():
     config  = load_config()
     dry_run = not args.apply and config.get("dry_run", True)
     window  = args.days or config.get("run_window_days", 90)
+
+    # Scan for Tbilisi events and update config
+    print("Scanning for events...")
+    scan_events()
+    print()
 
     # Auto-login — no manual cookie needed
     print("Logging into MiniHotel...")
