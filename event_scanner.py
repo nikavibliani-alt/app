@@ -6,6 +6,8 @@ Saves pending events to Firestore for approval in SleepyPMS.
 Sends email notification for newly found events.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re
