@@ -371,7 +371,6 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, query, orderBy, limit, onSnapshot, doc, updateDoc, addDoc, deleteDoc, serverTimestamp, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -384,12 +383,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
-const auth = getAuth(app);
-
-// Auth check
-onAuthStateChanged(auth, user => {
-  if (!user) window.location.href = 'index.html';
-});
 
 // ---- HELPERS ----
 function showToast(msg, type = 'success') {
