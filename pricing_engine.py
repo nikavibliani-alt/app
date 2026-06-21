@@ -129,6 +129,38 @@ def days_until(date_str: str) -> int:
     return (target - today).days
 
 
+
+def get_ceiling(rt: str, season: str, config: dict) -> float:
+    """Return ceiling price for a property/season, or 0 if no ceiling defined."""
+    return config.get("ceiling_prices_gel", {}).get(rt, {}).get(season, 0)
+
+
+def load_todays_changes(db) -> dict:
+    """
+    Load prices already changed today from Firestore.
+    Returns {rt: {date_str: price_gel}} for changes made today.
+    """
+    from datetime import datetime
+    today = datetime.now().strftime("%Y-%m-%d")
+    try:
+        doc = db.collection("pricing_state").document(f"daily_{today}").get()
+        if doc.exists:
+            return doc.to_dict() or {}
+    except Exception:
+        pass
+    return {}
+
+
+def save_todays_changes(db, changes: dict):
+    """Save today's price changes to Firestore so subsequent runs skip them."""
+    from datetime import datetime
+    today = datetime.now().strftime("%Y-%m-%d")
+    try:
+        db.collection("pricing_state").document(f"daily_{today}").set(changes, merge=True)
+    except Exception as e:
+        print(f"  Warning: could not save daily state: {e}", file=sys.stderr)
+
+
 # ---------------------------------------------------------------------------
 # FETCH
 # ---------------------------------------------------------------------------
@@ -151,7 +183,9 @@ def fetch_data(date_from: str, date_to: str) -> list:
 # CORE ENGINE
 # ---------------------------------------------------------------------------
 
-def compute_prices(raw_data: list, config: dict) -> dict:
+def compute_prices(raw_data: list, config: dict, todays_changes: dict = None) -> dict:
+    if todays_changes is None:
+        todays_changes = {}
     avail_map = {}
     price_map = {}
 
@@ -236,25 +270,34 @@ def compute_prices(raw_data: list, config: dict) -> dict:
                 elif base_gel > 0:
                     adj               = get_occupancy_adjustment(occupancy_pct, config)
                     max_drop, max_raise = get_lead_time_limits(days, config, season)
+                    ceiling_gel       = config.get("ceiling_prices_gel", {}).get(rt, {}).get(season, 0)
 
                     if prices["gel"] == 0:
                         proposed_gel = base_gel * event_mult
                         reason = f"unset→base {base_gel}₾ season={season}"
                     else:
-                        target = prices["gel"] * (1 + adj) * event_mult
-                        if target > prices["gel"]:
-                            proposed_gel = min(target, prices["gel"] * (1 + max_raise))
+                        # Per-day cap: skip if already changed today and no event premium
+                        already_today = todays_changes.get(rt, {}).get(date_str)
+                        if already_today and event_mult == 1.0:
+                            proposed_gel = prices["gel"]
+                            reason = "already updated today"
                         else:
-                            proposed_gel = max(target, prices["gel"] * (1 - max_drop))
-                        reason = (
-                            f"occ={occupancy_pct:.0f}% ({booked}/{total_units}) "
-                            f"adj={adj:+.0%} lead={days}d "
-                            f"drop={max_drop:.0%} raise={max_raise:.0%}"
-                        )
+                            target = prices["gel"] * (1 + adj) * event_mult
+                            if target > prices["gel"]:
+                                proposed_gel = min(target, prices["gel"] * (1 + max_raise))
+                            else:
+                                proposed_gel = max(target, prices["gel"] * (1 - max_drop))
+                            reason = (
+                                f"occ={occupancy_pct:.0f}% ({booked}/{total_units}) "
+                                f"adj={adj:+.0%} lead={days}d "
+                                f"drop={max_drop:.0%} raise={max_raise:.0%}"
+                            )
                     if event_label:
                         reason += f" +event({event_label} ×{event_mult})"
 
                     proposed_gel = max(proposed_gel, floor_gel)
+                    if ceiling_gel > 0:
+                        proposed_gel = min(proposed_gel, ceiling_gel)
                     proposed_gel = round_price(proposed_gel, config.get("rounding", 5))
 
             # --- EUR price (Airbnb) ---
@@ -515,8 +558,21 @@ def main():
     print("Loading approved events...")
     config = load_approved_events(config)
 
+    # Load today's already-changed prices to avoid running up prices 3x per day
+    todays_changes = {}
+    try:
+        import firebase_admin
+        from firebase_admin import firestore as _fs
+        if firebase_admin._apps:
+            _db = _fs.client()
+            todays_changes = load_todays_changes(_db)
+            if todays_changes:
+                print(f"  Found {sum(len(v) for v in todays_changes.values() if isinstance(v,dict))} prices already changed today.")
+    except Exception as _e:
+        print(f"  Warning: could not load daily state: {_e}", file=sys.stderr)
+
     print("Computing prices...")
-    results = compute_prices(raw, config)
+    results = compute_prices(raw, config, todays_changes)
 
     print_report(results, dry_run)
 
@@ -534,6 +590,20 @@ def main():
     print(f"Writing {total_updates} date updates to MiniHotel...")
     write_prices(payload)
     print("Write OK.")
+    # Save today's changes so next run knows what was already updated
+    try:
+        import firebase_admin
+        from firebase_admin import firestore as _fs2
+        if firebase_admin._apps:
+            _db2 = _fs2.client()
+            daily_state = {}
+            for rt, dates in results.items():
+                changed = {d["date"]: d["proposed_gel"] for d in dates if d.get("changed") and not d.get("skip")}
+                if changed:
+                    daily_state[rt] = changed
+            save_todays_changes(_db2, daily_state)
+    except Exception as _e2:
+        print(f"  Warning: could not save daily state: {_e2}", file=sys.stderr)
 
     print("Syncing channels...")
     sync_channels(results)

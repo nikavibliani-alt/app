@@ -156,28 +156,28 @@
   },
   "floor_prices_gel": {
     "ROOMS": {
-      "low": 70,
-      "mid": 90,
-      "high": 100,
-      "peak": 110,
+      "low": 80,
+      "mid": 80,
+      "high": 80,
+      "peak": 80,
       "xmas_low": 80,
-      "new_year": 120
+      "new_year": 100
     },
     "MAXELA": {
-      "low": 140,
-      "mid": 170,
-      "high": 200,
-      "peak": 220,
-      "xmas_low": 150,
-      "new_year": 220
+      "low": 180,
+      "mid": 180,
+      "high": 180,
+      "peak": 180,
+      "xmas_low": 180,
+      "new_year": 200
     },
     "BIG_APT": {
-      "low": 250,
-      "mid": 350,
-      "high": 450,
-      "peak": 500,
-      "xmas_low": 320,
-      "new_year": 450
+      "low": 400,
+      "mid": 400,
+      "high": 400,
+      "peak": 400,
+      "xmas_low": 400,
+      "new_year": 500
     },
     "FREEDOM": {
       "low": 160,
@@ -269,7 +269,7 @@
     "ORBE_1": {},
     "ORBE_2": {}
   },
-  "max_daily_change_pct": 0.15,
+  "max_daily_change_pct": 0.08,
   "rounding": 5,
   "last_minute_cascade": {
     "ROOMS": [
@@ -325,6 +325,64 @@
       "_comment": "Peak season (Jul-Aug) \u2014 small drops only, prices will fill naturally",
       "max_drop_pct": 0.03,
       "max_raise_pct": 0.15
+    }
+  },
+  "lead_time_modifiers": [
+    {
+      "days_min": 0,
+      "days_max": 7,
+      "max_drop_pct": 0.08,
+      "max_raise_pct": 0.08
+    },
+    {
+      "days_min": 8,
+      "days_max": 14,
+      "max_drop_pct": 0.06,
+      "max_raise_pct": 0.08
+    },
+    {
+      "days_min": 15,
+      "days_max": 30,
+      "max_drop_pct": 0.04,
+      "max_raise_pct": 0.06
+    },
+    {
+      "days_min": 31,
+      "days_max": 60,
+      "max_drop_pct": 0.02,
+      "max_raise_pct": 0.05
+    },
+    {
+      "days_min": 61,
+      "days_max": 90,
+      "max_drop_pct": 0.01,
+      "max_raise_pct": 0.03
+    }
+  ],
+  "ceiling_prices_gel": {
+    "ROOMS": {
+      "low": 160,
+      "mid": 160,
+      "high": 160,
+      "peak": 160,
+      "xmas_low": 160,
+      "new_year": 200
+    },
+    "MAXELA": {
+      "low": 280,
+      "mid": 280,
+      "high": 280,
+      "peak": 280,
+      "xmas_low": 280,
+      "new_year": 350
+    },
+    "BIG_APT": {
+      "low": 750,
+      "mid": 750,
+      "high": 750,
+      "peak": 750,
+      "xmas_low": 750,
+      "new_year": 900
     }
   }
 }
