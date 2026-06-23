@@ -281,6 +281,29 @@
   .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+
+  /* AI CHAT */
+  .chat-wrap { padding: 20px; display: flex; flex-direction: column; gap: 12px; max-height: 500px; }
+  .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 200px; max-height: 320px; padding: 4px 0; }
+  .chat-msg { display: flex; gap: 10px; align-items: flex-start; }
+  .chat-msg.user { flex-direction: row-reverse; }
+  .chat-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+  .chat-avatar.ai { background: var(--accent); color: white; }
+  .chat-avatar.user { background: var(--blue); color: white; }
+  .chat-bubble { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
+  .chat-msg.ai .chat-bubble { background: var(--bg); border: 1px solid var(--border); border-radius: 4px 12px 12px 12px; }
+  .chat-msg.user .chat-bubble { background: var(--blue); color: white; border-radius: 12px 4px 12px 12px; }
+  .chat-input-row { display: flex; gap: 8px; }
+  .chat-input { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-family: var(--font); resize: none; background: var(--white); }
+  .chat-input:focus { outline: none; border-color: var(--accent); }
+  .chat-send { background: var(--accent); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .chat-send:hover { opacity: 0.88; }
+  .chat-send:disabled { opacity: 0.45; cursor: not-allowed; }
+  .chat-thinking { color: var(--muted); font-style: italic; font-size: 12px; }
+  .chat-suggestions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chat-suggestion { padding: 5px 10px; border: 1px solid var(--border); border-radius: 16px; font-size: 12px; cursor: pointer; background: var(--white); color: var(--text); transition: all 0.15s; }
+  .chat-suggestion:hover { border-color: var(--accent); color: var(--accent); }
+
   @media (max-width: 768px) {
     .stats { grid-template-columns: repeat(2, 1fr); }
     .price-grid { grid-template-columns: 120px repeat(3, 1fr); }
@@ -462,6 +485,33 @@
     </div>
   </div>
 
+
+  <!-- AI CHAT -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">🤖 Ask AI about Pricing</span>
+      <span style="font-size:12px;color:var(--muted)">Powered by Gemini</span>
+    </div>
+    <div class="chat-wrap">
+      <div class="chat-messages" id="chatMessages">
+        <div class="chat-msg ai">
+          <div class="chat-avatar ai">AI</div>
+          <div class="chat-bubble">Hi Nika! I can help you think through pricing for Maxela Apartments. Ask me anything — about specific dates, properties, or strategy.</div>
+        </div>
+      </div>
+      <div class="chat-suggestions">
+        <button class="chat-suggestion" onclick="sendSuggestion(this)">July is empty for Big Apartment, what should I do?</button>
+        <button class="chat-suggestion" onclick="sendSuggestion(this)">Should I lower Maxela prices for next week?</button>
+        <button class="chat-suggestion" onclick="sendSuggestion(this)">How are my prices compared to last year?</button>
+        <button class="chat-suggestion" onclick="sendSuggestion(this)">Mobi event is July 30, how should I price?</button>
+      </div>
+      <div class="chat-input-row">
+        <textarea class="chat-input" id="chatInput" rows="2" placeholder="Ask about your pricing strategy..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+        <button class="chat-send" id="chatSend" onclick="sendChat()">Send</button>
+      </div>
+    </div>
+  </div>
+
   <!-- LOG -->
   <div class="card">
     <div class="card-header">
@@ -477,7 +527,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, query, orderBy, limit, onSnapshot, doc, updateDoc, addDoc, deleteDoc, getDoc, setDoc, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, query, orderBy, limit, onSnapshot, doc, updateDoc, addDoc, deleteDoc, getDoc, setDoc, serverTimestamp, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -918,6 +968,86 @@ window.dismissRec = async (id) => {
   await updateDoc(doc(db, 'pricing_recommendations', id), {status: 'dismissed'});
   showToast('Recommendation dismissed');
 };
+
+
+// ── AI CHAT ──
+const chatHistory = [];
+
+window.sendSuggestion = (btn) => {
+  document.getElementById('chatInput').value = btn.textContent;
+  sendChat();
+};
+
+window.sendChat = async () => {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  input.value = '';
+  appendChatMsg('user', msg);
+  chatHistory.push({role: 'user', parts: [{text: msg}]});
+
+  const sendBtn = document.getElementById('chatSend');
+  sendBtn.disabled = true;
+  appendChatMsg('ai', '...', true);
+
+  try {
+    // Get Gemini key from Firestore
+    const configSnap = await getDoc(doc(db, 'globals', 'config'));
+    const geminiKey = configSnap.data()?.geminiKey || '';
+    if (!geminiKey) throw new Error('No Gemini key configured');
+
+    // Build system context
+    const systemContext = `You are a revenue management AI for Maxela Apartments in Tbilisi, Georgia.
+Properties: Rooms (5 small rooms), Maxela Apartments (7 mid-size), 3-Bed Big Apartment (1 unit, sleeps 12), Freedom Square (3 units), Orbeliani 1 (2 units), Orbeliani 3 (1 unit, Airbnb only).
+Primary guests: Arabic countries, Russia, Turkey.
+Peak season: Jul-Aug. High: May-Jun, Sep. Low: Jan-Mar, Nov-Dec.
+Channels: Booking.com + Expedia (GEL prices), Airbnb (EUR prices for BIG_APT, FREEDOM, ORBE).
+Be concise, practical, and specific. Give actual GEL/EUR numbers when recommending prices.`;
+
+    const payload = {
+      system_instruction: {parts: [{text: systemContext}]},
+      contents: chatHistory,
+      generationConfig: {temperature: 0.7, maxOutputTokens: 500}
+    };
+
+    const resp = await fetch(
+      \`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=\${geminiKey}\`,
+      {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)}
+    );
+
+    const data = await resp.json();
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
+
+    chatHistory.push({role: 'model', parts: [{text: reply}]});
+    removeThinking();
+    appendChatMsg('ai', reply);
+
+  } catch(e) {
+    removeThinking();
+    appendChatMsg('ai', 'Error: ' + e.message);
+  } finally {
+    sendBtn.disabled = false;
+  }
+};
+
+function appendChatMsg(role, text, thinking=false) {
+  const messages = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = \`chat-msg \${role}\`;
+  div.id = thinking ? 'thinking-msg' : '';
+  div.innerHTML = \`
+    <div class="chat-avatar \${role}">\${role === 'ai' ? 'AI' : 'N'}</div>
+    <div class="chat-bubble \${thinking ? 'chat-thinking' : ''}">\${text.replace(/\n/g, '<br>')}</div>
+  \`;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function removeThinking() {
+  document.getElementById('thinking-msg')?.remove();
+}
+
 
 // ── INIT ──
 selectSeason('peak');

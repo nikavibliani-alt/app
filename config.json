@@ -322,14 +322,14 @@
       "max_raise_pct": 0.2
     },
     "peak": {
-      "_comment": "Peak season - protect prices, almost no drop allowed",
-      "max_drop_pct": 0.01,
-      "max_raise_pct": 0.08
+      "_comment": "Peak season - moderate protection, small drops allowed",
+      "max_drop_pct": 0.05,
+      "max_raise_pct": 0.1
     },
     "high": {
-      "_comment": "High season - small drops only",
-      "max_drop_pct": 0.02,
-      "max_raise_pct": 0.08
+      "_comment": "High season - moderate drops allowed",
+      "max_drop_pct": 0.05,
+      "max_raise_pct": 0.1
     }
   },
   "lead_time_modifiers": [
