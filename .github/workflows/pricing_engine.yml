@@ -31,4 +31,5 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           SERPAPI_KEY:              ${{ secrets.SERPAPI_KEY }}
           SENDGRID_KEY:             ${{ secrets.SENDGRID_KEY }}
+          GEMINI_KEY:               ${{ secrets.GEMINI_KEY }}
         run: python pricing_engine.py --apply
