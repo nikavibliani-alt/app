@@ -17,6 +17,7 @@ import time
 from datetime import datetime, timedelta
 
 import requests
+from price_tracker import get_learning_context
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
 
@@ -135,7 +136,7 @@ def get_approved_events(db) -> dict:
 # BUILD AI PROMPT
 # ---------------------------------------------------------------------------
 
-def build_prompt(property_data: dict, config: dict, velocity: dict, events: dict) -> str:
+def build_prompt(property_data: dict, config: dict, velocity: dict, events: dict, learning_context: str = "") -> str:
     """Build the prompt for Gemini with full context."""
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -203,6 +204,8 @@ Return ONLY valid JSON, no explanation, no markdown.
 ## BOUNDARY RECOMMENDATIONS
 If you detect that a floor is blocking bookings (price keeps hitting floor but dates stay empty) 
 or ceiling is blocking revenue (dates book immediately when price hits ceiling) — include a recommendation.
+
+" + learning_context + "
 
 ## RETURN FORMAT (strict JSON, no markdown):
 {
@@ -356,17 +359,20 @@ def ai_compute_prices(raw_data: list, config: dict, db=None) -> dict:
             })
         property_data[rt] = {"dates": dates_list}
 
-    # Get velocity and events from Firestore
+    # Get velocity, events and learning context from Firestore
     velocity = {}
     events = {}
+    learning_context = ""
     if db:
         print("  Loading booking velocity from Firestore...")
         velocity = get_booking_velocity(db)
         events = get_approved_events(db)
+        print("  Loading historical learning data...")
+        learning_context = get_learning_context(db)
 
     # Build prompt and call Gemini
     print("  Calling Gemini AI for price optimization...")
-    prompt = build_prompt(property_data, config, velocity, events)
+    prompt = build_prompt(property_data, config, velocity, events, learning_context)
 
     # Retry up to 3 times with backoff for rate limit errors
     ai_response = None

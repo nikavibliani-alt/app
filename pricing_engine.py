@@ -30,6 +30,7 @@ import requests
 from minihotel_auth import get_session_cookie
 from event_scanner import scan_and_update as scan_events
 from ai_pricing import ai_compute_prices
+from price_tracker import snapshot_prices, record_outcomes
 
 # ---------------------------------------------------------------------------
 # CONFIG
@@ -583,6 +584,10 @@ def main():
     except Exception as _e:
         print(f"  Warning: could not load daily state: {_e}", file=sys.stderr)
 
+    # Record any new booking outcomes before computing new prices
+    if _db_for_ai:
+        record_outcomes(raw)
+
     print("Computing prices (AI mode)...")
     # Try AI pricing first, fall back to rule-based if Gemini unavailable
     _db_for_ai = None
@@ -617,6 +622,9 @@ def main():
     print(f"Writing {total_updates} date updates to MiniHotel...")
     write_prices(payload)
     print("Write OK.")
+    # Snapshot prices for learning
+    if _db_for_ai:
+        snapshot_prices(results)
     # Save today's changes so next run knows what was already updated
     try:
         import firebase_admin
