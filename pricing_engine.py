@@ -320,6 +320,9 @@ def compute_prices(raw_data: list, config: dict, todays_changes: dict = None) ->
                             proposed_eur = max(target, prices["eur"] * (1 - max_drop))
 
                     proposed_eur = max(proposed_eur, floor_eur)
+                    ceiling_eur = config.get("ceiling_prices_eur", {}).get(rt, {}).get(season, 0)
+                    if ceiling_eur > 0:
+                        proposed_eur = min(proposed_eur, ceiling_eur)
                     proposed_eur = round_price(proposed_eur, config.get("rounding", 5))
 
             gel_changed = abs(proposed_gel - prices["gel"]) >= 1

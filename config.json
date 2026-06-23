@@ -180,54 +180,54 @@
       "new_year": 500
     },
     "FREEDOM": {
-      "low": 160,
-      "mid": 210,
-      "high": 230,
-      "peak": 250,
-      "xmas_low": 185,
-      "new_year": 250
+      "low": 180,
+      "mid": 180,
+      "high": 180,
+      "peak": 180,
+      "xmas_low": 180,
+      "new_year": 200
     },
     "ORBE_1": {
       "low": 180,
-      "mid": 210,
-      "high": 220,
-      "peak": 240,
-      "xmas_low": 200,
-      "new_year": 230
+      "mid": 180,
+      "high": 180,
+      "peak": 180,
+      "xmas_low": 180,
+      "new_year": 200
     }
   },
   "floor_prices_eur": {
     "BIG_APT": {
-      "low": 60,
-      "mid": 90,
-      "high": 130,
-      "peak": 150,
-      "xmas_low": 75,
-      "new_year": 110
+      "low": 100,
+      "mid": 100,
+      "high": 100,
+      "peak": 100,
+      "xmas_low": 100,
+      "new_year": 130
     },
     "FREEDOM": {
-      "low": 38,
-      "mid": 48,
-      "high": 52,
-      "peak": 60,
-      "xmas_low": 42,
-      "new_year": 65
+      "low": 35,
+      "mid": 35,
+      "high": 40,
+      "peak": 40,
+      "xmas_low": 35,
+      "new_year": 50
     },
     "ORBE_1": {
       "low": 35,
-      "mid": 43,
-      "high": 47,
-      "peak": 55,
-      "xmas_low": 40,
+      "mid": 35,
+      "high": 40,
+      "peak": 40,
+      "xmas_low": 35,
       "new_year": 50
     },
     "ORBE_2": {
-      "low": 33,
-      "mid": 42,
-      "high": 47,
-      "peak": 52,
-      "xmas_low": 37,
-      "new_year": 58
+      "low": 35,
+      "mid": 35,
+      "high": 40,
+      "peak": 40,
+      "xmas_low": 35,
+      "new_year": 50
     }
   },
   "occupancy_tiers": [
@@ -383,6 +383,56 @@
       "peak": 750,
       "xmas_low": 750,
       "new_year": 900
+    },
+    "FREEDOM": {
+      "low": 280,
+      "mid": 280,
+      "high": 280,
+      "peak": 280,
+      "xmas_low": 280,
+      "new_year": 350
+    },
+    "ORBE_1": {
+      "low": 280,
+      "mid": 280,
+      "high": 280,
+      "peak": 280,
+      "xmas_low": 280,
+      "new_year": 350
+    }
+  },
+  "ceiling_prices_eur": {
+    "BIG_APT": {
+      "low": 180,
+      "mid": 180,
+      "high": 180,
+      "peak": 180,
+      "xmas_low": 180,
+      "new_year": 220
+    },
+    "FREEDOM": {
+      "low": 70,
+      "mid": 70,
+      "high": 70,
+      "peak": 70,
+      "xmas_low": 70,
+      "new_year": 90
+    },
+    "ORBE_1": {
+      "low": 70,
+      "mid": 70,
+      "high": 70,
+      "peak": 70,
+      "xmas_low": 70,
+      "new_year": 90
+    },
+    "ORBE_2": {
+      "low": 70,
+      "mid": 70,
+      "high": 70,
+      "peak": 70,
+      "xmas_low": 70,
+      "new_year": 90
     }
   }
 }

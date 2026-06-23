@@ -357,11 +357,8 @@
       </div>
 
       <div class="price-section">
-        <div class="price-grid" id="seasonPriceGrid">
-          <div>Property</div>
-          <div>ROOMS</div>
-          <div>MAXELA</div>
-          <div>BIG_APT</div>
+        <div class="price-grid" id="seasonPriceGrid" style="grid-template-columns:140px repeat(5,1fr)">
+          <!-- rendered by JS -->
           <!-- rows injected by JS -->
         </div>
       </div>
@@ -486,10 +483,11 @@ const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
 // ── PRICING RULES STATE ──
-const PROPERTIES = ['ROOMS', 'MAXELA', 'BIG_APT'];
-const PROP_LABELS = { ROOMS: 'Rooms', MAXELA: 'Maxela Apts', BIG_APT: '3-Bed Apt' };
+const PROPERTIES = ['ROOMS', 'MAXELA', 'BIG_APT', 'FREEDOM', 'ORBE_1', 'ORBE_2'];
+const PROP_LABELS = { ROOMS: 'Rooms', MAXELA: 'Maxela Apts', BIG_APT: '3-Bed Apt', FREEDOM: 'Freedom Sq', ORBE_1: 'Orbeliani 1', ORBE_2: 'Orbeliani 3' };
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const SEASONS = ['low','mid','high','peak','new_year','xmas_low'];
+const EUR_PROPS = ['BIG_APT','FREEDOM','ORBE_1','ORBE_2'];
 const SEASON_LABELS = { low:'Low', mid:'Mid', high:'High', peak:'Peak', new_year:'New Year', xmas_low:'Xmas Low' };
 const SEASON_CLASSES = { low:'s-low', mid:'s-mid', high:'s-high', peak:'s-peak', new_year:'s-newyear', xmas_low:'s-xmas' };
 const DOT_CLASSES = { low:'dot-low', mid:'dot-mid', high:'dot-high', peak:'dot-peak', new_year:'dot-newyear', xmas_low:'dot-xmas' };
@@ -500,9 +498,18 @@ let monthSeasons = [null,'low','low','low','mid','mid','high','high','peak','pea
 
 // Price rules: { ROOMS: { low: {min:80,max:160}, mid:...}, ... }
 let priceRules = {
-  ROOMS:   { low:{min:80,max:160}, mid:{min:80,max:160}, high:{min:100,max:160}, peak:{min:110,max:160}, new_year:{min:120,max:200}, xmas_low:{min:80,max:160} },
-  MAXELA:  { low:{min:180,max:280}, mid:{min:180,max:280}, high:{min:200,max:280}, peak:{min:220,max:280}, new_year:{min:220,max:350}, xmas_low:{min:180,max:280} },
-  BIG_APT: { low:{min:400,max:750}, mid:{min:400,max:750}, high:{min:450,max:750}, peak:{min:500,max:750}, new_year:{min:500,max:900}, xmas_low:{min:400,max:750} },
+  ROOMS:    { low:{min:80,max:160},  mid:{min:80,max:160},  high:{min:100,max:160}, peak:{min:110,max:160}, new_year:{min:120,max:200}, xmas_low:{min:80,max:160}  },
+  MAXELA:   { low:{min:180,max:280}, mid:{min:180,max:280}, high:{min:200,max:280}, peak:{min:220,max:280}, new_year:{min:220,max:350}, xmas_low:{min:180,max:280} },
+  BIG_APT:  { low:{min:400,max:750}, mid:{min:400,max:750}, high:{min:450,max:750}, peak:{min:500,max:750}, new_year:{min:500,max:900}, xmas_low:{min:400,max:750} },
+  FREEDOM:  { low:{min:180,max:280}, mid:{min:180,max:280}, high:{min:200,max:280}, peak:{min:220,max:280}, new_year:{min:220,max:350}, xmas_low:{min:180,max:280} },
+  ORBE_1:   { low:{min:180,max:280}, mid:{min:180,max:280}, high:{min:200,max:280}, peak:{min:220,max:280}, new_year:{min:220,max:350}, xmas_low:{min:180,max:280} },
+  ORBE_2:   { low:{min:0,max:0},     mid:{min:0,max:0},     high:{min:0,max:0},     peak:{min:0,max:0},     new_year:{min:0,max:0},     xmas_low:{min:0,max:0}    },
+};
+let eurRules = {
+  BIG_APT:  { low:{min:100,max:180}, mid:{min:100,max:180}, high:{min:120,max:180}, peak:{min:130,max:180}, new_year:{min:130,max:220}, xmas_low:{min:100,max:180} },
+  FREEDOM:  { low:{min:35,max:70},   mid:{min:35,max:70},   high:{min:40,max:70},   peak:{min:40,max:70},   new_year:{min:50,max:90},   xmas_low:{min:35,max:70}  },
+  ORBE_1:   { low:{min:35,max:70},   mid:{min:35,max:70},   high:{min:40,max:70},   peak:{min:40,max:70},   new_year:{min:50,max:90},   xmas_low:{min:35,max:70}  },
+  ORBE_2:   { low:{min:35,max:70},   mid:{min:35,max:70},   high:{min:40,max:70},   peak:{min:40,max:70},   new_year:{min:50,max:90},   xmas_low:{min:35,max:70}  },
 };
 
 // Load saved rules from Firestore
@@ -512,6 +519,7 @@ async function loadRules() {
     if (snap.exists()) {
       const data = snap.data();
       if (data.priceRules) priceRules = data.priceRules;
+      if (data.eurRules) eurRules = data.eurRules;
       if (data.monthSeasons) monthSeasons = data.monthSeasons;
       if (data.dateOverrides) { dateOverrides = data.dateOverrides; renderDateOverrides(); }
     }
@@ -554,33 +562,56 @@ window.assignMonth = (m) => {
 
 function renderSeasonGrid() {
   const grid = document.getElementById('seasonPriceGrid');
-  let html = `<div>Property</div>`;
-  PROPERTIES.forEach(p => { html += `<div style="font-weight:700">${PROP_LABELS[p]}</div>`; });
+  // GEL table (all props except ORBE_2)
+  const gelProps = ['ROOMS','MAXELA','BIG_APT','FREEDOM','ORBE_1'];
+  let html = `<div>Season (GEL ₾)</div>`;
+  gelProps.forEach(p => { html += `<div style="font-weight:700;font-size:12px">${PROP_LABELS[p]}</div>`; });
 
   SEASONS.forEach(s => {
     const dot = `<span class="season-dot ${DOT_CLASSES[s]}"></span>`;
     html += `<div class="price-row-label">${dot}${SEASON_LABELS[s]}</div>`;
-    PROPERTIES.forEach(p => {
+    gelProps.forEach(p => {
       const r = priceRules[p]?.[s] || {min:0,max:0};
       html += `<div class="price-cell">
         <div class="price-pair">
-          <span class="price-pair-label">Min</span>
-          <input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${s}" data-field="min" onchange="updateRule(this)">
+          <input class="price-input" type="number" value="${r.min}" placeholder="min" data-prop="${p}" data-season="${s}" data-field="min" data-table="gel" onchange="updateRule(this)" style="width:56px">
           <span class="price-sep">–</span>
-          <span class="price-pair-label">Max</span>
-          <input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" onchange="updateRule(this)">
+          <input class="price-input" type="number" value="${r.max}" placeholder="max" data-prop="${p}" data-season="${s}" data-field="max" data-table="gel" onchange="updateRule(this)" style="width:56px">
         </div>
       </div>`;
     });
   });
+
+  // EUR table
+  const eurProps = ['BIG_APT','FREEDOM','ORBE_1','ORBE_2'];
+  html += `<div style="grid-column:1/-1;padding:10px 14px;background:var(--bg);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);border-top:2px solid var(--border2)">Season (EUR €) — Airbnb</div>`;
+  html += `<div>Season (EUR €)</div>`;
+  eurProps.forEach(p => { html += `<div style="font-weight:700;font-size:12px">${PROP_LABELS[p]}</div>`; });
+
+  SEASONS.forEach(s => {
+    const dot = `<span class="season-dot ${DOT_CLASSES[s]}"></span>`;
+    html += `<div class="price-row-label">${dot}${SEASON_LABELS[s]}</div>`;
+    eurProps.forEach(p => {
+      const r = eurRules[p]?.[s] || {min:0,max:0};
+      html += `<div class="price-cell">
+        <div class="price-pair">
+          <input class="price-input" type="number" value="${r.min}" placeholder="min" data-prop="${p}" data-season="${s}" data-field="min" data-table="eur" onchange="updateRule(this)" style="width:56px">
+          <span class="price-sep">–</span>
+          <input class="price-input" type="number" value="${r.max}" placeholder="max" data-prop="${p}" data-season="${s}" data-field="max" data-table="eur" onchange="updateRule(this)" style="width:56px">
+        </div>
+      </div>`;
+    });
+  });
+
   grid.innerHTML = html;
 }
 
 window.updateRule = (el) => {
-  const { prop, season, field } = el.dataset;
-  if (!priceRules[prop]) priceRules[prop] = {};
-  if (!priceRules[prop][season]) priceRules[prop][season] = {min:0,max:0};
-  priceRules[prop][season][field] = parseFloat(el.value) || 0;
+  const { prop, season, field, table } = el.dataset;
+  const rules = table === 'eur' ? eurRules : priceRules;
+  if (!rules[prop]) rules[prop] = {};
+  if (!rules[prop][season]) rules[prop][season] = {min:0,max:0};
+  rules[prop][season][field] = parseFloat(el.value) || 0;
 };
 
 // ── MONTH VIEW ──
@@ -658,6 +689,7 @@ window.saveRules = async () => {
   try {
     await setDoc(doc(db, 'pricing_config', 'rules'), {
       priceRules,
+      eurRules,
       monthSeasons,
       dateOverrides,
       updatedAt: serverTimestamp(),
