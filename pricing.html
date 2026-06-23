@@ -357,7 +357,7 @@
       </div>
 
       <div class="price-section">
-        <div class="price-grid" id="seasonPriceGrid" style="grid-template-columns:140px repeat(5,1fr)">
+        <div id="seasonPriceGrid">
           <!-- rendered by JS -->
           <!-- rows injected by JS -->
         </div>
@@ -561,49 +561,77 @@ window.assignMonth = (m) => {
 };
 
 function renderSeasonGrid() {
-  const grid = document.getElementById('seasonPriceGrid');
-  // GEL table (all props except ORBE_2)
+  const container = document.getElementById('seasonPriceGrid');
   const gelProps = ['ROOMS','MAXELA','BIG_APT','FREEDOM','ORBE_1'];
-  let html = `<div>Season (GEL ₾)</div>`;
-  gelProps.forEach(p => { html += `<div style="font-weight:700;font-size:12px">${PROP_LABELS[p]}</div>`; });
+  const eurProps = ['BIG_APT','FREEDOM','ORBE_1','ORBE_2'];
+
+  // GEL TABLE
+  let gelHtml = `<div style="overflow-x:auto;margin-bottom:20px">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:10px">GEL ₾ — Booking.com & Expedia</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="background:var(--bg)">
+        <th style="padding:8px 12px;text-align:left;border:1px solid var(--border);font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase">Season</th>`;
+  gelProps.forEach(p => {
+    gelHtml += `<th colspan="2" style="padding:8px 12px;text-align:center;border:1px solid var(--border);font-weight:700">${PROP_LABELS[p]}</th>`;
+  });
+  gelHtml += `</tr><tr style="background:var(--bg)"><th style="border:1px solid var(--border)"></th>`;
+  gelProps.forEach(() => {
+    gelHtml += `<th style="padding:4px 8px;text-align:center;border:1px solid var(--border);font-size:11px;color:var(--muted)">Min</th>
+                <th style="padding:4px 8px;text-align:center;border:1px solid var(--border);font-size:11px;color:var(--muted)">Max</th>`;
+  });
+  gelHtml += `</tr></thead><tbody>`;
 
   SEASONS.forEach(s => {
-    const dot = `<span class="season-dot ${DOT_CLASSES[s]}"></span>`;
-    html += `<div class="price-row-label">${dot}${SEASON_LABELS[s]}</div>`;
+    gelHtml += `<tr><td style="padding:8px 12px;border:1px solid var(--border);font-weight:600;white-space:nowrap">
+      <span class="season-dot ${DOT_CLASSES[s]}" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px"></span>${SEASON_LABELS[s]}
+    </td>`;
     gelProps.forEach(p => {
       const r = priceRules[p]?.[s] || {min:0,max:0};
-      html += `<div class="price-cell">
-        <div class="price-pair">
-          <input class="price-input" type="number" value="${r.min}" placeholder="min" data-prop="${p}" data-season="${s}" data-field="min" data-table="gel" onchange="updateRule(this)" style="width:56px">
-          <span class="price-sep">–</span>
-          <input class="price-input" type="number" value="${r.max}" placeholder="max" data-prop="${p}" data-season="${s}" data-field="max" data-table="gel" onchange="updateRule(this)" style="width:56px">
-        </div>
-      </div>`;
+      gelHtml += `<td style="padding:6px 8px;border:1px solid var(--border)">
+        <input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${s}" data-field="min" data-table="gel" onchange="updateRule(this)" style="width:60px">
+      </td>
+      <td style="padding:6px 8px;border:1px solid var(--border)">
+        <input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" data-table="gel" onchange="updateRule(this)" style="width:60px">
+      </td>`;
     });
+    gelHtml += `</tr>`;
   });
+  gelHtml += `</tbody></table></div>`;
 
-  // EUR table
-  const eurProps = ['BIG_APT','FREEDOM','ORBE_1','ORBE_2'];
-  html += `<div style="grid-column:1/-1;padding:10px 14px;background:var(--bg);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);border-top:2px solid var(--border2)">Season (EUR €) — Airbnb</div>`;
-  html += `<div>Season (EUR €)</div>`;
-  eurProps.forEach(p => { html += `<div style="font-weight:700;font-size:12px">${PROP_LABELS[p]}</div>`; });
+  // EUR TABLE
+  let eurHtml = `<div style="overflow-x:auto">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:10px">EUR € — Airbnb</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="background:var(--bg)">
+        <th style="padding:8px 12px;text-align:left;border:1px solid var(--border);font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase">Season</th>`;
+  eurProps.forEach(p => {
+    eurHtml += `<th colspan="2" style="padding:8px 12px;text-align:center;border:1px solid var(--border);font-weight:700">${PROP_LABELS[p]}</th>`;
+  });
+  eurHtml += `</tr><tr style="background:var(--bg)"><th style="border:1px solid var(--border)"></th>`;
+  eurProps.forEach(() => {
+    eurHtml += `<th style="padding:4px 8px;text-align:center;border:1px solid var(--border);font-size:11px;color:var(--muted)">Min</th>
+                <th style="padding:4px 8px;text-align:center;border:1px solid var(--border);font-size:11px;color:var(--muted)">Max</th>`;
+  });
+  eurHtml += `</tr></thead><tbody>`;
 
   SEASONS.forEach(s => {
-    const dot = `<span class="season-dot ${DOT_CLASSES[s]}"></span>`;
-    html += `<div class="price-row-label">${dot}${SEASON_LABELS[s]}</div>`;
+    eurHtml += `<tr><td style="padding:8px 12px;border:1px solid var(--border);font-weight:600;white-space:nowrap">
+      <span class="season-dot ${DOT_CLASSES[s]}" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px"></span>${SEASON_LABELS[s]}
+    </td>`;
     eurProps.forEach(p => {
       const r = eurRules[p]?.[s] || {min:0,max:0};
-      html += `<div class="price-cell">
-        <div class="price-pair">
-          <input class="price-input" type="number" value="${r.min}" placeholder="min" data-prop="${p}" data-season="${s}" data-field="min" data-table="eur" onchange="updateRule(this)" style="width:56px">
-          <span class="price-sep">–</span>
-          <input class="price-input" type="number" value="${r.max}" placeholder="max" data-prop="${p}" data-season="${s}" data-field="max" data-table="eur" onchange="updateRule(this)" style="width:56px">
-        </div>
-      </div>`;
+      eurHtml += `<td style="padding:6px 8px;border:1px solid var(--border)">
+        <input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${s}" data-field="min" data-table="eur" onchange="updateRule(this)" style="width:60px">
+      </td>
+      <td style="padding:6px 8px;border:1px solid var(--border)">
+        <input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" data-table="eur" onchange="updateRule(this)" style="width:60px">
+      </td>`;
     });
+    eurHtml += `</tr>`;
   });
+  eurHtml += `</tbody></table></div>`;
 
-  grid.innerHTML = html;
+  container.innerHTML = gelHtml + eurHtml;
 }
 
 window.updateRule = (el) => {
