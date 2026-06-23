@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 
 import requests
 
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
 
 CHANNEL_MATRIX = {
     "ROOMS":   {"booking": True,  "expedia": True,  "airbnb": False},
@@ -139,8 +139,30 @@ def build_prompt(property_data: dict, config: dict, velocity: dict, events: dict
     """Build the prompt for Gemini with full context."""
     today = datetime.now().strftime("%Y-%m-%d")
 
-    prompt = f"""You are a revenue management AI for Maxela Apartments, a short-term rental business in Tbilisi, Georgia (near Rustavi).
+    prompt = f"""You are a revenue management AI for Maxela Apartments, a short-term rental business in Tbilisi, Georgia.
 Today is {today}.
+
+## BUSINESS CONTEXT
+- 22 units across 6 property types in central Tbilisi
+- Primary guests: Arabic countries, Russia, Turkey (NOT Georgian tourists — ignore Georgian holidays)
+- Peak demand: July-August (summer travel from these markets)
+- High demand: May-June, September
+- Low demand: January-March, November-December
+- Tbilisi events (concerts, festivals) strongly impact demand — check event list
+- Rustavi (25km away) events also impact Tbilisi accommodation demand
+- Most bookings come via Booking.com and Expedia (GEL pricing)
+- Airbnb is secondary/backup channel (EUR pricing)
+- Big Apartment (BIG_APT) sleeps 12 guests — premium pricing justified, books later than smaller units
+
+## PRICING BEHAVIOR
+- Dates 0-3 days away with availability: apply last-minute discount (guests may still book)
+- Dates 4-14 days away: standard occupancy-based pricing
+- Dates 15-30 days away: conservative adjustments, market is still forming
+- Dates 31-90 days away: minimal changes, protect price integrity
+- If a date has 3+ bookings in last 7 days for a property → demand signal → raise toward ceiling
+- If a property has 0 bookings in 14 days AND dates are within 30 days → consider small drop
+- Peak season (Jul-Aug): protect prices, minimal drops — these dates will fill naturally
+- Weekend premium: Fri/Sat arrival dates should be 10-15% higher than Mon-Thu same property
 
 Your job: Set optimal prices for each property for each date within the given floors and ceilings.
 Return ONLY valid JSON, no explanation, no markdown.

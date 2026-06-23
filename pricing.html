@@ -999,13 +999,17 @@ window.sendChat = async function() {
 
     const systemText = 'You are a revenue management AI for Maxela Apartments in Tbilisi, Georgia. Properties: Rooms (5 small rooms), Maxela Apartments (7 mid-size), 3-Bed Big Apartment (1 unit sleeps 12), Freedom Square (3 units), Orbeliani 1 (2 units), Orbeliani 3 (1 unit Airbnb only). Primary guests: Arabic countries, Russia, Turkey. Peak season: Jul-Aug. High: May-Jun Sep. Low: Jan-Mar Nov-Dec. Channels: Booking.com + Expedia (GEL prices), Airbnb (EUR prices). Be concise and practical. Give actual GEL/EUR numbers when recommending prices.';
 
+    // Build contents with system context prepended as first message
+    const contextedHistory = chatHistory.length === 1
+      ? [{role: 'user', parts: [{text: systemText + '\n\nUser question: ' + msg}]}]
+      : [{role: 'user', parts: [{text: systemText}]}, {role: 'model', parts: [{text: 'Understood! I am ready to help with Maxela pricing.'}]}, ...chatHistory];
+
     const payload = {
-      system_instruction: {parts: [{text: systemText}]},
-      contents: chatHistory,
+      contents: contextedHistory,
       generationConfig: {temperature: 0.7, maxOutputTokens: 500}
     };
 
-    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + geminiKey;
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' + geminiKey;
     const resp = await fetch(url, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
