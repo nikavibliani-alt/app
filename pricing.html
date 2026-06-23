@@ -970,15 +970,16 @@ window.dismissRec = async (id) => {
 };
 
 
+
 // ── AI CHAT ──
 const chatHistory = [];
 
-window.sendSuggestion = (btn) => {
-  document.getElementById('chatInput').value = btn.textContent;
+window.sendSuggestion = function(btn) {
+  document.getElementById('chatInput').value = btn.textContent.trim();
   sendChat();
 };
 
-window.sendChat = async () => {
+window.sendChat = async function() {
   const input = document.getElementById('chatInput');
   const msg = input.value.trim();
   if (!msg) return;
@@ -992,32 +993,29 @@ window.sendChat = async () => {
   appendChatMsg('ai', '...', true);
 
   try {
-    // Get Gemini key from Firestore
     const configSnap = await getDoc(doc(db, 'globals', 'config'));
-    const geminiKey = configSnap.data()?.geminiKey || '';
-    if (!geminiKey) throw new Error('No Gemini key configured');
+    const geminiKey = configSnap.data() && configSnap.data().geminiKey ? configSnap.data().geminiKey : '';
+    if (!geminiKey) throw new Error('No Gemini key configured in Firestore globals/config');
 
-    // Build system context
-    const systemContext = `You are a revenue management AI for Maxela Apartments in Tbilisi, Georgia.
-Properties: Rooms (5 small rooms), Maxela Apartments (7 mid-size), 3-Bed Big Apartment (1 unit, sleeps 12), Freedom Square (3 units), Orbeliani 1 (2 units), Orbeliani 3 (1 unit, Airbnb only).
-Primary guests: Arabic countries, Russia, Turkey.
-Peak season: Jul-Aug. High: May-Jun, Sep. Low: Jan-Mar, Nov-Dec.
-Channels: Booking.com + Expedia (GEL prices), Airbnb (EUR prices for BIG_APT, FREEDOM, ORBE).
-Be concise, practical, and specific. Give actual GEL/EUR numbers when recommending prices.`;
+    const systemText = 'You are a revenue management AI for Maxela Apartments in Tbilisi, Georgia. Properties: Rooms (5 small rooms), Maxela Apartments (7 mid-size), 3-Bed Big Apartment (1 unit sleeps 12), Freedom Square (3 units), Orbeliani 1 (2 units), Orbeliani 3 (1 unit Airbnb only). Primary guests: Arabic countries, Russia, Turkey. Peak season: Jul-Aug. High: May-Jun Sep. Low: Jan-Mar Nov-Dec. Channels: Booking.com + Expedia (GEL prices), Airbnb (EUR prices). Be concise and practical. Give actual GEL/EUR numbers when recommending prices.';
 
     const payload = {
-      system_instruction: {parts: [{text: systemContext}]},
+      system_instruction: {parts: [{text: systemText}]},
       contents: chatHistory,
       generationConfig: {temperature: 0.7, maxOutputTokens: 500}
     };
 
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-      {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)}
-    );
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + geminiKey;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
 
     const data = await resp.json();
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
+    const reply = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0].text)
+      ? data.candidates[0].content.parts[0].text
+      : 'Sorry, I could not generate a response.';
 
     chatHistory.push({role: 'model', parts: [{text: reply}]});
     removeThinking();
@@ -1026,28 +1024,31 @@ Be concise, practical, and specific. Give actual GEL/EUR numbers when recommendi
   } catch(e) {
     removeThinking();
     appendChatMsg('ai', 'Error: ' + e.message);
-  } finally {
-    sendBtn.disabled = false;
   }
+  sendBtn.disabled = false;
 };
 
-function appendChatMsg(role, text, thinking=false) {
+function appendChatMsg(role, text, thinking) {
   const messages = document.getElementById('chatMessages');
   const div = document.createElement('div');
-  div.className = \`chat-msg \${role}\`;
-  div.id = thinking ? 'thinking-msg' : '';
-  div.innerHTML = \`
-    <div class="chat-avatar \${role}">\${role === 'ai' ? 'AI' : 'N'}</div>
-    <div class="chat-bubble \${thinking ? 'chat-thinking' : ''}">\${text.replace(/\n/g, '<br>')}</div>
-  \`;
+  div.className = 'chat-msg ' + role;
+  if (thinking) div.id = 'thinking-msg';
+  const avatar = document.createElement('div');
+  avatar.className = 'chat-avatar ' + role;
+  avatar.textContent = role === 'ai' ? 'AI' : 'N';
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble' + (thinking ? ' chat-thinking' : '');
+  bubble.innerHTML = text.replace(/\n/g, '<br>');
+  div.appendChild(avatar);
+  div.appendChild(bubble);
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
 }
 
 function removeThinking() {
-  document.getElementById('thinking-msg')?.remove();
+  const el = document.getElementById('thinking-msg');
+  if (el) el.remove();
 }
-
 
 // ── INIT ──
 selectSeason('peak');
