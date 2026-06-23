@@ -173,11 +173,11 @@
     },
     "BIG_APT": {
       "low": 400,
-      "mid": 400,
-      "high": 400,
-      "peak": 400,
+      "mid": 420,
+      "high": 450,
+      "peak": 500,
       "xmas_low": 400,
-      "new_year": 500
+      "new_year": 550
     },
     "FREEDOM": {
       "low": 180,
@@ -199,11 +199,11 @@
   "floor_prices_eur": {
     "BIG_APT": {
       "low": 100,
-      "mid": 100,
-      "high": 100,
-      "peak": 100,
+      "mid": 110,
+      "high": 130,
+      "peak": 140,
       "xmas_low": 100,
-      "new_year": 130
+      "new_year": 150
     },
     "FREEDOM": {
       "low": 35,
@@ -322,9 +322,14 @@
       "max_raise_pct": 0.2
     },
     "peak": {
-      "_comment": "Peak season (Jul-Aug) \u2014 small drops only, prices will fill naturally",
-      "max_drop_pct": 0.03,
-      "max_raise_pct": 0.15
+      "_comment": "Peak season - protect prices, almost no drop allowed",
+      "max_drop_pct": 0.01,
+      "max_raise_pct": 0.08
+    },
+    "high": {
+      "_comment": "High season - small drops only",
+      "max_drop_pct": 0.02,
+      "max_raise_pct": 0.08
     }
   },
   "lead_time_modifiers": [
