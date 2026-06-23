@@ -421,6 +421,15 @@
       </div>
     </div>
 
+  <!-- AI RECOMMENDATIONS -->
+  <div class="card" id="recsCard" style="display:none">
+    <div class="card-header">
+      <span class="card-title">🤖 AI Boundary Recommendations</span>
+      <span class="card-badge" id="recsBadge">0 pending</span>
+    </div>
+    <div id="recsList"></div>
+  </div>
+
   <!-- EVENTS -->
   <div class="card">
     <div class="card-header">
@@ -863,6 +872,52 @@ function showToast(msg, type='') {
   t.textContent=msg; t.className=`toast show ${type}`;
   setTimeout(()=>t.className='toast',3000);
 }
+
+
+// ── AI RECOMMENDATIONS ──
+onSnapshot(query(collection(db, 'pricing_recommendations'), where('status','==','pending')), snap => {
+  const card = document.getElementById('recsCard');
+  const list = document.getElementById('recsList');
+  const badge = document.getElementById('recsBadge');
+  badge.textContent = snap.size + ' pending';
+  card.style.display = snap.empty ? 'none' : '';
+
+  list.innerHTML = snap.docs.map(d => {
+    const r = d.data();
+    const arrow = r.type === 'raise_ceiling' ? '↑' : '↓';
+    const color = r.type === 'raise_ceiling' ? 'var(--green)' : 'var(--accent)';
+    return `<div class="event-row">
+      <div style="min-width:100px;font-weight:700;color:${color};font-size:18px">${arrow} ${r.currency?.toUpperCase()||'GEL'}</div>
+      <div class="event-info">
+        <div class="event-name">${PROP_LABELS[r.property]||r.property} — ${r.season||''} season ${r.type?.replace('_',' ')}</div>
+        <div class="event-venue">${r.current} → ${r.suggested} ${r.currency?.toUpperCase()||'GEL'} · ${r.reason||''}</div>
+      </div>
+      <div class="event-actions">
+        <button class="btn btn-approve" onclick="applyRec('${d.id}', '${r.property}', '${r.season}', '${r.currency}', '${r.type}', ${r.suggested})">Apply</button>
+        <button class="btn btn-dismiss" onclick="dismissRec('${d.id}')">Dismiss</button>
+      </div>
+    </div>`;
+  }).join('');
+});
+
+window.applyRec = async (id, prop, season, currency, type, value) => {
+  // Update the relevant rule in priceRules/eurRules
+  const rules = currency === 'eur' ? eurRules : priceRules;
+  if (!rules[prop]) rules[prop] = {};
+  if (!rules[prop][season]) rules[prop][season] = {min:0, max:0};
+  if (type === 'raise_ceiling' || type === 'lower_ceiling') rules[prop][season].max = value;
+  if (type === 'raise_floor'   || type === 'lower_floor')   rules[prop][season].min = value;
+
+  await saveRules();
+  await updateDoc(doc(db, 'pricing_recommendations', id), {status: 'applied'});
+  renderSeasonGrid();
+  showToast('Recommendation applied and saved', 'success');
+};
+
+window.dismissRec = async (id) => {
+  await updateDoc(doc(db, 'pricing_recommendations', id), {status: 'dismissed'});
+  showToast('Recommendation dismissed');
+};
 
 // ── INIT ──
 selectSeason('peak');

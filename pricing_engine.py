@@ -29,6 +29,7 @@ from datetime import datetime, timedelta
 import requests
 from minihotel_auth import get_session_cookie
 from event_scanner import scan_and_update as scan_events
+from ai_pricing import ai_compute_prices
 
 # ---------------------------------------------------------------------------
 # CONFIG
@@ -574,8 +575,23 @@ def main():
     except Exception as _e:
         print(f"  Warning: could not load daily state: {_e}", file=sys.stderr)
 
-    print("Computing prices...")
-    results = compute_prices(raw, config, todays_changes)
+    print("Computing prices (AI mode)...")
+    # Try AI pricing first, fall back to rule-based if Gemini unavailable
+    _db_for_ai = None
+    try:
+        import firebase_admin
+        from firebase_admin import firestore as _fs_ai
+        if firebase_admin._apps:
+            _db_for_ai = _fs_ai.client()
+    except Exception:
+        pass
+
+    results = ai_compute_prices(raw, config, db=_db_for_ai)
+    if results is None:
+        print("  Falling back to rule-based pricing engine...")
+        results = compute_prices(raw, config, todays_changes)
+    else:
+        print("  AI pricing applied.")
 
     print_report(results, dry_run)
 
