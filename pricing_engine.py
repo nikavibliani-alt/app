@@ -279,7 +279,9 @@ def compute_prices(raw_data: list, config: dict, todays_changes: dict = None) ->
                     else:
                         # Per-day cap: skip if already changed today and no event premium
                         already_today = todays_changes.get(rt, {}).get(date_str)
-                        if already_today and event_mult == 1.0:
+                        # Handle both old format (float) and new format (dict)
+                        already_gel = already_today.get("gel") if isinstance(already_today, dict) else already_today
+                        if already_gel and event_mult == 1.0:
                             proposed_gel = prices["gel"]
                             reason = "already updated today"
                         else:
@@ -314,11 +316,17 @@ def compute_prices(raw_data: list, config: dict, todays_changes: dict = None) ->
                     if prices["eur"] == 0:
                         proposed_eur = base_eur * event_mult
                     else:
-                        target = prices["eur"] * (1 + adj) * event_mult
-                        if target > prices["eur"]:
-                            proposed_eur = min(target, prices["eur"] * (1 + max_raise))
+                        # Per-day EUR tracking
+                        already_today_eur = todays_changes.get(rt, {}).get(date_str)
+                        already_eur = already_today_eur.get("eur") if isinstance(already_today_eur, dict) else None
+                        if already_eur and event_mult == 1.0:
+                            proposed_eur = prices["eur"]
                         else:
-                            proposed_eur = max(target, prices["eur"] * (1 - max_drop))
+                            target = prices["eur"] * (1 + adj) * event_mult
+                            if target > prices["eur"]:
+                                proposed_eur = min(target, prices["eur"] * (1 + max_raise))
+                            else:
+                                proposed_eur = max(target, prices["eur"] * (1 - max_drop))
 
                     proposed_eur = max(proposed_eur, floor_eur)
                     ceiling_eur = config.get("ceiling_prices_eur", {}).get(rt, {}).get(season, 0)
@@ -617,7 +625,8 @@ def main():
             _db2 = _fs2.client()
             daily_state = {}
             for rt, dates in results.items():
-                changed = {d["date"]: d["proposed_gel"] for d in dates if d.get("changed") and not d.get("skip")}
+                changed = {d["date"]: {"gel": d["proposed_gel"], "eur": d["proposed_eur"]} 
+                          for d in dates if d.get("changed") and not d.get("skip")}
                 if changed:
                     daily_state[rt] = changed
             save_todays_changes(_db2, daily_state)

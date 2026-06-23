@@ -346,10 +346,22 @@ def ai_compute_prices(raw_data: list, config: dict, db=None) -> dict:
     print("  Calling Gemini AI for price optimization...")
     prompt = build_prompt(property_data, config, velocity, events)
 
-    try:
-        ai_response = call_gemini(prompt, gemini_key)
-    except Exception as e:
-        print(f"  Gemini error: {e} — falling back to rule-based engine", file=sys.stderr)
+    # Retry up to 3 times with backoff for rate limit errors
+    ai_response = None
+    for attempt in range(3):
+        try:
+            ai_response = call_gemini(prompt, gemini_key)
+            break
+        except Exception as e:
+            err_str = str(e)
+            if "429" in err_str and attempt < 2:
+                wait = (attempt + 1) * 30
+                print(f"  Gemini rate limit, retrying in {wait}s...", file=sys.stderr)
+                time.sleep(wait)
+            else:
+                print(f"  Gemini error: {e} — falling back to rule-based engine", file=sys.stderr)
+                return None
+    if ai_response is None:
         return None
 
     print("  Gemini responded OK.")
