@@ -79,6 +79,14 @@ body{
 .greeting__apt .swatch{width:22px;height:22px;border-radius:6px;background:repeating-linear-gradient(135deg,oklch(0.85 0.04 70) 0 4px,oklch(0.82 0.05 70) 4px 8px);flex:none;}
 .greeting__apt b{font-weight:500;color:var(--ink);}
 .greeting__apt .sep{color:var(--line);}
+.apt-switcher-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin:14px 0 8px;}
+.apt-cards{display:flex;flex-direction:column;gap:8px;width:100%;}
+.apt-card{padding:14px 16px;border:1.5px solid var(--line);border-radius:14px;cursor:pointer;background:var(--surface);text-align:left;width:100%;font-family:var(--sans);}
+.apt-card--active{border-color:var(--accent);background:var(--surface);}
+.apt-card__name{font-size:15px;font-weight:600;color:var(--ink);}
+.apt-card__dates{font-size:13px;color:var(--muted);margin-top:2px;font-family:var(--mono);}
+.apt-card__sub{font-size:12px;color:var(--muted);margin-top:2px;}
+#apt-area.multi{display:block;background:none;border:none;padding:0;border-radius:0;}
 
 /* ── HERO CARD ── */
 .stack{display:flex;flex-direction:column;gap:14px;padding:0 16px;}
@@ -543,7 +551,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
     <div class="greeting">
       <p class="greeting__hello" id="t-greeting-label">Welcome back</p>
       <h2 class="greeting__name" id="home-guest-name">Guest</h2>
-      <div class="greeting__apt">
+      <div class="greeting__apt" id="apt-area">
         <span class="swatch"></span>
         <b id="home-apt-name">Apartment</b>
         <span class="sep">·</span>
@@ -626,6 +634,7 @@ let cdInterval=null;
 let elevatorData=null;
 let _pendingReg=null;
 let _pendingMatches=[];
+let allMatchedReservations=[];
 
 const T={
   en:{ac:'Access Code',vf:'Valid from',vt:'to',ttp:'Tap to copy',cp2:'Code generation pending — please contact host',chc:'Please contact host for your access code',
@@ -887,29 +896,46 @@ function partialNameMatch(input,resGuest){
 
 function normGuestId(n){return(n||'').toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'').slice(0,40);}
 
-function showRoomPicker(matches){
-  document.getElementById('reg-verify-error')?.remove();
-  document.getElementById('room-picker')?.remove();
-  const picker=document.createElement('div');
-  picker.id='room-picker';
-  picker.style.cssText='position:fixed;inset:0;background:var(--bg);z-index:100;overflow-y:auto;padding:28px 20px;';
-  picker.innerHTML=`<div class="kicker" style="margin-bottom:10px;"><span class="pip"></span> <span>MULTIPLE RESERVATIONS FOUND</span></div>
-    <h2 style="font-family:var(--serif);font-size:26px;line-height:1.1;margin-bottom:8px;">Which apartment are<br>you checking in to?</h2>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.5;">We found ${matches.length} reservations matching your name and arrival date.</p>
-    ${matches.map(m=>`<button onclick="window.selectRoom('${esc(m.res.id)}')" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:16px 18px;margin-bottom:10px;background:var(--surface);border:1.5px solid var(--line);border-radius:16px;font-family:var(--sans);font-size:15px;font-weight:500;color:var(--ink);cursor:pointer;text-align:left;"><span>${esc(APT_NAMES[m.res.roomCode]||m.res.roomCode||'Unknown room')}</span><span style="font-size:12px;color:var(--muted);">Check-in ${esc(m.res.checkin||'')} ›</span></button>`).join('')}`;
-  document.body.appendChild(picker);
+function fmtStay(s){
+  if(!s)return '';
+  const ms=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const p=s.split('-');
+  if(p.length<3)return s;
+  return ms[parseInt(p[1])-1]+' '+parseInt(p[2]);
 }
 
-window.selectRoom=async function(resId){
-  const match=_pendingMatches.find(m=>m.res.id===resId);
-  if(!match||!_pendingReg)return;
-  document.getElementById('room-picker')?.remove();
-  const btn=document.getElementById('submit-btn');
-  btn.disabled=true;
-  document.getElementById('t-submit-btn').textContent='Verifying...';
-  try{await finishRegistration_(match.res,_pendingReg);}
-  catch(e){btn.disabled=false;document.getElementById('t-submit-btn').textContent=t('sb');alert('Failed. Please check your connection and try again.\n'+e.message);}
+function renderGreetingApt(){
+  const el=document.getElementById('apt-area');
+  if(!el)return;
+  if(!allMatchedReservations||allMatchedReservations.length<=1){
+    el.className='greeting__apt';
+    el.innerHTML='<span class="swatch"></span><b id="home-apt-name">'+(esc(APT_NAMES[aptId]||aptId))+'</b><span class="sep">·</span><span>Maxela · Tbilisi</span>';
+    return;
+  }
+  el.className='greeting__apt multi';
+  let html='<div class="apt-switcher-label">YOUR APARTMENTS</div><div class="apt-cards">';
+  for(const res of allMatchedReservations){
+    const nm=esc(APT_NAMES[res.roomCode]||res.roomCode||'Unknown room');
+    const dates=esc(fmtStay(res.checkin)+' – '+fmtStay(res.checkout));
+    const active=res.roomCode===aptId;
+    html+='<button class="apt-card'+(active?' apt-card--active':'')+'" onclick="window.switchApt('+JSON.stringify(res.roomCode)+','+JSON.stringify(res.id)+')">';
+    html+='<div class="apt-card__name">'+nm+(active?' <span style="font-size:11px;color:var(--accent);font-weight:500;">✓ active</span>':'')+'</div>';
+    html+='<div class="apt-card__dates">'+dates+'</div>';
+    html+='<div class="apt-card__sub">Maxela · Tbilisi</div>';
+    html+='</button>';
+  }
+  html+='</div>';
+  el.innerHTML=html;
 }
+
+window.switchApt=async function(newRoomCode){
+  if(newRoomCode===aptId)return;
+  aptId=newRoomCode;
+  localStorage.setItem('maxela_apt_id',aptId);
+  try{const s=await getDoc(doc(db,'checkin_apartments',aptId));aptData=s.exists()?s.data():null;}catch(e){aptData=null;}
+  renderGreetingApt();
+  renderTiles();
+};
 
 async function finishRegistration_(bestRes,formData){
   const {name,guests,nationality,contact,contactType:ct,arrival}=formData;
@@ -943,6 +969,7 @@ async function finishRegistration_(bestRes,formData){
   localStorage.setItem('maxela_apt_id',aptId);
   localStorage.setItem('maxela_guest_id',guestId);
   localStorage.setItem('maxela_g_'+aptId,guestId);
+  localStorage.setItem('maxela_all_res',JSON.stringify(allMatchedReservations));
   _pendingReg=null;_pendingMatches=[];
   toast(t('rg'),3000);
   showHome();
@@ -1010,15 +1037,8 @@ window.submitRegistration=async function(){
       wrap.appendChild(errEl);
       return;
     }
-    if(!aptId&&allMatches.length>1){
-      _pendingReg={name:name||bookingRef,guests,nationality,contact,contactType,arrival};
-      _pendingMatches=allMatches;
-      btn.disabled=false;
-      document.getElementById('t-submit-btn').textContent=t('sb');
-      showRoomPicker(allMatches);
-      return;
-    }
     allMatches.sort((a,b)=>b.score-a.score);
+    allMatchedReservations=allMatches.map(m=>m.res);
     await finishRegistration_(allMatches[0].res,{name:name||bookingRef,guests,nationality,contact,contactType,arrival});
   }catch(e){
     btn.disabled=false;
@@ -1108,7 +1128,7 @@ function showHome(){
       warningTarget.after(div);
     }
   }
-  document.getElementById('home-apt-name').textContent=APT_NAMES[aptId]||aptId;
+  renderGreetingApt();
   document.getElementById('t-greeting-label').textContent=t('gl');
   renderTiles();
   console.log('DEBUG passport result:',JSON.stringify(guestData?.passportScanResult));
@@ -1565,6 +1585,7 @@ window.logout=function(){
 
 async function init(){
   // Try to restore session from localStorage (works with or without ?apt= in URL)
+  try{allMatchedReservations=JSON.parse(localStorage.getItem('maxela_all_res')||'[]');}catch(e){allMatchedReservations=[];}
   const savedApt=localStorage.getItem('maxela_apt_id');
   const savedGuest=localStorage.getItem('maxela_guest_id')
     ||(aptId?localStorage.getItem('maxela_g_'+aptId):null);
