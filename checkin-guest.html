@@ -288,11 +288,11 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 .rule-title{font-size:13.5px;font-weight:500;color:var(--ink);line-height:1.3;}
 .rule-item.smoking .rule-title{color:var(--red);font-weight:600;}
 .rule-sub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;}
-.date-wrap{position:relative;}
-.date-wrap .date-icon{position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted);display:flex;align-items:center;}
-.date-ph{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:17px;pointer-events:none;white-space:nowrap;}
-#r-arrival{color:transparent;padding-right:44px;cursor:pointer;width:100%;}
-#r-arrival.has-value{color:var(--ink);}
+.date-wrap{position:relative;display:flex;align-items:center;}
+.date-icon-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;padding:6px;cursor:pointer;color:var(--muted);display:flex;align-items:center;border-radius:8px;-webkit-tap-highlight-color:transparent;}
+.date-icon-btn:hover{color:var(--ink);}
+#r-arrival-display{font-family:'JetBrains Mono','SF Mono',monospace;font-size:17px;padding-right:44px;width:100%;letter-spacing:0.04em;}
+#r-arrival-display.invalid{border-color:var(--red)!important;}
 .passport-banner{margin:0 16px 8px;padding:14px 16px;border-radius:14px;display:flex;gap:12px;align-items:flex-start;}
 .passport-banner.warn{background:#fff3cd;border:1.5px solid #ffc107;}
 .passport-banner.info{background:var(--blue-bg);border:1.5px solid var(--blue-border);}
@@ -439,11 +439,12 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         <div class="auth-row">
           <span class="auth-row__label" id="t-arrival-date">Arrival date <span style="color:var(--red)">*</span></span>
           <div class="date-wrap">
-            <input type="date" class="form-input" id="r-arrival" onchange="this.classList.toggle('has-value',!!this.value);document.getElementById('r-arrival-ph').style.display=this.value?'none':'block';">
-            <span class="date-ph" id="r-arrival-ph">Select your arrival date</span>
-            <span class="date-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 9h18"/></svg></span>
+            <input type="text" class="form-input" id="r-arrival-display" placeholder="DD / MM / YYYY" autocomplete="off" inputmode="numeric" maxlength="14">
+            <input type="date" id="r-arrival" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;top:0;left:0;">
+            <button type="button" class="date-icon-btn" id="r-arrival-cal-btn" aria-label="Open calendar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 9h18"/></svg>
+            </button>
           </div>
-          <div class="arrival-fallback" id="r-arrival-fallback"></div>
         </div>
         <div class="auth-row">
           <span class="auth-row__label" id="t-contact-num">Phone / username <span style="color:var(--red)">*</span></span>
@@ -1553,7 +1554,7 @@ window.logout=function(){
   const reg=document.getElementById('page-register');
   reg.classList.add('active');
   document.getElementById('reg-verify-error')?.remove();
-  ['r-name','r-contact','r-arrival','r-arrival-day','r-arrival-month','r-arrival-year'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['r-name','r-contact','r-arrival','r-arrival-display'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';el.classList&&el.classList.remove('invalid');}});
   if(!aptId){
     document.getElementById('auth-apt').style.display='none';
   }else{
@@ -1598,39 +1599,69 @@ async function init(){
 }
 
 window.syncArrivalDate=function(){
-  const d=document.getElementById('r-arrival-day')?.value;
-  const m=document.getElementById('r-arrival-month')?.value;
-  const y=document.getElementById('r-arrival-year')?.value;
-  const inp=document.getElementById('r-arrival');
-  if(inp)inp.value=(d&&m&&y)?`${y}-${m}-${d}`:'';
+  // legacy no-op — date sync now handled by setupDateInput
+}
+
+function syncDisplayToHidden(){
+  const display=document.getElementById('r-arrival-display');
+  const hidden=document.getElementById('r-arrival');
+  if(!display||!hidden)return;
+  const raw=display.value.replace(/\D/g,'');
+  if(!raw){hidden.value='';return;}
+  if(raw.length!==8){display.classList.add('invalid');hidden.value='';return;}
+  const d=raw.substring(0,2),m=raw.substring(2,4),y=raw.substring(4,8);
+  const dt=new Date(parseInt(y),parseInt(m)-1,parseInt(d));
+  if(dt.getFullYear()!==parseInt(y)||dt.getMonth()!==parseInt(m)-1||dt.getDate()!==parseInt(d)){
+    display.classList.add('invalid');hidden.value='';return;
+  }
+  hidden.value=y+'-'+m+'-'+d;
+  display.classList.remove('invalid');
 }
 
 function setupDateInput(){
   const today=tbilisiToday();
   const tp=today.split('-').map(Number);
   const maxDt=new Date(tp[0],tp[1]-1,tp[2]+90);
-  const maxStr=`${maxDt.getFullYear()}-${String(maxDt.getMonth()+1).padStart(2,'0')}-${String(maxDt.getDate()).padStart(2,'0')}`;
-  const inp=document.getElementById('r-arrival');
-  if(inp){inp.min=today;inp.max=maxStr;}
+  const maxStr=maxDt.getFullYear()+'-'+String(maxDt.getMonth()+1).padStart(2,'0')+'-'+String(maxDt.getDate()).padStart(2,'0');
+  const hidden=document.getElementById('r-arrival');
+  const display=document.getElementById('r-arrival-display');
+  const calBtn=document.getElementById('r-arrival-cal-btn');
+  if(hidden){hidden.min=today;hidden.max=maxStr;}
+  if(!display)return;
 
-  // Feature-detect native date picker support
-  const test=document.createElement('input');
-  test.setAttribute('type','date');
-  if(test.type!=='date'){
-    // No native support (old browsers) — show dropdown fallback
-    if(inp)inp.style.display='none';
-    const fb=document.getElementById('r-arrival-fallback');
-    if(!fb)return;
-    fb.style.display='flex';
-    const todayY=tp[0];
-    const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const dayOpts=[...Array(31)].map((_,i)=>`<option value="${String(i+1).padStart(2,'0')}">${i+1}</option>`).join('');
-    const monOpts=MONTHS.map((mn,i)=>`<option value="${String(i+1).padStart(2,'0')}">${mn}</option>`).join('');
-    const yrOpts=[todayY,todayY+1].map(y=>`<option value="${y}">${y}</option>`).join('');
-    fb.innerHTML=
-      `<select class="form-input" id="r-arrival-day" onchange="window.syncArrivalDate()" style="flex:1;"><option value="">Day</option>${dayOpts}</select>`+
-      `<select class="form-input" id="r-arrival-month" onchange="window.syncArrivalDate()" style="flex:1.5;"><option value="">Month</option>${monOpts}</select>`+
-      `<select class="form-input" id="r-arrival-year" onchange="window.syncArrivalDate()" style="flex:1.2;"><option value="">Year</option>${yrOpts}</select>`;
+  // Auto-format as user types: digits only, insert " / " after day and month
+  display.addEventListener('input',function(){
+    const pos=this.selectionStart;
+    const raw=this.value.replace(/\D/g,'').substring(0,8);
+    let out='';
+    if(raw.length>0)out+=raw.substring(0,2);
+    if(raw.length>=2)out+=' / '+raw.substring(2,4);
+    if(raw.length>=4)out+=' / '+raw.substring(4,8);
+    this.value=out;
+    this.classList.remove('invalid');
+    if(raw.length===8)syncDisplayToHidden();
+  });
+
+  // Validate and sync hidden input on blur
+  display.addEventListener('blur',function(){
+    syncDisplayToHidden();
+  });
+
+  // Calendar button triggers native date picker
+  if(calBtn&&hidden){
+    calBtn.addEventListener('click',function(){
+      try{hidden.showPicker();}catch(e){hidden.focus();hidden.click();}
+    });
+  }
+
+  // When calendar picker selects a date, update display input
+  if(hidden){
+    hidden.addEventListener('change',function(){
+      if(!this.value)return;
+      const parts=this.value.split('-');
+      if(display)display.value=parts[2]+' / '+parts[1]+' / '+parts[0];
+      display.classList.remove('invalid');
+    });
   }
 }
 
