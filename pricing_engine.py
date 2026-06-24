@@ -584,12 +584,7 @@ def main():
     except Exception as _e:
         print(f"  Warning: could not load daily state: {_e}", file=sys.stderr)
 
-    # Record any new booking outcomes before computing new prices
-    if _db_for_ai:
-        record_outcomes(raw)
-
-    print("Computing prices (AI mode)...")
-    # Try AI pricing first, fall back to rule-based if Gemini unavailable
+    # Initialize Firestore client for AI and tracking
     _db_for_ai = None
     try:
         import firebase_admin
@@ -598,6 +593,13 @@ def main():
             _db_for_ai = _fs_ai.client()
     except Exception:
         pass
+
+    # Record any new booking outcomes before computing new prices
+    if _db_for_ai:
+        record_outcomes(raw)
+
+    print("Computing prices (AI mode)...")
+    # Try AI pricing first, fall back to rule-based if Gemini unavailable
 
     results = ai_compute_prices(raw, config, db=_db_for_ai)
     if results is None:
