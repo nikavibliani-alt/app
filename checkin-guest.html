@@ -909,7 +909,7 @@ function renderGreetingApt(){
   if(!el)return;
   if(!allMatchedReservations||allMatchedReservations.length<=1){
     el.className='greeting__apt';
-    el.innerHTML='<span class="swatch"></span><b id="home-apt-name">'+(esc(APT_NAMES[aptId]||aptId))+'</b><span class="sep">·</span><span>Maxela · Tbilisi</span>';
+    el.innerHTML='<span class="swatch"></span><b id="home-apt-name">'+esc(APT_NAMES[aptId]||aptId)+'</b><span class="sep">·</span><span>Maxela · Tbilisi</span>';
     return;
   }
   el.className='greeting__apt multi';
@@ -918,7 +918,8 @@ function renderGreetingApt(){
     const nm=esc(APT_NAMES[res.roomCode]||res.roomCode||'Unknown room');
     const dates=esc(fmtStay(res.checkin)+' – '+fmtStay(res.checkout));
     const active=res.roomCode===aptId;
-    html+='<button class="apt-card'+(active?' apt-card--active':'')+'" onclick="window.switchApt('+JSON.stringify(res.roomCode)+','+JSON.stringify(res.id)+')">';
+    // Use data attributes — avoids double-quote collision in onclick="..."
+    html+='<button class="apt-card'+(active?' apt-card--active':'')+'" data-room="'+esc(res.roomCode)+'">';
     html+='<div class="apt-card__name">'+nm+(active?' <span style="font-size:11px;color:var(--accent);font-weight:500;">✓ active</span>':'')+'</div>';
     html+='<div class="apt-card__dates">'+dates+'</div>';
     html+='<div class="apt-card__sub">Maxela · Tbilisi</div>';
@@ -926,15 +927,45 @@ function renderGreetingApt(){
   }
   html+='</div>';
   el.innerHTML=html;
+  // Wire up clicks after innerHTML is set
+  el.querySelectorAll('.apt-card[data-room]').forEach(btn=>{
+    btn.addEventListener('click',()=>window.switchApt(btn.dataset.room));
+  });
 }
 
 window.switchApt=async function(newRoomCode){
+  console.log('Switching to:', newRoomCode);
   if(newRoomCode===aptId)return;
   aptId=newRoomCode;
+  // Pin activeReservation to the selected apt immediately
+  activeReservation=allMatchedReservations.find(r=>r.roomCode===newRoomCode)||null;
   localStorage.setItem('maxela_apt_id',aptId);
-  try{const s=await getDoc(doc(db,'checkin_apartments',aptId));aptData=s.exists()?s.data():null;}catch(e){aptData=null;}
+  try{
+    const s=await getDoc(doc(db,'checkin_apartments',aptId));
+    aptData=s.exists()?s.data():null;
+  }catch(e){aptData=null;}
   renderGreetingApt();
   renderTiles();
+  // Restart elevator subscription if this apt needs it
+  if(needsElevatorCode()){
+    onSnapshot(doc(db,'globals','elevator_code'),snap=>{
+      elevatorData=snap.exists()?snap.data():null;
+      renderTiles();
+    });
+  }
+  // Restart reservation subscription for the new apt
+  const today=new Date().toISOString().slice(0,10);
+  onSnapshot(
+    query(collection(db,'reservations'),where('roomCode','==',aptId)),
+    snap=>{
+      const all=snap.docs.map(d=>({id:d.id,...d.data()}));
+      const matches=all.filter(r=>{const ci=r.checkin||r.checkIn||'';const co=r.checkout||r.checkOut||'';return ci&&co&&ci<=today&&co>today;});
+      const withPw=matches.filter(r=>r.tuyaPassword);
+      const sorted=(withPw.length?withPw:matches).sort((a,b)=>((a.checkin||a.checkIn||'')<(b.checkin||b.checkIn||''))?-1:1);
+      activeReservation=sorted[0]||null;
+      renderTiles();
+    }
+  );
 };
 
 async function finishRegistration_(bestRes,formData){
