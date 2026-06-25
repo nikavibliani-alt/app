@@ -30,7 +30,8 @@ import requests
 from minihotel_auth import get_session_cookie
 from event_scanner import scan_and_update as scan_events
 from ai_pricing import ai_compute_prices
-from price_tracker import snapshot_prices, record_outcomes, get_booking_velocity
+from price_tracker import snapshot_prices, record_outcomes
+from ai_pricing import get_booking_velocity
 from velocity_engine import compute_prices_velocity
 
 # ---------------------------------------------------------------------------
