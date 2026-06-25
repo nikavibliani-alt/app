@@ -230,33 +230,6 @@
       "new_year": 50
     }
   },
-  "occupancy_tiers": [
-    {
-      "min_pct": 0,
-      "max_pct": 30,
-      "adjustment": -0.1
-    },
-    {
-      "min_pct": 30,
-      "max_pct": 60,
-      "adjustment": 0.0
-    },
-    {
-      "min_pct": 60,
-      "max_pct": 80,
-      "adjustment": 0.12
-    },
-    {
-      "min_pct": 80,
-      "max_pct": 95,
-      "adjustment": 0.22
-    },
-    {
-      "min_pct": 95,
-      "max_pct": 101,
-      "adjustment": 0.3
-    }
-  ],
   "event_premiums": {
     "_comment": "Add Tbilisi events manually here. Example: 2026-07-15: {label: Big Concert, multiplier: 1.35}"
   },
@@ -269,7 +242,6 @@
     "ORBE_1": {},
     "ORBE_2": {}
   },
-  "max_daily_change_pct": 0.08,
   "rounding": 5,
   "last_minute_cascade": {
     "ROOMS": [
@@ -315,95 +287,46 @@
       }
     ]
   },
-  "season_lead_time_overrides": {
-    "new_year": {
-      "_comment": "New Year dates are protected \u2014 almost no drop allowed regardless of lead time",
-      "max_drop_pct": 0.01,
-      "max_raise_pct": 0.2
-    },
-    "peak": {
-      "_comment": "Peak season - moderate protection, small drops allowed",
-      "max_drop_pct": 0.05,
-      "max_raise_pct": 0.1
-    },
-    "high": {
-      "_comment": "High season - moderate drops allowed",
-      "max_drop_pct": 0.05,
-      "max_raise_pct": 0.1
-    }
-  },
-  "lead_time_modifiers": [
-    {
-      "days_min": 0,
-      "days_max": 7,
-      "max_drop_pct": 0.08,
-      "max_raise_pct": 0.08
-    },
-    {
-      "days_min": 8,
-      "days_max": 14,
-      "max_drop_pct": 0.06,
-      "max_raise_pct": 0.08
-    },
-    {
-      "days_min": 15,
-      "days_max": 30,
-      "max_drop_pct": 0.04,
-      "max_raise_pct": 0.06
-    },
-    {
-      "days_min": 31,
-      "days_max": 60,
-      "max_drop_pct": 0.02,
-      "max_raise_pct": 0.05
-    },
-    {
-      "days_min": 61,
-      "days_max": 90,
-      "max_drop_pct": 0.01,
-      "max_raise_pct": 0.03
-    }
-  ],
   "ceiling_prices_gel": {
     "ROOMS": {
-      "low": 160,
-      "mid": 160,
-      "high": 160,
-      "peak": 160,
-      "xmas_low": 160,
-      "new_year": 200
+      "low": 180,
+      "mid": 200,
+      "high": 220,
+      "peak": 250,
+      "xmas_low": 190,
+      "new_year": 280
     },
     "MAXELA": {
-      "low": 280,
-      "mid": 280,
-      "high": 280,
-      "peak": 280,
-      "xmas_low": 280,
-      "new_year": 350
+      "low": 320,
+      "mid": 350,
+      "high": 380,
+      "peak": 420,
+      "xmas_low": 330,
+      "new_year": 480
     },
     "BIG_APT": {
-      "low": 750,
-      "mid": 750,
-      "high": 750,
-      "peak": 750,
-      "xmas_low": 750,
-      "new_year": 900
+      "low": 800,
+      "mid": 850,
+      "high": 900,
+      "peak": 950,
+      "xmas_low": 820,
+      "new_year": 1000
     },
     "FREEDOM": {
-      "low": 280,
-      "mid": 280,
-      "high": 280,
-      "peak": 280,
-      "xmas_low": 280,
-      "new_year": 350
+      "low": 320,
+      "mid": 350,
+      "high": 380,
+      "peak": 420,
+      "xmas_low": 330,
+      "new_year": 480
     },
     "ORBE_1": {
-      "low": 280,
-      "mid": 280,
-      "high": 280,
-      "peak": 280,
-      "xmas_low": 280,
-      "new_year": 350
+      "low": 300,
+      "mid": 320,
+      "high": 350,
+      "peak": 380,
+      "xmas_low": 310,
+      "new_year": 420
     }
   },
   "ceiling_prices_eur": {
@@ -439,5 +362,6 @@
       "xmas_low": 70,
       "new_year": 90
     }
-  }
+  },
+  "_pricing_engine": "velocity-adjusted (see velocity_engine.py)"
 }

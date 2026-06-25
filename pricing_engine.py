@@ -30,7 +30,8 @@ import requests
 from minihotel_auth import get_session_cookie
 from event_scanner import scan_and_update as scan_events
 from ai_pricing import ai_compute_prices
-from price_tracker import snapshot_prices, record_outcomes
+from price_tracker import snapshot_prices, record_outcomes, get_booking_velocity
+from velocity_engine import compute_prices_velocity
 
 # ---------------------------------------------------------------------------
 # CONFIG
@@ -601,12 +602,23 @@ def main():
     print("Computing prices (AI mode)...")
     # Try AI pricing first, fall back to rule-based if Gemini unavailable
 
-    results = ai_compute_prices(raw, config, db=_db_for_ai)
-    if results is None:
-        print("  Falling back to rule-based pricing engine...")
-        results = compute_prices(raw, config, todays_changes)
-    else:
-        print("  AI pricing applied.")
+    # Load booking velocity for smart pricing
+    velocity = {}
+    if _db_for_ai:
+        print("  Loading booking velocity...")
+        velocity = get_booking_velocity(_db_for_ai)
+
+    # Use velocity-adjusted engine
+    print("  Running velocity-adjusted pricing engine...")
+    results = compute_prices_velocity(raw, config, velocity, todays_changes)
+
+    # Run AI in background (non-blocking) for daily boundary suggestions
+    try:
+        ai_results = ai_compute_prices(raw, config, db=_db_for_ai)
+        if ai_results:
+            print("  AI boundary suggestions processed.")
+    except Exception as _ai_e:
+        print(f"  AI review skipped: {_ai_e}", file=sys.stderr)
 
     print_report(results, dry_run)
 
