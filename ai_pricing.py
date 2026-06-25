@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 import requests
 from price_tracker import get_learning_context
 
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
 CHANNEL_MATRIX = {
     "ROOMS":   {"booking": True,  "expedia": True,  "airbnb": False},
@@ -154,6 +154,10 @@ Today is {today}.
 - Most bookings come via Booking.com and Expedia (GEL pricing)
 - Airbnb is secondary/backup channel (EUR pricing)
 - Big Apartment (BIG_APT) sleeps 12 guests — premium pricing justified, books later than smaller units
+- These are self-service apartments with NO hotel services (no breakfast, no reception, no daily cleaning)
+- Guests compare to hotels — keep prices competitive, never price so high that a hotel becomes cheaper
+- Better to fill at a good price than sit empty at a high price
+- Freedom Square is prime central location but still no services — price accordingly
 
 ## PRICING BEHAVIOR
 - Dates 0-3 days away with availability: apply last-minute discount (guests may still book)
