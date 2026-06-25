@@ -89,6 +89,17 @@ def get_occupancy_deficit(occ_pct: float, target_min: float, target_max: float) 
     return target_mid - occ_pct  # positive = deficit, negative = surplus
 
 
+def normalize_velocity(raw_bookings: int, total_units: int, lookback_days: int = 7) -> float:
+    """
+    Normalize booking count to a percentage of max possible room nights.
+    e.g. BIG_APT: 4 bookings / (1 unit × 7 days) = 57%
+         MAXELA:  4 bookings / (7 units × 7 days) = 8%
+    """
+    max_possible = total_units * lookback_days
+    room_nights = min(raw_bookings, max_possible)
+    return (room_nights / max_possible) * 100 if max_possible > 0 else 0
+
+
 def get_velocity_deficit(
     velocity_7d: int,
     days_ahead: int,
@@ -97,26 +108,28 @@ def get_velocity_deficit(
 ) -> float:
     """
     Velocity deficit as a percentage.
-    Compares actual bookings in velocity window vs expected pace.
-    Returns positive if booking too slowly, negative if booking fast.
+    Compares normalized actual velocity vs expected velocity for this lead time.
+    Returns positive if booking too slowly (deficit), negative if booking fast (surplus).
     """
-    # Expected bookings per week based on lead time and target curve
+    if days_ahead <= 0:
+        return 0
+
+    # Normalize actual velocity to % of capacity
+    lookback_days = 14 if is_big_apt else 7
+    actual_vel_pct = normalize_velocity(velocity_7d, total_units, lookback_days)
+
+    # Expected velocity % based on target occupancy curve
     target_min, target_max = get_target_occupancy(days_ahead, is_big_apt)
     target_mid = (target_min + target_max) / 2
 
-    # Expected weekly booking rate to reach target from 0
-    # Simple approximation: target% of units / (days_ahead/7) weeks
-    if days_ahead <= 0:
-        return 0
+    # Expected weekly fill rate: target% / weeks_remaining
     weeks_remaining = max(days_ahead / 7, 0.5)
-    expected_weekly = (target_mid / 100 * total_units) / weeks_remaining
+    expected_vel_pct = target_mid / weeks_remaining
 
-    # Actual velocity vs expected
-    velocity_deficit = expected_weekly - velocity_7d
-    # Normalize to 0-100 scale
-    if expected_weekly > 0:
-        return min(100, max(-100, (velocity_deficit / expected_weekly) * 100))
-    return 0
+    # Deficit: positive = behind (should consider dropping)
+    # Negative = ahead (should consider raising)
+    deficit = expected_vel_pct - actual_vel_pct
+    return max(-100, min(100, deficit))
 
 
 def calculate_price_score(occ_deficit: float, vel_deficit: float) -> float:
@@ -233,9 +246,12 @@ def compute_prices_velocity(
         total_units  = config["unit_counts"].get(rt, 1)
         channels     = CHANNEL_MATRIX[rt]
         is_big_apt   = (rt == "BIG_APT")
-        vel_data     = velocity.get(rt, {})
-        # BIG_APT uses 14-30d window, others use 7d
-        vel_bookings = vel_data.get("bookings_last_14d", 0) if is_big_apt else vel_data.get("bookings_last_7d", 0)
+        vel_data         = velocity.get(rt, {})
+        # BIG_APT uses 14d window, others use 7d
+        lookback_days    = 14 if is_big_apt else 7
+        vel_bookings_raw = vel_data.get("bookings_last_14d", 0) if is_big_apt else vel_data.get("bookings_last_7d", 0)
+        # Normalize velocity to % of max capacity
+        vel_pct_actual   = normalize_velocity(vel_bookings_raw, total_units, lookback_days)
         results[rt]  = []
 
         for date_str in sorted(avail_map[rt].keys()):
@@ -286,7 +302,7 @@ def compute_prices_velocity(
             occ_deficit = get_occupancy_deficit(occ_pct, tgt_min, tgt_max)
 
             # Velocity deficit
-            vel_deficit = get_velocity_deficit(vel_bookings, days, total_units, is_big_apt)
+            vel_deficit = get_velocity_deficit(vel_bookings_raw, days, total_units, is_big_apt)
 
             # Combined score
             score = calculate_price_score(occ_deficit, vel_deficit)
@@ -324,14 +340,16 @@ def compute_prices_velocity(
                             )
                             gel_reason = (
                                 f"occ={occ_pct:.0f}% tgt={tgt_min}-{tgt_max}% "
-                                f"vel={vel_bookings}bk score={score:.0f} {action}({pct:+.1%})"
+                                f"vel={vel_bookings_raw}bk({vel_pct_actual:.0f}%) score={score:.0f} {action}({pct:+.1%})"
                             )
                             if event_label:
                                 gel_reason += f" +{event_label}"
 
+                # STRICT boundary enforcement — always applied last
                 if ceiling_gel > 0:
                     proposed_gel = min(proposed_gel, ceiling_gel)
-                proposed_gel = max(proposed_gel, floor_gel) if floor_gel > 0 else proposed_gel
+                if floor_gel > 0:
+                    proposed_gel = max(proposed_gel, floor_gel)
                 proposed_gel = round_price(proposed_gel, rounding)
 
             # ── EUR PRICE ──
@@ -357,9 +375,11 @@ def compute_prices_velocity(
                                 prices["eur"], score, floor_eur, ceiling_eur or 99999
                             )
 
+                # STRICT EUR boundary enforcement
                 if ceiling_eur > 0:
                     proposed_eur = min(proposed_eur, ceiling_eur)
-                proposed_eur = max(proposed_eur, floor_eur) if floor_eur > 0 else proposed_eur
+                if floor_eur > 0:
+                    proposed_eur = max(proposed_eur, floor_eur)
                 proposed_eur = round_price(proposed_eur, rounding)
 
             gel_changed = abs(proposed_gel - prices["gel"]) >= 1
