@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 import requests
 from price_tracker import get_learning_context
 
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
 CHANNEL_MATRIX = {
     "ROOMS":   {"booking": True,  "expedia": True,  "airbnb": False},
@@ -136,9 +136,10 @@ def get_approved_events(db) -> dict:
 # BUILD AI PROMPT
 # ---------------------------------------------------------------------------
 
-def build_prompt(property_data: dict, config: dict, velocity: dict, events: dict, learning_context: str = "") -> str:
+def build_prompt_single(rt: str, dates: list, config: dict, velocity: dict, events: dict, learning_context: str = "") -> str:
     """Build the prompt for Gemini with full context."""
     today = datetime.now().strftime("%Y-%m-%d")
+    vel = velocity.get(rt, {})
 
     prompt = f"""You are a revenue management AI for Maxela Apartments, a short-term rental business in Tbilisi, Georgia.
 Today is {today}.
@@ -174,18 +175,16 @@ Return ONLY valid JSON, no explanation, no markdown.
 
 ## PROPERTY DATA
 """
-    for rt, info in property_data.items():
-        vel = velocity.get(rt, {})
-        prompt += f"""
-### {FRIENDLY_NAMES[rt]} ({rt})
+    prompt += f"""
+### {FRIENDLY_NAMES.get(rt, rt)} ({rt})
 - Channels: {', '.join(k for k,v in CHANNEL_MATRIX[rt].items() if v)}
 - Bookings last 7 days: {vel.get('bookings_last_7d', 0)}
 - Bookings last 14 days: {vel.get('bookings_last_14d', 0)}
 - Recently booked arrival dates: {vel.get('recently_booked_dates', [])}
-- Dates to price (date, availability, current_gel, current_eur, days_ahead, season):
+- Dates to price (date, avail, current_gel, current_eur, days_ahead, season, floor_gel, ceil_gel, floor_eur, ceil_eur):
 """
-        for d in info["dates"][:90]:  # max 90 dates
-            prompt += f"  {d['date']}: avail={d['avail']}/{d['total_units']}, gel={d['current_gel']}, eur={d['current_eur']}, days={d['days_ahead']}, season={d['season']}, floor_gel={d['floor_gel']}, ceil_gel={d['ceil_gel']}, floor_eur={d['floor_eur']}, ceil_eur={d['ceil_eur']}\n"
+    for d in dates[:90]:
+        prompt += f"  {d['date']}: avail={d['avail']}/{d['total_units']}, gel={d['current_gel']}, eur={d['current_eur']}, days={d['days_ahead']}, season={d['season']}, floor_gel={d['floor_gel']}, ceil_gel={d['ceil_gel']}, floor_eur={d['floor_eur']}, ceil_eur={d['ceil_eur']}\n"
 
     if events:
         prompt += "\n## UPCOMING EVENTS (approved by manager)\n"
@@ -214,13 +213,8 @@ or ceiling is blocking revenue (dates book immediately when price hits ceiling) 
 ## RETURN FORMAT (strict JSON, no markdown):
 {
   "prices": {
-    "ROOMS": {
-      "2026-06-25": {"gel": 120},
-      "2026-06-26": {"gel": 115}
-    },
-    "BIG_APT": {
-      "2026-07-01": {"gel": 550, "eur": 145}
-    }
+    "2026-06-25": {"gel": 120},
+    "2026-06-26": {"gel": 115, "eur": 45}
   },
   "recommendations": [
     {
@@ -378,23 +372,46 @@ def ai_compute_prices(raw_data: list, config: dict, db=None) -> dict:
     print("  Calling Gemini AI for price optimization...")
     prompt = build_prompt(property_data, config, velocity, events, learning_context)
 
-    # Retry up to 3 times with backoff for rate limit errors
-    ai_response = None
-    for attempt in range(3):
-        try:
-            ai_response = call_gemini(prompt, gemini_key)
-            break
-        except Exception as e:
-            err_str = str(e)
-            if "429" in err_str and attempt < 2:
-                wait = (attempt + 1) * 30
-                print(f"  Gemini rate limit, retrying in {wait}s...", file=sys.stderr)
-                time.sleep(wait)
-            else:
-                print(f"  Gemini error: {e} — falling back to rule-based engine", file=sys.stderr)
-                return None
-    if ai_response is None:
+    # Call Gemini per-property with delay to avoid TPM limits
+    print("  Calling Gemini AI for price optimization (per property)...")
+    all_prices = {}
+    all_recommendations = []
+
+    for rt, info in property_data.items():
+        prompt = build_prompt_single(rt, info["dates"], config, velocity, events, learning_context)
+        ai_response = None
+        for attempt in range(3):
+            try:
+                ai_response = call_gemini(prompt, gemini_key)
+                break
+            except Exception as e:
+                err_str = str(e)
+                if "429" in err_str and attempt < 2:
+                    wait = (attempt + 1) * 30
+                    print(f"  Gemini rate limit on {rt}, retrying in {wait}s...", file=sys.stderr)
+                    time.sleep(wait)
+                else:
+                    print(f"  Gemini error on {rt}: {e} — skipping this property", file=sys.stderr)
+                    break
+
+        if ai_response:
+            # Single property response has dates directly under "prices"
+            prop_prices = ai_response.get("prices", {})
+            if prop_prices:
+                all_prices[rt] = prop_prices
+            if ai_response.get("recommendations"):
+                all_recommendations.extend(ai_response["recommendations"])
+            print(f"    {rt}: {len(prop_prices)} date suggestions")
+
+        # Wait between properties to avoid TPM limit
+        time.sleep(8)
+
+    if not all_prices:
+        print("  Gemini returned no prices — falling back to rule-based engine", file=sys.stderr)
         return None
+
+    # Build combined response
+    ai_response = {"prices": all_prices, "recommendations": all_recommendations}
 
     print("  Gemini responded OK.")
 
@@ -429,7 +446,7 @@ def ai_compute_prices(raw_data: list, config: dict, db=None) -> dict:
                 })
                 continue
 
-            ai_date = rt_prices.get(date_str, {})
+            ai_date = rt_prices.get(date_str, {}) if isinstance(rt_prices, dict) else {}
             proposed_gel = prices["gel"]
             proposed_eur = prices["eur"]
 
