@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 import requests
 from price_tracker import get_learning_context
 
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
 
 CHANNEL_MATRIX = {
     "ROOMS":   {"booking": True,  "expedia": True,  "airbnb": False},
