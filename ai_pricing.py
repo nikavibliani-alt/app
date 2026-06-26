@@ -376,18 +376,18 @@ def ai_compute_prices(raw_data: list, config: dict, db=None) -> dict:
     for rt, info in property_data.items():
         prompt = build_prompt_single(rt, info["dates"], config, velocity, events, learning_context)
         ai_response = None
-        for attempt in range(3):
+        for attempt in range(4):
             try:
                 ai_response = call_gemini(prompt, gemini_key)
                 break
             except Exception as e:
                 err_str = str(e)
-                if "429" in err_str and attempt < 2:
-                    wait = (attempt + 1) * 30
-                    print(f"  Gemini rate limit on {rt}, retrying in {wait}s...", file=sys.stderr)
+                if "429" in err_str and attempt < 3:
+                    wait = 5 * (2 ** attempt)  # 5s, 10s, 20s, 40s
+                    print(f"  Gemini rate limit on {rt}, retrying in {wait}s (attempt {attempt+1}/4)...", file=sys.stderr)
                     time.sleep(wait)
                 else:
-                    print(f"  Gemini error on {rt}: {e} — skipping this property", file=sys.stderr)
+                    print(f"  Gemini error on {rt}: {e} — skipping", file=sys.stderr)
                     break
 
         if ai_response:
@@ -400,7 +400,7 @@ def ai_compute_prices(raw_data: list, config: dict, db=None) -> dict:
             print(f"    {rt}: {len(prop_prices)} date suggestions")
 
         # Wait between properties to avoid TPM limit
-        time.sleep(8)
+        time.sleep(15)
 
     if not all_prices:
         print("  Gemini returned no prices — falling back to rule-based engine", file=sys.stderr)
