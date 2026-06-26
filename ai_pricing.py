@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 import requests
 from price_tracker import get_learning_context
 
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent"
 
 CHANNEL_MATRIX = {
     "ROOMS":   {"booking": True,  "expedia": True,  "airbnb": False},
@@ -374,7 +374,7 @@ def ai_compute_prices(raw_data: list, config: dict, db=None) -> dict:
         print("  Loading historical learning data...")
         learning_context = get_learning_context(db)
 
-    # Call Gemini per-property with delay to avoid TPM limits
+    # Call Gemini per-property with resilient retry and pacing
     print("  Calling Gemini AI for price optimization (per property)...")
     all_prices = {}
     all_recommendations = []
@@ -382,22 +382,25 @@ def ai_compute_prices(raw_data: list, config: dict, db=None) -> dict:
     for rt, info in property_data.items():
         prompt = build_prompt_single(rt, info["dates"], config, velocity, events, learning_context)
         ai_response = None
-        for attempt in range(4):
+
+        for attempt in range(5):
             try:
                 ai_response = call_gemini(prompt, gemini_key)
                 break
-            except Exception as e:
-                err_str = str(e)
-                if "429" in err_str and attempt < 3:
-                    wait = 5 * (2 ** attempt)  # 5s, 10s, 20s, 40s
-                    print(f"  Gemini rate limit on {rt}, retrying in {wait}s (attempt {attempt+1}/4)...", file=sys.stderr)
+            except requests.exceptions.HTTPError as e:
+                status_code = e.response.status_code if e.response is not None else 0
+                if status_code in (429, 503) and attempt < 4:
+                    wait = 15 * (2 ** attempt)  # 15s, 30s, 60s, 120s
+                    print(f"  [Attempt {attempt+1}/5] Gemini {status_code} on {rt}, sleeping {wait}s...", file=sys.stderr)
                     time.sleep(wait)
                 else:
-                    print(f"  Gemini error on {rt}: {e} — skipping", file=sys.stderr)
+                    print(f"  [CRITICAL] Gemini HTTP error on {rt}: {e} — skipping", file=sys.stderr)
                     break
+            except Exception as e:
+                print(f"  [CRITICAL] Unexpected error on {rt}: {e} — skipping", file=sys.stderr)
+                break
 
         if ai_response:
-            # Single property response has dates directly under "prices"
             prop_prices = ai_response.get("prices", {})
             if prop_prices:
                 all_prices[rt] = prop_prices
@@ -405,8 +408,9 @@ def ai_compute_prices(raw_data: list, config: dict, db=None) -> dict:
                 all_recommendations.extend(ai_response["recommendations"])
             print(f"    {rt}: {len(prop_prices)} date suggestions")
 
-        # Wait between properties to avoid TPM limit
-        time.sleep(30)
+        # Hard pacing delay — always wait after each property to clear TPM window
+        print(f"  Pacing: waiting 35s before next property...")
+        time.sleep(35)
 
     if not all_prices:
         print("  Gemini returned no prices — falling back to rule-based engine", file=sys.stderr)
