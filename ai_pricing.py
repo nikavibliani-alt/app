@@ -400,7 +400,7 @@ def ai_compute_prices(raw_data: list, config: dict, db=None) -> dict:
             print(f"    {rt}: {len(prop_prices)} date suggestions")
 
         # Wait between properties to avoid TPM limit
-        time.sleep(15)
+        time.sleep(30)
 
     if not all_prices:
         print("  Gemini returned no prices — falling back to rule-based engine", file=sys.stderr)
