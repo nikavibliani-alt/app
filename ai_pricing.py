@@ -165,7 +165,8 @@ Today is {today}.
 - Dates 4-14 days away: standard occupancy-based pricing
 - Dates 15-30 days away: conservative adjustments, market is still forming
 - Dates 31-90 days away: minimal changes, protect price integrity
-- If a date has 3+ bookings in last 7 days for a property → demand signal → raise toward ceiling
+- If a property has >35% of its weekly capacity booked (normalized) → demand signal → raise toward ceiling
+- If a property has <10% of its weekly capacity booked and is behind target curve → consider small drop
 - If a property has 0 bookings in 14 days AND dates are within 30 days → consider small drop
 - Peak season (Jul-Aug): protect prices, minimal drops — these dates will fill naturally
 - Weekend premium: Fri/Sat arrival dates should be 10-15% higher than Mon-Thu same property
@@ -175,11 +176,16 @@ Return ONLY valid JSON, no explanation, no markdown.
 
 ## PROPERTY DATA
 """
+    total_units = config["unit_counts"].get(rt, 1)
+    lookback = 14 if rt == "BIG_APT" else 7
+    raw_bk = vel.get("bookings_last_14d", 0) if rt == "BIG_APT" else vel.get("bookings_last_7d", 0)
+    max_possible = total_units * lookback
+    vel_rate_pct = (raw_bk / max_possible * 100) if max_possible > 0 else 0
+
     prompt += f"""
-### {FRIENDLY_NAMES.get(rt, rt)} ({rt})
+### {FRIENDLY_NAMES.get(rt, rt)} ({rt}) — {total_units} unit(s)
 - Channels: {', '.join(k for k,v in CHANNEL_MATRIX[rt].items() if v)}
-- Bookings last 7 days: {vel.get('bookings_last_7d', 0)}
-- Bookings last 14 days: {vel.get('bookings_last_14d', 0)}
+- Capacity booked last {lookback} days: {vel_rate_pct:.1f}% of total inventory ({raw_bk} bookings / {max_possible} possible room-nights)
 - Recently booked arrival dates: {vel.get('recently_booked_dates', [])}
 - Dates to price (date, avail, current_gel, current_eur, days_ahead, season, floor_gel, ceil_gel, floor_eur, ceil_eur):
 """
