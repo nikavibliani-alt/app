@@ -368,10 +368,6 @@ def ai_compute_prices(raw_data: list, config: dict, db=None) -> dict:
         print("  Loading historical learning data...")
         learning_context = get_learning_context(db)
 
-    # Build prompt and call Gemini
-    print("  Calling Gemini AI for price optimization...")
-    prompt = build_prompt(property_data, config, velocity, events, learning_context)
-
     # Call Gemini per-property with delay to avoid TPM limits
     print("  Calling Gemini AI for price optimization (per property)...")
     all_prices = {}
