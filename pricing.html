@@ -220,18 +220,7 @@
     </div>
   </div>
 
-  <!-- STARTING PRICE -->
-  <div class="card">
-    <div class="card-header">
-      <span class="card-title">🎯 Starting Price</span>
-      <span style="font-size:12px;color:var(--muted)">Where the engine starts — drops toward min if demand is low</span>
-    </div>
-    <div class="price-section">
-      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Set the starting GEL price per property per season. Engine starts here and drops toward your minimum based on booking velocity. Must be between your min and max.</p>
-      <div id="startPriceGrid"></div>
-      <button class="btn btn-save" style="margin-top:16px" onclick="saveStartPrices()">Save Starting Prices</button>
-    </div>
-  </div>
+
 
   <!-- AI RECOMMENDATIONS -->
   <div class="card" id="recsCard" style="display:none">
@@ -345,7 +334,6 @@ async function loadRules() {
   renderMonthChips();
   renderSeasonGrid();
   renderMonthView();
-  renderStartPrices();
 }
 
 // ── SEASON TAB ──
@@ -410,18 +398,21 @@ function makeTableFull(props, rules, currency, season) {
   const sym = currency==='eur'?'€':'₾';
   let h = `<table class="tbl"><thead>
     <tr><th class="left">Season</th>`;
-  props.forEach(p => { h += `<th colspan="3">${PROP_LABELS[p]}</th>`; });
+  props.forEach(p => { h += `<th colspan="${currency==='gel'?3:2}">${PROP_LABELS[p]}</th>`; });
   h += `</tr><tr><th></th>`;
-  props.forEach(() => { h += `<th>Min${sym}</th><th>Max${sym}</th><th style="background:#eef7f2">Start${sym}</th>`; });
+  props.forEach(() => {
+    h += `<th>Min${sym}</th><th>Max${sym}</th>`;
+    if (currency==='gel') h += `<th style="background:#eef7f2">Start${sym}</th>`;
+  });
   h += `</tr></thead><tbody>`;
   SEASONS.forEach(s => {
     h += `<tr><td class="label"><span class="sdot ${DOT_CLASSES[s]}"></span>${SEASON_LABELS[s]}</td>`;
     props.forEach(p => {
       const r = rules[p]?.[s]||{min:0,max:0};
-      const sp = currency==='gel' ? (startPrices[p]?.[s]||0) : 0;
+      const sp = startPrices[p]?.[s]||0;
       h += `<td><input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${s}" data-field="min" data-table="${currency}" onchange="updateRule(this)"></td>
-            <td><input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" data-table="${currency}" onchange="updateRule(this)"></td>
-            <td style="background:#f0faf4">${currency==='gel'?`<input class="price-input" type="number" value="${sp}" data-prop="${p}" data-season="${s}" onchange="updateStartPrice(this)" style="background:transparent">`:'<span style="color:var(--muted);font-size:11px">—</span>'}</td>`;
+            <td><input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" data-table="${currency}" onchange="updateRule(this)"></td>`;
+      if (currency==='gel') h += `<td style="background:#f0faf4"><input class="price-input" type="number" value="${sp}" data-prop="${p}" data-season="${s}" onchange="updateStartPrice(this)" style="background:transparent;width:68px"></td>`;
     });
     h += `</tr>`;
   });
@@ -489,35 +480,7 @@ window.renderMonthView = () => {
 };
 
 // ── START PRICES CARD ──
-function renderStartPrices() {
-  const grid = document.getElementById('startPriceGrid');
-  if (!grid) return;
-  grid.innerHTML = `<div style="overflow-x:auto">
-    <table class="tbl"><thead>
-      <tr><th class="left">Property</th>${SEASONS.map(s=>`<th>${SEASON_LABELS[s]} ₾</th>`).join('')}</tr>
-    </thead><tbody>
-      ${GEL_PROPS.map(p => `<tr>
-        <td class="label">${PROP_LABELS[p]}</td>
-        ${SEASONS.map(s => {
-          const sp = startPrices[p]?.[s]||0;
-          const mn = priceRules[p]?.[s]?.min||0;
-          const mx = priceRules[p]?.[s]?.max||0;
-          return `<td>
-            <input class="price-input" type="number" value="${sp}" data-prop="${p}" data-season="${s}" onchange="updateStartPrice(this)" style="width:72px">
-            <div style="font-size:10px;color:var(--muted);margin-top:2px">${mn}–${mx}</div>
-          </td>`;
-        }).join('')}
-      </tr>`).join('')}
-    </tbody></table>
-  </div>`;
-}
 
-window.saveStartPrices = async () => {
-  try {
-    await setDoc(doc(db,'pricing_config','rules'), {startPrices}, {merge:true});
-    showToast('Starting prices saved','success');
-  } catch(e) { showToast('Error: '+e.message,'error'); }
-};
 
 // ── DATE OVERRIDES ──
 function renderDateOverrides() {
