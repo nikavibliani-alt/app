@@ -6,309 +6,89 @@
 <title>Pricing Engine — Maxela</title>
 <style>
   :root {
-    --bg: #f5f5f3;
-    --white: #ffffff;
-    --border: #e5e5e2;
-    --border2: #d0d0cc;
-    --text: #1a1a1a;
-    --muted: #888884;
-    --accent: #1e6b3e;
-    --accent-light: #e8f4ed;
-    --green: #2d7d4e;
-    --green-light: #edf7f1;
-    --red: #c0392b;
-    --red-light: #fdf0ee;
-    --yellow: #c47d0e;
-    --yellow-light: #fdf6e8;
-    --blue: #2563a8;
-    --blue-light: #eef4fd;
-    --font: 'Inter', system-ui, -apple-system, sans-serif;
-    --mono: 'JetBrains Mono', 'SF Mono', monospace;
-    --radius: 8px;
-    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+    --bg: #f5f5f3; --white: #ffffff; --border: #e5e5e2; --border2: #d0d0cc;
+    --text: #1a1a1a; --muted: #888884; --accent: #1e6b3e; --accent-light: #e8f4ed;
+    --green: #2d7d4e; --green-light: #edf7f1; --red: #c0392b; --red-light: #fdf0ee;
+    --yellow: #c47d0e; --yellow-light: #fdf6e8; --blue: #2563a8;
+    --font: 'Inter', system-ui, sans-serif; --mono: 'JetBrains Mono','SF Mono',monospace;
+    --radius: 8px; --shadow: 0 1px 3px rgba(0,0,0,0.08);
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; min-height: 100vh; }
-
-  /* HEADER */
-  .header {
-    background: var(--white);
-    border-bottom: 1px solid var(--border);
-    padding: 0 24px;
-    height: 52px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+  .header { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
   .header-left { display: flex; align-items: center; gap: 8px; }
-  .back-link { color: var(--muted); text-decoration: none; font-size: 13px; display: flex; align-items: center; gap: 4px; }
+  .back-link { color: var(--muted); text-decoration: none; font-size: 13px; }
   .back-link:hover { color: var(--text); }
   .sep { color: var(--border2); }
   .page-title { font-size: 14px; font-weight: 600; }
-  .run-btn {
-    background: var(--accent);
-    color: white;
-    border: none;
-    padding: 7px 14px;
-    border-radius: var(--radius);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: opacity 0.15s;
-  }
-  .run-btn:hover { opacity: 0.88; }
-  .run-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
-  /* LAYOUT */
-  .main { max-width: 1140px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
-
-  /* STATS */
+  .run-btn { background: var(--accent); color: white; border: none; padding: 7px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .run-btn:hover { opacity: 0.88; } .run-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .main { max-width: 1200px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-  .stat {
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 18px;
-    box-shadow: var(--shadow);
-  }
+  .stat { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
   .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
   .stat-value { font-size: 24px; font-weight: 700; color: var(--accent); font-family: var(--mono); }
   .stat-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-
-  /* CARD */
-  .card {
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    overflow: hidden;
-  }
-  .card-header {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .card-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
-  .card-badge {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 10px;
-    background: var(--bg);
-    color: var(--muted);
-    border: 1px solid var(--border);
-  }
-
-  /* TABS */
+  .card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .card-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .card-title { font-size: 13px; font-weight: 600; }
+  .card-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
   .tabs { display: flex; gap: 2px; background: var(--bg); padding: 3px; border-radius: 6px; }
-  .tab {
-    padding: 5px 14px;
-    border-radius: 5px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
-    background: transparent;
-    color: var(--muted);
-    transition: all 0.15s;
-  }
+  .tab { padding: 5px 14px; border-radius: 5px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: transparent; color: var(--muted); transition: all 0.15s; }
   .tab.active { background: var(--white); color: var(--text); box-shadow: var(--shadow); }
-
-  /* PRICE TABLE */
   .price-section { padding: 20px; }
-  .price-grid { display: grid; grid-template-columns: 160px repeat(3, 1fr); gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-  .price-grid-header { display: contents; }
-  .price-grid-header > div, .price-row > div {
-    padding: 10px 14px;
-    border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-  }
-  .price-grid-header > div:last-child, .price-row > div:last-child { border-right: none; }
-  .price-grid-header > div { background: var(--bg); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-  .price-row { display: contents; }
-  .price-row:last-child > div { border-bottom: none; }
-  .price-row-label { font-weight: 600; font-size: 13px; background: var(--bg); display: flex; align-items: center; gap: 8px; }
-  .season-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-
-  .price-cell { display: flex; align-items: center; gap: 8px; }
-  .price-pair { display: flex; align-items: center; gap: 6px; flex: 1; }
-  .price-pair-label { font-size: 11px; color: var(--muted); min-width: 28px; }
-  .price-input {
-    width: 70px;
-    padding: 5px 8px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    font-size: 13px;
-    font-family: var(--mono);
-    color: var(--text);
-    background: var(--white);
-    text-align: right;
-    transition: border-color 0.15s;
-  }
+  .price-input { width: 68px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; font-family: var(--mono); color: var(--text); background: var(--white); text-align: right; }
   .price-input:focus { outline: none; border-color: var(--accent); background: var(--accent-light); }
-  .price-sep { color: var(--border2); font-size: 13px; }
-
-  /* SEASON EDITOR */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th { background: var(--bg); padding: 8px 10px; border: 1px solid var(--border); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); text-align: center; }
+  .tbl th.left { text-align: left; }
+  .tbl td { padding: 6px 8px; border: 1px solid var(--border); text-align: center; vertical-align: middle; }
+  .tbl td.label { text-align: left; font-weight: 600; white-space: nowrap; background: var(--bg); }
+  .tbl tr:hover td { background: #fafafa; }
+  .tbl tr:hover td.label { background: var(--bg); }
+  .cell-pair { display: flex; align-items: center; justify-content: center; gap: 4px; }
+  .cell-sep { color: var(--border2); font-size: 12px; }
+  .sdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
   .season-editor { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-  .month-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; }
-  .month-chip {
-    padding: 8px 4px;
-    border-radius: 6px;
-    text-align: center;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    border: 2px solid transparent;
-    transition: all 0.15s;
-    user-select: none;
-  }
   .season-legend { display: flex; gap: 10px; flex-wrap: wrap; }
-  .season-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 6px;
-    border: 2px solid transparent;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 600;
-    transition: all 0.15s;
-    background: var(--bg);
-    color: var(--text);
-  }
+  .season-btn { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.15s; background: var(--bg); color: var(--text); }
   .season-btn.selected { border-color: currentColor; }
-  .season-btn .dot { width: 10px; height: 10px; border-radius: 50%; }
-
-  /* SEASON COLORS */
-  .s-low     { background: #e8f0fe; color: #3b5bdb; }
-  .s-mid     { background: #e8f5e8; color: #2d7d4e; }
-  .s-high    { background: #fff3cd; color: #c47d0e; }
-  .s-peak    { background: #ffe5e5; color: #c0392b; }
-  .s-newyear { background: #f3e5f5; color: #7b3fa0; }
-  .s-xmas    { background: #e5f5f5; color: #2980b9; }
-  .dot-low     { background: #3b5bdb; }
-  .dot-mid     { background: #2d7d4e; }
-  .dot-high    { background: #c47d0e; }
-  .dot-peak    { background: #c0392b; }
-  .dot-newyear { background: #7b3fa0; }
-  .dot-xmas    { background: #2980b9; }
-
-  /* EVENTS */
-  .event-row {
-    display: flex;
-    align-items: center;
-    padding: 12px 20px;
-    border-bottom: 1px solid var(--border);
-    gap: 14px;
-    transition: background 0.1s;
-  }
-  .event-row:last-child { border-bottom: none; }
-  .event-row:hover { background: var(--bg); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .month-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; }
+  .month-chip { padding: 8px 4px; border-radius: 6px; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; user-select: none; }
+  .s-low{background:#e8f0fe;color:#3b5bdb}.s-mid{background:#e8f5e8;color:#2d7d4e}.s-high{background:#fff3cd;color:#c47d0e}
+  .s-peak{background:#ffe5e5;color:#c0392b}.s-newyear{background:#f3e5f5;color:#7b3fa0}.s-xmas{background:#e5f5f5;color:#2980b9}
+  .dot-low{background:#3b5bdb}.dot-mid{background:#2d7d4e}.dot-high{background:#c47d0e}
+  .dot-peak{background:#c0392b}.dot-newyear{background:#7b3fa0}.dot-xmas{background:#2980b9}
+  .event-row { display: flex; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--border); gap: 14px; }
+  .event-row:last-child { border-bottom: none; } .event-row:hover { background: var(--bg); }
   .event-date { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--accent); min-width: 100px; }
-  .event-info { flex: 1; }
-  .event-name { font-weight: 600; font-size: 14px; }
-  .event-venue { font-size: 12px; color: var(--muted); }
+  .event-info { flex: 1; } .event-name { font-weight: 600; font-size: 14px; } .event-venue { font-size: 12px; color: var(--muted); }
   .event-actions { display: flex; align-items: center; gap: 8px; }
-  .mult-input {
-    width: 68px;
-    padding: 5px 8px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    font-size: 13px;
-    font-family: var(--mono);
-    text-align: center;
-  }
-  .mult-input:focus { outline: none; border-color: var(--accent); }
+  .mult-input { width: 68px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; font-family: var(--mono); text-align: center; }
   .badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
-  .badge-pending  { background: var(--yellow-light); color: var(--yellow); }
-  .badge-approved { background: var(--green-light);  color: var(--green); }
-  .badge-manual   { background: var(--accent-light); color: var(--accent); }
-
+  .badge-pending{background:var(--yellow-light);color:var(--yellow)}.badge-approved{background:var(--green-light);color:var(--green)}.badge-manual{background:var(--accent-light);color:var(--accent)}
   .btn { padding: 5px 12px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
-  .btn-approve { background: var(--green-light); color: var(--green); border-color: rgba(45,125,78,0.2); }
-  .btn-approve:hover { background: #d5ede2; }
-  .btn-dismiss { background: var(--bg); color: var(--muted); border-color: var(--border); }
-  .btn-dismiss:hover { color: var(--red); border-color: var(--red); }
-  .btn-remove { background: var(--bg); color: var(--muted); border-color: var(--border); }
-  .btn-remove:hover { color: var(--red); border-color: var(--red); }
-  .btn-save { background: var(--accent); color: white; border-color: var(--accent); }
-  .btn-save:hover { opacity: 0.88; }
-
-  /* ADD EVENT FORM */
+  .btn-approve{background:var(--green-light);color:var(--green);border-color:rgba(45,125,78,0.2)}.btn-approve:hover{background:#d5ede2}
+  .btn-dismiss{background:var(--bg);color:var(--muted);border-color:var(--border)}.btn-dismiss:hover{color:var(--red);border-color:var(--red)}
+  .btn-remove{background:var(--bg);color:var(--muted);border-color:var(--border)}.btn-remove:hover{color:var(--red);border-color:var(--red)}
+  .btn-save{background:var(--accent);color:white;border-color:var(--accent)}.btn-save:hover{opacity:0.88}
   .add-form { padding: 16px 20px; border-top: 1px solid var(--border); background: var(--bg); display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
   .form-group { display: flex; flex-direction: column; gap: 4px; }
   .form-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
   .form-input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; background: var(--white); color: var(--text); }
   .form-input:focus { outline: none; border-color: var(--accent); }
-
-  /* LOG */
   .log-row { display: flex; align-items: baseline; padding: 10px 20px; border-bottom: 1px solid var(--border); gap: 12px; }
   .log-row:last-child { border-bottom: none; }
   .log-time { font-family: var(--mono); font-size: 12px; color: var(--muted); min-width: 130px; }
-  .log-msg { flex: 1; font-size: 13px; }
-  .log-count { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent); }
-  .log-error { color: var(--red); }
-
-  /* EMPTY */
+  .log-msg { flex: 1; font-size: 13px; } .log-count { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent); } .log-error { color: var(--red); }
   .empty { padding: 36px 20px; text-align: center; color: var(--muted); }
   .empty-icon { font-size: 24px; margin-bottom: 8px; }
-
-  /* TOAST */
-  .toast {
-    position: fixed; bottom: 20px; right: 20px;
-    background: var(--text); color: white;
-    padding: 10px 16px; border-radius: var(--radius);
-    font-size: 13px; font-weight: 500;
-    box-shadow: var(--shadow-md);
-    transform: translateY(60px); opacity: 0;
-    transition: all 0.2s; z-index: 999;
-  }
-  .toast.show { transform: translateY(0); opacity: 1; }
-  .toast.success { background: var(--green); }
-  .toast.error { background: var(--red); }
-
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--text); color: white; padding: 10px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: translateY(60px); opacity: 0; transition: all 0.2s; z-index: 999; }
+  .toast.show { transform: translateY(0); opacity: 1; } .toast.success { background: var(--green); } .toast.error { background: var(--red); }
   .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
-
-  /* AI CHAT */
-  .chat-wrap { padding: 20px; display: flex; flex-direction: column; gap: 12px; max-height: 500px; }
-  .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 200px; max-height: 320px; padding: 4px 0; }
-  .chat-msg { display: flex; gap: 10px; align-items: flex-start; }
-  .chat-msg.user { flex-direction: row-reverse; }
-  .chat-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
-  .chat-avatar.ai { background: var(--accent); color: white; }
-  .chat-avatar.user { background: var(--blue); color: white; }
-  .chat-bubble { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
-  .chat-msg.ai .chat-bubble { background: var(--bg); border: 1px solid var(--border); border-radius: 4px 12px 12px 12px; }
-  .chat-msg.user .chat-bubble { background: var(--blue); color: white; border-radius: 12px 4px 12px 12px; }
-  .chat-input-row { display: flex; gap: 8px; }
-  .chat-input { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-family: var(--font); resize: none; background: var(--white); }
-  .chat-input:focus { outline: none; border-color: var(--accent); }
-  .chat-send { background: var(--accent); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-  .chat-send:hover { opacity: 0.88; }
-  .chat-send:disabled { opacity: 0.45; cursor: not-allowed; }
-  .chat-thinking { color: var(--muted); font-style: italic; font-size: 12px; }
-  .chat-suggestions { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chat-suggestion { padding: 5px 10px; border: 1px solid var(--border); border-radius: 16px; font-size: 12px; cursor: pointer; background: var(--white); color: var(--text); transition: all 0.15s; }
-  .chat-suggestion:hover { border-color: var(--accent); color: var(--accent); }
-
-  @media (max-width: 768px) {
-    .stats { grid-template-columns: repeat(2, 1fr); }
-    .price-grid { grid-template-columns: 120px repeat(3, 1fr); }
-    .month-grid { grid-template-columns: repeat(6, 1fr); }
-  }
+  .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 12px; }
 </style>
 </head>
 <body>
@@ -378,71 +158,80 @@
         </div>
         <div class="month-grid" id="monthGrid"></div>
       </div>
-
-      <div class="price-section">
-        <div id="seasonPriceGrid">
-          <!-- rendered by JS -->
-          <!-- rows injected by JS -->
-        </div>
-      </div>
+      <div class="price-section" id="seasonPriceGrid"></div>
     </div>
 
     <!-- MONTH VIEW -->
     <div id="monthView" style="display:none">
       <div class="price-section">
-        <div style="margin-bottom:14px">
-          <select id="monthSelect" onchange="renderMonthGrid()" style="padding:7px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--white)">
-            <option value="1">January</option><option value="2">February</option>
-            <option value="3">March</option><option value="4">April</option>
-            <option value="5">May</option><option value="6">June</option>
-            <option value="7">July</option><option value="8">August</option>
-            <option value="9">September</option><option value="10">October</option>
-            <option value="11">November</option><option value="12">December</option>
+        <div style="margin-bottom:16px">
+          <select id="monthSelect" onchange="renderMonthView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--white)">
+            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
           </select>
         </div>
-        <div class="price-grid" id="monthPriceGrid">
-          <div>Property</div>
-          <div>ROOMS</div>
-          <div>MAXELA</div>
-          <div>BIG_APT</div>
-        </div>
+        <div id="monthViewContent"></div>
       </div>
     </div>
-  </div>
-
 
     <!-- DATE VIEW -->
     <div id="dateView" style="display:none">
       <div class="price-section">
-        <div style="margin-bottom:14px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div style="margin-bottom:16px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
           <div class="form-group">
             <label class="form-label">Date</label>
             <input type="date" class="form-input" id="dateOverrideDate" style="width:160px">
           </div>
           <div class="form-group">
             <label class="form-label">Property</label>
-            <select class="form-input" id="dateOverrideProp" style="width:140px">
+            <select class="form-input" id="dateOverrideProp" style="width:160px">
               <option value="ROOMS">Rooms</option>
               <option value="MAXELA">Maxela Apts</option>
-              <option value="BIG_APT">3-Bed Apt</option>
+              <option value="BIG_APT">3-Bed Apartment</option>
+              <option value="FREEDOM">Freedom Square</option>
+              <option value="ORBE_1">Orbeliani 1</option>
+              <option value="ORBE_2">Orbeliani 3</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Min Price (GEL)</label>
-            <input type="number" class="form-input price-input" id="dateOverrideMin" placeholder="e.g. 150" style="width:100px">
+            <label class="form-label">Min GEL</label>
+            <input type="number" class="form-input price-input" id="dateOverrideMin" placeholder="e.g. 150" style="width:90px">
           </div>
           <div class="form-group">
-            <label class="form-label">Max Price (GEL)</label>
-            <input type="number" class="form-input price-input" id="dateOverrideMax" placeholder="e.g. 300" style="width:100px">
+            <label class="form-label">Max GEL</label>
+            <input type="number" class="form-input price-input" id="dateOverrideMax" placeholder="e.g. 300" style="width:90px">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Min EUR</label>
+            <input type="number" class="form-input price-input" id="dateOverrideMinEur" placeholder="e.g. 45" style="width:90px">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max EUR</label>
+            <input type="number" class="form-input price-input" id="dateOverrideMaxEur" placeholder="e.g. 80" style="width:90px">
           </div>
           <button class="btn btn-save" onclick="addDateOverride()">+ Add Override</button>
         </div>
-
         <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden" id="dateOverrideList">
-          <div class="empty"><div class="empty-icon">📆</div>No date overrides yet. Add specific dates above.</div>
+          <div class="empty"><div class="empty-icon">📆</div>No date overrides yet.</div>
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- STARTING PRICE -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">🎯 Starting Price</span>
+      <span style="font-size:12px;color:var(--muted)">Where the engine starts — drops toward min if demand is low</span>
+    </div>
+    <div class="price-section">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Set the starting GEL price per property per season. Engine starts here and drops toward your minimum based on booking velocity. Must be between your min and max.</p>
+      <div id="startPriceGrid"></div>
+      <button class="btn btn-save" style="margin-top:16px" onclick="saveStartPrices()">Save Starting Prices</button>
+    </div>
+  </div>
 
   <!-- AI RECOMMENDATIONS -->
   <div class="card" id="recsCard" style="display:none">
@@ -459,7 +248,7 @@
       <span class="card-title">🔔 Suggested Events</span>
       <span class="card-badge" id="pendingBadge">0 pending</span>
     </div>
-    <div id="pendingList"><div class="empty"><div class="empty-icon">🎵</div>No pending events. Engine scans 3× daily.</div></div>
+    <div id="pendingList"><div class="empty"><div class="empty-icon">🎵</div>No pending events. Engine scans daily.</div></div>
   </div>
 
   <div class="card">
@@ -485,52 +274,6 @@
     </div>
   </div>
 
-
-
-  <!-- BASE PRICE % CONTROL -->
-  <div class="card" style="margin-top:16px;">
-    <div class="card-header">
-      <span class="card-title">📊 Starting Price Level</span>
-      <span style="font-size:12px;color:var(--muted)">% of ceiling price the engine starts from</span>
-    </div>
-    <div style="padding:16px;">
-      <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">
-        Engine starts at this % of your max price and drops toward min based on demand. 
-        Higher % = more room to drop. Lower % = more conservative start.
-      </p>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;" id="basePctGrid">
-        <!-- Filled by JS -->
-      </div>
-      <button class="btn btn-primary" style="margin-top:12px;" onclick="saveBasePct()">Save Starting Prices</button>
-    </div>
-  </div>
-
-  <!-- AI CHAT -->
-  <div class="card">
-    <div class="card-header">
-      <span class="card-title">🤖 Ask AI about Pricing</span>
-      <span style="font-size:12px;color:var(--muted)">Powered by Gemini</span>
-    </div>
-    <div class="chat-wrap">
-      <div class="chat-messages" id="chatMessages">
-        <div class="chat-msg ai">
-          <div class="chat-avatar ai">AI</div>
-          <div class="chat-bubble">Hi Nika! I can help you think through pricing for Maxela Apartments. Ask me anything — about specific dates, properties, or strategy.</div>
-        </div>
-      </div>
-      <div class="chat-suggestions">
-        <button class="chat-suggestion" onclick="sendSuggestion(this)">July is empty for Big Apartment, what should I do?</button>
-        <button class="chat-suggestion" onclick="sendSuggestion(this)">Should I lower Maxela prices for next week?</button>
-        <button class="chat-suggestion" onclick="sendSuggestion(this)">How are my prices compared to last year?</button>
-        <button class="chat-suggestion" onclick="sendSuggestion(this)">Mobi event is July 30, how should I price?</button>
-      </div>
-      <div class="chat-input-row">
-        <textarea class="chat-input" id="chatInput" rows="2" placeholder="Ask about your pricing strategy..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
-        <button class="chat-send" id="chatSend" onclick="sendChat()">Send</button>
-      </div>
-    </div>
-  </div>
-
   <!-- LOG -->
   <div class="card">
     <div class="card-header">
@@ -548,68 +291,65 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, query, orderBy, limit, onSnapshot, doc, updateDoc, addDoc, deleteDoc, getDoc, setDoc, serverTimestamp, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
-  authDomain: "sleepy-5c962.firebaseapp.com",
-  projectId: "sleepy-5c962",
-  storageBucket: "sleepy-5c962.firebasestorage.app",
-  messagingSenderId: "152940098906",
-  appId: "1:152940098906:web:bf245230d705c0a62c2f63"
-};
+const app = initializeApp({ apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk", authDomain:"sleepy-5c962.firebaseapp.com", projectId:"sleepy-5c962", storageBucket:"sleepy-5c962.firebasestorage.app", messagingSenderId:"152940098906", appId:"1:152940098906:web:bf245230d705c0a62c2f63" });
+const db = getFirestore(app);
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
-
-// ── PRICING RULES STATE ──
-const PROPERTIES = ['ROOMS', 'MAXELA', 'BIG_APT', 'FREEDOM', 'ORBE_1', 'ORBE_2'];
-const PROP_LABELS = { ROOMS: 'Rooms', MAXELA: 'Maxela Apts', BIG_APT: '3-Bed Apt', FREEDOM: 'Freedom Sq', ORBE_1: 'Orbeliani 1', ORBE_2: 'Orbeliani 3' };
+// ── CONSTANTS ──
+const GEL_PROPS = ['ROOMS','MAXELA','BIG_APT','FREEDOM','ORBE_1'];
+const EUR_PROPS = ['BIG_APT','FREEDOM','ORBE_1','ORBE_2'];
+const ALL_PROPS = ['ROOMS','MAXELA','BIG_APT','FREEDOM','ORBE_1','ORBE_2'];
+const PROP_LABELS = { ROOMS:'Rooms', MAXELA:'Maxela Apts', BIG_APT:'3-Bed Apt', FREEDOM:'Freedom Sq', ORBE_1:'Orbeliani 1', ORBE_2:'Orbeliani 3' };
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const SEASONS = ['low','mid','high','peak','new_year','xmas_low'];
-const EUR_PROPS = ['BIG_APT','FREEDOM','ORBE_1','ORBE_2'];
 const SEASON_LABELS = { low:'Low', mid:'Mid', high:'High', peak:'Peak', new_year:'New Year', xmas_low:'Xmas Low' };
 const SEASON_CLASSES = { low:'s-low', mid:'s-mid', high:'s-high', peak:'s-peak', new_year:'s-newyear', xmas_low:'s-xmas' };
 const DOT_CLASSES = { low:'dot-low', mid:'dot-mid', high:'dot-high', peak:'dot-peak', new_year:'dot-newyear', xmas_low:'dot-xmas' };
 
-// Default month→season mapping
+// ── STATE ──
 let monthSeasons = [null,'low','low','low','mid','mid','high','high','peak','peak','high','mid','xmas_low','new_year'];
-// monthSeasons[1..12]
-
-// Price rules: { ROOMS: { low: {min:80,max:160}, mid:...}, ... }
 let priceRules = {
-  ROOMS:    { low:{min:80,max:160},  mid:{min:80,max:160},  high:{min:100,max:160}, peak:{min:110,max:160}, new_year:{min:120,max:200}, xmas_low:{min:80,max:160}  },
-  MAXELA:   { low:{min:180,max:280}, mid:{min:180,max:280}, high:{min:200,max:280}, peak:{min:220,max:280}, new_year:{min:220,max:350}, xmas_low:{min:180,max:280} },
-  BIG_APT:  { low:{min:400,max:750}, mid:{min:400,max:750}, high:{min:450,max:750}, peak:{min:500,max:750}, new_year:{min:500,max:900}, xmas_low:{min:400,max:750} },
-  FREEDOM:  { low:{min:180,max:280}, mid:{min:180,max:280}, high:{min:200,max:280}, peak:{min:220,max:280}, new_year:{min:220,max:350}, xmas_low:{min:180,max:280} },
-  ORBE_1:   { low:{min:180,max:280}, mid:{min:180,max:280}, high:{min:200,max:280}, peak:{min:220,max:280}, new_year:{min:220,max:350}, xmas_low:{min:180,max:280} },
-  ORBE_2:   { low:{min:0,max:0},     mid:{min:0,max:0},     high:{min:0,max:0},     peak:{min:0,max:0},     new_year:{min:0,max:0},     xmas_low:{min:0,max:0}    },
+  ROOMS:   {low:{min:80,max:160}, mid:{min:80,max:160}, high:{min:100,max:160}, peak:{min:110,max:160}, new_year:{min:120,max:200}, xmas_low:{min:80,max:160}},
+  MAXELA:  {low:{min:180,max:280},mid:{min:180,max:280},high:{min:200,max:280},peak:{min:220,max:280},new_year:{min:220,max:350},xmas_low:{min:180,max:280}},
+  BIG_APT: {low:{min:400,max:750},mid:{min:400,max:750},high:{min:450,max:750},peak:{min:500,max:750},new_year:{min:500,max:900},xmas_low:{min:400,max:750}},
+  FREEDOM: {low:{min:180,max:280},mid:{min:180,max:280},high:{min:200,max:280},peak:{min:220,max:280},new_year:{min:220,max:350},xmas_low:{min:180,max:280}},
+  ORBE_1:  {low:{min:160,max:280},mid:{min:160,max:280},high:{min:180,max:280},peak:{min:200,max:280},new_year:{min:200,max:350},xmas_low:{min:160,max:280}},
 };
 let eurRules = {
-  BIG_APT:  { low:{min:100,max:180}, mid:{min:100,max:180}, high:{min:120,max:180}, peak:{min:130,max:180}, new_year:{min:130,max:220}, xmas_low:{min:100,max:180} },
-  FREEDOM:  { low:{min:35,max:70},   mid:{min:35,max:70},   high:{min:40,max:70},   peak:{min:40,max:70},   new_year:{min:50,max:90},   xmas_low:{min:35,max:70}  },
-  ORBE_1:   { low:{min:35,max:70},   mid:{min:35,max:70},   high:{min:40,max:70},   peak:{min:40,max:70},   new_year:{min:50,max:90},   xmas_low:{min:35,max:70}  },
-  ORBE_2:   { low:{min:35,max:70},   mid:{min:35,max:70},   high:{min:40,max:70},   peak:{min:40,max:70},   new_year:{min:50,max:90},   xmas_low:{min:35,max:70}  },
+  BIG_APT: {low:{min:100,max:180},mid:{min:100,max:180},high:{min:120,max:180},peak:{min:130,max:180},new_year:{min:130,max:220},xmas_low:{min:100,max:180}},
+  FREEDOM: {low:{min:35,max:70}, mid:{min:35,max:70}, high:{min:40,max:70}, peak:{min:40,max:70}, new_year:{min:50,max:90}, xmas_low:{min:35,max:70}},
+  ORBE_1:  {low:{min:35,max:70}, mid:{min:35,max:70}, high:{min:40,max:70}, peak:{min:40,max:70}, new_year:{min:50,max:90}, xmas_low:{min:35,max:70}},
+  ORBE_2:  {low:{min:35,max:70}, mid:{min:35,max:70}, high:{min:40,max:70}, peak:{min:40,max:70}, new_year:{min:50,max:90}, xmas_low:{min:35,max:70}},
 };
+let startPrices = {
+  ROOMS:   {low:140,mid:140,high:145,peak:150,new_year:180,xmas_low:140},
+  MAXELA:  {low:245,mid:250,high:255,peak:260,new_year:320,xmas_low:245},
+  BIG_APT: {low:600,mid:620,high:660,peak:700,new_year:800,xmas_low:610},
+  FREEDOM: {low:245,mid:250,high:255,peak:260,new_year:320,xmas_low:245},
+  ORBE_1:  {low:225,mid:235,high:240,peak:250,new_year:300,xmas_low:230},
+};
+let dateOverrides = {};
 
-// Load saved rules from Firestore
+// ── LOAD RULES ──
 async function loadRules() {
   try {
-    const snap = await getDoc(doc(db, 'pricing_config', 'rules'));
+    const snap = await getDoc(doc(db,'pricing_config','rules'));
     if (snap.exists()) {
-      const data = snap.data();
-      if (data.priceRules) priceRules = data.priceRules;
-      if (data.eurRules) eurRules = data.eurRules;
-      if (data.monthSeasons) monthSeasons = data.monthSeasons;
-      if (data.dateOverrides) { dateOverrides = data.dateOverrides; renderDateOverrides(); }
+      const d = snap.data();
+      if (d.priceRules) priceRules = d.priceRules;
+      if (d.eurRules) eurRules = d.eurRules;
+      if (d.monthSeasons) monthSeasons = d.monthSeasons;
+      if (d.dateOverrides) { dateOverrides = d.dateOverrides; renderDateOverrides(); }
+      if (d.startPrices) startPrices = d.startPrices;
     }
   } catch(e) { console.warn('Could not load rules:', e); }
   renderMonthChips();
   renderSeasonGrid();
-  renderMonthGrid();
+  renderMonthView();
+  renderStartPrices();
 }
 
 // ── SEASON TAB ──
 let selectedSeason = 'peak';
-
 window.selectSeason = (s) => {
   selectedSeason = s;
   document.querySelectorAll('.season-btn').forEach(b => b.classList.remove('selected'));
@@ -617,211 +357,228 @@ window.selectSeason = (s) => {
 };
 
 window.switchTab = (tab) => {
-  document.getElementById('seasonView').style.display = tab === 'season' ? '' : 'none';
-  document.getElementById('monthView').style.display  = tab === 'month'  ? '' : 'none';
-  document.getElementById('dateView').style.display   = tab === 'date'   ? '' : 'none';
-  document.getElementById('tabSeason').classList.toggle('active', tab === 'season');
-  document.getElementById('tabMonth').classList.toggle('active', tab === 'month');
-  document.getElementById('tabDate').classList.toggle('active', tab === 'date');
+  ['season','month','date'].forEach(t => {
+    document.getElementById(t+'View').style.display = tab===t ? '' : 'none';
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', tab===t);
+  });
+  if (tab==='month') renderMonthView();
 };
 
 function renderMonthChips() {
-  const grid = document.getElementById('monthGrid');
-  grid.innerHTML = MONTHS.map((m, i) => {
-    const s = monthSeasons[i+1] || 'low';
+  document.getElementById('monthGrid').innerHTML = MONTHS.map((m,i) => {
+    const s = monthSeasons[i+1]||'low';
     return `<div class="month-chip ${SEASON_CLASSES[s]}" data-month="${i+1}" onclick="assignMonth(${i+1})">${m}</div>`;
   }).join('');
 }
+window.assignMonth = (m) => { monthSeasons[m]=selectedSeason; renderMonthChips(); };
 
-window.assignMonth = (m) => {
-  monthSeasons[m] = selectedSeason;
-  renderMonthChips();
-};
+function makeTable(props, rules, currency, season) {
+  const sym = currency==='EUR' ? '€' : '₾';
+  let h = `<table class="tbl"><thead><tr>
+    <th class="left">Property</th>
+    <th>Min ${sym}</th><th>Max ${sym}</th>
+    <th>Start ${sym}</th>
+  </tr></thead><tbody>`;
+  props.forEach(p => {
+    const r = rules[p]?.[season]||{min:0,max:0};
+    const sp = currency==='GEL' ? (startPrices[p]?.[season]||0) : 0;
+    h += `<tr>
+      <td class="label"><span class="sdot ${DOT_CLASSES[season]}"></span>${PROP_LABELS[p]}</td>
+      <td><input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${season}" data-field="min" data-table="${currency.toLowerCase()}" onchange="updateRule(this)"></td>
+      <td><input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${season}" data-field="max" data-table="${currency.toLowerCase()}" onchange="updateRule(this)"></td>
+      <td>${currency==='GEL' ? `<input class="price-input" type="number" value="${sp}" data-prop="${p}" data-season="${season}" onchange="updateStartPrice(this)" style="background:var(--accent-light)">` : '<span style="color:var(--muted);font-size:12px">—</span>'}</td>
+    </tr>`;
+  });
+  return h + '</tbody></table>';
+}
 
 function renderSeasonGrid() {
   const container = document.getElementById('seasonPriceGrid');
-  const gelProps = ['ROOMS','MAXELA','BIG_APT','FREEDOM','ORBE_1'];
-  const eurProps = ['BIG_APT','FREEDOM','ORBE_1','ORBE_2'];
+  const s = selectedSeason || 'peak';
+  container.innerHTML = `
+    <div style="overflow-x:auto;margin-bottom:20px">
+      <div class="section-title">GEL ₾ — Booking.com & Expedia</div>
+      ${makeTableFull(GEL_PROPS, priceRules, 'gel', s)}
+    </div>
+    <div style="overflow-x:auto">
+      <div class="section-title">EUR € — Airbnb</div>
+      ${makeTableFull(EUR_PROPS, eurRules, 'eur', s)}
+    </div>`;
+}
 
-  // GEL TABLE
-  let gelHtml = `<div style="overflow-x:auto;margin-bottom:20px">
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:10px">GEL ₾ — Booking.com & Expedia</div>
-    <table style="width:100%;border-collapse:collapse;font-size:13px">
-      <thead><tr style="background:var(--bg)">
-        <th style="padding:8px 12px;text-align:left;border:1px solid var(--border);font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase">Season</th>`;
-  gelProps.forEach(p => {
-    gelHtml += `<th colspan="2" style="padding:8px 12px;text-align:center;border:1px solid var(--border);font-weight:700">${PROP_LABELS[p]}</th>`;
-  });
-  gelHtml += `</tr><tr style="background:var(--bg)"><th style="border:1px solid var(--border)"></th>`;
-  gelProps.forEach(() => {
-    gelHtml += `<th style="padding:4px 8px;text-align:center;border:1px solid var(--border);font-size:11px;color:var(--muted)">Min</th>
-                <th style="padding:4px 8px;text-align:center;border:1px solid var(--border);font-size:11px;color:var(--muted)">Max</th>`;
-  });
-  gelHtml += `</tr></thead><tbody>`;
-
+function makeTableFull(props, rules, currency, season) {
+  const sym = currency==='eur'?'€':'₾';
+  let h = `<table class="tbl"><thead>
+    <tr><th class="left">Season</th>`;
+  props.forEach(p => { h += `<th colspan="3">${PROP_LABELS[p]}</th>`; });
+  h += `</tr><tr><th></th>`;
+  props.forEach(() => { h += `<th>Min${sym}</th><th>Max${sym}</th><th style="background:#eef7f2">Start${sym}</th>`; });
+  h += `</tr></thead><tbody>`;
   SEASONS.forEach(s => {
-    gelHtml += `<tr><td style="padding:8px 12px;border:1px solid var(--border);font-weight:600;white-space:nowrap">
-      <span class="season-dot ${DOT_CLASSES[s]}" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px"></span>${SEASON_LABELS[s]}
-    </td>`;
-    gelProps.forEach(p => {
-      const r = priceRules[p]?.[s] || {min:0,max:0};
-      gelHtml += `<td style="padding:6px 8px;border:1px solid var(--border)">
-        <input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${s}" data-field="min" data-table="gel" onchange="updateRule(this)" style="width:60px">
-      </td>
-      <td style="padding:6px 8px;border:1px solid var(--border)">
-        <input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" data-table="gel" onchange="updateRule(this)" style="width:60px">
-      </td>`;
+    h += `<tr><td class="label"><span class="sdot ${DOT_CLASSES[s]}"></span>${SEASON_LABELS[s]}</td>`;
+    props.forEach(p => {
+      const r = rules[p]?.[s]||{min:0,max:0};
+      const sp = currency==='gel' ? (startPrices[p]?.[s]||0) : 0;
+      h += `<td><input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${s}" data-field="min" data-table="${currency}" onchange="updateRule(this)"></td>
+            <td><input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" data-table="${currency}" onchange="updateRule(this)"></td>
+            <td style="background:#f0faf4">${currency==='gel'?`<input class="price-input" type="number" value="${sp}" data-prop="${p}" data-season="${s}" onchange="updateStartPrice(this)" style="background:transparent">`:'<span style="color:var(--muted);font-size:11px">—</span>'}</td>`;
     });
-    gelHtml += `</tr>`;
+    h += `</tr>`;
   });
-  gelHtml += `</tbody></table></div>`;
-
-  // EUR TABLE
-  let eurHtml = `<div style="overflow-x:auto">
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:10px">EUR € — Airbnb</div>
-    <table style="width:100%;border-collapse:collapse;font-size:13px">
-      <thead><tr style="background:var(--bg)">
-        <th style="padding:8px 12px;text-align:left;border:1px solid var(--border);font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase">Season</th>`;
-  eurProps.forEach(p => {
-    eurHtml += `<th colspan="2" style="padding:8px 12px;text-align:center;border:1px solid var(--border);font-weight:700">${PROP_LABELS[p]}</th>`;
-  });
-  eurHtml += `</tr><tr style="background:var(--bg)"><th style="border:1px solid var(--border)"></th>`;
-  eurProps.forEach(() => {
-    eurHtml += `<th style="padding:4px 8px;text-align:center;border:1px solid var(--border);font-size:11px;color:var(--muted)">Min</th>
-                <th style="padding:4px 8px;text-align:center;border:1px solid var(--border);font-size:11px;color:var(--muted)">Max</th>`;
-  });
-  eurHtml += `</tr></thead><tbody>`;
-
-  SEASONS.forEach(s => {
-    eurHtml += `<tr><td style="padding:8px 12px;border:1px solid var(--border);font-weight:600;white-space:nowrap">
-      <span class="season-dot ${DOT_CLASSES[s]}" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px"></span>${SEASON_LABELS[s]}
-    </td>`;
-    eurProps.forEach(p => {
-      const r = eurRules[p]?.[s] || {min:0,max:0};
-      eurHtml += `<td style="padding:6px 8px;border:1px solid var(--border)">
-        <input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${s}" data-field="min" data-table="eur" onchange="updateRule(this)" style="width:60px">
-      </td>
-      <td style="padding:6px 8px;border:1px solid var(--border)">
-        <input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" data-table="eur" onchange="updateRule(this)" style="width:60px">
-      </td>`;
-    });
-    eurHtml += `</tr>`;
-  });
-  eurHtml += `</tbody></table></div>`;
-
-  container.innerHTML = gelHtml + eurHtml;
+  return h + '</tbody></table>';
 }
 
 window.updateRule = (el) => {
-  const { prop, season, field, table } = el.dataset;
-  const rules = table === 'eur' ? eurRules : priceRules;
-  if (!rules[prop]) rules[prop] = {};
-  if (!rules[prop][season]) rules[prop][season] = {min:0,max:0};
-  rules[prop][season][field] = parseFloat(el.value) || 0;
+  const {prop,season,field,table} = el.dataset;
+  const rules = table==='eur' ? eurRules : priceRules;
+  if (!rules[prop]) rules[prop]={};
+  if (!rules[prop][season]) rules[prop][season]={min:0,max:0};
+  rules[prop][season][field] = parseFloat(el.value)||0;
+};
+
+window.updateStartPrice = (el) => {
+  const {prop,season} = el.dataset;
+  if (!startPrices[prop]) startPrices[prop]={};
+  startPrices[prop][season] = parseFloat(el.value)||0;
 };
 
 // ── MONTH VIEW ──
-window.renderMonthGrid = () => {
-  const m = parseInt(document.getElementById('monthSelect').value);
-  const grid = document.getElementById('monthPriceGrid');
-  const s = monthSeasons[m] || 'low';
-
-  let html = `<div>Month (${MONTHS[m-1]})<br><span style="font-size:11px;color:var(--muted)">Season: ${SEASON_LABELS[s]}</span></div>`;
-  PROPERTIES.forEach(p => { html += `<div style="font-weight:700">${PROP_LABELS[p]}</div>`; });
-  html += `<div class="price-row-label"><span class="season-dot ${DOT_CLASSES[s]}"></span>Min / Max</div>`;
-  PROPERTIES.forEach(p => {
-    const r = priceRules[p]?.[s] || {min:0,max:0};
-    html += `<div class="price-cell">
-      <div class="price-pair">
-        <input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${s}" data-field="min" onchange="updateRule(this)">
-        <span class="price-sep">–</span>
-        <input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" onchange="updateRule(this)">
-      </div>
+window.renderMonthView = () => {
+  const m = parseInt(document.getElementById('monthSelect')?.value||1);
+  const s = monthSeasons[m]||'low';
+  const content = document.getElementById('monthViewContent');
+  if (!content) return;
+  content.innerHTML = `
+    <div style="margin-bottom:12px;font-size:13px">
+      <span class="sdot ${DOT_CLASSES[s]}" style="display:inline-block"></span>
+      <strong>${MONTHS[m-1]}</strong> — ${SEASON_LABELS[s]} season
+      <span style="color:var(--muted);font-size:12px;margin-left:8px">To change season assignment, use the By Season tab</span>
+    </div>
+    <div style="overflow-x:auto;margin-bottom:20px">
+      <div class="section-title">GEL ₾ — Booking.com & Expedia</div>
+      <table class="tbl"><thead><tr>
+        <th class="left">Property</th><th>Min ₾</th><th>Max ₾</th><th style="background:#eef7f2">Start ₾</th>
+      </tr></thead><tbody>
+        ${GEL_PROPS.map(p => {
+          const r = priceRules[p]?.[s]||{min:0,max:0};
+          const sp = startPrices[p]?.[s]||0;
+          return `<tr>
+            <td class="label">${PROP_LABELS[p]}</td>
+            <td><input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${s}" data-field="min" data-table="gel" onchange="updateRule(this)"></td>
+            <td><input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" data-table="gel" onchange="updateRule(this)"></td>
+            <td style="background:#f0faf4"><input class="price-input" type="number" value="${sp}" data-prop="${p}" data-season="${s}" onchange="updateStartPrice(this)" style="background:transparent"></td>
+          </tr>`;
+        }).join('')}
+      </tbody></table>
+    </div>
+    <div style="overflow-x:auto">
+      <div class="section-title">EUR € — Airbnb</div>
+      <table class="tbl"><thead><tr>
+        <th class="left">Property</th><th>Min €</th><th>Max €</th>
+      </tr></thead><tbody>
+        ${EUR_PROPS.map(p => {
+          const r = eurRules[p]?.[s]||{min:0,max:0};
+          return `<tr>
+            <td class="label">${PROP_LABELS[p]}</td>
+            <td><input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${s}" data-field="min" data-table="eur" onchange="updateRule(this)"></td>
+            <td><input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" data-table="eur" onchange="updateRule(this)"></td>
+          </tr>`;
+        }).join('')}
+      </tbody></table>
     </div>`;
-  });
-  grid.innerHTML = html;
 };
 
+// ── START PRICES CARD ──
+function renderStartPrices() {
+  const grid = document.getElementById('startPriceGrid');
+  if (!grid) return;
+  grid.innerHTML = `<div style="overflow-x:auto">
+    <table class="tbl"><thead>
+      <tr><th class="left">Property</th>${SEASONS.map(s=>`<th>${SEASON_LABELS[s]} ₾</th>`).join('')}</tr>
+    </thead><tbody>
+      ${GEL_PROPS.map(p => `<tr>
+        <td class="label">${PROP_LABELS[p]}</td>
+        ${SEASONS.map(s => {
+          const sp = startPrices[p]?.[s]||0;
+          const mn = priceRules[p]?.[s]?.min||0;
+          const mx = priceRules[p]?.[s]?.max||0;
+          return `<td>
+            <input class="price-input" type="number" value="${sp}" data-prop="${p}" data-season="${s}" onchange="updateStartPrice(this)" style="width:72px">
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">${mn}–${mx}</div>
+          </td>`;
+        }).join('')}
+      </tr>`).join('')}
+    </tbody></table>
+  </div>`;
+}
+
+window.saveStartPrices = async () => {
+  try {
+    await setDoc(doc(db,'pricing_config','rules'), {startPrices}, {merge:true});
+    showToast('Starting prices saved','success');
+  } catch(e) { showToast('Error: '+e.message,'error'); }
+};
 
 // ── DATE OVERRIDES ──
-// { "ROOMS": { "2026-12-31": {min:200, max:400} }, ... }
-let dateOverrides = {};
-
 function renderDateOverrides() {
   const list = document.getElementById('dateOverrideList');
   const rows = [];
-  Object.entries(dateOverrides).forEach(([prop, dates]) => {
-    Object.entries(dates).sort().forEach(([date, vals]) => {
-      rows.push({prop, date, min: vals.min, max: vals.max});
-    });
+  Object.entries(dateOverrides).forEach(([prop,dates]) => {
+    Object.entries(dates).sort().forEach(([date,vals]) => rows.push({prop,date,...vals}));
   });
-  if (!rows.length) {
-    list.innerHTML = '<div class="empty"><div class="empty-icon">📆</div>No date overrides yet.</div>';
-    return;
-  }
-  rows.sort((a,b) => a.date.localeCompare(b.date));
-  list.innerHTML = rows.map(r => `
-    <div class="event-row">
-      <div class="event-date">${formatDate(r.date)}</div>
-      <div class="event-info">
-        <div class="event-name">${PROP_LABELS[r.prop]}</div>
-      </div>
-      <div class="event-actions">
-        <span style="font-family:var(--mono);font-size:13px">Min: <b>${r.min}</b> — Max: <b>${r.max}</b> GEL</span>
-        <button class="btn btn-remove" onclick="removeDateOverride('${r.prop}','${r.date}')">Remove</button>
-      </div>
-    </div>`).join('');
+  if (!rows.length) { list.innerHTML='<div class="empty"><div class="empty-icon">📆</div>No date overrides yet.</div>'; return; }
+  rows.sort((a,b)=>a.date.localeCompare(b.date));
+  list.innerHTML = rows.map(r => `<div class="event-row">
+    <div class="event-date">${formatDate(r.date)}</div>
+    <div class="event-info"><div class="event-name">${PROP_LABELS[r.prop]}</div></div>
+    <div class="event-actions">
+      <span style="font-family:var(--mono);font-size:13px">
+        GEL: ${r.min||0}–${r.max||0} ₾
+        ${(r.minEur||r.maxEur) ? ' · EUR: '+(r.minEur||0)+'–'+(r.maxEur||0)+' €' : ''}
+      </span>
+      <button class="btn btn-remove" onclick="removeDateOverride('${r.prop}','${r.date}')">Remove</button>
+    </div>
+  </div>`).join('');
 }
 
 window.addDateOverride = () => {
   const date = document.getElementById('dateOverrideDate').value;
   const prop = document.getElementById('dateOverrideProp').value;
-  const min  = parseFloat(document.getElementById('dateOverrideMin').value);
-  const max  = parseFloat(document.getElementById('dateOverrideMax').value);
+  const min  = parseFloat(document.getElementById('dateOverrideMin').value)||0;
+  const max  = parseFloat(document.getElementById('dateOverrideMax').value)||0;
+  const minEur = parseFloat(document.getElementById('dateOverrideMinEur').value)||0;
+  const maxEur = parseFloat(document.getElementById('dateOverrideMaxEur').value)||0;
   if (!date) { showToast('Select a date','error'); return; }
-  if (!dateOverrides[prop]) dateOverrides[prop] = {};
-  dateOverrides[prop][date] = {min: min||0, max: max||0};
+  if (!dateOverrides[prop]) dateOverrides[prop]={};
+  dateOverrides[prop][date] = {min,max,minEur,maxEur};
   renderDateOverrides();
   showToast('Override added — click Save Changes to apply');
 };
-
-window.removeDateOverride = (prop, date) => {
+window.removeDateOverride = (prop,date) => {
   if (dateOverrides[prop]) delete dateOverrides[prop][date];
   renderDateOverrides();
 };
 
-// ── SAVE RULES ──
+// ── SAVE ALL RULES ──
 window.saveRules = async () => {
   try {
-    await setDoc(doc(db, 'pricing_config', 'rules'), {
-      priceRules,
-      eurRules,
-      monthSeasons,
-      dateOverrides,
-      updatedAt: serverTimestamp(),
-    });
-    showToast('Pricing rules saved', 'success');
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    await setDoc(doc(db,'pricing_config','rules'), {priceRules, eurRules, monthSeasons, dateOverrides, startPrices, updatedAt:serverTimestamp()});
+    showToast('Pricing rules saved','success');
+  } catch(e) { showToast('Error: '+e.message,'error'); }
 };
 
 // ── EVENTS ──
-onSnapshot(query(collection(db, 'pricing_events'), where('status','==','pending')), snap => {
+onSnapshot(query(collection(db,'pricing_events'),where('status','==','pending')), snap => {
   const list = document.getElementById('pendingList');
   const badge = document.getElementById('pendingBadge');
   document.getElementById('pendingCount').textContent = snap.size;
   badge.textContent = `${snap.size} pending`;
-
-  if (snap.empty) { list.innerHTML = '<div class="empty"><div class="empty-icon">🎵</div>No pending events. Engine scans 3× daily.</div>'; return; }
-
+  if (snap.empty) { list.innerHTML='<div class="empty"><div class="empty-icon">🎵</div>No pending events. Engine scans daily.</div>'; return; }
   list.innerHTML = snap.docs.map(d => {
-    const e = d.data();
-    const dateStr = d.id.replace('event_','');
+    const e=d.data(), dateStr=d.id.replace('event_','');
     return `<div class="event-row">
       <div class="event-date">${formatDate(dateStr)}</div>
-      <div class="event-info">
-        <div class="event-name">${e.label||'Unknown'}</div>
-        <div class="event-venue">${e.venue||''} ${e.ticket_count ? '· '+e.ticket_count+' ticket sources':''}</div>
-      </div>
+      <div class="event-info"><div class="event-name">${e.label||'Unknown'}</div><div class="event-venue">${e.venue||''}</div></div>
       <div class="event-actions">
         <span class="badge badge-pending">Pending</span>
         <input class="mult-input" type="number" value="${e.multiplier||1.35}" min="1" max="2" step="0.05" id="m-${d.id}">
@@ -832,25 +589,18 @@ onSnapshot(query(collection(db, 'pricing_events'), where('status','==','pending'
   }).join('');
 });
 
-onSnapshot(query(collection(db, 'pricing_events'), where('status','in',['approved','manual'])), snap => {
+onSnapshot(query(collection(db,'pricing_events'),where('status','in',['approved','manual'])), snap => {
   const list = document.getElementById('activeList');
   const badge = document.getElementById('activeBadge');
   document.getElementById('activeCount').textContent = snap.size;
   badge.textContent = `${snap.size} active`;
-
-  if (snap.empty) { list.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>No active premiums.</div>'; return; }
-
+  if (snap.empty) { list.innerHTML='<div class="empty"><div class="empty-icon">📅</div>No active premiums.</div>'; return; }
   list.innerHTML = snap.docs.map(d => {
-    const e = d.data();
-    const dateStr = d.id.replace('event_','') || e.date || '';
-    const cls = e.status === 'manual' ? 'badge-manual' : 'badge-approved';
-    const lbl = e.status === 'manual' ? 'Manual' : 'Approved';
+    const e=d.data(), dateStr=d.id.replace('event_','')||e.date||'';
+    const cls=e.status==='manual'?'badge-manual':'badge-approved', lbl=e.status==='manual'?'Manual':'Approved';
     return `<div class="event-row">
       <div class="event-date">${formatDate(dateStr)}</div>
-      <div class="event-info">
-        <div class="event-name">${e.label||'Event'}</div>
-        <div class="event-venue">${e.venue||''}</div>
-      </div>
+      <div class="event-info"><div class="event-name">${e.label||'Event'}</div><div class="event-venue">${e.venue||''}</div></div>
       <div class="event-actions">
         <span class="badge ${cls}">${lbl}</span>
         <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent)">×${e.multiplier}</span>
@@ -861,259 +611,81 @@ onSnapshot(query(collection(db, 'pricing_events'), where('status','in',['approve
 });
 
 // ── LOG ──
-onSnapshot(query(collection(db,'pricing_log'), orderBy('timestamp','desc'), limit(10)), snap => {
+onSnapshot(query(collection(db,'pricing_log'),orderBy('timestamp','desc'),limit(10)), snap => {
   const list = document.getElementById('logList');
-  if (snap.empty) { list.innerHTML = '<div class="empty"><div class="empty-icon">📊</div>No runs yet.</div>'; return; }
-
+  if (snap.empty) { list.innerHTML='<div class="empty"><div class="empty-icon">📊</div>No runs yet.</div>'; return; }
   const latest = snap.docs[0].data();
   document.getElementById('lastRunTime').textContent = formatTs(latest.timestamp);
   document.getElementById('lastRunStatus').textContent = latest.error ? '⚠ Failed' : '✓ Success';
-  document.getElementById('lastRunChanges').textContent = latest.changes_count ?? '—';
-
+  document.getElementById('lastRunChanges').textContent = latest.changes_count??'—';
   list.innerHTML = snap.docs.map(d => {
-    const r = d.data();
+    const r=d.data();
     return `<div class="log-row">
       <span class="log-time">${formatTs(r.timestamp)}</span>
-      <span class="log-msg ${r.error?'log-error':''}">${r.error ? '⚠ '+r.error : r.message||'Run completed'}</span>
-      <span class="log-count">${r.changes_count!=null ? r.changes_count+' updates':''}</span>
+      <span class="log-msg ${r.error?'log-error':''}">${r.error?'⚠ '+r.error:r.message||'Run completed'}</span>
+      <span class="log-count">${r.changes_count!=null?r.changes_count+' updates':''}</span>
     </div>`;
   }).join('');
 });
 
-// ── ACTIONS ──
-window.approveEvent = async (id) => {
-  const mult = parseFloat(document.getElementById(`m-${id}`)?.value||1.35);
-  await updateDoc(doc(db,'pricing_events',id), {status:'approved', multiplier:mult});
-  showToast('Event approved', 'success');
-};
-window.dismissEvent = async (id) => {
-  await updateDoc(doc(db,'pricing_events',id), {status:'dismissed'});
-  showToast('Event dismissed');
-};
-window.removeEvent = async (id) => {
-  if (!confirm('Remove this event premium?')) return;
-  await deleteDoc(doc(db,'pricing_events',id));
-  showToast('Removed');
-};
-window.addManualEvent = async () => {
-  const date = document.getElementById('manualDate').value;
-  const label = document.getElementById('manualLabel').value.trim();
-  const mult = parseFloat(document.getElementById('manualMult').value);
-  if (!date||!label) { showToast('Enter date and name','error'); return; }
-  const id = `event_${date}`;
-  await setDoc(doc(db,'pricing_events',id), {label,multiplier:mult,status:'manual',venue:'',source:'manual',found_at:new Date().toISOString()});
-  document.getElementById('manualDate').value='';
-  document.getElementById('manualLabel').value='';
-  showToast('Event added','success');
-};
-
-window.triggerRun = async () => {
-  const btn = document.getElementById('runBtn');
-  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Running...';
-  try {
-    const snap = await getDoc(doc(db,'globals','config'));
-    const token = snap.data()?.githubToken||'';
-    const resp = await fetch('https://api.github.com/repos/nikavibliani-alt/app/actions/workflows/pricing_engine.yml/dispatches',{
-      method:'POST',
-      headers:{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
-      body:JSON.stringify({ref:'main'})
-    });
-    if (resp.status===204) showToast('Engine triggered — check log in ~2 min','success');
-    else throw new Error(`GitHub ${resp.status}`);
-  } catch(e) { showToast('Error: '+e.message,'error'); }
-  finally { setTimeout(()=>{ btn.disabled=false; btn.innerHTML='▶ Run Now'; },5000); }
-};
-
-// ── HELPERS ──
-function formatDate(s) {
-  if (!s||s.length<10) return s||'—';
-  const d = new Date(s+'T12:00:00');
-  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-}
-function formatTs(ts) {
-  if (!ts) return '—';
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-}
-
-function showToast(msg, type='') {
-  const t = document.getElementById('toast');
-  t.textContent=msg; t.className=`toast show ${type}`;
-  setTimeout(()=>t.className='toast',3000);
-}
-
-
-// ── AI RECOMMENDATIONS ──
-onSnapshot(query(collection(db, 'pricing_recommendations'), where('status','==','pending')), snap => {
-  const card = document.getElementById('recsCard');
-  const list = document.getElementById('recsList');
-  const badge = document.getElementById('recsBadge');
-  badge.textContent = snap.size + ' pending';
-  card.style.display = snap.empty ? 'none' : '';
-
+// ── AI RECS ──
+onSnapshot(query(collection(db,'pricing_recommendations'),where('status','==','pending')), snap => {
+  const card=document.getElementById('recsCard'), list=document.getElementById('recsList'), badge=document.getElementById('recsBadge');
+  badge.textContent=snap.size+' pending'; card.style.display=snap.empty?'none':'';
   list.innerHTML = snap.docs.map(d => {
-    const r = d.data();
-    const arrow = r.type === 'raise_ceiling' ? '↑' : '↓';
-    const color = r.type === 'raise_ceiling' ? 'var(--green)' : 'var(--accent)';
+    const r=d.data(); const arrow=r.type==='raise_ceiling'?'↑':'↓'; const color=r.type==='raise_ceiling'?'var(--green)':'var(--accent)';
     return `<div class="event-row">
-      <div style="min-width:100px;font-weight:700;color:${color};font-size:18px">${arrow} ${r.currency?.toUpperCase()||'GEL'}</div>
+      <div style="min-width:80px;font-weight:700;color:${color};font-size:18px">${arrow}</div>
       <div class="event-info">
-        <div class="event-name">${PROP_LABELS[r.property]||r.property} — ${r.season||''} season ${r.type?.replace('_',' ')}</div>
-        <div class="event-venue">${r.current} → ${r.suggested} ${r.currency?.toUpperCase()||'GEL'} · ${r.reason||''}</div>
+        <div class="event-name">${PROP_LABELS[r.property]||r.property} — ${r.season||''} ${r.type?.replace('_',' ')}</div>
+        <div class="event-venue">${r.current} → ${r.suggested} ${(r.currency||'gel').toUpperCase()} · ${r.reason||''}</div>
       </div>
       <div class="event-actions">
-        <button class="btn btn-approve" onclick="applyRec('${d.id}', '${r.property}', '${r.season}', '${r.currency}', '${r.type}', ${r.suggested})">Apply</button>
+        <button class="btn btn-approve" onclick="applyRec('${d.id}','${r.property}','${r.season}','${r.currency}','${r.type}',${r.suggested})">Apply</button>
         <button class="btn btn-dismiss" onclick="dismissRec('${d.id}')">Dismiss</button>
       </div>
     </div>`;
   }).join('');
 });
 
-window.applyRec = async (id, prop, season, currency, type, value) => {
-  // Update the relevant rule in priceRules/eurRules
-  const rules = currency === 'eur' ? eurRules : priceRules;
-  if (!rules[prop]) rules[prop] = {};
-  if (!rules[prop][season]) rules[prop][season] = {min:0, max:0};
-  if (type === 'raise_ceiling' || type === 'lower_ceiling') rules[prop][season].max = value;
-  if (type === 'raise_floor'   || type === 'lower_floor')   rules[prop][season].min = value;
-
-  await saveRules();
-  await updateDoc(doc(db, 'pricing_recommendations', id), {status: 'applied'});
-  renderSeasonGrid();
-  showToast('Recommendation applied and saved', 'success');
+window.applyRec = async (id,prop,season,currency,type,value) => {
+  const rules=currency==='eur'?eurRules:priceRules;
+  if (!rules[prop]) rules[prop]={};
+  if (!rules[prop][season]) rules[prop][season]={min:0,max:0};
+  if (type==='raise_ceiling'||type==='lower_ceiling') rules[prop][season].max=value;
+  if (type==='raise_floor'||type==='lower_floor') rules[prop][season].min=value;
+  await saveRules(); await updateDoc(doc(db,'pricing_recommendations',id),{status:'applied'});
+  renderSeasonGrid(); showToast('Recommendation applied','success');
 };
+window.dismissRec = async (id) => { await updateDoc(doc(db,'pricing_recommendations',id),{status:'dismissed'}); showToast('Dismissed'); };
 
-window.dismissRec = async (id) => {
-  await updateDoc(doc(db, 'pricing_recommendations', id), {status: 'dismissed'});
-  showToast('Recommendation dismissed');
+// ── ACTIONS ──
+window.approveEvent = async (id) => { const mult=parseFloat(document.getElementById(`m-${id}`)?.value||1.35); await updateDoc(doc(db,'pricing_events',id),{status:'approved',multiplier:mult}); showToast('Event approved','success'); };
+window.dismissEvent = async (id) => { await updateDoc(doc(db,'pricing_events',id),{status:'dismissed'}); showToast('Dismissed'); };
+window.removeEvent = async (id) => { if (!confirm('Remove this event premium?')) return; await deleteDoc(doc(db,'pricing_events',id)); showToast('Removed'); };
+window.addManualEvent = async () => {
+  const date=document.getElementById('manualDate').value, label=document.getElementById('manualLabel').value.trim(), mult=parseFloat(document.getElementById('manualMult').value);
+  if (!date||!label) { showToast('Enter date and name','error'); return; }
+  await setDoc(doc(db,'pricing_events','event_'+date),{label,multiplier:mult,status:'manual',venue:'',source:'manual',found_at:new Date().toISOString()});
+  document.getElementById('manualDate').value=''; document.getElementById('manualLabel').value='';
+  showToast('Event added','success');
 };
-
-
-
-
-// ── BASE PRICE PCT ──
-const PROPERTY_NAMES = {
-  'ROOMS': 'Rooms', 'MAXELA': 'Maxela', 'BIG_APT': 'Big Apartment',
-  'FREEDOM': 'Freedom Square', 'ORBE_1': 'Orbeliani 1', 'ORBE_2': 'Orbeliani 3'
-};
-
-async function loadBasePct() {
+window.triggerRun = async () => {
+  const btn=document.getElementById('runBtn'); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Running...';
   try {
-    const snap = await getDoc(doc(db, 'pricing_config', 'rules'));
-    const data = snap.exists() ? snap.data() : {};
-    const pcts = data.base_price_pct || {};
-    const grid = document.getElementById('basePctGrid');
-    if (!grid) return;
-    grid.innerHTML = Object.entries(PROPERTY_NAMES).map(([rt, name]) => {
-      const pct = Math.round((pcts[rt] || 0.90) * 100);
-      return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;">
-        <div style="font-size:12px;font-weight:600;margin-bottom:8px;">${name}</div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <input type="range" min="70" max="100" value="${pct}" 
-            oninput="this.nextElementSibling.textContent=this.value+'%'"
-            style="flex:1;" data-rt="${rt}">
-          <span style="font-size:13px;font-weight:600;min-width:36px;">${pct}%</span>
-        </div>
-      </div>`;
-    }).join('');
-  } catch(e) { console.error('loadBasePct:', e); }
-}
-
-window.saveBasePct = async function() {
-  try {
-    const inputs = document.querySelectorAll('#basePctGrid input[data-rt]');
-    const pcts = {};
-    inputs.forEach(inp => { pcts[inp.dataset.rt] = parseInt(inp.value) / 100; });
-    await setDoc(doc(db, 'pricing_config', 'rules'), { base_price_pct: pcts }, { merge: true });
-    alert('Starting prices saved!');
-  } catch(e) { alert('Error: ' + e.message); }
+    const snap=await getDoc(doc(db,'globals','config')); const token=snap.data()?.githubToken||'';
+    const resp=await fetch('https://api.github.com/repos/nikavibliani-alt/app/actions/workflows/pricing_engine.yml/dispatches',{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({ref:'main'})});
+    if (resp.status===204) showToast('Engine triggered — check log in ~2 min','success'); else throw new Error(`GitHub ${resp.status}`);
+  } catch(e) { showToast('Error: '+e.message,'error'); }
+  finally { setTimeout(()=>{ btn.disabled=false; btn.innerHTML='▶ Run Now'; },5000); }
 };
 
-// ── AI CHAT ──
-const chatHistory = [];
-
-window.sendSuggestion = function(btn) {
-  document.getElementById('chatInput').value = btn.textContent.trim();
-  sendChat();
-};
-
-window.sendChat = async function() {
-  const input = document.getElementById('chatInput');
-  const msg = input.value.trim();
-  if (!msg) return;
-
-  input.value = '';
-  appendChatMsg('user', msg);
-  chatHistory.push({role: 'user', parts: [{text: msg}]});
-
-  const sendBtn = document.getElementById('chatSend');
-  sendBtn.disabled = true;
-  appendChatMsg('ai', '...', true);
-
-  try {
-    const configSnap = await getDoc(doc(db, 'globals', 'config'));
-    const geminiKey = configSnap.data() && configSnap.data().geminiKey ? configSnap.data().geminiKey : '';
-    if (!geminiKey) throw new Error('No Gemini key configured in Firestore globals/config');
-
-    const systemText = 'You are a revenue management AI for Maxela Apartments in Tbilisi, Georgia. Properties: Rooms (5 small rooms), Maxela Apartments (7 mid-size), 3-Bed Big Apartment (1 unit sleeps 12), Freedom Square (3 units), Orbeliani 1 (2 units), Orbeliani 3 (1 unit Airbnb only). Primary guests: Arabic countries, Russia, Turkey. Peak season: Jul-Aug. High: May-Jun Sep. Low: Jan-Mar Nov-Dec. Channels: Booking.com + Expedia (GEL prices), Airbnb (EUR prices). Be concise and practical. Give actual GEL/EUR numbers when recommending prices.';
-
-    // Build contents with system context prepended as first message
-    const contextedHistory = chatHistory.length === 1
-      ? [{role: 'user', parts: [{text: systemText + '\n\nUser question: ' + msg}]}]
-      : [{role: 'user', parts: [{text: systemText}]}, {role: 'model', parts: [{text: 'Understood! I am ready to help with Maxela pricing.'}]}, ...chatHistory];
-
-    const payload = {
-      contents: contextedHistory,
-      generationConfig: {temperature: 0.7, maxOutputTokens: 500}
-    };
-
-    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=' + geminiKey;
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload)
-    });
-
-    const data = await resp.json();
-    const reply = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0].text)
-      ? data.candidates[0].content.parts[0].text
-      : 'Sorry, I could not generate a response.';
-
-    chatHistory.push({role: 'model', parts: [{text: reply}]});
-    removeThinking();
-    appendChatMsg('ai', reply);
-
-  } catch(e) {
-    removeThinking();
-    appendChatMsg('ai', 'Error: ' + e.message);
-  }
-  sendBtn.disabled = false;
-};
-
-function appendChatMsg(role, text, thinking) {
-  const messages = document.getElementById('chatMessages');
-  const div = document.createElement('div');
-  div.className = 'chat-msg ' + role;
-  if (thinking) div.id = 'thinking-msg';
-  const avatar = document.createElement('div');
-  avatar.className = 'chat-avatar ' + role;
-  avatar.textContent = role === 'ai' ? 'AI' : 'N';
-  const bubble = document.createElement('div');
-  bubble.className = 'chat-bubble' + (thinking ? ' chat-thinking' : '');
-  bubble.innerHTML = text.replace(/\n/g, '<br>');
-  div.appendChild(avatar);
-  div.appendChild(bubble);
-  messages.appendChild(div);
-  messages.scrollTop = messages.scrollHeight;
-}
-
-function removeThinking() {
-  const el = document.getElementById('thinking-msg');
-  if (el) el.remove();
-}
+// ── HELPERS ──
+function formatDate(s) { if (!s||s.length<10) return s||'—'; const d=new Date(s+'T12:00:00'); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
+function formatTs(ts) { if (!ts) return '—'; const d=ts.toDate?ts.toDate():new Date(ts); return d.toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}); }
+function showToast(msg,type='') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast show ${type}`; setTimeout(()=>t.className='toast',3000); }
 
 // ── INIT ──
-loadBasePct();
 selectSeason('peak');
 loadRules();
 </script>
