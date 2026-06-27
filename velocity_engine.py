@@ -247,9 +247,13 @@ def compute_prices_velocity(
             floor_eur   = config.get("floor_prices_eur",   {}).get(rt, {}).get(season, 0)
             ceiling_eur = config.get("ceiling_prices_eur", {}).get(rt, {}).get(season, 0)
             # Base price = ceiling × base_price_pct (adjustable per property)
+            # Base prices from startPrices/startPricesEur (set in pricing page)
+            # Fall back to base_price_pct of ceiling if not set
             base_pct    = config.get("base_price_pct", {}).get(rt, 0.90)
-            base_gel    = round_price(ceiling_gel * base_pct, rounding) if ceiling_gel > 0 else config.get("base_prices_gel", {}).get(rt, {}).get(season, 0)
-            base_eur    = round_price(ceiling_eur * base_pct, rounding) if ceiling_eur > 0 else config.get("base_prices_eur", {}).get(rt, {}).get(season, 0)
+            sp_gel      = config.get("startPrices", {}).get(rt, {}).get(season, 0)
+            sp_eur      = config.get("startPricesEur", {}).get(rt, {}).get(season, 0)
+            base_gel    = sp_gel if sp_gel > 0 else (round_price(ceiling_gel * base_pct, rounding) if ceiling_gel > 0 else 0)
+            base_eur    = sp_eur if sp_eur > 0 else (round_price(ceiling_eur * base_pct, rounding) if ceiling_eur > 0 else 0)
 
             # Per-date manual floor override
             date_override = config.get("date_overrides", {}).get(rt, {}).get(date_str)

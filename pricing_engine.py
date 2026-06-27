@@ -604,9 +604,32 @@ def main():
     if _db_for_ai:
         try:
             rules_snap = _db_for_ai.collection("pricing_config").document("rules").get()
-            if rules_snap.exists and rules_snap.to_dict().get("base_price_pct"):
-                config["base_price_pct"] = rules_snap.to_dict()["base_price_pct"]
-                print(f"  Loaded base_price_pct from Firestore.")
+            rules_data = rules_snap.to_dict() if rules_snap.exists else {}
+            if rules_data.get("base_price_pct"):
+                config["base_price_pct"] = rules_data["base_price_pct"]
+            if rules_data.get("startPrices"):
+                config["startPrices"] = rules_data["startPrices"]
+            if rules_data.get("startPricesEur"):
+                config["startPricesEur"] = rules_data["startPricesEur"]
+            if rules_data.get("priceRules"):
+                for rt, seasons in rules_data["priceRules"].items():
+                    for s, vals in seasons.items():
+                        if "floor_prices_gel" not in config: config["floor_prices_gel"] = {}
+                        if rt not in config["floor_prices_gel"]: config["floor_prices_gel"][rt] = {}
+                        if "ceiling_prices_gel" not in config: config["ceiling_prices_gel"] = {}
+                        if rt not in config["ceiling_prices_gel"]: config["ceiling_prices_gel"][rt] = {}
+                        config["floor_prices_gel"][rt][s] = vals.get("min", 0)
+                        config["ceiling_prices_gel"][rt][s] = vals.get("max", 0)
+            if rules_data.get("eurRules"):
+                for rt, seasons in rules_data["eurRules"].items():
+                    for s, vals in seasons.items():
+                        if "floor_prices_eur" not in config: config["floor_prices_eur"] = {}
+                        if rt not in config["floor_prices_eur"]: config["floor_prices_eur"][rt] = {}
+                        if "ceiling_prices_eur" not in config: config["ceiling_prices_eur"] = {}
+                        if rt not in config["ceiling_prices_eur"]: config["ceiling_prices_eur"][rt] = {}
+                        config["floor_prices_eur"][rt][s] = vals.get("min", 0)
+                        config["ceiling_prices_eur"][rt][s] = vals.get("max", 0)
+            print(f"  Loaded pricing rules from Firestore.")
         except Exception as _bpe:
             print(f"  Warning: could not load base_price_pct: {_bpe}", file=sys.stderr)
 
