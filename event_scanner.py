@@ -6,8 +6,6 @@ Saves pending events to Firestore for approval in SleepyPMS.
 Sends email notification for newly found events.
 """
 
-from __future__ import annotations
-
 import json
 import os
 import re
@@ -29,10 +27,24 @@ SERPAPI_URL    = "https://serpapi.com/search.json"
 SENDGRID_URL   = "https://api.sendgrid.com/v3/mail/send"
 
 SEARCH_QUERIES = [
-    "concerts in Tbilisi Georgia",
-    "festivals in Tbilisi Georgia",
-    "concerts in Rustavi Georgia",
-    "major events Tbilisi",
+    "concerts in Tbilisi Georgia 2026",
+    "festivals in Tbilisi Georgia 2026",
+    "concerts Rustavi International Motorpark 2026",
+    "major events Tbilisi 2026",
+    "international concerts Tbilisi 2026",
+    "Ricky Martin Tbilisi 2026",
+    "Till Lindemann Tbilisi 2026",
+]
+
+# Known major venues — any event here is significant regardless of ticket count
+MAJOR_VENUES = [
+    "rustavi international motorpark",
+    "rustavi motorpark",
+    "boris paichadze",
+    "dinamo arena",
+    "tbilisi sports palace",
+    "lisi wonderland",
+    "expo georgia",
 ]
 
 # 6+ ticket sources = major event
@@ -158,6 +170,12 @@ def is_major_event(event: dict) -> bool:
     for kw in SKIP_KEYWORDS:
         if kw in text:
             return False
+
+    # Always include events at major venues
+    venue = event.get("venue", {})
+    venue_name = (venue.get("name", "") if isinstance(venue, dict) else str(venue)).lower()
+    if any(v in venue_name for v in MAJOR_VENUES):
+        return True
 
     ticket_sources = len(event.get("ticket_info", []))
     return ticket_sources >= MIN_TICKET_SOURCES
