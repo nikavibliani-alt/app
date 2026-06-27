@@ -1,18 +1,24 @@
 """
-Velocity-Adjusted Dynamic Pricing Engine
-==========================================
-Replaces the old occupancy-tier system with a smarter algorithm based on:
-  1. Target Occupancy Curve — what occupancy SHOULD be at this lead time
-  2. Booking Velocity — are bookings actually arriving? (60% weight)
-  3. Occupancy Deficit — how far behind target are we? (40% weight)
-  4. Hybrid step drops — prevents runaway price crashes
-  5. Last-minute cascade — gradual drops in final 3 days
-  6. Max 5% change per run, max ~12% per day
+Velocity-Adjusted Dynamic Pricing Engine (Inverted Model)
+===========================================================
+Architecture: Start HIGH, drop only when behind target curve.
 
-Big Apartment has its own curve and uses a 14-30 day velocity window.
+Key principles:
+1. Default price = near ceiling (set in config as base_prices_gel)
+2. Engine ONLY drops prices — never raises from occupancy alone
+3. Raises only when significantly AHEAD of target curve (demand proven)
+4. Cancellation safe: room opens at last high price, not floor
+5. Floor = absolute last resort (same day, still empty)
+
+Pipeline:
+  Market State → Target Curve Check → Score → Step → Safety Limits → Publish
+
+Target Occupancy Curve (when should X% be booked):
+  Standard: 61-90d=0%, 31-60d=5-10%, 15-30d=15-25%, 4-14d=45-65%, 0-3d=85-100%
+  BIG_APT:  61-90d=10-15%, 31-60d=20-30%, 15-30d=40-50%, 4-14d=65-80%, 0-3d=85-100%
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 
@@ -20,7 +26,6 @@ from typing import Optional
 # TARGET OCCUPANCY CURVES
 # ---------------------------------------------------------------------------
 
-# Standard properties (Rooms, Maxela, Freedom, Orbe)
 STANDARD_CURVE = [
     {"days_min": 61, "days_max": 90, "target_min": 0,  "target_max": 10},
     {"days_min": 31, "days_max": 60, "target_min": 5,  "target_max": 10},
@@ -29,7 +34,6 @@ STANDARD_CURVE = [
     {"days_min":  0, "days_max":  3, "target_min": 85, "target_max": 100},
 ]
 
-# Big Apartment — books earlier, larger groups
 BIG_APT_CURVE = [
     {"days_min": 61, "days_max": 90, "target_min": 10, "target_max": 15},
     {"days_min": 31, "days_max": 60, "target_min": 20, "target_max": 30},
@@ -38,30 +42,14 @@ BIG_APT_CURVE = [
     {"days_min":  0, "days_max":  3, "target_min": 85, "target_max": 100},
 ]
 
-# Last-minute cascade percentages (fraction of way from current to floor)
-# Only applies if behind target AND within 3 days
+# Last-minute cascade: fraction of way from current to floor
+# Only triggers when behind target AND within 3 days
 CASCADE_STEPS = {
-    3: 0.15,   # 3 days: 15% of way toward floor
-    2: 0.45,   # 2 days: 45% of way toward floor
-    1: 0.75,   # 1 day:  75% of way toward floor
-    0: 1.00,   # same day: floor price
+    3: 0.10,   # 3 days: 10% toward floor (gentle nudge)
+    2: 0.35,   # 2 days: 35% toward floor
+    1: 0.65,   # 1 day:  65% toward floor
+    0: 1.00,   # same day: floor
 }
-
-# Hybrid step drops based on Price Score
-# Score = (occ_deficit% × 0.4) + (vel_deficit% × 0.6)
-STEP_DROPS = [
-    {"score_min":  0, "score_max": 10, "action": "hold",   "pct": 0.00},
-    {"score_min": 10, "score_max": 25, "action": "drop",   "pct": 0.03},
-    {"score_min": 25, "score_max": 50, "action": "drop",   "pct": 0.07},
-    {"score_min": 50, "score_max": 100,"action": "drop",   "pct": 0.12},
-]
-
-STEP_RAISES = [
-    {"score_min":  0, "score_max": 10, "action": "hold",   "pct": 0.00},
-    {"score_min": 10, "score_max": 25, "action": "raise",  "pct": 0.03},
-    {"score_min": 25, "score_max": 50, "action": "raise",  "pct": 0.07},
-    {"score_min": 50, "score_max": 100,"action": "raise",  "pct": 0.10},
-]
 
 MAX_CHANGE_PER_RUN = 0.05  # Never change more than 5% per run
 
@@ -71,113 +59,100 @@ MAX_CHANGE_PER_RUN = 0.05  # Never change more than 5% per run
 # ---------------------------------------------------------------------------
 
 def get_target_occupancy(days_ahead: int, is_big_apt: bool = False) -> tuple:
-    """Return (target_min%, target_max%) for given lead time."""
     curve = BIG_APT_CURVE if is_big_apt else STANDARD_CURVE
     for band in curve:
         if band["days_min"] <= days_ahead <= band["days_max"]:
             return band["target_min"], band["target_max"]
-    return 0, 10  # fallback for > 90 days
-
-
-def get_occupancy_deficit(occ_pct: float, target_min: float, target_max: float) -> float:
-    """
-    How far behind target are we?
-    Positive = behind target (should consider dropping)
-    Negative = ahead of target (should consider raising)
-    """
-    target_mid = (target_min + target_max) / 2
-    return target_mid - occ_pct  # positive = deficit, negative = surplus
+    return 0, 10
 
 
 def normalize_velocity(raw_bookings: int, total_units: int, lookback_days: int = 7) -> float:
-    """
-    Normalize booking count to a percentage of max possible room nights.
-    e.g. BIG_APT: 4 bookings / (1 unit × 7 days) = 57%
-         MAXELA:  4 bookings / (7 units × 7 days) = 8%
-    """
+    """Normalize booking count to % of max possible room nights."""
     max_possible = total_units * lookback_days
     room_nights = min(raw_bookings, max_possible)
-    return (room_nights / max_possible) * 100 if max_possible > 0 else 0
+    return (room_nights / max_possible * 100) if max_possible > 0 else 0
 
 
-def get_velocity_deficit(
-    velocity_7d: int,
+def calculate_score(
+    occ_pct: float,
+    tgt_min: float,
+    tgt_max: float,
+    vel_pct: float,
     days_ahead: int,
-    total_units: int,
-    is_big_apt: bool = False
-) -> float:
+) -> tuple:
     """
-    Velocity deficit as a percentage.
-    Compares normalized actual velocity vs expected velocity for this lead time.
-    Returns positive if booking too slowly (deficit), negative if booking fast (surplus).
+    Calculate pricing action score.
+    
+    Returns (score, action) where:
+      score > 0 → behind target → consider DROP
+      score < 0 → ahead of target → consider RAISE  
+      score ≈ 0 → on target → HOLD
+      
+    Velocity has 60% weight, occupancy deficit 40%.
     """
-    if days_ahead <= 0:
-        return 0
+    tgt_mid = (tgt_min + tgt_max) / 2
 
-    # Normalize actual velocity to % of capacity
-    lookback_days = 14 if is_big_apt else 7
-    actual_vel_pct = normalize_velocity(velocity_7d, total_units, lookback_days)
+    # Occupancy deficit: positive = behind
+    occ_deficit = tgt_mid - occ_pct
 
-    # Expected velocity % based on target occupancy curve
-    target_min, target_max = get_target_occupancy(days_ahead, is_big_apt)
-    target_mid = (target_min + target_max) / 2
-
-    # Expected weekly fill rate: target% / weeks_remaining
+    # Velocity deficit: are bookings arriving fast enough?
+    # Expected weekly velocity = target% / weeks remaining
     weeks_remaining = max(days_ahead / 7, 0.5)
-    expected_vel_pct = target_mid / weeks_remaining
+    expected_vel_pct = tgt_mid / weeks_remaining
+    vel_deficit = expected_vel_pct - vel_pct
 
-    # Deficit: positive = behind (should consider dropping)
-    # Negative = ahead (should consider raising)
-    deficit = expected_vel_pct - actual_vel_pct
-    return max(-100, min(100, deficit))
+    # Combined score (positive = should drop, negative = could raise)
+    score = (occ_deficit * 0.4) + (vel_deficit * 0.6)
 
-
-def calculate_price_score(occ_deficit: float, vel_deficit: float) -> float:
-    """
-    Combined score: positive = should drop, negative = should raise.
-    Velocity has 60% weight, occupancy 40%.
-    """
-    return (occ_deficit * 0.4) + (vel_deficit * 0.6)
-
-
-def apply_step(current_price: float, score: float, floor: float, ceiling: float) -> tuple:
-    """
-    Apply hybrid step drops/raises based on score.
-    Returns (proposed_price, action_taken, pct_change).
-    """
-    abs_score = abs(score)
-
-    if score > 0:
-        # Should drop
-        steps = STEP_DROPS
-        direction = -1
+    if score > 50:
+        action = "drop_large"
+    elif score > 25:
+        action = "drop_medium"
+    elif score > 10:
+        action = "drop_small"
+    elif score < -25:
+        action = "raise"
     else:
-        # Should raise
-        steps = STEP_RAISES
-        direction = 1
-        abs_score = abs(score)
+        action = "hold"
 
-    pct = 0.0
-    action = "hold"
-    for step in steps:
-        if step["score_min"] <= abs_score < step["score_max"]:
-            pct = step["pct"]
-            action = step["action"]
-            break
+    return score, action
 
-    # Apply change, capped at MAX_CHANGE_PER_RUN
-    pct = min(pct, MAX_CHANGE_PER_RUN)
-    proposed = current_price * (1 + direction * pct)
+
+def apply_inverted_step(
+    current_price: float,
+    action: str,
+    floor: float,
+    ceiling: float,
+) -> tuple:
+    """
+    Apply price change based on action.
+    Inverted model: drops are common, raises are rare.
+    Returns (proposed_price, pct_change)
+    """
+    drop_map  = {"drop_large": 0.07, "drop_medium": 0.04, "drop_small": 0.02}
+    raise_pct = 0.03  # Raises are small and cautious
+
+    if action in drop_map:
+        pct = min(drop_map[action], MAX_CHANGE_PER_RUN)
+        proposed = current_price * (1 - pct)
+    elif action == "raise":
+        pct = min(raise_pct, MAX_CHANGE_PER_RUN)
+        proposed = current_price * (1 + pct)
+        pct = -pct  # negative = raise
+    else:
+        return current_price, 0.0
 
     # Enforce boundaries
     proposed = max(proposed, floor)
-    proposed = min(proposed, ceiling)
+    if ceiling > 0:
+        proposed = min(proposed, ceiling)
 
-    return proposed, action, pct * direction
+    actual_pct = (proposed - current_price) / current_price if current_price > 0 else 0
+    return proposed, actual_pct
 
 
 def apply_cascade(current_price: float, floor: float, days_ahead: int) -> float:
-    """Apply last-minute cascade — gradual move toward floor."""
+    """Last-minute cascade toward floor."""
     if days_ahead not in CASCADE_STEPS:
         return current_price
     fraction = CASCADE_STEPS[days_ahead]
@@ -199,15 +174,13 @@ def compute_prices_velocity(
     todays_changes: dict = None,
 ) -> dict:
     """
-    Main pricing function using velocity-adjusted dynamic pricing.
-
-    velocity format (from price_tracker.get_booking_velocity):
-    {
-      "ROOMS": {"bookings_last_7d": 3, "bookings_last_14d": 5, ...},
-      ...
-    }
-
-    Returns same format as old compute_prices() for compatibility.
+    Inverted-model pricing engine.
+    
+    - Starts from base_prices_gel (set near ceiling)
+    - Only drops when behind target occupancy curve
+    - Raises cautiously when significantly ahead of target
+    - Last-minute cascade only for genuinely empty near dates
+    - Never changes more than 5% per run
     """
     from pricing_engine import (
         get_season, get_price_from_rates, days_until,
@@ -246,12 +219,10 @@ def compute_prices_velocity(
         total_units  = config["unit_counts"].get(rt, 1)
         channels     = CHANNEL_MATRIX[rt]
         is_big_apt   = (rt == "BIG_APT")
-        vel_data         = velocity.get(rt, {})
-        # BIG_APT uses 14d window, others use 7d
-        lookback_days    = 14 if is_big_apt else 7
-        vel_bookings_raw = vel_data.get("bookings_last_14d", 0) if is_big_apt else vel_data.get("bookings_last_7d", 0)
-        # Normalize velocity to % of max capacity
-        vel_pct_actual   = normalize_velocity(vel_bookings_raw, total_units, lookback_days)
+        vel_data     = velocity.get(rt, {})
+        lookback_days = 14 if is_big_apt else 7
+        vel_raw      = vel_data.get("bookings_last_14d", 0) if is_big_apt else vel_data.get("bookings_last_7d", 0)
+        vel_pct      = normalize_velocity(vel_raw, total_units, lookback_days)
         results[rt]  = []
 
         for date_str in sorted(avail_map[rt].keys()):
@@ -270,11 +241,15 @@ def compute_prices_velocity(
                 })
                 continue
 
-            # Get boundaries
+            # Get boundaries from config
             floor_gel   = config.get("floor_prices_gel",   {}).get(rt, {}).get(season, 0)
             ceiling_gel = config.get("ceiling_prices_gel", {}).get(rt, {}).get(season, 0)
             floor_eur   = config.get("floor_prices_eur",   {}).get(rt, {}).get(season, 0)
             ceiling_eur = config.get("ceiling_prices_eur", {}).get(rt, {}).get(season, 0)
+            # Base price = ceiling × base_price_pct (adjustable per property)
+            base_pct    = config.get("base_price_pct", {}).get(rt, 0.90)
+            base_gel    = round_price(ceiling_gel * base_pct, rounding) if ceiling_gel > 0 else config.get("base_prices_gel", {}).get(rt, {}).get(season, 0)
+            base_eur    = round_price(ceiling_eur * base_pct, rounding) if ceiling_eur > 0 else config.get("base_prices_eur", {}).get(rt, {}).get(season, 0)
 
             # Per-date manual floor override
             date_override = config.get("date_overrides", {}).get(rt, {}).get(date_str)
@@ -291,33 +266,26 @@ def compute_prices_velocity(
                     event_mult  = ev.get("multiplier", 1.0)
                     event_label = ev.get("label", "event")
 
-            # Occupancy %
-            booked      = total_units - avail
-            occ_pct     = (booked / total_units) * 100
+            # Occupancy
+            booked  = total_units - avail
+            occ_pct = (booked / total_units) * 100
 
-            # Target occupancy for this lead time
+            # Target curve
             tgt_min, tgt_max = get_target_occupancy(days, is_big_apt)
 
-            # Occupancy deficit
-            occ_deficit = get_occupancy_deficit(occ_pct, tgt_min, tgt_max)
-
-            # Velocity deficit
-            vel_deficit = get_velocity_deficit(vel_bookings_raw, days, total_units, is_big_apt)
-
-            # Combined score
-            score = calculate_price_score(occ_deficit, vel_deficit)
+            # Score and action
+            score, action = calculate_score(occ_pct, tgt_min, tgt_max, vel_pct, days)
 
             # ── GEL PRICE ──
             proposed_gel = prices["gel"]
             gel_reason   = ""
 
             if channels.get("booking") or channels.get("expedia"):
-                base_gel = config.get("base_prices_gel", {}).get(rt, {}).get(season, 0)
 
                 if prices["gel"] == 0 and base_gel > 0:
-                    # Not set yet — use base
+                    # Not set yet — start at base (near ceiling)
                     proposed_gel = base_gel * event_mult
-                    gel_reason   = f"unset→base {base_gel}₾ season={season}"
+                    gel_reason   = f"unset→base {base_gel}₾"
 
                 elif prices["gel"] > 0:
                     # Check per-day cap
@@ -328,25 +296,27 @@ def compute_prices_velocity(
                         proposed_gel = prices["gel"]
                         gel_reason   = "already updated today"
                     else:
-                        # Last-minute cascade (if behind target)
-                        if days <= 3 and occ_deficit > 5 and floor_gel > 0:
+                        # Last-minute cascade (only if genuinely behind)
+                        if days <= 3 and score > 20 and floor_gel > 0:
                             proposed_gel = apply_cascade(prices["gel"], floor_gel, days)
-                            gel_reason   = f"CASCADE day={days} occ={occ_pct:.0f}% target={tgt_min}-{tgt_max}%"
+                            gel_reason   = f"CASCADE day={days} occ={occ_pct:.0f}% tgt={tgt_min}-{tgt_max}%"
                         else:
-                            # Apply velocity-adjusted score
-                            eff_score  = score * event_mult
-                            proposed_gel, action, pct = apply_step(
-                                prices["gel"], eff_score, floor_gel, ceiling_gel or 99999
+                            # Apply inverted step
+                            eff_action = action
+                            if event_mult > 1.0:
+                                eff_action = "raise"
+                            proposed_gel, pct = apply_inverted_step(
+                                prices["gel"], eff_action, floor_gel, ceiling_gel or 99999
                             )
                             gel_reason = (
                                 f"occ={occ_pct:.0f}% tgt={tgt_min}-{tgt_max}% "
-                                f"vel={vel_bookings_raw}bk({vel_pct_actual:.0f}%) score={score:.0f} {action}({pct:+.1%})"
+                                f"vel={vel_raw}bk({vel_pct:.0f}%) score={score:.0f} {eff_action}({pct:+.1%})"
                             )
                             if event_label:
                                 gel_reason += f" +{event_label}"
 
-                # STRICT boundary enforcement — always applied last
-                if ceiling_gel > 0:
+                # STRICT boundary enforcement
+                if ceiling_gel > 0 and event_mult == 1.0:
                     proposed_gel = min(proposed_gel, ceiling_gel)
                 if floor_gel > 0:
                     proposed_gel = max(proposed_gel, floor_gel)
@@ -356,8 +326,6 @@ def compute_prices_velocity(
             proposed_eur = prices["eur"]
 
             if channels.get("airbnb"):
-                base_eur = config.get("base_prices_eur", {}).get(rt, {}).get(season, 0)
-
                 if prices["eur"] == 0 and base_eur > 0:
                     proposed_eur = base_eur * event_mult
 
@@ -368,15 +336,15 @@ def compute_prices_velocity(
                     if already_eur and event_mult == 1.0:
                         proposed_eur = prices["eur"]
                     else:
-                        if days <= 3 and occ_deficit > 5 and floor_eur > 0:
+                        if days <= 3 and score > 20 and floor_eur > 0:
                             proposed_eur = apply_cascade(prices["eur"], floor_eur, days)
                         else:
-                            proposed_eur, _, _ = apply_step(
-                                prices["eur"], score, floor_eur, ceiling_eur or 99999
+                            eff_action = "raise" if event_mult > 1.0 else action
+                            proposed_eur, _ = apply_inverted_step(
+                                prices["eur"], eff_action, floor_eur, ceiling_eur or 99999
                             )
 
-                # STRICT EUR boundary enforcement
-                if ceiling_eur > 0:
+                if ceiling_eur > 0 and event_mult == 1.0:
                     proposed_eur = min(proposed_eur, ceiling_eur)
                 if floor_eur > 0:
                     proposed_eur = max(proposed_eur, floor_eur)
@@ -396,7 +364,7 @@ def compute_prices_velocity(
                 "season":        season,
                 "skip":          False,
                 "changed":       gel_changed or eur_changed,
-                "reason":        gel_reason or f"occ={occ_pct:.0f}% score={score:.0f}",
+                "reason":        gel_reason or f"occ={occ_pct:.0f}% score={score:.0f} {action}",
             })
 
     return results

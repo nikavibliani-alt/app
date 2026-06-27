@@ -486,6 +486,25 @@
   </div>
 
 
+
+  <!-- BASE PRICE % CONTROL -->
+  <div class="card" style="margin-top:16px;">
+    <div class="card-header">
+      <span class="card-title">📊 Starting Price Level</span>
+      <span style="font-size:12px;color:var(--muted)">% of ceiling price the engine starts from</span>
+    </div>
+    <div style="padding:16px;">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">
+        Engine starts at this % of your max price and drops toward min based on demand. 
+        Higher % = more room to drop. Lower % = more conservative start.
+      </p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;" id="basePctGrid">
+        <!-- Filled by JS -->
+      </div>
+      <button class="btn btn-primary" style="margin-top:12px;" onclick="saveBasePct()">Save Starting Prices</button>
+    </div>
+  </div>
+
   <!-- AI CHAT -->
   <div class="card">
     <div class="card-header">
@@ -971,6 +990,45 @@ window.dismissRec = async (id) => {
 
 
 
+
+// ── BASE PRICE PCT ──
+const PROPERTY_NAMES = {
+  'ROOMS': 'Rooms', 'MAXELA': 'Maxela', 'BIG_APT': 'Big Apartment',
+  'FREEDOM': 'Freedom Square', 'ORBE_1': 'Orbeliani 1', 'ORBE_2': 'Orbeliani 3'
+};
+
+async function loadBasePct() {
+  try {
+    const snap = await getDoc(doc(db, 'pricing_config', 'rules'));
+    const data = snap.exists() ? snap.data() : {};
+    const pcts = data.base_price_pct || {};
+    const grid = document.getElementById('basePctGrid');
+    if (!grid) return;
+    grid.innerHTML = Object.entries(PROPERTY_NAMES).map(([rt, name]) => {
+      const pct = Math.round((pcts[rt] || 0.90) * 100);
+      return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px;">${name}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="range" min="70" max="100" value="${pct}" 
+            oninput="this.nextElementSibling.textContent=this.value+'%'"
+            style="flex:1;" data-rt="${rt}">
+          <span style="font-size:13px;font-weight:600;min-width:36px;">${pct}%</span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error('loadBasePct:', e); }
+}
+
+window.saveBasePct = async function() {
+  try {
+    const inputs = document.querySelectorAll('#basePctGrid input[data-rt]');
+    const pcts = {};
+    inputs.forEach(inp => { pcts[inp.dataset.rt] = parseInt(inp.value) / 100; });
+    await setDoc(doc(db, 'pricing_config', 'rules'), { base_price_pct: pcts }, { merge: true });
+    alert('Starting prices saved!');
+  } catch(e) { alert('Error: ' + e.message); }
+};
+
 // ── AI CHAT ──
 const chatHistory = [];
 
@@ -1055,6 +1113,7 @@ function removeThinking() {
 }
 
 // ── INIT ──
+loadBasePct();
 selectSeason('peak');
 loadRules();
 </script>

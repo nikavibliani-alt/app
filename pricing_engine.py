@@ -600,6 +600,16 @@ def main():
     if _db_for_ai:
         record_outcomes(raw)
 
+    # Load base_price_pct from Firestore (set from pricing page)
+    if _db_for_ai:
+        try:
+            rules_snap = _db_for_ai.collection("pricing_config").document("rules").get()
+            if rules_snap.exists and rules_snap.to_dict().get("base_price_pct"):
+                config["base_price_pct"] = rules_snap.to_dict()["base_price_pct"]
+                print(f"  Loaded base_price_pct from Firestore.")
+        except Exception as _bpe:
+            print(f"  Warning: could not load base_price_pct: {_bpe}", file=sys.stderr)
+
     print("Computing prices (AI mode)...")
     # Try AI pricing first, fall back to rule-based if Gemini unavailable
 

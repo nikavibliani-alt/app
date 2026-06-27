@@ -80,96 +80,96 @@
   ],
   "base_prices_gel": {
     "ROOMS": {
-      "low": 85,
-      "mid": 105,
-      "high": 120,
-      "peak": 140,
-      "xmas_low": 90,
-      "new_year": 140
+      "low": 145,
+      "mid": 150,
+      "high": 155,
+      "peak": 160,
+      "xmas_low": 145,
+      "new_year": 190
     },
     "MAXELA": {
-      "low": 160,
-      "mid": 190,
-      "high": 220,
-      "peak": 270,
-      "xmas_low": 170,
-      "new_year": 250
+      "low": 245,
+      "mid": 255,
+      "high": 260,
+      "peak": 265,
+      "xmas_low": 250,
+      "new_year": 330
     },
     "BIG_APT": {
-      "low": 290,
-      "mid": 410,
-      "high": 520,
-      "peak": 680,
-      "xmas_low": 370,
-      "new_year": 520
+      "low": 600,
+      "mid": 630,
+      "high": 670,
+      "peak": 700,
+      "xmas_low": 610,
+      "new_year": 800
     },
     "FREEDOM": {
-      "low": 185,
-      "mid": 245,
-      "high": 265,
-      "peak": 285,
-      "xmas_low": 215,
-      "new_year": 320
+      "low": 245,
+      "mid": 255,
+      "high": 260,
+      "peak": 265,
+      "xmas_low": 250,
+      "new_year": 330
     },
     "ORBE_1": {
       "low": 225,
-      "mid": 245,
-      "high": 260,
-      "peak": 290,
-      "xmas_low": 238,
-      "new_year": 265
+      "mid": 235,
+      "high": 245,
+      "peak": 255,
+      "xmas_low": 230,
+      "new_year": 300
     }
   },
   "base_prices_eur": {
     "BIG_APT": {
-      "low": 75,
-      "mid": 110,
+      "low": 150,
+      "mid": 155,
       "high": 160,
-      "peak": 185,
-      "xmas_low": 95,
-      "new_year": 140
+      "peak": 170,
+      "xmas_low": 150,
+      "new_year": 190
     },
     "FREEDOM": {
-      "low": 45,
+      "low": 58,
       "mid": 60,
-      "high": 65,
-      "peak": 75,
-      "xmas_low": 52,
-      "new_year": 85
+      "high": 63,
+      "peak": 65,
+      "xmas_low": 58,
+      "new_year": 80
     },
     "ORBE_1": {
-      "low": 42,
-      "mid": 52,
-      "high": 58,
-      "peak": 68,
-      "xmas_low": 48,
-      "new_year": 60
+      "low": 54,
+      "mid": 56,
+      "high": 59,
+      "peak": 61,
+      "xmas_low": 54,
+      "new_year": 72
     },
     "ORBE_2": {
-      "low": 40,
-      "mid": 50,
-      "high": 58,
-      "peak": 65,
-      "xmas_low": 45,
-      "new_year": 75
+      "low": 54,
+      "mid": 56,
+      "high": 59,
+      "peak": 61,
+      "xmas_low": 54,
+      "new_year": 72
     }
   },
   "floor_prices_gel": {
     "ROOMS": {
-      "low": 80,
-      "mid": 80,
-      "high": 80,
-      "peak": 80,
-      "xmas_low": 80,
-      "new_year": 100
+      "low": 100,
+      "mid": 100,
+      "high": 105,
+      "peak": 110,
+      "xmas_low": 100,
+      "new_year": 120
     },
     "MAXELA": {
-      "low": 180,
+      "low": 170,
       "mid": 180,
-      "high": 180,
-      "peak": 180,
-      "xmas_low": 180,
-      "new_year": 200
+      "high": 190,
+      "peak": 200,
+      "xmas_low": 175,
+      "new_year": 220
     },
     "BIG_APT": {
       "low": 400,
@@ -180,54 +180,54 @@
       "new_year": 550
     },
     "FREEDOM": {
-      "low": 180,
+      "low": 170,
       "mid": 180,
-      "high": 180,
-      "peak": 180,
-      "xmas_low": 180,
-      "new_year": 200
+      "high": 190,
+      "peak": 200,
+      "xmas_low": 175,
+      "new_year": 220
     },
     "ORBE_1": {
-      "low": 180,
-      "mid": 180,
+      "low": 160,
+      "mid": 170,
       "high": 180,
-      "peak": 180,
-      "xmas_low": 180,
-      "new_year": 200
+      "peak": 190,
+      "xmas_low": 165,
+      "new_year": 210
     }
   },
   "floor_prices_eur": {
     "BIG_APT": {
       "low": 100,
       "mid": 110,
-      "high": 130,
-      "peak": 140,
+      "high": 120,
+      "peak": 130,
       "xmas_low": 100,
       "new_year": 150
     },
     "FREEDOM": {
-      "low": 35,
-      "mid": 35,
-      "high": 40,
-      "peak": 40,
-      "xmas_low": 35,
-      "new_year": 50
+      "low": 40,
+      "mid": 42,
+      "high": 45,
+      "peak": 50,
+      "xmas_low": 40,
+      "new_year": 60
     },
     "ORBE_1": {
-      "low": 35,
-      "mid": 35,
-      "high": 40,
-      "peak": 40,
-      "xmas_low": 35,
-      "new_year": 50
+      "low": 38,
+      "mid": 40,
+      "high": 42,
+      "peak": 48,
+      "xmas_low": 38,
+      "new_year": 55
     },
     "ORBE_2": {
-      "low": 35,
-      "mid": 35,
-      "high": 40,
-      "peak": 40,
-      "xmas_low": 35,
-      "new_year": 50
+      "low": 38,
+      "mid": 40,
+      "high": 42,
+      "peak": 48,
+      "xmas_low": 38,
+      "new_year": 55
     }
   },
   "event_premiums": {
@@ -289,79 +289,87 @@
   },
   "ceiling_prices_gel": {
     "ROOMS": {
-      "low": 180,
-      "mid": 200,
-      "high": 220,
-      "peak": 250,
-      "xmas_low": 190,
-      "new_year": 280
+      "low": 155,
+      "mid": 160,
+      "high": 165,
+      "peak": 170,
+      "xmas_low": 155,
+      "new_year": 200
     },
     "MAXELA": {
-      "low": 320,
-      "mid": 350,
-      "high": 380,
-      "peak": 420,
-      "xmas_low": 330,
-      "new_year": 480
+      "low": 260,
+      "mid": 270,
+      "high": 275,
+      "peak": 280,
+      "xmas_low": 265,
+      "new_year": 350
     },
     "BIG_APT": {
-      "low": 800,
-      "mid": 850,
-      "high": 900,
-      "peak": 950,
-      "xmas_low": 820,
-      "new_year": 1000
+      "low": 650,
+      "mid": 680,
+      "high": 720,
+      "peak": 750,
+      "xmas_low": 660,
+      "new_year": 850
     },
     "FREEDOM": {
-      "low": 320,
-      "mid": 350,
-      "high": 380,
-      "peak": 420,
-      "xmas_low": 330,
-      "new_year": 480
+      "low": 260,
+      "mid": 270,
+      "high": 275,
+      "peak": 280,
+      "xmas_low": 265,
+      "new_year": 350
     },
     "ORBE_1": {
-      "low": 300,
-      "mid": 320,
-      "high": 350,
-      "peak": 380,
-      "xmas_low": 310,
-      "new_year": 420
+      "low": 240,
+      "mid": 250,
+      "high": 260,
+      "peak": 270,
+      "xmas_low": 245,
+      "new_year": 320
     }
   },
   "ceiling_prices_eur": {
     "BIG_APT": {
-      "low": 180,
-      "mid": 180,
-      "high": 180,
+      "low": 160,
+      "mid": 165,
+      "high": 170,
       "peak": 180,
-      "xmas_low": 180,
-      "new_year": 220
+      "xmas_low": 160,
+      "new_year": 200
     },
     "FREEDOM": {
-      "low": 70,
-      "mid": 70,
-      "high": 70,
+      "low": 62,
+      "mid": 65,
+      "high": 68,
       "peak": 70,
-      "xmas_low": 70,
-      "new_year": 90
+      "xmas_low": 62,
+      "new_year": 85
     },
     "ORBE_1": {
-      "low": 70,
-      "mid": 70,
-      "high": 70,
-      "peak": 70,
-      "xmas_low": 70,
-      "new_year": 90
+      "low": 58,
+      "mid": 60,
+      "high": 63,
+      "peak": 65,
+      "xmas_low": 58,
+      "new_year": 78
     },
     "ORBE_2": {
-      "low": 70,
-      "mid": 70,
-      "high": 70,
-      "peak": 70,
-      "xmas_low": 70,
-      "new_year": 90
+      "low": 58,
+      "mid": 60,
+      "high": 63,
+      "peak": 65,
+      "xmas_low": 58,
+      "new_year": 78
     }
   },
-  "_pricing_engine": "velocity-adjusted (see velocity_engine.py)"
+  "_pricing_engine": "inverted-model v2 (start high, drop only when behind target)",
+  "base_price_pct": {
+    "ROOMS": 0.9,
+    "MAXELA": 0.9,
+    "BIG_APT": 0.9,
+    "FREEDOM": 0.9,
+    "ORBE_1": 0.9,
+    "ORBE_2": 0.9
+  }
 }
