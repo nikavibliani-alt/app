@@ -322,6 +322,10 @@ def compute_prices_velocity(
                 # STRICT boundary enforcement
                 if ceiling_gel > 0 and event_mult == 1.0:
                     proposed_gel = min(proposed_gel, ceiling_gel)
+                # Correct prices already above ceiling — bypasses score and daily cap
+                if ceiling_gel > 0 and prices["gel"] > ceiling_gel:
+                    proposed_gel = ceiling_gel
+                    gel_reason = f"above-ceiling correction: {prices['gel']:.0f}₾ → {ceiling_gel:.0f}₾"
                 if floor_gel > 0:
                     proposed_gel = max(proposed_gel, floor_gel)
                 proposed_gel = round_price(proposed_gel, rounding)
@@ -350,6 +354,9 @@ def compute_prices_velocity(
 
                 if ceiling_eur > 0 and event_mult == 1.0:
                     proposed_eur = min(proposed_eur, ceiling_eur)
+                # Correct prices already above ceiling — bypasses score and daily cap
+                if ceiling_eur > 0 and prices["eur"] > ceiling_eur:
+                    proposed_eur = ceiling_eur
                 if floor_eur > 0:
                     proposed_eur = max(proposed_eur, floor_eur)
                 proposed_eur = round_price(proposed_eur, rounding)
