@@ -716,13 +716,13 @@ function tbilisiHour(){
   }).format(new Date()),10);
 }
 
-function isUnlocked(){
+function isUnlocked(res){
   if(!guestData)return false;
   if(guestData.manualUnlock)return true;
 
-  // Use active reservation dates so unlock persists for the full stay
-  const ci=activeReservation?.checkin||activeReservation?.checkIn||'';
-  const co=activeReservation?.checkout||activeReservation?.checkOut||'';
+  const r=res||activeReservation;
+  const ci=(r?.checkin||r?.checkIn||'');
+  const co=(r?.checkout||r?.checkOut||'');
   if(!ci||!co)return false;
 
   const today=tbilisiToday();
@@ -922,11 +922,11 @@ function renderGreetingApt(){
     const nm=esc(APT_NAMES[res.roomCode]||res.roomCode||'Unknown room');
     const dates=esc(fmtStay(res.checkin)+' – '+fmtStay(res.checkout));
     const active=res.roomCode===aptId;
-    // Use data attributes — avoids double-quote collision in onclick="..."
+    const unlocked=isUnlocked(res);
     html+='<button class="apt-card'+(active?' apt-card--active':'')+'" data-room="'+esc(res.roomCode)+'">';
     html+='<div class="apt-card__name">'+nm+(active?' <span style="font-size:11px;color:var(--accent);font-weight:500;">✓ active</span>':'')+'</div>';
     html+='<div class="apt-card__dates">'+dates+'</div>';
-    html+='<div class="apt-card__sub">Maxela · Tbilisi</div>';
+    html+='<div class="apt-card__sub">Maxela · Tbilisi'+(unlocked?' · <span style="color:var(--accent)">Ready</span>':' · <span style="color:var(--muted)">Locked</span>')+'</div>';
     html+='</button>';
   }
   html+='</div>';
@@ -1213,7 +1213,7 @@ function showHome(){
 }
 
 function renderTiles(){
-  const u=isUnlocked();
+  const u=isUnlocked(activeReservation);
   const _ARR=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
   const ssid=(aptData&&aptData.wifiName)?aptData.wifiName:'';
   document.getElementById('tiles-grid').innerHTML=`
