@@ -165,12 +165,14 @@ def sync_to_firestore(db, reservations):
     count = 0
     skipped = 0
 
-    # Detect which reservation numbers appear more than once (different rooms)
+    # Detect which reservation numbers appear more than once with different valid rooms
     res_num_counts = {}
     for r in reservations:
         if r.get('roomNumber', '') in SKIP_ROOMS:
             continue
         if r.get('status', '') not in VALID_STATUSES:
+            continue
+        if r.get('roomNumber', '') not in ROOM_MAP:
             continue
         rn = r.get('reservationNumber', '')
         if rn:
