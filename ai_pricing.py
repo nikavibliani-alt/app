@@ -383,21 +383,21 @@ def ai_compute_prices(raw_data: list, config: dict, db=None) -> dict:
         prompt = build_prompt_single(rt, info["dates"], config, velocity, events, learning_context)
         ai_response = None
 
-        for attempt in range(5):
+        for attempt in range(2):
             try:
                 ai_response = call_gemini(prompt, gemini_key)
                 break
             except requests.exceptions.HTTPError as e:
                 status_code = e.response.status_code if e.response is not None else 0
-                if status_code in (429, 503) and attempt < 4:
-                    wait = 15 * (2 ** attempt)  # 15s, 30s, 60s, 120s
-                    print(f"  [Attempt {attempt+1}/5] Gemini {status_code} on {rt}, sleeping {wait}s...", file=sys.stderr)
+                if status_code in (429, 503) and attempt < 1:
+                    wait = min(20, 15 * (2 ** attempt))  # 15s max per retry, 20s hard cap
+                    print(f"  [Attempt {attempt+1}/2] Gemini {status_code} on {rt}, sleeping {wait}s...", file=sys.stderr)
                     time.sleep(wait)
                 else:
-                    print(f"  [CRITICAL] Gemini HTTP error on {rt}: {e} — skipping", file=sys.stderr)
+                    print(f"  Gemini HTTP error on {rt}: {e} — skipping", file=sys.stderr)
                     break
             except Exception as e:
-                print(f"  [CRITICAL] Unexpected error on {rt}: {e} — skipping", file=sys.stderr)
+                print(f"  Gemini error on {rt}: {e} — skipping", file=sys.stderr)
                 break
 
         if ai_response:

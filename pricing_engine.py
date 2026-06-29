@@ -21,6 +21,7 @@ Usage:
 """
 
 import argparse
+import concurrent.futures
 import json
 import sys
 import time
@@ -646,11 +647,15 @@ def main():
     print("  Running velocity-adjusted pricing engine...")
     results = compute_prices_velocity(raw, config, velocity, todays_changes)
 
-    # Run AI in background (non-blocking) for daily boundary suggestions
+    # Run AI review with a hard timeout — never block the engine for more than 90s
     try:
-        ai_results = ai_compute_prices(raw, config, db=_db_for_ai)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _ai_pool:
+            _ai_future = _ai_pool.submit(ai_compute_prices, raw, config, _db_for_ai)
+            ai_results = _ai_future.result(timeout=90)
         if ai_results:
             print("  AI boundary suggestions processed.")
+    except concurrent.futures.TimeoutError:
+        print("  AI review timed out (>90s) — skipped.", file=sys.stderr)
     except Exception as _ai_e:
         print(f"  AI review skipped: {_ai_e}", file=sys.stderr)
 
