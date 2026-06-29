@@ -186,6 +186,11 @@ def sync_to_firestore(db, reservations):
             doc_id = f"{doc_id}_{member_id}"
 
         ref = coll.document(doc_id)
+        existing = ref.get()
+        if existing.exists and existing.to_dict().get('manualRoom'):
+            doc.pop('roomCode', None)
+            doc.pop('allRooms', None)
+            doc.pop('minihotelRoom', None)
         batch.set(ref, doc, merge=True)
         count += 1
 
