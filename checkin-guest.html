@@ -1194,13 +1194,10 @@ function showHome(){
         const matchedId=guestData?.matchedReservationId;
         if(matchedId){
           activeReservation=all.find(r=>r.id===matchedId)||null;
-        }else{
-          // Fall back: active reservation preferring one with tuyaPassword
-          const matches=all.filter(r=>{
-            const ci=r.checkin||r.checkIn||'';
-            const co=r.checkout||r.checkOut||'';
-            return ci&&co&&ci<=today&&co>today;
-          });
+        }
+        if(!activeReservation){
+          // Fall back: nearest upcoming or current reservation, preferring one with tuyaPassword
+          const matches=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>today;});
           const withPassword=matches.filter(r=>r.tuyaPassword);
           const sorted=(withPassword.length?withPassword:matches)
             .sort((a,b)=>((a.checkin||a.checkIn||'')<(b.checkin||b.checkIn||''))?-1:1);
@@ -1317,7 +1314,7 @@ function buildContactHero({labelText,message,kind='apartment'}){
 }
 
 window.openPage=function(type){
-  if((type==='checkin'||type==='wifi')&&!isUnlocked()){openLocked();return;}
+  if((type==='checkin'||type==='wifi')&&!isUnlocked(activeReservation)){openLocked(activeReservation);return;}
   const d=aptData||{};
   const titles={checkin:t('tc'),wifi:t('tw'),services:t('tsv'),recs:t('tr'),rules:t('tru'),contact:t('tco')};
   let body='';
@@ -1444,8 +1441,8 @@ window.openPage=function(type){
   openSubpage(titles[type]||'',body);
 }
 
-function fmtCheckinAvailable(){
-  const ci=activeReservation?.checkin||activeReservation?.checkIn||'';
+function fmtCheckinAvailable(res){
+  const ci=(res||activeReservation)?.checkin||(res||activeReservation)?.checkIn||'';
   if(!ci)return '';
   const p=ci.split('-');
   if(p.length<3)return ci;
@@ -1455,12 +1452,13 @@ function fmtCheckinAvailable(){
   return`${day} ${mon} at ${String(getCheckInHour()).padStart(2,'0')}:00`;
 }
 
-function openLocked(){
+function openLocked(res){
+  const r=res||activeReservation;
   openSubpage(t('tc'),`<div class="locked-card">
     <div class="lc-icon">🔒</div>
     <div class="lc-title">${t('lt')}</div>
     <div class="lc-sub" style="margin-bottom:0">${t('ls')}</div>
-    <div style="margin-top:14px;font-size:17px;font-weight:500;color:var(--ink);">Available from ${esc(fmtCheckinAvailable())}</div>
+    <div style="margin-top:14px;font-size:17px;font-weight:500;color:var(--ink);">Available from ${esc(fmtCheckinAvailable(r))}</div>
   </div>`);
 }
 
