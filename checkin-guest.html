@@ -962,8 +962,9 @@ window.switchApt=async function(newRoomCode){
   onSnapshot(
     query(collection(db,'reservations'),where('roomCode','==',aptId)),
     snap=>{
-      const all=snap.docs.map(d=>({id:d.id,...d.data()}));
-      const matches=all.filter(r=>{const ci=r.checkin||r.checkIn||'';const co=r.checkout||r.checkOut||'';return ci&&co&&ci<=today&&co>today;});
+      const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
+      // Include upcoming reservations (checkin in future) and current stays
+      const matches=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>today;});
       const withPw=matches.filter(r=>r.tuyaPassword);
       const sorted=(withPw.length?withPw:matches).sort((a,b)=>((a.checkin||a.checkIn||'')<(b.checkin||b.checkIn||''))?-1:1);
       activeReservation=sorted[0]||null;
