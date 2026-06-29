@@ -203,7 +203,7 @@ def compute_prices_velocity(
         price_map[rt] = {}
         for d in entry.get("Dates", []):
             date_str = d["Date"].split("T")[0] if "T" in d["Date"] else d["Date"]
-            avail = d.get("Availability") or d.get("DefaultAvailability") or 0
+            avail = d.get("Availability") if d.get("Availability") is not None else (d.get("DefaultAvailability") or 0)
             avail_map[rt][date_str] = int(avail)
             price_map[rt][date_str] = {
                 "gel": get_price_from_rates(d.get("Rates"), "GEL"),
