@@ -165,6 +165,19 @@ def sync_to_firestore(db, reservations):
     count = 0
     skipped = 0
 
+    # Detect which reservation numbers appear more than once (different rooms)
+    res_num_counts = {}
+    for r in reservations:
+        if r.get('roomNumber', '') in SKIP_ROOMS:
+            continue
+        if r.get('status', '') not in VALID_STATUSES:
+            continue
+        rn = r.get('reservationNumber', '')
+        if rn:
+            res_num_counts[rn] = res_num_counts.get(rn, 0) + 1
+
+    first_seen = {}  # reservationNumber → first doc written (for backwards-compat primary doc)
+
     for r in reservations:
         if r.get('roomNumber', '') in SKIP_ROOMS:
             skipped += 1
@@ -179,20 +192,39 @@ def sync_to_firestore(db, reservations):
             skipped += 1
             continue
 
-        # Doc ID: reservationNumber, append memberId for multi-room bookings
-        doc_id = doc['reservationNumber']
+        res_num = doc['reservationNumber']
         member_id = r.get('memberId', '')
-        if member_id:
-            doc_id = f"{doc_id}_{member_id}"
+        is_multi_room = res_num_counts.get(res_num, 1) > 1
 
-        ref = coll.document(doc_id)
-        existing = ref.get()
-        if existing.exists and existing.to_dict().get('manualRoom'):
-            doc.pop('roomCode', None)
-            doc.pop('allRooms', None)
-            doc.pop('minihotelRoom', None)
-        batch.set(ref, doc, merge=True)
+        if member_id:
+            # MiniHotel-provided member ID takes priority
+            doc_id = f"{res_num}_{member_id}"
+        elif is_multi_room:
+            # Same reservation number, multiple rooms — differentiate by roomCode
+            doc_id = f"{res_num}_{doc['roomCode']}"
+        else:
+            doc_id = res_num
+
+        def _write(ref, d):
+            existing = ref.get()
+            payload = dict(d)
+            if existing.exists and existing.to_dict().get('manualRoom'):
+                payload.pop('roomCode', None)
+                payload.pop('allRooms', None)
+                payload.pop('minihotelRoom', None)
+            batch.set(ref, payload, merge=True)
+
+        _write(coll.document(doc_id), doc)
         count += 1
+
+        # Backwards-compat: keep original reservationNumber doc pointing to first room
+        if is_multi_room and res_num not in first_seen:
+            first_seen[res_num] = doc
+            _write(coll.document(res_num), doc)
+            count += 1
+            print(f"  Multi-room: {res_num} primary doc → {doc['roomCode']}")
+
+        print(f"  Wrote {doc_id} → {doc.get('roomCode')} ({doc.get('guest')})")
 
         if count % 450 == 0:
             batch.commit()
