@@ -1314,7 +1314,11 @@ function buildContactHero({labelText,message,kind='apartment'}){
 }
 
 window.openPage=function(type){
-  if((type==='checkin'||type==='wifi')&&!isUnlocked(activeReservation)){openLocked(activeReservation);return;}
+  // Prefer the reservation from allMatchedReservations for current aptId — it's
+  // populated from the registration search and has correct checkin/checkout dates.
+  // Fall back to activeReservation only if no match found.
+  const pageRes=allMatchedReservations.find(r=>r.roomCode===aptId)||activeReservation;
+  if((type==='checkin'||type==='wifi')&&!isUnlocked(pageRes)){openLocked(pageRes);return;}
   const d=aptData||{};
   const titles={checkin:t('tc'),wifi:t('tw'),services:t('tsv'),recs:t('tr'),rules:t('tru'),contact:t('tco')};
   let body='';
