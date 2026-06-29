@@ -634,7 +634,6 @@ let activeReservation=null; // reservation matching this apt with tuyaPassword
 let myRequests=[];
 let currentSvcId=null;
 let currentSvcName=null;
-let cdInterval=null;
 let elevatorData=null;
 let _pendingReg=null;
 let _pendingMatches=[];
@@ -1445,21 +1444,24 @@ window.openPage=function(type){
   openSubpage(titles[type]||'',body);
 }
 
+function fmtCheckinAvailable(){
+  const ci=activeReservation?.checkin||activeReservation?.checkIn||'';
+  if(!ci)return '';
+  const p=ci.split('-');
+  if(p.length<3)return ci;
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const day=parseInt(p[2]);
+  const mon=months[parseInt(p[1])-1]||p[1];
+  return`${day} ${mon} at ${String(getCheckInHour()).padStart(2,'0')}:00`;
+}
+
 function openLocked(){
-  const rem=timeUntilCheckin();
   openSubpage(t('tc'),`<div class="locked-card">
     <div class="lc-icon">🔒</div>
     <div class="lc-title">${t('lt')}</div>
-    <div class="lc-sub">${t('ls').replace('2:00 PM',checkInHour()+':00').replace('14:00',checkInHour()+':00')}</div>
-    <div style="font-size:11px;color:var(--hint);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">${t('cl')}</div>
-    <div class="countdown" id="cd">${fmtCD(rem)}</div>
+    <div class="lc-sub" style="margin-bottom:0">${t('ls')}</div>
+    <div style="margin-top:14px;font-size:17px;font-weight:500;color:var(--ink);">Available from ${esc(fmtCheckinAvailable())}</div>
   </div>`);
-  if(cdInterval)clearInterval(cdInterval);
-  cdInterval=setInterval(()=>{
-    const el=document.getElementById('cd');if(!el){clearInterval(cdInterval);return;}
-    const r=timeUntilCheckin();el.textContent=fmtCD(r);
-    if(r<=0||isUnlocked()){clearInterval(cdInterval);closeSP();window.openPage('checkin');}
-  },1000);
 }
 
 function openSubpage(title,body){
@@ -1471,7 +1473,6 @@ function openSubpage(title,body){
 window.closeSP=function(){
   const sp=document.getElementById('cur-sp');
   if(sp){sp.style.transition='transform 0.2s,opacity 0.2s';sp.style.transform='translateX(100%)';sp.style.opacity='0';setTimeout(()=>sp.remove(),210);}
-  if(cdInterval){clearInterval(cdInterval);cdInterval=null;}
 }
 
 window.copySth=function(text,btn){
