@@ -622,6 +622,8 @@ def main():
             if rules_data.get("startPricesEur"):
                 config["startPricesEur"] = rules_data["startPricesEur"]
             if rules_data.get("priceRules"):
+                orbe1_raw = rules_data["priceRules"].get("ORBE_1")
+                print(f"  DEBUG priceRules.ORBE_1 from Firestore: {orbe1_raw}")
                 for rt, seasons in rules_data["priceRules"].items():
                     for s, vals in seasons.items():
                         if "floor_prices_gel" not in config: config["floor_prices_gel"] = {}
@@ -630,6 +632,8 @@ def main():
                         if rt not in config["ceiling_prices_gel"]: config["ceiling_prices_gel"][rt] = {}
                         config["floor_prices_gel"][rt][s] = vals.get("min", 0)
                         config["ceiling_prices_gel"][rt][s] = vals.get("max", 0)
+            else:
+                print("  DEBUG priceRules: field missing or empty in Firestore doc")
             if rules_data.get("eurRules"):
                 for rt, seasons in rules_data["eurRules"].items():
                     for s, vals in seasons.items():
@@ -640,6 +644,8 @@ def main():
                         config["floor_prices_eur"][rt][s] = vals.get("min", 0)
                         config["ceiling_prices_eur"][rt][s] = vals.get("max", 0)
             print(f"  Loaded pricing rules from Firestore.")
+            print(f"  DEBUG ceiling_prices_gel[ORBE_1]: {config.get('ceiling_prices_gel', {}).get('ORBE_1')}")
+            print(f"  DEBUG ceiling_prices_gel[ORBE_1][high]: {config.get('ceiling_prices_gel', {}).get('ORBE_1', {}).get('high')}")
         except Exception as _bpe:
             print(f"  Warning: could not load base_price_pct: {_bpe}", file=sys.stderr)
 
