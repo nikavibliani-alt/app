@@ -2,840 +2,269 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Maxela — Check-in Admin</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guest Check-in Admin</title>
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-:root{
-  --bg:#f7f6f4;--surface:#fff;--surface2:#f0eeeb;
-  --border:#e2dfd9;--border2:#c8c3bb;
-  --text:#1e1c1a;--muted:#6e6b66;--hint:#aea9a2;
-  --accent:#3d6b5a;--accent-bg:#f0f6f3;--accent-border:#9ec9b8;
-  --green:#2d6a4f;--green-bg:#f0f7f4;--green-border:#95d5b2;
-  --red:#922b21;--red-bg:#fdf2f2;--red-border:#f5a9a0;
-  --amber:#7a5a0a;--amber-bg:#fdf8ee;--amber-border:#e8c97a;
-  --blue:#1d4ed8;--blue-bg:#eff4ff;--blue-border:#bfcffa;
-  --r:10px;--rs:7px;--rsm:4px;
-}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;padding-bottom:4rem;}
-@keyframes spin{to{transform:rotate(360deg);}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
-
-.loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:999;}
-.spinner{width:22px;height:22px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
-.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;font-size:13px;padding:8px 18px;border-radius:20px;z-index:9999;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;}
-.toast.show{opacity:1;}
-
-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
-.logo{font-size:16px;font-weight:700;letter-spacing:-0.02em;}
-.logo span{color:var(--accent);}
-.admin-badge{font-size:11px;font-weight:600;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);padding:3px 10px;border-radius:20px;letter-spacing:0.04em;text-transform:uppercase;}
-
-.tabs{display:flex;gap:2px;padding:0 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);}
-.tab{padding:10px 16px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;background:none;border-top:none;border-left:none;border-right:none;font-family:'DM Sans',sans-serif;}
-.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
-
-.main{max-width:900px;margin:0 auto;padding:1.5rem;}
-.page{animation:fadeIn 0.2s ease;}
-
-/* Cards */
-.section-title{font-size:16px;font-weight:600;margin-bottom:1rem;letter-spacing:-0.01em;}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;}
-.card-header{padding:0.85rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--border);}
-.card-title{font-size:14px;font-weight:600;}
-.card-body{padding:1rem;}
-.card-sub{font-size:12px;color:var(--muted);margin-top:2px;}
-
-/* Buttons */
-.btn{height:36px;padding:0 14px;border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text);transition:all 0.15s;display:inline-flex;align-items:center;gap:6px;}
-.btn:hover{background:var(--surface2);}
-.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);}
-.btn-primary:hover{opacity:0.9;}
-.btn-green{background:var(--green);color:#fff;border-color:var(--green);}
-.btn-green:hover{opacity:0.9;}
-.btn-red{background:var(--red-bg);color:var(--red);border-color:var(--red-border);}
-.btn-red:hover{background:#fee2e2;}
-.btn-sm{height:30px;padding:0 10px;font-size:12px;}
-.btn-amber{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border);}
-
-/* Form */
-.form-group{margin-bottom:0.85rem;}
-.form-label{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;display:block;text-transform:uppercase;letter-spacing:0.05em;}
-.form-input{width:100%;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);background:var(--bg);outline:none;transition:border-color 0.15s;}
-.form-input:focus{border-color:var(--accent);background:#fff;}
-textarea.form-input{height:auto;padding:10px;resize:vertical;line-height:1.5;}
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-
-/* Apartment grid */
-.apt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;}
-.apt-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem;cursor:pointer;transition:all 0.15s;}
-.apt-card:hover{border-color:var(--accent-border);box-shadow:0 2px 10px rgba(61,107,90,0.08);}
-.apt-code{font-size:20px;font-weight:700;font-family:'DM Mono',monospace;color:var(--text);margin-bottom:4px;}
-.apt-name{font-size:12px;color:var(--muted);}
-.apt-status{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
-.status-pill{font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:0.04em;}
-.pill-ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);}
-.pill-warn{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);}
-.pill-err{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);}
-
-/* Guest list */
-.guest-row{display:flex;align-items:center;gap:12px;padding:0.75rem 1rem;border-bottom:1px solid var(--border);transition:background 0.1s;}
-.guest-row:last-child{border-bottom:none;}
-.guest-row:hover{background:var(--bg);}
-.guest-apt{font-size:13px;font-weight:700;font-family:'DM Mono',monospace;min-width:50px;}
-.guest-name{flex:1;font-size:13px;font-weight:500;}
-.guest-meta{font-size:11px;color:var(--muted);}
-.guest-actions{display:flex;gap:6px;}
-.unlock-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;text-transform:uppercase;}
-.unlocked{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);}
-.locked{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);}
-.waiting{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);}
-
-/* Drawer */
-.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:200;opacity:0;transition:opacity 0.25s;pointer-events:none;}
-.drawer-overlay.open{opacity:1;pointer-events:all;}
-.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);background:var(--surface);border-left:1px solid var(--border);z-index:201;transform:translateX(100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);display:flex;flex-direction:column;overflow:hidden;}
-.drawer.open{transform:translateX(0);}
-.drawer-header{padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.drawer-title{font-size:16px;font-weight:600;}
-.drawer-close{width:30px;height:30px;border:none;background:var(--surface2);border-radius:var(--rsm);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;color:var(--muted);}
-.drawer-body{flex:1;overflow-y:auto;padding:1.25rem;}
-.drawer-footer{padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;}
-
-/* Photo preview */
-.photo-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px;}
-.photo-thumb{width:100%;aspect-ratio:1;border-radius:var(--rsm);object-fit:cover;border:1px solid var(--border);display:block;}
-.photo-add{aspect-ratio:1;border-radius:var(--rsm);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--hint);font-size:20px;transition:all 0.15s;background:var(--bg);}
-.photo-add:hover{border-color:var(--accent);color:var(--accent);}
-
-/* Guest photo */
-.passport-img{width:100%;max-height:200px;object-fit:cover;border-radius:var(--rs);border:1px solid var(--border);margin-top:6px;}
-
-@media(max-width:600px){
-  .form-row{grid-template-columns:1fr;}
-  .apt-grid{grid-template-columns:1fr 1fr;}
-  .main{padding:1rem;}
-}
+  :root {
+    --bg: #f5f5f3; --white: #fff; --border: #e5e5e2; --text: #1a1a1a;
+    --muted: #888; --accent: #1e6b3e; --accent-light: #e8f4ed;
+    --red: #c0392b; --red-light: #fdf0ee; --yellow: #c47d0e; --yellow-light: #fdf6e8;
+    --font: 'Inter', system-ui, sans-serif; --radius: 8px; --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; }
+  .header { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .header-left { display: flex; align-items: center; gap: 8px; }
+  .back-link { color: var(--muted); text-decoration: none; font-size: 13px; }
+  .page-title { font-size: 14px; font-weight: 600; }
+  .save-btn { background: var(--accent); color: white; border: none; padding: 7px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .save-btn:hover { opacity: 0.88; }
+  .main { max-width: 1100px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .card-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .card-title { font-size: 13px; font-weight: 600; }
+  .card-body { padding: 20px; }
+  .prop-tabs { display: flex; gap: 2px; background: var(--bg); padding: 3px; border-radius: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+  .prop-tab { padding: 5px 12px; border-radius: 5px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; background: transparent; color: var(--muted); transition: all 0.15s; }
+  .prop-tab.active { background: var(--white); color: var(--text); box-shadow: var(--shadow); }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-info { flex: 1; }
+  .toggle-name { font-weight: 600; font-size: 13px; }
+  .toggle-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; border-radius: 24px; transition: 0.2s; }
+  .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s; }
+  input:checked + .slider { background: var(--accent); }
+  input:checked + .slider:before { transform: translateX(20px); }
+  .item-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 8px; }
+  .item-row input[type="text"] { flex: 1; border: none; background: transparent; font-size: 13px; font-family: var(--font); color: var(--text); outline: none; min-width: 0; }
+  .item-row input[type="number"] { width: 70px; border: 1px solid var(--border); background: var(--white); border-radius: 5px; padding: 4px 8px; font-size: 13px; font-family: var(--font); text-align: right; }
+  .gel-label { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+  .del-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 16px; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+  .del-btn:hover { color: var(--red); background: var(--red-light); }
+  .add-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+  .add-input { flex: 1; min-width: 140px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; font-family: var(--font); background: var(--white); }
+  .add-input:focus { outline: none; border-color: var(--accent); }
+  .add-price { width: 80px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; font-family: var(--font); background: var(--white); text-align: right; }
+  .add-price:focus { outline: none; border-color: var(--accent); }
+  .add-btn { background: var(--accent-light); color: var(--accent); border: 1px solid rgba(30,107,62,0.2); padding: 8px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .add-btn:hover { background: var(--accent); color: white; }
+  .info-box { background: var(--yellow-light); border: 1px solid rgba(196,125,14,0.2); border-radius: var(--radius); padding: 12px 16px; font-size: 13px; color: var(--yellow); margin-bottom: 16px; }
+  .note-input { border: 1px solid var(--border); border-radius: 5px; padding: 4px 8px; font-size: 12px; font-family: var(--font); background: var(--white); width: 160px; }
+  .note-input:focus { outline: none; border-color: var(--accent); }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--text); color: white; padding: 10px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: translateY(60px); opacity: 0; transition: all 0.2s; z-index: 999; }
+  .toast.show { transform: translateY(0); opacity: 1; } .toast.success { background: var(--accent); } .toast.error { background: var(--red); }
 </style>
 </head>
 <body>
 
-<div class="loading" id="loading">
-  <div style="font-size:20px;font-weight:700;letter-spacing:-0.02em;">Maxela <span style="color:var(--accent);">Admin</span></div>
-  <div class="spinner"></div>
+<div class="header">
+  <div class="header-left">
+    <a href="SleepyPMS.html" class="back-link">← Dashboard</a>
+    <span style="color:#e5e5e2">/</span>
+    <span class="page-title">Guest Check-in Admin</span>
+  </div>
+  <button class="save-btn" onclick="saveAll()">Save All Changes</button>
+</div>
+
+<div class="main">
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">👁 Section Visibility</span>
+      <span style="font-size:12px;color:var(--muted)">Control what guests see per property type</span>
+    </div>
+    <div class="card-body">
+      <div class="info-box">Changes apply immediately after saving. Guests see updated sections on next page load.</div>
+      <div class="prop-tabs" id="propTabs">
+        <button class="prop-tab active" onclick="selectProp('ROOMS')" data-prop="ROOMS">Rooms (0-x)</button>
+        <button class="prop-tab" onclick="selectProp('MAXELA')" data-prop="MAXELA">Maxela (6-x, 7-x)</button>
+        <button class="prop-tab" onclick="selectProp('BIG_APT')" data-prop="BIG_APT">Big Apt (6-3)</button>
+        <button class="prop-tab" onclick="selectProp('FREEDOM')" data-prop="FREEDOM">Freedom (tab-x)</button>
+        <button class="prop-tab" onclick="selectProp('ORBELIANI')" data-prop="ORBELIANI">Orbeliani (orb-x)</button>
+      </div>
+      <div id="sectionToggles"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">👕 Laundry Items</span>
+      <span style="font-size:12px;color:var(--muted)">Guest selects items, total calculated automatically</span>
+    </div>
+    <div class="card-body">
+      <div id="laundryList"></div>
+      <div class="add-row">
+        <input type="text" class="add-input" id="newItemName" placeholder="Item name (e.g. T-shirt)">
+        <input type="number" class="add-price" id="newItemPrice" placeholder="5" min="1">
+        <span class="gel-label">GEL</span>
+        <button class="add-btn" onclick="addLaundryItem()">+ Add Item</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">🛎 Other Services</span>
+      <span style="font-size:12px;color:var(--muted)">Shown in the Services section (excluding laundry)</span>
+    </div>
+    <div class="card-body">
+      <div id="serviceList"></div>
+      <div class="add-row" style="margin-top:4px">
+        <input type="text" class="add-input" id="newSvcName" placeholder="Service name">
+        <input type="number" class="add-price" id="newSvcPrice" placeholder="Price" min="0">
+        <span class="gel-label">GEL</span>
+        <input type="text" class="add-input note-input" id="newSvcNote" placeholder="Note (optional)">
+        <button class="add-btn" onclick="addService()">+ Add</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 <div class="toast" id="toast"></div>
 
-<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
-<div class="drawer" id="drawer">
-  <div class="drawer-header">
-    <div class="drawer-title" id="drawer-title">Edit Apartment</div>
-    <button class="drawer-close" onclick="closeDrawer()">×</button>
-  </div>
-  <div class="drawer-body" id="drawer-body"></div>
-  <div class="drawer-footer" id="drawer-footer"></div>
-</div>
-
-<header>
-  <div class="logo">Maxela <span>Check-in</span></div>
-  <div class="admin-badge">Admin Panel</div>
-</header>
-
-<div class="tabs">
-  <button class="tab active" data-tab="apartments" onclick="switchTab('apartments')">Apartments</button>
-  <button class="tab" data-tab="guests" onclick="switchTab('guests')">Guests</button>
-  <button class="tab" data-tab="hkpins" onclick="switchTab('hkpins')">HK Pins</button>
-  <button class="tab" data-tab="hkschedule" onclick="switchTab('hkschedule')">HK Schedule</button>
-</div>
-
-<div class="main" id="main"></div>
-
 <script type="module">
-import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDoc}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-// Cloudinary
-const CLOUD='dlkjizhya';
-const PRESET='maxela_uploads';
-async function uploadToCloudinary(file,folder='maxela'){
-  const fd=new FormData();
-  fd.append('file',file);
-  fd.append('upload_preset',PRESET);
-  fd.append('folder',folder);
-  const res=await fetch('https://api.cloudinary.com/v1_1/'+CLOUD+'/auto/upload',{method:'POST',body:fd});
-  const d=await res.json();
-  if(d.secure_url)return d.secure_url;
-  throw new Error(d.error?.message||'Upload failed');
-}
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const fb=initializeApp({
-  apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
-  authDomain:"sleepy-5c962.firebaseapp.com",
-  projectId:"sleepy-5c962",
-  storageBucket:"sleepy-5c962.firebasestorage.app",
-  messagingSenderId:"152940098906",
-  appId:"1:152940098906:web:bf245230d705c0a62c2f63"
-});
-const db=getFirestore(fb);
+const app = initializeApp({ apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk", authDomain:"sleepy-5c962.firebaseapp.com", projectId:"sleepy-5c962", storageBucket:"sleepy-5c962.firebasestorage.app", messagingSenderId:"152940098906", appId:"1:152940098906:web:bf245230d705c0a62c2f63" });
+const db = getFirestore(app);
 
-
-// ── APARTMENT DEFINITIONS ──────────────────────────
-const APARTMENTS=[
-  // Shartava — 0- rooms
-  {id:'0-1',code:'0-1',name:'Small Room 1',group:'Shartava — 0- Rooms',rulesType:'small'},
-  {id:'0-2',code:'0-2',name:'Small Room 2',group:'Shartava — 0- Rooms',rulesType:'small'},
-  {id:'0-3',code:'0-3',name:'Small Room 3',group:'Shartava — 0- Rooms',rulesType:'small'},
-  {id:'0-4',code:'0-4',name:'Small Room 4',group:'Shartava — 0- Rooms',rulesType:'small'},
-  {id:'0-5',code:'0-5',name:'Small Room 5',group:'Shartava — 0- Rooms',rulesType:'small'},
-  // Shartava — 6- apts
-  {id:'6-1',code:'6-1',name:'Apartment 6-1',group:'Shartava — 6- Apartments',rulesType:'apartment'},
-  {id:'6-2',code:'6-2',name:'Apartment 6-2',group:'Shartava — 6- Apartments',rulesType:'apartment'},
-  {id:'6-3',code:'6-3',name:'Apartment 6-3',group:'Shartava — 6- Apartments',rulesType:'apartment'},
-  {id:'6-4',code:'6-4',name:'Apartment 6-4',group:'Shartava — 6- Apartments',rulesType:'apartment'},
-  // Shartava — 7- apts
-  {id:'7-1',code:'7-1',name:'Apartment 7-1',group:'Shartava — 7- Apartments',rulesType:'apartment'},
-  {id:'7-2',code:'7-2',name:'Apartment 7-2',group:'Shartava — 7- Apartments',rulesType:'apartment'},
-  {id:'7-4',code:'7-4',name:'Apartment 7-4',group:'Shartava — 7- Apartments',rulesType:'apartment'},
-  // Centre — Orb
-  {id:'orb-1',code:'Orb 1',name:'Orb Building, Unit 1',group:'City Centre — Orb',rulesType:'apartment'},
-  {id:'orb-2',code:'Orb 2',name:'Orb Building, Unit 2',group:'City Centre — Orb',rulesType:'apartment'},
-  {id:'orb-3',code:'Orb 3',name:'Orb Building, Unit 3',group:'City Centre — Orb',rulesType:'apartment'},
-  // Centre — Tab
-  {id:'tab-1',code:'Tab 1',name:'Tab Building, Unit 1',group:'City Centre — Tab',rulesType:'apartment'},
-  {id:'tab-2',code:'Tab 2',name:'Tab Building, Unit 2',group:'City Centre — Tab',rulesType:'apartment'},
-  {id:'tab-3',code:'Tab 3',name:'Tab Building, Unit 3',group:'City Centre — Tab',rulesType:'apartment'},
+const SECTIONS = [
+  { id:'checkin',           name:'Check-in Details',              desc:'Door code, instructions, photos, video' },
+  { id:'access_code',       name:'Access Code / Door Lock',       desc:'Smart lock code inside Check-in Details' },
+  { id:'elevator_code',     name:'Elevator / Entrance Code',      desc:'Building entrance code' },
+  { id:'wifi',              name:'WiFi & Internet',               desc:'Network name and password' },
+  { id:'services',          name:'Services Section',              desc:'The entire Services tile' },
+  { id:'laundry',           name:'↳ Laundry',                     desc:'Laundry itemized list inside Services' },
+  { id:'cleaning',          name:'↳ Cleaning',                    desc:'Cleaning service inside Services' },
+  { id:'city_tour',         name:'↳ City Tour',                   desc:'City tour inside Services' },
+  { id:'airport_transfer',  name:'↳ Airport Transfer',            desc:'Airport transfer inside Services' },
+  { id:'recs',              name:'Recommendations',               desc:'Local restaurants & places' },
+  { id:'rules',             name:'House Rules',                   desc:'Apartment rules page' },
+  { id:'contact',           name:'Contact Us',                    desc:'WhatsApp contact button' },
 ];
 
-let aptData={}; // Firebase data per apartment
-let guestData=[]; // All guest registrations
-let currentTab='apartments';
-let hkPinsData={shartava:'',centre:'',admin:''};
-let currentDrawerApt=null;
-
-// ── HELPERS ───────────────────────────────────────
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function toast(msg,duration=2500){
-  const t=document.getElementById('toast');
-  t.textContent=msg;t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),duration);
-}
-function openDrawer(){
-  document.getElementById('drawer').classList.add('open');
-  document.getElementById('drawer-overlay').classList.add('open');
-}
-window.closeDrawer=function(){
-  document.getElementById('drawer').classList.remove('open');
-  document.getElementById('drawer-overlay').classList.remove('open');
-}
-
-// ── TAB SWITCHING ─────────────────────────────────
-window.switchTab=function(tab){
-  currentTab=tab;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',(t.dataset.tab||t.textContent.toLowerCase())===tab));
-  render();
-}
-
-// ── RENDER ────────────────────────────────────────
-function render(){
-  if(currentTab==='apartments') renderApartments();
-  else if(currentTab==='hkpins') renderHkPins();
-  else if(currentTab==='hkschedule') renderHkSchedule();
-  else renderGuests();
-}
-
-function renderApartments(){
-  const groups={};
-  APARTMENTS.forEach(a=>{
-    if(!groups[a.group])groups[a.group]=[];
-    groups[a.group].push(a);
-  });
-
-  let html='<div class="page">';
-  Object.entries(groups).forEach(([grp,apts])=>{
-    html+=`<div class="section-title" style="margin-top:1.5rem;">${grp}</div>
-    <div class="apt-grid">`;
-    apts.forEach(a=>{
-      const d=aptData[a.id]||{};
-      const hasCode=!!d.doorCode;
-      const hasInstructions=!!d.instructions;
-      const hasPhotos=(d.photos||[]).length>0;
-      html+=`<div class="apt-card" onclick="window.openAptDrawer('${a.id}')">
-        <div class="apt-code">${esc(a.code)}</div>
-        <div class="apt-name">${esc(a.name)}</div>
-        <div class="apt-status">
-          <span class="status-pill ${hasCode?'pill-ok':'pill-err'}">${hasCode?'Door code ✓':'No code'}</span>
-          <span class="status-pill ${hasInstructions?'pill-ok':'pill-warn'}">${hasInstructions?'Instructions ✓':'No instructions'}</span>
-          <span class="status-pill ${hasPhotos?'pill-ok':'pill-warn'}">${hasPhotos?(d.photos.length)+' photos':'No photos'}</span>
-        </div>
-      </div>`;
-    });
-    html+='</div>';
-  });
-  html+='</div>';
-  document.getElementById('main').innerHTML=html;
-}
-
-window.deleteGuest=async function(guestId,guestName){
-  if(!confirm(`Are you sure you want to delete this check-in record for ${guestName}?`))return;
-  try{
-    await deleteDoc(doc(db,'checkin_guests',guestId));
-    toast('Deleted ✓');
-  }catch(e){toast('Delete failed: '+e.message);}
+const DEFAULTS = {
+  ROOMS:     {checkin:true,access_code:false,elevator_code:false,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  MAXELA:    {checkin:true,access_code:true, elevator_code:true, wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  BIG_APT:   {checkin:true,access_code:true, elevator_code:true, wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  FREEDOM:   {checkin:true,access_code:true, elevator_code:false,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  ORBELIANI: {checkin:true,access_code:true, elevator_code:false,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
 };
 
-window.cleanDuplicateGuests=async function(){
-  const groups={};
-  guestData.forEach(g=>{
-    const key=`${g.aptId||''}_${(g.name||'').toLowerCase().trim().replace(/\s+/g,'_')}`;
-    if(!groups[key])groups[key]=[];
-    groups[key].push(g);
-  });
-  const toDelete=[];
-  Object.values(groups).forEach(dups=>{
-    if(dups.length<2)return;
-    dups.sort((a,b)=>(b.submittedAt?.seconds||0)-(a.submittedAt?.seconds||0));
-    toDelete.push(...dups.slice(1));
-  });
-  if(!toDelete.length){toast('No duplicates found');return;}
-  if(!confirm(`Delete ${toDelete.length} duplicate record${toDelete.length!==1?'s':''}? Newest copy of each guest will be kept.`))return;
-  try{
-    await Promise.all(toDelete.map(g=>deleteDoc(doc(db,'checkin_guests',g.id))));
-    toast(`Deleted ${toDelete.length} duplicate${toDelete.length!==1?'s':''} ✓`);
-  }catch(e){toast('Delete failed: '+e.message);}
-};
+let visibility = JSON.parse(JSON.stringify(DEFAULTS));
+let laundryItems = [
+  {name:'T-shirt / Polo',price:5},{name:'Pants / Jeans',price:8},
+  {name:'Dress',price:10},{name:'Jacket / Coat',price:15},
+  {name:'Underwear / Socks',price:3},{name:'Bedsheet',price:12},{name:'Towel',price:5},
+];
+let services = [
+  {name:'Cleaning',price:30,note:''},
+  {name:'City Tour',price:50,note:'per person'},
+  {name:'Airport Transfer',price:0,note:'price on request'},
+  {name:'Other Request',price:0,note:''},
+];
+let currentProp = 'ROOMS';
 
-window.deleteOldGuests=async function(){
-  const cutoff=new Date();
-  cutoff.setDate(cutoff.getDate()-7);
-  const old=guestData.filter(g=>{
-    const sub=g.submittedAt?.toDate?g.submittedAt.toDate():null;
-    return sub&&sub<cutoff;
-  });
-  if(!old.length){toast('No records older than 7 days');return;}
-  if(!confirm(`Delete ${old.length} check-in record${old.length!==1?'s':''} older than 7 days? This cannot be undone.`))return;
-  try{
-    await Promise.all(old.map(g=>deleteDoc(doc(db,'checkin_guests',g.id))));
-    toast(`Deleted ${old.length} record${old.length!==1?'s':''} ✓`);
-  }catch(e){toast('Delete failed: '+e.message);}
-};
-
-function renderGuests(){
-  const today=new Date().toISOString().split('T')[0];
-  const recent=guestData
-    .sort((a,b)=>b.submittedAt?.seconds-a.submittedAt?.seconds)
-    .slice(0,50);
-
-  let html='<div class="page">';
-  if(!recent.length){
-    html+=`<div style="text-align:center;padding:3rem;color:var(--hint);">
-      <div style="font-size:32px;margin-bottom:12px;">👤</div>
-      <div style="font-size:14px;font-weight:500;color:var(--muted);">No guest registrations yet</div>
-    </div>`;
-  } else {
-    const oldCount=guestData.filter(g=>{const sub=g.submittedAt?.toDate?g.submittedAt.toDate():null;return sub&&(new Date()-sub)>7*24*60*60*1000;}).length;
-    html+=`<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;">
-      <button class="btn btn-sm" onclick="window.cleanDuplicateGuests()">🔁 Clean duplicates</button>
-      <button class="btn btn-red btn-sm" onclick="window.deleteOldGuests()"${!oldCount?' disabled':''}>🗑 Delete old (${oldCount})</button>
-    </div>`;
-    html+=`<div class="card"><div class="card-body" style="padding:0;">`;
-    recent.forEach(g=>{
-      const apt=APARTMENTS.find(a=>a.id===g.aptId);
-      const statusLabel=g.manualUnlock?'Unlocked':'Waiting 2pm';
-      const statusCls=g.manualUnlock?'unlocked':'waiting';
-      const submittedAt=g.submittedAt?.toDate?g.submittedAt.toDate():null;
-      const timeStr=submittedAt?submittedAt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+submittedAt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
-      const sr=g.passportScanResult;
-      const hasScan=sr&&Object.keys(sr).length>0;
-      const badPassport=hasScan&&sr.valid===false;
-      const passportBadge=!hasScan
-        ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);">NO SCAN</span>`
-        :(sr.valid===false
-          ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);" title="${esc(sr.reason||'')}">⚠ BAD ID</span>`
-          :`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">✓ ID OK</span>`);
-      const ctIcon=g.contactType==='tg'
-        ?`<span style="font-size:9px;font-weight:700;color:#0088cc;background:#e8f5fe;border:1px solid #90cdf4;padding:1px 5px;border-radius:4px;">TG</span>`
-        :`<span style="font-size:9px;font-weight:700;color:#25D366;background:#f0fff4;border:1px solid #86efac;padding:1px 5px;border-radius:4px;">WA</span>`;
-      const passportThumb=g.passportUrl
-        ?`<a href="${esc(g.passportUrl)}" target="_blank" title="View passport" style="flex-shrink:0;cursor:pointer;"><img src="${esc(g.passportUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:2px solid ${badPassport?'var(--red)':'var(--border)'};display:block;"></a>`
-        :`<div style="width:48px;height:48px;border-radius:6px;background:var(--surface2);flex-shrink:0;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;">📷</div>`;
-      const resNumShort=g.matchedReservationId?(g.matchedReservationId.length>8?'…'+g.matchedReservationId.slice(-6):g.matchedReservationId):'';
-      html+=`<div class="guest-row"${badPassport?' style="background:var(--red-bg);border-left:3px solid var(--red);"':''}>
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
-            <span class="guest-apt">${esc(apt?.code||g.aptId)}</span>
-            <span class="guest-name">${esc(g.name||'—')}</span>
-            ${passportBadge}
-          </div>
-          <div class="guest-meta">${g.guests||1} guest${(g.guests||1)>1?'s':''} · ${ctIcon} ${esc(g.contact||'—')} · ${esc(g.arrivalDate||'—')} · ${timeStr}${resNumShort?' · #'+esc(resNumShort):''}</div>
-        </div>
-        ${passportThumb}
-        <span class="unlock-badge ${statusCls}">${statusLabel}</span>
-        <div class="guest-actions">
-          ${!g.manualUnlock?`<button class="btn btn-sm btn-green" onclick="window.unlockGuest('${g.id}')">Unlock</button>`:''}
-          <button class="btn btn-sm" onclick="window.viewGuest('${g.id}')">View</button>
-          <button class="btn btn-sm btn-red" onclick="window.deleteGuest('${g.id}','${esc(g.name||'this guest')}')">Delete</button>
-        </div>
-      </div>`;
-    });
-    html+=`</div></div>`;
-  }
-  html+='</div>';
-  document.getElementById('main').innerHTML=html;
+async function load() {
+  try {
+    const snap = await getDoc(doc(db,'checkin_admin','config'));
+    if (snap.exists()) {
+      const d = snap.data();
+      if (d.visibility) visibility = {...JSON.parse(JSON.stringify(DEFAULTS)), ...d.visibility};
+      if (d.laundryItems) laundryItems = d.laundryItems;
+      if (d.services) services = d.services;
+    }
+  } catch(e) { console.warn(e); }
+  renderToggles(); renderLaundry(); renderServices();
 }
 
-// ── APARTMENT DRAWER ──────────────────────────────
-window.openAptDrawer=function(aptId){
-  const apt=APARTMENTS.find(a=>a.id===aptId);if(!apt)return;
-  currentDrawerApt=aptId;
-  const d=aptData[aptId]||{};
+window.selectProp = (prop) => {
+  currentProp = prop;
+  document.querySelectorAll('.prop-tab').forEach(t => t.classList.toggle('active', t.dataset.prop===prop));
+  renderToggles();
+};
 
-  document.getElementById('drawer-title').textContent=apt.code+' — '+apt.name;
-  document.getElementById('drawer-body').innerHTML=`
-    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;">Check-in details</div>
-
-    ${d.doorCode?`<!-- legacy doorCode preserved in Firestore but hidden from UI -->`:''}
-
-    <div class="form-group">
-      <label class="form-label" style="display:flex;align-items:center;gap:8px;">
-        Tuya Device ID
-        <span style="font-size:12px;font-weight:400;">${d.tuyaDeviceId?'🟢 Tuya connected':'⚪ No lock linked'}</span>
+function renderToggles() {
+  const vis = visibility[currentProp]||{};
+  document.getElementById('sectionToggles').innerHTML = SECTIONS.map(s => `
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <div class="toggle-name">${s.name}</div>
+        <div class="toggle-desc">${s.desc}</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" ${vis[s.id]!==false?'checked':''} onchange="toggleSection('${s.id}',this.checked)">
+        <span class="slider"></span>
       </label>
-      <input type="text" class="form-input" id="apt-tuya-device-id"
-        value="${esc(d.tuyaDeviceId||'')}"
-        placeholder="e.g. bf9f9b096af5eb1043fik2">
-      <div style="display:flex;gap:8px;margin-top:6px;">
-        <button type="button" class="btn btn-sm" style="flex:1;"
-          onclick="window.testTuyaDevice('${aptId}')">🔓 Test offline code</button>
-      </div>
-      <div id="tuya-test-result-${aptId}" style="margin-top:6px;display:none;font-family:monospace;font-size:12px;padding:8px 10px;border-radius:6px;background:var(--surface2);"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Check-in time</label>
-        <input type="time" class="form-input" id="apt-checkin-time" value="${esc(d.checkInTime||'14:00')}">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Check-out time</label>
-        <input type="time" class="form-input" id="apt-checkout-time" value="${esc(d.checkOutTime||'12:00')}">
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">WiFi name</label>
-        <input type="text" class="form-input" id="apt-wifi-name" value="${esc(d.wifiName||'')}" placeholder="Network name">
-      </div>
-      <div class="form-group">
-        <label class="form-label">WiFi password</label>
-        <input type="text" class="form-input" id="apt-wifi-pass" value="${esc(d.wifiPass||'')}" placeholder="Password">
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Check-in instructions</label>
-      <textarea class="form-input" id="apt-instructions" rows="5" placeholder="How to get to the apartment, how to use the door, where to find keys, etc.">${esc(d.instructions||'')}</textarea>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Video</label>
-      <input type="url" class="form-input" id="apt-video" value="${esc(d.videoUrl||'')}" placeholder="Paste YouTube link or upload below" style="margin-bottom:6px;">
-      <input type="file" id="apt-video-input" accept="video/*" style="display:none;" onchange="window.uploadVideo('${aptId}',this)">
-      <button type="button" class="btn btn-sm" onclick="document.getElementById('apt-video-input').click()" style="width:100%;margin-top:4px;">
-        📹 Upload video file (plays directly in guest app)
-      </button>
-      <div style="font-size:11px;color:var(--hint);margin-top:5px;">Upload video here OR paste a YouTube link above. Both play inside the app — guests never leave your page.</div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">House rules <span style="color:var(--hint);font-weight:400;">(type: ${apt.rulesType})</span></label>
-      <textarea class="form-input" id="apt-rules" rows="4" placeholder="No smoking, no parties, quiet hours 11pm...">${esc(d.rules||'')}</textarea>
-    </div>
-
-    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin:1rem 0 0.75rem;">Service pricing</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <div class="form-group">
-        <label class="form-label">Room cleaning</label>
-        <input type="text" class="form-input" id="svc-price-cleaning" value="${esc((d.servicePrices||{}).cleaning||'30 GEL')}" placeholder="30 GEL">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Laundry</label>
-        <input type="text" class="form-input" id="svc-price-laundry" value="${esc((d.servicePrices||{}).laundry||'25 GEL')}" placeholder="25 GEL">
-      </div>
-      <div class="form-group">
-        <label class="form-label">City tour</label>
-        <input type="text" class="form-input" id="svc-price-tour" value="${esc((d.servicePrices||{}).tour||'50 GEL/person')}" placeholder="50 GEL/person">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Airport transfer</label>
-        <input type="text" class="form-input" id="svc-price-transfer" value="${esc((d.servicePrices||{}).transfer||'On request')}" placeholder="On request">
-      </div>
-    </div>
-
-    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin:1rem 0 0.5rem;">Check-in Photos</div>
-    <div style="font-size:12px;color:var(--hint);margin-bottom:8px;">Upload photos of each step — write instructions that guests will see below each photo.</div>
-    <input type="file" id="apt-photo-input" accept="image/*" multiple style="display:none;" onchange="window.uploadPhotos('${aptId}',this)">
-    <div id="photo-grid">
-      ${(d.photos||[]).map((url,i,arr)=>`
-        <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--rs);overflow:hidden;">
-          <div style="position:relative;">
-            <img src="${url}" style="width:100%;height:160px;object-fit:cover;display:block;">
-            <button onclick="window.deletePhoto('${aptId}',${i})" style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.7);color:#fff;border:none;cursor:pointer;font-size:13px;line-height:1;">×</button>
-            <div style="position:absolute;bottom:6px;left:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.9);background:rgba(0,0,0,0.45);padding:2px 7px;border-radius:4px;">Step ${i+1}</div>
-          </div>
-          <div style="padding:8px 10px;background:var(--bg);">
-            <div style="display:flex;gap:6px;margin-bottom:8px;">
-              <button type="button" onclick="window.movePhoto('${aptId}',${i},-1)" ${i===0?'disabled':''} style="flex:1;padding:5px 0;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:13px;cursor:${i===0?'default':'pointer'};opacity:${i===0?'0.35':'1'};">↑ Up</button>
-              <button type="button" onclick="window.movePhoto('${aptId}',${i},1)" ${i===arr.length-1?'disabled':''} style="flex:1;padding:5px 0;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:13px;cursor:${i===arr.length-1?'default':'pointer'};opacity:${i===arr.length-1?'0.35':'1'};">↓ Down</button>
-              <input type="file" id="replace-input-${i}" accept="image/*,video/*" style="display:none;" onchange="window.doReplacePhoto('${aptId}',${i},this)">
-              <button type="button" onclick="document.getElementById('replace-input-${i}').click()" style="flex:1;padding:5px 0;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:13px;cursor:pointer;">↺ Replace</button>
-            </div>
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:4px;">Instructions for this photo</div>
-            <textarea class="form-input" id="photo-cap-${i}" rows="2" placeholder="e.g. Enter the code on the keypad to unlock the door..." style="font-size:13px;min-height:60px;">${esc((d.photoCaptions||[])[i]||'')}</textarea>
-          </div>
-        </div>`).join('')}
-      <button type="button" class="btn" style="width:100%;margin-top:4px;" onclick="document.getElementById('apt-photo-input').click()">+ Add photos</button>
-    </div>
-
-    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin:1rem 0 0.5rem;">Service pricing</div>
-    <div style="font-size:12px;color:var(--hint);margin-bottom:8px;">Set prices shown to guests for each service.</div>
-    ${[
-      {id:'cleaning',icon:'🧹',label:'Room Cleaning'},
-      {id:'laundry',icon:'👕',label:'Laundry'},
-      {id:'tour',icon:'🗺️',label:'City Tour'},
-      {id:'transfer',icon:'🚕',label:'Airport Transfer'},
-    ].map(svc=>{
-      const existing=(d.services||[]).find(s=>s.id===svc.id)||{};
-      return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span style="font-size:18px;width:28px;">${svc.icon}</span>
-        <span style="flex:1;font-size:13px;font-weight:500;">${svc.label}</span>
-        <input type="text" class="form-input" style="width:100px;height:34px;font-size:13px;" 
-          id="svc-price-${svc.id}" value="${esc(existing.price||'')}" placeholder="e.g. 30 GEL">
-      </div>`;
-    }).join('')}
-
-    <div style="margin-top:1rem;">
-      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Guest page link</div>
-      <div style="font-family:'DM Mono',monospace;font-size:12px;background:var(--surface2);padding:8px 12px;border-radius:var(--rs);color:var(--accent);word-break:break-all;">
-        ${window.location.origin+window.location.pathname.replace('checkin-admin.html','')}checkin-guest.html?apt=${aptId}
-      </div>
-      <button class="btn btn-sm" style="margin-top:6px;" onclick="navigator.clipboard.writeText('${window.location.origin+window.location.pathname.replace('checkin-admin.html','')}checkin-guest.html?apt=${aptId}').then(()=>toast('Link copied!'))">Copy link</button>
-    </div>`;
-
-  document.getElementById('drawer-footer').innerHTML=`
-    <button class="btn" onclick="closeDrawer()">Cancel</button>
-    <button class="btn btn-primary" onclick="window.saveAptData('${aptId}')">Save</button>`;
-
-  openDrawer();
+    </div>`).join('');
 }
 
-window.uploadVideo=async function(aptId,input){
-  const file=input.files[0];if(!file)return;
-  if(file.size>100*1024*1024){alert('Video too large. Max 100MB. Please compress it first.');return;}
-  toast('Uploading video... please wait',60000);
-  try{
-    const url=await uploadToCloudinary(file,'maxela/'+aptId+'/videos');
-    const vi=document.getElementById('apt-video');
-    if(vi)vi.value=url;
-    toast('Video uploaded! Click Save to apply.');
-  }catch(e){toast('Video upload failed: '+e.message);}
-}
-
-window.testTuyaDevice=async function(aptId){
-  const deviceId=document.getElementById('apt-tuya-device-id')?.value.trim();
-  const resultEl=document.getElementById('tuya-test-result-'+aptId);
-  if(!deviceId){toast('Enter a Tuya Device ID first');return;}
-  if(!resultEl)return;
-  resultEl.style.display='block';
-  resultEl.style.background='var(--surface2)';
-  resultEl.textContent='⏳ Generating offline code…';
-  try{
-    // Get token via local proxy (must be running on localhost:3000)
-    const tr=await fetch('http://localhost:3000/v1.0/token?grant_type=1');
-    const td=await tr.json();
-    if(!td.success)throw new Error('Token failed: '+td.msg);
-    const token=td.result.access_token;
-    const nowSec=Math.floor(Date.now()/1000);
-    const pr=await fetch(`http://localhost:3000/v1.1/devices/${deviceId}/door-lock/offline-temp-password`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','access_token':token},
-      body:JSON.stringify({name:'AdminTest',type:'multiple',effective_time:nowSec,invalid_time:nowSec+3600})
-    });
-    const pd=await pr.json();
-    if(pd.success){
-      const code=pd.result?.offline_temp_password||pd.result?.password||'(see response)';
-      resultEl.style.background='#052e16';
-      resultEl.style.color='#86efac';
-      resultEl.innerHTML=`✅ Code: <strong style="font-size:18px;letter-spacing:.1em;">${code}</strong><br><span style="opacity:.7;font-size:11px;">valid 1h · device connected</span>`;
-    }else{
-      resultEl.style.background='#450a0a';
-      resultEl.style.color='#fca5a5';
-      resultEl.textContent=`✗ code=${pd.code}: ${pd.msg}`;
-    }
-  }catch(e){
-    resultEl.style.background='#450a0a';
-    resultEl.style.color='#fca5a5';
-    resultEl.textContent='✗ '+e.message+' (is local proxy running on :3000?)';
-  }
+window.toggleSection = (id, val) => {
+  if (!visibility[currentProp]) visibility[currentProp]={};
+  visibility[currentProp][id] = val;
 };
 
-window.deletePhoto=async function(aptId,idx){
-  if(!confirm('Delete this photo?'))return;
-  const photos=(aptData[aptId]?.photos||[]).filter((_,i)=>i!==idx);
-  const photoCaptions=(aptData[aptId]?.photoCaptions||[]).filter((_,i)=>i!==idx);
-  await setDoc(doc(db,'checkin_apartments',aptId),{photos,photoCaptions},{merge:true});
-  aptData[aptId]={...aptData[aptId],photos,photoCaptions};
-  toast('Photo deleted');
-  window.openAptDrawer(aptId);
+function renderLaundry() {
+  document.getElementById('laundryList').innerHTML = laundryItems.map((item,i) => `
+    <div class="item-row">
+      <input type="text" value="${item.name}" onchange="laundryItems[${i}].name=this.value" placeholder="Item name">
+      <input type="number" value="${item.price}" min="0" onchange="laundryItems[${i}].price=parseFloat(this.value)||0">
+      <span class="gel-label">GEL</span>
+      <button class="del-btn" onclick="laundryItems.splice(${i},1);renderLaundry()">✕</button>
+    </div>`).join('');
 }
 
-window.movePhoto=async function(aptId,idx,dir){
-  const photos=[...(aptData[aptId]?.photos||[])];
-  const newIdx=idx+dir;
-  if(newIdx<0||newIdx>=photos.length)return;
-  // Capture any unsaved caption edits from the DOM before re-rendering
-  const photoCaptions=photos.map((_,i)=>{
-    const el=document.getElementById('photo-cap-'+i);
-    return el?el.value.trim():(aptData[aptId]?.photoCaptions||[])[i]||'';
-  });
-  [photos[idx],photos[newIdx]]=[photos[newIdx],photos[idx]];
-  [photoCaptions[idx],photoCaptions[newIdx]]=[photoCaptions[newIdx],photoCaptions[idx]];
-  try{
-    await setDoc(doc(db,'checkin_apartments',aptId),{photos,photoCaptions},{merge:true});
-    aptData[aptId]={...aptData[aptId],photos,photoCaptions};
-    window.openAptDrawer(aptId);
-  }catch(e){toast('Move failed');}
-}
-
-window.doReplacePhoto=async function(aptId,idx,input){
-  const file=input.files[0];
-  if(!file)return;
-  const photos=[...(aptData[aptId]?.photos||[])];
-  // Capture any unsaved caption edits before re-rendering
-  const photoCaptions=photos.map((_,i)=>{
-    const el=document.getElementById('photo-cap-'+i);
-    return el?el.value.trim():(aptData[aptId]?.photoCaptions||[])[i]||'';
-  });
-  try{
-    toast('Uploading replacement...',15000);
-    const url=await uploadToCloudinary(file,'maxela/'+aptId+'/photos');
-    photos[idx]=url;
-    await setDoc(doc(db,'checkin_apartments',aptId),{photos,photoCaptions},{merge:true});
-    aptData[aptId]={...aptData[aptId],photos,photoCaptions};
-    toast('✓ Step '+(idx+1)+' replaced!');
-    window.openAptDrawer(aptId);
-  }catch(e){toast('Replace failed: '+e.message);}
-}
-
-window.saveAptData=async function(aptId){
-  // Build services array from price inputs
-  const SVC_DEFS=[
-    {id:'cleaning',icon:'🧹',nameEn:'Room Cleaning',descEn:'Professional mid-stay cleaning. Apartment must be empty during cleaning.',hasTime:true},
-    {id:'laundry',icon:'👕',nameEn:'Laundry',descEn:'We collect your laundry, wash & return it.',hasTime:true},
-    {id:'tour',icon:'🗺️',nameEn:'City Tour',descEn:'Guided tours around Tbilisi.',hasTime:false},
-    {id:'transfer',icon:'🚕',nameEn:'Airport Transfer',descEn:'Comfortable transfer to/from airport.',hasTime:false},
-    {id:'custom',icon:'✨',nameEn:'Other Request',descEn:'Anything else we can help with?',hasTime:false},
-  ];
-  const services=SVC_DEFS.map(s=>{
-    const priceEl=document.getElementById('svc-price-'+s.id);
-    return{...s,price:priceEl?priceEl.value.trim():''};
-  });
-
-  // Build photo captions
-  const photoCaptions=(aptData[aptId]?.photos||[]).map((_,i)=>{
-    const el=document.getElementById('photo-cap-'+i);
-    return el?el.value.trim():'';
-  });
-
-  const data={
-    tuyaDeviceId:document.getElementById('apt-tuya-device-id')?.value.trim()||'',
-    checkInTime:document.getElementById('apt-checkin-time')?.value||'14:00',
-    checkOutTime:document.getElementById('apt-checkout-time')?.value||'12:00',
-    doorCode:aptData[aptId]?.doorCode||'', // preserve legacy value, no longer editable in UI
-    wifiName:document.getElementById('apt-wifi-name')?.value.trim()||'',
-    wifiPass:document.getElementById('apt-wifi-pass')?.value.trim()||'',
-    instructions:document.getElementById('apt-instructions')?.value.trim()||'',
-    videoUrl:document.getElementById('apt-video')?.value.trim()||'',
-    rules:document.getElementById('apt-rules')?.value.trim()||'',
-    photos:aptData[aptId]?.photos||[],
-    photoCaptions,services,
-    updatedAt:serverTimestamp()
-  };
-  try{
-    await setDoc(doc(db,'checkin_apartments',aptId),data);
-    aptData[aptId]={...aptData[aptId],...data};
-    toast('Saved ✓');
-    closeDrawer();
-    render();
-  }catch(e){toast('Failed to save');}
-}
-
-window.uploadPhotos=async function(aptId,input){
-  const files=Array.from(input.files);
-  if(!files.length)return;
-  try{
-    const urls=[];
-    for(let i=0;i<files.length;i++){
-      toast('Uploading '+(i+1)+' of '+files.length+'...',15000);
-      const url=await uploadToCloudinary(files[i],'maxela/'+aptId+'/photos');
-      urls.push(url);
-    }
-    const existing=aptData[aptId]?.photos||[];
-    const allPhotos=[...existing,...urls];
-    await setDoc(doc(db,'checkin_apartments',aptId),{photos:allPhotos},{merge:true});
-    aptData[aptId]={...aptData[aptId],photos:allPhotos};
-    toast('✓ '+urls.length+' photo(s) uploaded!');
-    window.openAptDrawer(aptId);
-  }catch(e){toast('Failed: '+e.message);}
-}
-
-// ── GUEST MANAGEMENT ─────────────────────────────
-window.unlockGuest=async function(guestId){
-  if(!confirm('Unlock check-in for this guest now?'))return;
-  try{
-    await updateDoc(doc(db,'checkin_guests',guestId),{manualUnlock:true,unlockedAt:serverTimestamp()});
-    toast('Guest unlocked ✓');
-  }catch(e){toast('Failed');}
-}
-
-function buildScanBadge(sr){
-  if(!sr)return'';
-  if(sr.valid)return`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">✅ Valid</span>`;
-  if(sr.isPassport===false)return`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">❌ Not a passport</span>`;
-  return`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);">⚠️ Suspicious</span>`;
-}
-
-window.alertPassport=function(guestId){
-  const g=guestData.find(x=>x.id===guestId);if(!g)return;
-  const apt=APARTMENTS.find(a=>a.id===g.aptId);
-  const sr=g.passportScanResult||{};
-  const subject=encodeURIComponent(`⚠️ Suspicious passport upload - ${g.name||'Unknown guest'}`);
-  const body=encodeURIComponent([
-    `Guest Name: ${g.name||'Unknown'}`,
-    `Apartment: ${apt?.code||g.aptId}`,
-    `Reservation ID: ${g.matchedReservationId||'Not matched'}`,
-    `AI Scan Result: ${sr.isPassport===false?'Not a passport':'Suspicious'}`,
-    `Confidence: ${sr.confidence||'unknown'}`,
-    `AI Reason: ${sr.reason||'No reason given'}`,
-    '',
-    'Please review this guest\'s passport upload in the admin panel.'
-  ].join('\n'));
-  window.open(`mailto:nikavibliani@gmail.com?subject=${subject}&body=${body}`);
+window.addLaundryItem = () => {
+  const name = document.getElementById('newItemName').value.trim();
+  const price = parseFloat(document.getElementById('newItemPrice').value)||0;
+  if (!name) { showToast('Enter item name','error'); return; }
+  laundryItems.push({name,price});
+  document.getElementById('newItemName').value='';
+  document.getElementById('newItemPrice').value='';
+  renderLaundry(); showToast('Item added');
 };
 
-window.viewGuest=function(guestId){
-  const g=guestData.find(x=>x.id===guestId);if(!g)return;
-  const apt=APARTMENTS.find(a=>a.id===g.aptId);
-  const sr=g.passportScanResult;
-  const badge=buildScanBadge(sr);
-  const alertBlock=sr&&!sr.valid?
-    `<div style="margin-top:8px;padding:10px 12px;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--rs);font-size:12px;color:var(--amber);">
-       <strong>AI reason:</strong> ${esc(sr.reason||'No reason given')}
-     </div>
-     <button class="btn btn-amber btn-sm" style="margin-top:8px;width:100%;" onclick="window.alertPassport('${guestId}')">
-       📧 Send alert email
-     </button>` : '';
-  const passportHtml=g.passportUrl
-    ?`<div class="form-group">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-          <div class="form-label" style="margin:0;">Passport photo</div>
-          ${badge||'<span style="font-size:11px;color:var(--hint);">Not scanned</span>'}
-        </div>
-        <img src="${g.passportUrl}" class="passport-img">
-        ${alertBlock}
-      </div>`
-    :'<div style="color:var(--hint);font-size:13px;">No passport photo uploaded</div>';
-  document.getElementById('drawer-title').textContent='Guest — '+(apt?.code||g.aptId);
-  document.getElementById('drawer-body').innerHTML=`
-    <div class="form-group">
-      <div class="form-label">Full name</div>
-      <div style="font-size:15px;font-weight:600;">${esc(g.name||'—')}</div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><div class="form-label">Guests</div><div style="font-weight:600;">${g.guests||1}</div></div>
-      <div class="form-group"><div class="form-label">Status</div>
-        <span class="unlock-badge ${g.manualUnlock?'unlocked':'waiting'}">${g.manualUnlock?'Unlocked':'Waiting 2pm'}</span>
-      </div>
-    </div>
-    ${passportHtml}
-    ${!g.manualUnlock?`<button class="btn btn-green" style="width:100%;margin-top:1rem;" onclick="window.unlockGuest('${guestId}');closeDrawer()">Unlock check-in now</button>`:''}`;
-  document.getElementById('drawer-footer').innerHTML=`<button class="btn" onclick="closeDrawer()">Close</button>`;
-  openDrawer();
+function renderServices() {
+  document.getElementById('serviceList').innerHTML = services.map((svc,i) => `
+    <div class="item-row">
+      <input type="text" value="${svc.name}" onchange="services[${i}].name=this.value" placeholder="Service name">
+      <input type="number" value="${svc.price}" min="0" onchange="services[${i}].price=parseFloat(this.value)||0">
+      <span class="gel-label">GEL</span>
+      <input type="text" class="note-input" value="${svc.note||''}" onchange="services[${i}].note=this.value" placeholder="Note">
+      <button class="del-btn" onclick="services.splice(${i},1);renderServices()">✕</button>
+    </div>`).join('');
 }
 
-// ── HK SCHEDULE ──────────────────────────────────
-function renderHkSchedule(){
-  document.getElementById('main').innerHTML=
-    `<iframe src="hk-manage.html" style="display:block;width:100%;height:calc(100vh - 101px);border:none;"></iframe>`;
-}
-
-// ── HK PINS ───────────────────────────────────────
-function renderHkPins(){
-  const main=document.getElementById('main');
-  const roles=[
-    {id:'shartava',label:'Shartava Team PIN',desc:'Used by Shartava housekeeping staff'},
-    {id:'centre',label:'Centre Team PIN',desc:'Used by City Centre housekeeping staff'},
-    {id:'admin',label:'Admin PIN',desc:'Shows all rooms across both properties'}
-  ];
-  let html=`<div style="padding:1rem;max-width:480px;">
-    <div class="section-title">🔑 HK App PINs</div>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:1.25rem;">4-digit PINs used by housekeeping staff to log in to the HK app. Changes take effect immediately.</p>`;
-  roles.forEach(({id,label,desc})=>{
-    const cur=hkPinsData[id]||'';
-    html+=`<div class="card" style="margin-bottom:10px;">
-      <div class="card-body">
-        <div class="card-title">${label}</div>
-        <div class="card-sub" style="margin-bottom:10px;">${desc}</div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <input type="text" inputmode="numeric" maxlength="4" placeholder="••••"
-            value="${esc(cur)}" id="pin-inp-${id}"
-            style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;
-                   font-family:'DM Mono',monospace;font-size:20px;letter-spacing:6px;text-align:center;">
-          <button onclick="window.saveHkPin('${id}')"
-            style="padding:9px 20px;background:var(--accent);color:#fff;border:none;
-                   border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">
-            Save
-          </button>
-        </div>
-      </div>
-    </div>`;
-  });
-  html+='</div>';
-  main.innerHTML=html;
-}
-window.saveHkPin=async function(roleId){
-  const input=document.getElementById('pin-inp-'+roleId);
-  const pin=(input?.value||'').trim();
-  if(!/^\d{4}$/.test(pin)){toast('PIN must be exactly 4 digits');return;}
-  try{
-    await setDoc(doc(db,'hk_pins',roleId),{pin,updatedAt:serverTimestamp()});
-    hkPinsData[roleId]=pin;
-    toast('PIN saved ✓');
-  }catch(e){toast('Failed: '+e.message);}
+window.addService = () => {
+  const name = document.getElementById('newSvcName').value.trim();
+  const price = parseFloat(document.getElementById('newSvcPrice').value)||0;
+  const note = document.getElementById('newSvcNote').value.trim();
+  if (!name) { showToast('Enter service name','error'); return; }
+  services.push({name,price,note});
+  document.getElementById('newSvcName').value='';
+  document.getElementById('newSvcPrice').value='';
+  document.getElementById('newSvcNote').value='';
+  renderServices(); showToast('Service added');
 };
 
-// ── FIREBASE LISTENERS ────────────────────────────
-let loaded=0;
-function checkLoaded(){loaded++;if(loaded>=2){document.getElementById('loading').style.display='none';render();}}
+window.saveAll = async () => {
+  try {
+    await setDoc(doc(db,'checkin_admin','config'), {visibility, laundryItems, services, updatedAt:serverTimestamp()});
+    showToast('All changes saved','success');
+  } catch(e) { showToast('Error: '+e.message,'error'); }
+};
 
-onSnapshot(collection(db,'checkin_apartments'),snap=>{
-  aptData={};
-  snap.docs.forEach(d=>{aptData[d.id]=d.data();});
-  // Pre-fill tuyaDeviceId for apartment 0-4 if not already set
-  if(!aptData['0-4']?.tuyaDeviceId){
-    setDoc(doc(db,'checkin_apartments','0-4'),{tuyaDeviceId:'bf9f9b096af5eb1043fik2'},{merge:true})
-      .catch(()=>{});
-  }
-  if(loaded>=2)render();else checkLoaded();
-});
+function showToast(msg,type='') {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className=`toast show ${type}`;
+  setTimeout(()=>t.className='toast',3000);
+}
 
-onSnapshot(collection(db,'checkin_guests'),snap=>{
-  guestData=snap.docs.map(d=>({id:d.id,...d.data()}));
-  if(loaded>=2)render();else checkLoaded();
-});
-
-onSnapshot(collection(db,'hk_pins'),snap=>{
-  snap.docs.forEach(d=>{if(d.id in hkPinsData)hkPinsData[d.id]=d.data().pin||'';});
-  if(currentTab==='hkpins')render();
-});
-
-
-setTimeout(()=>{document.getElementById('loading').style.display='none';render();},5000);
+load();
 </script>
 </body>
 </html>
