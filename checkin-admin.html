@@ -112,6 +112,37 @@ textarea.form-input{height:auto;padding:10px;resize:vertical;line-height:1.5;}
 /* Guest photo */
 .passport-img{width:100%;max-height:200px;object-fit:cover;border-radius:var(--rs);border:1px solid var(--border);margin-top:6px;}
 
+/* Guest Settings */
+.prop-tabs{display:flex;gap:2px;background:var(--surface2);padding:3px;border-radius:6px;margin-bottom:20px;flex-wrap:wrap;}
+.prop-tab{padding:5px 12px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:all 0.15s;font-family:'DM Sans',sans-serif;}
+.prop-tab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);}
+.toggle-row:last-child{border-bottom:none;}
+.toggle-info{flex:1;}
+.toggle-name{font-weight:600;font-size:13px;}
+.toggle-desc{font-size:12px;color:var(--muted);margin-top:2px;}
+.switch{position:relative;width:44px;height:24px;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;}
+.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#ccc;border-radius:24px;transition:0.2s;}
+.slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:0.2s;}
+input:checked+.slider{background:var(--accent);}
+input:checked+.slider:before{transform:translateX(20px);}
+.item-row{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border-radius:var(--rs);border:1px solid var(--border);margin-bottom:8px;}
+.item-row input[type="text"]{flex:1;border:none;background:transparent;font-size:13px;font-family:'DM Sans',sans-serif;color:var(--text);outline:none;min-width:0;}
+.item-row input[type="number"]{width:70px;border:1px solid var(--border);background:var(--surface);border-radius:5px;padding:4px 8px;font-size:13px;text-align:right;}
+.gel-label{font-size:12px;color:var(--muted);flex-shrink:0;}
+.del-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:2px 6px;border-radius:4px;flex-shrink:0;}
+.del-btn:hover{color:var(--red);background:var(--red-bg);}
+.gs-add-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;}
+.gs-add-input{flex:1;min-width:140px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--rs);font-size:13px;font-family:'DM Sans',sans-serif;background:var(--surface);}
+.gs-add-input:focus{outline:none;border-color:var(--accent);}
+.gs-add-price{width:80px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--rs);font-size:13px;font-family:'DM Sans',sans-serif;background:var(--surface);text-align:right;}
+.gs-add-price:focus{outline:none;border-color:var(--accent);}
+.gs-add-btn{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);padding:8px 14px;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif;}
+.gs-add-btn:hover{background:var(--accent);color:#fff;}
+.gs-note-input{border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--surface);width:140px;}
+.gs-note-input:focus{outline:none;border-color:var(--accent);}
+
 @media(max-width:600px){
   .form-row{grid-template-columns:1fr;}
   .apt-grid{grid-template-columns:1fr 1fr;}
@@ -146,7 +177,7 @@ textarea.form-input{height:auto;padding:10px;resize:vertical;line-height:1.5;}
   <button class="tab active" data-tab="apartments" onclick="switchTab('apartments')">Apartments</button>
   <button class="tab" data-tab="guests" onclick="switchTab('guests')">Guests</button>
   <button class="tab" data-tab="hkpins" onclick="switchTab('hkpins')">HK Pins</button>
-  <button class="tab" data-tab="hkschedule" onclick="switchTab('hkschedule')">HK Schedule</button>
+  <button class="tab" data-tab="guestsettings" onclick="switchTab('guestsettings')">Guest Page Settings</button>
 </div>
 
 <div class="main" id="main"></div>
@@ -212,6 +243,45 @@ let currentTab='apartments';
 let hkPinsData={shartava:'',centre:'',admin:''};
 let currentDrawerApt=null;
 
+// ── GUEST PAGE SETTINGS STATE ─────────────────────
+const SECTIONS=[
+  {id:'checkin',name:'Check-in Details',desc:'Door code, instructions, photos, video'},
+  {id:'access_code',name:'Access Code / Door Lock',desc:'Smart lock code inside Check-in Details'},
+  {id:'elevator_code',name:'Elevator / Entrance Code',desc:'Building entrance code'},
+  {id:'wifi',name:'WiFi & Internet',desc:'Network name and password'},
+  {id:'services',name:'Services Section',desc:'The entire Services tile'},
+  {id:'laundry',name:'↳ Laundry',desc:'Laundry itemized list inside Services'},
+  {id:'cleaning',name:'↳ Cleaning',desc:'Cleaning service inside Services'},
+  {id:'city_tour',name:'↳ City Tour',desc:'City tour inside Services'},
+  {id:'airport_transfer',name:'↳ Airport Transfer',desc:'Airport transfer inside Services'},
+  {id:'recs',name:'Recommendations',desc:'Local restaurants & places'},
+  {id:'rules',name:'House Rules',desc:'Apartment rules page'},
+  {id:'contact',name:'Contact Us',desc:'WhatsApp contact button'},
+];
+const SECTION_DEFAULTS={
+  ROOMS:    {checkin:true,access_code:false,elevator_code:false,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  MAXELA:   {checkin:true,access_code:true, elevator_code:true, wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  BIG_APT:  {checkin:true,access_code:true, elevator_code:true, wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  FREEDOM:  {checkin:true,access_code:true, elevator_code:false,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  ORBELIANI:{checkin:true,access_code:true, elevator_code:false,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+};
+const LAUNDRY_DEFAULTS=[
+  {name:'T-shirt / Polo',price:5},{name:'Pants / Jeans',price:8},
+  {name:'Dress',price:10},{name:'Jacket / Coat',price:15},
+  {name:'Underwear / Socks',price:3},{name:'Bedsheet',price:12},{name:'Towel',price:5},
+];
+const SERVICE_DEFAULTS=[
+  {name:'Cleaning',price:30,note:''},
+  {name:'City Tour',price:50,note:'per person'},
+  {name:'Airport Transfer',price:0,note:'price on request'},
+  {name:'Other Request',price:0,note:''},
+];
+let gsVisibility=JSON.parse(JSON.stringify(SECTION_DEFAULTS));
+let gsLaundry=[...LAUNDRY_DEFAULTS];
+let gsServices=[...SERVICE_DEFAULTS];
+let gsProp='ROOMS';
+let gsLoaded=false;
+
 // ── HELPERS ───────────────────────────────────────
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function toast(msg,duration=2500){
@@ -239,7 +309,7 @@ window.switchTab=function(tab){
 function render(){
   if(currentTab==='apartments') renderApartments();
   else if(currentTab==='hkpins') renderHkPins();
-  else if(currentTab==='hkschedule') renderHkSchedule();
+  else if(currentTab==='guestsettings') renderGuestSettings();
   else renderGuests();
 }
 
@@ -758,11 +828,180 @@ window.viewGuest=function(guestId){
   openDrawer();
 }
 
-// ── HK SCHEDULE ──────────────────────────────────
-function renderHkSchedule(){
-  document.getElementById('main').innerHTML=
-    `<iframe src="hk-manage.html" style="display:block;width:100%;height:calc(100vh - 101px);border:none;"></iframe>`;
+// ── GUEST PAGE SETTINGS ───────────────────────────
+async function loadGuestSettings(){
+  try{
+    const snap=await getDoc(doc(db,'checkin_admin','config'));
+    if(snap.exists()){
+      const d=snap.data();
+      if(d.visibility)gsVisibility={...JSON.parse(JSON.stringify(SECTION_DEFAULTS)),...d.visibility};
+      if(d.laundryItems)gsLaundry=d.laundryItems;
+      if(d.services)gsServices=d.services;
+    }
+  }catch(e){console.warn('Guest settings load error:',e);}
+  gsLoaded=true;
 }
+
+async function renderGuestSettings(){
+  const main=document.getElementById('main');
+  if(!gsLoaded){
+    main.innerHTML='<div style="padding:2rem;text-align:center;color:var(--hint);"><div class="spinner" style="margin:0 auto 12px;"></div>Loading…</div>';
+    await loadGuestSettings();
+  }
+  main.innerHTML=`<div class="page">
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header">
+        <div class="card-title">👁 Section Visibility</div>
+        <span style="font-size:12px;color:var(--muted);">Control what guests see per property type</span>
+      </div>
+      <div class="card-body">
+        <div style="background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--rs);padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:16px;">
+          Changes apply after saving. Guests see updated sections on next page load.
+        </div>
+        <div class="prop-tabs" id="gsPropTabs">
+          <button class="prop-tab active" data-prop="ROOMS" onclick="window.gsPropSelect('ROOMS')">Rooms (0-x)</button>
+          <button class="prop-tab" data-prop="MAXELA" onclick="window.gsPropSelect('MAXELA')">Maxela (6-x, 7-x)</button>
+          <button class="prop-tab" data-prop="BIG_APT" onclick="window.gsPropSelect('BIG_APT')">Big Apt (6-3)</button>
+          <button class="prop-tab" data-prop="FREEDOM" onclick="window.gsPropSelect('FREEDOM')">Freedom (tab-x)</button>
+          <button class="prop-tab" data-prop="ORBELIANI" onclick="window.gsPropSelect('ORBELIANI')">Orbeliani (orb-x)</button>
+        </div>
+        <div id="gsToggles"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header">
+        <div class="card-title">👕 Laundry Items</div>
+        <span style="font-size:12px;color:var(--muted);">Guest selects items, total calculated automatically</span>
+      </div>
+      <div class="card-body">
+        <div id="gsLaundryList"></div>
+        <div class="gs-add-row">
+          <input type="text" class="gs-add-input" id="gsNewItemName" placeholder="Item name (e.g. T-shirt)">
+          <input type="number" class="gs-add-price" id="gsNewItemPrice" placeholder="5" min="1">
+          <span class="gel-label">GEL</span>
+          <button class="gs-add-btn" onclick="window.gsAddLaundry()">+ Add Item</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header">
+        <div class="card-title">🛎 Other Services</div>
+        <span style="font-size:12px;color:var(--muted);">Shown in the Services section (excluding laundry)</span>
+      </div>
+      <div class="card-body">
+        <div id="gsServiceList"></div>
+        <div class="gs-add-row">
+          <input type="text" class="gs-add-input" id="gsNewSvcName" placeholder="Service name">
+          <input type="number" class="gs-add-price" id="gsNewSvcPrice" placeholder="Price" min="0">
+          <span class="gel-label">GEL</span>
+          <input type="text" class="gs-add-input gs-note-input" id="gsNewSvcNote" placeholder="Note (optional)">
+          <button class="gs-add-btn" onclick="window.gsAddService()">+ Add</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;padding-bottom:1.5rem;">
+      <button class="btn btn-primary" onclick="window.gsSave()">Save Guest Page Settings</button>
+    </div>
+  </div>`;
+
+  gsRenderPropTabs();
+  gsRenderToggles();
+  gsRenderLaundry();
+  gsRenderServices();
+}
+
+function gsRenderPropTabs(){
+  document.querySelectorAll('#gsPropTabs .prop-tab').forEach(t=>
+    t.classList.toggle('active',t.dataset.prop===gsProp));
+}
+
+function gsRenderToggles(){
+  const vis=gsVisibility[gsProp]||{};
+  const el=document.getElementById('gsToggles');
+  if(!el)return;
+  el.innerHTML=SECTIONS.map(s=>`
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <div class="toggle-name">${s.name}</div>
+        <div class="toggle-desc">${s.desc}</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" ${vis[s.id]!==false?'checked':''} onchange="window.gsToggle('${s.id}',this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>`).join('');
+}
+
+function gsRenderLaundry(){
+  const el=document.getElementById('gsLaundryList');
+  if(!el)return;
+  el.innerHTML=gsLaundry.map((item,i)=>`
+    <div class="item-row">
+      <input type="text" value="${esc(item.name)}" onchange="gsLaundry[${i}].name=this.value" placeholder="Item name">
+      <input type="number" value="${item.price}" min="0" onchange="gsLaundry[${i}].price=parseFloat(this.value)||0">
+      <span class="gel-label">GEL</span>
+      <button class="del-btn" onclick="gsLaundry.splice(${i},1);gsRenderLaundry()">✕</button>
+    </div>`).join('');
+}
+
+function gsRenderServices(){
+  const el=document.getElementById('gsServiceList');
+  if(!el)return;
+  el.innerHTML=gsServices.map((svc,i)=>`
+    <div class="item-row">
+      <input type="text" value="${esc(svc.name)}" onchange="gsServices[${i}].name=this.value" placeholder="Service name">
+      <input type="number" value="${svc.price}" min="0" onchange="gsServices[${i}].price=parseFloat(this.value)||0">
+      <span class="gel-label">GEL</span>
+      <input type="text" class="gs-note-input" value="${esc(svc.note||'')}" onchange="gsServices[${i}].note=this.value" placeholder="Note">
+      <button class="del-btn" onclick="gsServices.splice(${i},1);gsRenderServices()">✕</button>
+    </div>`).join('');
+}
+
+window.gsPropSelect=function(prop){
+  gsProp=prop;
+  gsRenderPropTabs();
+  gsRenderToggles();
+};
+
+window.gsToggle=function(id,val){
+  if(!gsVisibility[gsProp])gsVisibility[gsProp]={};
+  gsVisibility[gsProp][id]=val;
+};
+
+window.gsAddLaundry=function(){
+  const name=document.getElementById('gsNewItemName')?.value.trim();
+  const price=parseFloat(document.getElementById('gsNewItemPrice')?.value)||0;
+  if(!name){toast('Enter item name');return;}
+  gsLaundry.push({name,price});
+  document.getElementById('gsNewItemName').value='';
+  document.getElementById('gsNewItemPrice').value='';
+  gsRenderLaundry();
+  toast('Item added');
+};
+
+window.gsAddService=function(){
+  const name=document.getElementById('gsNewSvcName')?.value.trim();
+  const price=parseFloat(document.getElementById('gsNewSvcPrice')?.value)||0;
+  const note=document.getElementById('gsNewSvcNote')?.value.trim()||'';
+  if(!name){toast('Enter service name');return;}
+  gsServices.push({name,price,note});
+  document.getElementById('gsNewSvcName').value='';
+  document.getElementById('gsNewSvcPrice').value='';
+  document.getElementById('gsNewSvcNote').value='';
+  gsRenderServices();
+  toast('Service added');
+};
+
+window.gsSave=async function(){
+  try{
+    await setDoc(doc(db,'checkin_admin','config'),
+      {visibility:gsVisibility,laundryItems:gsLaundry,services:gsServices,updatedAt:serverTimestamp()});
+    toast('Guest page settings saved ✓');
+  }catch(e){toast('Failed to save: '+e.message);}
+};
 
 // ── HK PINS ───────────────────────────────────────
 function renderHkPins(){
