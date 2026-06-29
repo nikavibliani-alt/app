@@ -935,15 +935,23 @@ function gsRenderToggles(){
     </div>`).join('');
 }
 
+window.gsDeleteLaundry=function(i){gsLaundry.splice(i,1);gsRenderLaundry();};
+window.gsUpdateLaundryName=function(i,v){gsLaundry[i].name=v;};
+window.gsUpdateLaundryPrice=function(i,v){gsLaundry[i].price=parseFloat(v)||0;};
+window.gsDeleteService=function(i){gsServices.splice(i,1);gsRenderServices();};
+window.gsUpdateSvcName=function(i,v){gsServices[i].name=v;};
+window.gsUpdateSvcPrice=function(i,v){gsServices[i].price=parseFloat(v)||0;};
+window.gsUpdateSvcNote=function(i,v){gsServices[i].note=v;};
+
 function gsRenderLaundry(){
   const el=document.getElementById('gsLaundryList');
   if(!el)return;
   el.innerHTML=gsLaundry.map((item,i)=>`
     <div class="item-row">
-      <input type="text" value="${esc(item.name)}" onchange="gsLaundry[${i}].name=this.value" placeholder="Item name">
-      <input type="number" value="${item.price}" min="0" onchange="gsLaundry[${i}].price=parseFloat(this.value)||0">
+      <input type="text" value="${esc(item.name)}" onchange="window.gsUpdateLaundryName(${i},this.value)" placeholder="Item name">
+      <input type="number" value="${item.price}" min="0" onchange="window.gsUpdateLaundryPrice(${i},this.value)">
       <span class="gel-label">GEL</span>
-      <button class="del-btn" onclick="gsLaundry.splice(${i},1);gsRenderLaundry()">✕</button>
+      <button class="del-btn" onclick="window.gsDeleteLaundry(${i})">✕</button>
     </div>`).join('');
 }
 
@@ -952,11 +960,11 @@ function gsRenderServices(){
   if(!el)return;
   el.innerHTML=gsServices.map((svc,i)=>`
     <div class="item-row">
-      <input type="text" value="${esc(svc.name)}" onchange="gsServices[${i}].name=this.value" placeholder="Service name">
-      <input type="number" value="${svc.price}" min="0" onchange="gsServices[${i}].price=parseFloat(this.value)||0">
+      <input type="text" value="${esc(svc.name)}" onchange="window.gsUpdateSvcName(${i},this.value)" placeholder="Service name">
+      <input type="number" value="${svc.price}" min="0" onchange="window.gsUpdateSvcPrice(${i},this.value)">
       <span class="gel-label">GEL</span>
-      <input type="text" class="gs-note-input" value="${esc(svc.note||'')}" onchange="gsServices[${i}].note=this.value" placeholder="Note">
-      <button class="del-btn" onclick="gsServices.splice(${i},1);gsRenderServices()">✕</button>
+      <input type="text" class="gs-note-input" value="${esc(svc.note||'')}" onchange="window.gsUpdateSvcNote(${i},this.value)" placeholder="Note">
+      <button class="del-btn" onclick="window.gsDeleteService(${i})">✕</button>
     </div>`).join('');
 }
 
