@@ -404,13 +404,22 @@ def sync_channels(results: dict):
 
     for portal in portals_needed:
         print(f"  Syncing {portal}...")
-        resp = requests.post(
-            f"{SYNC_ENDPOINT}?Portal={portal}",
-            json={"portal": portal},
-            headers=get_headers(),
-            timeout=60,
-        )
-        resp.raise_for_status()
+        for attempt in range(3):
+            try:
+                resp = requests.post(
+                    f"{SYNC_ENDPOINT}?Portal={portal}",
+                    json={"portal": portal},
+                    headers=get_headers(),
+                    timeout=60,
+                )
+                resp.raise_for_status()
+                break
+            except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
+                if attempt < 2:
+                    print(f"  [{portal}] attempt {attempt+1}/3 failed: {e} — retrying in 10s...", file=sys.stderr)
+                    time.sleep(10)
+                else:
+                    print(f"  [{portal}] all 3 attempts failed: {e} — skipping channel.", file=sys.stderr)
         time.sleep(2)
 
 
