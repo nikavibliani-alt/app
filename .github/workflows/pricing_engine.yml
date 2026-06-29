@@ -2,10 +2,6 @@ name: Maxela Pricing Engine
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 5 * * *'    # 09:00 Tbilisi time
-    - cron: '0 11 * * *'   # 15:00 Tbilisi time
-    - cron: '0 17 * * *'   # 21:00 Tbilisi time
 
 jobs:
   pricing:
