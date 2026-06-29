@@ -1057,7 +1057,7 @@ window.submitRegistration=async function(){
           else if(refNm)score=2;
         }
       }
-      if(score>=2)allMatches.push({res:r,score});
+      if(score>=3)allMatches.push({res:r,score});
     });
     if(!allMatches.length){
       btn.disabled=false;
@@ -1148,6 +1148,24 @@ function showHome(){
   document.getElementById('page-register').classList.remove('active');
   document.getElementById('page-home').classList.add('active');
   document.getElementById('home-guest-name').textContent=guestData?.name||'Guest';
+
+  // Post-checkout: every reservation has ended — show thank-you, skip all tiles
+  const _today=tbilisiToday();
+  if(allMatchedReservations.length>0&&allMatchedReservations.every(r=>{
+    const co=r.checkout||r.checkOut||'';return co&&co<_today;
+  })){
+    document.getElementById('t-greeting-label').textContent='';
+    const aptEl=document.getElementById('apt-area');
+    if(aptEl){aptEl.className='greeting__apt';aptEl.innerHTML='<span class="swatch"></span><b>Maxela · Tbilisi</b>';}
+    document.getElementById('tiles-grid').innerHTML=
+      `<div style="padding:3rem 1.5rem 4rem;text-align:center;">
+        <div style="font-size:52px;margin-bottom:1.25rem;">🌟</div>
+        <div style="font-size:22px;font-weight:600;color:var(--ink);margin-bottom:10px;letter-spacing:-0.01em;">Thank you for staying with us!</div>
+        <div style="font-size:15px;color:var(--muted);line-height:1.7;">Safe travels. We hope to see you again soon.</div>
+      </div>`;
+    return;
+  }
+
   console.log('HOME PAGE - passportScanResult:', JSON.stringify(guestData?.passportScanResult));
   console.log('Has keys:', Object.keys(guestData?.passportScanResult || {}).length);
   const warningTarget = document.querySelector('#page-home .greeting');
