@@ -289,6 +289,7 @@ let gsServices=SERVICE_DEFAULTS.map(s=>({...s}));
 let gsProp='ROOMS';
 let gsLoaded=false;
 let gsOpenEdits={};
+let gsSectionLabels={};
 
 // ── HELPERS ───────────────────────────────────────
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -855,6 +856,7 @@ async function loadGuestSettings(){
           if(!gsServices.find(s=>s.id===def.id))gsServices.push({...def});
         }
       }
+      if(d.sectionLabels)gsSectionLabels=d.sectionLabels;
     }
   }catch(e){console.warn('Guest settings load error:',e);}
   gsLoaded=true;
@@ -869,7 +871,7 @@ async function renderGuestSettings(){
   main.innerHTML=`<div class="page">
     <div class="card" style="margin-bottom:12px;">
       <div class="card-header">
-        <div class="card-title">👁 Section Visibility</div>
+        <div class="card-title">👁 Section Visibility & Content</div>
         <span style="font-size:12px;color:var(--muted);">Control what guests see per property type</span>
       </div>
       <div class="card-body">
@@ -887,39 +889,6 @@ async function renderGuestSettings(){
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:12px;">
-      <div class="card-header">
-        <div class="card-title">👕 Laundry Items</div>
-        <span style="font-size:12px;color:var(--muted);">Guest selects items, total calculated automatically</span>
-      </div>
-      <div class="card-body">
-        <div id="gsLaundryList"></div>
-        <div class="gs-add-row">
-          <input type="text" class="gs-add-input" id="gsNewItemName" placeholder="Item name (e.g. T-shirt)">
-          <input type="number" class="gs-add-price" id="gsNewItemPrice" placeholder="5" min="1">
-          <span class="gel-label">GEL</span>
-          <button class="gs-add-btn" onclick="window.gsAddLaundry()">+ Add Item</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:12px;">
-      <div class="card-header">
-        <div class="card-title">🛎 Other Services</div>
-        <span style="font-size:12px;color:var(--muted);">Shown in the Services section (excluding laundry)</span>
-      </div>
-      <div class="card-body">
-        <div id="gsServiceList"></div>
-        <div class="gs-add-row">
-          <input type="text" class="gs-add-input" id="gsNewSvcName" placeholder="Service name">
-          <input type="number" class="gs-add-price" id="gsNewSvcPrice" placeholder="Price" min="0">
-          <span class="gel-label">GEL</span>
-          <input type="text" class="gs-add-input gs-note-input" id="gsNewSvcNote" placeholder="Note (optional)">
-          <button class="gs-add-btn" onclick="window.gsAddService()">+ Add</button>
-        </div>
-      </div>
-    </div>
-
     <div style="display:flex;justify-content:flex-end;padding-bottom:1.5rem;">
       <button class="btn btn-primary" onclick="window.gsSave()">Save Guest Page Settings</button>
     </div>
@@ -927,8 +896,6 @@ async function renderGuestSettings(){
 
   gsRenderPropTabs();
   gsRenderToggles();
-  gsRenderLaundry();
-  gsRenderServices();
 }
 
 function gsRenderPropTabs(){
@@ -940,39 +907,57 @@ function gsRenderToggles(){
   const vis=gsVisibility[gsProp]||{};
   const el=document.getElementById('gsToggles');
   if(!el)return;
-  const EDITABLE=['laundry','cleaning','city_tour','airport_transfer'];
+  const EDIT_TYPE={
+    wifi:'label',laundry:'laundry',
+    cleaning:'service',city_tour:'service',airport_transfer:'service',
+    recs:'label',rules:'label',contact:'label',
+  };
   el.innerHTML=SECTIONS.map(s=>{
-    const editable=EDITABLE.includes(s.id);
-    const svc=editable?gsServices.find(x=>x.id===s.id):null;
+    const eType=EDIT_TYPE[s.id];
     const open=!!gsOpenEdits[s.id];
-    const formHtml=svc?`
+    let formHtml='';
+    if(eType==='service'){
+      const svc=gsServices.find(x=>x.id===s.id)||{};
+      formHtml=`
       <div class="svc-edit-form${open?' open':''}" id="svc-edit-form-${s.id}">
-        <div>
-          <div class="svc-ef-label">Display name</div>
-          <input class="svc-ef-input" type="text" value="${esc(svc.name||'')}" oninput="window.gsUpdateSvcField('${s.id}','name',this.value)" placeholder="Service name">
+        <div><div class="svc-ef-label">Display name</div>
+          <input class="svc-ef-input" type="text" value="${esc(svc.name||'')}" oninput="window.gsUpdateSvcField('${s.id}','name',this.value)" placeholder="Service name"></div>
+        <div><div class="svc-ef-label">Price (GEL)</div>
+          <input class="svc-ef-input" type="number" value="${svc.price||0}" min="0" oninput="window.gsUpdateSvcField('${s.id}','price',this.value)"></div>
+        <div><div class="svc-ef-label">Price note</div>
+          <input class="svc-ef-input" type="text" value="${esc(svc.note||'')}" oninput="window.gsUpdateSvcField('${s.id}','note',this.value)" placeholder='e.g. "per person"'></div>
+        <div><div class="svc-ef-label">Description</div>
+          <input class="svc-ef-input" type="text" value="${esc(svc.desc||'')}" oninput="window.gsUpdateSvcField('${s.id}','desc',this.value)" placeholder="Shown to guest"></div>
+      </div>`;
+    }else if(eType==='laundry'){
+      formHtml=`
+      <div class="svc-edit-form${open?' open':''}" id="svc-edit-form-laundry">
+        <div style="grid-column:1/-1;">
+          <div id="gsLaundryInlineList"></div>
+          <div class="gs-add-row" style="margin-top:8px;">
+            <input type="text" class="gs-add-input" id="gsNewItemName" placeholder="Item name (e.g. T-shirt)">
+            <input type="number" class="gs-add-price" id="gsNewItemPrice" placeholder="5" min="1">
+            <span class="gel-label">GEL</span>
+            <button class="gs-add-btn" onclick="window.gsAddLaundry()">+ Add</button>
+          </div>
         </div>
-        ${s.id!=='laundry'?`
-        <div>
-          <div class="svc-ef-label">Price (GEL)</div>
-          <input class="svc-ef-input" type="number" value="${svc.price||0}" min="0" oninput="window.gsUpdateSvcField('${s.id}','price',this.value)">
+      </div>`;
+    }else if(eType==='label'){
+      formHtml=`
+      <div class="svc-edit-form${open?' open':''}" id="svc-edit-form-${s.id}">
+        <div style="grid-column:1/-1;"><div class="svc-ef-label">Subtitle text (shown on guest tile)</div>
+          <input class="svc-ef-input" type="text" value="${esc(gsSectionLabels[s.id]||'')}" oninput="window.gsUpdateSectionLabel('${s.id}',this.value)" placeholder="${esc(s.desc)}">
         </div>
-        <div>
-          <div class="svc-ef-label">Price note</div>
-          <input class="svc-ef-input" type="text" value="${esc(svc.note||'')}" oninput="window.gsUpdateSvcField('${s.id}','note',this.value)" placeholder='e.g. "per person"'>
-        </div>
-        <div>`:`<div style="grid-column:1/-1;">` }
-          <div class="svc-ef-label">Description</div>
-          <input class="svc-ef-input" type="text" value="${esc(svc.desc||'')}" oninput="window.gsUpdateSvcField('${s.id}','desc',this.value)" placeholder="Shown to guest on services page">
-        </div>
-      </div>`:'';
+      </div>`;
+    }
     return `
-    <div class="toggle-row"${editable?' style="flex-wrap:wrap;"':''}>
+    <div class="toggle-row"${eType?' style="flex-wrap:wrap;"':''}>
       <div class="toggle-info">
         <div class="toggle-name">${s.name}</div>
         <div class="toggle-desc">${s.desc}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        ${editable?`<button class="edit-btn${open?' active':''}" id="svc-edit-btn-${s.id}" onclick="window.gsSvcEditToggle('${s.id}')">Edit ›</button>`:''}
+        ${eType?`<button class="edit-btn${open?' active':''}" id="svc-edit-btn-${s.id}" onclick="window.gsSvcEditToggle('${s.id}')">Edit ›</button>`:''}
         <label class="switch">
           <input type="checkbox" ${vis[s.id]!==false?'checked':''} onchange="window.gsToggle('${s.id}',this.checked)">
           <span class="slider"></span>
@@ -981,30 +966,29 @@ function gsRenderToggles(){
       ${formHtml}
     </div>`;
   }).join('');
+  if(gsOpenEdits['laundry'])gsRenderLaundry();
 }
 
 window.gsDeleteLaundry=function(i){gsLaundry.splice(i,1);gsRenderLaundry();};
 window.gsUpdateLaundryName=function(i,v){gsLaundry[i].name=v;};
 window.gsUpdateLaundryPrice=function(i,v){gsLaundry[i].price=parseFloat(v)||0;};
-window.gsDeleteService=function(i){gsServices.splice(i,1);gsRenderServices();};
-window.gsUpdateSvcName=function(i,v){gsServices[i].name=v;};
-window.gsUpdateSvcPrice=function(i,v){gsServices[i].price=parseFloat(v)||0;};
-window.gsUpdateSvcNote=function(i,v){gsServices[i].note=v;};
 window.gsSvcEditToggle=function(id){
   gsOpenEdits[id]=!gsOpenEdits[id];
   const form=document.getElementById('svc-edit-form-'+id);
   const btn=document.getElementById('svc-edit-btn-'+id);
   if(form)form.classList.toggle('open',!!gsOpenEdits[id]);
   if(btn)btn.classList.toggle('active',!!gsOpenEdits[id]);
+  if(id==='laundry'&&gsOpenEdits[id])gsRenderLaundry();
 };
 window.gsUpdateSvcField=function(id,field,val){
   const svc=gsServices.find(x=>x.id===id);
   if(!svc)return;
   svc[field]=field==='price'?(parseFloat(val)||0):val;
 };
+window.gsUpdateSectionLabel=function(id,val){gsSectionLabels[id]=val;};
 
 function gsRenderLaundry(){
-  const el=document.getElementById('gsLaundryList');
+  const el=document.getElementById('gsLaundryInlineList');
   if(!el)return;
   el.innerHTML=gsLaundry.map((item,i)=>`
     <div class="item-row">
@@ -1015,18 +999,6 @@ function gsRenderLaundry(){
     </div>`).join('');
 }
 
-function gsRenderServices(){
-  const el=document.getElementById('gsServiceList');
-  if(!el)return;
-  el.innerHTML=gsServices.map((svc,i)=>`
-    <div class="item-row">
-      <input type="text" value="${esc(svc.name)}" onchange="window.gsUpdateSvcName(${i},this.value)" placeholder="Service name">
-      <input type="number" value="${svc.price}" min="0" onchange="window.gsUpdateSvcPrice(${i},this.value)">
-      <span class="gel-label">GEL</span>
-      <input type="text" class="gs-note-input" value="${esc(svc.note||'')}" onchange="window.gsUpdateSvcNote(${i},this.value)" placeholder="Note">
-      <button class="del-btn" onclick="window.gsDeleteService(${i})">✕</button>
-    </div>`).join('');
-}
 
 window.gsPropSelect=function(prop){
   gsProp=prop;
@@ -1050,23 +1022,11 @@ window.gsAddLaundry=function(){
   toast('Item added');
 };
 
-window.gsAddService=function(){
-  const name=document.getElementById('gsNewSvcName')?.value.trim();
-  const price=parseFloat(document.getElementById('gsNewSvcPrice')?.value)||0;
-  const note=document.getElementById('gsNewSvcNote')?.value.trim()||'';
-  if(!name){toast('Enter service name');return;}
-  gsServices.push({name,price,note});
-  document.getElementById('gsNewSvcName').value='';
-  document.getElementById('gsNewSvcPrice').value='';
-  document.getElementById('gsNewSvcNote').value='';
-  gsRenderServices();
-  toast('Service added');
-};
 
 window.gsSave=async function(){
   try{
     await setDoc(doc(db,'checkin_admin','config'),
-      {visibility:gsVisibility,laundryItems:gsLaundry,services:gsServices,updatedAt:serverTimestamp()});
+      {visibility:gsVisibility,laundryItems:gsLaundry,services:gsServices,sectionLabels:gsSectionLabels,updatedAt:serverTimestamp()});
     toast('Guest page settings saved ✓');
   }catch(e){toast('Failed to save: '+e.message);}
 };
