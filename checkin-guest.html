@@ -327,7 +327,8 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 .sc-arrow{color:var(--muted);font-size:20px;flex-shrink:0;}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;display:flex;align-items:flex-end;justify-content:center;}
 .modal-overlay.hidden{display:none;}
-.modal-sheet{background:var(--surface);border-radius:var(--r) var(--r) 0 0;width:100%;max-width:560px;padding:1.5rem 1.25rem 2.5rem;animation:fadeUp 0.25s ease;}
+.modal-sheet{background:var(--surface);border-radius:var(--r) var(--r) 0 0;width:100%;max-width:560px;padding:1.5rem 1.25rem 2.5rem;animation:fadeUp 0.25s ease;max-height:90vh;display:flex;flex-direction:column;}
+.modal-scroll{overflow-y:auto;flex:1;min-height:0;}
 .modal-handle{width:36px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 1.25rem;}
 .modal-title{font-family:var(--serif);font-size:18px;font-weight:400;margin-bottom:1rem;letter-spacing:-0.005em;}
 textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
@@ -387,10 +388,12 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-title" id="svc-modal-title">Request</div>
-    <div id="svc-modal-extra"></div>
-    <div class="form-group">
-      <label class="form-label" id="svc-note-lbl">Notes</label>
-      <textarea class="form-input" id="svc-note" placeholder="..."></textarea>
+    <div class="modal-scroll">
+      <div id="svc-modal-extra"></div>
+      <div class="form-group">
+        <label class="form-label" id="svc-note-lbl">Notes</label>
+        <textarea class="form-input" id="svc-note" placeholder="..."></textarea>
+      </div>
     </div>
     <button class="modal-submit" onclick="window.submitService()">Send request</button>
     <button class="modal-cancel" onclick="window.closeServiceModal()">Cancel</button>
