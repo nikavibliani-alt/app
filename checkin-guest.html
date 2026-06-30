@@ -1551,7 +1551,7 @@ window.openSvc=async function(id,name,hasTime){
         <div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);">
           <div style="flex:1;">
             <div style="font-size:14px;font-weight:500;">${esc(item.name)}</div>
-            <div style="font-size:12px;color:var(--muted);">${item.price||0} GEL each</div>
+            <div style="font-size:12px;color:var(--muted);">${item.price||0} GEL &nbsp;·&nbsp; <span style="color:var(--accent);">2nd+: ${Math.round((item.price||0)*0.4)} GEL</span></div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
             <button onclick="window.updateLaundryQty(${i},-1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;">−</button>
@@ -1576,13 +1576,17 @@ window.openSvc=async function(id,name,hasTime){
   modal.classList.remove('hidden');
 }
 
+function laundryItemTotal(price,qty){
+  if(qty<=0)return 0;
+  return price+(qty-1)*price*0.4;
+}
 window.updateLaundryQty=function(i,delta){
   laundryQtys[i]=Math.max(0,(laundryQtys[i]||0)+delta);
   const el=document.getElementById('lq-'+i);
   if(el)el.textContent=laundryQtys[i];
-  const total=laundryItems.reduce((s,item,idx)=>s+(laundryQtys[idx]||0)*(item.price||0),0);
+  const total=laundryItems.reduce((s,item,idx)=>s+laundryItemTotal(item.price||0,laundryQtys[idx]||0),0);
   const totalEl=document.getElementById('laundry-total');
-  if(totalEl)totalEl.textContent='Total: '+total+' GEL';
+  if(totalEl)totalEl.textContent='Total: '+Math.round(total)+' GEL';
 };
 window.closeServiceModal=function(){document.getElementById('svc-modal').classList.add('hidden');}
 window.submitService=async function(){
@@ -1598,7 +1602,7 @@ window.submitService=async function(){
   let laundryTotal=0;
   if(currentSvcId==='laundry'){
     selectedItems=laundryItems
-      .map((item,i)=>({name:item.name,price:item.price||0,qty:laundryQtys[i]||0,subtotal:(laundryQtys[i]||0)*(item.price||0)}))
+      .map((item,i)=>({name:item.name,price:item.price||0,qty:laundryQtys[i]||0,subtotal:Math.round(laundryItemTotal(item.price||0,laundryQtys[i]||0))}))
       .filter(it=>it.qty>0);
     if(!selectedItems.length){alert('Please select at least one laundry item.');return;}
     laundryTotal=selectedItems.reduce((s,it)=>s+it.subtotal,0);
