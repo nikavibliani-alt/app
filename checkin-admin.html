@@ -140,6 +140,12 @@ input:checked+.slider:before{transform:translateX(20px);}
 .gs-add-price:focus{outline:none;border-color:var(--accent);}
 .gs-add-btn{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);padding:8px 14px;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif;}
 .gs-add-btn:hover{background:var(--accent);color:#fff;}
+.edit-btn{font-size:11px;font-weight:600;padding:3px 9px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--muted);cursor:pointer;flex-shrink:0;font-family:'DM Sans',sans-serif;}
+.edit-btn.active{background:var(--accent-bg);border-color:var(--accent-border,var(--accent));color:var(--accent);}
+.svc-edit-form{display:none;width:100%;margin-top:10px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);box-sizing:border-box;}
+.svc-edit-form.open{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;}
+.svc-ef-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;}
+.svc-ef-input{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--bg);box-sizing:border-box;}
 .gs-note-input{border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--surface);width:140px;}
 .gs-note-input:focus{outline:none;border-color:var(--accent);}
 
@@ -271,16 +277,18 @@ const LAUNDRY_DEFAULTS=[
   {name:'Underwear / Socks',price:3},{name:'Bedsheet',price:12},{name:'Towel',price:5},
 ];
 const SERVICE_DEFAULTS=[
-  {name:'Cleaning',price:30,note:''},
-  {name:'City Tour',price:50,note:'per person'},
-  {name:'Airport Transfer',price:0,note:'price on request'},
-  {name:'Other Request',price:0,note:''},
+  {id:'laundry',          name:'Laundry',          price:0,  note:'',            desc:'We collect, wash & return. Note: we do not wash socks or underwear.'},
+  {id:'cleaning',         name:'Room Cleaning',     price:30, note:'',            desc:'Professional mid-stay cleaning'},
+  {id:'city_tour',        name:'City Tour',         price:50, note:'per person',  desc:'Guided tours around Tbilisi'},
+  {id:'airport_transfer', name:'Airport Transfer',  price:0,  note:'on request',  desc:'Comfortable airport transfer'},
+  {id:'custom',           name:'Other Request',     price:0,  note:'',            desc:'Anything else we can help with?'},
 ];
 let gsVisibility=JSON.parse(JSON.stringify(SECTION_DEFAULTS));
 let gsLaundry=[...LAUNDRY_DEFAULTS];
-let gsServices=[...SERVICE_DEFAULTS];
+let gsServices=SERVICE_DEFAULTS.map(s=>({...s}));
 let gsProp='ROOMS';
 let gsLoaded=false;
+let gsOpenEdits={};
 
 // ── HELPERS ───────────────────────────────────────
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -836,7 +844,17 @@ async function loadGuestSettings(){
       const d=snap.data();
       if(d.visibility)gsVisibility={...JSON.parse(JSON.stringify(SECTION_DEFAULTS)),...d.visibility};
       if(d.laundryItems)gsLaundry=d.laundryItems;
-      if(d.services)gsServices=d.services;
+      if(d.services){
+        const nameToId={'Cleaning':'cleaning','Room Cleaning':'cleaning','City Tour':'city_tour','Airport Transfer':'airport_transfer','Other Request':'custom','Laundry':'laundry'};
+        gsServices=d.services.map(s=>{
+          const id=s.id||nameToId[s.name]||'';
+          const def=SERVICE_DEFAULTS.find(x=>x.id===id)||{};
+          return{...def,...s,id};
+        });
+        for(const def of SERVICE_DEFAULTS){
+          if(!gsServices.find(s=>s.id===def.id))gsServices.push({...def});
+        }
+      }
     }
   }catch(e){console.warn('Guest settings load error:',e);}
   gsLoaded=true;
@@ -922,17 +940,47 @@ function gsRenderToggles(){
   const vis=gsVisibility[gsProp]||{};
   const el=document.getElementById('gsToggles');
   if(!el)return;
-  el.innerHTML=SECTIONS.map(s=>`
-    <div class="toggle-row">
+  const EDITABLE=['laundry','cleaning','city_tour','airport_transfer'];
+  el.innerHTML=SECTIONS.map(s=>{
+    const editable=EDITABLE.includes(s.id);
+    const svc=editable?gsServices.find(x=>x.id===s.id):null;
+    const open=!!gsOpenEdits[s.id];
+    const formHtml=svc?`
+      <div class="svc-edit-form${open?' open':''}" id="svc-edit-form-${s.id}">
+        <div>
+          <div class="svc-ef-label">Display name</div>
+          <input class="svc-ef-input" type="text" value="${esc(svc.name||'')}" oninput="window.gsUpdateSvcField('${s.id}','name',this.value)" placeholder="Service name">
+        </div>
+        ${s.id!=='laundry'?`
+        <div>
+          <div class="svc-ef-label">Price (GEL)</div>
+          <input class="svc-ef-input" type="number" value="${svc.price||0}" min="0" oninput="window.gsUpdateSvcField('${s.id}','price',this.value)">
+        </div>
+        <div>
+          <div class="svc-ef-label">Price note</div>
+          <input class="svc-ef-input" type="text" value="${esc(svc.note||'')}" oninput="window.gsUpdateSvcField('${s.id}','note',this.value)" placeholder='e.g. "per person"'>
+        </div>
+        <div>`:`<div style="grid-column:1/-1;">` }
+          <div class="svc-ef-label">Description</div>
+          <input class="svc-ef-input" type="text" value="${esc(svc.desc||'')}" oninput="window.gsUpdateSvcField('${s.id}','desc',this.value)" placeholder="Shown to guest on services page">
+        </div>
+      </div>`:'';
+    return `
+    <div class="toggle-row"${editable?' style="flex-wrap:wrap;"':''}>
       <div class="toggle-info">
         <div class="toggle-name">${s.name}</div>
         <div class="toggle-desc">${s.desc}</div>
       </div>
-      <label class="switch">
-        <input type="checkbox" ${vis[s.id]!==false?'checked':''} onchange="window.gsToggle('${s.id}',this.checked)">
-        <span class="slider"></span>
-      </label>
-    </div>`).join('');
+      <div style="display:flex;align-items:center;gap:8px;">
+        ${editable?`<button class="edit-btn${open?' active':''}" id="svc-edit-btn-${s.id}" onclick="window.gsSvcEditToggle('${s.id}')">Edit ›</button>`:''}
+        <label class="switch">
+          <input type="checkbox" ${vis[s.id]!==false?'checked':''} onchange="window.gsToggle('${s.id}',this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+      ${formHtml}
+    </div>`;
+  }).join('');
 }
 
 window.gsDeleteLaundry=function(i){gsLaundry.splice(i,1);gsRenderLaundry();};
@@ -942,6 +990,18 @@ window.gsDeleteService=function(i){gsServices.splice(i,1);gsRenderServices();};
 window.gsUpdateSvcName=function(i,v){gsServices[i].name=v;};
 window.gsUpdateSvcPrice=function(i,v){gsServices[i].price=parseFloat(v)||0;};
 window.gsUpdateSvcNote=function(i,v){gsServices[i].note=v;};
+window.gsSvcEditToggle=function(id){
+  gsOpenEdits[id]=!gsOpenEdits[id];
+  const form=document.getElementById('svc-edit-form-'+id);
+  const btn=document.getElementById('svc-edit-btn-'+id);
+  if(form)form.classList.toggle('open',!!gsOpenEdits[id]);
+  if(btn)btn.classList.toggle('active',!!gsOpenEdits[id]);
+};
+window.gsUpdateSvcField=function(id,field,val){
+  const svc=gsServices.find(x=>x.id===id);
+  if(!svc)return;
+  svc[field]=field==='price'?(parseFloat(val)||0):val;
+};
 
 function gsRenderLaundry(){
   const el=document.getElementById('gsLaundryList');
