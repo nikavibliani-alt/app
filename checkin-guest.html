@@ -319,7 +319,7 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 .video-wrap iframe{width:100%;height:100%;border:none;}
 .service-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1rem 1.1rem;margin-bottom:10px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all 0.15s;}
 .service-card:hover{border-color:var(--gold-border);background:var(--accent-soft);}
-.sc-icon{width:48px;height:48px;border-radius:var(--rs);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+.sc-icon{width:48px;height:48px;border-radius:var(--rs);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;color:var(--ink);}
 .sc-info{flex:1;min-width:0;}
 .sc-name{font-size:14px;font-weight:500;margin-bottom:2px;}
 .sc-desc{font-size:12px;color:var(--muted);line-height:1.4;}
@@ -1165,7 +1165,7 @@ function showHome(){
     const aptEl=document.getElementById('apt-area');
     if(aptEl){aptEl.className='greeting__apt';aptEl.innerHTML='<span class="swatch"></span><b>Maxela · Tbilisi</b>';}
     document.getElementById('tiles-grid').innerHTML=
-      `<div style="padding:3rem 1.5rem 4rem;text-align:center;">
+      `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3rem 1.5rem 4rem;">
         <div style="font-size:52px;margin-bottom:1.25rem;">🌟</div>
         <div style="font-size:22px;font-weight:600;color:var(--ink);margin-bottom:10px;letter-spacing:-0.01em;">Thank you for staying with us!</div>
         <div style="font-size:15px;color:var(--muted);line-height:1.7;">Safe travels. We hope to see you again soon.</div>
@@ -1451,12 +1451,19 @@ window.openPage=async function(type){
     const _laundryTilePrice=laundryItems.length
       ?'from '+Math.max(5,Math.min(...laundryItems.map(i=>i.price||0)))+' GEL'
       :'25 GEL';
+    const _I={
+      cleaning:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22v-4l9-9"/><path d="m15 3-3 3 5 5 3-3a2 2 0 0 0 0-2.83L17.83 3a2 2 0 0 0-2.83 0z"/><path d="M6 18H3"/></svg>`,
+      laundry:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><circle cx="12" cy="13" r="4"/><line x1="6" y1="7" x2="6.01" y2="7"/><line x1="10" y1="7" x2="16" y2="7"/></svg>`,
+      tour:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+      transfer:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v5h-3"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>`,
+      custom:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
+    };
     const SVCS=[
-      {id:'cleaning',icon:'🧹',name:{en:'Room Cleaning',ka:'ოთახის დასუფთავება',ru:'Уборка номера',ar:'تنظيف الغرفة'},desc:{en:'Professional mid-stay cleaning',ka:'დასუფთავება ყოფნის დროს',ru:'Профессиональная уборка',ar:'تنظيف احترافي'},price:'30 GEL',hasTime:true},
-      {id:'laundry',icon:'👕',name:{en:'Laundry',ka:'სამრეცხაო',ru:'Стирка',ar:'غسيل'},desc:{en:'We collect, wash & return. Note: we do not wash socks or underwear.',ka:'ვაგროვებთ, ვრეცხავთ, ვაბრუნებთ',ru:'Собираем, стираем, возвращаем',ar:'نجمع ونغسل ونعيد'},price:_laundryTilePrice,hasTime:true},
-      {id:'tour',icon:'🗺️',name:{en:'City Tour',ka:'ქალაქის ტური',ru:'Экскурсия',ar:'جولة المدينة'},desc:{en:'Guided tours around Tbilisi',ka:'გიდური ტური თბილისში',ru:'Экскурсии по Тбилиси',ar:'جولات مرشدة في تبليسي'},price:'50 GEL/person',hasTime:false},
-      {id:'transfer',icon:'🚕',name:{en:'Airport Transfer',ka:'ტრანსფერი',ru:'Трансфер',ar:'نقل المطار'},desc:{en:'Comfortable airport transfer',ka:'კომფორტული ტრანსფერი',ru:'Комфортный трансфер',ar:'نقل مريح'},price:'On request',hasTime:false},
-      {id:'custom',icon:'✨',name:{en:'Other Request',ka:'სხვა მოთხოვნა',ru:'Другое',ar:'طلب آخر'},desc:{en:'Anything else we can help with?',ka:'სხვა რამე გჭირდებათ?',ru:'Чем ещё помочь?',ar:'أي شيء آخر؟'},price:'',hasTime:false},
+      {id:'cleaning',icon:_I.cleaning,name:{en:'Room Cleaning',ka:'ოთახის დასუფთავება',ru:'Уборка номера',ar:'تنظيف الغرفة'},desc:{en:'Professional mid-stay cleaning',ka:'დასუფთავება ყოფნის დროს',ru:'Профессиональная уборка',ar:'تنظيف احترافي'},price:'30 GEL',hasTime:true},
+      {id:'laundry',icon:_I.laundry,name:{en:'Laundry',ka:'სამრეცხაო',ru:'Стирка',ar:'غسيل'},desc:{en:'We collect, wash & return. Note: we do not wash socks or underwear.',ka:'ვაგროვებთ, ვრეცხავთ, ვაბრუნებთ',ru:'Собираем, стираем, возвращаем',ar:'نجمع ونغسل ونعيد'},price:_laundryTilePrice,hasTime:true},
+      {id:'tour',icon:_I.tour,name:{en:'City Tour',ka:'ქალაქის ტური',ru:'Экскурсия',ar:'جولة المدينة'},desc:{en:'Guided tours around Tbilisi',ka:'გიდური ტური თბილისში',ru:'Экскурсии по Тбилиси',ar:'جولات مرشدة في تبليسي'},price:'50 GEL/person',hasTime:false},
+      {id:'transfer',icon:_I.transfer,name:{en:'Airport Transfer',ka:'ტრანსფერი',ru:'Трансфер',ar:'نقل المطار'},desc:{en:'Comfortable airport transfer',ka:'კომფორტული ტრანსფერი',ru:'Комфортный трансфер',ar:'نقل مريح'},price:'On request',hasTime:false},
+      {id:'custom',icon:_I.custom,name:{en:'Other Request',ka:'სხვა მოთხოვნა',ru:'Другое',ar:'طلب آخر'},desc:{en:'Anything else we can help with?',ka:'სხვა რამე გჭირდებათ?',ru:'Чем ещё помочь?',ar:'أي شيء آخر؟'},price:'',hasTime:false},
     ];
     body=`<div style="background:var(--gold-light);border:1px solid var(--gold-border);border-radius:var(--rs);padding:0.75rem 1rem;margin-bottom:1rem;font-size:13px;color:var(--text);line-height:1.5;">💵 Payment is directly to the cleaning staff in cash.</div>`;
     body+=SVCS.map(s=>`<div class="service-card" onclick="window.openSvc('${s.id}','${esc(s.name[lang]||s.name.en)}',${s.hasTime})">
