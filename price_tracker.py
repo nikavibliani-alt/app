@@ -54,7 +54,9 @@ def snapshot_prices(results: dict):
     """
     try:
         db = get_db()
-        today = datetime.now().strftime("%Y-%m-%d")
+        now = datetime.now()
+        today = now.strftime("%Y-%m-%d")
+        run_stamp = now.strftime("%Y%m%d_%H%M")
         batch = db.batch()
         count = 0
 
@@ -62,7 +64,7 @@ def snapshot_prices(results: dict):
             for d in dates:
                 if d.get("skip"):
                     continue
-                doc_id = f"{rt}_{d['date']}_{today.replace('-','')}"
+                doc_id = f"{rt}_{d['date']}_{run_stamp}"
                 ref = db.collection("pricing_snapshots").document(doc_id)
                 batch.set(ref, {
                     "property":      rt,
@@ -76,7 +78,7 @@ def snapshot_prices(results: dict):
                     "changed":       d.get("changed", False),
                     "reason":        d.get("reason", ""),
                     "ts":            datetime.now().isoformat(),
-                }, merge=True)
+                })
                 count += 1
 
                 if count % 400 == 0:
