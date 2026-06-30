@@ -634,6 +634,9 @@ let activeReservation=null; // reservation matching this apt with tuyaPassword
 let myRequests=[];
 let currentSvcId=null;
 let currentSvcName=null;
+let laundryItems=[];
+let laundryQtys={};
+let _laundryLoaded=false;
 let elevatorData=null;
 let _pendingReg=null;
 let _pendingMatches=[];
@@ -1510,8 +1513,9 @@ window.copySth=function(text,btn){
   });
 }
 
-window.openSvc=function(id,name,hasTime){
+window.openSvc=async function(id,name,hasTime){
   currentSvcId=id;currentSvcName=name;
+  laundryQtys={};
   const modal=document.getElementById('svc-modal');
   document.getElementById('svc-modal-title').textContent=name;
   document.getElementById('svc-note-lbl').textContent=t('sn');
@@ -1519,22 +1523,64 @@ window.openSvc=function(id,name,hasTime){
   document.getElementById('svc-note').value='';
 
   const extra=document.getElementById('svc-modal-extra');
-  if(hasTime){
-    const specificMsg=id==='cleaning'?'Apartment must be empty during cleaning.':'Choose when to leave your items for pick-up.';
+  const timePicker=`<div style="margin-bottom:0.85rem;">
+    <label style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:0.06em;">Preferred time <span style="color:var(--red);">*</span></label>
+    <select id="svc-time" style="width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);background:var(--bg);outline:none;">
+      <option value="">Select a time (10:00–19:00)...</option>
+      ${['10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00'].map(h=>`<option value="${h}">${h}</option>`).join('')}
+    </select>
+  </div>`;
+  const infoBar=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:0.75rem 1rem;font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:0.85rem;">Staff checks requests the next day. For urgent requests contact us on WhatsApp.</div>`;
+
+  if(id==='laundry'){
+    // Lazy-load laundry items from Firestore
+    if(!_laundryLoaded){
+      try{
+        const cfg=await getDoc(doc(db,'checkin_admin','config'));
+        if(cfg.exists()&&cfg.data().laundryItems&&cfg.data().laundryItems.length){
+          laundryItems=cfg.data().laundryItems;
+        }
+      }catch(e){}
+      _laundryLoaded=true;
+    }
+    const itemsHtml=laundryItems.length
+      ?laundryItems.map((item,i)=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);">
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:500;">${esc(item.name)}</div>
+            <div style="font-size:12px;color:var(--muted);">${item.price||0} GEL each</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button onclick="window.updateLaundryQty(${i},-1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;">−</button>
+            <span id="lq-${i}" style="min-width:18px;text-align:center;font-size:15px;font-weight:600;">0</span>
+            <button onclick="window.updateLaundryQty(${i},1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--accent);background:var(--accent-bg);font-size:20px;line-height:1;cursor:pointer;color:var(--accent);display:flex;align-items:center;justify-content:center;">+</button>
+          </div>
+        </div>`).join('')
+      :'<div style="color:var(--muted);font-size:13px;padding:12px 0;">No items configured.</div>';
+    extra.innerHTML=`
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;">We collect, wash & return. Note: we do not wash socks or underwear.</div>
+      ${infoBar}
+      <div style="margin-bottom:4px;">${itemsHtml}</div>
+      <div id="laundry-total" style="padding:12px 0 4px;font-size:15px;font-weight:600;text-align:right;color:var(--text);">Total: 0 GEL</div>
+      ${timePicker}`;
+  } else if(hasTime){
+    const specificMsg=id==='cleaning'?'Apartment must be empty during cleaning.':'Choose a preferred time.';
     extra.innerHTML=`<div style="background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:var(--rs);padding:0.75rem 1rem;font-size:13px;color:var(--blue);line-height:1.5;margin-bottom:8px;">${specificMsg}</div>
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:0.75rem 1rem;font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:0.85rem;">Staff checks requests the next day. For urgent requests contact us on WhatsApp. Request must be accepted before confirmed.</div>
-    <div style="margin-bottom:0.85rem;">
-      <label style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:0.06em;">Preferred time <span style="color:var(--red);">*</span></label>
-      <select id="svc-time" style="width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);background:var(--bg);outline:none;">
-        <option value="">Select a time (10:00–19:00)...</option>
-        ${['10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00'].map(h=>`<option value="${h}">${h}</option>`).join('')}
-      </select>
-    </div>`;
+    ${infoBar}${timePicker}`;
   } else {
     extra.innerHTML='';
   }
   modal.classList.remove('hidden');
 }
+
+window.updateLaundryQty=function(i,delta){
+  laundryQtys[i]=Math.max(0,(laundryQtys[i]||0)+delta);
+  const el=document.getElementById('lq-'+i);
+  if(el)el.textContent=laundryQtys[i];
+  const total=laundryItems.reduce((s,item,idx)=>s+(laundryQtys[idx]||0)*(item.price||0),0);
+  const totalEl=document.getElementById('laundry-total');
+  if(totalEl)totalEl.textContent='Total: '+total+' GEL';
+};
 window.closeServiceModal=function(){document.getElementById('svc-modal').classList.add('hidden');}
 window.submitService=async function(){
   if(!currentSvcId||!guestId)return;
@@ -1543,22 +1589,44 @@ window.submitService=async function(){
   const preferredTime=timeEl?.value||'';
   if(timeEl&&!preferredTime){alert('Please select a preferred time.');return;}
   const aptName=APT_NAMES[aptId]||aptId;
+
+  // Laundry: collect selected items
+  let selectedItems=[];
+  let laundryTotal=0;
+  if(currentSvcId==='laundry'){
+    selectedItems=laundryItems
+      .map((item,i)=>({name:item.name,price:item.price||0,qty:laundryQtys[i]||0,subtotal:(laundryQtys[i]||0)*(item.price||0)}))
+      .filter(it=>it.qty>0);
+    if(!selectedItems.length){alert('Please select at least one laundry item.');return;}
+    laundryTotal=selectedItems.reduce((s,it)=>s+it.subtotal,0);
+  }
+
   try{
-    await addDoc(collection(db,'checkin_requests'),{
+    const payload={
       guestId,aptId,serviceId:currentSvcId,serviceName:currentSvcName,
       note,preferredTime,done:false,createdAt:serverTimestamp()
-    });
+    };
+    if(currentSvcId==='laundry'){
+      payload.laundryItems=selectedItems;
+      payload.totalPrice=laundryTotal;
+    }
+    await addDoc(collection(db,'checkin_requests'),payload);
     window.closeServiceModal();
     toast(t('rs'));
-    // Open WhatsApp with notification
-    const waMsg=encodeURIComponent(
-      `New service request from ${aptName}:\n`+
+
+    // Build WhatsApp message
+    let waBody=`New service request from ${aptName}:\n`+
       `Guest: ${guestData?.name||'Guest'}\n`+
-      `Service: ${currentSvcName}\n`+
-      (preferredTime?`Time: ${preferredTime}\n`:'')+
-      (note?`Notes: ${note}\n`:'')+
-      `Contact: ${guestData?.contact||'—'}`
-    );
+      `Service: ${currentSvcName}\n`;
+    if(currentSvcId==='laundry'&&selectedItems.length){
+      waBody+=selectedItems.map(it=>`  • ${it.name} ×${it.qty} = ${it.subtotal} GEL`).join('\n')+'\n';
+      waBody+=`Total: ${laundryTotal} GEL\n`;
+    }
+    if(preferredTime)waBody+=`Time: ${preferredTime}\n`;
+    if(note)waBody+=`Notes: ${note}\n`;
+    waBody+=`Contact: ${guestData?.contact||'—'}`;
+
+    const waMsg=encodeURIComponent(waBody);
     setTimeout(()=>window.open('https://wa.me/'+WA+'?text='+waMsg,'_blank'),500);
   }catch(e){toast(t('rf'));}
 }
