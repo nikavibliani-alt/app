@@ -642,6 +642,7 @@ let laundryQtys={};
 let _laundryLoaded=false;
 let elevatorData=null;
 let _pendingReg=null;
+let guestCfgVisibility=null; // cached from checkin_admin/config.visibility
 let _pendingMatches=[];
 let allMatchedReservations=[];
 
@@ -1337,7 +1338,26 @@ function buildContactHero({labelText,message,kind='apartment'}){
 </div>`;
 }
 
-window.openPage=function(type){
+// Maps room code → property type key used in checkin_admin/config.visibility
+const ROOM_TO_PROP={
+  '0-1':'ROOMS','0-2':'ROOMS','0-3':'ROOMS','0-4':'ROOMS','0-5':'ROOMS',
+  '6-1':'MAXELA','6-2':'MAXELA','6-4':'MAXELA',
+  '6-3':'BIG_APT',
+  '7-1':'MAXELA','7-2':'MAXELA','7-3':'MAXELA','7-4':'MAXELA',
+  'tab-1':'FREEDOM','tab-2':'FREEDOM','tab-3':'FREEDOM',
+  'orb-1':'ORBE_1','orb-2':'ORBE_1','orb-3':'ORBE_2',
+};
+function aptPropType(){return ROOM_TO_PROP[aptId]||'ROOMS';}
+async function getGuestCfg(){
+  if(guestCfgVisibility)return guestCfgVisibility;
+  try{
+    const snap=await getDoc(doc(db,'checkin_admin','config'));
+    guestCfgVisibility=(snap.exists()&&snap.data().visibility)||{};
+  }catch(e){guestCfgVisibility={};}
+  return guestCfgVisibility;
+}
+
+window.openPage=async function(type){
   // Prefer the reservation from allMatchedReservations for current aptId — it's
   // populated from the registration search and has correct checkin/checkout dates.
   // Fall back to activeReservation only if no match found.
@@ -1351,22 +1371,27 @@ window.openPage=function(type){
     const embed=ytEmbed(d.videoUrl||'');
     const _WA_BTN=`<a class="contact-btn" href="https://wa.me/${WA}" target="_blank" style="width:100%;justify-content:center;"><div class="cb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div><div><div class="cb-title">WhatsApp</div></div></a>`;
     // ── Access code: Tuya password > legacy doorCode > contact host ──────────
+    const vis=await getGuestCfg();
+    const propVis=vis[aptPropType()]||{};
+    const showAccessCode=propVis.access_code!==false;
     const r=activeReservation;
     let codeBlock='';
-    if(r&&r.tuyaPassword){
-      const validFrom=formatTbilisiTime(r.tuyaEffectiveTime);
-      const validTo  =formatTbilisiTime(r.tuyaInvalidTime);
-      codeBlock=buildCodeHero({
-        kind:'apartment',labelText:t('ac'),code:r.tuyaPassword,
-        statusLabel:'VALID UNTIL',statusTime:esc(validTo),
-        infoText:esc(t('vf')+' '+validFrom),
-      });
-    }else if(r&&r.tuyaError){
-      codeBlock=buildContactHero({kind:'apartment',labelText:t('ac'),message:t('cp2')});
-    }else if(d.doorCode){
-      codeBlock=buildCodeHero({kind:'apartment',labelText:t('dc'),code:d.doorCode,statusLabel:t('dc'),statusTime:'',infoText:''});
-    }else{
-      codeBlock=buildContactHero({kind:'apartment',labelText:t('ac'),message:t('chc')});
+    if(showAccessCode){
+      if(r&&r.tuyaPassword){
+        const validFrom=formatTbilisiTime(r.tuyaEffectiveTime);
+        const validTo  =formatTbilisiTime(r.tuyaInvalidTime);
+        codeBlock=buildCodeHero({
+          kind:'apartment',labelText:t('ac'),code:r.tuyaPassword,
+          statusLabel:'VALID UNTIL',statusTime:esc(validTo),
+          infoText:esc(t('vf')+' '+validFrom),
+        });
+      }else if(r&&r.tuyaError){
+        codeBlock=buildContactHero({kind:'apartment',labelText:t('ac'),message:t('cp2')});
+      }else if(d.doorCode){
+        codeBlock=buildCodeHero({kind:'apartment',labelText:t('dc'),code:d.doorCode,statusLabel:t('dc'),statusTime:'',infoText:''});
+      }else{
+        codeBlock=buildContactHero({kind:'apartment',labelText:t('ac'),message:t('chc')});
+      }
     }
     // ── Elevator / Entrance code (floors 6 & 7 only) ─────────────────────────
     let elevatorBlock='';
@@ -1540,9 +1565,9 @@ window.openSvc=async function(id,name,hasTime){
     if(!_laundryLoaded){
       try{
         const cfg=await getDoc(doc(db,'checkin_admin','config'));
-        if(cfg.exists()&&cfg.data().laundryItems&&cfg.data().laundryItems.length){
-          laundryItems=cfg.data().laundryItems;
-        }
+        const cfgData=cfg.exists()?cfg.data():{};
+        if(cfgData.laundryItems&&cfgData.laundryItems.length)laundryItems=cfgData.laundryItems;
+        if(cfgData.visibility&&!guestCfgVisibility)guestCfgVisibility=cfgData.visibility;
         _laundryLoaded=true;
       }catch(e){console.error('Laundry load error:',e);}
     }
