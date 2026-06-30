@@ -1540,8 +1540,8 @@ window.openSvc=async function(id,name,hasTime){
         if(cfg.exists()&&cfg.data().laundryItems&&cfg.data().laundryItems.length){
           laundryItems=cfg.data().laundryItems;
         }
-      }catch(e){}
-      _laundryLoaded=true;
+        _laundryLoaded=true;
+      }catch(e){console.error('Laundry load error:',e);}
     }
     const itemsHtml=laundryItems.length
       ?laundryItems.map((item,i)=>`
