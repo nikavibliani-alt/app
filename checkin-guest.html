@@ -1439,9 +1439,21 @@ window.openPage=async function(type){
   }
 
   if(type==='services'){
+    if(!_laundryLoaded){
+      try{
+        const cfgSnap=await getDoc(doc(db,'checkin_admin','config'));
+        const cfgData=cfgSnap.exists()?cfgSnap.data():{};
+        if(cfgData.laundryItems&&cfgData.laundryItems.length)laundryItems=cfgData.laundryItems;
+        if(cfgData.visibility&&!guestCfgVisibility)guestCfgVisibility=cfgData.visibility;
+        _laundryLoaded=true;
+      }catch(e){}
+    }
+    const _laundryTilePrice=laundryItems.length
+      ?'from '+Math.max(5,Math.min(...laundryItems.map(i=>i.price||0)))+' GEL'
+      :'25 GEL';
     const SVCS=[
       {id:'cleaning',icon:'🧹',name:{en:'Room Cleaning',ka:'ოთახის დასუფთავება',ru:'Уборка номера',ar:'تنظيف الغرفة'},desc:{en:'Professional mid-stay cleaning',ka:'დასუფთავება ყოფნის დროს',ru:'Профессиональная уборка',ar:'تنظيف احترافي'},price:'30 GEL',hasTime:true},
-      {id:'laundry',icon:'👕',name:{en:'Laundry',ka:'სამრეცხაო',ru:'Стирка',ar:'غسيل'},desc:{en:'We collect, wash & return. Note: we do not wash socks or underwear.',ka:'ვაგროვებთ, ვრეცხავთ, ვაბრუნებთ',ru:'Собираем, стираем, возвращаем',ar:'نجمع ونغسل ونعيد'},price:'25 GEL',hasTime:true},
+      {id:'laundry',icon:'👕',name:{en:'Laundry',ka:'სამრეცხაო',ru:'Стирка',ar:'غسيل'},desc:{en:'We collect, wash & return. Note: we do not wash socks or underwear.',ka:'ვაგროვებთ, ვრეცხავთ, ვაბრუნებთ',ru:'Собираем, стираем, возвращаем',ar:'نجمع ونغسل ونعيد'},price:_laundryTilePrice,hasTime:true},
       {id:'tour',icon:'🗺️',name:{en:'City Tour',ka:'ქალაქის ტური',ru:'Экскурсия',ar:'جولة المدينة'},desc:{en:'Guided tours around Tbilisi',ka:'გიდური ტური თბილისში',ru:'Экскурсии по Тбилиси',ar:'جولات مرشدة في تبليسي'},price:'50 GEL/person',hasTime:false},
       {id:'transfer',icon:'🚕',name:{en:'Airport Transfer',ka:'ტრანსფერი',ru:'Трансфер',ar:'نقل المطار'},desc:{en:'Comfortable airport transfer',ka:'კომფორტული ტრანსფერი',ru:'Комфортный трансфер',ar:'نقل مريح'},price:'On request',hasTime:false},
       {id:'custom',icon:'✨',name:{en:'Other Request',ka:'სხვა მოთხოვნა',ru:'Другое',ar:'طلب آخر'},desc:{en:'Anything else we can help with?',ka:'სხვა რამე გჭირდებათ?',ru:'Чем ещё помочь?',ar:'أي شيء آخر؟'},price:'',hasTime:false},
