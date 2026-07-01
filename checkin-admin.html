@@ -154,6 +154,92 @@ input:checked+.slider:before{transform:translateX(20px);}
   .apt-grid{grid-template-columns:1fr 1fr;}
   .main{padding:1rem;}
 }
+
+/* ── GUEST PAGE SETTINGS — PREMIUM DESIGN SYSTEM ── */
+.gs-root {
+  --gs-bg: #fafafa;
+  --gs-white: #ffffff;
+  --gs-border: #e5e7eb;
+  --gs-border-hover: #d1d5db;
+  --gs-text-main: #1f2937;
+  --gs-text-muted: #6b7280;
+  --gs-accent: #111827;
+  --gs-accent-light: #f3f4f6;
+  --gs-green: #10b981;
+  --gs-red: #ef4444;
+  --gs-shadow-sm: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+  --gs-shadow-md: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.05);
+  --gs-radius-lg: 12px;
+  --gs-radius-md: 8px;
+  --gs-radius-sm: 6px;
+  --gs-drawer-w: 460px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--gs-text-main);
+  -webkit-font-smoothing: antialiased;
+}
+.gs-prop-bar { display:flex; gap:6px; background:#f3f4f6; padding:6px; border-radius:var(--gs-radius-lg); margin-bottom:32px; border:1px solid var(--gs-border); }
+.gs-prop-btn { flex:1; padding:10px 12px; border-radius:var(--gs-radius-md); border:none; background:transparent; font-size:13px; font-weight:600; color:var(--gs-text-muted); cursor:pointer; transition:all 0.2s cubic-bezier(0.4,0,0.2,1); white-space:nowrap; text-align:center; }
+.gs-prop-btn:hover { color:var(--gs-text-main); }
+.gs-prop-btn.active { background:var(--gs-white); color:var(--gs-accent); box-shadow:var(--gs-shadow-sm); }
+.gs-card { background:var(--gs-white); border:1px solid var(--gs-border); border-radius:var(--gs-radius-lg); margin-bottom:24px; box-shadow:var(--gs-shadow-sm); overflow:hidden; }
+.gs-card-header { padding:18px 24px; border-bottom:1px solid var(--gs-border); display:flex; align-items:center; gap:12px; background:#fbfbfb; }
+.gs-card-icon { width:32px; height:32px; border-radius:var(--gs-radius-md); display:flex; align-items:center; justify-content:center; flex-shrink:0; background:var(--gs-accent-light); border:1px solid var(--gs-border); }
+.gs-card-title { font-size:14px; font-weight:700; letter-spacing:-0.01em; color:var(--gs-accent); }
+.gs-row { display:flex; align-items:center; padding:16px 24px; border-bottom:1px solid var(--gs-border); gap:16px; transition:background 0.15s ease; }
+.gs-row:last-child { border-bottom:none; }
+.gs-row:hover { background:#fafafa; }
+.gs-row-icon { width:36px; height:36px; border-radius:var(--gs-radius-md); background:var(--gs-bg); border:1px solid var(--gs-border); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.gs-row-info { flex:1; min-width:0; }
+.gs-row-title { font-size:14px; font-weight:600; color:var(--gs-accent); }
+.gs-row-sub { font-size:12px; color:var(--gs-text-muted); margin-top:2px; }
+.gs-row-actions { display:flex; align-items:center; gap:14px; flex-shrink:0; }
+.gs-edit-btn { padding:6px 12px; border-radius:var(--gs-radius-sm); border:1px solid var(--gs-border); background:var(--gs-white); font-size:12px; font-weight:600; color:var(--gs-text-main); cursor:pointer; transition:all 0.15s ease; }
+.gs-edit-btn:hover { border-color:var(--gs-accent); background:#fafafa; }
+.gs-add-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:16px; background:#fafafa; border:none; border-top:1px dashed var(--gs-border); font-size:13px; font-weight:600; color:var(--gs-text-main); cursor:pointer; transition:all 0.2s ease; }
+.gs-add-btn:hover { background:var(--gs-accent-light); color:var(--gs-accent); }
+.gs-toggle { position:relative; width:44px; height:24px; flex-shrink:0; }
+.gs-toggle input { opacity:0; width:0; height:0; }
+.gs-toggle-track { position:absolute; inset:0; background:#e5e7eb; border-radius:24px; cursor:pointer; transition:background 0.2s; }
+.gs-toggle-track:before { content:''; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:white; border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,0.15); transition:transform 0.2s cubic-bezier(0.4,0,0.2,1); }
+.gs-toggle input:checked + .gs-toggle-track { background:var(--gs-green); }
+.gs-toggle input:checked + .gs-toggle-track:before { transform:translateX(20px); }
+.gs-drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(2px); z-index:1000; opacity:0; pointer-events:none; transition:opacity 0.25s ease; }
+.gs-drawer-overlay.open { opacity:1; pointer-events:all; }
+.gs-drawer { position:fixed; top:0; right:0; bottom:0; width:var(--gs-drawer-w); max-width:95vw; background:var(--gs-white); box-shadow:var(--gs-shadow-md); transform:translateX(100%); transition:transform 0.3s cubic-bezier(0.16,1,0.3,1); z-index:1001; display:flex; flex-direction:column; }
+.gs-drawer.open { transform:translateX(0); }
+.gs-drawer-head { padding:24px; border-bottom:1px solid var(--gs-border); display:flex; align-items:center; justify-content:space-between; }
+.gs-drawer-title { font-size:16px; font-weight:700; letter-spacing:-0.01em; }
+.gs-drawer-close { width:32px; height:32px; border-radius:var(--gs-radius-sm); border:1px solid var(--gs-border); background:var(--gs-white); cursor:pointer; font-size:14px; color:var(--gs-text-muted); display:flex; align-items:center; justify-content:center; transition:all 0.15s; }
+.gs-drawer-close:hover { background:var(--gs-bg); color:var(--gs-accent); }
+.gs-drawer-body { flex:1; overflow-y:auto; padding:24px; background:#fcfcfc; }
+.gs-drawer-section { margin-bottom:24px; }
+.gs-drawer-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--gs-text-muted); margin-bottom:8px; }
+.gs-drawer-input { width:100%; padding:10px 14px; border:1px solid var(--gs-border); border-radius:var(--gs-radius-md); font-size:14px; font-family:inherit; color:var(--gs-text-main); background:var(--gs-white); box-shadow:var(--gs-shadow-sm); transition:all 0.15s ease; box-sizing:border-box; }
+.gs-drawer-input:focus { outline:none; border-color:var(--gs-accent); box-shadow:0 0 0 3px rgba(17,24,39,0.06); }
+.gs-drawer-row { display:flex; gap:10px; }
+.gs-drawer-row .gs-drawer-input { flex:1; }
+.gs-unit { font-size:14px; font-weight:600; color:var(--gs-text-muted); align-self:center; }
+.gs-drawer-footer { padding:18px 24px; border-top:1px solid var(--gs-border); display:flex; gap:12px; background:var(--gs-white); }
+.gs-drawer-save { flex:1; padding:12px; border-radius:var(--gs-radius-md); background:var(--gs-accent); color:white; border:none; font-size:14px; font-weight:600; cursor:pointer; transition:opacity 0.2s; }
+.gs-drawer-save:hover { opacity:0.9; }
+.gs-drawer-cancel { padding:12px 18px; border-radius:var(--gs-radius-md); background:var(--gs-white); color:var(--gs-text-muted); border:1px solid var(--gs-border); font-size:14px; font-weight:600; cursor:pointer; transition:all 0.15s; }
+.gs-drawer-cancel:hover { background:var(--gs-bg); color:var(--gs-text-main); }
+.gs-laundry-item { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--gs-white); border-radius:var(--gs-radius-md); margin-bottom:8px; border:1px solid var(--gs-border); box-shadow:var(--gs-shadow-sm); }
+.gs-laundry-item input[type="text"] { flex:1; border:none; background:transparent; font-size:14px; font-family:inherit; color:var(--gs-text-main); outline:none; }
+.gs-laundry-item input[type="number"] { width:70px; padding:6px 10px; border:1px solid var(--gs-border); border-radius:var(--gs-radius-sm); font-size:13px; font-weight:600; text-align:right; }
+.gs-item-del { background:none; border:none; cursor:pointer; color:var(--gs-text-muted); font-size:16px; display:flex; align-items:center; justify-content:center; }
+.gs-item-del:hover { color:var(--gs-red); }
+.gs-laundry-add { display:flex; gap:8px; margin-top:12px; }
+.gs-laundry-add input { flex:1; padding:10px; border:1px solid var(--gs-border); border-radius:var(--gs-radius-md); font-size:13px; }
+.gs-laundry-add button { padding:10px 16px; border-radius:var(--gs-radius-md); border:none; background:var(--gs-accent); color:white; font-size:13px; font-weight:600; cursor:pointer; }
+.gs-discount-note { font-size:12px; background:#f0fdf4; border-radius:var(--gs-radius-md); padding:12px; margin-top:16px; border:1px solid #bbf7d0; color:#166534; line-height:1.4; }
+.gs-save-bar { position:fixed; bottom:24px; left:50%; transform:translate(-50%,140%); width:calc(100% - 48px); max-width:600px; background:var(--gs-accent); padding:12px 24px; display:flex; align-items:center; justify-content:space-between; gap:16px; border-radius:var(--gs-radius-lg); box-shadow:0 20px 25px -5px rgba(0,0,0,0.15); transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1); z-index:900; }
+.gs-save-bar.visible { transform:translate(-50%,0); }
+.gs-save-bar-msg { font-size:13px; font-weight:500; color:#9ca3af; }
+.gs-discard-btn { padding:8px 16px; border-radius:var(--gs-radius-md); border:1px solid #374151; background:transparent; font-size:13px; font-weight:600; cursor:pointer; color:#d1d5db; transition:all 0.15s; }
+.gs-discard-btn:hover { background:rgba(255,255,255,0.05); color:white; }
+.gs-save-settings-btn { padding:8px 20px; border-radius:var(--gs-radius-md); border:none; background:var(--gs-green); color:white; font-size:13px; font-weight:700; cursor:pointer; transition:opacity 0.15s; }
+.gs-save-settings-btn:hover { opacity:0.9; }
 </style>
 </head>
 <body>
@@ -860,6 +946,7 @@ async function loadGuestSettings(){
     }
   }catch(e){console.warn('Guest settings load error:',e);}
   gsLoaded=true;
+  document.dispatchEvent(new Event('gsReady'));
 }
 
 async function renderGuestSettings(){
@@ -868,34 +955,45 @@ async function renderGuestSettings(){
     main.innerHTML='<div style="padding:2rem;text-align:center;color:var(--hint);"><div class="spinner" style="margin:0 auto 12px;"></div>Loading…</div>';
     await loadGuestSettings();
   }
-  main.innerHTML=`<div class="page">
-    <div class="card" style="margin-bottom:12px;">
-      <div class="card-header">
-        <div class="card-title">👁 Section Visibility & Content</div>
-        <span style="font-size:12px;color:var(--muted);">Control what guests see per property type</span>
-      </div>
-      <div class="card-body">
-        <div style="background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--rs);padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:16px;">
-          Changes apply after saving. Guests see updated sections on next page load.
-        </div>
-        <div class="prop-tabs" id="gsPropTabs">
-          <button class="prop-tab active" data-prop="ROOMS" onclick="window.gsPropSelect('ROOMS')">Rooms (0-x)</button>
-          <button class="prop-tab" data-prop="MAXELA" onclick="window.gsPropSelect('MAXELA')">Maxela (6-x, 7-x)</button>
-          <button class="prop-tab" data-prop="BIG_APT" onclick="window.gsPropSelect('BIG_APT')">Big Apt (6-3)</button>
-          <button class="prop-tab" data-prop="FREEDOM" onclick="window.gsPropSelect('FREEDOM')">Freedom (tab-x)</button>
-          <button class="prop-tab" data-prop="ORBELIANI" onclick="window.gsPropSelect('ORBELIANI')">Orbeliani (orb-x)</button>
-        </div>
-        <div id="gsToggles"></div>
-      </div>
+  main.innerHTML=`<div class="gs-root" id="gsRoot">
+    <div class="gs-prop-bar" id="gsPropBar">
+      <button class="gs-prop-btn active" data-prop="ROOMS" onclick="gsSelectProp('ROOMS')">Rooms</button>
+      <button class="gs-prop-btn" data-prop="MAXELA" onclick="gsSelectProp('MAXELA')">Maxela</button>
+      <button class="gs-prop-btn" data-prop="BIG_APT" onclick="gsSelectProp('BIG_APT')">Big Apt</button>
+      <button class="gs-prop-btn" data-prop="FREEDOM" onclick="gsSelectProp('FREEDOM')">Freedom</button>
+      <button class="gs-prop-btn" data-prop="ORBELIANI" onclick="gsSelectProp('ORBELIANI')">Orbeliani</button>
     </div>
-
-    <div style="display:flex;justify-content:flex-end;padding-bottom:1.5rem;">
-      <button class="btn btn-primary" onclick="window.gsSave()">Save Guest Page Settings</button>
+    <div class="gs-card">
+      <div class="gs-card-header">
+        <div class="gs-card-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gs-accent)" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+        <span class="gs-card-title">Essential Stay Info</span>
+      </div>
+      <div id="gsEssentialRows"></div>
     </div>
+    <div class="gs-card">
+      <div class="gs-card-header">
+        <div class="gs-card-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gs-accent)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+        <span class="gs-card-title">Paid Services & Add-ons</span>
+      </div>
+      <div id="gsServiceRows"></div>
+      <button class="gs-add-btn" onclick="gsOpenDrawer('__new__')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Custom Service
+      </button>
+    </div>
+    <div class="gs-card">
+      <div class="gs-card-header">
+        <div class="gs-card-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gs-accent)" stroke-width="2.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+        <span class="gs-card-title">Additional Content</span>
+      </div>
+      <div id="gsContentRows"></div>
+    </div>
+    <div style="height:80px"></div>
   </div>`;
 
-  gsRenderPropTabs();
-  gsRenderToggles();
+  // Sync prop-bar active state to current gsProp
+  document.querySelectorAll('.gs-prop-btn').forEach(b=>b.classList.toggle('active',b.dataset.prop===gsProp));
+  gsRenderAll();
 }
 
 function gsRenderPropTabs(){
@@ -1009,6 +1107,7 @@ window.gsPropSelect=function(prop){
 window.gsToggle=function(id,val){
   if(!gsVisibility[gsProp])gsVisibility[gsProp]={};
   gsVisibility[gsProp][id]=val;
+  gsMarkDirty();
 };
 
 window.gsAddLaundry=function(){
@@ -1103,6 +1202,291 @@ onSnapshot(collection(db,'hk_pins'),snap=>{
 
 
 setTimeout(()=>{document.getElementById('loading').style.display='none';render();},5000);
+
+// ── GUEST PAGE SETTINGS — GEMINI UI ──────────────────────────────────────────
+
+// Bridge functions so Gemini code finds what it needs
+function gsSaveGuestPageSettings(){ gsSave(); }
+function gsLoad(){ gsLoaded=false; loadGuestSettings(); }
+let gsDrawerContext=null;
+let gsDirty=false;
+
+const GS_ESSENTIAL=[
+  {id:'checkin',       title:'Check-in Details',         sub:'Door code, instructions, photos',  icon:'key',      noEdit:true},
+  {id:'access_code',   title:'Access Code / Smart Lock', sub:'Door lock code for guests',        icon:'lock'},
+  {id:'elevator_code', title:'Elevator & Entrance',      sub:'Building entry code',              icon:'building'},
+  {id:'wifi',          title:'WiFi & Internet',          sub:'Network name and password',        icon:'wifi',     type:'label'},
+];
+const GS_SERVICES=[
+  {id:'laundry',          title:'Laundry',          sub:'Itemized wash & return service', icon:'shirt',   type:'laundry'},
+  {id:'cleaning',         title:'Room Cleaning',    sub:'Mid-stay professional clean',    icon:'broom',   type:'service'},
+  {id:'city_tour',        title:'City Tour',        sub:'Guided tours around Tbilisi',   icon:'map',     type:'service'},
+  {id:'airport_transfer', title:'Airport Transfer', sub:'Door-to-door transfer',         icon:'car',     type:'service'},
+];
+const GS_CONTENT=[
+  {id:'recs',    title:'Recommendations', sub:'Local restaurants & places', icon:'star', type:'label'},
+  {id:'rules',   title:'House Rules',     sub:'Apartment rules page',       icon:'list', noEdit:true},
+  {id:'contact', title:'Contact Us',      sub:'WhatsApp contact button',    icon:'chat', noEdit:true},
+];
+
+function gsIcon(name){
+  const icons={
+    key:      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>',
+    lock:     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+    building: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18zm-2 0h16M10 7h.01M14 7h.01M10 11h.01M14 11h.01M10 15h.01M14 15h.01"/></svg>',
+    wifi:     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>',
+    shirt:    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/></svg>',
+    broom:    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="M9 3h6l-1 9H10L9 3z"/><path d="M3 21c0-4 2-7 9-7s9 3 9 7"/><path d="M12 14v7"/></svg>',
+    map:      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>',
+    car:      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>',
+    star:     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+    list:     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
+    chat:     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  };
+  return icons[name]||icons['star'];
+}
+
+function gsRenderRows(containerId,sections){
+  const vis=(gsVisibility&&gsVisibility[gsProp])||{};
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  const html=sections.map(s=>{
+    const checked=vis[s.id]!==false?'checked':'';
+    const editBtn=(!s.noEdit)?`<button class="gs-edit-btn" onclick="gsOpenDrawer('${s.id}')">Configure</button>`:'';
+    return `<div class="gs-row">
+      <div class="gs-row-icon">${gsIcon(s.icon)}</div>
+      <div class="gs-row-info">
+        <div class="gs-row-title">${s.title}</div>
+        <div class="gs-row-sub">${s.sub}</div>
+      </div>
+      <div class="gs-row-actions">
+        ${editBtn}
+        <label class="gs-toggle">
+          <input type="checkbox" ${checked} onchange="gsToggle('${s.id}',this.checked)">
+          <span class="gs-toggle-track"></span>
+        </label>
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML=html;
+}
+
+function gsRenderAll(){
+  gsRenderRows('gsEssentialRows',GS_ESSENTIAL);
+  gsRenderRows('gsServiceRows',GS_SERVICES);
+  gsRenderRows('gsContentRows',GS_CONTENT);
+  const knownIds=[...GS_ESSENTIAL,...GS_SERVICES,...GS_CONTENT].map(s=>s.id);
+  const customSvcs=(gsServices||[]).filter(s=>!knownIds.includes(s.id));
+  const vis=(gsVisibility&&gsVisibility[gsProp])||{};
+  const customHtml=customSvcs.map(s=>{
+    const checked=vis[s.id]!==false?'checked':'';
+    return `<div class="gs-row">
+      <div class="gs-row-icon">${gsIcon('star')}</div>
+      <div class="gs-row-info">
+        <div class="gs-row-title">${s.name||s.id}</div>
+        <div class="gs-row-sub">${s.note||'Custom service'}</div>
+      </div>
+      <div class="gs-row-actions">
+        <button class="gs-edit-btn" onclick="gsOpenDrawer('${s.id}')">Configure</button>
+        <label class="gs-toggle">
+          <input type="checkbox" ${checked} onchange="gsToggle('${s.id}',this.checked)">
+          <span class="gs-toggle-track"></span>
+        </label>
+      </div>
+    </div>`;
+  }).join('');
+  const srEl=document.getElementById('gsServiceRows');
+  if(customHtml&&srEl)srEl.innerHTML+=customHtml;
+}
+
+window.gsSelectProp=function(prop){
+  gsProp=prop;
+  document.querySelectorAll('.gs-prop-btn').forEach(b=>b.classList.toggle('active',b.dataset.prop===prop));
+  gsRenderAll();
+};
+
+function gsMarkDirty(){
+  gsDirty=true;
+  const bar=document.getElementById('gsSaveBar');
+  if(bar)bar.classList.add('visible');
+}
+
+window.gsDiscard=function(){
+  gsDirty=false;
+  const bar=document.getElementById('gsSaveBar');
+  if(bar)bar.classList.remove('visible');
+  gsLoad();
+};
+
+window.gsOpenDrawer=function(sectionId){
+  const overlay=document.getElementById('gsDrawerOverlay');
+  const drawer=document.getElementById('gsDrawer');
+  const titleEl=document.getElementById('gsDrawerTitle');
+  const body=document.getElementById('gsDrawerBody');
+  if(!overlay||!drawer||!titleEl||!body)return;
+  gsDrawerContext=sectionId;
+  const allSections=[...GS_ESSENTIAL,...GS_SERVICES,...GS_CONTENT];
+  const def=allSections.find(s=>s.id===sectionId);
+  const svc=(gsServices||[]).find(s=>s.id===sectionId);
+  if(sectionId==='__new__'){
+    titleEl.textContent='Create Custom Service';
+    body.innerHTML=gsDrawerNewService();
+  }else if(def&&def.type==='laundry'){
+    titleEl.textContent='Manage Laundry Tariffs';
+    body.innerHTML=gsDrawerLaundry();
+  }else if((def&&def.type==='service')||svc){
+    const s=svc||{name:def?.title,price:0,note:'',desc:''};
+    titleEl.textContent=`Configure ${s.name||def?.title}`;
+    body.innerHTML=gsDrawerService(s,def);
+  }else if(def&&def.type==='label'){
+    const lbl=(gsSectionLabels||{})[sectionId]||'';
+    titleEl.textContent=`Configure Text: ${def.title}`;
+    body.innerHTML=gsDrawerLabel(def,lbl);
+  }
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+};
+
+window.gsCloseDrawer=function(){
+  const overlay=document.getElementById('gsDrawerOverlay');
+  const drawer=document.getElementById('gsDrawer');
+  if(overlay)overlay.classList.remove('open');
+  if(drawer)drawer.classList.remove('open');
+  gsDrawerContext=null;
+};
+
+window.gsDrawerSave=function(){
+  const id=gsDrawerContext;
+  if(!id)return;
+  if(id==='__new__'){
+    const name=document.getElementById('gsNewSvcName')?.value.trim();
+    const price=parseFloat(document.getElementById('gsNewSvcPrice')?.value)||0;
+    const note=document.getElementById('gsNewSvcNote')?.value.trim()||'';
+    if(!name){alert('Please enter a service name.');return;}
+    const newId=name.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+    if(gsServices)gsServices.push({id:newId,name,price,note});
+  }else if(id!=='laundry'){
+    const nameEl=document.getElementById('gsEditSvcName');
+    const priceEl=document.getElementById('gsEditSvcPrice');
+    const noteEl=document.getElementById('gsEditSvcNote');
+    const descEl=document.getElementById('gsEditSvcDesc');
+    const labelEl=document.getElementById('gsEditLabel');
+    if(nameEl&&gsServices){
+      const svc=gsServices.find(s=>s.id===id);
+      if(svc){svc.name=nameEl.value;svc.price=parseFloat(priceEl?.value)||0;svc.note=noteEl?.value||'';if(descEl)svc.desc=descEl.value;}
+    }
+    if(labelEl&&gsSectionLabels!==undefined){gsSectionLabels[id]=labelEl.value;}
+  }
+  gsMarkDirty();
+  gsRenderAll();
+  gsCloseDrawer();
+};
+
+function gsDrawerService(svc,def){
+  return `<div class="gs-drawer-section">
+    <div class="gs-drawer-label">Service Label Name</div>
+    <input class="gs-drawer-input" id="gsEditSvcName" value="${esc(svc.name||def?.title||'')}">
+  </div>
+  <div class="gs-drawer-section">
+    <div class="gs-drawer-label">Base Price (GEL)</div>
+    <input class="gs-drawer-input" id="gsEditSvcPrice" type="number" value="${svc.price||0}" min="0">
+  </div>
+  <div class="gs-drawer-section">
+    <div class="gs-drawer-label">Price Note</div>
+    <input class="gs-drawer-input" id="gsEditSvcNote" value="${esc(svc.note||'')}" placeholder='e.g. "per person"'>
+  </div>
+  <div class="gs-drawer-section">
+    <div class="gs-drawer-label">Description</div>
+    <input class="gs-drawer-input" id="gsEditSvcDesc" value="${esc(svc.desc||'')}" placeholder="Short info shown to guests">
+  </div>`;
+}
+
+function gsDrawerLabel(def,lbl){
+  return `<div class="gs-drawer-section">
+    <div class="gs-drawer-label">Section Subtitle Text</div>
+    <input class="gs-drawer-input" id="gsEditLabel" value="${esc(lbl)}" placeholder="${esc(def.sub)}">
+    <div style="font-size:12px;color:var(--gs-text-muted);margin-top:8px;line-height:1.4;">Overrides the subtitle shown below the tile heading on the guest check-in page.</div>
+  </div>`;
+}
+
+function gsDrawerNewService(){
+  return `<div class="gs-drawer-section">
+    <div class="gs-drawer-label">Service Title</div>
+    <input class="gs-drawer-input" id="gsNewSvcName" placeholder="e.g. Late Checkout">
+  </div>
+  <div class="gs-drawer-section">
+    <div class="gs-drawer-label">Price (GEL)</div>
+    <input class="gs-drawer-input" id="gsNewSvcPrice" type="number" placeholder="0" min="0">
+  </div>
+  <div class="gs-drawer-section">
+    <div class="gs-drawer-label">Price Note</div>
+    <input class="gs-drawer-input" id="gsNewSvcNote" placeholder="e.g. flat rate, per person">
+  </div>`;
+}
+
+function gsDrawerLaundry(){
+  const items=gsLaundry||[];
+  const rows=items.map((item,i)=>`
+    <div class="gs-laundry-item">
+      <input type="text" value="${esc(item.name)}" onchange="gsLaundry[${i}].name=this.value;gsMarkDirty()">
+      <input type="number" value="${item.price}" min="0" onchange="gsLaundry[${i}].price=parseFloat(this.value)||0;gsMarkDirty()">
+      <span style="font-size:13px;font-weight:600;color:var(--gs-text-muted)">GEL</span>
+      <button class="gs-item-del" onclick="gsLaundry.splice(${i},1);document.getElementById('gsDrawerBody').innerHTML=gsDrawerLaundry();gsMarkDirty()">✕</button>
+    </div>`).join('');
+  return `<div class="gs-drawer-section">
+    <div class="gs-drawer-label">Laundry Items</div>
+    ${rows}
+    <div class="gs-laundry-add">
+      <input id="gsNewLaundryName" placeholder="Item name (e.g. Jeans)">
+      <input id="gsNewLaundryPrice" type="number" placeholder="5" style="width:70px">
+      <button onclick="gsAddLaundryItem()">Add</button>
+    </div>
+    <div class="gs-discount-note">💡 <b>Bulk discount active:</b> 1st item at full price, 2nd+ items at 40% of the listed price.</div>
+  </div>`;
+}
+
+window.gsAddLaundryItem=function(){
+  const name=document.getElementById('gsNewLaundryName')?.value.trim();
+  const price=parseFloat(document.getElementById('gsNewLaundryPrice')?.value)||0;
+  if(!name)return;
+  if(gsLaundry)gsLaundry.push({name,price});
+  document.getElementById('gsDrawerBody').innerHTML=gsDrawerLaundry();
+  gsMarkDirty();
+};
+
+window.gsSaveAll=function(){
+  gsSaveGuestPageSettings();
+  gsDirty=false;
+  const bar=document.getElementById('gsSaveBar');
+  if(bar)bar.classList.remove('visible');
+};
+
+document.addEventListener('gsReady',function(){
+  if(document.getElementById('gsEssentialRows'))gsRenderAll();
+});
 </script>
+
+<!-- ── GUEST SETTINGS: RIGHT DRAWER ── -->
+<div class="gs-drawer-overlay" id="gsDrawerOverlay" onclick="gsCloseDrawer()"></div>
+<div class="gs-drawer" id="gsDrawer">
+  <div class="gs-drawer-head">
+    <span class="gs-drawer-title" id="gsDrawerTitle">Edit Setting</span>
+    <button class="gs-drawer-close" onclick="gsCloseDrawer()">✕</button>
+  </div>
+  <div class="gs-drawer-body" id="gsDrawerBody"></div>
+  <div class="gs-drawer-footer">
+    <button class="gs-drawer-cancel" onclick="gsCloseDrawer()">Cancel</button>
+    <button class="gs-drawer-save" onclick="gsDrawerSave()">Apply Changes</button>
+  </div>
+</div>
+
+<!-- ── GUEST SETTINGS: STICKY SAVE BAR ── -->
+<div class="gs-save-bar" id="gsSaveBar">
+  <span class="gs-save-bar-msg">✨ You have unsaved configuration updates</span>
+  <div style="display:flex;gap:8px;">
+    <button class="gs-discard-btn" onclick="gsDiscard()">Discard</button>
+    <button class="gs-save-settings-btn" onclick="gsSaveAll()">Save Settings</button>
+  </div>
+</div>
 </body>
 </html>
