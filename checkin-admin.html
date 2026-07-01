@@ -155,6 +155,86 @@ input:checked+.slider:before{transform:translateX(20px);}
   .main{padding:1rem;}
 }
 
+/* ── APARTMENTS TAB — PREMIUM TWO-COLUMN LAYOUT ── */
+:root{
+  --apt-bg:#f9fafb;--apt-white:#ffffff;--apt-border:#e5e7eb;
+  --apt-text:#111827;--apt-muted:#6b7280;--apt-accent:#111827;
+  --apt-accent-bg:#f3f4f6;--apt-green:#059669;--apt-green-bg:#ecfdf5;
+  --apt-amber:#d97706;--apt-amber-bg:#fffbeb;
+  --apt-red:#dc2626;--apt-red-bg:#fef2f2;
+  --apt-radius:8px;--apt-shadow:0 1px 2px 0 rgba(0,0,0,.05);
+}
+.main:has(.apt-layout){padding:0;max-width:none;margin:0;overflow:hidden;}
+.apt-layout{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 92px);}
+.apt-sidebar{background:var(--apt-white);border-right:1px solid var(--apt-border);overflow-y:auto;padding:16px 12px;}
+.apt-group-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--apt-muted);padding:4px 8px;margin:16px 0 8px;}
+.apt-group-label:first-child{margin-top:0;}
+.apt-room-card{padding:10px 12px;border-radius:6px;cursor:pointer;border:1px solid transparent;margin-bottom:4px;transition:all .15s ease;}
+.apt-room-card:hover{background:var(--apt-bg);border-color:var(--apt-border);}
+.apt-room-card.active{background:var(--apt-white);border-color:var(--apt-border);box-shadow:var(--apt-shadow);}
+.apt-room-code{font-size:14px;font-weight:600;margin-bottom:4px;color:var(--apt-text);}
+.apt-room-name{font-size:12px;color:var(--apt-muted);margin-bottom:8px;}
+.apt-room-pills{display:flex;flex-wrap:wrap;gap:4px;}
+.apt-pill{font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px;white-space:nowrap;border:1px solid transparent;}
+.apt-pill-ok{background:var(--apt-green-bg);color:var(--apt-green);border-color:#a7f3d0;}
+.apt-pill-warn{background:var(--apt-amber-bg);color:var(--apt-amber);border-color:#fde68a;}
+.apt-pill-err{background:var(--apt-red-bg);color:var(--apt-red);border-color:#fecaca;}
+.apt-editor{background:var(--apt-bg);overflow-y:auto;padding:32px 40px;display:flex;flex-direction:column;gap:16px;}
+.apt-editor-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;}
+.apt-editor-title{font-size:24px;font-weight:600;letter-spacing:-.02em;}
+.apt-editor-sub{font-size:14px;color:var(--apt-muted);margin-top:4px;}
+.apt-save-btn{padding:8px 16px;background:var(--apt-accent);color:white;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:background .2s;box-shadow:var(--apt-shadow);flex-shrink:0;}
+.apt-save-btn:hover{background:#374151;}
+.apt-card{background:var(--apt-white);border:1px solid var(--apt-border);border-radius:var(--apt-radius);overflow:hidden;box-shadow:var(--apt-shadow);}
+.apt-card-header{padding:14px 20px;border-bottom:1px solid var(--apt-border);display:flex;align-items:center;gap:12px;background:var(--apt-white);cursor:pointer;user-select:none;transition:background .15s;}
+.apt-card-header:hover{background:#f9fafb;}
+.apt-card-header svg{flex-shrink:0;color:#9ca3af;}
+.apt-card-title{font-size:14px;font-weight:600;flex:1;color:var(--apt-text);}
+.apt-card-badge{font-size:12px;padding:2px 8px;border-radius:4px;background:#f3f4f6;color:var(--apt-muted);font-weight:500;}
+.apt-card-body{padding:20px;}
+.apt-card-body.collapsed{display:none;}
+.apt-label{font-size:12px;font-weight:600;color:#4b5563;margin-bottom:6px;display:block;}
+.apt-input,.apt-textarea{width:100%;padding:10px 12px;border:1px solid var(--apt-border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--apt-text);background:var(--apt-white);transition:all .2s;box-sizing:border-box;box-shadow:0 1px 2px 0 rgba(0,0,0,.05) inset;}
+.apt-input:focus,.apt-textarea:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.1);}
+.apt-textarea{resize:vertical;min-height:100px;line-height:1.5;}
+.apt-row{display:flex;gap:16px;}
+.apt-row>*{flex:1;}
+.apt-field{margin-bottom:16px;}
+.apt-field:last-child{margin-bottom:0;}
+.apt-mode-group{display:flex;gap:8px;margin-bottom:16px;background:#f3f4f6;padding:4px;border-radius:8px;}
+.apt-mode-btn{flex:1;padding:8px;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:var(--apt-muted);transition:all .15s;font-family:inherit;}
+.apt-mode-btn.active{background:var(--apt-white);color:var(--apt-text);box-shadow:var(--apt-shadow);}
+.apt-input-row{display:flex;gap:8px;}
+.apt-input-row .apt-input{flex:1;}
+.apt-test-btn{padding:10px 16px;border:1px solid var(--apt-border);border-radius:6px;background:var(--apt-white);font-size:13px;font-weight:500;cursor:pointer;color:var(--apt-text);white-space:nowrap;box-shadow:var(--apt-shadow);transition:all .2s;font-family:inherit;}
+.apt-test-btn:hover{background:#f9fafb;border-color:#d1d5db;}
+.apt-steps{display:flex;flex-direction:column;gap:12px;}
+.apt-step{display:flex;gap:16px;align-items:flex-start;background:var(--apt-white);border:1px solid var(--apt-border);border-radius:8px;padding:16px;box-shadow:var(--apt-shadow);}
+.apt-step-thumb{width:80px;height:60px;flex-shrink:0;border-radius:6px;border:1px solid var(--apt-border);background:#f3f4f6;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;position:relative;}
+.apt-step-thumb img{width:100%;height:100%;object-fit:cover;}
+.apt-step-thumb-overlay{position:absolute;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:500;}
+.apt-step-thumb:hover .apt-step-thumb-overlay{display:flex;}
+.apt-step-content{flex:1;}
+.apt-step-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--apt-muted);margin-bottom:6px;}
+.apt-step-textarea{width:100%;padding:10px;border:1px solid var(--apt-border);border-radius:6px;font-size:13px;font-family:inherit;resize:none;line-height:1.5;min-height:60px;background:var(--apt-white);box-sizing:border-box;}
+.apt-step-textarea:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.1);}
+.apt-step-actions{display:flex;flex-direction:column;gap:4px;flex-shrink:0;}
+.apt-step-btn{width:28px;height:28px;border:1px solid var(--apt-border);border-radius:4px;background:var(--apt-white);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--apt-muted);transition:all .2s;}
+.apt-step-btn:hover{border-color:#d1d5db;color:var(--apt-text);background:#f9fafb;}
+.apt-step-btn.del:hover{border-color:#fecaca;color:#dc2626;background:#fef2f2;}
+.apt-step-btn:disabled{opacity:.3;cursor:default;pointer-events:none;}
+.apt-add-step{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:1px dashed #d1d5db;border-radius:8px;background:transparent;cursor:pointer;font-size:13px;font-weight:500;color:var(--apt-muted);width:100%;transition:all .2s;font-family:inherit;}
+.apt-add-step:hover{border-color:#9ca3af;color:var(--apt-text);background:#f9fafb;}
+.apt-link-box{display:flex;gap:12px;align-items:center;background:#f9fafb;border:1px solid var(--apt-border);border-radius:6px;padding:12px 16px;}
+.apt-link-url{flex:1;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;color:var(--apt-muted);word-break:break-all;}
+.apt-copy-btn{padding:8px 16px;border:1px solid var(--apt-border);border-radius:6px;background:var(--apt-white);font-size:13px;font-weight:500;cursor:pointer;color:var(--apt-text);flex-shrink:0;box-shadow:var(--apt-shadow);transition:all .2s;font-family:inherit;}
+.apt-copy-btn:hover{background:#f9fafb;}
+@media(max-width:768px){
+  .apt-layout{grid-template-columns:1fr;height:auto;}
+  .apt-sidebar{border-right:none;border-bottom:1px solid var(--apt-border);max-height:220px;}
+  .apt-editor{padding:20px 16px;}
+}
+
 /* ── GUEST PAGE SETTINGS — PREMIUM DESIGN SYSTEM ── */
 .gs-root {
   --gs-bg: #fafafa;
@@ -415,29 +495,35 @@ function renderApartments(){
     groups[a.group].push(a);
   });
 
-  let html='<div class="page">';
+  let sidebarHtml='';
   Object.entries(groups).forEach(([grp,apts])=>{
-    html+=`<div class="section-title" style="margin-top:1.5rem;">${grp}</div>
-    <div class="apt-grid">`;
+    sidebarHtml+=`<div class="apt-group-label">${esc(grp)}</div>`;
     apts.forEach(a=>{
       const d=aptData[a.id]||{};
-      const hasCode=!!d.doorCode;
+      const hasCode=!!(d.tuyaDeviceId||d.doorCode);
       const hasInstructions=!!d.instructions;
-      const hasPhotos=(d.photos||[]).length>0;
-      html+=`<div class="apt-card" onclick="window.openAptDrawer('${a.id}')">
-        <div class="apt-code">${esc(a.code)}</div>
-        <div class="apt-name">${esc(a.name)}</div>
-        <div class="apt-status">
-          <span class="status-pill ${hasCode?'pill-ok':'pill-err'}">${hasCode?'Door code ✓':'No code'}</span>
-          <span class="status-pill ${hasInstructions?'pill-ok':'pill-warn'}">${hasInstructions?'Instructions ✓':'No instructions'}</span>
-          <span class="status-pill ${hasPhotos?'pill-ok':'pill-warn'}">${hasPhotos?(d.photos.length)+' photos':'No photos'}</span>
+      const photoCount=(d.photos||[]).length;
+      sidebarHtml+=`<div class="apt-room-card" id="apt-card-${a.id}" onclick="window.openAptDrawer('${a.id}')">
+        <div class="apt-room-code">${esc(a.code)}</div>
+        <div class="apt-room-name">${esc(a.name)}</div>
+        <div class="apt-room-pills">
+          <span class="apt-pill ${hasCode?'apt-pill-ok':'apt-pill-err'}">${hasCode?'Code ✓':'No code'}</span>
+          <span class="apt-pill ${hasInstructions?'apt-pill-ok':'apt-pill-warn'}">${hasInstructions?'Steps ✓':'No steps'}</span>
+          <span class="apt-pill ${photoCount>0?'apt-pill-ok':'apt-pill-warn'}">${photoCount>0?photoCount+' photos':'No photos'}</span>
         </div>
       </div>`;
     });
-    html+='</div>';
   });
-  html+='</div>';
-  document.getElementById('main').innerHTML=html;
+
+  document.getElementById('main').innerHTML=`<div class="apt-layout">
+    <div class="apt-sidebar" id="aptSidebar">${sidebarHtml}</div>
+    <div class="apt-editor" id="aptEditor">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--apt-muted);gap:12px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <div style="font-size:14px;font-weight:500;">Select a room to edit</div>
+      </div>
+    </div>
+  </div>`;
 }
 
 window.deleteGuest=async function(guestId,guestName){
@@ -548,145 +634,146 @@ function renderGuests(){
   document.getElementById('main').innerHTML=html;
 }
 
-// ── APARTMENT DRAWER ──────────────────────────────
+// ── APARTMENT EDITOR ──────────────────────────────
 window.openAptDrawer=function(aptId){
   const apt=APARTMENTS.find(a=>a.id===aptId);if(!apt)return;
   currentDrawerApt=aptId;
   const d=aptData[aptId]||{};
 
-  document.getElementById('drawer-title').textContent=apt.code+' — '+apt.name;
-  document.getElementById('drawer-body').innerHTML=`
-    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;">Check-in details</div>
+  // Mark sidebar card active
+  document.querySelectorAll('.apt-room-card').forEach(c=>c.classList.remove('active'));
+  const sidebarCard=document.getElementById('apt-card-'+aptId);
+  if(sidebarCard){sidebarCard.classList.add('active');sidebarCard.scrollIntoView({block:'nearest'});}
 
-    ${d.doorCode?`<!-- legacy doorCode preserved in Firestore but hidden from UI -->`:''}
+  const photoCount=(d.photos||[]).length;
+  const guestUrl=window.location.origin+window.location.pathname.replace('checkin-admin.html','')+'checkin-guest.html?apt='+aptId;
+  const hasDeviceId=!!d.tuyaDeviceId;
+  const initMode=(!!d.doorCode&&!hasDeviceId)?'manual':'auto';
 
-    <div class="form-group">
-      <label class="form-label" style="display:flex;align-items:center;gap:8px;">
-        Tuya Device ID
-        <span style="font-size:12px;font-weight:400;">${d.tuyaDeviceId?'🟢 Tuya connected':'⚪ No lock linked'}</span>
-      </label>
-      <input type="text" class="form-input" id="apt-tuya-device-id"
-        value="${esc(d.tuyaDeviceId||'')}"
-        placeholder="e.g. bf9f9b096af5eb1043fik2">
-      <div style="display:flex;gap:8px;margin-top:6px;">
-        <button type="button" class="btn btn-sm" style="flex:1;"
-          onclick="window.testTuyaDevice('${aptId}')">🔓 Test offline code</button>
+  const photoSteps=(d.photos||[]).map((url,i,arr)=>`
+    <div class="apt-step">
+      <div class="apt-step-thumb" onclick="document.getElementById('replace-input-${aptId}-${i}').click()">
+        <img src="${esc(url)}" alt="Step ${i+1}">
+        <div class="apt-step-thumb-overlay">Replace</div>
+        <input type="file" id="replace-input-${aptId}-${i}" accept="image/*,video/*" style="display:none" onchange="window.doReplacePhoto('${aptId}',${i},this)">
       </div>
-      <div id="tuya-test-result-${aptId}" style="margin-top:6px;display:none;font-family:monospace;font-size:12px;padding:8px 10px;border-radius:6px;background:var(--surface2);"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Check-in time</label>
-        <input type="time" class="form-input" id="apt-checkin-time" value="${esc(d.checkInTime||'14:00')}">
+      <div class="apt-step-content">
+        <div class="apt-step-label">Step ${i+1}</div>
+        <textarea class="apt-step-textarea" id="photo-cap-${i}" placeholder="Describe what the guest sees...">${esc((d.photoCaptions||[])[i]||'')}</textarea>
       </div>
-      <div class="form-group">
-        <label class="form-label">Check-out time</label>
-        <input type="time" class="form-input" id="apt-checkout-time" value="${esc(d.checkOutTime||'12:00')}">
+      <div class="apt-step-actions">
+        <button class="apt-step-btn" onclick="window.movePhoto('${aptId}',${i},-1)" ${i===0?'disabled':''} title="Move up">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+        </button>
+        <button class="apt-step-btn" onclick="window.movePhoto('${aptId}',${i},1)" ${i===arr.length-1?'disabled':''} title="Move down">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <button class="apt-step-btn del" onclick="window.deletePhoto('${aptId}',${i})" title="Delete">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">WiFi name</label>
-        <input type="text" class="form-input" id="apt-wifi-name" value="${esc(d.wifiName||'')}" placeholder="Network name">
+    </div>`).join('');
+
+  const editorEl=document.getElementById('aptEditor');
+  if(!editorEl)return;
+  editorEl.innerHTML=`
+    <div class="apt-editor-header">
+      <div>
+        <div class="apt-editor-title">${esc(apt.code)}</div>
+        <div class="apt-editor-sub">${esc(apt.name)}</div>
       </div>
-      <div class="form-group">
-        <label class="form-label">WiFi password</label>
-        <input type="text" class="form-input" id="apt-wifi-pass" value="${esc(d.wifiPass||'')}" placeholder="Password">
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Check-in instructions</label>
-      <textarea class="form-input" id="apt-instructions" rows="5" placeholder="How to get to the apartment, how to use the door, where to find keys, etc.">${esc(d.instructions||'')}</textarea>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Video</label>
-      <input type="url" class="form-input" id="apt-video" value="${esc(d.videoUrl||'')}" placeholder="Paste YouTube link or upload below" style="margin-bottom:6px;">
-      <input type="file" id="apt-video-input" accept="video/*" style="display:none;" onchange="window.uploadVideo('${aptId}',this)">
-      <button type="button" class="btn btn-sm" onclick="document.getElementById('apt-video-input').click()" style="width:100%;margin-top:4px;">
-        📹 Upload video file (plays directly in guest app)
-      </button>
-      <div style="font-size:11px;color:var(--hint);margin-top:5px;">Upload video here OR paste a YouTube link above. Both play inside the app — guests never leave your page.</div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">House rules <span style="color:var(--hint);font-weight:400;">(type: ${apt.rulesType})</span></label>
-      <textarea class="form-input" id="apt-rules" rows="4" placeholder="No smoking, no parties, quiet hours 11pm...">${esc(d.rules||'')}</textarea>
+      <button class="apt-save-btn" onclick="window.saveAptData('${aptId}')">Save changes</button>
     </div>
 
-    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin:1rem 0 0.75rem;">Service pricing</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <div class="form-group">
-        <label class="form-label">Room cleaning</label>
-        <input type="text" class="form-input" id="svc-price-cleaning" value="${esc((d.servicePrices||{}).cleaning||'30 GEL')}" placeholder="30 GEL">
+    <div class="apt-card">
+      <div class="apt-card-header" onclick="toggleCard('lock')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span class="apt-card-title">Smart Lock</span>
+        <span class="apt-card-badge">${d.tuyaDeviceId?'Tuya linked':d.doorCode?'Manual code':'Not configured'}</span>
+        <svg id="card-arrow-lock" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;margin-left:auto;color:#9ca3af"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="form-group">
-        <label class="form-label">Laundry</label>
-        <input type="text" class="form-input" id="svc-price-laundry" value="${esc((d.servicePrices||{}).laundry||'25 GEL')}" placeholder="25 GEL">
-      </div>
-      <div class="form-group">
-        <label class="form-label">City tour</label>
-        <input type="text" class="form-input" id="svc-price-tour" value="${esc((d.servicePrices||{}).tour||'50 GEL/person')}" placeholder="50 GEL/person">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Airport transfer</label>
-        <input type="text" class="form-input" id="svc-price-transfer" value="${esc((d.servicePrices||{}).transfer||'On request')}" placeholder="On request">
-      </div>
-    </div>
-
-    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin:1rem 0 0.5rem;">Check-in Photos</div>
-    <div style="font-size:12px;color:var(--hint);margin-bottom:8px;">Upload photos of each step — write instructions that guests will see below each photo.</div>
-    <input type="file" id="apt-photo-input" accept="image/*" multiple style="display:none;" onchange="window.uploadPhotos('${aptId}',this)">
-    <div id="photo-grid">
-      ${(d.photos||[]).map((url,i,arr)=>`
-        <div style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--rs);overflow:hidden;">
-          <div style="position:relative;">
-            <img src="${url}" style="width:100%;height:160px;object-fit:cover;display:block;">
-            <button onclick="window.deletePhoto('${aptId}',${i})" style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.7);color:#fff;border:none;cursor:pointer;font-size:13px;line-height:1;">×</button>
-            <div style="position:absolute;bottom:6px;left:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.9);background:rgba(0,0,0,0.45);padding:2px 7px;border-radius:4px;">Step ${i+1}</div>
+      <div class="apt-card-body" id="card-body-lock">
+        <div class="apt-mode-group">
+          <button class="apt-mode-btn ${initMode==='auto'?'active':''}" id="mode-auto" onclick="setLockMode('auto')">Auto-generated code</button>
+          <button class="apt-mode-btn ${initMode==='manual'?'active':''}" id="mode-manual" onclick="setLockMode('manual')">Enter code manually</button>
+        </div>
+        <div id="lock-auto" style="display:${initMode==='auto'?'block':'none'}">
+          <label class="apt-label">Tuya Device ID</label>
+          <div class="apt-input-row">
+            <input class="apt-input" id="apt-tuya-device-id" value="${esc(d.tuyaDeviceId||'')}" placeholder="e.g. bf9f9b096af5eb1043fik2">
+            <button class="apt-test-btn" onclick="window.testTuyaDevice('${aptId}')">Test code</button>
           </div>
-          <div style="padding:8px 10px;background:var(--bg);">
-            <div style="display:flex;gap:6px;margin-bottom:8px;">
-              <button type="button" onclick="window.movePhoto('${aptId}',${i},-1)" ${i===0?'disabled':''} style="flex:1;padding:5px 0;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:13px;cursor:${i===0?'default':'pointer'};opacity:${i===0?'0.35':'1'};">↑ Up</button>
-              <button type="button" onclick="window.movePhoto('${aptId}',${i},1)" ${i===arr.length-1?'disabled':''} style="flex:1;padding:5px 0;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:13px;cursor:${i===arr.length-1?'default':'pointer'};opacity:${i===arr.length-1?'0.35':'1'};">↓ Down</button>
-              <input type="file" id="replace-input-${i}" accept="image/*,video/*" style="display:none;" onchange="window.doReplacePhoto('${aptId}',${i},this)">
-              <button type="button" onclick="document.getElementById('replace-input-${i}').click()" style="flex:1;padding:5px 0;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:13px;cursor:pointer;">↺ Replace</button>
-            </div>
-            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:4px;">Instructions for this photo</div>
-            <textarea class="form-input" id="photo-cap-${i}" rows="2" placeholder="e.g. Enter the code on the keypad to unlock the door..." style="font-size:13px;min-height:60px;">${esc((d.photoCaptions||[])[i]||'')}</textarea>
-          </div>
-        </div>`).join('')}
-      <button type="button" class="btn" style="width:100%;margin-top:4px;" onclick="document.getElementById('apt-photo-input').click()">+ Add photos</button>
+          <div id="tuya-test-result-${aptId}" style="display:none;margin-top:8px;font-family:monospace;font-size:12px;padding:8px 10px;border-radius:6px;background:#f3f4f6;"></div>
+        </div>
+        <div id="lock-manual" style="display:${initMode==='manual'?'block':'none'}">
+          <label class="apt-label">Static Door Code</label>
+          <input class="apt-input" id="apt-door-code" value="${esc(d.doorCode||'')}" placeholder="e.g. 1234#">
+        </div>
+      </div>
     </div>
 
-    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin:1rem 0 0.5rem;">Service pricing</div>
-    <div style="font-size:12px;color:var(--hint);margin-bottom:8px;">Set prices shown to guests for each service.</div>
-    ${[
-      {id:'cleaning',icon:'🧹',label:'Room Cleaning'},
-      {id:'laundry',icon:'👕',label:'Laundry'},
-      {id:'tour',icon:'🗺️',label:'City Tour'},
-      {id:'transfer',icon:'🚕',label:'Airport Transfer'},
-    ].map(svc=>{
-      const existing=(d.services||[]).find(s=>s.id===svc.id)||{};
-      return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span style="font-size:18px;width:28px;">${svc.icon}</span>
-        <span style="flex:1;font-size:13px;font-weight:500;">${svc.label}</span>
-        <input type="text" class="form-input" style="width:100px;height:34px;font-size:13px;" 
-          id="svc-price-${svc.id}" value="${esc(existing.price||'')}" placeholder="e.g. 30 GEL">
-      </div>`;
-    }).join('')}
-
-    <div style="margin-top:1rem;">
-      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Guest page link</div>
-      <div style="font-family:'DM Mono',monospace;font-size:12px;background:var(--surface2);padding:8px 12px;border-radius:var(--rs);color:var(--accent);word-break:break-all;">
-        ${window.location.origin+window.location.pathname.replace('checkin-admin.html','')}checkin-guest.html?apt=${aptId}
+    <div class="apt-card">
+      <div class="apt-card-header" onclick="toggleCard('timing')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="apt-card-title">Timing</span>
+        <svg id="card-arrow-timing" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;margin-left:auto;color:#9ca3af"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <button class="btn btn-sm" style="margin-top:6px;" onclick="navigator.clipboard.writeText('${window.location.origin+window.location.pathname.replace('checkin-admin.html','')}checkin-guest.html?apt=${aptId}').then(()=>toast('Link copied!'))">Copy link</button>
-    </div>`;
+      <div class="apt-card-body" id="card-body-timing">
+        <div class="apt-row">
+          <div class="apt-field"><label class="apt-label">Check-in time</label><input class="apt-input" type="time" id="apt-checkin-time" value="${esc(d.checkInTime||'14:00')}"></div>
+          <div class="apt-field"><label class="apt-label">Check-out time</label><input class="apt-input" type="time" id="apt-checkout-time" value="${esc(d.checkOutTime||'12:00')}"></div>
+        </div>
+      </div>
+    </div>
 
-  document.getElementById('drawer-footer').innerHTML=`
-    <button class="btn" onclick="closeDrawer()">Cancel</button>
-    <button class="btn btn-primary" onclick="window.saveAptData('${aptId}')">Save</button>`;
+    <div class="apt-card">
+      <div class="apt-card-header" onclick="toggleCard('steps')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+        <span class="apt-card-title">Check-In Steps</span>
+        <span class="apt-card-badge" id="steps-photo-badge">${photoCount} photo${photoCount!==1?'s':''}</span>
+        <svg id="card-arrow-steps" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;margin-left:auto;color:#9ca3af"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="apt-card-body" id="card-body-steps">
+        <div class="apt-field">
+          <label class="apt-label">Written instructions</label>
+          <textarea class="apt-textarea" id="apt-instructions" placeholder="Step-by-step entry guide shown above the photos...">${esc(d.instructions||'')}</textarea>
+        </div>
+        <div class="apt-field">
+          <label class="apt-label">Video URL (optional)</label>
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <input class="apt-input" type="url" id="apt-video" value="${esc(d.videoUrl||'')}" placeholder="https://youtube.com/...">
+            <input type="file" id="apt-video-input" accept="video/*" style="display:none" onchange="window.uploadVideo('${aptId}',this)">
+            <button class="apt-test-btn" onclick="document.getElementById('apt-video-input').click()">Upload</button>
+          </div>
+        </div>
+        <div class="apt-field" style="margin-top:8px;">
+          <label class="apt-label">Photo steps</label>
+          <input type="file" id="apt-photo-input" accept="image/*" multiple style="display:none" onchange="window.uploadPhotos('${aptId}',this)">
+          <div class="apt-steps" id="aptPhotoSteps">${photoSteps||'<div style="font-size:13px;color:var(--apt-muted);padding:8px 0;">No photos yet — add your first step below.</div>'}</div>
+          <button class="apt-add-step" style="margin-top:12px" onclick="document.getElementById('apt-photo-input').click()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add photo step
+          </button>
+        </div>
+      </div>
+    </div>
 
-  openDrawer();
+    <div class="apt-card">
+      <div class="apt-card-header" onclick="toggleCard('link')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <span class="apt-card-title">Guest Check-In Link</span>
+        <svg id="card-arrow-link" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;margin-left:auto;color:#9ca3af"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="apt-card-body" id="card-body-link">
+        <div class="apt-link-box">
+          <span class="apt-link-url">${esc(guestUrl)}</span>
+          <button class="apt-copy-btn" onclick="navigator.clipboard.writeText('${guestUrl}').then(()=>toast('Link copied!'))">Copy URL</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:32px"></div>
+  `;
 }
 
 window.uploadVideo=async function(aptId,input){
@@ -788,47 +875,75 @@ window.doReplacePhoto=async function(aptId,idx,input){
 }
 
 window.saveAptData=async function(aptId){
-  // Build services array from price inputs
-  const SVC_DEFS=[
-    {id:'cleaning',icon:'🧹',nameEn:'Room Cleaning',descEn:'Professional mid-stay cleaning. Apartment must be empty during cleaning.',hasTime:true},
-    {id:'laundry',icon:'👕',nameEn:'Laundry',descEn:'We collect your laundry, wash & return it.',hasTime:true},
-    {id:'tour',icon:'🗺️',nameEn:'City Tour',descEn:'Guided tours around Tbilisi.',hasTime:false},
-    {id:'transfer',icon:'🚕',nameEn:'Airport Transfer',descEn:'Comfortable transfer to/from airport.',hasTime:false},
-    {id:'custom',icon:'✨',nameEn:'Other Request',descEn:'Anything else we can help with?',hasTime:false},
-  ];
-  const services=SVC_DEFS.map(s=>{
-    const priceEl=document.getElementById('svc-price-'+s.id);
-    return{...s,price:priceEl?priceEl.value.trim():''};
-  });
-
   // Build photo captions
   const photoCaptions=(aptData[aptId]?.photos||[]).map((_,i)=>{
     const el=document.getElementById('photo-cap-'+i);
     return el?el.value.trim():'';
   });
 
+  // Determine door code: manual mode takes precedence over legacy value
+  const inManualMode=document.getElementById('mode-manual')?.classList.contains('active');
+  const tuyaDeviceId=document.getElementById('apt-tuya-device-id')?.value.trim()||'';
+  const doorCode=inManualMode
+    ?(document.getElementById('apt-door-code')?.value.trim()||'')
+    :(aptData[aptId]?.doorCode||'');
+
   const data={
-    tuyaDeviceId:document.getElementById('apt-tuya-device-id')?.value.trim()||'',
+    tuyaDeviceId,
+    doorCode,
     checkInTime:document.getElementById('apt-checkin-time')?.value||'14:00',
     checkOutTime:document.getElementById('apt-checkout-time')?.value||'12:00',
-    doorCode:aptData[aptId]?.doorCode||'', // preserve legacy value, no longer editable in UI
-    wifiName:document.getElementById('apt-wifi-name')?.value.trim()||'',
-    wifiPass:document.getElementById('apt-wifi-pass')?.value.trim()||'',
+    // wifi & rules no longer shown in apt editor — preserve silently from Firestore
+    wifiName:aptData[aptId]?.wifiName||'',
+    wifiPass:aptData[aptId]?.wifiPass||'',
+    rules:aptData[aptId]?.rules||'',
     instructions:document.getElementById('apt-instructions')?.value.trim()||'',
     videoUrl:document.getElementById('apt-video')?.value.trim()||'',
-    rules:document.getElementById('apt-rules')?.value.trim()||'',
     photos:aptData[aptId]?.photos||[],
-    photoCaptions,services,
+    photoCaptions,
     updatedAt:serverTimestamp()
   };
   try{
     await setDoc(doc(db,'checkin_apartments',aptId),data);
     aptData[aptId]={...aptData[aptId],...data};
     toast('Saved ✓');
-    closeDrawer();
-    render();
+    // Refresh sidebar pill states in place
+    const d=aptData[aptId];
+    const cardEl=document.getElementById('apt-card-'+aptId);
+    if(cardEl){
+      const hasCode=!!(d.tuyaDeviceId||d.doorCode);
+      const hasInstructions=!!d.instructions;
+      const photoCount=(d.photos||[]).length;
+      cardEl.querySelector('.apt-room-pills').innerHTML=`
+        <span class="apt-pill ${hasCode?'apt-pill-ok':'apt-pill-err'}">${hasCode?'Code ✓':'No code'}</span>
+        <span class="apt-pill ${hasInstructions?'apt-pill-ok':'apt-pill-warn'}">${hasInstructions?'Steps ✓':'No steps'}</span>
+        <span class="apt-pill ${photoCount>0?'apt-pill-ok':'apt-pill-warn'}">${photoCount>0?photoCount+' photos':'No photos'}</span>`;
+    }
   }catch(e){toast('Failed to save');}
 }
+
+window.toggleCard=function(id){
+  const body=document.getElementById('card-body-'+id);
+  const arrow=document.getElementById('card-arrow-'+id);
+  if(!body)return;
+  const collapsed=body.classList.toggle('collapsed');
+  if(arrow)arrow.style.transform=collapsed?'rotate(-90deg)':'';
+};
+
+window.setLockMode=function(mode){
+  const autoDiv=document.getElementById('lock-auto');
+  const manDiv=document.getElementById('lock-manual');
+  const autBtn=document.getElementById('mode-auto');
+  const manBtn=document.getElementById('mode-manual');
+  if(!autoDiv||!manDiv)return;
+  if(mode==='auto'){
+    autoDiv.style.display='block';manDiv.style.display='none';
+    autBtn.classList.add('active');manBtn.classList.remove('active');
+  }else{
+    autoDiv.style.display='none';manDiv.style.display='block';
+    autBtn.classList.remove('active');manBtn.classList.add('active');
+  }
+};
 
 window.uploadPhotos=async function(aptId,input){
   const files=Array.from(input.files);
