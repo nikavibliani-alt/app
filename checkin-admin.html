@@ -191,20 +191,10 @@ input:checked+.slider:before{transform:translateX(20px);}
 .apt-card-header svg{flex-shrink:0;color:#9ca3af;}
 .apt-card-title{font-size:14px;font-weight:600;flex:1;color:var(--apt-text);}
 .apt-card-badge{font-size:12px;padding:2px 8px;border-radius:4px;background:#f3f4f6;color:var(--apt-muted);font-weight:500;}
-.apt-card-body{
-  padding:20px;
-  display:grid;
-  grid-template-rows:1fr;
-  transition:grid-template-rows .3s cubic-bezier(.4,0,.2,1),
-             padding-top .3s cubic-bezier(.4,0,.2,1),
-             padding-bottom .3s cubic-bezier(.4,0,.2,1);
-}
-.apt-card-body.collapsed{
-  grid-template-rows:0fr;
-  padding-top:0;
-  padding-bottom:0;
-}
-.apt-card-body-inner{min-height:0;overflow:hidden;}
+.apt-card-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s ease-out;padding:0;}
+.apt-card-body.open{grid-template-rows:1fr;}
+.apt-card-inner{min-height:0;overflow:hidden;padding:0 20px;}
+.apt-card-body.open .apt-card-inner{padding:20px;transition:padding .3s ease-out;}
 .apt-label{font-size:12px;font-weight:600;color:#4b5563;margin-bottom:6px;display:block;}
 .apt-input,.apt-textarea{width:100%;padding:10px 12px;border:1px solid var(--apt-border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--apt-text);background:var(--apt-white);transition:all .2s;box-sizing:border-box;box-shadow:0 1px 2px 0 rgba(0,0,0,.05) inset;}
 .apt-input:focus,.apt-textarea:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.1);}
@@ -704,8 +694,8 @@ window.openAptDrawer=function(aptId){
         <span class="apt-card-badge">${d.tuyaDeviceId?'Tuya linked':d.doorCode?'Manual code':'Not configured'}</span>
         <svg id="card-arrow-lock" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;margin-left:auto;color:#9ca3af"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="apt-card-body" id="card-body-lock">
-        <div class="apt-card-body-inner">
+      <div class="apt-card-body open" id="card-body-lock">
+        <div class="apt-card-inner">
         <div class="apt-mode-group">
           <button class="apt-mode-btn ${initMode==='auto'?'active':''}" id="mode-auto" onclick="setLockMode('auto')">Auto-generated code</button>
           <button class="apt-mode-btn ${initMode==='manual'?'active':''}" id="mode-manual" onclick="setLockMode('manual')">Enter code manually</button>
@@ -732,8 +722,8 @@ window.openAptDrawer=function(aptId){
         <span class="apt-card-title">Timing</span>
         <svg id="card-arrow-timing" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;margin-left:auto;color:#9ca3af"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="apt-card-body" id="card-body-timing">
-        <div class="apt-card-body-inner">
+      <div class="apt-card-body open" id="card-body-timing">
+        <div class="apt-card-inner">
         <div class="apt-row">
           <div class="apt-field"><label class="apt-label">Check-in time</label><input class="apt-input" type="time" id="apt-checkin-time" value="${esc(d.checkInTime||'14:00')}"></div>
           <div class="apt-field"><label class="apt-label">Check-out time</label><input class="apt-input" type="time" id="apt-checkout-time" value="${esc(d.checkOutTime||'12:00')}"></div>
@@ -749,8 +739,8 @@ window.openAptDrawer=function(aptId){
         <span class="apt-card-badge" id="steps-photo-badge">${photoCount} photo${photoCount!==1?'s':''}</span>
         <svg id="card-arrow-steps" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;margin-left:auto;color:#9ca3af"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="apt-card-body" id="card-body-steps">
-        <div class="apt-card-body-inner">
+      <div class="apt-card-body open" id="card-body-steps">
+        <div class="apt-card-inner">
         <div class="apt-field">
           <label class="apt-label">Written instructions</label>
           <textarea class="apt-textarea" id="apt-instructions" placeholder="Step-by-step entry guide shown above the photos...">${esc(d.instructions||'')}</textarea>
@@ -782,8 +772,8 @@ window.openAptDrawer=function(aptId){
         <span class="apt-card-title">Guest Check-In Link</span>
         <svg id="card-arrow-link" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;margin-left:auto;color:#9ca3af"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="apt-card-body" id="card-body-link">
-        <div class="apt-card-body-inner">
+      <div class="apt-card-body open" id="card-body-link">
+        <div class="apt-card-inner">
         <div class="apt-link-box">
           <span class="apt-link-url">${esc(guestUrl)}</span>
           <button class="apt-copy-btn" onclick="navigator.clipboard.writeText('${guestUrl}').then(()=>toast('Link copied!'))">Copy URL</button>
@@ -946,8 +936,8 @@ window.toggleCard=function(id){
   const body=document.getElementById('card-body-'+id);
   const arrow=document.getElementById('card-arrow-'+id);
   if(!body)return;
-  const collapsed=body.classList.toggle('collapsed');
-  if(arrow)arrow.style.transform=collapsed?'rotate(-90deg)':'';
+  const isOpen=body.classList.toggle('open');
+  if(arrow)arrow.style.transform=isOpen?'rotate(180deg)':'';
 };
 
 window.setLockMode=function(mode){
