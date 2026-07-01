@@ -172,7 +172,7 @@ input:checked+.slider:before{transform:translateX(20px);}
   --gs-radius-lg: 12px;
   --gs-radius-md: 8px;
   --gs-radius-sm: 6px;
-  --gs-drawer-w: 460px;
+  --gs-drawer-w: 480px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: var(--gs-text-main);
   -webkit-font-smoothing: antialiased;
@@ -1215,7 +1215,7 @@ const GS_ESSENTIAL=[
   {id:'checkin',       title:'Check-in Details',         sub:'Door code, instructions, photos',  icon:'key',      noEdit:true},
   {id:'access_code',   title:'Access Code / Smart Lock', sub:'Door lock code for guests',        icon:'lock'},
   {id:'elevator_code', title:'Elevator & Entrance',      sub:'Building entry code',              icon:'building'},
-  {id:'wifi',          title:'WiFi & Internet',          sub:'Network name and password',        icon:'wifi',     type:'label'},
+  {id:'wifi',          title:'WiFi & Internet',          sub:'Network name and password',        icon:'wifi',     type:'wifi'},
 ];
 const GS_SERVICES=[
   {id:'laundry',          title:'Laundry',          sub:'Itemized wash & return service', icon:'shirt',   type:'laundry'},
@@ -1224,9 +1224,9 @@ const GS_SERVICES=[
   {id:'airport_transfer', title:'Airport Transfer', sub:'Door-to-door transfer',         icon:'car',     type:'service'},
 ];
 const GS_CONTENT=[
-  {id:'recs',    title:'Recommendations', sub:'Local restaurants & places', icon:'star', type:'label'},
-  {id:'rules',   title:'House Rules',     sub:'Apartment rules page',       icon:'list', noEdit:true},
-  {id:'contact', title:'Contact Us',      sub:'WhatsApp contact button',    icon:'chat', noEdit:true},
+  {id:'recs',    title:'Recommendations', sub:'Local restaurants & places', icon:'star', type:'text'},
+  {id:'rules',   title:'House Rules',     sub:'Apartment rules page',       icon:'list', type:'text'},
+  {id:'contact', title:'Contact Us',      sub:'WhatsApp contact button',    icon:'chat', type:'text'},
 ];
 
 function gsIcon(name){
@@ -1334,6 +1334,12 @@ window.gsOpenDrawer=function(sectionId){
   }else if(def&&def.type==='laundry'){
     titleEl.textContent='Manage Laundry Tariffs';
     body.innerHTML=gsDrawerLaundry();
+  }else if(def&&def.type==='wifi'){
+    titleEl.textContent='Configure WiFi & Internet';
+    body.innerHTML=gsDrawerWifi();
+  }else if(def&&def.type==='text'){
+    titleEl.textContent=`Configure: ${def.title}`;
+    body.innerHTML=gsDrawerTextBlock(def);
   }else if((def&&def.type==='service')||svc){
     const s=svc||{name:def?.title,price:0,note:'',desc:''};
     titleEl.textContent=`Configure ${s.name||def?.title}`;
@@ -1365,6 +1371,10 @@ window.gsDrawerSave=function(){
     if(!name){alert('Please enter a service name.');return;}
     const newId=name.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
     if(gsServices)gsServices.push({id:newId,name,price,note});
+  }else if(id==='wifi'){
+    if(!gsSectionLabels)gsSectionLabels={};
+    gsSectionLabels.wifi_name=document.getElementById('gsEditWifiName')?.value||'';
+    gsSectionLabels.wifi_pass=document.getElementById('gsEditWifiPass')?.value||'';
   }else if(id!=='laundry'){
     const nameEl=document.getElementById('gsEditSvcName');
     const priceEl=document.getElementById('gsEditSvcPrice');
@@ -1428,20 +1438,60 @@ function gsDrawerLaundry(){
   const items=gsLaundry||[];
   const rows=items.map((item,i)=>`
     <div class="gs-laundry-item">
-      <input type="text" value="${esc(item.name)}" onchange="gsLaundry[${i}].name=this.value;gsMarkDirty()">
+      <input type="text" value="${esc(item.name)}" onchange="gsLaundry[${i}].name=this.value;gsMarkDirty()" placeholder="Item name">
       <input type="number" value="${item.price}" min="0" onchange="gsLaundry[${i}].price=parseFloat(this.value)||0;gsMarkDirty()">
       <span style="font-size:13px;font-weight:600;color:var(--gs-text-muted)">GEL</span>
-      <button class="gs-item-del" onclick="gsLaundry.splice(${i},1);document.getElementById('gsDrawerBody').innerHTML=gsDrawerLaundry();gsMarkDirty()">✕</button>
+      <button class="gs-item-del" onclick="gsDeleteLaundryItem(${i})">&#x2715;</button>
     </div>`).join('');
   return `<div class="gs-drawer-section">
-    <div class="gs-drawer-label">Laundry Items</div>
-    ${rows}
-    <div class="gs-laundry-add">
-      <input id="gsNewLaundryName" placeholder="Item name (e.g. Jeans)">
-      <input id="gsNewLaundryPrice" type="number" placeholder="5" style="width:70px">
-      <button onclick="gsAddLaundryItem()">Add</button>
+    <div class="gs-drawer-label">Laundry Items (${items.length})</div>
+    ${rows||'<div style="font-size:13px;color:var(--gs-text-muted);padding:12px 0;">No items yet — add one below.</div>'}
+  </div>
+  <div style="background:#fff;border:1px solid var(--gs-border);border-radius:var(--gs-radius-md);padding:16px;margin-top:4px;">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gs-text-muted);margin-bottom:14px;">Add New Item</div>
+    <div style="margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gs-text-muted);margin-bottom:6px;">Item Name</div>
+      <input class="gs-drawer-input" id="gsNewLaundryName" placeholder="e.g. T-shirt, Jeans, Jacket">
     </div>
-    <div class="gs-discount-note">💡 <b>Bulk discount active:</b> 1st item at full price, 2nd+ items at 40% of the listed price.</div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gs-text-muted);margin-bottom:6px;">Base Price (GEL)</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input class="gs-drawer-input" id="gsNewLaundryPrice" type="number" placeholder="5" min="1" style="max-width:140px;">
+        <span style="font-size:14px;font-weight:600;color:var(--gs-text-muted);">GEL</span>
+      </div>
+    </div>
+    <button onclick="gsAddLaundryItem()" style="width:100%;padding:11px;background:#111827;color:#fff;border:none;border-radius:var(--gs-radius-md);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.01em;">+ Add Item</button>
+  </div>
+  <div class="gs-discount-note" style="margin-top:12px;">&#x1F4A1; <b>Bulk discount active:</b> 1st item at full price, 2nd+ items at 40% of the listed price.</div>`;
+}
+
+window.gsDeleteLaundryItem=function(i){
+  gsLaundry.splice(i,1);
+  const body=document.getElementById('gsDrawerBody');
+  if(body)body.innerHTML=gsDrawerLaundry();
+  gsMarkDirty();
+};
+
+function gsDrawerWifi(){
+  return `<div class="gs-drawer-section">
+    <div class="gs-drawer-label">WiFi Network Name (SSID)</div>
+    <input class="gs-drawer-input" id="gsEditWifiName" value="${esc((gsSectionLabels||{}).wifi_name||'')}" placeholder="e.g. Maxela_Guest_5G">
+    <div style="font-size:12px;color:var(--gs-text-muted);margin-top:6px;line-height:1.4;">The exact network name guests should look for on their device.</div>
+  </div>
+  <div class="gs-drawer-section" style="margin-top:20px;">
+    <div class="gs-drawer-label">WiFi Password</div>
+    <input class="gs-drawer-input" id="gsEditWifiPass" value="${esc((gsSectionLabels||{}).wifi_pass||'')}" placeholder="Enter password">
+    <div style="font-size:12px;color:var(--gs-text-muted);margin-top:6px;line-height:1.4;">Both fields are shown as a clean card on the guest check-in page.</div>
+  </div>`;
+}
+
+function gsDrawerTextBlock(def){
+  const val=(gsSectionLabels||{})[def.id]||'';
+  return `<div class="gs-drawer-section">
+    <div class="gs-drawer-label">${def.title} Content</div>
+    <textarea class="gs-drawer-input" id="gsEditLabel" rows="10" placeholder="Type content here — line breaks are preserved..."
+      style="height:auto;min-height:200px;resize:vertical;line-height:1.6;padding:12px 14px;">${esc(val)}</textarea>
+    <div style="font-size:12px;color:var(--gs-text-muted);margin-top:8px;line-height:1.4;">Line breaks and paragraphs are preserved exactly as typed and shown to guests.</div>
   </div>`;
 }
 
