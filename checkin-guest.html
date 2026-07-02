@@ -1396,7 +1396,7 @@ window.openPage=async function(type){
       }else if(r&&r.tuyaError){
         codeBlock=buildContactHero({kind:'apartment',labelText:t('ac'),message:t('cp2')});
       }else if(d.doorCode){
-        codeBlock=buildCodeHero({kind:'apartment',labelText:t('dc'),code:d.doorCode,statusLabel:t('dc'),statusTime:'',infoText:''});
+        codeBlock=buildCodeHero({kind:'apartment',labelText:'Apartment door code',code:d.doorCode,statusLabel:'Apartment door code',statusTime:'',infoText:''});
       }else{
         codeBlock=buildContactHero({kind:'apartment',labelText:t('ac'),message:t('chc')});
       }
@@ -1427,7 +1427,7 @@ window.openPage=async function(type){
         elevatorBlock=buildContactHero({kind:'entrance',labelText:t('elevatorTitle'),message:t('elevatorUpdating')});
       }
     }
-    body=`<div class="hero-group">${codeBlock}${elevatorBlock}</div>`
+    body=`<div class="hero-group">${elevatorBlock}${codeBlock}</div>`
     +(d.instructions?`<div class="section-title">${t('hi')}</div><div class="instr-text">${esc(resolveElevatorCode(d.instructions))}</div>`:'')
     +(()=>{if(!(d.photos||[]).length)return'';window._lbPhotos=d.photos;const caps=d.photoCaptions||[];window._lbCaps=caps;return`<div class="tour">${d.photos.map((src,i)=>{const cap=resolveElevatorCode((caps[i]||'').trim());return`<div class="tour-item"><div class="tour-item__media"><img src="${src}" onclick="window.openLightbox(window._lbPhotos,${i})"></div><div class="tour-item__body"><div class="tour-item__num">${i+1}</div><div class="tour-item__txt"><div class="t">${esc(cap)}</div></div></div></div>`;}).join('')}</div>`;})()
     +(embed?`<div class="section-title">Video</div><div class="video-wrap">${
