@@ -334,7 +334,8 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 .modal-submit{width:100%;height:50px;background:var(--ink);color:#fff;border:none;border-radius:var(--rs);font-family:var(--sans);font-size:15px;font-weight:600;cursor:pointer;margin-top:0.75rem;}
 .modal-cancel{width:100%;height:44px;background:transparent;border:1px solid var(--line);border-radius:var(--rs);font-family:var(--sans);font-size:14px;color:var(--muted);cursor:pointer;margin-top:8px;}
-.req-card{background:var(--surface2);border:1px solid var(--line);border-radius:var(--rs);padding:10px 14px;margin-bottom:8px;}
+.req-card{background:var(--surface2);border:1px solid var(--line);border-radius:var(--rs);padding:10px 14px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s;}.req-card:hover{border-color:var(--accent-border);}.req-cancelled-card{opacity:0.55;}
+.req-cancelled{background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
 .req-name{font-size:13px;font-weight:500;margin-bottom:2px;}
 .req-note{font-size:12px;color:var(--muted);}
 .req-badge{display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:0.04em;margin-top:6px;}
@@ -397,6 +398,18 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
     </div>
     <button class="modal-submit" onclick="window.submitService()">Send request</button>
     <button class="modal-cancel" onclick="window.closeServiceModal()">Cancel</button>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="req-detail-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="rdm-title">Request Details</div>
+    <div class="modal-scroll" id="rdm-body" style="padding-bottom:0.5rem;"></div>
+    <div id="rdm-actions">
+      <button class="modal-submit" id="rdm-cancel-btn" onclick="window.cancelRequest()" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">Cancel Request</button>
+      <button class="modal-cancel" onclick="window.closeRequestDetail()">Close</button>
+    </div>
   </div>
 </div>
 
@@ -640,7 +653,9 @@ let currentSvcName=null;
 let laundryItems=[];
 let laundryQtys={};
 let _laundryLoaded=false;
-let _trManualCars=null;
+let _trSmallCars=0;
+let _trLargeCars=1;
+let currentReqId=null;
 let elevatorData=null;
 let _pendingReg=null;
 let guestCfgVisibility=null; // cached from checkin_admin/config.visibility
@@ -1492,7 +1507,12 @@ window.openPage=async function(type){
     </div>`).join('');
     if(myRequests.length){
       body+=`<div style="margin-top:1.5rem;"><div class="section-title">${t('mr')}</div>`;
-      body+=myRequests.map(r=>`<div class="req-card"><div class="req-name">${esc(r.serviceName||'')}</div>${r.note?`<div class="req-note">${esc(r.note)}</div>`:''}<span class="req-badge ${r.done?'req-done':'req-pending'}">${r.done?t('dn'):t('pe')}</span></div>`).join('');
+      body+=myRequests.map(r=>{
+        const isCan=r.status==='CANCELLED';
+        const badge=isCan?`<span class="req-badge req-cancelled">CANCELLED</span>`:r.done?`<span class="req-badge req-done">${t('dn')}</span>`:`<span class="req-badge req-pending">${t('pe')}</span>`;
+        const sub=r.carConfig||r.pickupDate||r.preferredTime||r.note||'';
+        return `<div class="req-card${isCan?' req-cancelled-card':''}" onclick="window.openRequestDetail('${r.id}')"><div class="req-name">${esc(r.serviceName||'')}</div>${sub?`<div class="req-note">${esc(sub)}</div>`:''} ${badge}</div>`;
+      }).join('');
       body+=`</div>`;
     }
   }
@@ -1636,6 +1656,7 @@ window.openSvc=async function(id,name,hasTime){
   } else if(id==='transfer'){
     const todayIso=tbilisiToday();
     const loc=getPickupLocation();
+    const{small,large,max}=getTransferConfig();
     const inputStyle=`width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);background:var(--bg);outline:none;`;
     const labelStyle=`font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:0.06em;`;
     extra.innerHTML=`
@@ -1651,15 +1672,25 @@ window.openSvc=async function(id,name,hasTime){
         <label style="${labelStyle}">Number of Guests <span style="color:var(--red);">*</span></label>
         <input type="number" id="tr-guests" value="1" min="1" max="30" style="${inputStyle}" oninput="window.updateTransferPrice()">
       </div>
-      <div id="tr-price-display" style="margin-bottom:0.5rem;padding:10px 14px;background:var(--accent-bg);border:1.5px solid var(--accent-border);border-radius:var(--rs);font-size:14px;font-weight:600;color:var(--accent);">1 small car — 70 GEL</div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;padding:2px 4px;">
-        <span style="font-size:12px;color:var(--muted);font-weight:500;">Number of cars <span style="font-weight:400;">(add for extra space)</span></span>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <button id="tr-cars-minus" onclick="window.adjustTransferCars(-1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1;font-family:'DM Sans',sans-serif;" disabled>−</button>
-          <span id="tr-cars-count" style="font-size:15px;font-weight:600;min-width:20px;text-align:center;">1</span>
-          <button onclick="window.adjustTransferCars(1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--accent);background:var(--accent-bg);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1;color:var(--accent);font-family:'DM Sans',sans-serif;">+</button>
+      <div style="border:1px solid var(--border);border-radius:var(--rs);overflow:hidden;margin-bottom:0.5rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border);">
+          <div><div style="font-size:13px;font-weight:600;">Small car</div><div style="font-size:11px;color:var(--muted);">1–3 pax · ${small} GEL each</div></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button id="tr-small-minus" onclick="window.adjustTrCar('small',-1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1;font-family:'DM Sans',sans-serif;" disabled>−</button>
+            <span id="tr-small-count" style="font-size:15px;font-weight:600;min-width:20px;text-align:center;">0</span>
+            <button onclick="window.adjustTrCar('small',1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--accent);background:var(--accent-bg);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1;color:var(--accent);font-family:'DM Sans',sans-serif;">+</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;">
+          <div><div style="font-size:13px;font-weight:600;">Large car</div><div style="font-size:11px;color:var(--muted);">up to ${max} pax · ${large} GEL each</div></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button id="tr-large-minus" onclick="window.adjustTrCar('large',-1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1;font-family:'DM Sans',sans-serif;" disabled>−</button>
+            <span id="tr-large-count" style="font-size:15px;font-weight:600;min-width:20px;text-align:center;">1</span>
+            <button onclick="window.adjustTrCar('large',1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--accent);background:var(--accent-bg);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1;color:var(--accent);font-family:'DM Sans',sans-serif;">+</button>
+          </div>
         </div>
       </div>
+      <div id="tr-price-display" style="margin-bottom:0.85rem;padding:10px 14px;background:var(--accent-bg);border:1.5px solid var(--accent-border);border-radius:var(--rs);font-size:14px;font-weight:600;color:var(--accent);">1 large car — ${large} GEL</div>
       <div style="margin-bottom:0.85rem;">
         <label style="${labelStyle}">Pickup</label>
         <input type="text" id="tr-pickup" readonly value="Tbilisi International Airport" style="${inputStyle}background:var(--surface2);color:var(--muted);">
@@ -1668,8 +1699,9 @@ window.openSvc=async function(id,name,hasTime){
         <label style="${labelStyle}">Drop-off</label>
         <input type="text" id="tr-dropoff" readonly value="${loc}" style="${inputStyle}background:var(--surface2);color:var(--muted);">
       </div>`:''}`;
-    _trManualCars=null;
-    window.updateTransferPrice();
+    const _nb=calcTransferBreakdown(1);
+    _trSmallCars=_nb.numSmall;_trLargeCars=_nb.numLarge;
+    window.updateTransferCars();
   } else {
     extra.innerHTML='';
   }
@@ -1689,11 +1721,50 @@ window.updateLaundryQty=function(i,delta){
   if(totalEl)totalEl.textContent='Total: '+Math.round(total)+' GEL';
 };
 window.closeServiceModal=function(){document.getElementById('svc-modal').classList.add('hidden');}
+window.openRequestDetail=function(id){
+  currentReqId=id;
+  const r=myRequests.find(x=>x.id===id);
+  if(!r)return;
+  const modal=document.getElementById('req-detail-modal');
+  const titleEl=document.getElementById('rdm-title');
+  const bodyEl=document.getElementById('rdm-body');
+  if(!modal||!titleEl||!bodyEl)return;
+  titleEl.textContent=r.serviceName||'Request';
+  const isCan=r.status==='CANCELLED';
+  const statusLabel=isCan?'CANCELLED':r.done?'CONFIRMED':'PENDING';
+  const statusColor=isCan?'var(--muted)':r.done?'var(--green)':'var(--amber)';
+  const row=(lbl,val)=>val!=null&&val!==''?`<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;gap:12px;"><span style="color:var(--muted);white-space:nowrap;">${esc(lbl)}</span><span style="font-weight:500;text-align:right;">${esc(String(val))}</span></div>`:'';
+  let rows=`<div style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:${statusColor};background:var(--surface2);border:1px solid var(--border);margin-bottom:12px;">${statusLabel}</div>`;
+  rows+=row('Date',r.pickupDate);
+  rows+=row('Arrival time',r.arrivalTime);
+  rows+=row('Guests',r.guests);
+  rows+=row('Pickup',r.pickupLocation);
+  rows+=row('Drop-off',r.dropoffLocation);
+  rows+=row('Cars',r.carConfig);
+  rows+=row('Total',r.price!=null?r.price+' GEL':null);
+  rows+=row('Time',r.preferredTime);
+  rows+=row('Notes',r.note);
+  bodyEl.innerHTML=`<div style="padding:0 2px;">${rows}</div>`;
+  const cancelBtn=document.getElementById('rdm-cancel-btn');
+  if(cancelBtn)cancelBtn.style.display=isCan?'none':'';
+  modal.classList.remove('hidden');
+};
+window.closeRequestDetail=function(){document.getElementById('req-detail-modal')?.classList.add('hidden');};
+window.cancelRequest=async function(){
+  if(!currentReqId)return;
+  try{
+    await setDoc(doc(db,'checkin_requests',currentReqId),{status:'CANCELLED'},{merge:true});
+    const r=myRequests.find(x=>x.id===currentReqId);
+    if(r)r.status='CANCELLED';
+    window.closeRequestDetail();
+    toast('Request cancelled');
+  }catch(e){toast('Could not cancel: '+e.message);}
+};
 function getTransferConfig(){
   const svc=(guestSvcs||[]).find(s=>s.id==='airport_transfer');
   return{small:svc?.smallCarPrice||70,large:svc?.largeCarPrice||100,max:svc?.maxGuestsPerCar||7};
 }
-function calcTransferBreakdown(guests,manualCars){
+function calcTransferBreakdown(guests){
   const n=parseInt(guests)||1;
   const{small,large,max}=getTransferConfig();
   let numLarge,numSmall;
@@ -1705,38 +1776,44 @@ function calcTransferBreakdown(guests,manualCars){
     else if(rem<=3){numLarge=Math.floor(n/max);numSmall=1;}
     else{numLarge=Math.ceil(n/max);numSmall=0;}
   }
-  const naturalMin=numLarge+numSmall;
-  const extra=Math.max(0,(manualCars||naturalMin)-naturalMin);
-  const dLarge=numLarge+extra;const dSmall=numSmall;
-  const displayTotal=dLarge+dSmall;
-  const price=dLarge*large+dSmall*small;
-  let carDesc;
-  if(dLarge>0&&dSmall>0){
-    const ls=dLarge===1?'1 large car':`${dLarge} large cars`;
-    const ss=dSmall===1?'1 small car':`${dSmall} small cars`;
-    carDesc=`${ls} + ${ss}`;
-  }else if(dLarge>0){carDesc=dLarge===1?'1 large car':`${dLarge} large cars`;}
-  else{carDesc=dSmall===1?'1 small car':`${dSmall} small cars`;}
-  const label=`${carDesc} — ${price} GEL`;
-  return{price,label,carDesc,displayTotal,naturalMin};
+  return{numSmall,numLarge};
 }
-window.updateTransferPrice=function(){
-  const guests=parseInt(document.getElementById('tr-guests')?.value)||1;
-  const natural=calcTransferBreakdown(guests,null);
-  if(_trManualCars!==null&&_trManualCars<natural.naturalMin)_trManualCars=natural.naturalMin;
-  const bd=calcTransferBreakdown(guests,_trManualCars);
+function buildTransferSummary(){
+  const{small,large}=getTransferConfig();
+  const price=_trSmallCars*small+_trLargeCars*large;
+  const ls=_trLargeCars===1?'1 large car':`${_trLargeCars} large cars`;
+  const ss=_trSmallCars===1?'1 small car':`${_trSmallCars} small cars`;
+  let carDesc;
+  if(_trLargeCars>0&&_trSmallCars>0)carDesc=`${ls} + ${ss}`;
+  else if(_trLargeCars>0)carDesc=ls;
+  else carDesc=ss;
+  return{price,carDesc,totalCars:_trSmallCars+_trLargeCars,label:`${carDesc} — ${price} GEL`};
+}
+window.updateTransferCars=function(){
+  const s=buildTransferSummary();
   const priceEl=document.getElementById('tr-price-display');
-  if(priceEl)priceEl.textContent=bd.label;
-  const carsEl=document.getElementById('tr-cars-count');
-  if(carsEl)carsEl.textContent=bd.displayTotal;
-  const minusBtn=document.getElementById('tr-cars-minus');
-  if(minusBtn)minusBtn.disabled=bd.displayTotal<=natural.naturalMin;
+  if(priceEl)priceEl.textContent=s.label;
+  const sEl=document.getElementById('tr-small-count');
+  if(sEl)sEl.textContent=_trSmallCars;
+  const lEl=document.getElementById('tr-large-count');
+  if(lEl)lEl.textContent=_trLargeCars;
+  const total=_trSmallCars+_trLargeCars;
+  const sm=document.getElementById('tr-small-minus');
+  if(sm)sm.disabled=_trSmallCars<=0||total<=1;
+  const lm=document.getElementById('tr-large-minus');
+  if(lm)lm.disabled=_trLargeCars<=0||total<=1;
 };
-window.adjustTransferCars=function(delta){
-  const guests=parseInt(document.getElementById('tr-guests')?.value)||1;
-  const natural=calcTransferBreakdown(guests,null);
-  _trManualCars=Math.max(natural.naturalMin,(_trManualCars||natural.naturalMin)+delta);
-  window.updateTransferPrice();
+window.adjustTrCar=function(type,delta){
+  if(delta<0&&(_trSmallCars+_trLargeCars)<=1)return;
+  if(type==='small'){_trSmallCars=Math.max(0,_trSmallCars+delta);}
+  else{_trLargeCars=Math.max(0,_trLargeCars+delta);}
+  window.updateTransferCars();
+};
+window.updateTransferPrice=function(){
+  const n=parseInt(document.getElementById('tr-guests')?.value)||1;
+  const{numSmall,numLarge}=calcTransferBreakdown(n);
+  _trSmallCars=numSmall;_trLargeCars=numLarge;
+  window.updateTransferCars();
 };
 window.submitService=async function(){
   if(!currentSvcId||!guestId)return;
@@ -1757,8 +1834,8 @@ window.submitService=async function(){
     if(!trDate){alert('Please select a pickup date.');return;}
     if(!trTime){alert('Please enter your landing/arrival time.');return;}
     const trGuestsNum=parseInt(trGuests)||1;
-    const trPricing=calcTransferBreakdown(trGuestsNum,_trManualCars);
-    transferDetails={pickupDate:trDate,arrivalTime:trTime,guests:trGuestsNum,pickupLocation:trPickup,dropoffLocation:trDropoff,cars:trPricing.displayTotal,carConfig:trPricing.carDesc,price:trPricing.price,priceLabel:trPricing.label};
+    const trSum=buildTransferSummary();
+    transferDetails={pickupDate:trDate,arrivalTime:trTime,guests:trGuestsNum,pickupLocation:trPickup,dropoffLocation:trDropoff,cars:trSum.totalCars,carConfig:trSum.carDesc,price:trSum.price,priceLabel:trSum.label};
   }
 
   // Laundry: collect selected items
