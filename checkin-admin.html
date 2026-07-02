@@ -735,6 +735,23 @@ window.openAptDrawer=function(aptId){
 
     <div class="apt-card">
       <div class="apt-card-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+        <span class="apt-card-title">WiFi</span>
+      </div>
+      <div class="apt-card-body">
+        <div class="apt-field">
+          <label class="apt-label">WiFi Network Name</label>
+          <input class="apt-input" id="apt-wifiName" value="${esc(d.wifiName||'')}" placeholder="e.g. Maxela_Guest_5G">
+        </div>
+        <div class="apt-field">
+          <label class="apt-label">WiFi Password</label>
+          <input class="apt-input" id="apt-wifiPass" value="${esc(d.wifiPass||'')}" placeholder="Enter password">
+        </div>
+      </div>
+    </div>
+
+    <div class="apt-card">
+      <div class="apt-card-header">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
         <span class="apt-card-title">Check-In Steps</span>
         <span class="apt-card-badge" id="steps-photo-badge">${photoCount} photo${photoCount!==1?'s':''}</span>
@@ -898,9 +915,8 @@ window.saveAptData=async function(aptId){
     doorCode,
     checkInTime:document.getElementById('apt-checkInTime')?.value||'14:00',
     checkOutTime:document.getElementById('apt-checkOutTime')?.value||'12:00',
-    // wifi & rules no longer shown in apt editor — preserve silently from Firestore
-    wifiName:aptData[aptId]?.wifiName||'',
-    wifiPass:aptData[aptId]?.wifiPass||'',
+    wifiName:document.getElementById('apt-wifiName')?.value.trim()||'',
+    wifiPass:document.getElementById('apt-wifiPass')?.value.trim()||'',
     rules:aptData[aptId]?.rules||'',
     instructions:document.getElementById('apt-instructions')?.value.trim()||'',
     videoUrl:document.getElementById('apt-videoUrl')?.value.trim()||'',
@@ -1376,7 +1392,7 @@ const GS_ESSENTIAL=[
   {id:'checkin',       title:'Check-in Details',         sub:'Door code, instructions, photos',  icon:'key',      noEdit:true},
   {id:'access_code',   title:'Access Code / Smart Lock', sub:'Door lock code for guests',        icon:'lock'},
   {id:'elevator_code', title:'Elevator & Entrance',      sub:'Building entry code',              icon:'building'},
-  {id:'wifi',          title:'WiFi & Internet',          sub:'Network name and password',        icon:'wifi',     type:'wifi'},
+  {id:'wifi',          title:'WiFi & Internet',          sub:'Show/hide WiFi tile on guest page', icon:'wifi',     noEdit:true},
 ];
 const GS_SERVICES=[
   {id:'laundry',          title:'Laundry',          sub:'Itemized wash & return service', icon:'shirt',   type:'laundry'},
