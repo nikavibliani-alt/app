@@ -1554,14 +1554,24 @@ window.gsDrawerSave=function(){
     gsSectionLabels.wifi_pass=document.getElementById('gsEditWifiPass')?.value||'';
   }else if(id!=='laundry'){
     const nameEl=document.getElementById('gsEditSvcName');
-    const priceEl=document.getElementById('gsEditSvcPrice');
-    const noteEl=document.getElementById('gsEditSvcNote');
     const descEl=document.getElementById('gsEditSvcDesc');
     const labelEl=document.getElementById('gsEditLabel');
     const waEl=document.getElementById('gsEditSvcWa');
     if(nameEl&&gsServices){
       const svc=gsServices.find(s=>s.id===id);
-      if(svc){svc.name=nameEl.value;svc.price=parseFloat(priceEl?.value)||0;svc.note=noteEl?.value||'';if(descEl)svc.desc=descEl.value;if(waEl)svc.whatsappNumber=waEl.value.trim();}
+      if(svc){
+        svc.name=nameEl.value;
+        if(descEl)svc.desc=descEl.value;
+        if(waEl)svc.whatsappNumber=waEl.value.trim();
+        if(id==='airport_transfer'){
+          svc.smallCarPrice=parseFloat(document.getElementById('gsEditSvcSmallPrice')?.value)||70;
+          svc.largeCarPrice=parseFloat(document.getElementById('gsEditSvcLargePrice')?.value)||100;
+          svc.maxGuestsPerCar=parseInt(document.getElementById('gsEditSvcMaxGuests')?.value)||7;
+        }else{
+          svc.price=parseFloat(document.getElementById('gsEditSvcPrice')?.value)||0;
+          svc.note=document.getElementById('gsEditSvcNote')?.value||'';
+        }
+      }
     }
     if(labelEl&&gsSectionLabels!==undefined){gsSectionLabels[id]=labelEl.value;}
   }
@@ -1573,10 +1583,21 @@ window.gsDrawerSave=function(){
 function gsDrawerService(svc,def){
   const svcId=def?.id||svc?.id||'';
   const showWa=['airport_transfer','city_tour'].includes(svcId);
-  return `<div class="gs-drawer-section">
-    <div class="gs-drawer-label">Service Label Name</div>
-    <input class="gs-drawer-input" id="gsEditSvcName" value="${esc(svc.name||def?.title||'')}">
+  const isTransfer=svcId==='airport_transfer';
+  const priceFields=isTransfer?`
+  <div class="gs-drawer-section">
+    <div class="gs-drawer-label">Small car price — 1 to 3 guests (GEL)</div>
+    <input class="gs-drawer-input" id="gsEditSvcSmallPrice" type="number" value="${svc.smallCarPrice||70}" min="0">
   </div>
+  <div class="gs-drawer-section">
+    <div class="gs-drawer-label">Large car price — 4+ guests (GEL)</div>
+    <input class="gs-drawer-input" id="gsEditSvcLargePrice" type="number" value="${svc.largeCarPrice||100}" min="0">
+  </div>
+  <div class="gs-drawer-section">
+    <div class="gs-drawer-label">Max guests per car</div>
+    <input class="gs-drawer-input" id="gsEditSvcMaxGuests" type="number" value="${svc.maxGuestsPerCar||7}" min="1" max="30">
+    <div style="font-size:12px;color:var(--gs-text-muted,var(--hint));margin-top:6px;line-height:1.4;">If guests exceed this limit, price multiplies automatically (e.g. 8 guests = 2 cars).</div>
+  </div>`:`
   <div class="gs-drawer-section">
     <div class="gs-drawer-label">Base Price (GEL)</div>
     <input class="gs-drawer-input" id="gsEditSvcPrice" type="number" value="${svc.price||0}" min="0">
@@ -1584,7 +1605,12 @@ function gsDrawerService(svc,def){
   <div class="gs-drawer-section">
     <div class="gs-drawer-label">Price Note</div>
     <input class="gs-drawer-input" id="gsEditSvcNote" value="${esc(svc.note||'')}" placeholder='e.g. "per person"'>
+  </div>`;
+  return `<div class="gs-drawer-section">
+    <div class="gs-drawer-label">Service Label Name</div>
+    <input class="gs-drawer-input" id="gsEditSvcName" value="${esc(svc.name||def?.title||'')}">
   </div>
+  ${priceFields}
   <div class="gs-drawer-section">
     <div class="gs-drawer-label">Description</div>
     <input class="gs-drawer-input" id="gsEditSvcDesc" value="${esc(svc.desc||'')}" placeholder="Short info shown to guests">

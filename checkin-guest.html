@@ -1650,11 +1650,12 @@ window.openSvc=async function(id,name,hasTime){
         <label style="${labelStyle}">Number of Guests <span style="color:var(--red);">*</span></label>
         <input type="number" id="tr-guests" value="1" min="1" max="20" style="${inputStyle}" oninput="window.updateTransferPrice()">
       </div>
-      <div id="tr-price-display" style="margin-bottom:0.85rem;padding:10px 14px;background:var(--accent-bg);border:1.5px solid var(--accent-border);border-radius:var(--rs);font-size:14px;font-weight:600;color:var(--accent);">Transfer price: 70 GEL</div>
+      <div id="tr-price-display" style="margin-bottom:0.85rem;padding:10px 14px;background:var(--accent-bg);border:1.5px solid var(--accent-border);border-radius:var(--rs);font-size:14px;font-weight:600;color:var(--accent);">Transfer price: 1 small car — 70 GEL</div>
       ${loc?`<div style="margin-bottom:0.85rem;">
         <label style="${labelStyle}">Pickup Location</label>
         <input type="text" id="tr-location" readonly value="${loc}" style="${inputStyle}background:var(--surface2);color:var(--muted);">
       </div>`:''}`;
+    window.updateTransferPrice();
   } else {
     extra.innerHTML='';
   }
@@ -1674,11 +1675,23 @@ window.updateLaundryQty=function(i,delta){
   if(totalEl)totalEl.textContent='Total: '+Math.round(total)+' GEL';
 };
 window.closeServiceModal=function(){document.getElementById('svc-modal').classList.add('hidden');}
-function calcTransferPrice(guests){return (parseInt(guests)||1)>=4?100:70;}
+function getTransferConfig(){
+  const svc=(guestSvcs||[]).find(s=>s.id==='airport_transfer');
+  return{small:svc?.smallCarPrice||70,large:svc?.largeCarPrice||100,max:svc?.maxGuestsPerCar||7};
+}
+function calcTransferPrice(guests){
+  const n=parseInt(guests)||1;
+  const{small,large,max}=getTransferConfig();
+  if(n<=3)return{price:small,label:`1 small car — ${small} GEL`};
+  if(n<=max)return{price:large,label:`1 large car — ${large} GEL`};
+  const cars=Math.ceil(n/max);
+  const total=cars*large;
+  return{price:total,label:`${cars} cars needed — ${total} GEL`};
+}
 window.updateTransferPrice=function(){
   const guests=parseInt(document.getElementById('tr-guests')?.value)||1;
   const el=document.getElementById('tr-price-display');
-  if(el)el.textContent='Transfer price: '+calcTransferPrice(guests)+' GEL';
+  if(el)el.textContent='Transfer price: '+calcTransferPrice(guests).label;
 };
 window.submitService=async function(){
   if(!currentSvcId||!guestId)return;
@@ -1698,7 +1711,8 @@ window.submitService=async function(){
     if(!trDate){alert('Please select a pickup date.');return;}
     if(!trTime){alert('Please enter your landing/arrival time.');return;}
     const trGuestsNum=parseInt(trGuests)||1;
-    transferDetails={pickupDate:trDate,arrivalTime:trTime,guests:trGuestsNum,pickupLocation:trLoc,price:calcTransferPrice(trGuestsNum)};
+    const trPricing=calcTransferPrice(trGuestsNum);
+    transferDetails={pickupDate:trDate,arrivalTime:trTime,guests:trGuestsNum,pickupLocation:trLoc,price:trPricing.price,priceLabel:trPricing.label};
   }
 
   // Laundry: collect selected items
@@ -1750,7 +1764,7 @@ window.submitService=async function(){
       waBody+=`Arrival time: ${transferDetails.arrivalTime}\n`;
       waBody+=`Number of guests: ${transferDetails.guests}\n`;
       if(transferDetails.pickupLocation)waBody+=`Pickup location: ${transferDetails.pickupLocation}\n`;
-      waBody+=`Price: ${transferDetails.price} GEL\n`;
+      waBody+=`Price: ${transferDetails.priceLabel}\n`;
     }
     if(currentSvcId==='laundry'&&selectedItems.length){
       waBody+=selectedItems.map(it=>`  • ${it.name} ×${it.qty} = ${it.subtotal} GEL`).join('\n')+'\n';
