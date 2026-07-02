@@ -1729,7 +1729,7 @@ function updateLightbox(){
   if(prev)prev.classList.toggle('hidden',lbIndex===0);
   if(next)next.classList.toggle('hidden',lbIndex===lbPhotos.length-1);
   const capEl=document.getElementById('lb-caption');
-  const capText=(lbCaps[lbIndex]||'').trim();
+  const capText=resolveElevatorCode((lbCaps[lbIndex]||'').trim());
   if(capEl){capEl.textContent=capText;capEl.classList.toggle('hidden',!capText);}
 }
 
