@@ -407,6 +407,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
     <div class="modal-title" id="rdm-title">Request Details</div>
     <div class="modal-scroll" id="rdm-body" style="padding-bottom:0.5rem;"></div>
     <div id="rdm-actions">
+      <button class="modal-submit" id="rdm-edit-btn" onclick="window.editRequest()" style="display:none;margin-bottom:8px;">Edit &amp; Resubmit</button>
       <button class="modal-submit" id="rdm-cancel-btn" onclick="window.cancelRequest()" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">Cancel Request</button>
       <button class="modal-cancel" onclick="window.closeRequestDetail()">Close</button>
     </div>
@@ -656,6 +657,8 @@ let _laundryLoaded=false;
 let _trSmallCars=0;
 let _trLargeCars=1;
 let currentReqId=null;
+let _editingReqId=null;
+let _trPrefill=null;
 let elevatorData=null;
 let _pendingReg=null;
 let guestCfgVisibility=null; // cached from checkin_admin/config.visibility
@@ -1506,7 +1509,7 @@ window.openPage=async function(type){
       <div class="sc-arrow">›</div>
     </div>`).join('');
     if(myRequests.length){
-      body+=`<div style="margin-top:1.5rem;"><div class="section-title">${t('mr')}</div>`;
+      body+=`<div id="my-requests-section" style="margin-top:1.5rem;"><div class="section-title">${t('mr')}</div>`;
       body+=myRequests.map(r=>{
         const isCan=r.status==='CANCELLED';
         const badge=isCan?`<span class="req-badge req-cancelled">CANCELLED</span>`:r.done?`<span class="req-badge req-done">${t('dn')}</span>`:`<span class="req-badge req-pending">${t('pe')}</span>`;
@@ -1702,6 +1705,15 @@ window.openSvc=async function(id,name,hasTime){
     const _nb=calcTransferBreakdown(1);
     _trSmallCars=_nb.numSmall;_trLargeCars=_nb.numLarge;
     window.updateTransferCars();
+    if(_trPrefill){
+      const p=_trPrefill;_trPrefill=null;
+      const dateEl=document.getElementById('tr-date');
+      if(dateEl&&p.pickupDate)dateEl.value=p.pickupDate;
+      const timeEl2=document.getElementById('tr-time');
+      if(timeEl2&&p.arrivalTime)timeEl2.value=p.arrivalTime;
+      const guestEl=document.getElementById('tr-guests');
+      if(guestEl&&p.guests){guestEl.value=p.guests;window.updateTransferPrice();}
+    }
   } else {
     extra.innerHTML='';
   }
@@ -1720,8 +1732,9 @@ window.updateLaundryQty=function(i,delta){
   const totalEl=document.getElementById('laundry-total');
   if(totalEl)totalEl.textContent='Total: '+Math.round(total)+' GEL';
 };
-window.closeServiceModal=function(){document.getElementById('svc-modal').classList.add('hidden');}
+window.closeServiceModal=function(){document.getElementById('svc-modal').classList.add('hidden');_editingReqId=null;}
 window.openRequestDetail=function(id){
+  console.log('openRequestDetail called', id, 'myRequests:', myRequests.length);
   currentReqId=id;
   const r=myRequests.find(x=>x.id===id);
   if(!r)return;
@@ -1747,6 +1760,8 @@ window.openRequestDetail=function(id){
   bodyEl.innerHTML=`<div style="padding:0 2px;">${rows}</div>`;
   const cancelBtn=document.getElementById('rdm-cancel-btn');
   if(cancelBtn)cancelBtn.style.display=isCan?'none':'';
+  const editBtn=document.getElementById('rdm-edit-btn');
+  if(editBtn)editBtn.style.display=(!isCan&&r.serviceId==='transfer')?'':'none';
   modal.classList.remove('hidden');
 };
 window.closeRequestDetail=function(){document.getElementById('req-detail-modal')?.classList.add('hidden');};
@@ -1758,8 +1773,27 @@ window.cancelRequest=async function(){
     if(r)r.status='CANCELLED';
     window.closeRequestDetail();
     toast('Request cancelled');
+    refreshMyRequestsSection();
   }catch(e){toast('Could not cancel: '+e.message);}
 };
+window.editRequest=function(){
+  const r=myRequests.find(x=>x.id===currentReqId);
+  if(!r||r.serviceId!=='transfer')return;
+  _editingReqId=currentReqId;
+  _trPrefill=r;
+  window.closeRequestDetail();
+  window.openSvc('transfer',r.serviceName||'Airport Transfer',false);
+};
+function refreshMyRequestsSection(){
+  const section=document.getElementById('my-requests-section');
+  if(!section)return;
+  section.innerHTML=`<div class="section-title">${t('mr')}</div>`+myRequests.map(r=>{
+    const isCan=r.status==='CANCELLED';
+    const badge=isCan?`<span class="req-badge req-cancelled">CANCELLED</span>`:r.done?`<span class="req-badge req-done">${t('dn')}</span>`:`<span class="req-badge req-pending">${t('pe')}</span>`;
+    const sub=r.carConfig||r.pickupDate||r.preferredTime||r.note||'';
+    return `<div class="req-card${isCan?' req-cancelled-card':''}" onclick="window.openRequestDetail('${r.id}')"><div class="req-name">${esc(r.serviceName||'')}</div>${sub?`<div class="req-note">${esc(sub)}</div>`:''} ${badge}</div>`;
+  }).join('');
+}
 function getTransferConfig(){
   const svc=(guestSvcs||[]).find(s=>s.id==='airport_transfer');
   return{small:svc?.smallCarPrice||70,large:svc?.largeCarPrice||100,max:svc?.maxGuestsPerCar||7};
@@ -1866,7 +1900,16 @@ window.submitService=async function(){
     if(currentSvcId==='transfer'){
       Object.assign(payload,transferDetails);
     }
-    await addDoc(collection(db,'checkin_requests'),payload);
+    if(_editingReqId){
+      const{createdAt:_ct,...updatePayload}=payload;
+      await setDoc(doc(db,'checkin_requests',_editingReqId),{...updatePayload,status:'PENDING',updatedAt:serverTimestamp()},{merge:true});
+      const ridx=myRequests.findIndex(x=>x.id===_editingReqId);
+      if(ridx>=0)Object.assign(myRequests[ridx],updatePayload);
+      _editingReqId=null;
+      refreshMyRequestsSection();
+    }else{
+      await addDoc(collection(db,'checkin_requests'),payload);
+    }
 
     // Log all requests to service_requests for tracking
     const details={note,...(currentSvcId==='transfer'?transferDetails:{}),...(currentSvcId==='laundry'?{items:selectedItems,total:laundryTotal}:{}),...(preferredTime?{preferredTime}:{})};
