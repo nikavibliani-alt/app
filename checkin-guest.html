@@ -1646,10 +1646,11 @@ window.openSvc=async function(id,name,hasTime){
         <label style="${labelStyle}">Landing / Arrival Time <span style="color:var(--red);">*</span></label>
         <input type="time" id="tr-time" style="${inputStyle}">
       </div>
-      <div style="margin-bottom:0.85rem;">
+      <div style="margin-bottom:0.5rem;">
         <label style="${labelStyle}">Number of Guests <span style="color:var(--red);">*</span></label>
-        <input type="number" id="tr-guests" value="1" min="1" max="20" style="${inputStyle}">
+        <input type="number" id="tr-guests" value="1" min="1" max="20" style="${inputStyle}" oninput="window.updateTransferPrice()">
       </div>
+      <div id="tr-price-display" style="margin-bottom:0.85rem;padding:10px 14px;background:var(--accent-bg);border:1.5px solid var(--accent-border);border-radius:var(--rs);font-size:14px;font-weight:600;color:var(--accent);">Transfer price: 70 GEL</div>
       ${loc?`<div style="margin-bottom:0.85rem;">
         <label style="${labelStyle}">Pickup Location</label>
         <input type="text" id="tr-location" readonly value="${loc}" style="${inputStyle}background:var(--surface2);color:var(--muted);">
@@ -1673,6 +1674,12 @@ window.updateLaundryQty=function(i,delta){
   if(totalEl)totalEl.textContent='Total: '+Math.round(total)+' GEL';
 };
 window.closeServiceModal=function(){document.getElementById('svc-modal').classList.add('hidden');}
+function calcTransferPrice(guests){return (parseInt(guests)||1)>=4?100:70;}
+window.updateTransferPrice=function(){
+  const guests=parseInt(document.getElementById('tr-guests')?.value)||1;
+  const el=document.getElementById('tr-price-display');
+  if(el)el.textContent='Transfer price: '+calcTransferPrice(guests)+' GEL';
+};
 window.submitService=async function(){
   if(!currentSvcId||!guestId)return;
   const note=document.getElementById('svc-note')?.value.trim()||'';
@@ -1690,7 +1697,8 @@ window.submitService=async function(){
     const trLoc=document.getElementById('tr-location')?.value||getPickupLocation();
     if(!trDate){alert('Please select a pickup date.');return;}
     if(!trTime){alert('Please enter your landing/arrival time.');return;}
-    transferDetails={pickupDate:trDate,arrivalTime:trTime,guests:parseInt(trGuests)||1,pickupLocation:trLoc};
+    const trGuestsNum=parseInt(trGuests)||1;
+    transferDetails={pickupDate:trDate,arrivalTime:trTime,guests:trGuestsNum,pickupLocation:trLoc,price:calcTransferPrice(trGuestsNum)};
   }
 
   // Laundry: collect selected items
@@ -1742,6 +1750,7 @@ window.submitService=async function(){
       waBody+=`Arrival time: ${transferDetails.arrivalTime}\n`;
       waBody+=`Number of guests: ${transferDetails.guests}\n`;
       if(transferDetails.pickupLocation)waBody+=`Pickup location: ${transferDetails.pickupLocation}\n`;
+      waBody+=`Price: ${transferDetails.price} GEL\n`;
     }
     if(currentSvcId==='laundry'&&selectedItems.length){
       waBody+=selectedItems.map(it=>`  • ${it.name} ×${it.qty} = ${it.subtotal} GEL`).join('\n')+'\n';
