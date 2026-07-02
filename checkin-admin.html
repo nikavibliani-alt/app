@@ -458,6 +458,7 @@ let gsProp='ROOMS';
 let gsLoaded=false;
 let gsOpenEdits={};
 let gsSectionLabels={};
+let gsElevatorData=null;
 
 // ── HELPERS ───────────────────────────────────────
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -1060,13 +1061,61 @@ async function loadGuestSettings(){
   document.dispatchEvent(new Event('gsReady'));
 }
 
+async function loadElevatorCode(){
+  try{
+    const snap=await getDoc(doc(db,'globals','elevator_code'));
+    gsElevatorData=snap.exists()?snap.data():null;
+  }catch(e){console.warn('Elevator code load error:',e);}
+}
+
+function gsPopulateElevatorCard(){
+  const inp=document.getElementById('gsElevatorInput');
+  const age=document.getElementById('gsElevatorAge');
+  if(!inp||!age)return;
+  if(gsElevatorData?.code)inp.value=gsElevatorData.code;
+  if(gsElevatorData?.updatedAt){
+    const sec=gsElevatorData.updatedAt.seconds||0;
+    const diffH=Math.round((Date.now()/1000-sec)/3600);
+    age.textContent=diffH<1?'Updated just now':`Updated ${diffH} hour${diffH!==1?'s':''} ago`;
+  }else{
+    age.textContent='Not yet set';
+  }
+}
+
+window.gsUpdateElevatorCode=async function(){
+  const inp=document.getElementById('gsElevatorInput');
+  const code=(inp?.value||'').trim();
+  if(!code){toast('Enter a code first');return;}
+  try{
+    await setDoc(doc(db,'globals','elevator_code'),{code,updatedAt:serverTimestamp()});
+    gsElevatorData={code,updatedAt:{seconds:Math.floor(Date.now()/1000)}};
+    gsPopulateElevatorCard();
+    toast('Elevator code updated ✓');
+  }catch(e){toast('Failed: '+e.message);}
+};
+
 async function renderGuestSettings(){
   const main=document.getElementById('main');
   if(!gsLoaded){
     main.innerHTML='<div style="padding:2rem;text-align:center;color:var(--hint);"><div class="spinner" style="margin:0 auto 12px;"></div>Loading…</div>';
     await loadGuestSettings();
   }
+  await loadElevatorCode();
   main.innerHTML=`<div class="gs-root" id="gsRoot">
+    <div class="gs-card" id="gsElevatorCard" style="margin-bottom:24px;">
+      <div class="gs-card-header">
+        <div class="gs-card-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gs-accent)" stroke-width="2.5"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="9" y1="9" x2="9" y2="9"/><line x1="15" y1="9" x2="15" y2="9"/><polyline points="9 6 12 9 15 6"/><polyline points="9 18 12 15 15 18"/></svg></div>
+        <span class="gs-card-title">Elevator Code</span>
+        <span id="gsElevatorAge" style="font-size:12px;color:var(--gs-text-muted);margin-left:auto;"></span>
+      </div>
+      <div style="padding:20px 24px;display:flex;gap:12px;align-items:center;">
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gs-text-muted);margin-bottom:6px;">Current code</div>
+          <input id="gsElevatorInput" class="gs-drawer-input" style="font-size:20px;font-weight:700;letter-spacing:.1em;font-family:ui-monospace,monospace;max-width:180px;" placeholder="e.g. 1234" type="text" inputmode="numeric">
+        </div>
+        <button onclick="gsUpdateElevatorCode()" style="padding:11px 20px;background:var(--gs-accent);color:#fff;border:none;border-radius:var(--gs-radius-md);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;align-self:flex-end;">Update Code</button>
+      </div>
+    </div>
     <div class="gs-prop-bar" id="gsPropBar">
       <button class="gs-prop-btn active" data-prop="ROOMS" onclick="gsSelectProp('ROOMS')">Rooms</button>
       <button class="gs-prop-btn" data-prop="MAXELA" onclick="gsSelectProp('MAXELA')">Maxela</button>
@@ -1105,6 +1154,7 @@ async function renderGuestSettings(){
   // Sync prop-bar active state to current gsProp
   document.querySelectorAll('.gs-prop-btn').forEach(b=>b.classList.toggle('active',b.dataset.prop===gsProp));
   gsRenderAll();
+  gsPopulateElevatorCard();
 }
 
 function gsRenderPropTabs(){
