@@ -1786,7 +1786,7 @@ window.editRequest=function(){
 };
 function refreshMyRequestsSection(){
   const section=document.getElementById('my-requests-section');
-  if(!section)return;
+  if(!section){window.openPage('services');return;}
   section.innerHTML=`<div class="section-title">${t('mr')}</div>`+myRequests.map(r=>{
     const isCan=r.status==='CANCELLED';
     const badge=isCan?`<span class="req-badge req-cancelled">CANCELLED</span>`:r.done?`<span class="req-badge req-done">${t('dn')}</span>`:`<span class="req-badge req-pending">${t('pe')}</span>`;
