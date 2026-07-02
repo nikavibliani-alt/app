@@ -643,6 +643,7 @@ let _laundryLoaded=false;
 let elevatorData=null;
 let _pendingReg=null;
 let guestCfgVisibility=null; // cached from checkin_admin/config.visibility
+let guestSvcs=null; // cached services array from checkin_admin/config
 let _pendingMatches=[];
 let allMatchedReservations=[];
 
@@ -1357,6 +1358,12 @@ const ROOM_TO_PROP={
   'orb-1':'ORBE_1','orb-2':'ORBE_1','orb-3':'ORBE_2',
 };
 function aptPropType(){return ROOM_TO_PROP[aptId]||'ROOMS';}
+function getPickupLocation(){
+  if(aptId.startsWith('0-')||aptId.startsWith('6-')||aptId.startsWith('7-'))return'Zhiuli Shartava St. 37';
+  if(aptId.startsWith('orb-'))return'Atoneli St. 9';
+  if(aptId.startsWith('tab-'))return'Galaktion Tabidze St. 3/5';
+  return'';
+}
 async function getGuestCfg(){
   if(guestCfgVisibility)return guestCfgVisibility;
   try{
@@ -1454,6 +1461,7 @@ window.openPage=async function(type){
         const cfgData=cfgSnap.exists()?cfgSnap.data():{};
         if(cfgData.laundryItems&&cfgData.laundryItems.length)laundryItems=cfgData.laundryItems;
         if(cfgData.visibility&&!guestCfgVisibility)guestCfgVisibility=cfgData.visibility;
+        if(cfgData.services)guestSvcs=cfgData.services;
         _laundryLoaded=true;
       }catch(e){}
     }
@@ -1596,6 +1604,7 @@ window.openSvc=async function(id,name,hasTime){
         const cfgData=cfg.exists()?cfg.data():{};
         if(cfgData.laundryItems&&cfgData.laundryItems.length)laundryItems=cfgData.laundryItems;
         if(cfgData.visibility&&!guestCfgVisibility)guestCfgVisibility=cfgData.visibility;
+        if(cfgData.services)guestSvcs=cfgData.services;
         _laundryLoaded=true;
       }catch(e){console.error('Laundry load error:',e);}
     }
@@ -1623,6 +1632,28 @@ window.openSvc=async function(id,name,hasTime){
     const specificMsg=id==='cleaning'?'Apartment must be empty during cleaning.':'Choose a preferred time.';
     extra.innerHTML=`<div style="background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:var(--rs);padding:0.75rem 1rem;font-size:13px;color:var(--blue);line-height:1.5;margin-bottom:8px;">${specificMsg}</div>
     ${infoBar}${timePicker}`;
+  } else if(id==='transfer'){
+    const todayIso=tbilisiToday();
+    const loc=getPickupLocation();
+    const inputStyle=`width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);background:var(--bg);outline:none;`;
+    const labelStyle=`font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:0.06em;`;
+    extra.innerHTML=`
+      <div style="margin-bottom:0.85rem;">
+        <label style="${labelStyle}">Pickup Date <span style="color:var(--red);">*</span></label>
+        <input type="date" id="tr-date" min="${todayIso}" style="${inputStyle}">
+      </div>
+      <div style="margin-bottom:0.85rem;">
+        <label style="${labelStyle}">Landing / Arrival Time <span style="color:var(--red);">*</span></label>
+        <input type="time" id="tr-time" style="${inputStyle}">
+      </div>
+      <div style="margin-bottom:0.85rem;">
+        <label style="${labelStyle}">Number of Guests <span style="color:var(--red);">*</span></label>
+        <input type="number" id="tr-guests" value="1" min="1" max="20" style="${inputStyle}">
+      </div>
+      ${loc?`<div style="margin-bottom:0.85rem;">
+        <label style="${labelStyle}">Pickup Location</label>
+        <input type="text" id="tr-location" readonly value="${loc}" style="${inputStyle}background:var(--surface2);color:var(--muted);">
+      </div>`:''}`;
   } else {
     extra.innerHTML='';
   }
@@ -1650,6 +1681,18 @@ window.submitService=async function(){
   if(timeEl&&!preferredTime){alert('Please select a preferred time.');return;}
   const aptName=APT_NAMES[aptId]||aptId;
 
+  // Transfer: collect extra fields
+  let transferDetails={};
+  if(currentSvcId==='transfer'){
+    const trDate=document.getElementById('tr-date')?.value||'';
+    const trTime=document.getElementById('tr-time')?.value||'';
+    const trGuests=document.getElementById('tr-guests')?.value||'1';
+    const trLoc=document.getElementById('tr-location')?.value||getPickupLocation();
+    if(!trDate){alert('Please select a pickup date.');return;}
+    if(!trTime){alert('Please enter your landing/arrival time.');return;}
+    transferDetails={pickupDate:trDate,arrivalTime:trTime,guests:parseInt(trGuests)||1,pickupLocation:trLoc};
+  }
+
   // Laundry: collect selected items
   let selectedItems=[];
   let laundryTotal=0;
@@ -1661,6 +1704,9 @@ window.submitService=async function(){
     laundryTotal=selectedItems.reduce((s,it)=>s+it.subtotal,0);
   }
 
+  // Resolve per-service WhatsApp number (fallback to global WA)
+  const svcWA=(guestSvcs||[]).find(s=>s.id===currentSvcId)?.whatsappNumber||WA;
+
   try{
     const payload={
       guestId,aptId,serviceId:currentSvcId,serviceName:currentSvcName,
@@ -1670,7 +1716,20 @@ window.submitService=async function(){
       payload.laundryItems=selectedItems;
       payload.totalPrice=laundryTotal;
     }
+    if(currentSvcId==='transfer'){
+      Object.assign(payload,transferDetails);
+    }
     await addDoc(collection(db,'checkin_requests'),payload);
+
+    // Log all requests to service_requests for tracking
+    const details={note,...(currentSvcId==='transfer'?transferDetails:{}),...(currentSvcId==='laundry'?{items:selectedItems,total:laundryTotal}:{}),...(preferredTime?{preferredTime}:{})};
+    await addDoc(collection(db,'service_requests'),{
+      aptId,roomCode:aptId,guestName:guestData?.name||'',
+      service:currentSvcName,serviceId:currentSvcId,
+      details,whatsappNumber:svcWA,
+      timestamp:serverTimestamp()
+    });
+
     window.closeServiceModal();
     toast(t('rs'));
 
@@ -1678,6 +1737,12 @@ window.submitService=async function(){
     let waBody=`New service request from ${aptName}:\n`+
       `Guest: ${guestData?.name||'Guest'}\n`+
       `Service: ${currentSvcName}\n`;
+    if(currentSvcId==='transfer'){
+      waBody+=`Pickup date: ${transferDetails.pickupDate}\n`;
+      waBody+=`Arrival time: ${transferDetails.arrivalTime}\n`;
+      waBody+=`Number of guests: ${transferDetails.guests}\n`;
+      if(transferDetails.pickupLocation)waBody+=`Pickup location: ${transferDetails.pickupLocation}\n`;
+    }
     if(currentSvcId==='laundry'&&selectedItems.length){
       waBody+=selectedItems.map(it=>`  • ${it.name} ×${it.qty} = ${it.subtotal} GEL`).join('\n')+'\n';
       waBody+=`Total: ${laundryTotal} GEL\n`;
@@ -1687,7 +1752,7 @@ window.submitService=async function(){
     waBody+=`Contact: ${guestData?.contact||'—'}`;
 
     const waMsg=encodeURIComponent(waBody);
-    setTimeout(()=>window.open('https://wa.me/'+WA+'?text='+waMsg,'_blank'),500);
+    setTimeout(()=>window.open('https://wa.me/'+svcWA+'?text='+waMsg,'_blank'),500);
   }catch(e){toast(t('rf'));}
 }
 

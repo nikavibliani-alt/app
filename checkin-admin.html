@@ -1558,9 +1558,10 @@ window.gsDrawerSave=function(){
     const noteEl=document.getElementById('gsEditSvcNote');
     const descEl=document.getElementById('gsEditSvcDesc');
     const labelEl=document.getElementById('gsEditLabel');
+    const waEl=document.getElementById('gsEditSvcWa');
     if(nameEl&&gsServices){
       const svc=gsServices.find(s=>s.id===id);
-      if(svc){svc.name=nameEl.value;svc.price=parseFloat(priceEl?.value)||0;svc.note=noteEl?.value||'';if(descEl)svc.desc=descEl.value;}
+      if(svc){svc.name=nameEl.value;svc.price=parseFloat(priceEl?.value)||0;svc.note=noteEl?.value||'';if(descEl)svc.desc=descEl.value;if(waEl)svc.whatsappNumber=waEl.value.trim();}
     }
     if(labelEl&&gsSectionLabels!==undefined){gsSectionLabels[id]=labelEl.value;}
   }
@@ -1570,6 +1571,8 @@ window.gsDrawerSave=function(){
 };
 
 function gsDrawerService(svc,def){
+  const svcId=def?.id||svc?.id||'';
+  const showWa=['airport_transfer','city_tour'].includes(svcId);
   return `<div class="gs-drawer-section">
     <div class="gs-drawer-label">Service Label Name</div>
     <input class="gs-drawer-input" id="gsEditSvcName" value="${esc(svc.name||def?.title||'')}">
@@ -1585,7 +1588,12 @@ function gsDrawerService(svc,def){
   <div class="gs-drawer-section">
     <div class="gs-drawer-label">Description</div>
     <input class="gs-drawer-input" id="gsEditSvcDesc" value="${esc(svc.desc||'')}" placeholder="Short info shown to guests">
-  </div>`;
+  </div>
+  ${showWa?`<div class="gs-drawer-section">
+    <div class="gs-drawer-label">WhatsApp Number</div>
+    <input class="gs-drawer-input" id="gsEditSvcWa" value="${esc(svc.whatsappNumber||'')}" placeholder="e.g. 995593000724">
+    <div style="font-size:12px;color:var(--gs-text-muted,var(--hint));margin-top:6px;line-height:1.4;">Requests from guests are sent to this number. Leave blank to use the default.</div>
+  </div>`:''}`;
 }
 
 function gsDrawerLabel(def,lbl){
