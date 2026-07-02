@@ -1660,9 +1660,13 @@ window.openSvc=async function(id,name,hasTime){
           <button onclick="window.adjustTransferCars(1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--accent);background:var(--accent-bg);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1;color:var(--accent);font-family:'DM Sans',sans-serif;">+</button>
         </div>
       </div>
+      <div style="margin-bottom:0.85rem;">
+        <label style="${labelStyle}">Pickup</label>
+        <input type="text" id="tr-pickup" readonly value="Tbilisi International Airport" style="${inputStyle}background:var(--surface2);color:var(--muted);">
+      </div>
       ${loc?`<div style="margin-bottom:0.85rem;">
-        <label style="${labelStyle}">Pickup Location</label>
-        <input type="text" id="tr-location" readonly value="${loc}" style="${inputStyle}background:var(--surface2);color:var(--muted);">
+        <label style="${labelStyle}">Drop-off</label>
+        <input type="text" id="tr-dropoff" readonly value="${loc}" style="${inputStyle}background:var(--surface2);color:var(--muted);">
       </div>`:''}`;
     _trManualCars=null;
     window.updateTransferPrice();
@@ -1707,10 +1711,13 @@ function calcTransferBreakdown(guests,manualCars){
   const displayTotal=dLarge+dSmall;
   const price=dLarge*large+dSmall*small;
   let carDesc;
-  if(dLarge>0&&dSmall>0)carDesc=`${dLarge} large + ${dSmall} small`;
-  else if(dLarge>0)carDesc=dLarge===1?'1 large car':`${dLarge} large cars`;
-  else carDesc='1 small car';
-  const label=displayTotal>1?`${displayTotal} cars: ${carDesc} — ${price} GEL`:`${carDesc} — ${price} GEL`;
+  if(dLarge>0&&dSmall>0){
+    const ls=dLarge===1?'1 large car':`${dLarge} large cars`;
+    const ss=dSmall===1?'1 small car':`${dSmall} small cars`;
+    carDesc=`${ls} + ${ss}`;
+  }else if(dLarge>0){carDesc=dLarge===1?'1 large car':`${dLarge} large cars`;}
+  else{carDesc=dSmall===1?'1 small car':`${dSmall} small cars`;}
+  const label=`${carDesc} — ${price} GEL`;
   return{price,label,carDesc,displayTotal,naturalMin};
 }
 window.updateTransferPrice=function(){
@@ -1745,12 +1752,13 @@ window.submitService=async function(){
     const trDate=document.getElementById('tr-date')?.value||'';
     const trTime=document.getElementById('tr-time')?.value||'';
     const trGuests=document.getElementById('tr-guests')?.value||'1';
-    const trLoc=document.getElementById('tr-location')?.value||getPickupLocation();
+    const trPickup=document.getElementById('tr-pickup')?.value||'Tbilisi International Airport';
+    const trDropoff=document.getElementById('tr-dropoff')?.value||getPickupLocation();
     if(!trDate){alert('Please select a pickup date.');return;}
     if(!trTime){alert('Please enter your landing/arrival time.');return;}
     const trGuestsNum=parseInt(trGuests)||1;
     const trPricing=calcTransferBreakdown(trGuestsNum,_trManualCars);
-    transferDetails={pickupDate:trDate,arrivalTime:trTime,guests:trGuestsNum,pickupLocation:trLoc,cars:trPricing.displayTotal,carConfig:trPricing.carDesc,price:trPricing.price,priceLabel:trPricing.label};
+    transferDetails={pickupDate:trDate,arrivalTime:trTime,guests:trGuestsNum,pickupLocation:trPickup,dropoffLocation:trDropoff,cars:trPricing.displayTotal,carConfig:trPricing.carDesc,price:trPricing.price,priceLabel:trPricing.label};
   }
 
   // Laundry: collect selected items
@@ -1765,7 +1773,9 @@ window.submitService=async function(){
   }
 
   // Resolve per-service WhatsApp number (fallback to global WA)
-  const svcWA=(guestSvcs||[]).find(s=>s.id===currentSvcId)?.whatsappNumber||WA;
+  // Map guest SVCS ids to Firestore service ids
+  const _fsId=currentSvcId==='transfer'?'airport_transfer':currentSvcId==='tour'?'city_tour':currentSvcId;
+  const svcWA=(guestSvcs||[]).find(s=>s.id===_fsId)?.whatsappNumber||WA;
 
   try{
     const payload={
@@ -1798,11 +1808,12 @@ window.submitService=async function(){
       `Guest: ${guestData?.name||'Guest'}\n`+
       `Service: ${currentSvcName}\n`;
     if(currentSvcId==='transfer'){
-      waBody+=`Pickup date: ${transferDetails.pickupDate}\n`;
+      waBody+=`Date: ${transferDetails.pickupDate}\n`;
       waBody+=`Arrival time: ${transferDetails.arrivalTime}\n`;
       waBody+=`Guests: ${transferDetails.guests}\n`;
-      if(transferDetails.pickupLocation)waBody+=`Pickup location: ${transferDetails.pickupLocation}\n`;
-      waBody+=`Cars: ${transferDetails.carConfig} (${transferDetails.cars} total)\n`;
+      waBody+=`Pickup: ${transferDetails.pickupLocation}\n`;
+      if(transferDetails.dropoffLocation)waBody+=`Drop-off: ${transferDetails.dropoffLocation}\n`;
+      waBody+=`Cars: ${transferDetails.carConfig}\n`;
       waBody+=`Total: ${transferDetails.price} GEL\n`;
     }
     if(currentSvcId==='laundry'&&selectedItems.length){
