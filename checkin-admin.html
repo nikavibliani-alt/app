@@ -186,15 +186,12 @@ input:checked+.slider:before{transform:translateX(20px);}
 .apt-save-btn{padding:8px 16px;background:var(--apt-accent);color:white;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:background .2s;box-shadow:var(--apt-shadow);flex-shrink:0;}
 .apt-save-btn:hover{background:#374151;}
 .apt-card{background:var(--apt-white);border:1px solid var(--apt-border);border-radius:var(--apt-radius);overflow:hidden;box-shadow:var(--apt-shadow);}
-.apt-card-header{padding:14px 20px;border-bottom:1px solid var(--apt-border);display:flex;align-items:center;gap:12px;background:var(--apt-white);cursor:pointer;user-select:none;transition:background .15s;}
-.apt-card-header:hover{background:#f9fafb;}
+.apt-card-header{padding:14px 20px;border-bottom:1px solid var(--apt-border);display:flex;align-items:center;gap:12px;background:var(--apt-white);}
 .apt-card-header svg{flex-shrink:0;color:#9ca3af;}
 .apt-card-title{font-size:14px;font-weight:600;flex:1;color:var(--apt-text);}
 .apt-card-badge{font-size:12px;padding:2px 8px;border-radius:4px;background:#f3f4f6;color:var(--apt-muted);font-weight:500;}
-.apt-card-body{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s ease-out;padding:0;}
-.apt-card-body.open{grid-template-rows:1fr;}
-.apt-card-inner{min-height:0;overflow:hidden;padding:0 20px;}
-.apt-card-body.open .apt-card-inner{padding:20px;transition:padding .3s ease-out;}
+.apt-card-body{padding:20px;}
+.apt-card-inner{}
 .apt-label{font-size:12px;font-weight:600;color:#4b5563;margin-bottom:6px;display:block;}
 .apt-input,.apt-textarea{width:100%;padding:10px 12px;border:1px solid var(--apt-border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--apt-text);background:var(--apt-white);transition:all .2s;box-sizing:border-box;box-shadow:0 1px 2px 0 rgba(0,0,0,.05) inset;}
 .apt-input:focus,.apt-textarea:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.1);}
@@ -526,6 +523,8 @@ function renderApartments(){
       </div>
     </div>
   </div>`;
+  // Restore previously selected room after Firestore-triggered re-render
+  if(window._currentAptId)window.openAptDrawer(window._currentAptId);
 }
 
 window.deleteGuest=async function(guestId,guestName){
@@ -640,6 +639,7 @@ function renderGuests(){
 window.openAptDrawer=function(aptId){
   const apt=APARTMENTS.find(a=>a.id===aptId);if(!apt)return;
   currentDrawerApt=aptId;
+  window._currentAptId=aptId;
   const d=aptData[aptId]||{};
 
   // Mark sidebar card active
@@ -688,13 +688,13 @@ window.openAptDrawer=function(aptId){
     </div>
 
     <div class="apt-card">
-      <div class="apt-card-header" onclick="toggleCard('lock')">
+      <div class="apt-card-header">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         <span class="apt-card-title">Smart Lock</span>
         <span class="apt-card-badge">${d.tuyaDeviceId?'Tuya linked':d.doorCode?'Manual code':'Not configured'}</span>
         <svg id="card-arrow-lock" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;margin-left:auto;color:#9ca3af"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="apt-card-body open" id="card-body-lock">
+      <div class="apt-card-body" id="card-body-lock">
         <div class="apt-card-inner">
         <div class="apt-mode-group">
           <button class="apt-mode-btn ${initMode==='auto'?'active':''}" id="mode-auto" onclick="setLockMode('auto')">Auto-generated code</button>
@@ -717,12 +717,12 @@ window.openAptDrawer=function(aptId){
     </div>
 
     <div class="apt-card">
-      <div class="apt-card-header" onclick="toggleCard('timing')">
+      <div class="apt-card-header">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span class="apt-card-title">Timing</span>
         <svg id="card-arrow-timing" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;margin-left:auto;color:#9ca3af"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="apt-card-body open" id="card-body-timing">
+      <div class="apt-card-body" id="card-body-timing">
         <div class="apt-card-inner">
         <div class="apt-row">
           <div class="apt-field"><label class="apt-label">Check-in time</label><input class="apt-input" type="time" id="apt-checkin-time" value="${esc(d.checkInTime||'14:00')}"></div>
@@ -733,13 +733,13 @@ window.openAptDrawer=function(aptId){
     </div>
 
     <div class="apt-card">
-      <div class="apt-card-header" onclick="toggleCard('steps')">
+      <div class="apt-card-header">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
         <span class="apt-card-title">Check-In Steps</span>
         <span class="apt-card-badge" id="steps-photo-badge">${photoCount} photo${photoCount!==1?'s':''}</span>
         <svg id="card-arrow-steps" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;margin-left:auto;color:#9ca3af"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="apt-card-body open" id="card-body-steps">
+      <div class="apt-card-body" id="card-body-steps">
         <div class="apt-card-inner">
         <div class="apt-field">
           <label class="apt-label">Written instructions</label>
@@ -767,12 +767,12 @@ window.openAptDrawer=function(aptId){
     </div>
 
     <div class="apt-card">
-      <div class="apt-card-header" onclick="toggleCard('link')">
+      <div class="apt-card-header">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         <span class="apt-card-title">Guest Check-In Link</span>
         <svg id="card-arrow-link" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;margin-left:auto;color:#9ca3af"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="apt-card-body open" id="card-body-link">
+      <div class="apt-card-body" id="card-body-link">
         <div class="apt-card-inner">
         <div class="apt-link-box">
           <span class="apt-link-url">${esc(guestUrl)}</span>
@@ -931,14 +931,6 @@ window.saveAptData=async function(aptId){
     }
   }catch(e){toast('Failed to save');}
 }
-
-window.toggleCard=function(id){
-  const body=document.getElementById('card-body-'+id);
-  const arrow=document.getElementById('card-arrow-'+id);
-  if(!body)return;
-  const isOpen=body.classList.toggle('open');
-  if(arrow)arrow.style.transform=isOpen?'rotate(180deg)':'';
-};
 
 window.setLockMode=function(mode){
   const autoDiv=document.getElementById('lock-auto');
