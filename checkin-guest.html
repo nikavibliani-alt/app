@@ -1323,6 +1323,7 @@ function buildCodeHero({kind,labelText,code,copyCode,statusLabel,statusTime,info
     <span class="sep"></span>
     <span class="grp">${digs2}${sfxHtml}</span>
   </div>
+  ${kind==='entrance'?'<p style="font-size:11px;color:#c0392b;margin-top:8px;display:flex;align-items:center;gap:3px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Use only on check-in &amp; check-out day — not during your stay</p>':''}
   <div class="hero__status">
     <div class="hero__status__left">
       <span class="pulse"></span>
