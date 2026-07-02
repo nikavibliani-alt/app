@@ -1601,6 +1601,17 @@ window.copySth=function(text,btn){
 window.openSvc=async function(id,name,hasTime){
   currentSvcId=id;currentSvcName=name;
   laundryQtys={};
+  // Ensure services config (incl. whatsappNumber) is loaded before modal opens
+  if(!_laundryLoaded){
+    try{
+      const cfg=await getDoc(doc(db,'checkin_admin','config'));
+      const cfgData=cfg.exists()?cfg.data():{};
+      if(cfgData.laundryItems&&cfgData.laundryItems.length)laundryItems=cfgData.laundryItems;
+      if(cfgData.visibility&&!guestCfgVisibility)guestCfgVisibility=cfgData.visibility;
+      if(cfgData.services)guestSvcs=cfgData.services;
+      _laundryLoaded=true;
+    }catch(e){console.error('Config load error:',e);}
+  }
   const modal=document.getElementById('svc-modal');
   document.getElementById('svc-modal-title').textContent=name;
   document.getElementById('svc-note-lbl').textContent=t('sn');
@@ -1618,17 +1629,6 @@ window.openSvc=async function(id,name,hasTime){
   const infoBar=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:0.75rem 1rem;font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:0.85rem;">Staff checks requests the next day. For urgent requests contact us on WhatsApp.</div>`;
 
   if(id==='laundry'){
-    // Lazy-load laundry items from Firestore
-    if(!_laundryLoaded){
-      try{
-        const cfg=await getDoc(doc(db,'checkin_admin','config'));
-        const cfgData=cfg.exists()?cfg.data():{};
-        if(cfgData.laundryItems&&cfgData.laundryItems.length)laundryItems=cfgData.laundryItems;
-        if(cfgData.visibility&&!guestCfgVisibility)guestCfgVisibility=cfgData.visibility;
-        if(cfgData.services)guestSvcs=cfgData.services;
-        _laundryLoaded=true;
-      }catch(e){console.error('Laundry load error:',e);}
-    }
     const itemsHtml=laundryItems.length
       ?laundryItems.map((item,i)=>`
         <div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);">
