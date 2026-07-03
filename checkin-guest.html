@@ -1947,7 +1947,14 @@ window.submitService=async function(){
     waBody+=`Contact: ${guestData?.contact||'—'}`;
 
     const waMsg=encodeURIComponent(waBody);
-    window.location.href='https://wa.me/'+svcWA+'?text='+waMsg;
+    const waUrl='https://wa.me/'+svcWA+'?text='+waMsg;
+    const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if(isMobile){
+      const a=document.createElement('a');a.href=waUrl;a.target='_blank';
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+    }else{
+      window.open(waUrl,'_blank');
+    }
   }catch(e){toast(t('rf'));}
 }
 
