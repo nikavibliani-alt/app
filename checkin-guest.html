@@ -1784,6 +1784,7 @@ window.editRequest=function(){
   window.openSvc('transfer',r.serviceName||'Airport Transfer',false);
 };
 function refreshMyRequestsSection(){
+  console.log('REFRESH called, section:', document.getElementById('my-requests-section'), 'requests count:', myRequests.length);
   const section=document.getElementById('my-requests-section');
   if(!section){window.openPage('services');return;}
   section.innerHTML=`<div class="section-title">${t('mr')}</div>`+myRequests.map(r=>{
@@ -1907,7 +1908,9 @@ window.submitService=async function(){
       _editingReqId=null;
       refreshMyRequestsSection();
     }else{
-      await addDoc(collection(db,'checkin_requests'),payload);
+      const newRef=await addDoc(collection(db,'checkin_requests'),payload);
+      myRequests.push({...payload,id:newRef.id,status:'PENDING',createdAt:new Date()});
+      refreshMyRequestsSection();
     }
 
     // Log all requests to service_requests for tracking
