@@ -1918,7 +1918,7 @@ window.submitService=async function(){
   try{
     const payload={
       guestId,aptId,serviceId:currentSvcId,serviceName:currentSvcName,
-      note,preferredTime,...(preferredDate?{preferredDate}:{}),done:false,createdAt:serverTimestamp()
+      note,preferredTime,...(preferredDate?{preferredDate}:{}),status:'PENDING',done:false,createdAt:serverTimestamp()
     };
     if(currentSvcId==='laundry'){
       payload.laundryItems=selectedItems;
@@ -1945,7 +1945,7 @@ window.submitService=async function(){
     await addDoc(collection(db,'service_requests'),{
       aptId,roomCode:aptId,guestName:guestData?.name||'',
       service:currentSvcName,serviceId:currentSvcId,
-      details,whatsappNumber:svcWA,
+      status:'PENDING',details,whatsappNumber:svcWA,
       timestamp:serverTimestamp()
     });
 

@@ -607,7 +607,7 @@ async function loadGuestRequests(){
     const filtered=allDocs.filter(r=>{
       const code=r.aptId||r.roomCode||'';
       const inRoom=SHARTAVA_ROOM_CODES.includes(code);
-      const isPending=r.status==='PENDING';
+      const isPending=!r.status||r.status==='PENDING';
       if(!inRoom)console.log(`loadGuestRequests: filtered OUT aptId="${code}" (not in SHARTAVA_ROOM_CODES)`);
       if(inRoom&&!isPending)console.log(`loadGuestRequests: filtered OUT id=${r.id} status="${r.status}" (not PENDING)`);
       return inRoom&&isPending;
