@@ -350,6 +350,7 @@ input:checked+.slider:before{transform:translateX(20px);}
 <div class="tabs">
   <button class="tab active" data-tab="apartments" onclick="switchTab('apartments')">Apartments</button>
   <button class="tab" data-tab="guests" onclick="switchTab('guests')">Guests</button>
+  <button class="tab" data-tab="requests" onclick="switchTab('requests')">Requests</button>
   <button class="tab" data-tab="hkpins" onclick="switchTab('hkpins')">HK Pins</button>
   <button class="tab" data-tab="guestsettings" onclick="switchTab('guestsettings')">Guest Page Settings</button>
 </div>
@@ -358,7 +359,7 @@ input:checked+.slider:before{transform:translateX(20px);}
 
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDoc}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDoc,getDocs,query,orderBy,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 // Cloudinary
 const CLOUD='dlkjizhya';
 const PRESET='maxela_uploads';
@@ -488,6 +489,7 @@ function render(){
   if(currentTab==='apartments') renderApartments();
   else if(currentTab==='hkpins') renderHkPins();
   else if(currentTab==='guestsettings') renderGuestSettings();
+  else if(currentTab==='requests') renderRequests();
   else renderGuests();
 }
 
@@ -1501,6 +1503,9 @@ window.gsOpenDrawer=function(sectionId){
   const titleEl=document.getElementById('gsDrawerTitle');
   const body=document.getElementById('gsDrawerBody');
   if(!overlay||!drawer||!titleEl||!body)return;
+  // Reset footer to standard settings buttons (in case requests tab left action buttons)
+  const footerEl=drawer.querySelector('.gs-drawer-footer');
+  if(footerEl)footerEl.innerHTML='<button class="gs-drawer-cancel" onclick="gsCloseDrawer()">Cancel</button><button class="gs-drawer-save" onclick="gsDrawerSave()">Apply Changes</button>';
   gsDrawerContext=sectionId;
   const allSections=[...GS_ESSENTIAL,...GS_SERVICES,...GS_CONTENT];
   const def=allSections.find(s=>s.id===sectionId);
@@ -1725,6 +1730,232 @@ window.gsSaveAll=function(){
 document.addEventListener('gsReady',function(){
   if(document.getElementById('gsEssentialRows'))gsRenderAll();
 });
+
+// ── REQUESTS TAB ──────────────────────────────────
+let reqData=[];
+let reqFilter='all';
+
+async function renderRequests(){
+  const main=document.getElementById('main');
+  main.innerHTML='<div style="padding:2rem;text-align:center;color:var(--hint);"><div class="spinner" style="margin:0 auto 12px;"></div>Loading…</div>';
+  try{
+    const snap=await getDocs(query(collection(db,'service_requests'),orderBy('timestamp','desc'),limit(100)));
+    reqData=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){
+    main.innerHTML='<div style="padding:2rem;text-align:center;color:var(--muted);">Could not load requests.</div>';
+    return;
+  }
+  updateRequestsBadge();
+  buildRequestsUI();
+}
+
+function buildRequestsUI(){
+  const main=document.getElementById('main');
+  const FILTERS=[
+    {id:'all',label:'All'},
+    {id:'airport_transfer',label:'Airport Transfer'},
+    {id:'transfer',label:'Transfer (guest)'},
+    {id:'city_tour',label:'City Tour'},
+    {id:'cleaning',label:'Cleaning'},
+    {id:'laundry',label:'Laundry'},
+    {id:'custom',label:'Other'},
+  ];
+  // Only show filters that have data
+  const usedIds=new Set(reqData.map(r=>r.serviceId));
+  const activeFilters=FILTERS.filter(f=>f.id==='all'||usedIds.has(f.id));
+
+  const filtered=reqFilter==='all'?reqData:reqData.filter(r=>r.serviceId===reqFilter);
+
+  const now=new Date();
+  const todayStr=now.toDateString();
+  const yd=new Date(now);yd.setDate(yd.getDate()-1);
+  const ydStr=yd.toDateString();
+
+  const groupOrder=[];
+  const groups={};
+  filtered.forEach(r=>{
+    const ts=r.timestamp?.toDate?r.timestamp.toDate():new Date((r.timestamp?.seconds||0)*1000);
+    const ds=ts.toDateString();
+    let label=ds===todayStr?'Today':ds===ydStr?'Yesterday':ts.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    if(!groups[label]){groups[label]=[];groupOrder.push(label);}
+    groups[label].push({...r,_ts:ts});
+  });
+
+  const filterBar=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:24px;">
+    ${activeFilters.map(f=>`<button onclick="window.setReqFilter('${f.id}')" style="padding:7px 14px;border-radius:20px;border:1px solid ${reqFilter===f.id?'#111827':'var(--border)'};background:${reqFilter===f.id?'#111827':'var(--surface)'};color:${reqFilter===f.id?'#fff':'var(--muted)'};font-size:13px;font-weight:${reqFilter===f.id?'600':'500'};cursor:pointer;font-family:inherit;transition:all 0.15s;">${f.label}</button>`).join('')}
+  </div>`;
+
+  let cardsHTML='';
+  if(!groupOrder.length){
+    cardsHTML='<div style="text-align:center;padding:3rem;color:var(--hint);">No requests yet</div>';
+  }else{
+    groupOrder.forEach(label=>{
+      const rows=groups[label];
+      cardsHTML+=`<div class="gs-card">
+        <div class="gs-card-header">
+          <div class="gs-card-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gs-accent)" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+          <span class="gs-card-title">${label}</span>
+          <span style="margin-left:auto;font-size:12px;color:var(--gs-text-muted);">${rows.length} request${rows.length!==1?'s':''}</span>
+        </div>
+        ${rows.map(r=>reqRow(r)).join('')}
+      </div>`;
+    });
+  }
+
+  main.innerHTML=`<div class="gs-root">${filterBar}${cardsHTML}<div style="height:60px;"></div></div>`;
+}
+
+function reqRow(r){
+  const ts=r._ts||new Date();
+  const timeStr=ts.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+', '+ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const status=r.status||'PENDING';
+  const badgeStyle=status==='CONFIRMED'
+    ?'background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;'
+    :status==='CANCELLED'
+    ?'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;'
+    :'background:#fffbeb;color:#d97706;border:1px solid #fde68a;';
+  const badge=`<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;${badgeStyle}">${status}</span>`;
+
+  const d=r.details||{};
+  const svcLabel=r.service||r.serviceId||'Service';
+  let sub=svcLabel+' · '+timeStr;
+  const sid=r.serviceId||'';
+  if(sid==='airport_transfer'||sid==='transfer'){
+    const parts=[];
+    if(d.pickupDate)parts.push(d.pickupDate);
+    if(d.arrivalTime)parts.push(d.arrivalTime);
+    if(d.guests)parts.push(d.guests+' guest'+(d.guests!=1?'s':''));
+    if(d.carConfig)parts.push(d.carConfig);
+    if(d.price)parts.push(d.price+' GEL');
+    if(parts.length)sub+=' · '+parts.join(' · ');
+  }else if(sid==='laundry'){
+    if(d.items&&d.items.length)sub+=' · '+d.items.map(i=>`${i.name}×${i.qty}`).join(', ');
+    if(d.total)sub+=' · '+d.total+' GEL';
+  }else if(d.preferredTime){
+    sub+=' · '+d.preferredTime;
+  }
+  if(d.note)sub+=' · "'+d.note+'"';
+
+  return `<div class="gs-row" style="cursor:pointer;" onclick="window.openReqDrawer('${r.id}')">
+    <div class="gs-row-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gs-text-muted)" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+    <div class="gs-row-info">
+      <div class="gs-row-title">${esc(r.guestName||'—')} <span style="font-weight:500;color:var(--gs-text-muted);font-size:13px;">${esc(r.aptId||r.roomCode||'')}</span></div>
+      <div class="gs-row-sub">${esc(sub)}</div>
+    </div>
+    <div class="gs-row-actions">${badge}</div>
+  </div>`;
+}
+
+window.setReqFilter=function(f){
+  reqFilter=f;
+  buildRequestsUI();
+};
+
+window.openReqDrawer=function(id){
+  const r=reqData.find(x=>x.id===id);
+  if(!r)return;
+  const overlay=document.getElementById('gsDrawerOverlay');
+  const drawer=document.getElementById('gsDrawer');
+  const titleEl=document.getElementById('gsDrawerTitle');
+  const body=document.getElementById('gsDrawerBody');
+  if(!overlay||!drawer||!titleEl||!body)return;
+
+  gsDrawerContext=null; // mark as request context, not settings
+
+  titleEl.textContent=r.guestName||'Request Details';
+
+  const ts=r.timestamp?.toDate?r.timestamp.toDate():new Date((r.timestamp?.seconds||0)*1000);
+  const timeStr=ts.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})+' at '+ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const status=r.status||'PENDING';
+  const d=r.details||{};
+  const sid=r.serviceId||'';
+
+  function detailRow(label,value){
+    if(!value&&value!==0)return'';
+    return`<div class="gs-drawer-section" style="margin-bottom:14px;">
+      <div class="gs-drawer-label">${label}</div>
+      <div style="font-size:14px;color:var(--gs-text-main);padding:10px 14px;background:var(--gs-white);border:1px solid var(--gs-border);border-radius:var(--gs-radius-md);">${esc(String(value))}</div>
+    </div>`;
+  }
+
+  let html=detailRow('Guest',r.guestName||'—');
+  html+=detailRow('Apartment',r.aptId||r.roomCode||'—');
+  html+=detailRow('Service',r.service||sid||'—');
+  html+=detailRow('Submitted',timeStr);
+
+  const badgeStyle=status==='CONFIRMED'
+    ?'background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;'
+    :status==='CANCELLED'
+    ?'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;'
+    :'background:#fffbeb;color:#d97706;border:1px solid #fde68a;';
+  html+=`<div class="gs-drawer-section" style="margin-bottom:14px;"><div class="gs-drawer-label">Status</div>
+    <span style="display:inline-block;font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;${badgeStyle}">${status}</span></div>`;
+
+  if(sid==='airport_transfer'||sid==='transfer'){
+    html+=detailRow('Pickup Date',d.pickupDate);
+    html+=detailRow('Arrival Time',d.arrivalTime);
+    html+=detailRow('Number of Guests',d.guests);
+    html+=detailRow('Pickup Location',d.pickupLocation);
+    if(d.dropoffLocation)html+=detailRow('Drop-off Location',d.dropoffLocation);
+    html+=detailRow('Car Config',d.carConfig);
+    if(d.price)html+=detailRow('Price',d.price+' GEL');
+    if(d.flightNumber)html+=detailRow('Flight Number',d.flightNumber);
+  }else if(sid==='laundry'){
+    if(d.items&&d.items.length)html+=detailRow('Items',d.items.map(i=>`${i.name} ×${i.qty} = ${i.subtotal} GEL`).join('\n'));
+    if(d.total)html+=detailRow('Total',d.total+' GEL');
+  }else if(sid==='cleaning'){
+    if(d.preferredTime)html+=detailRow('Preferred Time',d.preferredTime);
+  }
+  if(d.note)html+=detailRow('Guest Notes',d.note);
+  if(d.preferredTime&&sid!=='cleaning')html+=detailRow('Preferred Time',d.preferredTime);
+  if(r.whatsappNumber)html+=detailRow('WhatsApp',r.whatsappNumber);
+  if(r.guestName)html+=`<div style="margin-top:8px;"><a href="https://wa.me/${esc(r.whatsappNumber||'')}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:#25D366;color:#fff;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+    Open WhatsApp</a></div>`;
+
+  body.innerHTML=html;
+
+  const footerEl=drawer.querySelector('.gs-drawer-footer');
+  if(footerEl){
+    const canConfirm=status!=='CONFIRMED';
+    const canCancel=status!=='CANCELLED';
+    footerEl.innerHTML=`<button class="gs-drawer-cancel" onclick="gsCloseDrawer()">Close</button>
+      ${canConfirm?`<button class="gs-drawer-save" style="background:#16a34a;flex:0;" onclick="window.setReqStatus('${id}','CONFIRMED')">✓ Confirmed</button>`:''}
+      ${canCancel?`<button class="gs-drawer-save" style="background:#dc2626;flex:0;" onclick="window.setReqStatus('${id}','CANCELLED')">✕ Cancel</button>`:''}`;
+  }
+
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+};
+
+window.setReqStatus=async function(id,status){
+  try{
+    await updateDoc(doc(db,'service_requests',id),{status});
+    const r=reqData.find(x=>x.id===id);
+    if(r)r.status=status;
+    gsCloseDrawer();
+    updateRequestsBadge();
+    buildRequestsUI();
+    toast(status==='CONFIRMED'?'Request confirmed ✓':'Request cancelled');
+  }catch(e){
+    toast('Update failed: '+e.message);
+  }
+};
+
+function updateRequestsBadge(){
+  const pending=reqData.filter(r=>(r.status||'PENDING')==='PENDING').length;
+  const btn=document.querySelector('.tab[data-tab="requests"]');
+  if(!btn)return;
+  const existing=btn.querySelector('.req-badge');
+  if(existing)existing.remove();
+  if(pending>0){
+    const badge=document.createElement('span');
+    badge.className='req-badge';
+    badge.textContent=pending;
+    badge.style.cssText='display:inline-flex;align-items:center;justify-content:center;background:#ef4444;color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:50%;margin-left:6px;vertical-align:middle;padding:0 2px;';
+    btn.appendChild(badge);
+  }
+}
 </script>
 
 <!-- ── GUEST SETTINGS: RIGHT DRAWER ── -->
