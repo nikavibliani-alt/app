@@ -139,6 +139,30 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .sum-green{color:var(--green);}
 .sum-done{color:var(--muted);}
 
+/* Guest Requests */
+.requests-section{margin:10px 12px 0;}
+.requests-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.requests-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;}
+.requests-badge{background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;}
+.req-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:6px;overflow:hidden;}
+.req-card-header{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.req-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.req-info{flex:1;min-width:0;}
+.req-service{font-size:13px;font-weight:700;color:#111827;}
+.req-sub{font-size:12px;color:#6b7280;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.req-status{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0;}
+.req-status-pending{background:#fffbeb;color:#d97706;border:1px solid #fcd34d;}
+.req-status-done{background:#f0fdf4;color:#16a34a;border:1px solid #86efac;}
+.req-details{max-height:0;overflow:hidden;transition:max-height 0.25s ease;}
+.req-details.open{max-height:500px;padding:0 14px 14px;}
+.req-detail-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f3f4f6;font-size:13px;}
+.req-actions{display:flex;gap:8px;margin-top:12px;}
+.req-btn{flex:1;padding:9px;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;}
+.req-btn-done{background:#16a34a;color:#fff;}
+.req-btn-dismiss{background:#f3f4f6;color:#6b7280;}
+.req-btn-time{background:#eff6ff;color:#2563eb;}
+.section-divider{height:1px;background:#e5e7eb;margin:12px 0 8px;}
+
 /* PIN screen */
 .pin-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;padding:1rem;}
 .pin-card{background:var(--surface);border-radius:var(--r);padding:2rem 1.5rem;width:min(300px,100%);text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.12);}
@@ -320,6 +344,8 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 
 <div class="day-tabs" id="day-tabs"></div>
 
+<div id="requests-container"></div>
+
 <div class="legend">
   <div class="leg-item"><div class="leg-dot leg-red"></div>Same-day check-in</div>
   <div class="leg-item"><div class="leg-dot leg-yellow"></div>Check-in tomorrow</div>
@@ -338,7 +364,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,collection,doc,setDoc,deleteDoc,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,collection,doc,setDoc,deleteDoc,updateDoc,getDocs,query,where,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -387,6 +413,9 @@ let statusData={};
 
 let activeDay=0;
 let loadCount=0;
+let guestRequests=[];
+let reqOpenIds=new Set();
+let reqChangingTime=null;
 
 function fmtDate(d){if(typeof d==='string'&&/^\d{4}-\d{2}-\d{2}/.test(d))return d.slice(0,10);const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dy=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dy}`;}
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
@@ -560,7 +589,146 @@ function getCleanerName(){
 function isAdmin(){return localStorage.getItem('hk_shartava_role')==='admin';}
 function statusKey(roomCode,date){return roomCode+'_'+(typeof date==='string'?date.slice(0,10):fmtDate(date));}
 
-window.switchDay=function(day){activeDay=day;render();}
+// ── GUEST REQUESTS ───────────────────────────────────────────────────────────
+const SHARTAVA_ROOM_CODES=['0-1','0-2','0-3','0-4','0-5','6-1','6-2','6-3','6-4','7-1','7-2','7-4'];
+
+async function loadGuestRequests(){
+  try{
+    const snap=await getDocs(query(
+      collection(db,'service_requests'),
+      where('serviceId','in',['laundry','cleaning'])
+    ));
+    guestRequests=snap.docs
+      .map(d=>({id:d.id,...d.data()}))
+      .filter(r=>SHARTAVA_ROOM_CODES.includes(r.aptId||r.roomCode||'')&&r.status==='PENDING')
+      .sort((a,b)=>(b.timestamp?.seconds||0)-(a.timestamp?.seconds||0));
+  }catch(e){
+    console.warn('loadGuestRequests:',e);
+    guestRequests=[];
+  }
+}
+
+function renderGuestRequests(){
+  const container=document.getElementById('requests-container');
+  if(!container)return;
+  if(!guestRequests.length){container.innerHTML='';return;}
+
+  function fmtTs(r){
+    const ts=r.timestamp?.toDate?r.timestamp.toDate():new Date((r.timestamp?.seconds||0)*1000);
+    return ts.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  }
+
+  const cards=guestRequests.map(r=>{
+    const isOpen=reqOpenIds.has(r.id);
+    const sid=r.serviceId;
+    const d=r.details||{};
+    const isEditing=reqChangingTime===r.id;
+
+    const icon=sid==='laundry'
+      ?`<div class="req-icon" style="background:#eff6ff;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg></div>`
+      :`<div class="req-icon" style="background:#f0fdf4;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>`;
+
+    const chevron=`<svg style="flex-shrink:0;transition:transform 0.2s;transform:${isOpen?'rotate(180deg)':'none'}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>`;
+
+    let detailRows='';
+    if(sid==='laundry'){
+      const items=d.items||[];
+      if(d.preferredTime)detailRows+=`<div class="req-detail-row"><span>Preferred time</span><span>${d.preferredTime}</span></div>`;
+      detailRows+=items.map(it=>`<div class="req-detail-row"><span>${it.name||''}</span><span style="color:#6b7280;">×${it.qty} = ${it.subtotal} GEL</span></div>`).join('');
+      if(d.total)detailRows+=`<div class="req-detail-row" style="font-weight:700;border-bottom:none;"><span>Total</span><span>${d.total} GEL</span></div>`;
+    }else if(sid==='cleaning'){
+      const prefTime=d.preferredTime||r.preferredTime||'—';
+      detailRows+=`<div class="req-detail-row"><span>Preferred time</span><span id="req-time-display-${r.id}">${prefTime}</span></div>`;
+      if(d.note||r.note)detailRows+=`<div class="req-detail-row"><span>Notes</span><span style="text-align:right;max-width:60%;">${d.note||r.note}</span></div>`;
+    }
+    if(r.contact)detailRows+=`<div class="req-detail-row" style="border-bottom:none;"><span>Contact</span><span>${r.contact}</span></div>`;
+
+    let actionsHtml='';
+    if(isEditing){
+      actionsHtml=`<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input type="time" id="req-time-input-${r.id}" style="flex:1;min-width:110px;height:40px;border:1px solid #d1d5db;border-radius:8px;padding:0 10px;font-size:15px;font-family:'Inter',sans-serif;outline:none;">
+        <button class="req-btn req-btn-done" style="flex:0;padding:9px 16px;white-space:nowrap;" onclick="window.confirmChangeTime('${r.id}')">Confirm</button>
+        <button class="req-btn req-btn-dismiss" style="flex:0;padding:9px 12px;" onclick="window.cancelChangeTime()">Cancel</button>
+      </div>`;
+    }else{
+      actionsHtml=`<div class="req-actions">
+        <button class="req-btn req-btn-done" onclick="window.markReqDone('${r.id}')">✓ Done</button>
+        ${sid==='cleaning'?`<button class="req-btn req-btn-time" onclick="window.startChangeTime('${r.id}')">🕐 Time</button>`:''}
+        <button class="req-btn req-btn-dismiss" onclick="window.dismissReq('${r.id}')">Dismiss</button>
+      </div>`;
+    }
+
+    return `<div class="req-card">
+      <div class="req-card-header" onclick="window.toggleReqCard('${r.id}')">
+        ${icon}
+        <div class="req-info">
+          <div class="req-service">${r.service||sid} · ${r.aptId||r.roomCode||'—'}</div>
+          <div class="req-sub">${r.guestName||'Guest'} · ${fmtTs(r)}</div>
+        </div>
+        <span class="req-status req-status-pending">PENDING</span>
+        ${chevron}
+      </div>
+      <div class="req-details${isOpen?' open':''}">
+        ${detailRows}
+        ${actionsHtml}
+      </div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML=`<div class="requests-section">
+    <div class="requests-header">
+      <span class="requests-title">Guest Requests</span>
+      <span class="requests-badge">${guestRequests.length}</span>
+    </div>
+    ${cards}
+  </div>
+  <div class="section-divider"></div>`;
+}
+
+window.toggleReqCard=function(id){
+  if(reqOpenIds.has(id))reqOpenIds.delete(id);else reqOpenIds.add(id);
+  renderGuestRequests();
+};
+
+window.markReqDone=async function(id){
+  try{
+    await setDoc(doc(db,'service_requests',id),{status:'DONE'},{merge:true});
+    guestRequests=guestRequests.filter(r=>r.id!==id);
+    reqOpenIds.delete(id);if(reqChangingTime===id)reqChangingTime=null;
+    renderGuestRequests();toast('Request marked done ✓');
+  }catch(e){toast('Failed to update');}
+};
+
+window.dismissReq=async function(id){
+  try{
+    await setDoc(doc(db,'service_requests',id),{status:'DISMISSED'},{merge:true});
+    guestRequests=guestRequests.filter(r=>r.id!==id);
+    reqOpenIds.delete(id);if(reqChangingTime===id)reqChangingTime=null;
+    renderGuestRequests();toast('Dismissed');
+  }catch(e){toast('Failed to update');}
+};
+
+window.startChangeTime=function(id){
+  reqChangingTime=id;reqOpenIds.add(id);renderGuestRequests();
+};
+
+window.cancelChangeTime=function(){
+  reqChangingTime=null;renderGuestRequests();
+};
+
+window.confirmChangeTime=async function(id){
+  const input=document.getElementById('req-time-input-'+id);
+  const newTime=input?input.value:'';
+  if(!newTime){toast('Please select a time');return;}
+  try{
+    await updateDoc(doc(db,'service_requests',id),{'details.preferredTime':newTime});
+    const r=guestRequests.find(x=>x.id===id);
+    if(r){if(!r.details)r.details={};r.details.preferredTime=newTime;}
+    reqChangingTime=null;renderGuestRequests();toast('Time updated ✓');
+  }catch(e){toast('Failed to save time');}
+};
+
+window.switchDay=function(day){activeDay=day;render();loadGuestRequests().then(()=>renderGuestRequests());}
 
 window.toggleDone=async function(roomCode,dateStr){
   const key=roomCode+'_'+dateStr;
@@ -590,6 +758,7 @@ function render(){
   console.log(`[HK] render() — activeDay=${activeDay} | targetDate=${ds} | today=${fmtDate(today())} | reservations in memory=${reservations.length}`);
 
   renderTabs();
+  renderGuestRequests();
 
   // get rooms with checkouts + manually-added admin rooms
   const checkoutRooms=getTaskRooms(date);
@@ -720,7 +889,7 @@ function render(){
   document.getElementById('sum-done').textContent=sumDone+'/'+checkoutRooms.length;
 }
 
-function checkReady(){loadCount++;if(loadCount>=1){document.getElementById('loading').style.display='none';render();setSyncing('live');}}
+function checkReady(){loadCount++;if(loadCount>=1){document.getElementById('loading').style.display='none';render();setSyncing('live');loadGuestRequests().then(()=>renderGuestRequests());}}
 
 // set date
 document.getElementById('hdr-date').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
