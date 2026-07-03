@@ -61,6 +61,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .exp-cat-badge{font-size:10px;font-weight:600;background:var(--bg);border:1px solid var(--border);border-radius:var(--rsm);padding:2px 7px;color:var(--muted);white-space:nowrap;}
 .exp-amt{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;flex:1;text-align:right;}
 .exp-del{background:none;border:1px solid var(--border);border-radius:var(--rsm);cursor:pointer;color:var(--hint);font-size:13px;padding:2px 7px;line-height:1;background:var(--red-bg);color:var(--red);}
+.exp-edit{background:var(--blue-bg);border:1px solid var(--blue);border-radius:var(--rsm);cursor:pointer;color:var(--blue);font-size:13px;padding:2px 7px;line-height:1;flex-shrink:0;}
 .paid-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0;}
 .paid-biz{background:#f0f0f0;color:#555;}
 .paid-nika{background:#eff4ff;color:#1d4ed8;}
@@ -311,6 +312,8 @@ let mKey=null;       // mobile current month key
 let cache={};
 let saveTimer=null;
 let pendingSaves={};
+let _activeKey=null;
+let _activeRefresh=null;
 
 // ── helpers ──────────────────────────────
 function n2(x){return Math.abs(x).toFixed(2);}
@@ -410,11 +413,12 @@ function renderExpList(key,onDel){
   exps.forEach(e=>{
     const cur=e.cur||'GEL';const r=document.createElement('div');r.className='exp-item';
     const del=document.createElement('button');del.className='exp-del';del.textContent='×';del.onclick=()=>onDel(key,e.id);
+    const edit=document.createElement('button');edit.className='exp-edit';edit.textContent='✎';edit.onclick=()=>window.startExpEdit(e.id);
     const pb=e.paidBy||'business';
     const pbLabel={business:'💼 Biz',nika:'👤 Nika',tuka:'👤 Tuka'}[pb]||'💼 Biz';
     const pbCls={business:'paid-biz',nika:'paid-nika',tuka:'paid-tuka'}[pb]||'paid-biz';
     r.innerHTML=`<span class="exp-cat-badge">${e.cat}</span><span class="cur-tag ${cur==='USD'?'usd':'gel'}" style="flex-shrink:0;">${cur}</span><span class="exp-amt">${famt(e.amt,cur)}</span><span class="paid-badge ${pbCls}">${pbLabel}</span>`;
-    r.appendChild(del);list.appendChild(r);
+    r.dataset.id=String(e.id);r.appendChild(edit);r.appendChild(del);list.appendChild(r);
   });
   const tr=document.createElement('div');tr.className='exp-total-row';
   tr.innerHTML='<span class="lbl">Total (GEL)</span><span class="val">'+fgel(tg)+'</span>';list.appendChild(tr);
@@ -669,7 +673,7 @@ function mBuildDetail(key){
   document.getElementById('m-btn-add-per').onclick=()=>addPer(key,()=>mRefreshLists(key));
   document.getElementById('m-btn-calc').onclick=()=>{doCalc(key,true);document.getElementById('f-results').classList.remove('hidden');setTimeout(()=>document.getElementById('f-results').scrollIntoView({behavior:'smooth',block:'start'}),50);if(IS_MOBILE)mRenderList();};
   document.getElementById('m-btn-copy').onclick=()=>navigator.clipboard.writeText(document.getElementById('f-tpl').textContent).then(()=>showToast('Copied!'));
-  updateBtax(key);mRefreshLists(key);
+  updateBtax(key);mRefreshLists(key);_activeKey=key;_activeRefresh=()=>mRefreshLists(key);
   if(m.snapshot)doCalc(key,false);
 }
 
@@ -772,7 +776,7 @@ function dRenderMonthPanel(key,mon){
   document.getElementById('d-btn-add-per').onclick=()=>addPer(key,()=>dRefreshLists(key));
   document.getElementById('d-btn-calc').onclick=()=>{doCalc(key,true);document.getElementById('f-results').classList.remove('hidden');dRenderSidebar();};
   document.getElementById('d-btn-copy').onclick=()=>navigator.clipboard.writeText(document.getElementById('f-tpl').textContent).then(()=>showToast('Copied!'));
-  updateBtax(key);dRefreshLists(key);
+  updateBtax(key);dRefreshLists(key);_activeKey=key;_activeRefresh=()=>dRefreshLists(key);
   if(m.snapshot)doCalc(key,false);
 }
 
@@ -791,6 +795,54 @@ function dOpenCurrentMonth(){
 window.toggleCustomExp=function(sel){
   const wrap=document.getElementById('f-exp-custom-wrap');
   if(wrap)wrap.style.display=sel.value==='Other'?'block':'none';
+};
+// ══════════════ EXPENSE EDIT ══════════════
+window.startExpEdit=function(id){
+  if(!_activeKey)return;
+  const m=getM(_activeKey);
+  const e=(m.expenses||[]).find(x=>x.id===id);
+  if(!e)return;
+  const row=document.querySelector(`.exp-item[data-id="${id}"]`);
+  if(!row)return;
+  const cur=e.cur||'GEL';const pb=e.paidBy||'business';
+  const stdCats=['Cleaning','Laundry','Maintenance','Bills','Supplies','Commission'];
+  const isCustom=!stdCats.includes(e.cat);const catVal=isCustom?'Other':e.cat;
+  const catOpts=stdCats.map(c=>`<option value="${c}"${catVal===c?' selected':''}>${c}</option>`).join('')+`<option value="Other"${catVal==='Other'?' selected':''}>Other</option>`;
+  const s='border:1px solid var(--border);border-radius:var(--rs);background:var(--bg);';
+  row.innerHTML=`<div style="display:flex;flex-direction:column;gap:6px;width:100%;padding:2px 0;">
+    <div style="display:flex;gap:6px;">
+      <input type="number" id="eeamt${id}" value="${e.amt}" min="0" inputmode="decimal" style="flex:1;height:34px;font-size:13px;padding:4px 8px;${s}">
+      <select id="eecur${id}" style="width:70px;height:34px;font-size:13px;padding:4px 6px;${s}"><option value="GEL"${cur==='GEL'?' selected':''}>GEL</option><option value="USD"${cur==='USD'?' selected':''}>USD</option></select>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <select id="eecat${id}" onchange="document.getElementById('eecc${id}').style.display=this.value==='Other'?'block':'none'" style="flex:1;height:34px;font-size:13px;padding:4px 6px;${s}">${catOpts}</select>
+      <select id="eepaid${id}" style="flex:1;height:34px;font-size:13px;padding:4px 6px;${s}"><option value="business"${pb==='business'?' selected':''}>💼 Biz</option><option value="nika"${pb==='nika'?' selected':''}>👤 Nika</option><option value="tuka"${pb==='tuka'?' selected':''}>👤 Tuka</option></select>
+    </div>
+    <input type="text" id="eecc${id}" value="${isCustom?e.cat:''}" placeholder="Custom category" style="display:${catVal==='Other'?'block':'none'};height:34px;font-size:13px;padding:4px 8px;${s}">
+    <div style="display:flex;gap:6px;">
+      <button onclick="window.saveExpEdit(${id})" style="flex:1;height:32px;background:var(--green);color:#fff;border:none;border-radius:var(--rs);font-size:12px;font-weight:600;cursor:pointer;">Save</button>
+      <button onclick="window.cancelExpEdit()" style="flex:1;height:32px;background:var(--bg);border:1px solid var(--border);border-radius:var(--rs);font-size:12px;cursor:pointer;color:var(--muted);">Cancel</button>
+    </div>
+  </div>`;
+};
+window.saveExpEdit=function(id){
+  if(!_activeKey)return;
+  const m=getM(_activeKey);
+  const idx=(m.expenses||[]).findIndex(x=>x.id===id);
+  if(idx<0)return;
+  const amt=parseFloat(document.getElementById('eeamt'+id)?.value);
+  if(!amt||amt<=0){alert('Enter a valid amount');return;}
+  const cur=document.getElementById('eecur'+id)?.value||'GEL';
+  const catSel=document.getElementById('eecat'+id)?.value||'';
+  const catCustom=(document.getElementById('eecc'+id)?.value||'').trim();
+  const cat=catSel==='Other'?(catCustom||m.expenses[idx].cat):catSel;
+  const paidBy=document.getElementById('eepaid'+id)?.value||'business';
+  m.expenses[idx]={...m.expenses[idx],amt,cur,cat,paidBy};
+  saveM(_activeKey,m);
+  if(_activeRefresh)_activeRefresh();
+};
+window.cancelExpEdit=function(){
+  if(_activeRefresh)_activeRefresh();
 };
 // ══════════════ LIVE CURRENCY ══════════════
 let liveRate=null;
