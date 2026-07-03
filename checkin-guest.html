@@ -1654,8 +1654,11 @@ window.openSvc=async function(id,name,hasTime){
       ${timePicker}`;
   } else if(hasTime){
     const specificMsg=id==='cleaning'?'Apartment must be empty during cleaning.':'Choose a preferred time.';
+    const labelStyle=`font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:0.06em;`;
+    const inputStyle=`width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);background:var(--bg);outline:none;`;
+    const datePicker=id==='cleaning'?`<div style="margin-bottom:0.85rem;"><label style="${labelStyle}">Preferred date <span style="color:var(--red);">*</span></label><input type="date" id="svc-date" min="${tbilisiToday()}" value="${tbilisiToday()}" style="${inputStyle}"></div>`:'';
     extra.innerHTML=`<div style="background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:var(--rs);padding:0.75rem 1rem;font-size:13px;color:var(--blue);line-height:1.5;margin-bottom:8px;">${specificMsg}</div>
-    ${infoBar}${timePicker}`;
+    ${infoBar}${datePicker}${timePicker}`;
   } else if(id==='transfer'){
     const todayIso=tbilisiToday();
     const loc=getPickupLocation();
@@ -1855,6 +1858,8 @@ window.submitService=async function(){
   const timeEl=document.getElementById('svc-time');
   const preferredTime=timeEl?.value||'';
   if(timeEl&&!preferredTime){alert('Please select a preferred time.');return;}
+  const dateEl=document.getElementById('svc-date');
+  const preferredDate=dateEl?.value||'';
   const aptName=APT_NAMES[aptId]||aptId;
 
   // Transfer: collect extra fields
@@ -1913,7 +1918,7 @@ window.submitService=async function(){
   try{
     const payload={
       guestId,aptId,serviceId:currentSvcId,serviceName:currentSvcName,
-      note,preferredTime,done:false,createdAt:serverTimestamp()
+      note,preferredTime,...(preferredDate?{preferredDate}:{}),done:false,createdAt:serverTimestamp()
     };
     if(currentSvcId==='laundry'){
       payload.laundryItems=selectedItems;
@@ -1936,7 +1941,7 @@ window.submitService=async function(){
     }
 
     // Log all requests to service_requests for tracking
-    const details={note,...(currentSvcId==='transfer'?transferDetails:{}),...(currentSvcId==='laundry'?{items:selectedItems,total:laundryTotal}:{}),...(preferredTime?{preferredTime}:{})};
+    const details={note,...(currentSvcId==='transfer'?transferDetails:{}),...(currentSvcId==='laundry'?{items:selectedItems,total:laundryTotal}:{}),...(preferredTime?{preferredTime}:{}),...(preferredDate?{preferredDate}:{})};
     await addDoc(collection(db,'service_requests'),{
       aptId,roomCode:aptId,guestName:guestData?.name||'',
       service:currentSvcName,serviceId:currentSvcId,
@@ -1948,6 +1953,7 @@ window.submitService=async function(){
     toast(t('rs'));
 
     setTimeout(()=>{
+      if(currentSvcId==='cleaning')return;
       const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       if(isMobile){window.location.href=waUrl;}
       else{window.open(waUrl,'_blank');}
