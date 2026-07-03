@@ -1888,6 +1888,28 @@ window.submitService=async function(){
   const _fsId=currentSvcId==='transfer'?'airport_transfer':currentSvcId==='tour'?'city_tour':currentSvcId;
   const svcWA=(guestSvcs||[]).find(s=>s.id===_fsId)?.whatsappNumber||WA;
 
+  // Build WhatsApp URL before any async work so it counts as user-initiated
+  let waBody=`New service request from ${aptName}:\n`+
+    `Guest: ${guestData?.name||'Guest'}\n`+
+    `Service: ${currentSvcName}\n`;
+  if(currentSvcId==='transfer'){
+    waBody+=`Date: ${transferDetails.pickupDate}\n`;
+    waBody+=`Arrival time: ${transferDetails.arrivalTime}\n`;
+    waBody+=`Guests: ${transferDetails.guests}\n`;
+    waBody+=`Pickup: ${transferDetails.pickupLocation}\n`;
+    if(transferDetails.dropoffLocation)waBody+=`Drop-off: ${transferDetails.dropoffLocation}\n`;
+    waBody+=`Cars: ${transferDetails.carConfig}\n`;
+    waBody+=`Total: ${transferDetails.price} GEL\n`;
+  }
+  if(currentSvcId==='laundry'&&selectedItems.length){
+    waBody+=selectedItems.map(it=>`  • ${it.name} ×${it.qty} = ${it.subtotal} GEL`).join('\n')+'\n';
+    waBody+=`Total: ${laundryTotal} GEL\n`;
+  }
+  if(preferredTime)waBody+=`Time: ${preferredTime}\n`;
+  if(note)waBody+=`Notes: ${note}\n`;
+  waBody+=`Contact: ${guestData?.contact||'—'}`;
+  const waUrl='https://wa.me/'+svcWA+'?text='+encodeURIComponent(waBody);
+
   try{
     const payload={
       guestId,aptId,serviceId:currentSvcId,serviceName:currentSvcName,
@@ -1925,36 +1947,11 @@ window.submitService=async function(){
     window.closeServiceModal();
     toast(t('rs'));
 
-    // Build WhatsApp message
-    let waBody=`New service request from ${aptName}:\n`+
-      `Guest: ${guestData?.name||'Guest'}\n`+
-      `Service: ${currentSvcName}\n`;
-    if(currentSvcId==='transfer'){
-      waBody+=`Date: ${transferDetails.pickupDate}\n`;
-      waBody+=`Arrival time: ${transferDetails.arrivalTime}\n`;
-      waBody+=`Guests: ${transferDetails.guests}\n`;
-      waBody+=`Pickup: ${transferDetails.pickupLocation}\n`;
-      if(transferDetails.dropoffLocation)waBody+=`Drop-off: ${transferDetails.dropoffLocation}\n`;
-      waBody+=`Cars: ${transferDetails.carConfig}\n`;
-      waBody+=`Total: ${transferDetails.price} GEL\n`;
-    }
-    if(currentSvcId==='laundry'&&selectedItems.length){
-      waBody+=selectedItems.map(it=>`  • ${it.name} ×${it.qty} = ${it.subtotal} GEL`).join('\n')+'\n';
-      waBody+=`Total: ${laundryTotal} GEL\n`;
-    }
-    if(preferredTime)waBody+=`Time: ${preferredTime}\n`;
-    if(note)waBody+=`Notes: ${note}\n`;
-    waBody+=`Contact: ${guestData?.contact||'—'}`;
-
-    const waMsg=encodeURIComponent(waBody);
-    const waUrl='https://wa.me/'+svcWA+'?text='+waMsg;
-    const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    if(isMobile){
-      const a=document.createElement('a');a.href=waUrl;a.target='_blank';a.rel='noopener noreferrer';
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
-    }else{
-      window.open(waUrl,'_blank');
-    }
+    setTimeout(()=>{
+      const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if(isMobile){window.location.href=waUrl;}
+      else{window.open(waUrl,'_blank');}
+    },300);
   }catch(e){toast(t('rf'));}
 }
 
