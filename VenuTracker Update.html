@@ -355,10 +355,10 @@ function buildDetailHTML(key){
       <div class="card-body">
         <div class="rate-grid">
           <div class="rate-item"><div class="rate-label">1 USD =</div>
-            <div class="rate-row"><input type="number" id="r-usd" value="${rate}" step="0.01" min="0.01" inputmode="decimal"><span class="rate-cur">GEL</span></div>
+            <div class="rate-row"><input type="text" id="r-usd" value="${rate}" step="0.01" min="0.01" inputmode="decimal"><span class="rate-cur">GEL</span></div>
           </div>
           <div class="rate-item"><div class="rate-label">1 GEL =</div>
-            <div class="rate-row"><input type="number" id="r-gel" value="${(1/rate).toFixed(4)}" step="0.0001" min="0.0001" inputmode="decimal"><span class="rate-cur">USD</span></div>
+            <div class="rate-row"><input type="text" id="r-gel" value="${(1/rate).toFixed(4)}" step="0.0001" min="0.0001" inputmode="decimal"><span class="rate-cur">USD</span></div>
           </div>
         </div>
       </div>
@@ -456,7 +456,7 @@ function renderExpList(key,onDel){
       const editRow=document.createElement('div');
       editRow.className='exp-inline-edit';
       editRow.innerHTML=`
-        <input type="number" id="edit-amt-${e.id}" value="${e.amt}" min="0" step="1" placeholder="Amount">
+        <input type="text" inputmode="decimal" id="edit-amt-${e.id}" value="${e.amt}" min="0" step="1" placeholder="Amount">
         <select id="edit-cur-${e.id}">
           <option value="GEL"${cur==='GEL'?' selected':''}>GEL</option>
           <option value="USD"${cur==='USD'?' selected':''}>USD</option>
@@ -690,23 +690,23 @@ function mBuildDetail(key){
       <div class="m-ds-header"><span class="m-ds-title">Exchange rate</span></div>
       <div class="m-ds-body">
         <div class="rate-grid">
-          <div class="rate-item"><div class="rate-label">1 USD =</div><div class="rate-row"><input type="number" id="r-usd" value="${rate}" step="0.01" min="0.01" inputmode="decimal"><span class="rate-cur">GEL</span></div></div>
-          <div class="rate-item"><div class="rate-label">1 GEL =</div><div class="rate-row"><input type="number" id="r-gel" value="${(1/rate).toFixed(4)}" step="0.0001" min="0.0001" inputmode="decimal"><span class="rate-cur">USD</span></div></div>
+          <div class="rate-item"><div class="rate-label">1 USD =</div><div class="rate-row"><input type="text" id="r-usd" value="${rate}" step="0.01" min="0.01" inputmode="decimal"><span class="rate-cur">GEL</span></div></div>
+          <div class="rate-item"><div class="rate-label">1 GEL =</div><div class="rate-row"><input type="text" id="r-gel" value="${(1/rate).toFixed(4)}" step="0.0001" min="0.0001" inputmode="decimal"><span class="rate-cur">USD</span></div></div>
         </div>
       </div>
     </div>
     <div class="m-detail-section">
       <div class="m-ds-header"><span class="m-ds-title">Income</span></div>
       <div class="m-ds-body">
-        <div class="m-income-field"><div class="m-income-label">Airbnb <span class="cur-tag usd">USD</span></div><input type="number" id="f-airbnb" value="${m.airbnb||''}" min="0" inputmode="decimal" placeholder="0.00"></div>
-        <div class="m-income-field"><div class="m-income-label">Booking <span class="cur-tag gel">GEL</span> <span style="font-size:11px;color:var(--hint);">7.5% tax auto</span></div><input type="number" id="f-booking" value="${m.booking||''}" min="0" inputmode="decimal" placeholder="0.00"><div class="tax-note" id="f-btax"></div></div>
-        <div class="m-income-field"><div class="m-income-label">Direct reservation</div><div class="m-income-row"><input type="number" id="f-direct" value="${m.direct||''}" min="0" inputmode="decimal" placeholder="0.00"><select id="f-dcur" style="width:90px;flex-shrink:0;"><option value="USD" ${(m.directCur||'USD')==='USD'?'selected':''}>USD</option><option value="GEL" ${(m.directCur||'USD')==='GEL'?'selected':''}>GEL</option></select></div></div>
+        <div class="m-income-field"><div class="m-income-label">Airbnb <span class="cur-tag usd">USD</span></div><input type="text" id="f-airbnb" value="${m.airbnb||''}" min="0" inputmode="decimal" placeholder="0.00"></div>
+        <div class="m-income-field"><div class="m-income-label">Booking <span class="cur-tag gel">GEL</span> <span style="font-size:11px;color:var(--hint);">7.5% tax auto</span></div><input type="text" id="f-booking" value="${m.booking||''}" min="0" inputmode="decimal" placeholder="0.00"><div class="tax-note" id="f-btax"></div></div>
+        <div class="m-income-field"><div class="m-income-label">Direct reservation</div><div class="m-income-row"><input type="text" id="f-direct" value="${m.direct||''}" min="0" inputmode="decimal" placeholder="0.00"><select id="f-dcur" style="width:90px;flex-shrink:0;"><option value="USD" ${(m.directCur||'USD')==='USD'?'selected':''}>USD</option><option value="GEL" ${(m.directCur||'USD')==='GEL'?'selected':''}>GEL</option></select></div></div>
       </div>
     </div>
     <div class="m-detail-section">
       <div class="m-ds-header"><span class="m-ds-title">Business expenses</span><span class="card-badge" id="f-exp-total" style="color:var(--red);">0.00</span></div>
       <div class="m-ds-body">
-        <div class="m-add-row"><input type="number" id="f-exp-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-exp-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select></div>
+        <div class="m-add-row"><input type="text" id="f-exp-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-exp-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select></div>
         <div class="m-add-row2"><select id="f-exp-cat" onchange="toggleCustomExp(this)"><option>Cleaning</option><option>Laundry</option><option>Maintenance</option><option>Bills</option><option>Supplies</option><option>Commission</option><option>Other</option></select><button class="m-add-btn" id="m-btn-add-exp">+ Add</button></div>
         <div id="f-exp-custom-wrap" style="display:none;margin-bottom:8px;"><input type="text" id="f-exp-custom" placeholder="Type category name"></div>
         <div style="margin-bottom:8px;">
@@ -722,7 +722,7 @@ function mBuildDetail(key){
     <div class="m-detail-section">
       <div class="m-ds-header"><span class="m-ds-title">Venu personal expenses</span><span class="card-badge" id="f-per-total" style="color:var(--orange);">0.00</span></div>
       <div class="m-ds-body">
-        <div class="m-add-row"><input type="number" id="f-per-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-per-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select></div>
+        <div class="m-add-row"><input type="text" id="f-per-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-per-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select></div>
         <div class="m-add-row2"><input type="text" id="f-per-note" placeholder="Note"><button class="m-add-btn" id="m-btn-add-per">+ Add</button></div>
         <div id="f-per-list"></div>
       </div>
@@ -809,22 +809,22 @@ function dRenderMonthPanel(key,mon){
     <div class="card">
       <div class="card-header"><span class="card-title">Exchange rate</span></div>
       <div class="card-body"><div class="rate-grid">
-        <div class="rate-item"><div class="rate-label">1 USD =</div><div class="rate-row"><input type="number" id="r-usd" value="${rate}" step="0.01" min="0.01" inputmode="decimal"><span class="rate-cur">GEL</span></div></div>
-        <div class="rate-item"><div class="rate-label">1 GEL =</div><div class="rate-row"><input type="number" id="r-gel" value="${(1/rate).toFixed(4)}" step="0.0001" min="0.0001" inputmode="decimal"><span class="rate-cur">USD</span></div></div>
+        <div class="rate-item"><div class="rate-label">1 USD =</div><div class="rate-row"><input type="text" id="r-usd" value="${rate}" step="0.01" min="0.01" inputmode="decimal"><span class="rate-cur">GEL</span></div></div>
+        <div class="rate-item"><div class="rate-label">1 GEL =</div><div class="rate-row"><input type="text" id="r-gel" value="${(1/rate).toFixed(4)}" step="0.0001" min="0.0001" inputmode="decimal"><span class="rate-cur">USD</span></div></div>
       </div></div>
     </div>
     <div class="card">
       <div class="card-header"><span class="card-title">Income</span></div>
       <div class="card-body"><div class="d-income-grid">
-        <div class="d-income-field"><div class="d-income-label">Airbnb <span class="cur-tag usd">USD</span></div><input type="number" id="f-airbnb" value="${m.airbnb||''}" min="0" inputmode="decimal" placeholder="0.00"></div>
-        <div class="d-income-field"><div class="d-income-label">Booking <span class="cur-tag gel">GEL</span> <span style="font-size:10px;color:var(--hint);">7.5% auto</span></div><input type="number" id="f-booking" value="${m.booking||''}" min="0" inputmode="decimal" placeholder="0.00"><div class="tax-note" id="f-btax"></div></div>
-        <div class="d-income-field"><div class="d-income-label">Direct reservation</div><div class="d-direct-row"><input type="number" id="f-direct" value="${m.direct||''}" min="0" inputmode="decimal" placeholder="0.00"><select id="f-dcur" style="width:80px;flex-shrink:0;"><option value="USD" ${(m.directCur||'USD')==='USD'?'selected':''}>USD</option><option value="GEL" ${(m.directCur||'USD')==='GEL'?'selected':''}>GEL</option></select></div></div>
+        <div class="d-income-field"><div class="d-income-label">Airbnb <span class="cur-tag usd">USD</span></div><input type="text" id="f-airbnb" value="${m.airbnb||''}" min="0" inputmode="decimal" placeholder="0.00"></div>
+        <div class="d-income-field"><div class="d-income-label">Booking <span class="cur-tag gel">GEL</span> <span style="font-size:10px;color:var(--hint);">7.5% auto</span></div><input type="text" id="f-booking" value="${m.booking||''}" min="0" inputmode="decimal" placeholder="0.00"><div class="tax-note" id="f-btax"></div></div>
+        <div class="d-income-field"><div class="d-income-label">Direct reservation</div><div class="d-direct-row"><input type="text" id="f-direct" value="${m.direct||''}" min="0" inputmode="decimal" placeholder="0.00"><select id="f-dcur" style="width:80px;flex-shrink:0;"><option value="USD" ${(m.directCur||'USD')==='USD'?'selected':''}>USD</option><option value="GEL" ${(m.directCur||'USD')==='GEL'?'selected':''}>GEL</option></select></div></div>
       </div></div>
     </div>
     <div class="card">
       <div class="card-header"><span class="card-title">Business expenses</span><span class="card-badge" id="f-exp-total" style="color:var(--red);">0.00</span></div>
       <div class="card-body">
-        <div class="d-add-exp-row"><input type="number" id="f-exp-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-exp-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select><select id="f-exp-cat" onchange="toggleCustomExp(this)"><option>Cleaning</option><option>Laundry</option><option>Maintenance</option><option>Bills</option><option>Supplies</option><option>Commission</option><option>Other</option></select>
+        <div class="d-add-exp-row"><input type="text" id="f-exp-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-exp-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select><select id="f-exp-cat" onchange="toggleCustomExp(this)"><option>Cleaning</option><option>Laundry</option><option>Maintenance</option><option>Bills</option><option>Supplies</option><option>Commission</option><option>Other</option></select>
           <select id="f-exp-paid"><option value="business">💼 Business</option><option value="nika">👤 Nika</option><option value="venu">👤 Venu</option></select>
           <button class="d-add-exp-btn" id="d-btn-add-exp">+ Add</button></div>
         <div id="f-exp-custom-wrap" style="display:none;margin-bottom:8px;"><input type="text" id="f-exp-custom" placeholder="Type category name"></div>
@@ -834,7 +834,7 @@ function dRenderMonthPanel(key,mon){
     <div class="card">
       <div class="card-header"><span class="card-title">Venu personal expenses</span><span class="card-badge" id="f-per-total" style="color:var(--orange);">0.00</span></div>
       <div class="card-body">
-        <div class="d-add-exp-row"><input type="number" id="f-per-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-per-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select><input type="text" id="f-per-note" placeholder="Note"><button class="d-add-exp-btn" id="d-btn-add-per">+ Add</button></div>
+        <div class="d-add-exp-row"><input type="text" id="f-per-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-per-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select><input type="text" id="f-per-note" placeholder="Note"><button class="d-add-exp-btn" id="d-btn-add-per">+ Add</button></div>
         <div id="f-per-list"></div>
       </div>
     </div>
@@ -952,6 +952,10 @@ async function init(){
     else{dRenderSidebar();}
   });
 }
+
+document.addEventListener('input',e=>{
+  if(e.target.getAttribute('inputmode')==='decimal'){const v=e.target.value;if(v.includes(','))e.target.value=v.replace(/,/g,'.');}
+});
 
 init();
 </script>
