@@ -1685,6 +1685,10 @@ function gsRenderRoomCategory(){
       <input type="text" class="form-input" value="${esc(data.name||'')}" placeholder="${esc(def.name||'')}" oninput="window.gsSetCategoryField('${gsProp}','name',this.value)">
     </div>
     <div class="form-group" style="margin:0;">
+      <div class="form-label">Description</div>
+      <textarea class="form-input" style="height:80px;" placeholder="Describe this room type..." oninput="window.gsSetCategoryField('${gsProp}','description',this.value)">${esc(data.description||'')}</textarea>
+    </div>
+    <div class="form-group" style="margin:0;">
       <div class="form-label">Max guests</div>
       <input type="number" class="form-input" style="width:120px;" value="${data.maxGuests||''}" min="1" max="30" oninput="window.gsSetCategoryField('${gsProp}','maxGuests',parseInt(this.value)||0)">
     </div>
@@ -1733,6 +1737,21 @@ function gsRenderLocationInfo(){
     <div class="form-group" style="margin:0;">
       <div class="form-label">Parking Maps URL (optional)</div>
       <input type="url" class="form-input" value="${esc(data.parkingMapsUrl||'')}" placeholder="https://maps.google.com/..." oninput="window.gsSetLocationField('${gsProp}','parkingMapsUrl',this.value)">
+    </div>
+    <div class="form-group" style="margin:0;">
+      <div class="form-label">Parking photo / video</div>
+      ${data.parkingMediaUrl
+        ? (data.parkingMediaUrl.match(/\.(mp4|mov|webm|avi)$/i)
+            ? `<video src="${esc(data.parkingMediaUrl)}" style="width:100%;max-height:200px;border-radius:8px;margin-bottom:8px;" controls></video>`
+            : `<img src="${esc(data.parkingMediaUrl)}" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-bottom:8px;border:1px solid var(--gs-border);">`)
+        : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <label style="padding:7px 14px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;display:inline-block;">
+          Upload photo / video
+          <input type="file" accept="image/*,video/*" style="display:none;" onchange="window.gsUploadParkingMedia('${gsProp}',this)">
+        </label>
+        ${data.parkingMediaUrl?`<button onclick="window.gsSetLocationField('${gsProp}','parkingMediaUrl','');gsRenderLocationInfo();" style="padding:7px 14px;background:var(--red-bg);border:1px solid var(--red-border);border-radius:6px;font-size:12px;font-weight:500;color:var(--red);cursor:pointer;border-style:solid;">Remove</button>`:''}
+      </div>
     </div>`:''}
   </div>`;
 }
@@ -1771,6 +1790,17 @@ window.gsUploadCategoryPhoto=async function(prop,input){
     const url=await uploadToCloudinary(file,'maxela/room-categories');
     window.gsSetCategoryField(prop,'photoUrl',url);
     toast('Photo uploaded ✓');
+  }catch(e){toast('Upload failed: '+e.message);}
+};
+
+window.gsUploadParkingMedia=async function(prop,input){
+  const file=input.files[0];if(!file)return;
+  toast('Uploading...',10000);
+  try{
+    const url=await uploadToCloudinary(file,'maxela/parking-media');
+    window.gsSetLocationField(prop,'parkingMediaUrl',url);
+    gsRenderLocationInfo();
+    toast('Uploaded ✓');
   }catch(e){toast('Upload failed: '+e.message);}
 };
 
