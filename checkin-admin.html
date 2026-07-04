@@ -1621,6 +1621,7 @@ function gsRenderRows(containerId,sections){
 }
 
 function gsRenderAll(){
+  console.log('gsRenderAll called');
   gsRenderRows('gsEssentialRows',GS_ESSENTIAL);
   gsRenderRows('gsServiceRows',GS_SERVICES);
   gsRenderRows('gsContentRows',GS_CONTENT);
@@ -1657,6 +1658,7 @@ window.gsSelectProp=function(prop){
 };
 
 function gsRenderRoomCategory(){
+  console.log('gsRenderRoomCategory called, element:',document.getElementById('gsRoomCategoryBody'));
   const el=document.getElementById('gsRoomCategoryBody');
   if(!el)return;
   const def=ROOM_CATEGORY_DEFAULTS[gsProp]||{};
@@ -1700,6 +1702,7 @@ function gsRenderRoomCategory(){
 }
 
 function gsRenderLocationInfo(){
+  console.log('gsRenderLocationInfo called, element:',document.getElementById('gsLocationBody'));
   const el=document.getElementById('gsLocationBody');
   if(!el)return;
   const def=LOCATION_INFO_DEFAULTS[gsProp]||{};
