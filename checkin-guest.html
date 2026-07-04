@@ -375,6 +375,22 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 .tour-item__txt .s{margin-top:5px;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:0.02em;line-height:1.45;}
 @media(max-width:480px){.tour-item__media{height:220px;}.lightbox{padding:24px 16px;}.lb-caption{font-size:15px;}}
 @media(max-width:360px){.tiles{grid-template-columns:1fr;}.tile.wide{grid-column:1;}}
+/* What You Booked card */
+.wyb-card{margin:0 16px 4px;background:var(--surface);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 1px 2px rgba(40,30,15,0.04);}
+.wyb-photo{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;}
+.wyb-photo-placeholder{width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,#e8f4f0 0%,#d4ebe4 100%);display:flex;align-items:center;justify-content:center;}
+.wyb-body{padding:14px 16px 16px;}
+.wyb-name{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:4px;}
+.wyb-guests{font-size:12px;color:var(--muted);margin-bottom:10px;}
+.wyb-amenities{display:flex;flex-wrap:wrap;gap:6px;}
+.wyb-pill{font-size:11px;font-weight:500;padding:3px 9px;border-radius:10px;background:var(--surface2);color:var(--ink-2);border:1px solid var(--line);}
+/* Location page */
+.loc-address{font-size:20px;font-weight:700;color:var(--ink);line-height:1.3;margin-bottom:6px;}
+.loc-maps-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;margin:16px 0;text-decoration:none;font-family:var(--sans);}
+.loc-section{margin-top:20px;padding-top:20px;border-top:1px solid var(--line);}
+.loc-section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;}
+.loc-desc{font-size:14px;color:var(--ink-2);line-height:1.6;}
+.loc-parking-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;background:var(--surface2);color:var(--ink);border:1px solid var(--line);border-radius:14px;font-size:14px;font-weight:600;cursor:pointer;margin-top:12px;text-decoration:none;font-family:var(--sans);}
 </style>
 </head>
 <body>
@@ -575,6 +591,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         <span>Maxela · Tbilisi</span>
       </div>
     </div>
+    <div id="what-you-booked"></div>
     <div class="menu-label"><h3>Your stay</h3></div>
     <div class="tiles" id="tiles-grid"></div>
     <div class="foot">
@@ -662,19 +679,20 @@ let _trPrefill=null;
 let elevatorData=null;
 let _pendingReg=null;
 let guestCfgVisibility=null; // cached from checkin_admin/config.visibility
+let guestFullCfg=null;
 let guestSvcs=null; // cached services array from checkin_admin/config
 let _pendingMatches=[];
 let allMatchedReservations=[];
 
 const T={
   en:{ac:'Access Code',vf:'Valid from',vt:'to',ttp:'Tap to copy',cp2:'Code generation pending — please contact host',chc:'Please contact host for your access code',
-ws:'Welcome — please complete your check-in',yi:'Your information',fn:'Full name',gu:'Guests',na:'Nationality',ct:'Contact',cnu:'Your number / username',pt:'Passport / ID photo',ph:'Tap to take a photo or upload from gallery',sb:'Complete registration',gl:'Welcome back',tc:'Check-in Details',tcs:'Instructions, door code & photos',tw:'WiFi & Internet',tws:'Network name & password',tsv:'Services',tsvs:'Cleaning, laundry, tours & more',tr:'Recommendations',trs:'Best places nearby',tru:'House Rules',trus:'Please read before your stay',tco:'Contact Us',tcos:"We're here 24/7",lt:'Not available yet',ls:'Your room is being prepared. Instructions will unlock automatically at 3:00 PM.',cl:'Available in',dc:'Door code',wn:'WiFi name',wp:'Password',cp:'Copy',cpd:'Copied!',hi:'How to check in',hr:'House rules',rs:'Request sent!',rf:'Failed to send',sn:'Notes (optional)',snh:'Any special instructions...',sr:'Send request',ca:'Cancel',mr:'My requests',nr:'No requests yet',pe:'Pending',dn:'Done',cwa:'WhatsApp',cwas:'Chat with us directly on WhatsApp',rg:'Registered! Loading your stay...',elevatorTitle:'Elevator & Entrance Code',elevatorHint:'Same code for building entrance and elevator. Enter the code then press #.',elevatorToday:'Code for today,',elevatorUpdating:'Elevator code updating — please contact host if needed',checkinTitle:"Let's get you checked in.",checkinSub:"Just a few details and you'll have everything you need for your stay.",checkinKicker:'GUEST CHECK-IN',searchInstructions:'Enter your reservation number OR your full name to find your booking. You can enter both for faster matching.',resNumber:'Reservation number',resPlaceholder:'Your confirmation number',fullName:'Full name',namePlaceholder:'As shown on your booking',arrivalDate:'Arrival date',selectDate:'Select your arrival date',phoneLabel:'Phone / username',guestsLabel:'Guests',fields:'fields'},
+ws:'Welcome — please complete your check-in',yi:'Your information',fn:'Full name',gu:'Guests',na:'Nationality',ct:'Contact',cnu:'Your number / username',pt:'Passport / ID photo',ph:'Tap to take a photo or upload from gallery',sb:'Complete registration',gl:'Welcome back',tc:'Check-in Details',tcs:'Instructions, door code & photos',tw:'WiFi & Internet',tws:'Network name & password',tsv:'Services',tsvs:'Cleaning, laundry, tours & more',tr:'Recommendations',trs:'Best places nearby',tru:'House Rules',trus:'Please read before your stay',tco:'Contact Us',tcos:"We're here 24/7",lt:'Not available yet',ls:'Your room is being prepared. Instructions will unlock automatically at 3:00 PM.',cl:'Available in',dc:'Door code',wn:'WiFi name',wp:'Password',cp:'Copy',cpd:'Copied!',hi:'How to check in',hr:'House rules',rs:'Request sent!',rf:'Failed to send',sn:'Notes (optional)',snh:'Any special instructions...',sr:'Send request',ca:'Cancel',mr:'My requests',nr:'No requests yet',pe:'Pending',dn:'Done',cwa:'WhatsApp',cwas:'Chat with us directly on WhatsApp',rg:'Registered! Loading your stay...',elevatorTitle:'Elevator & Entrance Code',elevatorHint:'Same code for building entrance and elevator. Enter the code then press #.',elevatorToday:'Code for today,',elevatorUpdating:'Elevator code updating — please contact host if needed',checkinTitle:"Let's get you checked in.",checkinSub:"Just a few details and you'll have everything you need for your stay.",checkinKicker:'GUEST CHECK-IN',searchInstructions:'Enter your reservation number OR your full name to find your booking. You can enter both for faster matching.',resNumber:'Reservation number',resPlaceholder:'Your confirmation number',fullName:'Full name',namePlaceholder:'As shown on your booking',arrivalDate:'Arrival date',selectDate:'Select your arrival date',phoneLabel:'Phone / username',guestsLabel:'Guests',fields:'fields',tlo:'Location & Parking',tlos:'Address, maps & parking',wyb:'What You Booked'},
   ka:{ac:'კარის კოდი',vf:'მოქმედია',vt:'–',ttp:'შეეხეთ კოპირებისთვის',cp2:'კოდი მუშავდება — დაუკავშირდით ჰოსტს',chc:'კოდისთვის დაუკავშირდით ჰოსტს',
-ws:'კეთილი იყოს — გთხოვთ შეავსოთ ჩეკინი',yi:'თქვენი ინფორმაცია',fn:'სრული სახელი',gu:'სტუმრები',na:'ეროვნება',ct:'კონტაქტი',cnu:'ნომერი ან username',pt:'პასპორტის ფოტო',ph:'შეეხეთ გადასაღებად',sb:'რეგისტრაციის დასრულება',gl:'კეთილი იყოს თქვენი მობრძანება',tc:'ჩეკინის დეტალები',tcs:'ინსტრუქცია, კარის კოდი და ფოტოები',tw:'WiFi',tws:'ქსელის სახელი და პაროლი',tsv:'სერვისები',tsvs:'დასუფთავება, სამრეცხაო, ტური',tr:'რეკომენდაციები',trs:'საუკეთესო ადგილები',tru:'სახლის წესები',trus:'გთხოვთ წაიკითხოთ',tco:'დაგვიკავშირდით',tcos:'ჩვენ ყოველთვის აქ ვართ',lt:'ჯერ მიუწვდომელია',ls:'ოთახი მზადდება. ინსტრუქცია გამოჩნდება 15:00 საათზე.',cl:'დარჩა',dc:'კარის კოდი',wn:'WiFi სახელი',wp:'პაროლი',cp:'კოპირება',cpd:'დაკოპირდა!',hi:'როგორ შეხვიდეთ',hr:'სახლის წესები',rs:'მოთხოვნა გაიგზავნა!',rf:'გაგზავნა ვერ მოხერხდა',sn:'შენიშვნები',snh:'სპეციალური მოთხოვნები...',sr:'გაგზავნა',ca:'გაუქმება',mr:'ჩემი მოთხოვნები',nr:'მოთხოვნები არ არის',pe:'განხილვაში',dn:'შესრულდა',cwa:'WhatsApp',cwas:'დაგვიკავშირდით WhatsApp-ით',rg:'დარეგისტრირდით! იტვირთება...',elevatorTitle:'ლიფტისა და შესასვლელის კოდი',elevatorHint:'ეს კოდი გამოიყენება შესასვლელისა და ლიფტისთვის. შეიყვანეთ კოდი და დააჭირეთ #.',elevatorToday:'დღევანდელი კოდი,',elevatorUpdating:'ლიფტის კოდი განახლდება — საჭიროების შემთხვევაში დაუკავშირდით ჰოსტს',checkinTitle:'მოდით, გაგატარებთ რეგისტრაციას.',checkinSub:'სულ რამდენიმე დეტალი და თქვენ გექნებათ ყველაფერი, რაც გჭირდებათ თქვენი ყოფნისთვის.',checkinKicker:'სტუმრის რეგისტრაცია',searchInstructions:'შეიყვანეთ თქვენი ჯავშნის ნომერი ან სრული სახელი თქვენი ჯავშნის მოსაძებნად. სწრაფი დამთხვევისთვის შეგიძლიათ ორივე შეიყვანოთ.',resNumber:'ჯავშნის ნომერი',resPlaceholder:'თქვენი დადასტურების ნომერი',fullName:'სრული სახელი',namePlaceholder:'როგორც მითითებულია თქვენს ჯავშანში',arrivalDate:'ჩასვლის თარიღი',selectDate:'აირჩიეთ ჩასვლის თარიღი',phoneLabel:'ტელეფონი / მომხმარებლის სახელი',guestsLabel:'სტუმრები',fields:'ველი'},
+ws:'კეთილი იყოს — გთხოვთ შეავსოთ ჩეკინი',yi:'თქვენი ინფორმაცია',fn:'სრული სახელი',gu:'სტუმრები',na:'ეროვნება',ct:'კონტაქტი',cnu:'ნომერი ან username',pt:'პასპორტის ფოტო',ph:'შეეხეთ გადასაღებად',sb:'რეგისტრაციის დასრულება',gl:'კეთილი იყოს თქვენი მობრძანება',tc:'ჩეკინის დეტალები',tcs:'ინსტრუქცია, კარის კოდი და ფოტოები',tw:'WiFi',tws:'ქსელის სახელი და პაროლი',tsv:'სერვისები',tsvs:'დასუფთავება, სამრეცხაო, ტური',tr:'რეკომენდაციები',trs:'საუკეთესო ადგილები',tru:'სახლის წესები',trus:'გთხოვთ წაიკითხოთ',tco:'დაგვიკავშირდით',tcos:'ჩვენ ყოველთვის აქ ვართ',lt:'ჯერ მიუწვდომელია',ls:'ოთახი მზადდება. ინსტრუქცია გამოჩნდება 15:00 საათზე.',cl:'დარჩა',dc:'კარის კოდი',wn:'WiFi სახელი',wp:'პაროლი',cp:'კოპირება',cpd:'დაკოპირდა!',hi:'როგორ შეხვიდეთ',hr:'სახლის წესები',rs:'მოთხოვნა გაიგზავნა!',rf:'გაგზავნა ვერ მოხერხდა',sn:'შენიშვნები',snh:'სპეციალური მოთხოვნები...',sr:'გაგზავნა',ca:'გაუქმება',mr:'ჩემი მოთხოვნები',nr:'მოთხოვნები არ არის',pe:'განხილვაში',dn:'შესრულდა',cwa:'WhatsApp',cwas:'დაგვიკავშირდით WhatsApp-ით',rg:'დარეგისტრირდით! იტვირთება...',elevatorTitle:'ლიფტისა და შესასვლელის კოდი',elevatorHint:'ეს კოდი გამოიყენება შესასვლელისა და ლიფტისთვის. შეიყვანეთ კოდი და დააჭირეთ #.',elevatorToday:'დღევანდელი კოდი,',elevatorUpdating:'ლიფტის კოდი განახლდება — საჭიროების შემთხვევაში დაუკავშირდით ჰოსტს',checkinTitle:'მოდით, გაგატარებთ რეგისტრაციას.',checkinSub:'სულ რამდენიმე დეტალი და თქვენ გექნებათ ყველაფერი, რაც გჭირდებათ თქვენი ყოფნისთვის.',checkinKicker:'სტუმრის რეგისტრაცია',searchInstructions:'შეიყვანეთ თქვენი ჯავშნის ნომერი ან სრული სახელი თქვენი ჯავშნის მოსაძებნად. სწრაფი დამთხვევისთვის შეგიძლიათ ორივე შეიყვანოთ.',resNumber:'ჯავშნის ნომერი',resPlaceholder:'თქვენი დადასტურების ნომერი',fullName:'სრული სახელი',namePlaceholder:'როგორც მითითებულია თქვენს ჯავშანში',arrivalDate:'ჩასვლის თარიღი',selectDate:'აირჩიეთ ჩასვლის თარიღი',phoneLabel:'ტელეფონი / მომხმარებლის სახელი',guestsLabel:'სტუმრები',fields:'ველი',tlo:'მდებარეობა',tlos:'მისამართი და პარკინგი',wyb:'თქვენი ბინა'},
   ru:{ac:'Код доступа',vf:'Действует с',vt:'по',ttp:'Нажмите для копирования',cp2:'Код генерируется — свяжитесь с хозяином',chc:'Свяжитесь с хозяином для получения кода',
-ws:'Добро пожаловать — завершите регистрацию',yi:'Ваши данные',fn:'Полное имя',gu:'Гостей',na:'Гражданство',ct:'Контакт',cnu:'Ваш номер или username',pt:'Фото паспорта',ph:'Нажмите для фото или загрузки',sb:'Завершить регистрацию',gl:'С возвращением',tc:'Детали заезда',tcs:'Инструкции, код двери и фото',tw:'WiFi',tws:'Имя сети и пароль',tsv:'Услуги',tsvs:'Уборка, стирка, туры и другое',tr:'Рекомендации',trs:'Лучшие места рядом',tru:'Правила проживания',trus:'Пожалуйста прочитайте',tco:'Связаться с нами',tcos:'Мы здесь круглосуточно',lt:'Пока недоступно',ls:'Номер готовится. Инструкции откроются в 15:00.',cl:'Доступно через',dc:'Код двери',wn:'Имя сети',wp:'Пароль',cp:'Копировать',cpd:'Скопировано!',hi:'Как заселиться',hr:'Правила проживания',rs:'Запрос отправлен!',rf:'Ошибка',sn:'Примечания',snh:'Особые пожелания...',sr:'Отправить',ca:'Отмена',mr:'Мои запросы',nr:'Запросов нет',pe:'В обработке',dn:'Выполнено',cwa:'WhatsApp',cwas:'Напишите нам в WhatsApp',rg:'Зарегистрировано! Загрузка...',elevatorTitle:'Код лифта и входа',elevatorHint:'Этот код используется для входа в здание и лифта. Введите код и нажмите #.',elevatorToday:'Код на сегодня,',elevatorUpdating:'Код лифта обновляется — при необходимости свяжитесь с хозяином',checkinTitle:'Давайте оформим вашу регистрацию.',checkinSub:'Всего несколько деталей, и у вас будет всё необходимое для вашего проживания.',checkinKicker:'РЕГИСТРАЦИЯ ГОСТЯ',searchInstructions:'Введите номер бронирования ИЛИ ваше полное имя для поиска бронирования. Можно ввести оба для более быстрого поиска.',resNumber:'Номер бронирования',resPlaceholder:'Ваш номер подтверждения',fullName:'Полное имя',namePlaceholder:'Как указано в вашем бронировании',arrivalDate:'Дата заезда',selectDate:'Выберите дату заезда',phoneLabel:'Телефон / имя пользователя',guestsLabel:'Гости',fields:'поля'},
+ws:'Добро пожаловать — завершите регистрацию',yi:'Ваши данные',fn:'Полное имя',gu:'Гостей',na:'Гражданство',ct:'Контакт',cnu:'Ваш номер или username',pt:'Фото паспорта',ph:'Нажмите для фото или загрузки',sb:'Завершить регистрацию',gl:'С возвращением',tc:'Детали заезда',tcs:'Инструкции, код двери и фото',tw:'WiFi',tws:'Имя сети и пароль',tsv:'Услуги',tsvs:'Уборка, стирка, туры и другое',tr:'Рекомендации',trs:'Лучшие места рядом',tru:'Правила проживания',trus:'Пожалуйста прочитайте',tco:'Связаться с нами',tcos:'Мы здесь круглосуточно',lt:'Пока недоступно',ls:'Номер готовится. Инструкции откроются в 15:00.',cl:'Доступно через',dc:'Код двери',wn:'Имя сети',wp:'Пароль',cp:'Копировать',cpd:'Скопировано!',hi:'Как заселиться',hr:'Правила проживания',rs:'Запрос отправлен!',rf:'Ошибка',sn:'Примечания',snh:'Особые пожелания...',sr:'Отправить',ca:'Отмена',mr:'Мои запросы',nr:'Запросов нет',pe:'В обработке',dn:'Выполнено',cwa:'WhatsApp',cwas:'Напишите нам в WhatsApp',rg:'Зарегистрировано! Загрузка...',elevatorTitle:'Код лифта и входа',elevatorHint:'Этот код используется для входа в здание и лифта. Введите код и нажмите #.',elevatorToday:'Код на сегодня,',elevatorUpdating:'Код лифта обновляется — при необходимости свяжитесь с хозяином',checkinTitle:'Давайте оформим вашу регистрацию.',checkinSub:'Всего несколько деталей, и у вас будет всё необходимое для вашего проживания.',checkinKicker:'РЕГИСТРАЦИЯ ГОСТЯ',searchInstructions:'Введите номер бронирования ИЛИ ваше полное имя для поиска бронирования. Можно ввести оба для более быстрого поиска.',resNumber:'Номер бронирования',resPlaceholder:'Ваш номер подтверждения',fullName:'Полное имя',namePlaceholder:'Как указано в вашем бронировании',arrivalDate:'Дата заезда',selectDate:'Выберите дату заезда',phoneLabel:'Телефон / имя пользователя',guestsLabel:'Гости',fields:'поля',tlo:'Расположение',tlos:'Адрес, карты и парковка',wyb:'Ваш номер'},
   ar:{ac:'رمز الوصول',vf:'صالح من',vt:'إلى',ttp:'انقر للنسخ',cp2:'جارٍ إنشاء الرمز — تواصل مع المضيف',chc:'تواصل مع المضيف للحصول على رمز الوصول',
-ws:'مرحباً — يرجى إكمال تسجيل الوصول',yi:'معلوماتك',fn:'الاسم الكامل',gu:'الضيوف',na:'الجنسية',ct:'التواصل',cnu:'رقمك أو اسم المستخدم',pt:'صورة جواز السفر',ph:'انقر للتصوير أو الرفع',sb:'إتمام التسجيل',gl:'مرحباً بعودتك',tc:'تفاصيل الوصول',tcs:'التعليمات ورمز الباب والصور',tw:'واي فاي',tws:'اسم الشبكة وكلمة المرور',tsv:'الخدمات',tsvs:'تنظيف وغسيل وجولات',tr:'التوصيات',trs:'أفضل الأماكن القريبة',tru:'قواعد المنزل',trus:'يرجى القراءة قبل إقامتك',tco:'تواصل معنا',tcos:'نحن هنا على مدار الساعة',lt:'غير متاح بعد',ls:'غرفتك قيد التجهيز. ستظهر التعليمات في الساعة 3:00 مساءً.',cl:'متاح في',dc:'رمز الباب',wn:'اسم الشبكة',wp:'كلمة المرور',cp:'نسخ',cpd:'تم النسخ!',hi:'كيفية تسجيل الوصول',hr:'قواعد المنزل',rs:'تم إرسال الطلب!',rf:'فشل الإرسال',sn:'ملاحظات',snh:'تعليمات خاصة...',sr:'إرسال الطلب',ca:'إلغاء',mr:'طلباتي',nr:'لا توجد طلبات',pe:'قيد الانتظار',dn:'تم',cwa:'واتساب',cwas:'تواصل معنا على واتساب',rg:'تم التسجيل! جارٍ التحميل...',elevatorTitle:'رمز المصعد والمدخل',elevatorHint:'نفس الرمز لمدخل المبنى والمصعد. أدخل الرمز ثم اضغط #.',elevatorToday:'رمز اليوم،',elevatorUpdating:'رمز المصعد قيد التحديث — تواصل مع المضيف إذا لزم الأمر',checkinTitle:'لنقم بتسجيل وصولك.',checkinSub:'فقط بضع تفاصيل وستحصل على كل ما تحتاجه لإقامتك.',checkinKicker:'تسجيل وصول الضيف',searchInstructions:'أدخل رقم الحجز الخاص بك أو اسمك الكامل للعثور على حجزك. يمكنك إدخال كليهما لمطابقة أسرع.',resNumber:'رقم الحجز',resPlaceholder:'رقم التأكيد الخاص بك',fullName:'الاسم الكامل',namePlaceholder:'كما هو موضح في حجزك',arrivalDate:'تاريخ الوصول',selectDate:'اختر تاريخ وصولك',phoneLabel:'الهاتف / اسم المستخدم',guestsLabel:'الضيوف',fields:'حقول'}
+ws:'مرحباً — يرجى إكمال تسجيل الوصول',yi:'معلوماتك',fn:'الاسم الكامل',gu:'الضيوف',na:'الجنسية',ct:'التواصل',cnu:'رقمك أو اسم المستخدم',pt:'صورة جواز السفر',ph:'انقر للتصوير أو الرفع',sb:'إتمام التسجيل',gl:'مرحباً بعودتك',tc:'تفاصيل الوصول',tcs:'التعليمات ورمز الباب والصور',tw:'واي فاي',tws:'اسم الشبكة وكلمة المرور',tsv:'الخدمات',tsvs:'تنظيف وغسيل وجولات',tr:'التوصيات',trs:'أفضل الأماكن القريبة',tru:'قواعد المنزل',trus:'يرجى القراءة قبل إقامتك',tco:'تواصل معنا',tcos:'نحن هنا على مدار الساعة',lt:'غير متاح بعد',ls:'غرفتك قيد التجهيز. ستظهر التعليمات في الساعة 3:00 مساءً.',cl:'متاح في',dc:'رمز الباب',wn:'اسم الشبكة',wp:'كلمة المرور',cp:'نسخ',cpd:'تم النسخ!',hi:'كيفية تسجيل الوصول',hr:'قواعد المنزل',rs:'تم إرسال الطلب!',rf:'فشل الإرسال',sn:'ملاحظات',snh:'تعليمات خاصة...',sr:'إرسال الطلب',ca:'إلغاء',mr:'طلباتي',nr:'لا توجد طلبات',pe:'قيد الانتظار',dn:'تم',cwa:'واتساب',cwas:'تواصل معنا على واتساب',rg:'تم التسجيل! جارٍ التحميل...',elevatorTitle:'رمز المصعد والمدخل',elevatorHint:'نفس الرمز لمدخل المبنى والمصعد. أدخل الرمز ثم اضغط #.',elevatorToday:'رمز اليوم،',elevatorUpdating:'رمز المصعد قيد التحديث — تواصل مع المضيف إذا لزم الأمر',checkinTitle:'لنقم بتسجيل وصولك.',checkinSub:'فقط بضع تفاصيل وستحصل على كل ما تحتاجه لإقامتك.',checkinKicker:'تسجيل وصول الضيف',searchInstructions:'أدخل رقم الحجز الخاص بك أو اسمك الكامل للعثور على حجزك. يمكنك إدخال كليهما لمطابقة أسرع.',resNumber:'رقم الحجز',resPlaceholder:'رقم التأكيد الخاص بك',fullName:'الاسم الكامل',namePlaceholder:'كما هو موضح في حجزك',arrivalDate:'تاريخ الوصول',selectDate:'اختر تاريخ وصولك',phoneLabel:'الهاتف / اسم المستخدم',guestsLabel:'الضيوف',fields:'حقول',tlo:'الموقع والمواقف',tlos:'العنوان والخرائط والمواقف',wyb:'ما حجزته'}
 };
 
 function t(k){return T[lang]?.[k]||T.en?.[k]||k;}
@@ -1260,6 +1278,7 @@ function showHome(){
   renderGreetingApt();
   document.getElementById('t-greeting-label').textContent=t('gl');
   renderTiles();
+  renderWhatYouBooked();
   console.log('DEBUG passport result:',JSON.stringify(guestData?.passportScanResult));
   renderPassportBanner();
   if(guestId){
@@ -1340,6 +1359,12 @@ function renderTiles(){
       <div class="tile__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 1 1-3.4-6.55L21 4l-1.45 3.4A7.97 7.97 0 0 1 21 12z"/></svg></div>
       <div class="tile__title">${t('tco')}</div>
       <div class="tile__sub">${t('tcos')}</div>
+      <div class="tile__arrow">${_ARR}</div>
+    </div>
+    <div class="tile" onclick="window.openPage('location')">
+      <div class="tile__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>
+      <div class="tile__title">${t('tlo')}</div>
+      <div class="tile__sub">${t('tlos')}</div>
       <div class="tile__arrow">${_ARR}</div>
     </div>`;
   const warningTarget2 = document.querySelector('#page-home .greeting');
@@ -1426,6 +1451,10 @@ const ROOM_TO_PROP={
   'orb-1':'ORBE_1','orb-2':'ORBE_1','orb-3':'ORBE_2',
 };
 function aptPropType(){return ROOM_TO_PROP[aptId]||'ROOMS';}
+function aptPropTypeForConfig(){
+  if(aptId.startsWith('orb-'))return'ORBELIANI';
+  return aptPropType();
+}
 function getPickupLocation(){
   if(aptId.startsWith('0-')||aptId.startsWith('6-')||aptId.startsWith('7-'))return'Zhiuli Shartava St. 37';
   if(aptId.startsWith('orb-'))return'Atoneli St. 9';
@@ -1439,6 +1468,33 @@ async function getGuestCfg(){
     guestCfgVisibility=(snap.exists()&&snap.data().visibility)||{};
   }catch(e){guestCfgVisibility={};}
   return guestCfgVisibility;
+}
+
+async function getFullCfg(){
+  if(guestFullCfg)return guestFullCfg;
+  try{
+    const snap=await getDoc(doc(db,'checkin_admin','config'));
+    guestFullCfg=snap.exists()?snap.data():{};
+    if(guestFullCfg.visibility&&!guestCfgVisibility)guestCfgVisibility=guestFullCfg.visibility;
+  }catch(e){guestFullCfg={};}
+  return guestFullCfg;
+}
+
+async function renderWhatYouBooked(){
+  const el=document.getElementById('what-you-booked');
+  if(!el)return;
+  if(!aptId){el.innerHTML='';return;}
+  try{
+    const cfg=await getFullCfg();
+    const prop=aptPropTypeForConfig();
+    const defaults={ROOMS:{name:'Triple Room with Private Bathroom',maxGuests:4,amenities:['Private Bathroom','Free WiFi']},MAXELA:{name:'Superior Apartment',maxGuests:6,amenities:['Full Kitchen','Free WiFi']},BIG_APT:{name:'3-Bedroom Apartment',maxGuests:12,amenities:['3 Bedrooms','Free WiFi']},FREEDOM:{name:'Tabidze Studio',maxGuests:2,amenities:['Kitchenette','Free WiFi']},ORBELIANI:{name:'Orbeliani Suite',maxGuests:3,amenities:['Free WiFi','City View']}};
+    const cat={...(defaults[prop]||{}),...((cfg.roomCategories||{})[prop]||{})};
+    const amenities=cat.amenities||[];
+    const photoHtml=cat.photoUrl
+      ?`<img class="wyb-photo" src="${esc(cat.photoUrl)}" alt="${esc(cat.name)}">`
+      :`<div class="wyb-photo-placeholder"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9ec9b8" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>`;
+    el.innerHTML=`<div class="wyb-card"><div class="menu-label" style="padding:14px 22px 2px;"><h3>${t('wyb')}</h3></div><div>${photoHtml}</div><div class="wyb-body"><div class="wyb-name">${esc(cat.name||'')}</div><div class="wyb-guests">Up to ${cat.maxGuests||''} guests</div><div class="wyb-amenities">${amenities.map(a=>`<span class="wyb-pill">${esc(a)}</span>`).join('')}</div></div></div>`;
+  }catch(e){const el2=document.getElementById('what-you-booked');if(el2)el2.innerHTML='';}
 }
 
 window.openPage=async function(type){
@@ -1600,7 +1656,29 @@ window.openPage=async function(type){
     </a>`;
   }
 
-  openSubpage(titles[type]||'',body);
+  if(type==='location'){
+    const cfg=await getFullCfg();
+    const prop=aptPropTypeForConfig();
+    const locDefaults={ROOMS:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},MAXELA:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},BIG_APT:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},FREEDOM:{address:'Galaktion Tabidze St. 3/5, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},ORBELIANI:{address:'Atoneli St. 9, Tbilisi',parkingEnabled:false,parkingDesc:''}};
+    const locData={...(locDefaults[prop]||{}),...((cfg.locationInfo||{})[prop]||{})};
+    const mapsBtn=locData.mapsUrl
+      ?`<a href="${esc(locData.mapsUrl)}" target="_blank" class="loc-maps-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>Open in Google Maps</a>`
+      :`<div class="loc-maps-btn" style="opacity:0.5;cursor:default;">Open in Google Maps</div>`;
+    const neighborhood=locData.neighborhood
+      ?`<div class="loc-section"><div class="loc-section-title">Neighborhood</div><div class="loc-desc">${esc(locData.neighborhood)}</div></div>`
+      :'';
+    const parkingSection=locData.parkingEnabled
+      ?`<div class="loc-section"><div class="loc-section-title">Parking</div><div class="loc-desc">${esc(locData.parkingDesc||'Paid parking available nearby')}</div>${locData.parkingMapsUrl?`<a href="${esc(locData.parkingMapsUrl)}" target="_blank" class="loc-parking-btn">Open parking in Maps</a>`:''}</div>`
+      :'';
+    body=`<div style="padding:0 4px;">
+      <div class="loc-address">${esc(locData.address||'')}</div>
+      ${mapsBtn}
+      ${neighborhood}
+      ${parkingSection}
+    </div>`;
+  }
+
+  openSubpage(titles[type]||t('tlo'),body);
 }
 
 function fmtCheckinAvailable(res){

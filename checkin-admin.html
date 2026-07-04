@@ -500,6 +500,20 @@ const LAUNDRY_DEFAULTS=[
   {name:'Dress',price:10},{name:'Jacket / Coat',price:15},
   {name:'Underwear / Socks',price:3},{name:'Bedsheet',price:12},{name:'Towel',price:5},
 ];
+const ROOM_CATEGORY_DEFAULTS={
+  ROOMS:    {name:'Triple Room with Private Bathroom',maxGuests:4,amenities:['Private Bathroom','Free WiFi','Daily Housekeeping'],photoUrl:''},
+  MAXELA:   {name:'Superior Apartment',maxGuests:6,amenities:['Full Kitchen','Living Room','Free WiFi','City View'],photoUrl:''},
+  BIG_APT:  {name:'3-Bedroom Apartment',maxGuests:12,amenities:['3 Bedrooms','Full Kitchen','Living Room','Free WiFi','Sleeps 12'],photoUrl:''},
+  FREEDOM:  {name:'Tabidze Studio',maxGuests:2,amenities:['Kitchenette','Free WiFi','City Center'],photoUrl:''},
+  ORBELIANI:{name:'Orbeliani Suite',maxGuests:3,amenities:['Free WiFi','City View','Historic District'],photoUrl:''},
+};
+const LOCATION_INFO_DEFAULTS={
+  ROOMS:    {address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:''},
+  MAXELA:   {address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:''},
+  BIG_APT:  {address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:''},
+  FREEDOM:  {address:'Galaktion Tabidze St. 3/5, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:''},
+  ORBELIANI:{address:'Atoneli St. 9, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:false,parkingDesc:'',parkingMapsUrl:''},
+};
 const SERVICE_DEFAULTS=[
   {id:'laundry',          name:'Laundry',          price:0,  note:'',            desc:'We collect, wash & return. Note: we do not wash socks or underwear.'},
   {id:'cleaning',         name:'Room Cleaning',     price:30, note:'',            desc:'Professional mid-stay cleaning'},
@@ -514,6 +528,8 @@ let gsProp='ROOMS';
 let gsLoaded=false;
 let gsOpenEdits={};
 let gsSectionLabels={};
+let gsRoomCategories={};
+let gsLocationInfo={};
 let gsElevatorData=null;
 
 // ── HELPERS ───────────────────────────────────────
@@ -1210,6 +1226,8 @@ async function loadGuestSettings(){
         }
       }
       if(d.sectionLabels)gsSectionLabels=d.sectionLabels;
+      if(d.roomCategories)gsRoomCategories=d.roomCategories;
+      if(d.locationInfo)gsLocationInfo=d.locationInfo;
     }
   }catch(e){console.warn('Guest settings load error:',e);}
   gsLoaded=true;
@@ -1302,6 +1320,20 @@ async function renderGuestSettings(){
         <span class="gs-card-title">Additional Content</span>
       </div>
       <div id="gsContentRows"></div>
+    </div>
+    <div class="gs-card">
+      <div class="gs-card-header">
+        <div class="gs-card-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gs-accent)" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+        <span class="gs-card-title">Room Categories</span>
+      </div>
+      <div id="gsRoomCategoryBody"></div>
+    </div>
+    <div class="gs-card">
+      <div class="gs-card-header">
+        <div class="gs-card-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gs-accent)" stroke-width="2.5"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>
+        <span class="gs-card-title">Location & Parking</span>
+      </div>
+      <div id="gsLocationBody"></div>
     </div>
     <div style="height:80px"></div>
   </div>`;
@@ -1441,7 +1473,8 @@ window.gsAddLaundry=function(){
 window.gsSave=async function(){
   try{
     await setDoc(doc(db,'checkin_admin','config'),
-      {visibility:gsVisibility,laundryItems:gsLaundry,services:gsServices,sectionLabels:gsSectionLabels,updatedAt:serverTimestamp()});
+      {visibility:gsVisibility,laundryItems:gsLaundry,services:gsServices,sectionLabels:gsSectionLabels,
+       roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,updatedAt:serverTimestamp()});
     toast('Guest page settings saved ✓');
   }catch(e){toast('Failed to save: '+e.message);}
 };
@@ -1613,12 +1646,135 @@ function gsRenderAll(){
   }).join('');
   const srEl=document.getElementById('gsServiceRows');
   if(customHtml&&srEl)srEl.innerHTML+=customHtml;
+  gsRenderRoomCategory();
+  gsRenderLocationInfo();
 }
 
 window.gsSelectProp=function(prop){
   gsProp=prop;
   document.querySelectorAll('.gs-prop-btn').forEach(b=>b.classList.toggle('active',b.dataset.prop===prop));
   gsRenderAll();
+};
+
+function gsRenderRoomCategory(){
+  const el=document.getElementById('gsRoomCategoryBody');
+  if(!el)return;
+  const def=ROOM_CATEGORY_DEFAULTS[gsProp]||{};
+  const cat=gsRoomCategories[gsProp]||{};
+  const data={...def,...cat};
+  const amenities=data.amenities||[];
+  el.innerHTML=`<div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+    <div class="form-group" style="margin:0;">
+      <div class="form-label">Category photo</div>
+      ${data.photoUrl
+        ?`<img src="${esc(data.photoUrl)}" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;margin-bottom:8px;border:1px solid var(--gs-border);display:block;">`
+        :`<div style="width:100%;aspect-ratio:16/9;background:#f3f4f6;border-radius:8px;border:2px dashed #d1d5db;display:flex;align-items:center;justify-content:center;font-size:13px;color:#9ca3af;margin-bottom:8px;">No photo uploaded</div>`
+      }
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <label style="padding:7px 14px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;display:inline-block;">
+          Upload photo
+          <input type="file" accept="image/*" style="display:none;" onchange="window.gsUploadCategoryPhoto('${gsProp}',this)">
+        </label>
+        ${data.photoUrl?`<button onclick="window.gsSetCategoryField('${gsProp}','photoUrl','')" style="padding:7px 14px;background:var(--red-bg);border:1px solid var(--red-border);border-radius:6px;font-size:12px;font-weight:500;color:var(--red);cursor:pointer;border-style:solid;">Remove photo</button>`:''}
+      </div>
+    </div>
+    <div class="form-group" style="margin:0;">
+      <div class="form-label">Display name</div>
+      <input type="text" class="form-input" value="${esc(data.name||'')}" placeholder="${esc(def.name||'')}" oninput="window.gsSetCategoryField('${gsProp}','name',this.value)">
+    </div>
+    <div class="form-group" style="margin:0;">
+      <div class="form-label">Max guests</div>
+      <input type="number" class="form-input" style="width:120px;" value="${data.maxGuests||''}" min="1" max="30" oninput="window.gsSetCategoryField('${gsProp}','maxGuests',parseInt(this.value)||0)">
+    </div>
+    <div class="form-group" style="margin:0;">
+      <div class="form-label">Amenities</div>
+      <div id="gsAmenityList-${gsProp}" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;min-height:28px;">
+        ${amenities.map((a,i)=>`<span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 8px 3px 10px;font-size:12px;">${esc(a)}<button onclick="window.gsRemoveAmenity('${gsProp}',${i})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;padding:0 2px;">×</button></span>`).join('')}
+      </div>
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="gsNewAmenity-${gsProp}" class="form-input" style="flex:1;" placeholder="Add amenity..." onkeydown="if(event.key==='Enter'){window.gsAddAmenity('${gsProp}');event.preventDefault();}">
+        <button onclick="window.gsAddAmenity('${gsProp}')" style="padding:0 16px;background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:var(--rs);color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;border-style:solid;">Add</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function gsRenderLocationInfo(){
+  const el=document.getElementById('gsLocationBody');
+  if(!el)return;
+  const def=LOCATION_INFO_DEFAULTS[gsProp]||{};
+  const loc=gsLocationInfo[gsProp]||{};
+  const data={...def,...loc};
+  el.innerHTML=`<div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+    <div class="form-group" style="margin:0;">
+      <div class="form-label">Address</div>
+      <input type="text" class="form-input" value="${esc(data.address||'')}" placeholder="${esc(def.address||'')}" oninput="window.gsSetLocationField('${gsProp}','address',this.value)">
+    </div>
+    <div class="form-group" style="margin:0;">
+      <div class="form-label">Google Maps URL</div>
+      <input type="url" class="form-input" value="${esc(data.mapsUrl||'')}" placeholder="https://maps.google.com/..." oninput="window.gsSetLocationField('${gsProp}','mapsUrl',this.value)">
+    </div>
+    <div class="form-group" style="margin:0;">
+      <div class="form-label">Neighborhood description (optional)</div>
+      <textarea class="form-input" style="height:80px;" placeholder="e.g. Located in the heart of Tbilisi's old town..." oninput="window.gsSetLocationField('${gsProp}','neighborhood',this.value)">${esc(data.neighborhood||'')}</textarea>
+    </div>
+    <div class="toggle-row" style="border-top:1px solid var(--border);padding-top:14px;">
+      <div class="toggle-info"><div class="toggle-name">Parking available</div><div class="toggle-desc">Show parking section on guest page</div></div>
+      <label class="switch"><input type="checkbox" ${data.parkingEnabled?'checked':''} onchange="window.gsSetLocationField('${gsProp}','parkingEnabled',this.checked);gsRenderLocationInfo();"><span class="slider"></span></label>
+    </div>
+    ${data.parkingEnabled?`
+    <div class="form-group" style="margin:0;">
+      <div class="form-label">Parking description</div>
+      <textarea class="form-input" style="height:70px;" placeholder="e.g. Paid street parking available on Shartava St." oninput="window.gsSetLocationField('${gsProp}','parkingDesc',this.value)">${esc(data.parkingDesc||'')}</textarea>
+    </div>
+    <div class="form-group" style="margin:0;">
+      <div class="form-label">Parking Maps URL (optional)</div>
+      <input type="url" class="form-input" value="${esc(data.parkingMapsUrl||'')}" placeholder="https://maps.google.com/..." oninput="window.gsSetLocationField('${gsProp}','parkingMapsUrl',this.value)">
+    </div>`:''}
+  </div>`;
+}
+
+window.gsSetCategoryField=function(prop,field,val){
+  if(!gsRoomCategories[prop])gsRoomCategories[prop]={...ROOM_CATEGORY_DEFAULTS[prop]};
+  gsRoomCategories[prop][field]=val;
+  gsMarkDirty();
+  if(field==='photoUrl')gsRenderRoomCategory();
+};
+
+window.gsAddAmenity=function(prop){
+  const inp=document.getElementById('gsNewAmenity-'+prop);
+  const val=(inp?.value||'').trim();
+  if(!val){toast('Enter an amenity name');return;}
+  if(!gsRoomCategories[prop])gsRoomCategories[prop]={...ROOM_CATEGORY_DEFAULTS[prop]};
+  if(!gsRoomCategories[prop].amenities)gsRoomCategories[prop].amenities=[...ROOM_CATEGORY_DEFAULTS[prop].amenities];
+  gsRoomCategories[prop].amenities.push(val);
+  if(inp)inp.value='';
+  gsMarkDirty();
+  gsRenderRoomCategory();
+};
+
+window.gsRemoveAmenity=function(prop,idx){
+  if(!gsRoomCategories[prop])gsRoomCategories[prop]={...ROOM_CATEGORY_DEFAULTS[prop]};
+  if(!gsRoomCategories[prop].amenities)gsRoomCategories[prop].amenities=[...ROOM_CATEGORY_DEFAULTS[prop].amenities];
+  gsRoomCategories[prop].amenities.splice(idx,1);
+  gsMarkDirty();
+  gsRenderRoomCategory();
+};
+
+window.gsUploadCategoryPhoto=async function(prop,input){
+  const file=input.files[0];if(!file)return;
+  toast('Uploading photo...',10000);
+  try{
+    const url=await uploadToCloudinary(file,'maxela/room-categories');
+    window.gsSetCategoryField(prop,'photoUrl',url);
+    toast('Photo uploaded ✓');
+  }catch(e){toast('Upload failed: '+e.message);}
+};
+
+window.gsSetLocationField=function(prop,field,val){
+  if(!gsLocationInfo[prop])gsLocationInfo[prop]={...LOCATION_INFO_DEFAULTS[prop]};
+  gsLocationInfo[prop][field]=val;
+  gsMarkDirty();
 };
 
 function gsMarkDirty(){
