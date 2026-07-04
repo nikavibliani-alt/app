@@ -742,6 +742,45 @@ function tbilisiHour(){
   }).format(new Date()),10);
 }
 
+// ── HK STATUS CACHE (for unlock logic) ───────────────────────
+let hkStatusCache={};
+let _hkFetching=false;
+
+function prevDay(dateStr){
+  const d=new Date(dateStr+'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate()-1);
+  return d.toISOString().slice(0,10);
+}
+
+async function prefetchHkStatus(res){
+  if(!res)return;
+  const rc=res.roomCode||aptId;
+  const ci=res.checkin||res.checkIn||'';
+  if(!rc||!ci)return;
+  const key1=rc+'_'+ci;
+  const key2=rc+'_'+prevDay(ci);
+  try{
+    const[s1,s2]=await Promise.all([
+      getDoc(doc(db,'hk_status',key1)),
+      getDoc(doc(db,'hk_status',key2)),
+    ]);
+    hkStatusCache[key1]=s1.exists()?s1.data():null;
+    hkStatusCache[key2]=s2.exists()?s2.data():null;
+  }catch(e){}
+}
+
+function ensureHkStatusCached(res){
+  if(!res||_hkFetching)return;
+  const rc=res.roomCode||aptId;
+  const ci=res.checkin||res.checkIn||'';
+  if(!rc||!ci)return;
+  const key1=rc+'_'+ci;
+  const key2=rc+'_'+prevDay(ci);
+  if(key1 in hkStatusCache&&key2 in hkStatusCache)return;
+  _hkFetching=true;
+  prefetchHkStatus(res).then(()=>{_hkFetching=false;renderTiles();});
+}
+
 function isUnlocked(res){
   if(!guestData)return false;
   if(guestData.manualUnlock)return true;
@@ -749,15 +788,24 @@ function isUnlocked(res){
   const r=res||activeReservation;
   const ci=(r?.checkin||r?.checkIn||'');
   const co=(r?.checkout||r?.checkOut||'');
+  const rc=(r?.roomCode||aptId);
   if(!ci||!co)return false;
 
   const today=tbilisiToday();
   const hour=tbilisiHour();
-  const ciHour=getCheckInHour();
 
-  if(today<ci)return false;                   // before check-in date — locked
-  if(today===ci&&hour<ciHour)return false;    // check-in day but before check-in hour
-  if(today>co)return false;                   // after checkout date — locked
+  if(today<ci)return false;   // before check-in date
+  if(today>co)return false;   // after checkout date
+
+  // Check HK cleaning status from cache (populated by ensureHkStatusCached)
+  const hkSameDay=hkStatusCache[rc+'_'+ci];        // back-to-back: prev checkout = checkin day
+  const hkPrevDay=hkStatusCache[rc+'_'+prevDay(ci)]; // gap of 1: prev checkout = day before
+
+  if(hkSameDay?.done)return true;                              // cleaned same day → unlock immediately
+  if(hkPrevDay?.done&&today===ci&&hour>=12)return true;        // cleaned day before → unlock at 12:00
+
+  // Fallback: configured check-in hour (default 15:00)
+  if(today===ci&&hour<getCheckInHour())return false;
   return true;
 }
 
@@ -1255,6 +1303,7 @@ function showHome(){
 }
 
 function renderTiles(){
+  ensureHkStatusCached(activeReservation);
   const u=isUnlocked(activeReservation);
   const _ARR=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
   const ssid=(aptData&&aptData.wifiName)?aptData.wifiName:'';
