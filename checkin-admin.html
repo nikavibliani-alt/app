@@ -111,6 +111,18 @@ textarea.form-input{height:auto;padding:10px;resize:vertical;line-height:1.5;}
 
 /* Guest photo */
 .passport-img{width:100%;max-height:200px;object-fit:cover;border-radius:var(--rs);border:1px solid var(--border);margin-top:6px;}
+.passport-full-wrap{width:100%;background:#000;border-radius:var(--rs);overflow:hidden;margin-top:6px;cursor:zoom-in;position:relative;}
+.passport-full-img{width:100%;max-height:400px;object-fit:contain;display:block;}
+.passport-tap-hint{text-align:center;font-size:11px;color:#888;padding:4px 0 6px;}
+/* Passport lightbox */
+#guestImgLightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.96);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;}
+#guestImgLightbox img{max-width:100%;max-height:100dvh;object-fit:contain;display:block;}
+/* Mobile: drawer is full-screen */
+@media(max-width:768px){
+  .drawer{border-left:none;}
+  .drawer-header{position:sticky;top:0;z-index:2;background:var(--surface);}
+  .drawer-close{width:40px;height:40px;font-size:22px;}
+}
 
 /* Guest Settings */
 .prop-tabs{display:flex;gap:2px;background:var(--surface2);padding:3px;border-radius:6px;margin-bottom:20px;flex-wrap:wrap;}
@@ -370,6 +382,10 @@ input:checked+.slider:before{transform:translateX(20px);}
   <div class="spinner"></div>
 </div>
 <div class="toast" id="toast"></div>
+
+<div id="guestImgLightbox" onclick="window.closeImgLightbox()">
+  <img id="guestImgLightboxImg" alt="Passport full screen">
+</div>
 
 <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer">
@@ -1071,43 +1087,106 @@ window.alertPassport=function(guestId){
   window.open(`mailto:nikavibliani@gmail.com?subject=${subject}&body=${body}`);
 };
 
+window.openImgLightbox=function(url){
+  const lb=document.getElementById('guestImgLightbox');
+  const img=document.getElementById('guestImgLightboxImg');
+  if(!lb||!img)return;
+  img.src=url;
+  lb.style.display='flex';
+  document.body.style.overflow='hidden';
+};
+window.closeImgLightbox=function(){
+  const lb=document.getElementById('guestImgLightbox');
+  if(lb)lb.style.display='none';
+  document.body.style.overflow='';
+};
+
 window.viewGuest=function(guestId){
   const g=guestData.find(x=>x.id===guestId);if(!g)return;
   const apt=APARTMENTS.find(a=>a.id===g.aptId);
   const sr=g.passportScanResult;
   const badge=buildScanBadge(sr);
-  const alertBlock=sr&&!sr.valid?
-    `<div style="margin-top:8px;padding:10px 12px;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--rs);font-size:12px;color:var(--amber);">
-       <strong>AI reason:</strong> ${esc(sr.reason||'No reason given')}
-     </div>
-     <button class="btn btn-amber btn-sm" style="margin-top:8px;width:100%;" onclick="window.alertPassport('${guestId}')">
-       📧 Send alert email
-     </button>` : '';
+
+  const scanBlock=sr?(
+    sr.valid===false
+      ?`<div style="margin-top:8px;padding:10px 12px;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--rs);font-size:12px;color:var(--amber);">
+          <strong>AI reason:</strong> ${esc(sr.reason||'No reason given')}
+        </div>
+        <button class="btn btn-amber btn-sm" style="margin-top:8px;width:100%;min-height:44px;" onclick="window.alertPassport('${guestId}')">��� Send alert email</button>`
+      :''
+  ):'';
+
   const passportHtml=g.passportUrl
     ?`<div class="form-group">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
           <div class="form-label" style="margin:0;">Passport photo</div>
           ${badge||'<span style="font-size:11px;color:var(--hint);">Not scanned</span>'}
         </div>
-        <img src="${g.passportUrl}" class="passport-img">
-        ${alertBlock}
+        <div class="passport-full-wrap" onclick="window.openImgLightbox('${esc(g.passportUrl)}')">
+          <img src="${esc(g.passportUrl)}" class="passport-full-img" alt="Passport">
+          <div class="passport-tap-hint">Tap to view full screen</div>
+        </div>
+        ${scanBlock}
       </div>`
-    :'<div style="color:var(--hint);font-size:13px;">No passport photo uploaded</div>';
+    :`<div class="form-group"><div style="color:var(--hint);font-size:13px;">No passport photo uploaded</div></div>`;
+
+  const ctIcon=g.contactType==='tg'
+    ?`<span style="font-size:9px;font-weight:700;color:#0088cc;background:#e8f5fe;border:1px solid #90cdf4;padding:1px 5px;border-radius:4px;">TG</span>`
+    :`<span style="font-size:9px;font-weight:700;color:#25D366;background:#f0fff4;border:1px solid #86efac;padding:1px 5px;border-radius:4px;">WA</span>`;
+
+  const submittedAt=g.submittedAt?.toDate?g.submittedAt.toDate():null;
+  const timeStr=submittedAt
+    ?submittedAt.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' '+submittedAt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
+    :'—';
+
   document.getElementById('drawer-title').textContent='Guest — '+(apt?.code||g.aptId);
   document.getElementById('drawer-body').innerHTML=`
     <div class="form-group">
       <div class="form-label">Full name</div>
-      <div style="font-size:15px;font-weight:600;">${esc(g.name||'—')}</div>
+      <div style="font-size:16px;font-weight:700;">${esc(g.name||'—')}</div>
     </div>
     <div class="form-row">
-      <div class="form-group"><div class="form-label">Guests</div><div style="font-weight:600;">${g.guests||1}</div></div>
-      <div class="form-group"><div class="form-label">Status</div>
+      <div class="form-group">
+        <div class="form-label">Apartment</div>
+        <div style="font-weight:600;font-family:'DM Mono',monospace;">${esc(apt?.code||g.aptId||'—')}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(apt?.name||'')}</div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Reservation #</div>
+        <div style="font-weight:600;font-family:'DM Mono',monospace;font-size:12px;word-break:break-all;">${esc(g.matchedReservationId||'—')}</div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">Arrival date</div>
+        <div style="font-weight:600;">${esc(g.arrivalDate||'—')}</div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Guests</div>
+        <div style="font-weight:600;">${g.guests||1} guest${(g.guests||1)>1?'s':''}</div>
+      </div>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Contact</div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        ${ctIcon}
+        <span style="font-weight:500;word-break:break-all;">${esc(g.contact||'—')}</span>
+      </div>
+    </div>
+    ${g.nationality?`<div class="form-group"><div class="form-label">Nationality</div><div style="font-weight:500;">${esc(g.nationality)}</div></div>`:''}
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">Status</div>
         <span class="unlock-badge ${g.manualUnlock?'unlocked':'waiting'}">${g.manualUnlock?'Unlocked':'Waiting 2pm'}</span>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Registered</div>
+        <div style="font-size:12px;color:var(--muted);">${timeStr}</div>
       </div>
     </div>
     ${passportHtml}
-    ${!g.manualUnlock?`<button class="btn btn-green" style="width:100%;margin-top:1rem;" onclick="window.unlockGuest('${guestId}');closeDrawer()">Unlock check-in now</button>`:''}`;
-  document.getElementById('drawer-footer').innerHTML=`<button class="btn" onclick="closeDrawer()">Close</button>`;
+    ${!g.manualUnlock?`<button class="btn btn-green" style="width:100%;margin-top:1rem;min-height:44px;" onclick="window.unlockGuest('${guestId}');closeDrawer()">Unlock check-in now</button>`:''}`;
+  document.getElementById('drawer-footer').innerHTML=`<button class="btn" style="min-height:44px;flex:1;" onclick="closeDrawer()">Close</button>`;
   openDrawer();
 }
 
