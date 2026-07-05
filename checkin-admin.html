@@ -707,6 +707,11 @@ function renderGuests(){
       const isBlocked=!!g.blocked;
       const resNumShort=g.matchedReservationId?(g.matchedReservationId.length>8?'…'+g.matchedReservationId.slice(-6):g.matchedReservationId):'';
       const blockedBadge=isBlocked?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">BLOCKED</span>`:'';
+      const adminOverrideBadge=adminApproved
+        ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">Admin ✓</span>`
+        :adminRejected
+        ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">Admin ✕</span>`
+        :'';
       const rowStyle=isBlocked?'background:#fff0f0;border-left:3px solid var(--red);':(badPassport?'background:var(--red-bg);border-left:3px solid var(--red);':'');
       html+=`<div class="guest-row"${rowStyle?` style="${rowStyle}"`:''}>
         <div style="flex:1;min-width:0;">
@@ -715,6 +720,7 @@ function renderGuests(){
             <span class="guest-name">${esc(g.name||'—')}</span>
             ${blockedBadge}
             ${passportBadge}
+            ${adminOverrideBadge}
           </div>
           ${passportStatus}
           <div class="guest-meta">${g.guests||1} guest${(g.guests||1)>1?'s':''} · ${ctIcon} ${esc(g.contact||'—')} · ${esc(g.arrivalDate||'—')} · ${timeStr}${resNumShort?' · #'+esc(resNumShort):''}</div>
@@ -1193,6 +1199,21 @@ window.rejectPassport=async function(guestId){
   }catch(e){toast('Failed: '+e.message);}
 }
 
+window.passportActionInDrawer=async function(guestId,approve){
+  try{
+    await updateDoc(doc(db,'checkin_guests',guestId),{
+      'passportScanResult.overrideByAdmin':approve,
+      'passportScanResult.valid':approve,
+    });
+    const g=guestData.find(x=>x.id===guestId);
+    if(g&&g.passportScanResult){
+      g.passportScanResult={...g.passportScanResult,overrideByAdmin:approve,valid:approve};
+    }
+    toast(approve?'ID approved ✓':'ID rejected');
+    window.viewGuest(guestId);
+  }catch(e){toast('Failed: '+e.message);}
+}
+
 window.blockGuest=async function(guestId,guestName){
   if(!confirm(`Block access for ${guestName}? They will see a revoked-access message immediately.`))return;
   try{
@@ -1254,14 +1275,22 @@ window.viewGuest=function(guestId){
   const sr=g.passportScanResult;
   const badge=buildScanBadge(sr);
 
-  const scanBlock=sr?(
-    sr.valid===false
-      ?`<div style="margin-top:8px;padding:10px 12px;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--rs);font-size:12px;color:var(--amber);">
-          <strong>AI reason:</strong> ${esc(sr.reason||'No reason given')}
-        </div>
-        <button class="btn btn-amber btn-sm" style="margin-top:8px;width:100%;min-height:44px;" onclick="window.alertPassport('${guestId}')">��� Send alert email</button>`
-      :''
-  ):'';
+  const alertBtn=(sr&&sr.valid===false&&!sr?.overrideByAdmin)
+    ?`<div style="margin-top:8px;padding:10px 12px;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--rs);font-size:12px;color:var(--amber);"><strong>AI reason:</strong> ${esc(sr.reason||'No reason given')}</div>
+      <button class="btn btn-amber btn-sm" style="margin-top:8px;width:100%;min-height:44px;" onclick="window.alertPassport('${guestId}')">⚠️ Send alert email</button>`
+    :'';
+  const adminStatusHtml=sr?.overrideByAdmin===true
+    ?`<div style="margin-top:8px;display:flex;align-items:center;gap:6px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">Admin: Approved ✓</span></div>`
+    :sr?.overrideByAdmin===false
+    ?`<div style="margin-top:8px;display:flex;align-items:center;gap:6px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">Admin: Rejected ✕</span></div>`
+    :'';
+  const passportActionBtns=sr
+    ?`<div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-green" style="flex:1;min-height:44px;font-size:13px;" onclick="window.passportActionInDrawer('${guestId}',true)">✓ Approve</button>
+        <button class="btn btn-red" style="flex:1;min-height:44px;font-size:13px;" onclick="window.passportActionInDrawer('${guestId}',false)">✕ Reject</button>
+      </div>`
+    :'';
+  const scanBlock=alertBtn+adminStatusHtml+passportActionBtns;
 
   const passportHtml=g.passportUrl
     ?`<div class="form-group">
