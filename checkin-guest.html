@@ -377,11 +377,20 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 @media(max-width:360px){.tiles{grid-template-columns:1fr;}.tile.wide{grid-column:1;}}
 /* What You Booked card */
 .wyb-card{margin:0 16px 4px;background:var(--surface);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 1px 2px rgba(40,30,15,0.04);}
-.wyb-photo{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;}
-.wyb-photo-placeholder{width:100%;aspect-ratio:16/9;background:linear-gradient(135deg,#e8f4f0 0%,#d4ebe4 100%);display:flex;align-items:center;justify-content:center;}
-.wyb-body{padding:14px 16px 16px;}
-.wyb-name{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:4px;}
-.wyb-guests{font-size:12px;color:var(--muted);margin-bottom:10px;}
+.wyb-header{cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.wyb-hero{position:relative;height:180px;overflow:hidden;}
+.wyb-hero img{width:100%;height:100%;object-fit:cover;display:block;}
+.wyb-hero-ph{width:100%;height:100%;background:linear-gradient(135deg,#e8f4f0 0%,#d4ebe4 100%);display:flex;align-items:center;justify-content:center;}
+.wyb-hero-overlay{position:absolute;bottom:0;left:0;right:0;padding:12px 16px;background:linear-gradient(transparent,rgba(0,0,0,0.55));color:#fff;}
+.wyb-hero-name{font-size:17px;font-weight:700;line-height:1.2;}
+.wyb-hero-meta{display:flex;align-items:center;justify-content:space-between;margin-top:4px;font-size:13px;opacity:.9;}
+.wyb-chevron{transition:transform .25s;flex-shrink:0;}
+.wyb-chevron.open{transform:rotate(180deg);}
+.wyb-expanded{padding:0 16px 16px;}
+.room-gallery{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding-bottom:8px;margin-bottom:12px;}
+.room-gallery::-webkit-scrollbar{display:none;}
+.room-gallery img{width:280px;height:200px;object-fit:cover;border-radius:8px;flex-shrink:0;scroll-snap-align:start;}
+.wyb-desc{font-size:14px;color:var(--ink-2);line-height:1.6;margin-bottom:12px;}
 .wyb-amenities{display:flex;flex-wrap:wrap;gap:6px;}
 .wyb-pill{font-size:11px;font-weight:500;padding:3px 9px;border-radius:10px;background:var(--surface2);color:var(--ink-2);border:1px solid var(--line);}
 /* Location page */
@@ -1489,12 +1498,42 @@ async function renderWhatYouBooked(){
     const defaults={ROOMS:{name:'Triple Room with Private Bathroom',maxGuests:4,amenities:['Private Bathroom','Free WiFi']},MAXELA:{name:'Superior Apartment',maxGuests:6,amenities:['Full Kitchen','Free WiFi']},BIG_APT:{name:'3-Bedroom Apartment',maxGuests:12,amenities:['3 Bedrooms','Free WiFi']},FREEDOM:{name:'Tabidze Studio',maxGuests:2,amenities:['Kitchenette','Free WiFi']},ORBELIANI:{name:'Orbeliani Suite',maxGuests:3,amenities:['Free WiFi','City View']}};
     const cat={...(defaults[prop]||{}),...((cfg.roomCategories||{})[prop]||{})};
     const amenities=cat.amenities||[];
-    const photoHtml=cat.photoUrl
-      ?`<img class="wyb-photo" src="${esc(cat.photoUrl)}" alt="${esc(cat.name)}">`
-      :`<div class="wyb-photo-placeholder"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9ec9b8" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>`;
-    el.innerHTML=`<div class="wyb-card"><div class="menu-label" style="padding:14px 22px 2px;"><h3>${t('wyb')}</h3></div><div>${photoHtml}</div><div class="wyb-body"><div class="wyb-name">${esc(cat.name||'')}</div><div class="wyb-guests">Up to ${cat.maxGuests||''} guests</div><div class="wyb-amenities">${amenities.map(a=>`<span class="wyb-pill">${esc(a)}</span>`).join('')}</div></div></div>`;
+    const photos=cat.photoUrl?[cat.photoUrl]:[];
+    const heroInner=photos.length
+      ?`<img src="${esc(photos[0])}" alt="${esc(cat.name)}">`
+      :`<div class="wyb-hero-ph"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9ec9b8" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>`;
+    const galleryHtml=photos.length
+      ?`<div class="room-gallery">${photos.map(p=>`<img src="${esc(p)}" alt="${esc(cat.name)}">`).join('')}</div>`
+      :'';
+    const descHtml=cat.description?`<div class="wyb-desc">${esc(cat.description)}</div>`:'';
+    const chevron=`<svg class="wyb-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+    el.innerHTML=`<div class="wyb-card">
+      <div class="menu-label" style="padding:14px 22px 2px;"><h3>${t('wyb')}</h3></div>
+      <div class="wyb-header" onclick="window.wybToggle()">
+        <div class="wyb-hero">${heroInner}
+          <div class="wyb-hero-overlay">
+            <div class="wyb-hero-name">${esc(cat.name||'')}</div>
+            <div class="wyb-hero-meta"><span>Up to ${cat.maxGuests||''} guests</span>${chevron}</div>
+          </div>
+        </div>
+      </div>
+      <div class="wyb-expanded" id="wyb-expanded" style="display:none;">
+        ${galleryHtml}
+        ${descHtml}
+        ${amenities.length?`<div class="wyb-amenities">${amenities.map(a=>`<span class="wyb-pill">${esc(a)}</span>`).join('')}</div>`:''}
+      </div>
+    </div>`;
   }catch(e){const el2=document.getElementById('what-you-booked');if(el2)el2.innerHTML='';}
 }
+
+window.wybToggle=function(){
+  const exp=document.getElementById('wyb-expanded');
+  const ch=document.querySelector('.wyb-chevron');
+  if(!exp)return;
+  const open=exp.style.display!=='none';
+  exp.style.display=open?'none':'block';
+  if(ch)ch.classList.toggle('open',!open);
+};
 
 window.openPage=async function(type){
   // Prefer the reservation from allMatchedReservations for current aptId — it's
@@ -1666,8 +1705,14 @@ window.openPage=async function(type){
     const neighborhood=locData.neighborhood
       ?`<div class="loc-section"><div class="loc-section-title">Neighborhood</div><div class="loc-desc">${esc(locData.neighborhood)}</div></div>`
       :'';
+    const _pm=locData.parkingMediaUrl||'';
+    const parkingMedia=_pm
+      ?(/\.(mp4|mov|webm|avi)$/i.test(_pm)||_pm.includes('/video/')
+        ?`<video controls playsinline style="width:100%;border-radius:8px;margin-top:8px;" src="${esc(_pm)}"></video>`
+        :`<img src="${esc(_pm)}" style="width:100%;border-radius:8px;margin-top:8px;object-fit:cover;max-height:200px;">`)
+      :'';
     const parkingSection=locData.parkingEnabled
-      ?`<div class="loc-section"><div class="loc-section-title">Parking</div><div class="loc-desc">${esc(locData.parkingDesc||'Paid parking available nearby')}</div>${locData.parkingMapsUrl?`<a href="${esc(locData.parkingMapsUrl)}" target="_blank" class="loc-parking-btn">Open parking in Maps</a>`:''}</div>`
+      ?`<div class="loc-section"><div class="loc-section-title">Parking</div><div class="loc-desc">${esc(locData.parkingDesc||'Paid parking available nearby')}</div>${parkingMedia}${locData.parkingMapsUrl?`<a href="${esc(locData.parkingMapsUrl)}" target="_blank" class="loc-parking-btn">Open parking in Maps</a>`:''}</div>`
       :'';
     body=`<div style="padding:0 4px;">
       <div class="loc-address">${esc(locData.address||'')}</div>
