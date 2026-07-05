@@ -1270,7 +1270,25 @@ function needsElevatorCode(){
   return elevatorRooms.includes(aptId);
 }
 
+function showBlockedScreen(){
+  document.getElementById('page-register').classList.remove('active');
+  document.getElementById('page-home').classList.add('active');
+  const greeting=document.querySelector('#page-home .greeting');
+  const wyb=document.getElementById('what-you-booked');
+  const menuLabel=document.querySelector('#page-home .menu-label');
+  if(greeting)greeting.style.display='none';
+  if(wyb)wyb.style.display='none';
+  if(menuLabel)menuLabel.style.display='none';
+  document.getElementById('passport-warning-banner')?.remove();
+  document.getElementById('tiles-grid').innerHTML=`<div style="text-align:center;padding:64px 24px 40px;">
+    <div style="font-size:40px;margin-bottom:16px;">🚫</div>
+    <div style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:10px;">Access Revoked</div>
+    <div style="font-size:14px;color:var(--muted);line-height:1.6;">Your access has been revoked.<br>Please contact the host.</div>
+  </div>`;
+}
+
 function showHome(){
+  if(guestData?.blocked===true){showBlockedScreen();return;}
   document.getElementById('page-register').classList.remove('active');
   document.getElementById('page-home').classList.add('active');
   const _guestName=allMatchedReservations[0]?.guest||activeReservation?.guest||(guestData?.name&&!/^\d+$/.test(guestData.name)?guestData.name:null)||'Guest';
@@ -1317,7 +1335,11 @@ function showHome(){
   renderPassportBanner();
   if(guestId){
     onSnapshot(doc(db,'checkin_guests',guestId),snap=>{
-      if(snap.exists()){guestData={...snap.data(),id:guestId};renderTiles();renderPassportBanner();}
+      if(snap.exists()){
+        guestData={...snap.data(),id:guestId};
+        if(guestData.blocked===true){showBlockedScreen();return;}
+        renderTiles();renderPassportBanner();
+      }
     });
     onSnapshot(collection(db,'checkin_requests'),snap=>{
       myRequests=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.guestId===guestId);

@@ -700,12 +700,16 @@ function renderGuests(){
       const passportThumb=g.passportUrl
         ?`<a class="g-thumb" href="${esc(g.passportUrl)}" target="_blank" title="View passport" style="flex-shrink:0;cursor:pointer;"><img src="${esc(g.passportUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:2px solid ${badPassport?'var(--red)':'var(--border)'};display:block;"></a>`
         :`<div class="g-thumb" style="width:48px;height:48px;border-radius:6px;background:var(--surface2);flex-shrink:0;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;">📷</div>`;
+      const isBlocked=!!g.blocked;
       const resNumShort=g.matchedReservationId?(g.matchedReservationId.length>8?'…'+g.matchedReservationId.slice(-6):g.matchedReservationId):'';
-      html+=`<div class="guest-row"${badPassport?' style="background:var(--red-bg);border-left:3px solid var(--red);"':''}>
+      const blockedBadge=isBlocked?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">BLOCKED</span>`:'';
+      const rowStyle=isBlocked?'background:#fff0f0;border-left:3px solid var(--red);':(badPassport?'background:var(--red-bg);border-left:3px solid var(--red);':'');
+      html+=`<div class="guest-row"${rowStyle?` style="${rowStyle}"`:''}>
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
             <span class="guest-apt">${esc(apt?.code||g.aptId)}</span>
             <span class="guest-name">${esc(g.name||'—')}</span>
+            ${blockedBadge}
             ${passportBadge}
           </div>
           <div class="guest-meta">${g.guests||1} guest${(g.guests||1)>1?'s':''} · ${ctIcon} ${esc(g.contact||'—')} · ${esc(g.arrivalDate||'—')} · ${timeStr}${resNumShort?' · #'+esc(resNumShort):''}</div>
@@ -715,6 +719,9 @@ function renderGuests(){
         <div class="guest-actions">
           ${!g.manualUnlock?`<button class="btn btn-sm btn-green" onclick="window.unlockGuest('${g.id}')">Unlock</button>`:''}
           ${badPassport?`<button class="btn btn-sm btn-green" onclick="window.approvePassport('${g.id}')">Approve ID</button>`:''}
+          ${isBlocked
+            ?`<button class="btn btn-sm btn-green" onclick="window.unblockGuest('${g.id}')">Unblock</button>`
+            :`<button class="btn btn-sm btn-red" onclick="window.blockGuest('${g.id}','${esc(g.name||'this guest')}')">Block</button>`}
           <button class="btn btn-sm" onclick="window.viewGuest('${g.id}')">View</button>
           <button class="btn btn-sm btn-red" onclick="window.deleteGuest('${g.id}','${esc(g.name||'this guest')}')">Delete</button>
         </div>
@@ -1167,6 +1174,22 @@ window.approvePassport=async function(guestId){
       'passportScanResult.valid':true,
     });
     toast('ID approved ✓');
+  }catch(e){toast('Failed: '+e.message);}
+}
+
+window.blockGuest=async function(guestId,guestName){
+  if(!confirm(`Block access for ${guestName}? They will see a revoked-access message immediately.`))return;
+  try{
+    await updateDoc(doc(db,'checkin_guests',guestId),{blocked:true,blockedAt:serverTimestamp()});
+    toast('Guest blocked');
+  }catch(e){toast('Failed: '+e.message);}
+}
+
+window.unblockGuest=async function(guestId){
+  if(!confirm('Restore access for this guest?'))return;
+  try{
+    await updateDoc(doc(db,'checkin_guests',guestId),{blocked:false});
+    toast('Access restored ✓');
   }catch(e){toast('Failed: '+e.message);}
 }
 
