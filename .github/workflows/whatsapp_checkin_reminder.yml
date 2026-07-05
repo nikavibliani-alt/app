@@ -1,0 +1,29 @@
+name: "WhatsApp: Check-in Reminder"
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests firebase-admin
+
+      - name: Run checkin reminder
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          YCLOUD_API_KEY: ${{ secrets.YCLOUD_API_KEY }}
+          YCLOUD_PHONE_NUMBER: ${{ secrets.YCLOUD_PHONE_NUMBER }}
+        run: python3 whatsapp_automation.py --job checkin_reminder
