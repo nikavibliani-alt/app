@@ -1273,10 +1273,7 @@ function needsElevatorCode(){
 function showHome(){
   document.getElementById('page-register').classList.remove('active');
   document.getElementById('page-home').classList.add('active');
-  console.log('DEBUG guestData:', JSON.stringify(guestData));
-  console.log('DEBUG activeReservation guest:', activeReservation?.guest);
-  console.log('DEBUG allMatchedReservations[0] guest:', allMatchedReservations[0]?.guest);
-  const _guestName=guestData?.name||guestData?.firstName||activeReservation?.guest||allMatchedReservations[0]?.guest||'Guest';
+  const _guestName=allMatchedReservations[0]?.guest||activeReservation?.guest||(guestData?.name&&!/^\d+$/.test(guestData.name)?guestData.name:null)||'Guest';
   document.getElementById('home-guest-name').textContent=_guestName;
 
   // Post-checkout: every reservation has ended — show thank-you, skip all tiles
