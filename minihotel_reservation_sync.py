@@ -9,7 +9,7 @@ Runs as a GitHub Action on schedule (every 30 min).
 Requires: FIREBASE_SERVICE_ACCOUNT, MINIHOTEL_USER, MINIHOTEL_PASS, MINIHOTEL_HOTEL secrets.
 """
 
-import os, sys, json, base64, datetime, time
+import os, sys, json, base64, datetime, time, re
 import requests
 from bs4 import BeautifulSoup
 import firebase_admin
@@ -433,6 +433,74 @@ def fetch_guest_details(session, db, reservations):
     print(f"Guest details: {updated} updated, {skipped} skipped, {errors} errors")
 
 
+def fetch_booking_ids(session, db, reservations):
+    """
+    For OTA reservations (source=booking/expedia) in the current sync window that
+    are missing bookingId, fetch the detail endpoint and parse remarks.printed.
+    Handles multi-room bookings by querying all Firestore docs per reservationNumber.
+    """
+    ota_sources = {'booking', 'expedia'}
+    coll = db.collection('reservations')
+
+    # Deduplicate by reservationNumber — multi-room bookings share one res number
+    seen = set()
+    targets = []
+    for r in reservations:
+        if (r.get('source') or '').lower() not in ota_sources:
+            continue
+        if r.get('status', '') not in VALID_STATUSES:
+            continue
+        if r.get('roomNumber', '') in SKIP_ROOMS:
+            continue
+        rn = str(r.get('reservationNumber', '')).strip()
+        if rn and rn not in seen:
+            seen.add(rn)
+            targets.append(rn)
+
+    print(f"Checking bookingId for {len(targets)} OTA reservations...")
+    updated = skipped = errors = 0
+
+    for res_num in targets:
+        try:
+            # Check if ANY Firestore doc for this reservation already has bookingId
+            docs = list(coll.where('reservationNumber', '==', res_num).stream())
+            if any(d.to_dict().get('bookingId') for d in docs):
+                skipped += 1
+                continue
+
+            resp = session.get(
+                f'https://ssl20.minihotelpms.com/api/Reservations/{res_num}',
+                headers={'Accept': 'application/json'},
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                print(f"  {res_num}: detail API error {resp.status_code}")
+                errors += 1
+                time.sleep(0.5)
+                continue
+
+            remarks = (resp.json().get('remarks') or {}).get('printed') or ''
+            m = re.search(r'Booking id[:\s]+(\d+)', remarks, re.IGNORECASE)
+            if not m:
+                skipped += 1
+                time.sleep(0.5)
+                continue
+
+            booking_id = m.group(1)
+            for doc in docs:
+                doc.reference.set({'bookingId': booking_id}, merge=True)
+            print(f"  {res_num}: bookingId={booking_id} ({len(docs)} doc(s))")
+            updated += 1
+
+        except Exception as e:
+            print(f"  {res_num}: error: {e}")
+            errors += 1
+
+        time.sleep(0.5)
+
+    print(f"Booking IDs: {updated} fetched/updated, {skipped} skipped, {errors} errors")
+
+
 def main():
     now = datetime.datetime.utcnow()
     print(f"Starting MiniHotel reservation sync at {now.isoformat()}")
@@ -450,6 +518,9 @@ def main():
 
     # Fetch phone/email/country for upcoming check-ins
     fetch_guest_details(session, db, reservations)
+
+    # Fetch Booking.com/Expedia confirmation IDs for OTA reservations
+    fetch_booking_ids(session, db, reservations)
 
     # Detect cancellations
     detect_cancellations(db, reservations, from_date, to_date)
