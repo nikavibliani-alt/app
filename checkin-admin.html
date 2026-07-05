@@ -1665,20 +1665,23 @@ function gsRenderRoomCategory(){
   const cat=gsRoomCategories[gsProp]||{};
   const data={...def,...cat};
   const amenities=data.amenities||[];
+  const photos=(data.photos&&data.photos.length)?data.photos:(data.photoUrl?[data.photoUrl]:[]);
   el.innerHTML=`<div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
     <div class="form-group" style="margin:0;">
-      <div class="form-label">Category photo</div>
-      ${data.photoUrl
-        ?`<img src="${esc(data.photoUrl)}" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;margin-bottom:8px;border:1px solid var(--gs-border);display:block;">`
-        :`<div style="width:100%;aspect-ratio:16/9;background:#f3f4f6;border-radius:8px;border:2px dashed #d1d5db;display:flex;align-items:center;justify-content:center;font-size:13px;color:#9ca3af;margin-bottom:8px;">No photo uploaded</div>`
-      }
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <label style="padding:7px 14px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;display:inline-block;">
-          Upload photo
-          <input type="file" accept="image/*" style="display:none;" onchange="window.gsUploadCategoryPhoto('${gsProp}',this)">
-        </label>
-        ${data.photoUrl?`<button onclick="window.gsSetCategoryField('${gsProp}','photoUrl','')" style="padding:7px 14px;background:var(--red-bg);border:1px solid var(--red-border);border-radius:6px;font-size:12px;font-weight:500;color:var(--red);cursor:pointer;border-style:solid;">Remove photo</button>`:''}
+      <div class="form-label">Photos</div>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px;-webkit-overflow-scrolling:touch;">
+        ${photos.map((p,i)=>`<div style="position:relative;flex-shrink:0;">
+          <img src="${esc(p)}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:${i===0?'2px solid var(--accent)':'1px solid var(--border)'};">
+          ${i===0?`<div style="position:absolute;top:2px;left:2px;background:var(--accent);color:#fff;font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;line-height:1.4;">MAIN</div>`:''}
+          ${i>0?`<button onclick="window.gsSetMainPhoto('${gsProp}',${i})" title="Set as main" style="position:absolute;top:2px;left:2px;background:rgba(0,0,0,.55);border:none;color:gold;font-size:12px;cursor:pointer;padding:0 3px;border-radius:3px;line-height:1.5;">★</button>`:''}
+          <button onclick="window.gsRemoveCategoryPhoto('${gsProp}',${i})" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,.55);border:none;color:#fff;font-size:13px;cursor:pointer;padding:0 4px;border-radius:3px;line-height:1.5;">×</button>
+        </div>`).join('')}
+        ${photos.length===0?`<div style="width:80px;height:80px;background:#f3f4f6;border-radius:6px;border:2px dashed #d1d5db;display:flex;align-items:center;justify-content:center;font-size:11px;color:#9ca3af;">No photos</div>`:''}
       </div>
+      <label style="padding:7px 14px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;display:inline-block;">
+        Add photo
+        <input type="file" accept="image/*" style="display:none;" onchange="window.gsUploadCategoryPhoto('${gsProp}',this)">
+      </label>
     </div>
     <div class="form-group" style="margin:0;">
       <div class="form-label">Display name</div>
@@ -1788,9 +1791,33 @@ window.gsUploadCategoryPhoto=async function(prop,input){
   toast('Uploading photo...',10000);
   try{
     const url=await uploadToCloudinary(file,'maxela/room-categories');
-    window.gsSetCategoryField(prop,'photoUrl',url);
+    if(!gsRoomCategories[prop])gsRoomCategories[prop]={...ROOM_CATEGORY_DEFAULTS[prop]};
+    if(!gsRoomCategories[prop].photos){
+      const legacy=gsRoomCategories[prop].photoUrl||'';
+      gsRoomCategories[prop].photos=legacy?[legacy]:[];
+    }
+    gsRoomCategories[prop].photos.push(url);
+    gsMarkDirty();
+    gsRenderRoomCategory();
     toast('Photo uploaded ✓');
   }catch(e){toast('Upload failed: '+e.message);}
+};
+
+window.gsRemoveCategoryPhoto=function(prop,idx){
+  if(!gsRoomCategories[prop])gsRoomCategories[prop]={...ROOM_CATEGORY_DEFAULTS[prop]};
+  if(!gsRoomCategories[prop].photos)gsRoomCategories[prop].photos=[];
+  gsRoomCategories[prop].photos.splice(idx,1);
+  gsMarkDirty();
+  gsRenderRoomCategory();
+};
+
+window.gsSetMainPhoto=function(prop,idx){
+  if(!gsRoomCategories[prop])gsRoomCategories[prop]={...ROOM_CATEGORY_DEFAULTS[prop]};
+  const arr=gsRoomCategories[prop].photos;
+  if(!arr||idx===0||idx>=arr.length)return;
+  arr.unshift(arr.splice(idx,1)[0]);
+  gsMarkDirty();
+  gsRenderRoomCategory();
 };
 
 window.gsUploadParkingMedia=async function(prop,input){
