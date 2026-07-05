@@ -1211,7 +1211,7 @@ window.submitRegistration=async function(){
 
 function renderPassportBanner(){
   document.getElementById('passport-warning-banner')?.remove();
-  if(guestData?.passportScanResult?.valid===false){
+  if(guestData?.passportScanResult?.valid===false&&!guestData?.passportScanResult?.overrideByAdmin){
     const banner=document.createElement('div');
     banner.id='passport-warning-banner';
     banner.innerHTML=`<div style="margin:0 16px 16px;padding:16px 20px;background:#dc2626;color:#fff;border-radius:16px;font-size:15px;line-height:1.5;"><b>⚠️ Your ID document wasn't verified.</b><br>Please upload a valid passport or national ID.<div style="margin-top:10px;"><button onclick="document.getElementById('reupload-passport').click()" style="background:#fff;color:#dc2626;border:none;padding:8px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Upload again</button></div></div>`;
