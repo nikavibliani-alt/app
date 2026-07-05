@@ -353,10 +353,10 @@ input:checked+.slider:before{transform:translateX(20px);}
 .gs-drawer-row .gs-drawer-input { flex:1; }
 .gs-unit { font-size:14px; font-weight:600; color:var(--gs-text-muted); align-self:center; }
 .gs-drawer-footer { padding:18px 24px; border-top:1px solid var(--gs-border); display:flex; gap:12px; background:var(--gs-white); }
-.gs-drawer-save { flex:1; padding:12px; border-radius:var(--gs-radius-md); background:var(--gs-accent); color:white; border:none; font-size:14px; font-weight:600; cursor:pointer; transition:opacity 0.2s; }
-.gs-drawer-save:hover { opacity:0.9; }
-.gs-drawer-cancel { padding:12px 18px; border-radius:var(--gs-radius-md); background:var(--gs-white); color:var(--gs-text-muted); border:1px solid var(--gs-border); font-size:14px; font-weight:600; cursor:pointer; transition:all 0.15s; }
-.gs-drawer-cancel:hover { background:var(--gs-bg); color:var(--gs-text-main); }
+.gs-drawer-save { flex:1; padding:10px 20px; border-radius:8px; background:#111827; color:#ffffff; border:none; font-size:14px; font-weight:600; cursor:pointer; transition:opacity 0.2s; }
+.gs-drawer-save:hover { opacity:0.85; }
+.gs-drawer-cancel { padding:10px 20px; border-radius:8px; background:#ffffff; color:#374151; border:1px solid #e5e7eb; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.15s; }
+.gs-drawer-cancel:hover { background:#f9fafb; color:#111827; border-color:#d1d5db; }
 .gs-laundry-item { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--gs-white); border-radius:var(--gs-radius-md); margin-bottom:8px; border:1px solid var(--gs-border); box-shadow:var(--gs-shadow-sm); }
 .gs-laundry-item input[type="text"] { flex:1; border:none; background:transparent; font-size:14px; font-family:inherit; color:var(--gs-text-main); outline:none; }
 .gs-laundry-item input[type="number"] { width:70px; padding:6px 10px; border:1px solid var(--gs-border); border-radius:var(--gs-radius-sm); font-size:13px; font-weight:600; text-align:right; }
@@ -686,18 +686,14 @@ function renderGuests(){
       const sr=g.passportScanResult;
       const hasScan=sr&&Object.keys(sr).length>0;
       const adminApproved=hasScan&&sr.overrideByAdmin===true;
-      const adminRejected=hasScan&&sr.overrideByAdmin===false;
       const badPassport=hasScan&&sr.valid===false&&!adminApproved;
       const passportBadge=!hasScan
         ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);">NO SCAN</span>`
-        :(adminApproved
-          ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">APPROVED ✓</span>`
-          :(sr.valid===false
-            ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);" title="${esc(sr.reason||'')}">⚠ BAD ID</span>`
-            :`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">✓ ID OK</span>`));
+        :(sr.valid===false&&!adminApproved
+          ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);" title="${esc(sr.reason||'')}">⚠ BAD ID</span>`
+          :`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">✓ ID OK</span>`);
       const aiLabel=hasScan?(sr.isPassport===false?'not a passport':sr.valid===true?'valid':'suspicious'):null;
-      const adminLabel=adminApproved?' · Admin: approved':adminRejected?' · Admin: rejected':'';
-      const passportStatus=hasScan?'<div style="font-size:11px;color:var(--muted);margin-top:3px;">AI: '+aiLabel+adminLabel+'</div>':'';
+      const passportStatus=hasScan?'<div style="font-size:11px;color:var(--muted);margin-top:3px;">AI: '+aiLabel+'</div>':'';
       const ctIcon=g.contactType==='tg'
         ?`<span style="font-size:9px;font-weight:700;color:#0088cc;background:#e8f5fe;border:1px solid #90cdf4;padding:1px 5px;border-radius:4px;">TG</span>`
         :`<span style="font-size:9px;font-weight:700;color:#25D366;background:#f0fff4;border:1px solid #86efac;padding:1px 5px;border-radius:4px;">WA</span>`;
@@ -707,11 +703,6 @@ function renderGuests(){
       const isBlocked=!!g.blocked;
       const resNumShort=g.matchedReservationId?(g.matchedReservationId.length>8?'…'+g.matchedReservationId.slice(-6):g.matchedReservationId):'';
       const blockedBadge=isBlocked?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">BLOCKED</span>`:'';
-      const adminOverrideBadge=adminApproved
-        ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">Admin ✓</span>`
-        :adminRejected
-        ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">Admin ✕</span>`
-        :'';
       const rowStyle=isBlocked?'background:#fff0f0;border-left:3px solid var(--red);':(badPassport?'background:var(--red-bg);border-left:3px solid var(--red);':'');
       html+=`<div class="guest-row"${rowStyle?` style="${rowStyle}"`:''}>
         <div style="flex:1;min-width:0;">
@@ -720,7 +711,6 @@ function renderGuests(){
             <span class="guest-name">${esc(g.name||'—')}</span>
             ${blockedBadge}
             ${passportBadge}
-            ${adminOverrideBadge}
           </div>
           ${passportStatus}
           <div class="guest-meta">${g.guests||1} guest${(g.guests||1)>1?'s':''} · ${ctIcon} ${esc(g.contact||'—')} · ${esc(g.arrivalDate||'—')} · ${timeStr}${resNumShort?' · #'+esc(resNumShort):''}</div>
@@ -729,7 +719,6 @@ function renderGuests(){
         <span class="unlock-badge ${statusCls}">${statusLabel}</span>
         <div class="guest-actions">
           ${!g.manualUnlock?`<button class="btn btn-sm btn-green" onclick="window.unlockGuest('${g.id}')">Unlock</button>`:''}
-          ${hasScan?`<button class="btn btn-sm btn-green" onclick="window.approvePassport('${g.id}')">✓ Approve</button><button class="btn btn-sm btn-red" onclick="window.rejectPassport('${g.id}')">✕ Reject</button>`:''}
           ${isBlocked
             ?`<button class="btn btn-sm btn-green" onclick="window.unblockGuest('${g.id}')">Unblock</button>`
             :`<button class="btn btn-sm btn-red" onclick="window.blockGuest('${g.id}','${esc(g.name||'this guest')}')">Block</button>`}
@@ -1362,7 +1351,7 @@ window.viewGuest=function(guestId){
     </div>
     ${passportHtml}
     ${!g.manualUnlock?`<button class="btn btn-green" style="width:100%;margin-top:1rem;min-height:44px;" onclick="window.unlockGuest('${guestId}');closeDrawer()">Unlock check-in now</button>`:''}`;
-  document.getElementById('drawer-footer').innerHTML=`<button class="btn" style="min-height:44px;flex:1;" onclick="closeDrawer()">Close</button>`;
+  document.getElementById('drawer-footer').innerHTML=`<button style="flex:1;padding:10px 20px;border-radius:8px;background:#ffffff;color:#374151;border:1px solid #e5e7eb;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;min-height:44px;" onclick="closeDrawer()">Close</button>`;
   openDrawer();
 }
 
