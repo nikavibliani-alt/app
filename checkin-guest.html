@@ -377,20 +377,25 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 @media(max-width:360px){.tiles{grid-template-columns:1fr;}.tile.wide{grid-column:1;}}
 /* What You Booked card */
 .wyb-card{margin:0 16px 4px;background:var(--surface);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 1px 2px rgba(40,30,15,0.04);}
+.wyb-header{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent;gap:12px;}
+.wyb-header-text{min-width:0;flex:1;}
+.wyb-name{font-size:15px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wyb-guests{font-size:12px;color:var(--muted);margin-top:2px;}
+.wyb-chevron{flex-shrink:0;color:var(--muted);transition:transform 0.3s ease;}
+.wyb-chevron.open{transform:rotate(90deg);}
+.wyb-content{max-height:0;overflow:hidden;transition:max-height 0.3s ease;}
+.wyb-content.open{max-height:800px;}
 .wyb-gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;height:220px;}
 .wyb-gallery::-webkit-scrollbar{display:none;}
 .wyb-gallery img{width:100%;height:220px;object-fit:cover;flex-shrink:0;scroll-snap-align:start;}
 .wyb-gallery-ph{width:100%;height:220px;background:linear-gradient(135deg,#e8f4f0 0%,#d4ebe4 100%);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.wyb-dots{display:flex;justify-content:center;gap:5px;padding:7px 0 2px;}
+.wyb-dots{display:flex;justify-content:center;gap:5px;padding:8px 0 4px;}
 .wyb-dot{width:6px;height:6px;border-radius:50%;background:var(--line-2);transition:background .2s;}
 .wyb-dot.active{background:var(--accent);}
-.wyb-body{padding:12px 16px 14px;}
-.wyb-name{font-size:16px;font-weight:700;color:var(--ink);margin-bottom:3px;}
-.wyb-guests{font-size:12px;color:var(--muted);}
-.wyb-desc{font-size:14px;color:var(--ink-2);line-height:1.6;margin-top:12px;}
-.wyb-amenities{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
+.wyb-body{padding:12px 16px 16px;}
+.wyb-desc{font-size:14px;color:var(--ink-2);line-height:1.6;margin-bottom:12px;}
+.wyb-amenities{display:flex;flex-wrap:wrap;gap:6px;}
 .wyb-pill{font-size:11px;font-weight:500;padding:3px 9px;border-radius:10px;background:var(--surface2);color:var(--ink-2);border:1px solid var(--line);}
-.wyb-toggle-btn{display:block;width:100%;padding:11px;background:none;border:none;border-top:1px solid var(--line);color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);-webkit-tap-highlight-color:transparent;}
 /* Location page */
 .loc-address{font-size:20px;font-weight:700;color:var(--ink);line-height:1.3;margin-bottom:6px;}
 .loc-maps-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;margin:16px 0;text-decoration:none;font-family:var(--sans);}
@@ -1486,7 +1491,6 @@ async function getFullCfg(){
   return guestFullCfg;
 }
 
-let roomCategoryExpanded=false;
 let _wybCat=null;
 
 function _renderWybCard(cat){
@@ -1504,24 +1508,25 @@ function _renderWybCard(cat){
   }else{
     galleryHtml=`<div class="wyb-gallery"><div class="wyb-gallery-ph"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9ec9b8" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div></div>`;
   }
-  const descHtml=roomCategoryExpanded&&cat.description?`<div class="wyb-desc">${esc(cat.description)}</div>`:'';
-  const pillsHtml=roomCategoryExpanded&&amenities.length
-    ?`<div class="wyb-amenities">${amenities.map(a=>`<span class="wyb-pill">${esc(a)}</span>`).join('')}</div>`
-    :'';
-  const showToggle=amenities.length>0||!!cat.description;
-  const toggleBtn=showToggle
-    ?`<button class="wyb-toggle-btn" onclick="window.wybToggle()">${roomCategoryExpanded?'Show less −':'Show more +'}</button>`
-    :'';
+  const descHtml=cat.description?`<div class="wyb-desc">${esc(cat.description)}</div>`:'';
+  const pillsHtml=amenities.length?`<div class="wyb-amenities">${amenities.map(a=>`<span class="wyb-pill">${esc(a)}</span>`).join('')}</div>`:'';
+  const chevron=`<svg class="wyb-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
   el.innerHTML=`<div class="wyb-card">
-    <div class="menu-label" style="padding:14px 22px 2px;"><h3>${t('wyb')}</h3></div>
-    ${galleryHtml}
-    <div class="wyb-body">
-      <div class="wyb-name">${esc(cat.name||'')}</div>
-      <div class="wyb-guests">Up to ${cat.maxGuests||''} guests</div>
-      ${descHtml}
-      ${pillsHtml}
+    <div class="menu-label" style="padding:10px 16px 0;font-size:11px;">${t('wyb')}</div>
+    <div class="wyb-header" onclick="window.wybToggle()">
+      <div class="wyb-header-text">
+        <div class="wyb-name">${esc(cat.name||'')}</div>
+        <div class="wyb-guests">Up to ${cat.maxGuests||''} guests</div>
+      </div>
+      ${chevron}
     </div>
-    ${toggleBtn}
+    <div class="wyb-content" id="wyb-content">
+      ${galleryHtml}
+      <div class="wyb-body">
+        ${descHtml}
+        ${pillsHtml}
+      </div>
+    </div>
   </div>`;
   if(photos.length>1){
     const g=document.getElementById('wyb-gallery');
@@ -1541,14 +1546,16 @@ async function renderWhatYouBooked(){
     const prop=aptPropTypeForConfig();
     const defaults={ROOMS:{name:'Triple Room with Private Bathroom',maxGuests:4,amenities:['Private Bathroom','Free WiFi']},MAXELA:{name:'Superior Apartment',maxGuests:6,amenities:['Full Kitchen','Free WiFi']},BIG_APT:{name:'3-Bedroom Apartment',maxGuests:12,amenities:['3 Bedrooms','Free WiFi']},FREEDOM:{name:'Tabidze Studio',maxGuests:2,amenities:['Kitchenette','Free WiFi']},ORBELIANI:{name:'Orbeliani Suite',maxGuests:3,amenities:['Free WiFi','City View']}};
     _wybCat={...(defaults[prop]||{}),...((cfg.roomCategories||{})[prop]||{})};
-    roomCategoryExpanded=false;
     _renderWybCard(_wybCat);
   }catch(e){const el2=document.getElementById('what-you-booked');if(el2)el2.innerHTML='';}
 }
 
 window.wybToggle=function(){
-  roomCategoryExpanded=!roomCategoryExpanded;
-  _renderWybCard(_wybCat);
+  const content=document.getElementById('wyb-content');
+  const chevron=document.querySelector('.wyb-chevron');
+  if(!content)return;
+  const open=content.classList.toggle('open');
+  if(chevron)chevron.classList.toggle('open',open);
 };
 
 window.openPage=async function(type){
