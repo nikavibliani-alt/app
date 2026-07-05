@@ -379,7 +379,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 .wyb-card{margin:0 16px 4px;background:var(--surface);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 1px 2px rgba(40,30,15,0.04);}
 .wyb-header{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent;gap:12px;}
 .wyb-header-text{min-width:0;flex:1;}
-.wyb-name{font-size:15px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wyb-name{font-size:15px;font-weight:700;color:var(--ink);white-space:normal;word-wrap:break-word;}
 .wyb-guests{font-size:12px;color:var(--muted);margin-top:2px;}
 .wyb-chevron{flex-shrink:0;color:var(--muted);transition:transform 0.3s ease;}
 .wyb-chevron.open{transform:rotate(90deg);}
@@ -1273,7 +1273,8 @@ function needsElevatorCode(){
 function showHome(){
   document.getElementById('page-register').classList.remove('active');
   document.getElementById('page-home').classList.add('active');
-  document.getElementById('home-guest-name').textContent=guestData?.name||'Guest';
+  const _guestName=guestData?.name||activeReservation?.guest||allMatchedReservations[0]?.guest||'Guest';
+  document.getElementById('home-guest-name').textContent=_guestName;
 
   // Post-checkout: every reservation has ended — show thank-you, skip all tiles
   const _today=tbilisiToday();
