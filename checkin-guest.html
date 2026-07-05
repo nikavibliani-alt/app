@@ -403,6 +403,9 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 .loc-section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px;}
 .loc-desc{font-size:14px;color:var(--ink-2);line-height:1.6;}
 .loc-parking-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;background:var(--surface2);color:var(--ink);border:1px solid var(--line);border-radius:14px;font-size:14px;font-weight:600;cursor:pointer;margin-top:12px;text-decoration:none;font-family:var(--sans);}
+/* Search mode toggle */
+.search-tab{flex:1;padding:9px;border-radius:50px;border:none;font-size:14px;font-weight:600;cursor:pointer;background:transparent;color:var(--muted);transition:all 0.2s;font-family:var(--sans);-webkit-tap-highlight-color:transparent;}
+.search-tab.active{background:var(--surface);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,0.1);}
 </style>
 </head>
 <body>
@@ -474,34 +477,36 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
       </div>
     </div>
 
-    <div id="t-search-instructions" style="margin:16px 16px 0;padding:14px 18px;background:var(--surface);border:1px solid var(--line-2);border-radius:16px;font-size:15px;color:var(--ink-2);line-height:1.55;">
-      Enter your <b>reservation number</b> OR your <b>full name</b> to find your booking. You can enter both for faster matching.
+    <div style="padding:16px 16px 0;">
+      <div style="display:flex;background:var(--surface2);border-radius:50px;padding:3px;">
+        <button class="search-tab active" id="tab-name" onclick="window.setSearchMode('name')">Guest Name</button>
+        <button class="search-tab" id="tab-number" onclick="window.setSearchMode('number')">Reservation Number</button>
+      </div>
     </div>
 
     <div class="auth-section">
       <div class="auth-section__label"><span id="t-your-info">Your details</span><span class="count" id="t-field-count">4 FIELDS</span></div>
       <div class="auth-form">
-        <div class="auth-row">
-          <span class="auth-row__label" id="t-res-number">Booking.com / Expedia confirmation number</span>
-          <input type="text" class="form-input" id="r-booking-id" placeholder="Booking.com / Expedia confirmation number" autocomplete="off">
+        <div id="search-name-section">
+          <div class="auth-row">
+            <span class="auth-row__label" id="t-full-name">Full name</span>
+            <input type="text" class="form-input" id="r-name" placeholder="Enter your full name" autocomplete="name">
+          </div>
+          <div class="auth-row">
+            <span class="auth-row__label" id="t-arrival-date">Arrival date <span style="color:var(--red)">*</span></span>
+            <div class="date-wrap">
+              <input type="text" class="form-input" id="r-arrival-display" placeholder="DD / MM / YYYY" autocomplete="off" inputmode="numeric" maxlength="14">
+              <input type="date" id="r-arrival" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;top:0;left:0;">
+              <button type="button" class="date-icon-btn" id="r-arrival-cal-btn" aria-label="Open calendar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 9h18"/></svg>
+              </button>
+            </div>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:12px;margin:4px 0;">
-          <div style="flex:1;height:1px;background:var(--line-2)"></div>
-          <span style="font-size:13px;font-weight:700;color:var(--muted);letter-spacing:0.05em">OR</span>
-          <div style="flex:1;height:1px;background:var(--line-2)"></div>
-        </div>
-        <div class="auth-row">
-          <span class="auth-row__label" id="t-full-name">Full name</span>
-          <input type="text" class="form-input" id="r-name" placeholder="As shown on your booking" autocomplete="name">
-        </div>
-        <div class="auth-row">
-          <span class="auth-row__label" id="t-arrival-date">Arrival date <span style="color:var(--red)">*</span></span>
-          <div class="date-wrap">
-            <input type="text" class="form-input" id="r-arrival-display" placeholder="DD / MM / YYYY" autocomplete="off" inputmode="numeric" maxlength="14">
-            <input type="date" id="r-arrival" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;top:0;left:0;">
-            <button type="button" class="date-icon-btn" id="r-arrival-cal-btn" aria-label="Open calendar">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 9h18"/></svg>
-            </button>
+        <div id="search-number-section" style="display:none;">
+          <div class="auth-row">
+            <span class="auth-row__label" id="t-res-number">Booking.com / Expedia confirmation number</span>
+            <input type="text" class="form-input" id="r-booking-id" placeholder="Enter your reservation number" autocomplete="off">
           </div>
         </div>
         <div class="auth-row">
@@ -676,6 +681,7 @@ const APT_NAMES={
 let lang='en';
 let contactType='wa';
 let passportFile=null;
+let searchMode='name';
 let passportScanResult=null;
 let _geminiKey='';
 let guestId=null;
@@ -902,6 +908,15 @@ function applyTranslations(){
   const nmEl=document.getElementById('r-name');if(nmEl)nmEl.placeholder=t('namePlaceholder');
 }
 
+window.setSearchMode=function(mode){
+  searchMode=mode;
+  document.getElementById('search-name-section').style.display=mode==='name'?'':'none';
+  document.getElementById('search-number-section').style.display=mode==='number'?'':'none';
+  document.querySelectorAll('.search-tab').forEach(btn=>btn.classList.remove('active'));
+  const tab=document.getElementById('tab-'+mode);
+  if(tab)tab.classList.add('active');
+};
+
 window.setContact=function(type){
   contactType=type;
   document.getElementById('ct-wa').className='ct-btn'+(type==='wa'?' wa-active':'');
@@ -1121,15 +1136,16 @@ async function finishRegistration_(bestRes,formData){
 }
 
 window.submitRegistration=async function(){
-  const bookingRef=(document.getElementById('r-booking-id')?.value||'').trim().replace(/\s+/g,'');
-  const name    =(document.getElementById('r-name')?.value||'').trim();
+  const bookingRef=searchMode==='number'?(document.getElementById('r-booking-id')?.value||'').trim().replace(/\s+/g,''):'';
+  const name    =searchMode==='name'?(document.getElementById('r-name')?.value||'').trim():'';
+  const arrival =searchMode==='name'?(document.getElementById('r-arrival')?.value||''):'';
   const guests  =parseInt(document.getElementById('r-guests')?.value)||1;
   const nationality=document.getElementById('r-nationality')?.value.trim()||'';
   const contact =document.getElementById('r-contact')?.value.trim()||'';
-  const arrival =document.getElementById('r-arrival')?.value||'';
-  if(!bookingRef&&!name){alert('Please enter your name or booking reference');return;}
+  if(searchMode==='name'&&!name){alert('Please enter your full name');return;}
+  if(searchMode==='number'&&!bookingRef){alert('Please enter your reservation number');return;}
   if(!contact){alert('Please enter your WhatsApp or Telegram number');return;}
-  if(!arrival){alert('Please enter your arrival date');return;}
+  if(searchMode==='name'&&!arrival){alert('Please enter your arrival date');return;}
   if(!passportFile){alert('Please upload your passport or ID photo');return;}
   const btn=document.getElementById('submit-btn');
   btn.disabled=true;
