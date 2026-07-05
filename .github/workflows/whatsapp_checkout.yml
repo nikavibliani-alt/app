@@ -1,8 +1,8 @@
 name: "WhatsApp: Checkout Reminder"
 
 on:
-  schedule:
-    - cron: '0 8 * * *'
+  repository_dispatch:
+    types: [whatsapp_checkout]
   workflow_dispatch:
 
 jobs:

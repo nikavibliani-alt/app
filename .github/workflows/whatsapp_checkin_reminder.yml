@@ -1,8 +1,8 @@
 name: "WhatsApp: Check-in Reminder"
 
 on:
-  schedule:
-    - cron: '0 * * * *'
+  repository_dispatch:
+    types: [whatsapp_checkin_reminder]
   workflow_dispatch:
 
 jobs:
