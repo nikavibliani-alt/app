@@ -1211,7 +1211,13 @@ window.submitRegistration=async function(){
 
 function renderPassportBanner(){
   document.getElementById('passport-warning-banner')?.remove();
-  if(guestData?.passportScanResult?.valid===false&&!guestData?.passportScanResult?.overrideByAdmin){
+  document.getElementById('pp-warn')?.remove();
+  const sr=guestData?.passportScanResult;
+  if(sr?.overrideByAdmin===true)return;
+  if(sr?.valid===true)return;
+  const isEmpty=sr&&Object.keys(sr).length===0;
+  const isBad=sr?.valid===false;
+  if(isBad||(isEmpty&&!guestData?.passportUrl)){
     const banner=document.createElement('div');
     banner.id='passport-warning-banner';
     banner.innerHTML=`<div style="margin:0 16px 16px;padding:16px 20px;background:#dc2626;color:#fff;border-radius:16px;font-size:15px;line-height:1.5;"><b>⚠️ Your ID document wasn't verified.</b><br>Please upload a valid passport or national ID.<div style="margin-top:10px;"><button onclick="document.getElementById('reupload-passport').click()" style="background:#fff;color:#dc2626;border:none;padding:8px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Upload again</button></div></div>`;
@@ -1311,27 +1317,10 @@ function showHome(){
     return;
   }
 
-  console.log('HOME PAGE - passportScanResult:', JSON.stringify(guestData?.passportScanResult));
-  console.log('Has keys:', Object.keys(guestData?.passportScanResult || {}).length);
-  const warningTarget = document.querySelector('#page-home .greeting');
-  if (warningTarget) {
-    const old = document.getElementById('pp-warn');
-    if (old) old.remove();
-    const sr = guestData?.passportScanResult;
-    const needsWarning = sr && (Object.keys(sr).length === 0 || sr.valid === false);
-    if (needsWarning) {
-      const div = document.createElement('div');
-      div.id = 'pp-warn';
-      div.style.cssText = 'margin:16px;padding:16px 20px;background:#dc2626;color:white;border-radius:16px;font-size:15px;line-height:1.6;';
-      div.innerHTML = '<b>⚠️ Your ID document was not accepted.</b><br>Please upload a valid passport or national ID photo.<br><input type="file" id="pp-reupload" accept="image/*" style="display:none" onchange="window.handleReupload(this)"><button onclick="document.getElementById(\'pp-reupload\').click()" style="margin-top:10px;background:white;color:#dc2626;border:none;padding:8px 20px;border-radius:10px;font-weight:600;cursor:pointer;font-size:14px;">Upload new photo</button>';
-      warningTarget.after(div);
-    }
-  }
   renderGreetingApt();
   document.getElementById('t-greeting-label').textContent=t('gl');
   renderTiles();
   renderWhatYouBooked();
-  console.log('DEBUG passport result:',JSON.stringify(guestData?.passportScanResult));
   renderPassportBanner();
   if(guestId){
     onSnapshot(doc(db,'checkin_guests',guestId),snap=>{
@@ -1423,20 +1412,6 @@ function renderTiles(){
       <div class="tile__sub">${t('tlos')}</div>
       <div class="tile__arrow">${_ARR}</div>
     </div>`;
-  const warningTarget2 = document.querySelector('#page-home .greeting');
-  if (warningTarget2) {
-    const old2 = document.getElementById('pp-warn');
-    if (old2) old2.remove();
-    const sr2 = guestData?.passportScanResult;
-    const needsWarning2 = sr2 && (Object.keys(sr2).length === 0 || sr2.valid === false);
-    if (needsWarning2) {
-      const div2 = document.createElement('div');
-      div2.id = 'pp-warn';
-      div2.style.cssText = 'margin:16px;padding:16px 20px;background:#dc2626;color:white;border-radius:16px;font-size:15px;line-height:1.6;';
-      div2.innerHTML = '<b>⚠️ Your ID document was not accepted.</b><br>Please upload a valid passport or national ID photo.<br><input type="file" id="pp-reupload" accept="image/*" style="display:none" onchange="window.handleReupload(this)"><button onclick="document.getElementById(\'pp-reupload\').click()" style="margin-top:10px;background:white;color:#dc2626;border:none;padding:8px 20px;border-radius:10px;font-weight:600;cursor:pointer;font-size:14px;">Upload new photo</button>';
-      warningTarget2.after(div2);
-    }
-  }
 }
 
 // ── Code hero card builder ────────────────────────────────────────────────────

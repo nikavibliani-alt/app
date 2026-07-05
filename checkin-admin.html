@@ -686,6 +686,7 @@ function renderGuests(){
       const sr=g.passportScanResult;
       const hasScan=sr&&Object.keys(sr).length>0;
       const adminApproved=hasScan&&sr.overrideByAdmin===true;
+      const adminRejected=hasScan&&sr.overrideByAdmin===false;
       const badPassport=hasScan&&sr.valid===false&&!adminApproved;
       const passportBadge=!hasScan
         ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);">NO SCAN</span>`
@@ -694,6 +695,9 @@ function renderGuests(){
           :(sr.valid===false
             ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);" title="${esc(sr.reason||'')}">⚠ BAD ID</span>`
             :`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">✓ ID OK</span>`));
+      const aiLabel=hasScan?(sr.isPassport===false?'not a passport':sr.valid===true?'valid':'suspicious'):null;
+      const adminLabel=adminApproved?' · Admin: approved':adminRejected?' · Admin: rejected':'';
+      const passportStatus=hasScan?'<div style="font-size:11px;color:var(--muted);margin-top:3px;">AI: '+aiLabel+adminLabel+'</div>':'';
       const ctIcon=g.contactType==='tg'
         ?`<span style="font-size:9px;font-weight:700;color:#0088cc;background:#e8f5fe;border:1px solid #90cdf4;padding:1px 5px;border-radius:4px;">TG</span>`
         :`<span style="font-size:9px;font-weight:700;color:#25D366;background:#f0fff4;border:1px solid #86efac;padding:1px 5px;border-radius:4px;">WA</span>`;
@@ -712,13 +716,14 @@ function renderGuests(){
             ${blockedBadge}
             ${passportBadge}
           </div>
+          ${passportStatus}
           <div class="guest-meta">${g.guests||1} guest${(g.guests||1)>1?'s':''} · ${ctIcon} ${esc(g.contact||'—')} · ${esc(g.arrivalDate||'—')} · ${timeStr}${resNumShort?' · #'+esc(resNumShort):''}</div>
         </div>
         ${passportThumb}
         <span class="unlock-badge ${statusCls}">${statusLabel}</span>
         <div class="guest-actions">
           ${!g.manualUnlock?`<button class="btn btn-sm btn-green" onclick="window.unlockGuest('${g.id}')">Unlock</button>`:''}
-          ${badPassport?`<button class="btn btn-sm btn-green" onclick="window.approvePassport('${g.id}')">Approve ID</button>`:''}
+          ${hasScan?`<button class="btn btn-sm btn-green" onclick="window.approvePassport('${g.id}')">✓ Approve</button><button class="btn btn-sm btn-red" onclick="window.rejectPassport('${g.id}')">✕ Reject</button>`:''}
           ${isBlocked
             ?`<button class="btn btn-sm btn-green" onclick="window.unblockGuest('${g.id}')">Unblock</button>`
             :`<button class="btn btn-sm btn-red" onclick="window.blockGuest('${g.id}','${esc(g.name||'this guest')}')">Block</button>`}
@@ -1174,6 +1179,17 @@ window.approvePassport=async function(guestId){
       'passportScanResult.valid':true,
     });
     toast('ID approved ✓');
+  }catch(e){toast('Failed: '+e.message);}
+}
+
+window.rejectPassport=async function(guestId){
+  if(!confirm('Mark this ID as rejected? The guest will see the rejection banner again.'))return;
+  try{
+    await updateDoc(doc(db,'checkin_guests',guestId),{
+      'passportScanResult.overrideByAdmin':false,
+      'passportScanResult.valid':false,
+    });
+    toast('ID rejected');
   }catch(e){toast('Failed: '+e.message);}
 }
 
