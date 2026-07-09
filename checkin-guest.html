@@ -807,16 +807,16 @@ function isUnlocked(/* res unused — arrivalDate comes from guestData */){
   if(!guestData)return false;
   const today=tbilisiToday();
   const arrival=guestData.arrivalDate||'';
-  // Rule 1: not arrival day — locked (never unlock before or after arrival day gate)
-  if(!arrival||today!==arrival)return false;
-  // Rule 2: admin manual unlock
+  if(!arrival)return false;
+  // Mid-stay (today after check-in day) → always unlocked
+  if(today>arrival)return true;
+  // Before check-in day → locked
+  if(today<arrival)return false;
+  // today === arrival: time-based rules
   if(guestData.manualUnlock)return true;
   const hour=tbilisiHour();
-  // Rule 3: configured check-in hour reached
   if(hour>=getCheckInHour())return true;
-  // Rule 4: HK cleaning done + at least 11:00
   if(hour>=11&&_hkTodayData?.done===true)return true;
-  // Rule 5: locked/waiting
   return false;
 }
 
