@@ -469,8 +469,10 @@ const APARTMENTS=[
 
 let aptData={}; // Firebase data per apartment
 let guestData=[]; // All guest registrations
+let hkStatusData={}; // hk_status docs keyed by "{roomCode}_{date}"
 let currentTab='apartments';
 let hkPinsData={shartava:'',centre:'',admin:''};
+const CHECK_IN_HOUR=15; // Default check-in hour Tbilisi (UTC+4, no DST)
 let currentDrawerApt=null;
 
 // ── GUEST PAGE SETTINGS STATE ─────────────────────
@@ -561,7 +563,7 @@ function render(){
   else if(currentTab==='hkpins') renderHkPins();
   else if(currentTab==='guestsettings') renderGuestSettings();
   else if(currentTab==='requests') renderRequests();
-  else renderGuests();
+  else{_loadResCache();renderGuests();}
 }
 
 function renderApartments(){
@@ -607,7 +609,8 @@ function renderApartments(){
   if(window._currentAptId)window.openAptDrawer(window._currentAptId);
 }
 
-window.deleteGuest=async function(guestId,guestName){
+window.deleteGuest=async function(guestId){
+  const guestName=resolveDisplayName(guestData.find(x=>x.id===guestId))||'this guest';
   if(!confirm(`Are you sure you want to delete this check-in record for ${guestName}?`))return;
   try{
     await deleteDoc(doc(db,'checkin_guests',guestId));
@@ -651,6 +654,50 @@ window.deleteOldGuests=async function(){
   }catch(e){toast('Delete failed: '+e.message);}
 };
 
+function resolveDisplayName(g){
+  if(!g)return'';
+  if(/[a-zA-Z]/.test(g.name||''))return g.name||'';
+  const res=g.matchedReservationId?(_resCache||[]).find(r=>r.id===g.matchedReservationId):null;
+  return res?.guest||g.name||'';
+}
+
+function guestStatus(g){
+  const tbilisiDate=new Date(Date.now()+4*3600*1000); // UTC+4, Tbilisi has no DST
+  const today=tbilisiDate.toISOString().slice(0,10);
+  const hour=tbilisiDate.getUTCHours();
+  const arrival=g.arrivalDate||'';
+
+  // Day-based rules (only when arrivalDate is set)
+  if(arrival){
+    if(today<arrival)return{label:'Arrives '+arrival,cls:'waiting'};
+    if(today>arrival)return{label:'Checked in',cls:'unlocked'};
+    // today === arrival falls through to time-based rules
+  }
+
+  // Arrival day (or missing arrivalDate — fall through to time-only):
+  // Rule 2: admin manual unlock
+  if(g.manualUnlock)return{label:'Unlocked',cls:'unlocked'};
+
+  const aptCheckIn=aptData[g.aptId]?.checkInTime||'';
+  const checkInHour=aptCheckIn?parseInt(aptCheckIn.split(':')[0]):CHECK_IN_HOUR;
+
+  // Rule 3: check-in hour reached
+  if(hour>=checkInHour)return{label:'Unlocked',cls:'unlocked'};
+
+  // Rule 4: HK cleaning done
+  const hkKey=g.aptId+'_'+today;
+  const hkDone=hkStatusData[hkKey]?.done===true;
+  if(hkDone){
+    if(hour>=11)return{label:'Unlocked early',cls:'unlocked'};
+    return{label:'Ready 11am',cls:'waiting'}; // cleaned but gate not open until 11
+  }
+
+  // Rule 5: waiting
+  const h=checkInHour;
+  const hrLabel=h===12?'12pm':h<12?h+'am':(h-12)+'pm';
+  return{label:'Waiting '+hrLabel,cls:'waiting'};
+}
+
 function renderGuests(){
   const today=new Date().toISOString().split('T')[0];
   const recent=guestData
@@ -679,8 +726,9 @@ function renderGuests(){
     html+=`<div class="card"><div class="card-body" style="padding:0;">`;
     recent.forEach(g=>{
       const apt=APARTMENTS.find(a=>a.id===g.aptId);
-      const statusLabel=g.manualUnlock?'Unlocked':'Waiting 2pm';
-      const statusCls=g.manualUnlock?'unlocked':'waiting';
+      const displayName=resolveDisplayName(g)||'—';
+      // Fix 4: status from guestStatus helper (Tbilisi time, hk_status, configurable hour)
+      const {label:statusLabel,cls:statusCls}=guestStatus(g);
       const submittedAt=g.submittedAt?.toDate?g.submittedAt.toDate():null;
       const timeStr=submittedAt?submittedAt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+submittedAt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
       const sr=g.passportScanResult;
@@ -697,33 +745,41 @@ function renderGuests(){
       const ctIcon=g.contactType==='tg'
         ?`<span style="font-size:9px;font-weight:700;color:#0088cc;background:#e8f5fe;border:1px solid #90cdf4;padding:1px 5px;border-radius:4px;">TG</span>`
         :`<span style="font-size:9px;font-weight:700;color:#25D366;background:#f0fff4;border:1px solid #86efac;padding:1px 5px;border-radius:4px;">WA</span>`;
+      // Fix 2+3: type-aware contact link (wa → wa.me, tg → t.me)
+      const rawDigits=(g.contact||'').replace(/\D/g,'');
+      const normDigits=rawDigits&&(rawDigits.length<11||rawDigits.startsWith('5'))?'995'+rawDigits:rawDigits;
+      const contactLink=normDigits&&g.contactType==='wa'
+        ?`<a href="https://wa.me/${normDigits}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(g.contact||'—')}</a>`
+        :normDigits&&g.contactType==='tg'
+        ?`<a href="https://t.me/+${normDigits}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(g.contact||'—')}</a>`
+        :esc(g.contact||'—');
       const passportThumb=g.passportUrl
-        ?`<a class="g-thumb" href="${esc(g.passportUrl)}" target="_blank" title="View passport" style="flex-shrink:0;cursor:pointer;"><img src="${esc(g.passportUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:2px solid ${badPassport?'var(--red)':'var(--border)'};display:block;"></a>`
+        ?`<a class="g-thumb" href="${esc(g.passportUrl)}" target="_blank" title="View passport" onclick="event.stopPropagation()" style="flex-shrink:0;cursor:pointer;"><img src="${esc(g.passportUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:2px solid ${badPassport?'var(--red)':'var(--border)'};display:block;"></a>`
         :`<div class="g-thumb" style="width:48px;height:48px;border-radius:6px;background:var(--surface2);flex-shrink:0;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;">📷</div>`;
       const isBlocked=!!g.blocked;
       const resNumShort=g.matchedReservationId?(g.matchedReservationId.length>8?'…'+g.matchedReservationId.slice(-6):g.matchedReservationId):'';
       const blockedBadge=isBlocked?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">BLOCKED</span>`:'';
       const rowStyle=isBlocked?'background:#fff0f0;border-left:3px solid var(--red);':(badPassport?'background:var(--red-bg);border-left:3px solid var(--red);':'');
-      html+=`<div class="guest-row"${rowStyle?` style="${rowStyle}"`:''}>
+      // Fix 3: entire card is clickable; action buttons stop propagation
+      html+=`<div class="guest-row" style="cursor:pointer;${rowStyle}" onclick="window.viewGuest('${g.id}')">
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
             <span class="guest-apt">${esc(apt?.code||g.aptId)}</span>
-            <span class="guest-name">${esc(g.name||'—')}</span>
+            <span class="guest-name">${esc(displayName)}</span>
             ${blockedBadge}
             ${passportBadge}
           </div>
           ${passportStatus}
-          <div class="guest-meta">${g.guests||1} guest${(g.guests||1)>1?'s':''} · ${ctIcon} ${esc(g.contact||'—')} · ${esc(g.arrivalDate||'—')} · ${timeStr}${resNumShort?' · #'+esc(resNumShort):''}</div>
+          <div class="guest-meta">${g.guests||1} guest${(g.guests||1)>1?'s':''} · ${ctIcon} ${contactLink} · ${esc(g.arrivalDate||'—')} · ${timeStr}${resNumShort?' · #'+esc(resNumShort):''}</div>
         </div>
         ${passportThumb}
         <span class="unlock-badge ${statusCls}">${statusLabel}</span>
         <div class="guest-actions">
-          ${!g.manualUnlock?`<button class="btn btn-sm btn-green" onclick="window.unlockGuest('${g.id}')">Unlock</button>`:''}
+          ${!g.manualUnlock?`<button class="btn btn-sm btn-green" onclick="event.stopPropagation();window.unlockGuest('${g.id}')">Unlock</button>`:''}
           ${isBlocked
-            ?`<button class="btn btn-sm btn-green" onclick="window.unblockGuest('${g.id}')">Unblock</button>`
-            :`<button class="btn btn-sm btn-red" onclick="window.blockGuest('${g.id}','${esc(g.name||'this guest')}')">Block</button>`}
-          <button class="btn btn-sm" onclick="window.viewGuest('${g.id}')">View</button>
-          <button class="btn btn-sm btn-red" onclick="window.deleteGuest('${g.id}','${esc(g.name||'this guest')}')">Delete</button>
+            ?`<button class="btn btn-sm btn-green" onclick="event.stopPropagation();window.unblockGuest('${g.id}')">Unblock</button>`
+            :`<button class="btn btn-sm btn-red" onclick="event.stopPropagation();window.blockGuest('${g.id}')">Block</button>`}
+          <button class="btn btn-sm btn-red" onclick="event.stopPropagation();window.deleteGuest('${g.id}')">Delete</button>
         </div>
       </div>`;
     });
@@ -753,6 +809,8 @@ async function _loadResCache(){
     _resCache=snap.docs.map(d=>({id:d.id,...d.data()}));
   }catch(e){console.error('res lookup load error',e);_resCache=[];}
   _resLoading=false;
+  // Re-render so name fallbacks populate for existing bad-name records
+  if(currentTab!=='apartments'&&currentTab!=='hkpins'&&currentTab!=='guestsettings'&&currentTab!=='requests')renderGuests();
 }
 
 function _roomLabel(code){
@@ -898,7 +956,7 @@ window.openAptDrawer=function(aptId){
       </div>
       <div class="apt-card-body">
         <div class="apt-row">
-          <div class="apt-field"><label class="apt-label">Check-in time</label><input class="apt-input" type="time" id="apt-checkInTime" value="${esc(d.checkInTime||'14:00')}"></div>
+          <div class="apt-field"><label class="apt-label">Check-in time</label><input class="apt-input" type="time" id="apt-checkInTime" value="${esc(d.checkInTime||'15:00')}"></div>
           <div class="apt-field"><label class="apt-label">Check-out time</label><input class="apt-input" type="time" id="apt-checkOutTime" value="${esc(d.checkOutTime||'12:00')}"></div>
         </div>
       </div>
@@ -1093,7 +1151,7 @@ window.saveAptData=async function(aptId){
   const data={
     tuyaDeviceId,
     doorCode,
-    checkInTime:document.getElementById('apt-checkInTime')?.value||'14:00',
+    checkInTime:document.getElementById('apt-checkInTime')?.value||'15:00',
     checkOutTime:document.getElementById('apt-checkOutTime')?.value||'12:00',
     wifiName:document.getElementById('apt-wifiName')?.value.trim()||'',
     wifiPass:document.getElementById('apt-wifiPass')?.value.trim()||'',
@@ -1203,7 +1261,8 @@ window.passportActionInDrawer=async function(guestId,approve){
   }catch(e){toast('Failed: '+e.message);}
 }
 
-window.blockGuest=async function(guestId,guestName){
+window.blockGuest=async function(guestId){
+  const guestName=resolveDisplayName(guestData.find(x=>x.id===guestId))||'this guest';
   if(!confirm(`Block access for ${guestName}? They will see a revoked-access message immediately.`))return;
   try{
     await updateDoc(doc(db,'checkin_guests',guestId),{blocked:true,blockedAt:serverTimestamp()});
@@ -1230,9 +1289,10 @@ window.alertPassport=function(guestId){
   const g=guestData.find(x=>x.id===guestId);if(!g)return;
   const apt=APARTMENTS.find(a=>a.id===g.aptId);
   const sr=g.passportScanResult||{};
-  const subject=encodeURIComponent(`⚠️ Suspicious passport upload - ${g.name||'Unknown guest'}`);
+  const displayName=resolveDisplayName(g)||'Unknown guest';
+  const subject=encodeURIComponent(`⚠️ Suspicious passport upload - ${displayName}`);
   const body=encodeURIComponent([
-    `Guest Name: ${g.name||'Unknown'}`,
+    `Guest Name: ${displayName}`,
     `Apartment: ${apt?.code||g.aptId}`,
     `Reservation ID: ${g.matchedReservationId||'Not matched'}`,
     `AI Scan Result: ${sr.isPassport===false?'Not a passport':'Suspicious'}`,
@@ -1261,6 +1321,9 @@ window.closeImgLightbox=function(){
 window.viewGuest=function(guestId){
   const g=guestData.find(x=>x.id===guestId);if(!g)return;
   const apt=APARTMENTS.find(a=>a.id===g.aptId);
+  const displayName=resolveDisplayName(g)||'—';
+  // Fix 4: status badge
+  const {label:statusLabel,cls:statusCls}=guestStatus(g);
   const sr=g.passportScanResult;
   const badge=buildScanBadge(sr);
 
@@ -1308,7 +1371,7 @@ window.viewGuest=function(guestId){
   document.getElementById('drawer-body').innerHTML=`
     <div class="form-group">
       <div class="form-label">Full name</div>
-      <div style="font-size:16px;font-weight:700;">${esc(g.name||'—')}</div>
+      <div style="font-size:16px;font-weight:700;">${esc(displayName)}</div>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -1342,7 +1405,7 @@ window.viewGuest=function(guestId){
     <div class="form-row">
       <div class="form-group">
         <div class="form-label">Status</div>
-        <span class="unlock-badge ${g.manualUnlock?'unlocked':'waiting'}">${g.manualUnlock?'Unlocked':'Waiting 2pm'}</span>
+        <span class="unlock-badge ${statusCls}">${statusLabel}</span>
       </div>
       <div class="form-group">
         <div class="form-label">Registered</div>
@@ -1696,6 +1759,13 @@ onSnapshot(collection(db,'checkin_guests'),snap=>{
 onSnapshot(collection(db,'hk_pins'),snap=>{
   snap.docs.forEach(d=>{if(d.id in hkPinsData)hkPinsData[d.id]=d.data().pin||'';});
   if(currentTab==='hkpins')render();
+});
+
+const _hkToday=new Date(Date.now()+4*60*60*1000).toISOString().split('T')[0]; // UTC+4 Tbilisi
+onSnapshot(query(collection(db,'hk_status'),where('date','==',_hkToday)),snap=>{
+  hkStatusData={};
+  snap.docs.forEach(d=>{hkStatusData[d.id]=d.data();});
+  if(currentTab!=='apartments'&&currentTab!=='hkpins'&&currentTab!=='guestsettings'&&currentTab!=='requests')renderGuests();
 });
 
 

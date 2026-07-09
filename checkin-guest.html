@@ -252,7 +252,6 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 .scan-status{margin-top:10px;padding:10px 14px;border-radius:10px;font-size:13px;font-weight:500;line-height:1.5;}
 .scan-status.scanning{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.04);color:#6e6b66;}
 .scan-status.scan-ok{display:flex;align-items:center;gap:8px;background:#f0fdf4;color:#166534;border:1px solid #86efac;}
-.scan-status.scan-warn{display:block;background:#fffbeb;color:#92400e;border:1px solid #fcd34d;}
 @keyframes scanSpin{to{transform:rotate(360deg);}}
 .scan-spinner{width:14px;height:14px;border:2px solid rgba(0,0,0,0.12);border-top-color:#3d6b5a;border-radius:50%;animation:scanSpin 0.8s linear infinite;flex-shrink:0;}
 
@@ -684,6 +683,7 @@ let contactType='wa';
 let passportFile=null;
 let searchMode='name';
 let passportScanResult=null;
+let _uploadResetTimer=null;
 let _geminiKey='';
 let guestId=null;
 let guestData=null;
@@ -766,89 +766,58 @@ function getCheckInHour(){
 const checkInHour=getCheckInHour;
 
 function tbilisiToday(){
-  const parts=new Intl.DateTimeFormat('en-CA',{
-    timeZone:'Asia/Tbilisi',
-    year:'numeric',month:'2-digit',day:'2-digit'
-  }).formatToParts(new Date());
-  const y=parts.find(p=>p.type==='year').value;
-  const m=parts.find(p=>p.type==='month').value;
-  const d=parts.find(p=>p.type==='day').value;
-  return`${y}-${m}-${d}`;
+  return new Date(Date.now()+4*3600*1000).toISOString().slice(0,10);
 }
 
 function tbilisiHour(){
-  return parseInt(new Intl.DateTimeFormat('en-US',{
-    timeZone:'Asia/Tbilisi',
-    hour:'2-digit',
-    hour12:false
-  }).format(new Date()),10);
+  return new Date(Date.now()+4*3600*1000).getUTCHours();
 }
 
-// ── HK STATUS CACHE (for unlock logic) ───────────────────────
-let hkStatusCache={};
+// ── HK STATUS (single today-doc fetch; refreshed every 60s and on visibilitychange) ──
+let _hkTodayData=null; // null = not yet fetched
 let _hkFetching=false;
+let _unlockPollTimer=null;
 
-function prevDay(dateStr){
-  const d=new Date(dateStr+'T12:00:00Z');
-  d.setUTCDate(d.getUTCDate()-1);
-  return d.toISOString().slice(0,10);
-}
-
-async function prefetchHkStatus(res){
-  if(!res)return;
-  const rc=res.roomCode||aptId;
-  const ci=res.checkin||res.checkIn||'';
-  if(!rc||!ci)return;
-  const key1=rc+'_'+ci;
-  const key2=rc+'_'+prevDay(ci);
-  try{
-    const[s1,s2]=await Promise.all([
-      getDoc(doc(db,'hk_status',key1)),
-      getDoc(doc(db,'hk_status',key2)),
-    ]);
-    hkStatusCache[key1]=s1.exists()?s1.data():null;
-    hkStatusCache[key2]=s2.exists()?s2.data():null;
-  }catch(e){}
-}
-
-function ensureHkStatusCached(res){
-  if(!res||_hkFetching)return;
-  const rc=res.roomCode||aptId;
-  const ci=res.checkin||res.checkIn||'';
-  if(!rc||!ci)return;
-  const key1=rc+'_'+ci;
-  const key2=rc+'_'+prevDay(ci);
-  if(key1 in hkStatusCache&&key2 in hkStatusCache)return;
+async function refreshHkToday(){
+  if(_hkFetching||!aptId)return;
   _hkFetching=true;
-  prefetchHkStatus(res).then(()=>{_hkFetching=false;renderTiles();});
+  const key=aptId+'_'+tbilisiToday();
+  try{
+    const snap=await getDoc(doc(db,'hk_status',key));
+    _hkTodayData=snap.exists()?snap.data():null;
+  }catch(e){_hkTodayData=null;}
+  _hkFetching=false;
+  if(document.getElementById('page-home')?.classList.contains('active'))renderTiles();
 }
 
-function isUnlocked(res){
+function startUnlockPoller(){
+  if(_unlockPollTimer)return;
+  _unlockPollTimer=setInterval(refreshHkToday,60000);
+}
+function stopUnlockPoller(){
+  if(_unlockPollTimer){clearInterval(_unlockPollTimer);_unlockPollTimer=null;}
+}
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&document.getElementById('page-home')?.classList.contains('active'))
+    refreshHkToday();
+});
+
+// ── UNLOCK GATE (single shared decision — guest page is source of truth) ──────
+function isUnlocked(/* res unused — arrivalDate comes from guestData */){
   if(!guestData)return false;
-  if(guestData.manualUnlock)return true;
-
-  const r=res||activeReservation;
-  const ci=(r?.checkin||r?.checkIn||'');
-  const co=(r?.checkout||r?.checkOut||'');
-  const rc=(r?.roomCode||aptId);
-  if(!ci||!co)return false;
-
   const today=tbilisiToday();
+  const arrival=guestData.arrivalDate||'';
+  // Rule 1: not arrival day — locked (never unlock before or after arrival day gate)
+  if(!arrival||today!==arrival)return false;
+  // Rule 2: admin manual unlock
+  if(guestData.manualUnlock)return true;
   const hour=tbilisiHour();
-
-  if(today<ci)return false;   // before check-in date
-  if(today>co)return false;   // after checkout date
-
-  // Check HK cleaning status from cache (populated by ensureHkStatusCached)
-  const hkSameDay=hkStatusCache[rc+'_'+ci];        // back-to-back: prev checkout = checkin day
-  const hkPrevDay=hkStatusCache[rc+'_'+prevDay(ci)]; // gap of 1: prev checkout = day before
-
-  if(hkSameDay?.done)return true;                              // cleaned same day → unlock immediately
-  if(hkPrevDay?.done&&today===ci&&hour>=12)return true;        // cleaned day before → unlock at 12:00
-
-  // Fallback: configured check-in hour (default 15:00)
-  if(today===ci&&hour<getCheckInHour())return false;
-  return true;
+  // Rule 3: configured check-in hour reached
+  if(hour>=getCheckInHour())return true;
+  // Rule 4: HK cleaning done + at least 11:00
+  if(hour>=11&&_hkTodayData?.done===true)return true;
+  // Rule 5: locked/waiting
+  return false;
 }
 
 function timeUntilCheckin(){
@@ -978,22 +947,11 @@ async function scanPassport(file){
     try{const m=raw.match(/\{[\s\S]*?\}/);result=JSON.parse(m?.[0]||'{}');}
     catch(pe){result={valid:false,confidence:'low',reason:'Unable to parse result',isPassport:false};}
     passportScanResult=result;
-    if(result.valid){
-      statusEl.className='scan-status scan-ok';
-      statusEl.innerHTML='<span>✓</span><span>Document looks good</span>';
-    }else{
-      statusEl.className='scan-status scan-warn';
-      const msgs={
-        en:"This doesn't look like a valid passport. Please upload a clear photo of your passport or national ID.",
-        ka:'ეს არ გამოიყურება ვალიდური პასპორტი. გთხოვთ ატვირთოთ პასპორტის ან პირადობის ფოტო.',
-        ru:'Это не похоже на действительный паспорт. Загрузите фото паспорта или удостоверения личности.',
-        ar:'هذا لا يبدو وثيقة سفر صالحة. يرجى تحميل صورة جواز سفرك أو بطاقة هوية.'
-      };
-      statusEl.textContent='⚠ '+(msgs[lang]||msgs.en);
-    }
+    statusEl.className='scan-status scan-ok';
+    statusEl.innerHTML='<span>✓</span><span>Document received</span>';
   }catch(e){
-    statusEl.style.display='none';
     passportScanResult={valid:false,reason:'Scan failed',confidence:'low'};
+    statusEl.style.display='none';
   }
 }
 
@@ -1066,6 +1024,7 @@ window.switchApt=async function(newRoomCode){
   console.log('Switching to:', newRoomCode);
   if(newRoomCode===aptId)return;
   aptId=newRoomCode;
+  _hkTodayData=null; // reset HK cache for new apt
   // Pin activeReservation to the selected apt immediately
   activeReservation=allMatchedReservations.find(r=>r.roomCode===newRoomCode)||null;
   localStorage.setItem('maxela_apt_id',aptId);
@@ -1106,17 +1065,25 @@ async function finishRegistration_(bestRes,formData){
     document.getElementById('home-apt-name').textContent=APT_NAMES[aptId]||aptId;
   }
   document.getElementById('t-submit-btn').textContent='Uploading...';
-  if (passportFile && !passportScanResult) {
-    await scanPassport(passportFile);
-  }
-  console.log('Saving to Firestore, passportScanResult:', JSON.stringify(passportScanResult));
-  const passportUrl=await uploadToCloudinary(passportFile,'maxela/guests/'+aptId);
-  if(passportScanResult?.valid===false){
-    try{await setDoc(doc(db,'passport_alerts',`${aptId}_${Date.now()}`),{aptId,guestName:name,passportUrl,scanResult:passportScanResult,reason:passportScanResult.reason||'',createdAt:serverTimestamp()});}catch(e){}
-  }
+  clearTimeout(_uploadResetTimer);
+  _uploadResetTimer=setTimeout(()=>{
+    const b=document.getElementById('submit-btn');const s=document.getElementById('t-submit-btn');
+    if(b&&b.disabled){b.disabled=false;if(s)s.textContent=t('sb');}
+    _uploadResetTimer=null;
+  },15000);
+  // Fire scan async — don't block page transition
+  const scanPromise=(passportFile&&!passportScanResult)?scanPassport(passportFile):Promise.resolve();
+  // Upload with 30s timeout
+  const uploadWithTimeout=new Promise(async(resolve,reject)=>{
+    const timer=setTimeout(()=>reject(new Error('Upload timed out after 30 seconds')),30000);
+    try{const url=await uploadToCloudinary(passportFile,'maxela/guests/'+aptId);clearTimeout(timer);resolve(url);}
+    catch(e){clearTimeout(timer);reject(e);}
+  });
+  const passportUrl=await uploadWithTimeout;
+  // Save to Firestore immediately with empty scan result placeholder; transition to home
   const docId=`${aptId}_${arrival}`;
   const data={aptId,name,guests,nationality,contact,contactType:ct,passportUrl,
-    passportScanResult:passportScanResult||null,arrivalDate:arrival,
+    passportScanResult:{},arrivalDate:arrival,
     matchedReservationId:bestRes?.id||null,manualUnlock:false};
   const existing=await getDoc(doc(db,'checkin_guests',docId));
   if(existing.exists()){
@@ -1134,6 +1101,19 @@ async function finishRegistration_(bestRes,formData){
   _pendingReg=null;_pendingMatches=[];
   toast(t('rg'),3000);
   showHome();
+  clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
+  const _sb=document.getElementById('submit-btn');const _st=document.getElementById('t-submit-btn');
+  if(_sb)_sb.disabled=false;if(_st)_st.textContent=t('sb');
+  // Update Firestore with real scan result once AI finishes (background)
+  scanPromise.then(async()=>{
+    if(!passportScanResult)return;
+    try{
+      await setDoc(doc(db,'checkin_guests',docId),{passportScanResult},{merge:true});
+      if(passportScanResult.valid===false){
+        await setDoc(doc(db,'passport_alerts',`${aptId}_${Date.now()}`),{aptId,guestName:name,passportUrl,scanResult:passportScanResult,reason:passportScanResult.reason||'',createdAt:serverTimestamp()});
+      }
+    }catch(e){}
+  });
 }
 
 window.submitRegistration=async function(){
@@ -1201,11 +1181,12 @@ window.submitRegistration=async function(){
     }
     allMatches.sort((a,b)=>b.score-a.score);
     allMatchedReservations=allMatches.map(m=>m.res);
-    await finishRegistration_(allMatches[0].res,{name:name||bookingRef,guests,nationality,contact,contactType,arrival});
+    await finishRegistration_(allMatches[0].res,{name:name||(allMatches[0].res?.guest)||bookingRef,guests,nationality,contact,contactType,arrival});
   }catch(e){
+    clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
     btn.disabled=false;
     document.getElementById('t-submit-btn').textContent=t('sb');
-    alert('Failed. Please check your connection and try again.\n'+e.message);
+    alert('Upload failed — please try again.');
   }
 }
 
@@ -1213,17 +1194,12 @@ function renderPassportBanner(){
   document.getElementById('passport-warning-banner')?.remove();
   document.getElementById('pp-warn')?.remove();
   const sr=guestData?.passportScanResult;
-  if(sr?.overrideByAdmin===true)return;
-  if(sr?.valid===true)return;
-  const isEmpty=sr&&Object.keys(sr).length===0;
-  const isBad=sr?.valid===false;
-  if(isBad||(isEmpty&&!guestData?.passportUrl)){
-    const banner=document.createElement('div');
-    banner.id='passport-warning-banner';
-    banner.innerHTML=`<div style="margin:0 16px 16px;padding:16px 20px;background:#dc2626;color:#fff;border-radius:16px;font-size:15px;line-height:1.5;"><b>⚠️ Your ID document wasn't verified.</b><br>Please upload a valid passport or national ID.<div style="margin-top:10px;"><button onclick="document.getElementById('reupload-passport').click()" style="background:#fff;color:#dc2626;border:none;padding:8px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Upload again</button></div></div>`;
-    const greeting=document.querySelector('#page-home .greeting');
-    if(greeting)greeting.parentNode.insertBefore(banner,greeting.nextSibling);
-  }
+  if(sr?.overrideByAdmin!==false)return;
+  const banner=document.createElement('div');
+  banner.id='passport-warning-banner';
+  banner.innerHTML=`<div style="margin:0 16px 16px;padding:16px 20px;background:#dc2626;color:#fff;border-radius:16px;font-size:15px;line-height:1.5;"><b>⚠️ Your ID document wasn't verified.</b><br>Please upload a valid passport or national ID.<div style="margin-top:10px;"><button onclick="document.getElementById('reupload-passport').click()" style="background:#fff;color:#dc2626;border:none;padding:8px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Upload again</button></div></div>`;
+  const greeting=document.querySelector('#page-home .greeting');
+  if(greeting)greeting.parentNode.insertBefore(banner,greeting.nextSibling);
 }
 window.reuploadPassport=async function(input){
   await window.handlePassportReupload(input);
@@ -1234,12 +1210,12 @@ window.handleReupload = async function(input) {
   if (!file) return;
   try {
     const url = await uploadToCloudinary(file, 'maxela/guests/' + aptId);
-    await setDoc(doc(db, 'checkin_guests', guestId), { passportUrl: url, passportScanResult: null }, { merge: true });
-    await scanPassport(file);
-    if (passportScanResult) {
-      await setDoc(doc(db, 'checkin_guests', guestId), { passportScanResult: passportScanResult }, { merge: true });
-    }
-    toast(passportScanResult?.valid ? 'Document verified ✓' : 'Document not accepted');
+    await setDoc(doc(db, 'checkin_guests', guestId), { passportUrl: url, passportScanResult: {} }, { merge: true });
+    toast('Document received — verifying...');
+    scanPassport(file).then(async()=>{
+      if(!passportScanResult)return;
+      try{await setDoc(doc(db,'checkin_guests',guestId),{passportScanResult},{merge:true});}catch(e){}
+    });
   } catch(e) { toast('Upload failed'); }
 };
 
@@ -1248,27 +1224,24 @@ window.handlePassportReupload=async function(input){
   if(!file)return;
   input.value='';
   const el=document.getElementById('passport-warn-banner');
-  if(el)el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon">⏳</div><div class="passport-banner__body"><div class="passport-banner__title">Verifying document...</div></div></div>`;
-  const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
-  let scanResult=null;
-  let apiKey=_geminiKey;
-  if(!apiKey){try{const cfg=await getDoc(doc(db,'globals','config'));if(cfg.exists()){apiKey=cfg.data().geminiKey||'';_geminiKey=apiKey;}}catch(e){}}
-  if(apiKey){try{
-    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{inlineData:{mimeType:file.type||'image/jpeg',data:base64}},{text:'Look at this image. Is this a valid passport or government-issued ID document? Check: 1) Is it actually a passport/ID? 2) Are all expected fields visible (name, DOB, expiry, MRZ)? 3) Does it look unaltered? Reply ONLY in JSON: {"valid": true/false, "confidence": "high/medium/low", "reason": "...", "isPassport": true/false}'}]}]})});
-    const rdata=await resp.json();
-    const raw=rdata.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    try{const m=raw.match(/\{[\s\S]*?\}/);scanResult=JSON.parse(m?.[0]||'{}');}catch(pe){}
-  }catch(e){}}
-  passportScanResult=scanResult;
   if(el)el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon">⏳</div><div class="passport-banner__body"><div class="passport-banner__title">Uploading...</div></div></div>`;
   let newUrl=guestData?.passportUrl||null;
   try{newUrl=await uploadToCloudinary(file,'maxela/guests/'+aptId);}catch(e){}
   if(guestId&&newUrl){
-    const update={passportUrl:newUrl,passportScanResult:scanResult,passportUpdatedAt:serverTimestamp()};
+    const update={passportUrl:newUrl,passportScanResult:{},passportUpdatedAt:serverTimestamp()};
     try{await setDoc(doc(db,'checkin_guests',guestId),update,{merge:true});}catch(e){}
     guestData={...guestData,...update};
   }
+  if(el)el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon">⏳</div><div class="passport-banner__body"><div class="passport-banner__title">Verifying your document...</div></div></div>`;
   renderPassportBanner();
+  // Run AI scan in background and update Firestore when done
+  scanPassport(file).then(async()=>{
+    if(!passportScanResult||!guestId)return;
+    try{
+      await setDoc(doc(db,'checkin_guests',guestId),{passportScanResult},{merge:true});
+      guestData={...guestData,passportScanResult};
+    }catch(e){}
+  });
 };
 
 function needsElevatorCode(){
@@ -1320,6 +1293,7 @@ function showHome(){
   renderGreetingApt();
   document.getElementById('t-greeting-label').textContent=t('gl');
   renderTiles();
+  startUnlockPoller();
   renderWhatYouBooked();
   renderPassportBanner();
   if(guestId){
@@ -1367,8 +1341,8 @@ function showHome(){
 }
 
 function renderTiles(){
-  ensureHkStatusCached(activeReservation);
-  const u=isUnlocked(activeReservation);
+  if(_hkTodayData===null&&!_hkFetching)refreshHkToday(); // kick off first fetch if not started
+  const u=isUnlocked();
   const _ARR=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
   const ssid=(aptData&&aptData.wifiName)?aptData.wifiName:'';
   document.getElementById('tiles-grid').innerHTML=`
@@ -1583,7 +1557,7 @@ window.openPage=async function(type){
   // populated from the registration search and has correct checkin/checkout dates.
   // Fall back to activeReservation only if no match found.
   const pageRes=allMatchedReservations.find(r=>r.roomCode===aptId)||activeReservation;
-  if((type==='checkin'||type==='wifi')&&!isUnlocked(pageRes)){openLocked(pageRes);return;}
+  if((type==='checkin'||type==='wifi')&&!isUnlocked()){openLocked(pageRes);return;}
   const d=aptData||{};
   const titles={checkin:t('tc'),wifi:t('tw'),services:t('tsv'),recs:t('tr'),rules:t('tru'),contact:t('tco')};
   let body='';
@@ -2239,12 +2213,31 @@ window.logout=function(){
   localStorage.removeItem('maxela_guest_id');
   if(aptId)localStorage.removeItem('maxela_g_'+aptId);
   guestId=null;guestData=null;aptData=null;activeReservation=null;
+  passportFile=null;passportScanResult=null;
+  stopUnlockPoller();_hkTodayData=null;
   aptId=params.get('apt')||'';
   document.getElementById('page-home').classList.remove('active');
   const reg=document.getElementById('page-register');
   reg.classList.add('active');
   document.getElementById('reg-verify-error')?.remove();
   ['r-name','r-contact','r-arrival','r-arrival-display'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';el.classList&&el.classList.remove('invalid');}});
+  // Reset passport upload zone
+  const preview=document.getElementById('passport-preview');
+  if(preview){preview.src='';preview.style.display='none';}
+  document.getElementById('passport-zone')?.classList.remove('has-photo');
+  const hint=document.getElementById('t-passport-hint');
+  if(hint)hint.textContent='Tap to upload passport / ID';
+  const scanStatus=document.getElementById('passport-scan-status');
+  if(scanStatus){scanStatus.style.display='none';scanStatus.className='scan-status';}
+  // Reset house-rules checkboxes and submit button
+  _rules.noise=false;_rules.smoke=false;_rules.care=false;
+  ['noise','smoke','care'].forEach(r=>document.getElementById('rule-'+r)?.classList.remove('checked'));
+  clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
+  const _lsb=document.getElementById('submit-btn');const _lst=document.getElementById('t-submit-btn');
+  if(_lsb)_lsb.disabled=true;if(_lst)_lst.textContent=t('sb');
+  // Clear any passport banner from home page
+  document.getElementById('passport-warning-banner')?.remove();
+  document.getElementById('passport-warn-banner')?.remove();
   if(!aptId){
     document.getElementById('auth-apt').style.display='none';
   }else{

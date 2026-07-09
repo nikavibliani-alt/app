@@ -230,22 +230,27 @@ def sync_to_firestore(db, reservations):
 
 def detect_cancellations(db, api_reservations, from_date, to_date):
     """Mark Firestore reservations as cancelled if they're not in the API response.
-    Also deletes old non-API docs that have no matching API reservation (one-time cleanup)."""
+    Also deletes stale room-move orphan docs and old non-API docs with no API match."""
     coll = db.collection('reservations')
 
     # Build lookup sets from the API response
-    active_checkout_keys = set()   # roomCode_checkout — for cancellation detection
-    active_checkin_keys = set()    # roomCode_checkin  — for old-doc cleanup
+    active_res_nums = set()     # all reservation numbers — no room/status filtering
+    active_room_pairs = set()   # "{rn}_{roomCode}" for known-room entries
+    active_checkin_keys = set() # "{roomCode}_{checkin}" for old-doc cleanup (unchanged)
+    room_code_values = set(ROOM_MAP.values())
+
     for r in api_reservations:
+        rn = str(r.get('reservationNumber', '') or '').strip()
+        if rn:
+            active_res_nums.add(rn)
         room_code = ROOM_MAP.get(r.get('roomNumber', ''))
         checkin = parse_date(r.get('checkIn'))
-        checkout = parse_date(r.get('checkOut'))
-        if room_code and checkout:
-            active_checkout_keys.add(f"{room_code}_{checkout}")
+        if room_code and rn:
+            active_room_pairs.add(f"{rn}_{room_code}")
         if room_code and checkin:
             active_checkin_keys.add(f"{room_code}_{checkin}")
 
-    # ── Cancellation check: API docs no longer in MiniHotel ──────────────────
+    # ── Cancellation + stale room-move cleanup ────────────────────────────────
     snap = coll \
         .where('checkout', '>=', from_date) \
         .where('checkout', '<=', to_date) \
@@ -253,23 +258,49 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
         .get()
 
     batch = db.batch()
+    op_count = 0
     cancelled = 0
+    stale_deleted = 0
 
     for doc in snap:
         data = doc.to_dict()
-        key = f"{data.get('roomCode')}_{data.get('checkout')}"
-        if key not in active_checkout_keys and data.get('status') != 'CANCELLED':
-            batch.update(doc.reference, {
-                'status': 'CANCELLED',
-                'statusDescription': 'Cancelled (not in MiniHotel)',
-                'syncedAt': firestore.SERVER_TIMESTAMP,
-            })
-            cancelled += 1
-            print(f"  Cancelled: {data.get('guest')} | {data.get('roomCode')} | {data.get('checkout')}")
+        rn = str(data.get('reservationNumber') or '').strip()
 
-    if cancelled > 0:
+        if not rn:
+            continue  # can't key without a reservation number — skip safely
+
+        if rn not in active_res_nums:
+            # Reservation is entirely gone from MiniHotel — true cancellation
+            if data.get('status') != 'CANCELLED':
+                batch.update(doc.reference, {
+                    'status': 'CANCELLED',
+                    'statusDescription': 'Cancelled (not in MiniHotel)',
+                    'syncedAt': firestore.SERVER_TIMESTAMP,
+                })
+                cancelled += 1
+                op_count += 1
+                print(f"  Cancelled: {data.get('guest')} | {data.get('roomCode')} | {data.get('checkout')}")
+        else:
+            # Reservation is active — check for stale room-move orphan
+            doc_id = doc.id
+            if doc_id != rn and doc_id.startswith(rn + '_'):
+                suffix = doc_id[len(rn) + 1:]
+                if (suffix in room_code_values
+                        and f"{rn}_{suffix}" not in active_room_pairs
+                        and not data.get('manualRoom')):
+                    batch.delete(doc.reference)
+                    stale_deleted += 1
+                    op_count += 1
+                    print(f"  Stale orphan deleted: {doc_id} | {data.get('guest')} | {data.get('roomCode')}")
+
+        if op_count > 0 and op_count % 450 == 0:
+            batch.commit()
+            batch = db.batch()
+            print(f"  Committed {op_count} ops...")
+
+    if op_count % 450 != 0:
         batch.commit()
-    print(f"Detected {cancelled} cancellations")
+    print(f"Detected {cancelled} cancellations, deleted {stale_deleted} stale room-move orphans")
 
     # ── Old-doc cleanup: non-API docs with no API equivalent ─────────────────
     # Collect old docs in the date window from known legacy syncSource values
