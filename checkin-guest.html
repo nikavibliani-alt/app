@@ -776,7 +776,8 @@ function tbilisiHour(){
 // ── HK STATUS (single today-doc fetch; refreshed every 60s and on visibilitychange) ──
 let _hkTodayData=null; // null = not yet fetched
 let _hkFetching=false;
-let _unlockPollTimer=null;
+let _unlockPollTimer=null; // 30s lightweight time-only re-check
+let _hkPollTimer=null;    // 60s Firestore HK fetch
 
 async function refreshHkToday(){
   if(_hkFetching||!aptId)return;
@@ -790,16 +791,29 @@ async function refreshHkToday(){
   if(document.getElementById('page-home')?.classList.contains('active'))renderTiles();
 }
 
+function _unlockTick(){
+  // Auto-dismiss locked subpage if the gate has now opened
+  if(isUnlocked()){
+    const sp=document.getElementById('cur-sp');
+    if(sp?.querySelector('.locked-card'))closeSP();
+  }
+  if(document.getElementById('page-home')?.classList.contains('active'))renderTiles();
+}
+
 function startUnlockPoller(){
   if(_unlockPollTimer)return;
-  _unlockPollTimer=setInterval(refreshHkToday,60000);
+  _unlockPollTimer=setInterval(_unlockTick,30000);  // pure time-check, no Firestore
+  _hkPollTimer=setInterval(refreshHkToday,60000);   // Firestore HK fetch
 }
 function stopUnlockPoller(){
   if(_unlockPollTimer){clearInterval(_unlockPollTimer);_unlockPollTimer=null;}
+  if(_hkPollTimer){clearInterval(_hkPollTimer);_hkPollTimer=null;}
 }
 document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden&&document.getElementById('page-home')?.classList.contains('active'))
+  if(!document.hidden){
+    _unlockTick();
     refreshHkToday();
+  }
 });
 
 // ── UNLOCK GATE (single shared decision — guest page is source of truth) ──────
