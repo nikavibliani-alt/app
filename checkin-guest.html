@@ -1099,6 +1099,7 @@ async function finishRegistration_(bestRes,formData){
   localStorage.setItem('maxela_g_'+aptId,guestId);
   localStorage.setItem('maxela_all_res',JSON.stringify(allMatchedReservations));
   _pendingReg=null;_pendingMatches=[];
+  syncGuestToWassenger(guestData,bestRes).catch(()=>{});
   toast(t('rg'),3000);
   showHome();
   clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
@@ -1114,6 +1115,47 @@ async function finishRegistration_(bestRes,formData){
       }
     }catch(e){}
   });
+}
+
+async function syncGuestToWassenger(gData,reservation){
+  try{
+    const roomCode=gData.aptId||'';
+    let buildingLabel='Maxela';
+    if(roomCode.startsWith('0-')||roomCode.startsWith('6-')||roomCode.startsWith('7-'))buildingLabel='Shartava';
+    else if(roomCode.startsWith('tab-'))buildingLabel='Freedom Square';
+    else if(roomCode.startsWith('orb-'))buildingLabel='Orbeliani';
+    const roomLabel=roomCode.toUpperCase();
+    let phone=(gData.contact||'').replace(/\s|-|\(|\)/g,'');
+    if(phone.startsWith('00'))phone='+'+phone.slice(2);
+    if(!phone.startsWith('+'))phone='+'+phone;
+    const source=reservation?.source||'';
+    let sourceLabel='Direct';
+    if(source.includes('booking'))sourceLabel='Booking.com';
+    else if(source.includes('airbnb'))sourceLabel='Airbnb';
+    else if(source.includes('expedia'))sourceLabel='Expedia';
+    const payload={
+      phone,
+      name:reservation?.guest||gData.name||'Guest',
+      labels:[buildingLabel,roomLabel,sourceLabel],
+      metadata:{
+        checkInDate:reservation?.checkin||'',
+        checkOutDate:reservation?.checkout||'',
+        apartment:roomCode,
+        reservationNumber:String(reservation?.reservationNumber||'')
+      }
+    };
+    const configSnap=await getDoc(doc(db,'globals','config'));
+    const wassengerKey=configSnap.data()?.wassengerKey;
+    if(!wassengerKey)return;
+    await fetch('https://api.wassenger.com/v1/contacts',{
+      method:'POST',
+      headers:{'Token':wassengerKey,'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    console.log('Wassenger contact synced:',phone,payload.labels);
+  }catch(e){
+    console.warn('Wassenger sync failed (non-critical):',e);
+  }
 }
 
 window.submitRegistration=async function(){

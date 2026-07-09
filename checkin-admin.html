@@ -1477,6 +1477,15 @@ function gsPopulateElevatorCard(){
   }
 }
 
+window.gsSaveWassengerKey=async function(){
+  const inp=document.getElementById('gsWassengerKey');
+  const key=(inp?.value||'').trim();
+  try{
+    await setDoc(doc(db,'globals','config'),{wassengerKey:key},{merge:true});
+    toast(key?'Wassenger API key saved ✓':'Wassenger API key cleared');
+  }catch(e){toast('Failed: '+e.message);}
+};
+
 window.gsUpdateElevatorCode=async function(){
   const inp=document.getElementById('gsElevatorInput');
   const code=(inp?.value||'').trim();
@@ -1557,6 +1566,20 @@ async function renderGuestSettings(){
       </div>
       <div id="gsLocationBody"></div>
     </div>
+    <div class="gs-card" id="gsIntegrationsCard">
+      <div class="gs-card-header">
+        <div class="gs-card-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gs-accent)" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg></div>
+        <span class="gs-card-title">Integrations</span>
+      </div>
+      <div style="padding:16px 24px 20px;display:flex;flex-direction:column;gap:12px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gs-text-muted);">Wassenger API Key</div>
+        <div style="font-size:12px;color:var(--gs-text-muted);margin-top:-6px;">Syncs new guest contacts to Wassenger with building, room and source labels.</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input id="gsWassengerKey" class="gs-drawer-input" type="password" placeholder="Paste API key…" style="flex:1;font-family:ui-monospace,monospace;font-size:13px;">
+          <button onclick="gsSaveWassengerKey()" style="padding:10px 18px;background:var(--gs-accent);color:#fff;border:none;border-radius:var(--gs-radius-md);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+        </div>
+      </div>
+    </div>
     <div style="height:80px"></div>
   </div>`;
 
@@ -1564,6 +1587,12 @@ async function renderGuestSettings(){
   document.querySelectorAll('.gs-prop-btn').forEach(b=>b.classList.toggle('active',b.dataset.prop===gsProp));
   gsRenderAll();
   gsPopulateElevatorCard();
+  // Load Wassenger key from globals/config
+  getDoc(doc(db,'globals','config')).then(snap=>{
+    const key=snap.data()?.wassengerKey||'';
+    const inp=document.getElementById('gsWassengerKey');
+    if(inp&&key)inp.value=key;
+  }).catch(()=>{});
 }
 
 function gsRenderPropTabs(){
