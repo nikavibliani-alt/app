@@ -745,13 +745,15 @@ function renderGuests(){
       const ctIcon=g.contactType==='tg'
         ?`<span style="font-size:9px;font-weight:700;color:#0088cc;background:#e8f5fe;border:1px solid #90cdf4;padding:1px 5px;border-radius:4px;">TG</span>`
         :`<span style="font-size:9px;font-weight:700;color:#25D366;background:#f0fff4;border:1px solid #86efac;padding:1px 5px;border-radius:4px;">WA</span>`;
-      // Fix 2+3: type-aware contact link (wa → wa.me, tg → t.me)
+      // type-aware contact link (wa → wa.me + WA Business, tg → t.me)
       const rawDigits=(g.contact||'').replace(/\D/g,'');
       const normDigits=rawDigits&&(rawDigits.length<11||rawDigits.startsWith('5'))?'995'+rawDigits:rawDigits;
+      const _stop='event.stopPropagation()';
       const contactLink=normDigits&&g.contactType==='wa'
-        ?`<a href="https://wa.me/${normDigits}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(g.contact||'—')}</a>`
+        ?`<a href="https://wa.me/${normDigits}" target="_blank" rel="noopener" onclick="${_stop}">${esc(g.contact||'—')}</a>`+
+          `<a href="https://api.whatsapp.com/send?phone=${normDigits}" target="_blank" rel="noopener" onclick="${_stop}" style="font-size:10px;color:#25D366;font-weight:600;white-space:nowrap;text-decoration:none;border:1px solid #86efac;background:#f0fff4;border-radius:4px;padding:1px 5px;">WA Biz</a>`
         :normDigits&&g.contactType==='tg'
-        ?`<a href="https://t.me/+${normDigits}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(g.contact||'—')}</a>`
+        ?`<a href="https://t.me/+${normDigits}" target="_blank" rel="noopener" onclick="${_stop}">${esc(g.contact||'—')}</a>`
         :esc(g.contact||'—');
       const passportThumb=g.passportUrl
         ?`<a class="g-thumb" href="${esc(g.passportUrl)}" target="_blank" title="View passport" onclick="event.stopPropagation()" style="flex-shrink:0;cursor:pointer;"><img src="${esc(g.passportUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:2px solid ${badPassport?'var(--red)':'var(--border)'};display:block;"></a>`
@@ -1361,6 +1363,14 @@ window.viewGuest=function(guestId){
   const ctIcon=g.contactType==='tg'
     ?`<span style="font-size:9px;font-weight:700;color:#0088cc;background:#e8f5fe;border:1px solid #90cdf4;padding:1px 5px;border-radius:4px;">TG</span>`
     :`<span style="font-size:9px;font-weight:700;color:#25D366;background:#f0fff4;border:1px solid #86efac;padding:1px 5px;border-radius:4px;">WA</span>`;
+  const _dRaw=(g.contact||'').replace(/\D/g,'');
+  const _dNorm=_dRaw&&(_dRaw.length<11||_dRaw.startsWith('5'))?'995'+_dRaw:_dRaw;
+  const contactDisplay=_dNorm&&g.contactType==='wa'
+    ?`<a href="https://wa.me/${_dNorm}" target="_blank" rel="noopener" style="font-weight:500;">${esc(g.contact||'—')}</a>`+
+      `<a href="https://api.whatsapp.com/send?phone=${_dNorm}" target="_blank" rel="noopener" style="font-size:10px;color:#25D366;font-weight:600;white-space:nowrap;text-decoration:none;border:1px solid #86efac;background:#f0fff4;border-radius:4px;padding:2px 7px;">WA Biz</a>`
+    :_dNorm&&g.contactType==='tg'
+    ?`<a href="https://t.me/+${_dNorm}" target="_blank" rel="noopener" style="font-weight:500;">${esc(g.contact||'—')}</a>`
+    :`<span style="font-weight:500;word-break:break-all;">${esc(g.contact||'—')}</span>`;
 
   const submittedAt=g.submittedAt?.toDate?g.submittedAt.toDate():null;
   const timeStr=submittedAt
@@ -1398,7 +1408,7 @@ window.viewGuest=function(guestId){
       <div class="form-label">Contact</div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
         ${ctIcon}
-        <span style="font-weight:500;word-break:break-all;">${esc(g.contact||'—')}</span>
+        ${contactDisplay}
       </div>
     </div>
     ${g.nationality?`<div class="form-group"><div class="form-label">Nationality</div><div style="font-weight:500;">${esc(g.nationality)}</div></div>`:''}
