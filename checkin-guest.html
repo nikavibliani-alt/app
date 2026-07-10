@@ -1612,6 +1612,7 @@ window.wybToggle=function(){
 };
 
 window.openPage=async function(type){
+try{
   // Prefer the reservation from allMatchedReservations for current aptId — it's
   // populated from the registration search and has correct checkin/checkout dates.
   // Fall back to activeReservation only if no match found.
@@ -1799,7 +1800,7 @@ window.openPage=async function(type){
   }
 
   openSubpage(titles[type]||t('tlo'),body);
-}
+}catch(e){console.error('openPage error:',e);toast('Could not open page. Please try again.');}}
 
 function fmtCheckinAvailable(res){
   const ci=(res||activeReservation)?.checkin||(res||activeReservation)?.checkIn||'';
@@ -1823,6 +1824,7 @@ function openLocked(res){
 }
 
 function openSubpage(title,body){
+  document.getElementById('cur-sp')?.remove();
   const sp=document.createElement('div');sp.className='subpage';sp.id='cur-sp';
   sp.innerHTML=`<div class="subpage-header"><button class="back-btn" onclick="closeSP()">←</button><div class="subpage-title">${esc(title)}</div></div><div class="subpage-body">${body}</div>`;
   document.getElementById('subpages').appendChild(sp);
@@ -2268,6 +2270,7 @@ document.addEventListener('keydown',e=>{
 });
 
 window.logout=function(){
+  document.getElementById('cur-sp')?.remove();
   localStorage.removeItem('maxela_apt_id');
   localStorage.removeItem('maxela_guest_id');
   if(aptId)localStorage.removeItem('maxela_g_'+aptId);
