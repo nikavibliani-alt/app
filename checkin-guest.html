@@ -817,10 +817,11 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 // ── UNLOCK GATE (single shared decision — guest page is source of truth) ──────
-function isUnlocked(/* res unused — arrivalDate comes from guestData */){
+function isUnlocked(){
   if(!guestData)return false;
   const today=tbilisiToday();
-  const arrival=guestData.arrivalDate||'';
+  // Fall back to reservation checkin date if arrivalDate was not saved (number-based registration)
+  const arrival=guestData.arrivalDate||activeReservation?.checkin||activeReservation?.checkIn||'';
   if(!arrival)return false;
   // Mid-stay (today after check-in day) → always unlocked
   if(today>arrival)return true;
@@ -1095,9 +1096,11 @@ async function finishRegistration_(bestRes,formData){
   });
   const passportUrl=await uploadWithTimeout;
   // Save to Firestore immediately with empty scan result placeholder; transition to home
-  const docId=`${aptId}_${arrival}`;
+  // For number-based bookings arrival is '' — fall back to reservation checkin date
+  const arrivalDate=arrival||bestRes?.checkin||bestRes?.checkIn||'';
+  const docId=`${aptId}_${arrivalDate||Date.now()}`;
   const data={aptId,name,guests,nationality,contact,contactType:ct,passportUrl,
-    passportScanResult:{},arrivalDate:arrival,
+    passportScanResult:{},arrivalDate,
     matchedReservationId:bestRes?.id||null,manualUnlock:false};
   const existing=await getDoc(doc(db,'checkin_guests',docId));
   if(existing.exists()){
