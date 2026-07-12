@@ -29,9 +29,9 @@ from datetime import datetime, timedelta
 import requests
 from minihotel_auth import get_session_cookie
 from event_scanner import scan_and_update as scan_events
-from ai_pricing import ai_compute_prices
-from price_tracker import snapshot_prices, record_outcomes
 from ai_pricing import get_booking_velocity
+from claude_pricing import claude_compute_prices
+from price_tracker import snapshot_prices, record_outcomes
 from velocity_engine import compute_prices_velocity
 
 # ---------------------------------------------------------------------------
@@ -631,18 +631,22 @@ def main():
 
     print("Computing prices...")
 
-    # Load booking velocity for smart pricing
+    # Load booking velocity
     velocity = {}
     if _db_for_ai:
         print("  Loading booking velocity...")
         velocity = get_booking_velocity(_db_for_ai)
 
-    # Run velocity-adjusted engine
+    # Run velocity engine as baseline for all properties
     print("  Running velocity-adjusted pricing engine...")
     results = compute_prices_velocity(raw, config, velocity)
 
-    # Gemini AI disabled — 429 rate-limiting on every run
-    # ai_compute_prices(raw, config, _db_for_ai)
+    # Run Claude AI layer — overrides velocity results per property where it succeeds
+    if _db_for_ai:
+        claude_results = claude_compute_prices(raw, config, _db_for_ai, velocity)
+        if claude_results:
+            results.update(claude_results)
+            print(f"  Claude pricing applied ({len(claude_results)} properties).")
 
     print_report(results, dry_run)
 

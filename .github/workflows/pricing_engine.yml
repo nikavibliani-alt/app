@@ -6,7 +6,7 @@ on:
 jobs:
   pricing:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -17,7 +17,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests firebase-admin
+        run: pip install requests firebase-admin anthropic
 
       - name: Run pricing engine
         env:
@@ -27,5 +27,5 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           SERPAPI_KEY:              ${{ secrets.SERPAPI_KEY }}
           SENDGRID_KEY:             ${{ secrets.SENDGRID_KEY }}
-          GEMINI_KEY:               ${{ secrets.GEMINI_KEY }}
+          ANTHROPIC_API_KEY:        ${{ secrets.ANTHROPIC_API_KEY }}
         run: python pricing_engine.py --apply

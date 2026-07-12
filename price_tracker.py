@@ -156,6 +156,16 @@ def record_outcomes(raw_data: list):
                 except Exception:
                     days_before_checkin = best_snap.get("days_ahead", 0)
 
+                # Check if booking happened within 24h of the snapshot
+                booked_within_24h = False
+                snap_ts = best_snap.get("ts")
+                if snap_ts:
+                    try:
+                        snap_time = datetime.fromisoformat(snap_ts)
+                        booked_within_24h = (datetime.now() - snap_time).total_seconds() < 86400
+                    except Exception:
+                        pass
+
                 # Record the outcome
                 db.collection("pricing_outcomes").document(outcome_id).set({
                     "property":             rt,
@@ -168,6 +178,7 @@ def record_outcomes(raw_data: list):
                     "season":               best_snap.get("season", ""),
                     "booked_on":            today_str,
                     "days_before_checkin":  days_before_checkin,
+                    "booked_within_24h":    booked_within_24h,
                     "ts":                   datetime.now().isoformat(),
                 })
                 outcomes_recorded += 1
