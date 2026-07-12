@@ -1,6 +1,7 @@
 
-# Firebase Cloud Functions — contains hardcoded Tuya credentials
-tuya-functions/
+# Firebase Cloud Functions — ignore all files except index.js (Tuya credentials in other files)
+tuya-functions/*
+!tuya-functions/index.js
 firebase-debug.log
 
 # Catch all firebase debug logs

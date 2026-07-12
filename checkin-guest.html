@@ -1161,15 +1161,11 @@ async function syncGuestToWassenger(gData,reservation){
         reservationNumber:String(reservation?.reservationNumber||'')
       }
     };
-    const configSnap=await getDoc(doc(db,'globals','config'));
-    const wassengerKey=configSnap.data()?.wassengerKey;
-    if(!wassengerKey)return;
-    await fetch('https://api.wassenger.com/v1/contacts',{
+    await fetch('https://europe-west1-sleepy-5c962.cloudfunctions.net/syncWassengerContact',{
       method:'POST',
-      headers:{'Token':wassengerKey,'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify(payload)
     });
-    console.log('Wassenger contact synced:',phone,payload.labels);
   }catch(e){
     console.warn('Wassenger sync failed (non-critical):',e);
   }
