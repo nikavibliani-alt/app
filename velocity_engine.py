@@ -129,22 +129,26 @@ def calculate_price_score(occ_deficit: float, vel_deficit: float) -> float:
     return (occ_deficit * 0.4) + (vel_deficit * 0.6)
 
 
-def apply_step(current_price: float, score: float, floor: float, ceiling: float) -> tuple:
+def apply_step(
+    current_price: float,
+    score: float,
+    floor: float,
+    ceiling: float,
+    max_change: float = MAX_CHANGE_PER_RUN,
+) -> tuple:
     """
     Apply hybrid step drops/raises based on score.
     Returns (proposed_price, action_taken, pct_change).
+    max_change overrides MAX_CHANGE_PER_RUN for high-demand situations.
     """
     abs_score = abs(score)
 
     if score > 0:
-        # Should drop
         steps = STEP_DROPS
         direction = -1
     else:
-        # Should raise
         steps = STEP_RAISES
         direction = 1
-        abs_score = abs(score)
 
     pct = 0.0
     action = "hold"
@@ -154,15 +158,32 @@ def apply_step(current_price: float, score: float, floor: float, ceiling: float)
             action = step["action"]
             break
 
-    # Apply change, capped at MAX_CHANGE_PER_RUN
-    pct = min(pct, MAX_CHANGE_PER_RUN)
+    pct = min(pct, max_change)
     proposed = current_price * (1 + direction * pct)
 
-    # Enforce boundaries
     proposed = max(proposed, floor)
     proposed = min(proposed, ceiling)
 
     return proposed, action, pct * direction
+
+
+def calculate_gravity_adjustment(current_price: float, start_price: float) -> float:
+    """
+    Returns the fraction to move current price toward start price per run.
+    Larger gaps → stronger pull, so prices far from target recover faster.
+    """
+    if start_price <= 0 or current_price <= 0:
+        return 0.0
+    abs_diff = abs(current_price - start_price) / start_price
+    if abs_diff > 0.30:
+        return 0.15
+    if abs_diff > 0.20:
+        return 0.10
+    if abs_diff > 0.10:
+        return 0.05
+    if abs_diff > 0.05:
+        return 0.02
+    return 0.0
 
 
 def apply_cascade(current_price: float, floor: float, days_ahead: int) -> float:
@@ -324,20 +345,42 @@ def compute_prices_velocity(
                         proposed_gel = apply_cascade(prices["gel"], floor_gel, days)
                         gel_reason   = f"CASCADE day={days} occ={occ_pct:.0f}% target={tgt_min}-{tgt_max}%"
                     else:
-                        # Apply velocity-adjusted score
-                        eff_score  = score * event_mult
+                        # Fix 1: snap to floor before any percentage calculation
+                        eff_gel = max(prices["gel"], floor_gel) if floor_gel > 0 else prices["gel"]
+                        extra_reason = ""
+                        if eff_gel != prices["gel"]:
+                            extra_reason += f" floor-snap({prices['gel']}→{eff_gel})"
+
+                        # Fix 3: start-price gravity — pull toward start price if far away
+                        start_gel = config.get("startPrices", {}).get(rt, {}).get(season, 0)
+                        gravity = calculate_gravity_adjustment(eff_gel, start_gel) if start_gel > 0 else 0.0
+                        if gravity > 0:
+                            gravity_dir = 1 if start_gel > eff_gel else -1
+                            eff_gel = eff_gel * (1 + gravity_dir * gravity)
+                            if floor_gel > 0:
+                                eff_gel = max(eff_gel, floor_gel)
+                            if ceiling_gel > 0:
+                                eff_gel = min(eff_gel, ceiling_gel)
+                            extra_reason += f" grav({gravity:+.0%}→{start_gel:.0f})"
+
+                        # Fix 2: faster step cap for high-demand short-window dates
+                        max_change = 0.15 if (occ_pct >= 70 and days <= 14) else MAX_CHANGE_PER_RUN
+
+                        eff_score = score * event_mult
                         proposed_gel, action, pct = apply_step(
-                            prices["gel"], eff_score, floor_gel, ceiling_gel or 99999
+                            eff_gel, eff_score, floor_gel, ceiling_gel or 99999, max_change
                         )
                         gel_reason = (
                             f"occ={occ_pct:.0f}% tgt={tgt_min}-{tgt_max}% "
                             f"vel={vel_bookings}bk score={score:.0f} {action}({pct:+.1%})"
+                            + extra_reason
                         )
                         if event_label:
                             gel_reason += f" +{event_label}"
                         if _debug_all or date_str in _debug_dates or (occ_pct >= 70 and days <= 14):
                             print(
-                                f"  [DBG] {rt} {date_str}: apply_step({prices['gel']}, score={score:.0f}, "
+                                f"  [DBG] {rt} {date_str}: eff_gel={eff_gel:.1f} grav={gravity:.2f} "
+                                f"max_chg={max_change} apply_step(score={score:.0f}, "
                                 f"floor={floor_gel}, ceil={ceiling_gel}) → {proposed_gel} ({action} {pct:+.1%})",
                                 file=sys.stderr,
                             )
@@ -360,8 +403,25 @@ def compute_prices_velocity(
                     if days <= 3 and occ_deficit > 5 and floor_eur > 0:
                         proposed_eur = apply_cascade(prices["eur"], floor_eur, days)
                     else:
+                        # Fix 1: snap to floor before percentage calculation
+                        eff_eur = max(prices["eur"], floor_eur) if floor_eur > 0 else prices["eur"]
+
+                        # Fix 3: start-price gravity for EUR
+                        start_eur = config.get("startPricesEur", {}).get(rt, {}).get(season, 0)
+                        gravity_eur = calculate_gravity_adjustment(eff_eur, start_eur) if start_eur > 0 else 0.0
+                        if gravity_eur > 0:
+                            g_dir = 1 if start_eur > eff_eur else -1
+                            eff_eur = eff_eur * (1 + g_dir * gravity_eur)
+                            if floor_eur > 0:
+                                eff_eur = max(eff_eur, floor_eur)
+                            if ceiling_eur > 0:
+                                eff_eur = min(eff_eur, ceiling_eur)
+
+                        # Fix 2: faster step cap for high-demand short-window dates
+                        max_change_eur = 0.15 if (occ_pct >= 70 and days <= 14) else MAX_CHANGE_PER_RUN
+
                         proposed_eur, _, _ = apply_step(
-                            prices["eur"], score, floor_eur, ceiling_eur or 99999
+                            eff_eur, score, floor_eur, ceiling_eur or 99999, max_change_eur
                         )
 
                 if ceiling_eur > 0:
