@@ -25,48 +25,42 @@ exports.syncWassengerContact = onRequest(
         res.status(400).json({success: false, error: 'phone is required'});
         return;
       }
-      const aptId = (labels || [])[1] || '';
+
+      // Normalize to E.164 then convert to Wassenger chat ID format: strip + and append @c.us
+      const normalized = normalizePhone(phone);
+      const chatId = normalized.replace(/^\+/, '') + '@c.us';
+      console.log('syncWassengerContact: phone=', phone, 'chatId=', chatId, 'labels=', labels);
 
       const configSnap = await db.doc('globals/config').get();
-      const wassengerKey = configSnap.data()?.wassengerKey;
+      const config = configSnap.data() || {};
+      const wassengerKey = config.wassengerKey;
+      const deviceId = config.wassengerDeviceId;
       if (!wassengerKey) {
         res.json({success: false, error: 'Wassenger key not configured'});
         return;
       }
-
-      // Step 1: find the chat by phone number
-      const chatRes = await fetch(
-        `https://api.wassenger.com/v1/chats?phone=${encodeURIComponent(phone)}`,
-        {headers: {'Token': wassengerKey}}
-      );
-      if (!chatRes.ok) {
-        const text = await chatRes.text();
-        res.json({success: false, error: `chats lookup failed: ${text}`});
+      if (!deviceId) {
+        res.json({success: false, error: 'wassengerDeviceId not configured in globals/config'});
         return;
       }
-      const chats = await chatRes.json();
-      const chat = Array.isArray(chats) ? chats[0] : null;
-      if (!chat) {
-        res.json({success: true, skipped: 'no chat found'});
-        return;
-      }
+      console.log('syncWassengerContact: deviceId=', deviceId);
 
-      // Step 2: label the chat with the aptId
-      const patchRes = await fetch(
-        `https://api.wassenger.com/v1/chats/${encodeURIComponent(chat.id)}`,
-        {
-          method: 'PATCH',
-          headers: {'Token': wassengerKey, 'Content-Type': 'application/json'},
-          body: JSON.stringify({labels: aptId ? [aptId] : []}),
-        }
-      );
+      // PATCH chat labels directly — no chat lookup needed
+      const url = `https://api.wassenger.com/v1/chat/${encodeURIComponent(deviceId)}/chats/${encodeURIComponent(chatId)}/labels`;
+      console.log('syncWassengerContact: PATCH', url, 'labels=', JSON.stringify(labels));
+      const patchRes = await fetch(url, {
+        method: 'PATCH',
+        headers: {'Token': wassengerKey, 'Content-Type': 'application/json'},
+        body: JSON.stringify(labels || []),
+      });
+      const patchText = await patchRes.text();
+      console.log('syncWassengerContact: patch status=', patchRes.status, 'body=', patchText);
       if (!patchRes.ok) {
-        const text = await patchRes.text();
-        res.json({success: false, error: `chat label failed: ${text}`});
+        res.json({success: false, error: `label failed (${patchRes.status}): ${patchText}`});
         return;
       }
 
-      res.json({success: true, chatId: chat.id, aptId});
+      res.json({success: true, deviceId, chatId});
     } catch (e) {
       res.status(500).json({success: false, error: e.message});
     }
