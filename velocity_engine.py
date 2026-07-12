@@ -12,6 +12,8 @@ Replaces the old occupancy-tier system with a smarter algorithm based on:
 Big Apartment has its own curve and uses a 14-30 day velocity window.
 """
 
+import os
+import sys
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -287,6 +289,23 @@ def compute_prices_velocity(
             # Combined score
             score = calculate_price_score(occ_deficit, vel_deficit)
 
+            # ── DEBUG LOG ──
+            # Prints full math for dates with high occupancy (≥70%) or within 14 days
+            _debug_dates = set(os.environ.get("PRICE_DEBUG_DATES", "").split(",")) - {""}
+            _debug_all   = os.environ.get("PRICE_DEBUG", "") == "1"
+            if _debug_all or date_str in _debug_dates or (occ_pct >= 70 and days <= 14):
+                weeks_rem = max(days / 7, 0.5) if days > 0 else 0.5
+                exp_wk = (((tgt_min + tgt_max) / 2) / 100 * total_units) / weeks_rem if weeks_rem else 0
+                print(
+                    f"  [DBG] {rt} {date_str}: avail={avail}/{total_units} "
+                    f"occ={occ_pct:.0f}% tgt={tgt_min}-{tgt_max}% "
+                    f"occ_deficit={occ_deficit:+.1f} | "
+                    f"vel={vel_bookings}bk exp_wk={exp_wk:.2f} vel_deficit={vel_deficit:+.1f} | "
+                    f"score={score:+.1f} | "
+                    f"gel={prices['gel']} floor={floor_gel} ceil={ceiling_gel}",
+                    file=sys.stderr,
+                )
+
             # ── GEL PRICE ──
             proposed_gel = prices["gel"]
             gel_reason   = ""
@@ -316,6 +335,12 @@ def compute_prices_velocity(
                         )
                         if event_label:
                             gel_reason += f" +{event_label}"
+                        if _debug_all or date_str in _debug_dates or (occ_pct >= 70 and days <= 14):
+                            print(
+                                f"  [DBG] {rt} {date_str}: apply_step({prices['gel']}, score={score:.0f}, "
+                                f"floor={floor_gel}, ceil={ceiling_gel}) → {proposed_gel} ({action} {pct:+.1%})",
+                                file=sys.stderr,
+                            )
 
                 if ceiling_gel > 0:
                     proposed_gel = min(proposed_gel, ceiling_gel)
