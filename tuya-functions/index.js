@@ -20,28 +20,53 @@ exports.syncWassengerContact = onRequest(
       return;
     }
     try {
-      const {phone, name, labels, metadata} = req.body;
+      const {phone, labels} = req.body;
       if (!phone) {
         res.status(400).json({success: false, error: 'phone is required'});
         return;
       }
+      const aptId = (labels || [])[1] || '';
+
       const configSnap = await db.doc('globals/config').get();
       const wassengerKey = configSnap.data()?.wassengerKey;
       if (!wassengerKey) {
         res.json({success: false, error: 'Wassenger key not configured'});
         return;
       }
-      const upstream = await fetch('https://api.wassenger.com/v1/contacts', {
-        method: 'POST',
-        headers: {'Token': wassengerKey, 'Content-Type': 'application/json'},
-        body: JSON.stringify({phone, name, labels, metadata}),
-      });
-      if (!upstream.ok) {
-        const text = await upstream.text();
-        res.json({success: false, error: text});
+
+      // Step 1: find the chat by phone number
+      const chatRes = await fetch(
+        `https://api.wassenger.com/v1/chats?phone=${encodeURIComponent(phone)}`,
+        {headers: {'Token': wassengerKey}}
+      );
+      if (!chatRes.ok) {
+        const text = await chatRes.text();
+        res.json({success: false, error: `chats lookup failed: ${text}`});
         return;
       }
-      res.json({success: true});
+      const chats = await chatRes.json();
+      const chat = Array.isArray(chats) ? chats[0] : null;
+      if (!chat) {
+        res.json({success: true, skipped: 'no chat found'});
+        return;
+      }
+
+      // Step 2: label the chat with the aptId
+      const patchRes = await fetch(
+        `https://api.wassenger.com/v1/chats/${encodeURIComponent(chat.id)}`,
+        {
+          method: 'PATCH',
+          headers: {'Token': wassengerKey, 'Content-Type': 'application/json'},
+          body: JSON.stringify({labels: aptId ? [aptId] : []}),
+        }
+      );
+      if (!patchRes.ok) {
+        const text = await patchRes.text();
+        res.json({success: false, error: `chat label failed: ${text}`});
+        return;
+      }
+
+      res.json({success: true, chatId: chat.id, aptId});
     } catch (e) {
       res.status(500).json({success: false, error: e.message});
     }
