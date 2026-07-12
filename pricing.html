@@ -234,6 +234,16 @@
     <div id="recsList"></div>
   </div>
 
+  <!-- CLAUDE PROPOSALS -->
+  <div class="card" id="proposalsCard" style="display:none">
+    <div class="card-header">
+      <span class="card-title">🧠 Claude Strategy Proposals</span>
+      <span class="card-badge" id="propsBadge">0 pending</span>
+    </div>
+    <div id="propsSummary" style="display:none;padding:12px 20px;font-size:13px;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--border)"></div>
+    <div id="propsList"></div>
+  </div>
+
   <!-- EVENTS -->
   <div class="card">
     <div class="card-header">
@@ -638,6 +648,100 @@ window.applyRec = async (id,prop,season,currency,type,value) => {
   renderSeasonGrid(); showToast('Recommendation applied','success');
 };
 window.dismissRec = async (id) => { await updateDoc(doc(db,'pricing_recommendations',id),{status:'dismissed'}); showToast('Dismissed'); };
+
+// ── CLAUDE PROPOSALS ──
+onSnapshot(query(collection(db,'pricing_proposals'),where('status','==','pending')), snap => {
+  const card=document.getElementById('proposalsCard');
+  const list=document.getElementById('propsList');
+  const badge=document.getElementById('propsBadge');
+  badge.textContent=snap.size+' pending';
+  card.style.display=snap.empty?'none':'';
+  list.innerHTML=snap.docs.map(d => {
+    const r=d.data();
+    const pct=r.change_pct||0;
+    const sign=pct>=0?'+':'';
+    const color=pct>=0?'var(--green)':'var(--red)';
+    const typeLabel=(r.type||'').replace(/([A-Z])/g,' $1').toLowerCase();
+    return `<div class="event-row">
+      <div style="min-width:72px;font-family:var(--mono);font-weight:700;font-size:15px;color:${color}">${sign}${pct.toFixed(1)}%</div>
+      <div class="event-info">
+        <div class="event-name">${PROP_LABELS[r.property]||r.property} — ${SEASON_LABELS[r.season]||r.season} ${typeLabel}</div>
+        <div class="event-venue">${r.current} → ${r.suggested} · ${r.reasoning||''}</div>
+      </div>
+      <div class="event-actions">
+        <button class="btn btn-approve" onclick="applyProposal('${d.id}','${r.property}','${r.season}','${r.type}',${r.suggested})">Apply</button>
+        <button class="btn btn-dismiss" onclick="rejectProposal('${d.id}')">Reject</button>
+      </div>
+    </div>`;
+  }).join('');
+});
+
+// Show today's daily summary if available
+(async () => {
+  try {
+    const today = new Date().toISOString().slice(0,10);
+    const markerSnap = await getDocs(query(collection(db,'pricing_proposals'),where('type','==','run_marker'),where('date','==',today),limit(1)));
+    if (!markerSnap.empty) {
+      const summary=markerSnap.docs[0].data().summary||'';
+      if (summary) {
+        const el=document.getElementById('propsSummary');
+        el.style.display='';
+        el.textContent='Claude: '+summary;
+        document.getElementById('proposalsCard').style.display='';
+      }
+    }
+  } catch(e) {}
+})();
+
+window.applyProposal = async (id, prop, season, ptype, value) => {
+  try {
+    const rulesSnap = await getDoc(doc(db,'pricing_config','rules'));
+    const rules = rulesSnap.exists() ? rulesSnap.data() : {};
+    if (ptype==='startPrice') {
+      if (!rules.startPrices) rules.startPrices={};
+      if (!rules.startPrices[prop]) rules.startPrices[prop]={};
+      rules.startPrices[prop][season]=value;
+      startPrices[prop]=rules.startPrices[prop];
+    } else if (ptype==='floor') {
+      if (!rules.priceRules) rules.priceRules={};
+      if (!rules.priceRules[prop]) rules.priceRules[prop]={};
+      if (!rules.priceRules[prop][season]) rules.priceRules[prop][season]={};
+      rules.priceRules[prop][season].min=value;
+      if (priceRules[prop]?.[season]) priceRules[prop][season].min=value;
+    } else if (ptype==='ceiling') {
+      if (!rules.priceRules) rules.priceRules={};
+      if (!rules.priceRules[prop]) rules.priceRules[prop]={};
+      if (!rules.priceRules[prop][season]) rules.priceRules[prop][season]={};
+      rules.priceRules[prop][season].max=value;
+      if (priceRules[prop]?.[season]) priceRules[prop][season].max=value;
+    } else if (ptype==='startPriceEur') {
+      if (!rules.startPricesEur) rules.startPricesEur={};
+      if (!rules.startPricesEur[prop]) rules.startPricesEur[prop]={};
+      rules.startPricesEur[prop][season]=value;
+      startPricesEur[prop]=rules.startPricesEur[prop];
+    } else if (ptype==='floorEur') {
+      if (!rules.eurRules) rules.eurRules={};
+      if (!rules.eurRules[prop]) rules.eurRules[prop]={};
+      if (!rules.eurRules[prop][season]) rules.eurRules[prop][season]={};
+      rules.eurRules[prop][season].min=value;
+      if (eurRules[prop]?.[season]) eurRules[prop][season].min=value;
+    } else if (ptype==='ceilingEur') {
+      if (!rules.eurRules) rules.eurRules={};
+      if (!rules.eurRules[prop]) rules.eurRules[prop]={};
+      if (!rules.eurRules[prop][season]) rules.eurRules[prop][season]={};
+      rules.eurRules[prop][season].max=value;
+      if (eurRules[prop]?.[season]) eurRules[prop][season].max=value;
+    }
+    await setDoc(doc(db,'pricing_config','rules'), rules, {merge:true});
+    await updateDoc(doc(db,'pricing_proposals',id), {status:'approved'});
+    renderSeasonGrid();
+    showToast('Proposal applied','success');
+  } catch(e) { showToast('Error: '+e.message,'error'); }
+};
+window.rejectProposal = async (id) => {
+  await updateDoc(doc(db,'pricing_proposals',id), {status:'rejected'});
+  showToast('Proposal rejected');
+};
 
 // ── ACTIONS ──
 window.approveEvent = async (id) => { const mult=parseFloat(document.getElementById(`m-${id}`)?.value||1.35); await updateDoc(doc(db,'pricing_events',id),{status:'approved',multiplier:mult}); showToast('Event approved','success'); };

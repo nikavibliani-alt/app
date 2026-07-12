@@ -29,8 +29,9 @@ from datetime import datetime, timedelta
 import requests
 from minihotel_auth import get_session_cookie
 from event_scanner import scan_and_update as scan_events
+import os
 from ai_pricing import get_booking_velocity
-from claude_pricing import claude_compute_prices
+from claude_pricing import claude_write_daily_proposal
 from price_tracker import snapshot_prices, record_outcomes
 from velocity_engine import compute_prices_velocity
 
@@ -427,7 +428,7 @@ def sync_channels(results: dict):
 # FIRESTORE LOG
 # ---------------------------------------------------------------------------
 
-def write_firestore_log(results: dict, dry_run: bool, error: str = None):
+def write_firestore_log(results: dict, dry_run: bool, error: str = None, trigger: str = "scheduled"):
     """Write run summary to Firestore pricing_log collection."""
     try:
         import firebase_admin
@@ -453,6 +454,7 @@ def write_firestore_log(results: dict, dry_run: bool, error: str = None):
             "timestamp":     fs.SERVER_TIMESTAMP,
             "dry_run":       dry_run,
             "changes_count": total_changes,
+            "trigger":       trigger,
             "message":       f"{'DRY RUN' if dry_run else 'LIVE'}: {total_changes} price updates",
         }
         if error:
@@ -550,6 +552,11 @@ def print_report(results: dict, dry_run: bool):
 def main():
     global _COOKIE
 
+    # Urgent mode — triggered by cancellation fast-path
+    urgent = os.environ.get("PRICING_URGENT", "").lower() == "true"
+    urgent_props = [p.strip() for p in os.environ.get("PRICING_PROPERTIES", "").split(",") if p.strip()]
+    urgent_dates = [d.strip() for d in os.environ.get("PRICING_DATES", "").split(",") if d.strip()]
+
     parser = argparse.ArgumentParser(description="Maxela Pricing Engine")
     parser.add_argument("--apply", action="store_true",
                         help="Write prices to MiniHotel (default: dry run)")
@@ -559,7 +566,17 @@ def main():
 
     config  = load_config()
     dry_run = not args.apply and config.get("dry_run", True)
-    window  = args.days or config.get("run_window_days", 90)
+
+    if urgent:
+        # Narrow window for speed: cover only the near-term cancellation dates
+        if urgent_dates:
+            max_days = max((days_until(d) for d in urgent_dates if d), default=14)
+            window = max(max_days + 2, 7)
+        else:
+            window = 14
+        print(f"URGENT MODE: cancellation reprice — properties={urgent_props or 'all'}, dates={urgent_dates or 'near-term'}, window={window}d")
+    else:
+        window = args.days or config.get("run_window_days", 90)
 
     # Scan for Tbilisi events and update config
     print("Scanning for events...")
@@ -596,7 +613,7 @@ def main():
     if _db_for_ai:
         record_outcomes(raw)
 
-    # Load base_price_pct from Firestore (set from pricing page)
+    # Load pricing rules from Firestore (set from pricing page)
     if _db_for_ai:
         try:
             rules_snap = _db_for_ai.collection("pricing_config").document("rules").get()
@@ -627,7 +644,7 @@ def main():
                         config["ceiling_prices_eur"][rt][s] = vals.get("max", 0)
             print(f"  Loaded pricing rules from Firestore.")
         except Exception as _bpe:
-            print(f"  Warning: could not load base_price_pct: {_bpe}", file=sys.stderr)
+            print(f"  Warning: could not load pricing rules: {_bpe}", file=sys.stderr)
 
     print("Computing prices...")
 
@@ -637,22 +654,27 @@ def main():
         print("  Loading booking velocity...")
         velocity = get_booking_velocity(_db_for_ai)
 
+    # Claude daily strategy analyst — runs once per day, updates config before velocity engine
+    # Skipped for urgent/cancellation runs to keep them fast
+    if _db_for_ai and not urgent:
+        print("  Running Claude strategy analyst...")
+        config = claude_write_daily_proposal(config, _db_for_ai, velocity)
+
     # Run velocity engine as baseline for all properties
     print("  Running velocity-adjusted pricing engine...")
     results = compute_prices_velocity(raw, config, velocity)
 
-    # Run Claude AI layer — overrides velocity results per property where it succeeds
-    if _db_for_ai:
-        claude_results = claude_compute_prices(raw, config, _db_for_ai, velocity)
-        if claude_results:
-            results.update(claude_results)
-            print(f"  Claude pricing applied ({len(claude_results)} properties).")
+    # Filter to urgent properties only when in urgent mode
+    if urgent and urgent_props:
+        results = {rt: dates for rt, dates in results.items() if rt in urgent_props}
 
     print_report(results, dry_run)
 
+    trigger = "cancellation" if urgent else "scheduled"
+
     if dry_run:
         print("DRY RUN — run with --apply to write changes to MiniHotel")
-        write_firestore_log(results, dry_run=True)
+        write_firestore_log(results, dry_run=True, trigger=trigger)
         return
 
     payload = build_write_payload(results)
@@ -670,7 +692,7 @@ def main():
     print("Syncing channels...")
     sync_channels(results)
     print("Done.")
-    write_firestore_log(results, dry_run=False)
+    write_firestore_log(results, dry_run=False, trigger=trigger)
 
 
 if __name__ == "__main__":

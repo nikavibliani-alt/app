@@ -2,6 +2,19 @@ name: Maxela Pricing Engine
 
 on:
   workflow_dispatch:
+    inputs:
+      urgent:
+        description: 'Urgent cancellation reprice (true/false)'
+        required: false
+        default: 'false'
+      property_types:
+        description: 'Comma-separated property types to reprice (ROOMS,MAXELA,...)'
+        required: false
+        default: ''
+      dates:
+        description: 'Comma-separated cancellation dates (YYYY-MM-DD)'
+        required: false
+        default: ''
 
 jobs:
   pricing:
@@ -28,4 +41,7 @@ jobs:
           SERPAPI_KEY:              ${{ secrets.SERPAPI_KEY }}
           SENDGRID_KEY:             ${{ secrets.SENDGRID_KEY }}
           ANTHROPIC_API_KEY:        ${{ secrets.ANTHROPIC_API_KEY }}
+          PRICING_URGENT:           ${{ github.event.inputs.urgent }}
+          PRICING_PROPERTIES:       ${{ github.event.inputs.property_types }}
+          PRICING_DATES:            ${{ github.event.inputs.dates }}
         run: python pricing_engine.py --apply

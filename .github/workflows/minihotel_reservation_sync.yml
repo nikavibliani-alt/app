@@ -25,7 +25,8 @@ jobs:
       - name: Run reservation sync
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          MINIHOTEL_HOTEL: ${{ secrets.MINIHOTEL_HOTEL }}
-          MINIHOTEL_USER: ${{ secrets.MINIHOTEL_USER }}
-          MINIHOTEL_PASS: ${{ secrets.MINIHOTEL_PASS }}
+          MINIHOTEL_HOTEL:          ${{ secrets.MINIHOTEL_HOTEL }}
+          MINIHOTEL_USER:           ${{ secrets.MINIHOTEL_USER }}
+          MINIHOTEL_PASS:           ${{ secrets.MINIHOTEL_PASS }}
+          GITHUB_TOKEN:             ${{ secrets.GITHUB_TOKEN }}
         run: python minihotel_reservation_sync.py

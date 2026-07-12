@@ -34,6 +34,21 @@ ROOM_MAP = {
 SKIP_ROOMS = {'VGL_ST1', 'VGL_ST2', 'VGL_AP3', 'VGL_AP4'}
 VALID_STATUSES = {'OK', 'OK2', 'CL', 'WL'}
 
+# Room code (post-ROOM_MAP) → pricing property type
+ROOM_TO_PROPERTY = {}
+for _i in range(1, 6):
+    ROOM_TO_PROPERTY[f"0-{_i}"] = "ROOMS"
+for _i in range(1, 5):
+    ROOM_TO_PROPERTY[f"6-{_i}"] = "MAXELA"
+ROOM_TO_PROPERTY["6-3"] = "BIG_APT"
+for _i in [1, 2, 3]:
+    ROOM_TO_PROPERTY[f"tab-{_i}"] = "FREEDOM"
+ROOM_TO_PROPERTY["orb-1"] = "ORBE_1"
+ROOM_TO_PROPERTY["orb-2"] = "ORBE_1"
+ROOM_TO_PROPERTY["orb-3"] = "ORBE_2"
+for _i in [1, 2, 4]:
+    ROOM_TO_PROPERTY[f"7-{_i}"] = "MAXELA"
+
 
 def parse_date(d):
     """Convert MiniHotel YYYYMMDD → YYYY-MM-DD"""
@@ -230,7 +245,11 @@ def sync_to_firestore(db, reservations):
 
 def detect_cancellations(db, api_reservations, from_date, to_date):
     """Mark Firestore reservations as cancelled if they're not in the API response.
-    Also deletes stale room-move orphan docs and old non-API docs with no API match."""
+    Also deletes stale room-move orphan docs and old non-API docs with no API match.
+
+    Returns list of {checkin, property_type} for newly cancelled near-term reservations
+    (checkin within 14 days) so the caller can trigger urgent repricing.
+    """
     coll = db.collection('reservations')
 
     # Build lookup sets from the API response
@@ -261,6 +280,10 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
     op_count = 0
     cancelled = 0
     stale_deleted = 0
+    near_term_cancellations = []  # {checkin, property_type} for urgent reprice trigger
+
+    today = datetime.datetime.utcnow().date()
+    cutoff_14d = (today + datetime.timedelta(days=14)).strftime('%Y-%m-%d')
 
     for doc in snap:
         data = doc.to_dict()
@@ -279,7 +302,17 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
                 })
                 cancelled += 1
                 op_count += 1
-                print(f"  Cancelled: {data.get('guest')} | {data.get('roomCode')} | {data.get('checkout')}")
+                checkin = data.get('checkin', '')
+                room_code = data.get('roomCode', '')
+                print(f"  Cancelled: {data.get('guest')} | {room_code} | {data.get('checkout')}")
+
+                # Track near-term cancellations for urgent repricing
+                prop_type = ROOM_TO_PROPERTY.get(room_code)
+                if prop_type and checkin and checkin <= cutoff_14d:
+                    near_term_cancellations.append({
+                        'checkin': checkin,
+                        'property_type': prop_type,
+                    })
         else:
             # Reservation is active — check for stale room-move orphan
             doc_id = doc.id
@@ -301,6 +334,7 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
     if op_count % 450 != 0:
         batch.commit()
     print(f"Detected {cancelled} cancellations, deleted {stale_deleted} stale room-move orphans")
+    return near_term_cancellations
 
     # ── Old-doc cleanup: non-API docs with no API equivalent ─────────────────
     # Collect old docs in the date window from known legacy syncSource values
@@ -337,6 +371,47 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
     if deleted > 0:
         batch2.commit()
     print(f"Cleaned {deleted} old non-API docs with no API equivalent")
+
+
+def trigger_urgent_pricing(cancellations: list):
+    """Trigger pricing_engine workflow for near-term cancellations via GitHub API."""
+    if not cancellations:
+        return
+
+    gh_token = os.environ.get('GITHUB_TOKEN', '')
+    if not gh_token:
+        print('  No GITHUB_TOKEN — skipping urgent pricing trigger')
+        return
+
+    affected_props = sorted(set(c['property_type'] for c in cancellations if c.get('property_type')))
+    affected_dates = sorted(set(c['checkin'] for c in cancellations if c.get('checkin')))
+
+    if not affected_props:
+        return
+
+    gh_repo = os.environ.get('GITHUB_REPOSITORY', 'nikavibliani-alt/app')
+    url = f'https://api.github.com/repos/{gh_repo}/actions/workflows/pricing_engine.yml/dispatches'
+
+    try:
+        resp = requests.post(url, json={
+            'ref': 'main',
+            'inputs': {
+                'urgent':         'true',
+                'property_types': ','.join(affected_props),
+                'dates':          ','.join(affected_dates),
+            },
+        }, headers={
+            'Authorization':        f'Bearer {gh_token}',
+            'Accept':               'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+        }, timeout=15)
+
+        if resp.status_code == 204:
+            print(f'  Urgent pricing triggered: properties={affected_props} dates={affected_dates}')
+        else:
+            print(f'  Warning: GitHub dispatch returned {resp.status_code}: {resp.text[:200]}', file=sys.stderr)
+    except Exception as e:
+        print(f'  Warning: could not trigger urgent pricing: {e}', file=sys.stderr)
 
 
 def cleanup_old_duplicates(db):
@@ -553,8 +628,9 @@ def main():
     # Fetch Booking.com/Expedia confirmation IDs for OTA reservations
     fetch_booking_ids(session, db, reservations)
 
-    # Detect cancellations
-    detect_cancellations(db, reservations, from_date, to_date)
+    # Detect cancellations and trigger urgent repricing for near-term ones
+    near_term = detect_cancellations(db, reservations, from_date, to_date)
+    trigger_urgent_pricing(near_term)
 
     # Clean up old duplicates (run once, then can be removed)
     cleanup_old_duplicates(db)
