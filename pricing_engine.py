@@ -21,7 +21,6 @@ Usage:
 """
 
 import argparse
-import concurrent.futures
 import json
 import sys
 import time
@@ -410,14 +409,14 @@ def sync_channels(results: dict):
                     f"{SYNC_ENDPOINT}?Portal={portal}",
                     json={"portal": portal},
                     headers=get_headers(),
-                    timeout=60,
+                    timeout=20,
                 )
                 resp.raise_for_status()
                 break
             except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
                 if attempt < 2:
-                    print(f"  [{portal}] attempt {attempt+1}/3 failed: {e} — retrying in 10s...", file=sys.stderr)
-                    time.sleep(10)
+                    print(f"  [{portal}] attempt {attempt+1}/3 failed: {e} — retrying in 5s...", file=sys.stderr)
+                    time.sleep(5)
                 else:
                     print(f"  [{portal}] all 3 attempts failed: {e} — skipping channel.", file=sys.stderr)
         time.sleep(2)
@@ -583,19 +582,6 @@ def main():
     print("Loading approved events...")
     config = load_approved_events(config)
 
-    # Load today's already-changed prices to avoid running up prices 3x per day
-    todays_changes = {}
-    try:
-        import firebase_admin
-        from firebase_admin import firestore as _fs
-        if firebase_admin._apps:
-            _db = _fs.client()
-            todays_changes = load_todays_changes(_db)
-            if todays_changes:
-                print(f"  Found {sum(len(v) for v in todays_changes.values() if isinstance(v,dict))} prices already changed today.")
-    except Exception as _e:
-        print(f"  Warning: could not load daily state: {_e}", file=sys.stderr)
-
     # Initialize Firestore client for AI and tracking
     _db_for_ai = None
     try:
@@ -643,8 +629,7 @@ def main():
         except Exception as _bpe:
             print(f"  Warning: could not load base_price_pct: {_bpe}", file=sys.stderr)
 
-    print("Computing prices (AI mode)...")
-    # Try AI pricing first, fall back to rule-based if Gemini unavailable
+    print("Computing prices...")
 
     # Load booking velocity for smart pricing
     velocity = {}
@@ -652,21 +637,12 @@ def main():
         print("  Loading booking velocity...")
         velocity = get_booking_velocity(_db_for_ai)
 
-    # Use velocity-adjusted engine
+    # Run velocity-adjusted engine
     print("  Running velocity-adjusted pricing engine...")
-    results = compute_prices_velocity(raw, config, velocity, todays_changes)
+    results = compute_prices_velocity(raw, config, velocity)
 
-    # Run AI review with a hard timeout — never block the engine for more than 90s
-    try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _ai_pool:
-            _ai_future = _ai_pool.submit(ai_compute_prices, raw, config, _db_for_ai)
-            ai_results = _ai_future.result(timeout=90)
-        if ai_results:
-            print("  AI boundary suggestions processed.")
-    except concurrent.futures.TimeoutError:
-        print("  AI review timed out (>90s) — skipped.", file=sys.stderr)
-    except Exception as _ai_e:
-        print(f"  AI review skipped: {_ai_e}", file=sys.stderr)
+    # Gemini AI disabled — 429 rate-limiting on every run
+    # ai_compute_prices(raw, config, _db_for_ai)
 
     print_report(results, dry_run)
 
@@ -687,22 +663,6 @@ def main():
     # Snapshot prices for learning
     if _db_for_ai:
         snapshot_prices(results)
-    # Save today's changes so next run knows what was already updated
-    try:
-        import firebase_admin
-        from firebase_admin import firestore as _fs2
-        if firebase_admin._apps:
-            _db2 = _fs2.client()
-            daily_state = {}
-            for rt, dates in results.items():
-                changed = {d["date"]: {"gel": d["proposed_gel"], "eur": d["proposed_eur"]} 
-                          for d in dates if d.get("changed") and not d.get("skip")}
-                if changed:
-                    daily_state[rt] = changed
-            save_todays_changes(_db2, daily_state)
-    except Exception as _e2:
-        print(f"  Warning: could not save daily state: {_e2}", file=sys.stderr)
-
     print("Syncing channels...")
     sync_channels(results)
     print("Done.")

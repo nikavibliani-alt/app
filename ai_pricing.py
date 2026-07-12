@@ -408,9 +408,7 @@ def ai_compute_prices(raw_data: list, config: dict, db=None) -> dict:
                 all_recommendations.extend(ai_response["recommendations"])
             print(f"    {rt}: {len(prop_prices)} date suggestions")
 
-        # Hard pacing delay — always wait after each property to clear TPM window
-        print(f"  Pacing: waiting 35s before next property...")
-        time.sleep(35)
+        # Pacing delay removed — Gemini disabled
 
     if not all_prices:
         print("  Gemini returned no prices — falling back to rule-based engine", file=sys.stderr)

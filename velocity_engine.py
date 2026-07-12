@@ -183,7 +183,6 @@ def compute_prices_velocity(
     raw_data: list,
     config: dict,
     velocity: dict,
-    todays_changes: dict = None,
 ) -> dict:
     """
     Main pricing function using velocity-adjusted dynamic pricing.
@@ -200,9 +199,6 @@ def compute_prices_velocity(
         get_season, get_price_from_rates, days_until,
         ROOM_TYPES, CHANNEL_MATRIX
     )
-
-    if todays_changes is None:
-        todays_changes = {}
 
     rounding = config.get("rounding", 5)
 
@@ -304,30 +300,22 @@ def compute_prices_velocity(
                     gel_reason   = f"unset→base {base_gel}₾ season={season}"
 
                 elif prices["gel"] > 0:
-                    # Check per-day cap
-                    already_today = todays_changes.get(rt, {}).get(date_str)
-                    already_gel   = already_today.get("gel") if isinstance(already_today, dict) else already_today
-
-                    if already_gel and event_mult == 1.0:
-                        proposed_gel = prices["gel"]
-                        gel_reason   = "already updated today"
+                    # Last-minute cascade (if behind target)
+                    if days <= 3 and occ_deficit > 5 and floor_gel > 0:
+                        proposed_gel = apply_cascade(prices["gel"], floor_gel, days)
+                        gel_reason   = f"CASCADE day={days} occ={occ_pct:.0f}% target={tgt_min}-{tgt_max}%"
                     else:
-                        # Last-minute cascade (if behind target)
-                        if days <= 3 and occ_deficit > 5 and floor_gel > 0:
-                            proposed_gel = apply_cascade(prices["gel"], floor_gel, days)
-                            gel_reason   = f"CASCADE day={days} occ={occ_pct:.0f}% target={tgt_min}-{tgt_max}%"
-                        else:
-                            # Apply velocity-adjusted score
-                            eff_score  = score * event_mult
-                            proposed_gel, action, pct = apply_step(
-                                prices["gel"], eff_score, floor_gel, ceiling_gel or 99999
-                            )
-                            gel_reason = (
-                                f"occ={occ_pct:.0f}% tgt={tgt_min}-{tgt_max}% "
-                                f"vel={vel_bookings}bk score={score:.0f} {action}({pct:+.1%})"
-                            )
-                            if event_label:
-                                gel_reason += f" +{event_label}"
+                        # Apply velocity-adjusted score
+                        eff_score  = score * event_mult
+                        proposed_gel, action, pct = apply_step(
+                            prices["gel"], eff_score, floor_gel, ceiling_gel or 99999
+                        )
+                        gel_reason = (
+                            f"occ={occ_pct:.0f}% tgt={tgt_min}-{tgt_max}% "
+                            f"vel={vel_bookings}bk score={score:.0f} {action}({pct:+.1%})"
+                        )
+                        if event_label:
+                            gel_reason += f" +{event_label}"
 
                 if ceiling_gel > 0:
                     proposed_gel = min(proposed_gel, ceiling_gel)
@@ -344,18 +332,12 @@ def compute_prices_velocity(
                     proposed_eur = base_eur * event_mult
 
                 elif prices["eur"] > 0:
-                    already_today = todays_changes.get(rt, {}).get(date_str)
-                    already_eur   = already_today.get("eur") if isinstance(already_today, dict) else None
-
-                    if already_eur and event_mult == 1.0:
-                        proposed_eur = prices["eur"]
+                    if days <= 3 and occ_deficit > 5 and floor_eur > 0:
+                        proposed_eur = apply_cascade(prices["eur"], floor_eur, days)
                     else:
-                        if days <= 3 and occ_deficit > 5 and floor_eur > 0:
-                            proposed_eur = apply_cascade(prices["eur"], floor_eur, days)
-                        else:
-                            proposed_eur, _, _ = apply_step(
-                                prices["eur"], score, floor_eur, ceiling_eur or 99999
-                            )
+                        proposed_eur, _, _ = apply_step(
+                            prices["eur"], score, floor_eur, ceiling_eur or 99999
+                        )
 
                 if ceiling_eur > 0:
                     proposed_eur = min(proposed_eur, ceiling_eur)
