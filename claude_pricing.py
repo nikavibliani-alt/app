@@ -12,7 +12,8 @@ Falls back silently if ANTHROPIC_API_KEY is missing or no booking data exists.
 import json
 import os
 import sys
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta
 
 import anthropic
 
@@ -58,7 +59,39 @@ change_pct = (suggested - current) / current * 100 (signed: positive = increase)
 Maximum ±30% change for any single proposal. Maximum 10 proposals total."""
 
 
-def build_analyst_prompt(config: dict, learning_context: str) -> str:
+def _get_rejection_context(db) -> str:
+    """Return a summary of recently rejected proposals so Claude avoids re-proposing them."""
+    try:
+        cutoff = (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d")
+        snaps = (
+            db.collection("pricing_proposals")
+            .where("status", "==", "rejected")
+            .where("date", ">=", cutoff)
+            .get()
+        )
+    except Exception:
+        return ""
+
+    groups = defaultdict(list)
+    for snap in snaps:
+        d = snap.to_dict()
+        key = (d.get("property", ""), d.get("season", ""), d.get("type", ""))
+        groups[key].append((d.get("date", ""), d.get("rejection_reason", "")))
+
+    if not groups:
+        return ""
+
+    lines = ["\nREJECTED PROPOSALS (last 60 days — do not re-propose without new evidence):"]
+    for (prop, season, ptype), rejections in sorted(groups.items()):
+        count = len(rejections)
+        parts = []
+        for date, reason in sorted(rejections, reverse=True)[:3]:
+            parts.append(f"'{reason}' ({date})" if reason else f"no reason ({date})")
+        lines.append(f"  {prop} {season} {ptype}: rejected {count}x — {', '.join(parts)}")
+    return "\n".join(lines)
+
+
+def build_analyst_prompt(config: dict, learning_context: str, rejection_context: str = "") -> str:
     today = datetime.now().strftime("%Y-%m-%d")
 
     lines = [
@@ -94,6 +127,9 @@ def build_analyst_prompt(config: dict, learning_context: str) -> str:
 
     if learning_context:
         lines.append(learning_context)
+
+    if rejection_context:
+        lines.append(rejection_context)
 
     return "\n".join(lines)
 
@@ -178,8 +214,11 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict
         print("  No booking history yet — skipping Claude analyst.")
         return config
 
+    # Load rejection history so Claude avoids re-proposing recently rejected changes
+    rejection_context = _get_rejection_context(db)
+
     # Build prompt and call Claude
-    prompt = build_analyst_prompt(config, learning_context)
+    prompt = build_analyst_prompt(config, learning_context, rejection_context)
     try:
         response = call_claude_analyst(prompt, api_key)
     except Exception as e:

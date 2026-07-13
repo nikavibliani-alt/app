@@ -71,6 +71,8 @@
   .btn { padding: 5px 12px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
   .btn-approve{background:var(--green-light);color:var(--green);border-color:rgba(45,125,78,0.2)}.btn-approve:hover{background:#d5ede2}
   .btn-dismiss{background:var(--bg);color:var(--muted);border-color:var(--border)}.btn-dismiss:hover{color:var(--red);border-color:var(--red)}
+  .reject-chip{font-size:11px;padding:3px 9px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--muted);cursor:pointer;white-space:nowrap;transition:all 0.15s}
+  .reject-chip:hover{border-color:var(--red);color:var(--red)}.reject-chip.active{background:var(--red-light);border-color:var(--red);color:var(--red);font-weight:600}
   .btn-remove{background:var(--bg);color:var(--muted);border-color:var(--border)}.btn-remove:hover{color:var(--red);border-color:var(--red)}
   .btn-save{background:var(--accent);color:white;border-color:var(--accent)}.btn-save:hover{opacity:0.88}
   .add-form { padding: 16px 20px; border-top: 1px solid var(--border); background: var(--bg); display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
@@ -668,9 +670,9 @@ onSnapshot(query(collection(db,'pricing_proposals'),where('status','==','pending
         <div class="event-name">${PROP_LABELS[r.property]||r.property} — ${SEASON_LABELS[r.season]||r.season} ${typeLabel}</div>
         <div class="event-venue">${r.current} → ${r.suggested} · ${r.reasoning||''}</div>
       </div>
-      <div class="event-actions">
+      <div class="event-actions" id="actions-${d.id}">
         <button class="btn btn-approve" onclick="applyProposal('${d.id}','${r.property}','${r.season}','${r.type}',${r.suggested})">Apply</button>
-        <button class="btn btn-dismiss" onclick="rejectProposal('${d.id}')">Reject</button>
+        <button class="btn btn-dismiss" onclick="showRejectPanel('${d.id}')">Reject</button>
       </div>
     </div>`;
   }).join('');
@@ -738,8 +740,45 @@ window.applyProposal = async (id, prop, season, ptype, value) => {
     showToast('Proposal applied','success');
   } catch(e) { showToast('Error: '+e.message,'error'); }
 };
-window.rejectProposal = async (id) => {
-  await updateDoc(doc(db,'pricing_proposals',id), {status:'rejected'});
+const _savedActions = {};
+const REJECT_REASONS = ['Not enough data yet',"Price didn't convert at this level",'Market uncertainty','Other'];
+
+window.showRejectPanel = (id) => {
+  const el = document.getElementById('actions-' + id);
+  if (!el) return;
+  _savedActions[id] = el.innerHTML;
+  const chips = REJECT_REASONS.map(r =>
+    `<button class="reject-chip" onclick="pickRejectReason('${id}',this,\`${r}\`)">${r}</button>`
+  ).join('');
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:280px;align-items:flex-end">
+      <div style="font-size:11px;color:var(--muted);font-weight:600;align-self:flex-start">Why rejecting? (optional)</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-start;width:100%">${chips}</div>
+      <input id="reject-txt-${id}" type="text" placeholder="Add reason..." style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:var(--font);color:var(--text);background:var(--white)">
+      <div style="display:flex;gap:6px">
+        <button class="btn" style="font-size:12px;padding:4px 10px" onclick="cancelRejectPanel('${id}')">Cancel</button>
+        <button class="btn btn-dismiss" style="font-size:12px;padding:4px 10px;color:var(--red);border-color:var(--red)" onclick="confirmReject('${id}')">Confirm reject</button>
+      </div>
+    </div>`;
+};
+
+window.pickRejectReason = (id, btn, reason) => {
+  document.querySelectorAll(`#actions-${id} .reject-chip`).forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('reject-txt-' + id).value = reason;
+};
+
+window.cancelRejectPanel = (id) => {
+  const el = document.getElementById('actions-' + id);
+  if (el && _savedActions[id]) { el.innerHTML = _savedActions[id]; delete _savedActions[id]; }
+};
+
+window.confirmReject = async (id) => {
+  const reason = (document.getElementById('reject-txt-' + id)?.value || '').trim();
+  const update = {status: 'rejected', rejected_at: new Date().toISOString()};
+  if (reason) update.rejection_reason = reason;
+  await updateDoc(doc(db,'pricing_proposals',id), update);
+  delete _savedActions[id];
   showToast('Proposal rejected');
 };
 
