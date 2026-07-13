@@ -3,814 +3,591 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pricing Engine — Maxela</title>
+<title>Pricing — Maxela</title>
 <style>
-  :root {
-    --bg: #f5f5f3; --white: #ffffff; --border: #e5e5e2; --border2: #d0d0cc;
-    --text: #1a1a1a; --muted: #888884; --accent: #1e6b3e; --accent-light: #e8f4ed;
-    --green: #2d7d4e; --green-light: #edf7f1; --red: #c0392b; --red-light: #fdf0ee;
-    --yellow: #c47d0e; --yellow-light: #fdf6e8; --blue: #2563a8;
-    --font: 'Inter', system-ui, sans-serif; --mono: 'JetBrains Mono','SF Mono',monospace;
-    --radius: 8px; --shadow: 0 1px 3px rgba(0,0,0,0.08);
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; }
-  .header { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
-  .header-left { display: flex; align-items: center; gap: 8px; }
-  .back-link { color: var(--muted); text-decoration: none; font-size: 13px; }
-  .back-link:hover { color: var(--text); }
-  .sep { color: var(--border2); }
-  .page-title { font-size: 14px; font-weight: 600; }
-  .run-btn { background: var(--accent); color: white; border: none; padding: 7px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
-  .run-btn:hover { opacity: 0.88; } .run-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-  .main { max-width: 1200px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-  .stat { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); }
-  .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 6px; }
-  .stat-value { font-size: 24px; font-weight: 700; color: var(--accent); font-family: var(--mono); }
-  .stat-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
-  .card-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-  .card-title { font-size: 13px; font-weight: 600; }
-  .card-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
-  .tabs { display: flex; gap: 2px; background: var(--bg); padding: 3px; border-radius: 6px; }
-  .tab { padding: 5px 14px; border-radius: 5px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: transparent; color: var(--muted); transition: all 0.15s; }
-  .tab.active { background: var(--white); color: var(--text); box-shadow: var(--shadow); }
-  .price-section { padding: 20px; }
-  .price-input { width: 68px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; font-family: var(--mono); color: var(--text); background: var(--white); text-align: right; }
-  .price-input:focus { outline: none; border-color: var(--accent); background: var(--accent-light); }
-  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .tbl th { background: var(--bg); padding: 8px 10px; border: 1px solid var(--border); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); text-align: center; }
-  .tbl th.left { text-align: left; }
-  .tbl td { padding: 6px 8px; border: 1px solid var(--border); text-align: center; vertical-align: middle; }
-  .tbl td.label { text-align: left; font-weight: 600; white-space: nowrap; background: var(--bg); }
-  .tbl tr:hover td { background: #fafafa; }
-  .tbl tr:hover td.label { background: var(--bg); }
-  .cell-pair { display: flex; align-items: center; justify-content: center; gap: 4px; }
-  .cell-sep { color: var(--border2); font-size: 12px; }
-  .sdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-  .season-editor { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-  .season-legend { display: flex; gap: 10px; flex-wrap: wrap; }
-  .season-btn { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.15s; background: var(--bg); color: var(--text); }
-  .season-btn.selected { border-color: currentColor; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; }
-  .month-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; }
-  .month-chip { padding: 8px 4px; border-radius: 6px; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; user-select: none; }
-  .s-low{background:#e8f0fe;color:#3b5bdb}.s-mid{background:#e8f5e8;color:#2d7d4e}.s-high{background:#fff3cd;color:#c47d0e}
-  .s-peak{background:#ffe5e5;color:#c0392b}.s-newyear{background:#f3e5f5;color:#7b3fa0}.s-xmas{background:#e5f5f5;color:#2980b9}
-  .dot-low{background:#3b5bdb}.dot-mid{background:#2d7d4e}.dot-high{background:#c47d0e}
-  .dot-peak{background:#c0392b}.dot-newyear{background:#7b3fa0}.dot-xmas{background:#2980b9}
-  .event-row { display: flex; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--border); gap: 14px; }
-  .event-row:last-child { border-bottom: none; } .event-row:hover { background: var(--bg); }
-  .event-date { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--accent); min-width: 100px; }
-  .event-info { flex: 1; } .event-name { font-weight: 600; font-size: 14px; } .event-venue { font-size: 12px; color: var(--muted); }
-  .event-actions { display: flex; align-items: center; gap: 8px; }
-  .mult-input { width: 68px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; font-family: var(--mono); text-align: center; }
-  .badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
-  .badge-pending{background:var(--yellow-light);color:var(--yellow)}.badge-approved{background:var(--green-light);color:var(--green)}.badge-manual{background:var(--accent-light);color:var(--accent)}
-  .btn { padding: 5px 12px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
-  .btn-approve{background:var(--green-light);color:var(--green);border-color:rgba(45,125,78,0.2)}.btn-approve:hover{background:#d5ede2}
-  .btn-dismiss{background:var(--bg);color:var(--muted);border-color:var(--border)}.btn-dismiss:hover{color:var(--red);border-color:var(--red)}
-  .reject-chip{font-size:11px;padding:3px 9px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--muted);cursor:pointer;white-space:nowrap;transition:all 0.15s}
-  .reject-chip:hover{border-color:var(--red);color:var(--red)}.reject-chip.active{background:var(--red-light);border-color:var(--red);color:var(--red);font-weight:600}
-  .btn-remove{background:var(--bg);color:var(--muted);border-color:var(--border)}.btn-remove:hover{color:var(--red);border-color:var(--red)}
-  .btn-save{background:var(--accent);color:white;border-color:var(--accent)}.btn-save:hover{opacity:0.88}
-  .add-form { padding: 16px 20px; border-top: 1px solid var(--border); background: var(--bg); display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-  .form-group { display: flex; flex-direction: column; gap: 4px; }
-  .form-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-  .form-input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; background: var(--white); color: var(--text); }
-  .form-input:focus { outline: none; border-color: var(--accent); }
-  .log-row { display: flex; align-items: baseline; padding: 10px 20px; border-bottom: 1px solid var(--border); gap: 12px; }
-  .log-row:last-child { border-bottom: none; }
-  .log-time { font-family: var(--mono); font-size: 12px; color: var(--muted); min-width: 130px; }
-  .log-msg { flex: 1; font-size: 13px; } .log-count { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent); } .log-error { color: var(--red); }
-  .empty { padding: 36px 20px; text-align: center; color: var(--muted); }
-  .empty-icon { font-size: 24px; margin-bottom: 8px; }
-  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--text); color: white; padding: 10px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: translateY(60px); opacity: 0; transition: all 0.2s; z-index: 999; }
-  .toast.show { transform: translateY(0); opacity: 1; } .toast.success { background: var(--green); } .toast.error { background: var(--red); }
-  .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 12px; }
+:root{
+  --bg:#F7F7F7;--card-bg:#FFFFFF;--primary:#008089;--primary-hover:#00666d;
+  --border:#EBEBEB;--text-main:#222222;--text-muted:#717171;
+  --radius-card:12px;--radius-el:6px;--shadow:0 2px 8px rgba(0,0,0,0.04);
+  --status-green:#2E6B34;--bg-green:#E3F1DF;--status-amber:#856404;--bg-amber:#FDF3C7;
+  --status-red:#9B2C2C;--bg-red:#FBE4E4;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text-main);line-height:1.5;padding:1.5rem;padding-bottom:5rem}
+.container{max-width:1400px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem}
+h1{font-size:1.4rem;font-weight:600;letter-spacing:-.01em}
+.engine-status{font-size:.8rem;color:var(--text-muted);display:flex;gap:1.1rem;flex-wrap:wrap;background:var(--card-bg);padding:.5rem 1rem;border-radius:var(--radius-el);border:1px solid var(--border)}
+.engine-status b{color:var(--text-main);font-weight:600}
+.engine-status .err{color:var(--status-amber);font-weight:600}
+.engine-status .ok{color:var(--status-green);font-weight:600}
+.dashboard-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:1.25rem;align-items:start}
+@media(max-width:1100px){.dashboard-grid{grid-template-columns:1fr}}
+.card{background:var(--card-bg);border-radius:var(--radius-card);box-shadow:var(--shadow);padding:1.1rem 1.25rem;margin-bottom:1.25rem;border:1px solid var(--border)}
+.card-title{font-size:1rem;font-weight:600;margin-bottom:.9rem;display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap}
+.card-title small{font-size:.72rem;color:var(--text-muted);font-weight:400}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+th{text-align:left;color:var(--text-muted);font-weight:500;padding:.35rem .4rem;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:.35rem .4rem;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+input.cfg{width:64px;padding:.25rem .35rem;border:1px solid var(--border);border-radius:4px;font-size:.82rem;text-align:right}
+input.cfg.dirty{border-color:var(--primary);background:#F0FAFA}
+input.cfg:disabled{background:transparent;border-color:transparent;color:var(--text-muted)}
+.badge{display:inline-block;padding:.1rem .45rem;border-radius:4px;font-size:.72rem;font-weight:600;white-space:nowrap}
+.b-green{background:var(--bg-green);color:var(--status-green)}
+.b-amber{background:var(--bg-amber);color:var(--status-amber)}
+.b-red{background:var(--bg-red);color:var(--status-red)}
+.b-gray{background:#F1F1F1;color:var(--text-muted);border:1px solid var(--border)}
+.b-teal{background:#E0F2F3;color:var(--primary)}
+.btn{padding:.35rem .8rem;border-radius:var(--radius-el);border:1px solid var(--border);background:var(--card-bg);cursor:pointer;font-size:.8rem;font-weight:500}
+.btn:hover{background:#F4F4F4}
+.btn-primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-small{padding:.2rem .6rem;font-size:.75rem}
+.date-controls{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.date-controls input[type=date]{padding:.25rem .4rem;border:1px solid var(--border);border-radius:4px;font-size:.78rem}
+.dl-row{display:flex;gap:.6rem;align-items:center;padding:.45rem .2rem;border-bottom:1px solid var(--border);font-size:.82rem;cursor:pointer;flex-wrap:wrap}
+.dl-row:hover{background:#FAFAFA}
+.dl-date{width:110px;font-weight:600;flex-shrink:0}
+.dl-prop{width:74px;color:var(--text-muted);font-size:.75rem;flex-shrink:0}
+.dl-reason{flex:1;color:var(--text-muted);font-size:.76rem;min-width:120px}
+.dl-price{font-weight:600;white-space:nowrap}
+.dl-eur{color:var(--text-muted);white-space:nowrap}
+.trace{display:none;background:#F7F9F9;border-radius:6px;margin:.2rem 0 .5rem;padding:.6rem .8rem;font-family:ui-monospace,Menlo,monospace;font-size:.72rem;color:#444;white-space:pre-wrap}
+.prop-item{border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem;margin-bottom:.6rem}
+.prop-head{font-size:.82rem;font-weight:600;margin-bottom:.2rem}
+.prop-reason{font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem}
+.prop-actions{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+.prop-actions select{padding:.2rem .3rem;font-size:.72rem;border:1px solid var(--border);border-radius:4px;display:none}
+.ev-row{display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:.5rem 0;border-bottom:1px solid var(--border);font-size:.82rem}
+.ev-row:last-child{border-bottom:none}
+.ev-meta{color:var(--text-muted);font-size:.74rem}
+#saveBar{position:fixed;left:0;right:0;bottom:0;background:var(--card-bg);border-top:1px solid var(--border);box-shadow:0 -2px 12px rgba(0,0,0,.08);padding:.7rem 1.5rem;display:none;justify-content:space-between;align-items:center;z-index:50}
+#saveBar.show{display:flex}
+.season-chips{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.8rem}
+.months{display:grid;grid-template-columns:repeat(6,1fr);gap:.4rem}
+@media(max-width:700px){.months{grid-template-columns:repeat(4,1fr)}}
+.month{padding:.5rem .2rem;border-radius:6px;text-align:center;font-size:.8rem;font-weight:600;cursor:pointer;border:1px solid var(--border);user-select:none}
+.month:hover{background:#FAFAFA}
+.month small{display:block;font-weight:400;font-size:.66rem;opacity:.85}
+.s-low{--sc:#8B909A}
+.s-mid{--sc:#5B7A9D}
+.s-high{--sc:#A8842F}
+.s-peak{--sc:#A65D57}
+.s-new_year{--sc:#75689E}
+.s-xmas_low{--sc:#4E8D8D}
+.schip{background:var(--card-bg);border:1px solid var(--border);color:#444;border-radius:6px}
+.schip::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--sc);margin-right:6px}
+.schip.sel{border-color:var(--sc);background:#FAFAFA;color:#222}
+.month{background:var(--card-bg);color:#333;border-bottom:3px solid var(--sc)}
+.month small{color:var(--sc)}
+.hist-row{display:flex;gap:.6rem;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:.78rem}
+.hist-row:last-child{border-bottom:none}
+.hist-when{color:var(--text-muted);white-space:nowrap;font-size:.72rem}
+.muted{color:var(--text-muted);font-size:.8rem}
+#pinOverlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+#pinBox{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-card);padding:2rem;text-align:center;box-shadow:var(--shadow)}
+#pinBox input{font-size:1.2rem;padding:.5rem;width:140px;text-align:center;border:1px solid var(--border);border-radius:6px;letter-spacing:.3em;margin:.8rem 0}
+.loading{text-align:center;padding:1.5rem;color:var(--text-muted);font-size:.85rem}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <div class="header-left">
-    <a href="SleepyPMS.html" class="back-link">← Dashboard</a>
-    <span class="sep">/</span>
-    <span class="page-title">Pricing Engine</span>
-  </div>
-  <div style="display:flex;align-items:center;gap:8px;">
-    <a href="price-history.html" style="font-size:13px;font-weight:600;color:var(--accent);text-decoration:none;padding:7px 14px;border:1px solid rgba(30,107,62,0.25);border-radius:var(--radius);background:var(--green-light);">📈 Price History</a>
-    <button class="run-btn" id="runBtn" onclick="triggerRun()">▶ Run Now</button>
+<div id="pinOverlay">
+  <div id="pinBox">
+    <div style="font-weight:600;font-size:1.05rem">Pricing admin</div>
+    <input type="password" id="pinInput" inputmode="numeric" maxlength="6" placeholder="PIN">
+    <div><button class="btn btn-primary" onclick="checkPin()">Enter</button></div>
+    <div id="pinErr" style="color:var(--status-red);font-size:.78rem;margin-top:.5rem"></div>
   </div>
 </div>
 
-<div class="main">
+<div class="container" id="app" style="display:none">
+  <header>
+    <h1>Pricing</h1>
+    <div class="engine-status" id="engineStatus"><span class="muted">Loading engine status…</span></div>
+  </header>
 
-  <!-- STATS -->
-  <div class="stats">
-    <div class="stat">
-      <div class="stat-label">Last Run</div>
-      <div class="stat-value" id="lastRunTime" style="font-size:16px">—</div>
-      <div class="stat-sub" id="lastRunStatus">—</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Price Updates</div>
-      <div class="stat-value" id="lastRunChanges">—</div>
-      <div class="stat-sub">last run</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Pending Events</div>
-      <div class="stat-value" id="pendingCount">—</div>
-      <div class="stat-sub">need review</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Active Premiums</div>
-      <div class="stat-value" id="activeCount">—</div>
-      <div class="stat-sub">upcoming dates</div>
-    </div>
+  <div style="margin-bottom:1.25rem">
+    <select id="propSelect" style="padding:.45rem .7rem;border:1px solid var(--border);border-radius:var(--radius-el);font-size:.9rem;background:var(--card-bg);min-width:200px">
+      <option value="ALL">All properties</option>
+      <option>ROOMS</option><option>MAXELA</option><option>BIG_APT</option>
+      <option>FREEDOM</option><option>ORBE_1</option><option>ORBE_2</option>
+    </select>
   </div>
 
-  <!-- PRICING RULES -->
-  <div class="card">
-    <div class="card-header">
-      <span class="card-title">💰 Pricing Rules</span>
-      <div style="display:flex;gap:8px;align-items:center">
-        <div class="tabs">
-          <button class="tab active" id="tabSeason" onclick="switchTab('season')">By Season</button>
-          <button class="tab" id="tabMonth" onclick="switchTab('month')">By Month</button>
-          <button class="tab" id="tabDate" onclick="switchTab('date')">By Date</button>
-        </div>
-        <button class="btn btn-save" onclick="saveRules()">Save Changes</button>
-      </div>
-    </div>
-
-    <!-- SEASON VIEW -->
-    <div id="seasonView">
-      <div class="season-editor">
-        <div>
-          <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.06em">Click a season, then click months to assign</div>
-          <div class="season-legend" id="seasonLegend">
-            <button class="season-btn s-low" data-season="low" onclick="selectSeason('low')"><span class="dot dot-low"></span>Low</button>
-            <button class="season-btn s-mid" data-season="mid" onclick="selectSeason('mid')"><span class="dot dot-mid"></span>Mid</button>
-            <button class="season-btn s-high" data-season="high" onclick="selectSeason('high')"><span class="dot dot-high"></span>High</button>
-            <button class="season-btn s-peak" data-season="peak" onclick="selectSeason('peak')"><span class="dot dot-peak"></span>Peak</button>
-            <button class="season-btn s-newyear" data-season="new_year" onclick="selectSeason('new_year')"><span class="dot dot-newyear"></span>New Year</button>
-            <button class="season-btn s-xmas" data-season="xmas_low" onclick="selectSeason('xmas_low')"><span class="dot dot-xmas"></span>Xmas Low</button>
-          </div>
-        </div>
-        <div class="month-grid" id="monthGrid"></div>
-      </div>
-      <div class="price-section" id="seasonPriceGrid"></div>
-    </div>
-
-    <!-- MONTH VIEW -->
-    <div id="monthView" style="display:none">
-      <div class="price-section">
-        <div style="margin-bottom:16px">
-          <select id="monthSelect" onchange="renderMonthView()" style="padding:7px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--white)">
-            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
-            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
-            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
-            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
-          </select>
-        </div>
-        <div id="monthViewContent"></div>
-      </div>
-    </div>
-
-    <!-- DATE VIEW -->
-    <div id="dateView" style="display:none">
-      <div class="price-section">
-        <div style="margin-bottom:16px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-          <div class="form-group">
-            <label class="form-label">Date</label>
-            <input type="date" class="form-input" id="dateOverrideDate" style="width:160px">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Property</label>
-            <select class="form-input" id="dateOverrideProp" style="width:160px">
-              <option value="ROOMS">Rooms</option>
-              <option value="MAXELA">Maxela Apts</option>
-              <option value="BIG_APT">3-Bed Apartment</option>
-              <option value="FREEDOM">Freedom Square</option>
-              <option value="ORBE_1">Orbeliani 1</option>
-              <option value="ORBE_2">Orbeliani 3</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Min GEL</label>
-            <input type="number" class="form-input price-input" id="dateOverrideMin" placeholder="e.g. 150" style="width:90px">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Max GEL</label>
-            <input type="number" class="form-input price-input" id="dateOverrideMax" placeholder="e.g. 300" style="width:90px">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Min EUR</label>
-            <input type="number" class="form-input price-input" id="dateOverrideMinEur" placeholder="e.g. 45" style="width:90px">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Max EUR</label>
-            <input type="number" class="form-input price-input" id="dateOverrideMaxEur" placeholder="e.g. 80" style="width:90px">
-          </div>
-          <button class="btn btn-save" onclick="addDateOverride()">+ Add Override</button>
-        </div>
-        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden" id="dateOverrideList">
-          <div class="empty"><div class="empty-icon">📆</div>No date overrides yet.</div>
+  <div class="dashboard-grid">
+    <div>
+      <div class="card">
+        <div class="card-title">Seasons <button class="btn btn-small" id="seasonToggle">Expand</button></div>
+        <div id="seasonBody" style="display:none">
+          <div class="season-chips" id="seasonChips"></div>
+          <div class="months" id="monthGrid"></div>
+          <div class="muted" style="margin-top:.6rem;font-size:.74rem">Pick a season above, then click months to assign it.</div>
         </div>
       </div>
-    </div>
-  </div>
 
-
-
-  <!-- AI RECOMMENDATIONS -->
-  <div class="card" id="recsCard" style="display:none">
-    <div class="card-header">
-      <span class="card-title">🤖 AI Boundary Recommendations</span>
-      <span class="card-badge" id="recsBadge">0 pending</span>
-    </div>
-    <div id="recsList"></div>
-  </div>
-
-  <!-- CLAUDE PROPOSALS -->
-  <div class="card" id="proposalsCard" style="display:none">
-    <div class="card-header">
-      <span class="card-title">🧠 Claude Strategy Proposals</span>
-      <span class="card-badge" id="propsBadge">0 pending</span>
-    </div>
-    <div id="propsSummary" style="display:none;padding:12px 20px;font-size:13px;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--border)"></div>
-    <div id="propsList"></div>
-  </div>
-
-  <!-- EVENTS -->
-  <div class="card">
-    <div class="card-header">
-      <span class="card-title">🔔 Suggested Events</span>
-      <span class="card-badge" id="pendingBadge">0 pending</span>
-    </div>
-    <div id="pendingList"><div class="empty"><div class="empty-icon">🎵</div>No pending events. Engine scans daily.</div></div>
-  </div>
-
-  <div class="card">
-    <div class="card-header">
-      <span class="card-title">✅ Active Event Premiums</span>
-      <span class="card-badge" id="activeBadge">0 active</span>
-    </div>
-    <div id="activeList"><div class="empty"><div class="empty-icon">📅</div>No active premiums.</div></div>
-    <div class="add-form">
-      <div class="form-group">
-        <label class="form-label">Date</label>
-        <input type="date" class="form-input" id="manualDate" style="width:150px">
+      <div class="card">
+        <div class="card-title">Season and currency rules</div>
+        <div style="overflow-x:auto"><table id="seasonTable"><thead>
+          <tr><th>Property · season</th><th>Base ₾</th><th>Floor ₾</th><th>Ceil ₾</th><th>Base €</th><th>Floor €</th><th>Ceil €</th></tr>
+        </thead><tbody><tr><td colspan="7" class="loading">Loading…</td></tr></tbody></table></div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Event Name</label>
-        <input type="text" class="form-input" id="manualLabel" placeholder="e.g. Kanye West Concert" style="width:220px">
+
+      <div class="card">
+        <div class="card-title">
+          <span>Dates</span>
+          <span class="date-controls">
+            <input type="date" id="dFrom"> <span class="muted">–</span> <input type="date" id="dTo">
+            <button class="btn btn-small" id="btnRange">Load</button>
+            <button class="btn btn-small" id="btnToggle">Minimize</button>
+          </span>
+        </div>
+        <div id="dateList"><div class="loading">Loading…</div></div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Multiplier</label>
-        <input type="number" class="form-input mult-input" id="manualMult" value="1.35" min="1" max="2" step="0.05" style="width:80px">
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="card-title">AI proposals</div>
+        <div id="proposals"><div class="loading">Loading…</div></div>
       </div>
-      <button class="btn btn-approve" onclick="addManualEvent()">+ Add Event</button>
+      <div class="card">
+        <div class="card-title">Changes history <button class="btn btn-small" id="histToggle">Show</button></div>
+        <div id="history" style="display:none"><div class="loading">Loading…</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Events</div>
+        <div id="events"><div class="loading">Loading…</div></div>
+      </div>
     </div>
   </div>
-
-  <!-- LOG -->
-  <div class="card">
-    <div class="card-header">
-      <span class="card-title">📋 Engine Log</span>
-      <span class="card-badge">last 10 runs</span>
-    </div>
-    <div id="logList"><div class="empty"><div class="empty-icon">📊</div>No runs yet.</div></div>
-  </div>
-
 </div>
 
-<div class="toast" id="toast"></div>
+<div id="saveBar">
+  <span class="muted" id="saveMsg">Unsaved changes</span>
+  <span style="display:flex;gap:.5rem">
+    <button class="btn" onclick="discardChanges()">Discard</button>
+    <button class="btn btn-primary" onclick="saveChanges()">Save changes</button>
+  </span>
+</div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, query, orderBy, limit, onSnapshot, doc, updateDoc, addDoc, deleteDoc, getDoc, setDoc, serverTimestamp, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-const app = initializeApp({ apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk", authDomain:"sleepy-5c962.firebaseapp.com", projectId:"sleepy-5c962", storageBucket:"sleepy-5c962.firebasestorage.app", messagingSenderId:"152940098906", appId:"1:152940098906:web:bf245230d705c0a62c2f63" });
+const firebaseConfig = {
+  apiKey: "AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
+  authDomain: "sleepy-5c962.firebaseapp.com",
+  projectId: "sleepy-5c962",
+  storageBucket: "sleepy-5c962.firebasestorage.app",
+  messagingSenderId: "152940098906",
+  appId: "1:152940098906:web:bf245230d705c0a62c2f63"
+};
+
+const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ── CONSTANTS ──
-const GEL_PROPS = ['ROOMS','MAXELA','BIG_APT','FREEDOM','ORBE_1'];
-const EUR_PROPS = ['BIG_APT','FREEDOM','ORBE_1','ORBE_2'];
-const ALL_PROPS = ['ROOMS','MAXELA','BIG_APT','FREEDOM','ORBE_1','ORBE_2'];
-const PROP_LABELS = { ROOMS:'Rooms', MAXELA:'Maxela Apts', BIG_APT:'3-Bed Apt', FREEDOM:'Freedom Sq', ORBE_1:'Orbeliani 1', ORBE_2:'Orbeliani 3' };
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const SEASONS = ['low','mid','high','peak','new_year','xmas_low'];
-const SEASON_LABELS = { low:'Low', mid:'Mid', high:'High', peak:'Peak', new_year:'New Year', xmas_low:'Xmas Low' };
-const SEASON_CLASSES = { low:'s-low', mid:'s-mid', high:'s-high', peak:'s-peak', new_year:'s-newyear', xmas_low:'s-xmas' };
-const DOT_CLASSES = { low:'dot-low', mid:'dot-mid', high:'dot-high', peak:'dot-peak', new_year:'dot-newyear', xmas_low:'dot-xmas' };
+const PROPERTIES = ["ROOMS","MAXELA","BIG_APT","FREEDOM","ORBE_1","ORBE_2"];
+const EUR_PROPS = ["BIG_APT","FREEDOM","ORBE_1","ORBE_2"];
+const GEL_PROPS = ["ROOMS","MAXELA","BIG_APT","FREEDOM","ORBE_1"];
+const SEASONS = ["low","mid","high","peak","new_year","xmas_low"];
+const RUN_HOURS_UTC = [0,5,9,12,18];
 
-// ── STATE ──
-let monthSeasons = [null,'low','low','low','mid','mid','high','high','peak','peak','high','mid','xmas_low','new_year'];
-let priceRules = {
-  ROOMS:   {low:{min:80,max:160}, mid:{min:80,max:160}, high:{min:100,max:160}, peak:{min:110,max:160}, new_year:{min:120,max:200}, xmas_low:{min:80,max:160}},
-  MAXELA:  {low:{min:180,max:280},mid:{min:180,max:280},high:{min:200,max:280},peak:{min:220,max:280},new_year:{min:220,max:350},xmas_low:{min:180,max:280}},
-  BIG_APT: {low:{min:400,max:750},mid:{min:400,max:750},high:{min:450,max:750},peak:{min:500,max:750},new_year:{min:500,max:900},xmas_low:{min:400,max:750}},
-  FREEDOM: {low:{min:180,max:280},mid:{min:180,max:280},high:{min:200,max:280},peak:{min:220,max:280},new_year:{min:220,max:350},xmas_low:{min:180,max:280}},
-  ORBE_1:  {low:{min:160,max:280},mid:{min:160,max:280},high:{min:180,max:280},peak:{min:200,max:280},new_year:{min:200,max:350},xmas_low:{min:160,max:280}},
+let activeProp = "ALL";
+let rules = null;           // live copy from Firestore
+let pendingEdits = {};      // path -> new value
+let snapshots = [];         // loaded date rows
+let locks = {};             // "prop_date" or date -> true
+let listMinimized = false;
+let ADMIN_PIN = null;       // loaded from hk_pins/admin
+
+/* ---------- auth ---------- */
+window.checkPin = () => {
+  const v = document.getElementById("pinInput").value;
+  if (!ADMIN_PIN || v === ADMIN_PIN) {
+    sessionStorage.setItem("pricing_auth","1");
+    document.getElementById("pinOverlay").style.display="none";
+    document.getElementById("app").style.display="block";
+    init();
+  } else {
+    document.getElementById("pinErr").textContent = "Wrong PIN";
+  }
 };
-let eurRules = {
-  BIG_APT: {low:{min:100,max:180},mid:{min:100,max:180},high:{min:120,max:180},peak:{min:130,max:180},new_year:{min:130,max:220},xmas_low:{min:100,max:180}},
-  FREEDOM: {low:{min:35,max:70}, mid:{min:35,max:70}, high:{min:40,max:70}, peak:{min:40,max:70}, new_year:{min:50,max:90}, xmas_low:{min:35,max:70}},
-  ORBE_1:  {low:{min:35,max:70}, mid:{min:35,max:70}, high:{min:40,max:70}, peak:{min:40,max:70}, new_year:{min:50,max:90}, xmas_low:{min:35,max:70}},
-  ORBE_2:  {low:{min:35,max:70}, mid:{min:35,max:70}, high:{min:40,max:70}, peak:{min:40,max:70}, new_year:{min:50,max:90}, xmas_low:{min:35,max:70}},
-};
-let startPrices = {
-  ROOMS:   {low:140,mid:140,high:145,peak:150,new_year:180,xmas_low:140},
-  MAXELA:  {low:245,mid:250,high:255,peak:260,new_year:320,xmas_low:245},
-  BIG_APT: {low:600,mid:620,high:660,peak:700,new_year:800,xmas_low:610},
-  FREEDOM: {low:245,mid:250,high:255,peak:260,new_year:320,xmas_low:245},
-  ORBE_1:  {low:225,mid:235,high:240,peak:250,new_year:300,xmas_low:230},
-};
-let startPricesEur = {
-  BIG_APT: {low:145,mid:150,high:155,peak:165,new_year:185,xmas_low:145},
-  FREEDOM: {low:55, mid:57, high:60, peak:63, new_year:78, xmas_low:55},
-  ORBE_1:  {low:50, mid:52, high:56, peak:58, new_year:70, xmas_low:50},
-  ORBE_2:  {low:50, mid:52, high:56, peak:58, new_year:70, xmas_low:50},
-};
-let dateOverrides = {};
+document.getElementById("pinInput").addEventListener("keydown",e=>{if(e.key==="Enter")window.checkPin();});
 
-// ── LOAD RULES ──
-async function loadRules() {
-  try {
-    const snap = await getDoc(doc(db,'pricing_config','rules'));
-    if (snap.exists()) {
-      const d = snap.data();
-      if (d.priceRules) priceRules = d.priceRules;
-      if (d.eurRules) eurRules = d.eurRules;
-      if (d.monthSeasons) monthSeasons = d.monthSeasons;
-      if (d.dateOverrides) { dateOverrides = d.dateOverrides; renderDateOverrides(); }
-      if (d.startPrices) startPrices = d.startPrices;
-      if (d.startPricesEur) startPricesEur = d.startPricesEur;
-    }
-  } catch(e) { console.warn('Could not load rules:', e); }
-  renderMonthChips();
-  renderSeasonGrid();
-  renderMonthView();
-}
-
-// ── SEASON TAB ──
-let selectedSeason = 'peak';
-window.selectSeason = (s) => {
-  selectedSeason = s;
-  document.querySelectorAll('.season-btn').forEach(b => b.classList.remove('selected'));
-  document.querySelector(`[data-season="${s}"]`)?.classList.add('selected');
-};
-
-window.switchTab = (tab) => {
-  ['season','month','date'].forEach(t => {
-    document.getElementById(t+'View').style.display = tab===t ? '' : 'none';
-    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active', tab===t);
-  });
-  if (tab==='month') renderMonthView();
-};
-
-function renderMonthChips() {
-  document.getElementById('monthGrid').innerHTML = MONTHS.map((m,i) => {
-    const s = monthSeasons[i+1]||'low';
-    return `<div class="month-chip ${SEASON_CLASSES[s]}" data-month="${i+1}" onclick="assignMonth(${i+1})">${m}</div>`;
-  }).join('');
-}
-window.assignMonth = (m) => { monthSeasons[m]=selectedSeason; renderMonthChips(); };
-
-function makeTable(props, rules, currency, season) {
-  const sym = currency==='EUR' ? '€' : '₾';
-  let h = `<table class="tbl"><thead><tr>
-    <th class="left">Property</th>
-    <th>Min ${sym}</th><th>Max ${sym}</th>
-    <th>Start ${sym}</th>
-  </tr></thead><tbody>`;
-  props.forEach(p => {
-    const r = rules[p]?.[season]||{min:0,max:0};
-    const sp = currency==='GEL' ? (startPrices[p]?.[season]||0) : 0;
-    h += `<tr>
-      <td class="label"><span class="sdot ${DOT_CLASSES[season]}"></span>${PROP_LABELS[p]}</td>
-      <td><input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${season}" data-field="min" data-table="${currency.toLowerCase()}" onchange="updateRule(this)"></td>
-      <td><input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${season}" data-field="max" data-table="${currency.toLowerCase()}" onchange="updateRule(this)"></td>
-      <td>${currency==='GEL' ? `<input class="price-input" type="number" value="${sp}" data-prop="${p}" data-season="${season}" onchange="updateStartPrice(this)" style="background:var(--accent-light)">` : '<span style="color:var(--muted);font-size:12px">—</span>'}</td>
-    </tr>`;
-  });
-  return h + '</tbody></table>';
-}
-
-function renderSeasonGrid() {
-  const container = document.getElementById('seasonPriceGrid');
-  const s = selectedSeason || 'peak';
-  container.innerHTML = `
-    <div style="overflow-x:auto;margin-bottom:20px">
-      <div class="section-title">GEL ₾ — Booking.com & Expedia</div>
-      ${makeTableFull(GEL_PROPS, priceRules, 'gel', s)}
-    </div>
-    <div style="overflow-x:auto">
-      <div class="section-title">EUR € — Airbnb</div>
-      ${makeTableFull(EUR_PROPS, eurRules, 'eur', s)}
-    </div>`;
-}
-
-function makeTableFull(props, rules, currency, season) {
-  const sym = currency==='eur'?'€':'₾';
-  let h = `<table class="tbl"><thead>
-    <tr><th class="left">Season</th>`;
-  props.forEach(p => { h += `<th colspan="3">${PROP_LABELS[p]}</th>`; });
-  h += `</tr><tr><th></th>`;
-  props.forEach(() => {
-    h += `<th>Min${sym}</th><th>Max${sym}</th><th style="background:#eef7f2">Start${sym}</th>`;
-  });
-  h += `</tr></thead><tbody>`;
-  SEASONS.forEach(s => {
-    h += `<tr><td class="label"><span class="sdot ${DOT_CLASSES[s]}"></span>${SEASON_LABELS[s]}</td>`;
-    props.forEach(p => {
-      const r = rules[p]?.[s]||{min:0,max:0};
-      const sp = currency==='gel' ? (startPrices[p]?.[s]||0) : (startPricesEur[p]?.[s]||0);
-      const onch = currency==='gel' ? `onchange="updateStartPrice(this)"` : `onchange="updateStartPriceEur(this)"`;
-      h += `<td><input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${s}" data-field="min" data-table="${currency}" onchange="updateRule(this)"></td>
-            <td><input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" data-table="${currency}" onchange="updateRule(this)"></td>
-            <td style="background:#f0faf4"><input class="price-input" type="number" value="${sp}" data-prop="${p}" data-season="${s}" ${onch} style="background:transparent;width:68px"></td>`;
-    });
-    h += `</tr>`;
-  });
-  return h + '</tbody></table>';
-}
-
-window.updateRule = (el) => {
-  const {prop,season,field,table} = el.dataset;
-  const rules = table==='eur' ? eurRules : priceRules;
-  if (!rules[prop]) rules[prop]={};
-  if (!rules[prop][season]) rules[prop][season]={min:0,max:0};
-  rules[prop][season][field] = parseFloat(el.value)||0;
-};
-
-window.updateStartPrice = (el) => {
-  const {prop,season} = el.dataset;
-  if (!startPrices[prop]) startPrices[prop]={};
-  startPrices[prop][season] = parseFloat(el.value)||0;
-};
-window.updateStartPriceEur = (el) => {
-  const {prop,season} = el.dataset;
-  if (!startPricesEur[prop]) startPricesEur[prop]={};
-  startPricesEur[prop][season] = parseFloat(el.value)||0;
-};
-
-// ── MONTH VIEW ──
-window.renderMonthView = () => {
-  const m = parseInt(document.getElementById('monthSelect')?.value||1);
-  const s = monthSeasons[m]||'low';
-  const content = document.getElementById('monthViewContent');
-  if (!content) return;
-  content.innerHTML = `
-    <div style="margin-bottom:12px;font-size:13px">
-      <span class="sdot ${DOT_CLASSES[s]}" style="display:inline-block"></span>
-      <strong>${MONTHS[m-1]}</strong> — ${SEASON_LABELS[s]} season
-      <span style="color:var(--muted);font-size:12px;margin-left:8px">To change season assignment, use the By Season tab</span>
-    </div>
-    <div style="overflow-x:auto;margin-bottom:20px">
-      <div class="section-title">GEL ₾ — Booking.com & Expedia</div>
-      <table class="tbl"><thead><tr>
-        <th class="left">Property</th><th>Min ₾</th><th>Max ₾</th><th style="background:#eef7f2">Start ₾</th>
-      </tr></thead><tbody>
-        ${GEL_PROPS.map(p => {
-          const r = priceRules[p]?.[s]||{min:0,max:0};
-          const sp = startPrices[p]?.[s]||0;
-          return `<tr>
-            <td class="label">${PROP_LABELS[p]}</td>
-            <td><input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${s}" data-field="min" data-table="gel" onchange="updateRule(this)"></td>
-            <td><input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" data-table="gel" onchange="updateRule(this)"></td>
-            <td style="background:#f0faf4"><input class="price-input" type="number" value="${sp}" data-prop="${p}" data-season="${s}" onchange="updateStartPrice(this)" style="background:transparent"></td>
-          </tr>`;
-        }).join('')}
-      </tbody></table>
-    </div>
-    <div style="overflow-x:auto">
-      <div class="section-title">EUR € — Airbnb</div>
-      <table class="tbl"><thead><tr>
-        <th class="left">Property</th><th>Min €</th><th>Max €</th><th style="background:#eef7f2">Start €</th>
-      </tr></thead><tbody>
-        ${EUR_PROPS.map(p => {
-          const r = eurRules[p]?.[s]||{min:0,max:0};
-          const sp = startPricesEur[p]?.[s]||0;
-          return `<tr>
-            <td class="label">${PROP_LABELS[p]}</td>
-            <td><input class="price-input" type="number" value="${r.min}" data-prop="${p}" data-season="${s}" data-field="min" data-table="eur" onchange="updateRule(this)"></td>
-            <td><input class="price-input" type="number" value="${r.max}" data-prop="${p}" data-season="${s}" data-field="max" data-table="eur" onchange="updateRule(this)"></td>
-            <td style="background:#f0faf4"><input class="price-input" type="number" value="${sp}" data-prop="${p}" data-season="${s}" onchange="updateStartPriceEur(this)" style="background:transparent"></td>
-          </tr>`;
-        }).join('')}
-      </tbody></table>
-    </div>`;
-};
-
-// ── START PRICES CARD ──
-
-
-// ── DATE OVERRIDES ──
-function renderDateOverrides() {
-  const list = document.getElementById('dateOverrideList');
-  const rows = [];
-  Object.entries(dateOverrides).forEach(([prop,dates]) => {
-    Object.entries(dates).sort().forEach(([date,vals]) => rows.push({prop,date,...vals}));
-  });
-  if (!rows.length) { list.innerHTML='<div class="empty"><div class="empty-icon">📆</div>No date overrides yet.</div>'; return; }
-  rows.sort((a,b)=>a.date.localeCompare(b.date));
-  list.innerHTML = rows.map(r => `<div class="event-row">
-    <div class="event-date">${formatDate(r.date)}</div>
-    <div class="event-info"><div class="event-name">${PROP_LABELS[r.prop]}</div></div>
-    <div class="event-actions">
-      <span style="font-family:var(--mono);font-size:13px">
-        GEL: ${r.min||0}–${r.max||0} ₾
-        ${(r.minEur||r.maxEur) ? ' · EUR: '+(r.minEur||0)+'–'+(r.maxEur||0)+' €' : ''}
-      </span>
-      <button class="btn btn-remove" onclick="removeDateOverride('${r.prop}','${r.date}')">Remove</button>
-    </div>
-  </div>`).join('');
-}
-
-window.addDateOverride = () => {
-  const date = document.getElementById('dateOverrideDate').value;
-  const prop = document.getElementById('dateOverrideProp').value;
-  const min  = parseFloat(document.getElementById('dateOverrideMin').value)||0;
-  const max  = parseFloat(document.getElementById('dateOverrideMax').value)||0;
-  const minEur = parseFloat(document.getElementById('dateOverrideMinEur').value)||0;
-  const maxEur = parseFloat(document.getElementById('dateOverrideMaxEur').value)||0;
-  if (!date) { showToast('Select a date','error'); return; }
-  if (!dateOverrides[prop]) dateOverrides[prop]={};
-  dateOverrides[prop][date] = {min,max,minEur,maxEur};
-  renderDateOverrides();
-  showToast('Override added — click Save Changes to apply');
-};
-window.removeDateOverride = (prop,date) => {
-  if (dateOverrides[prop]) delete dateOverrides[prop][date];
-  renderDateOverrides();
-};
-
-// ── SAVE ALL RULES ──
-window.saveRules = async () => {
-  try {
-    await setDoc(doc(db,'pricing_config','rules'), {priceRules, eurRules, monthSeasons, dateOverrides, startPrices, startPricesEur, updatedAt:serverTimestamp()});
-    showToast('Pricing rules saved','success');
-  } catch(e) { showToast('Error: '+e.message,'error'); }
-};
-
-// ── EVENTS ──
-onSnapshot(query(collection(db,'pricing_events'),where('status','==','pending')), snap => {
-  const list = document.getElementById('pendingList');
-  const badge = document.getElementById('pendingBadge');
-  document.getElementById('pendingCount').textContent = snap.size;
-  badge.textContent = `${snap.size} pending`;
-  if (snap.empty) { list.innerHTML='<div class="empty"><div class="empty-icon">🎵</div>No pending events. Engine scans daily.</div>'; return; }
-  list.innerHTML = snap.docs.map(d => {
-    const e=d.data(), dateStr=d.id.replace('event_','');
-    return `<div class="event-row">
-      <div class="event-date">${formatDate(dateStr)}</div>
-      <div class="event-info"><div class="event-name">${e.label||'Unknown'}</div><div class="event-venue">${e.venue||''}</div></div>
-      <div class="event-actions">
-        <span class="badge badge-pending">Pending</span>
-        <input class="mult-input" type="number" value="${e.multiplier||1.35}" min="1" max="2" step="0.05" id="m-${d.id}">
-        <button class="btn btn-approve" onclick="approveEvent('${d.id}')">Approve</button>
-        <button class="btn btn-dismiss" onclick="dismissEvent('${d.id}')">Dismiss</button>
-      </div>
-    </div>`;
-  }).join('');
-});
-
-onSnapshot(query(collection(db,'pricing_events'),where('status','in',['approved','manual'])), snap => {
-  const list = document.getElementById('activeList');
-  const badge = document.getElementById('activeBadge');
-  document.getElementById('activeCount').textContent = snap.size;
-  badge.textContent = `${snap.size} active`;
-  if (snap.empty) { list.innerHTML='<div class="empty"><div class="empty-icon">📅</div>No active premiums.</div>'; return; }
-  list.innerHTML = snap.docs.map(d => {
-    const e=d.data(), dateStr=d.id.replace('event_','')||e.date||'';
-    const cls=e.status==='manual'?'badge-manual':'badge-approved', lbl=e.status==='manual'?'Manual':'Approved';
-    return `<div class="event-row">
-      <div class="event-date">${formatDate(dateStr)}</div>
-      <div class="event-info"><div class="event-name">${e.label||'Event'}</div><div class="event-venue">${e.venue||''}</div></div>
-      <div class="event-actions">
-        <span class="badge ${cls}">${lbl}</span>
-        <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent)">×${e.multiplier}</span>
-        <button class="btn btn-remove" onclick="removeEvent('${d.id}')">Remove</button>
-      </div>
-    </div>`;
-  }).join('');
-});
-
-// ── LOG ──
-onSnapshot(query(collection(db,'pricing_log'),orderBy('timestamp','desc'),limit(10)), snap => {
-  const list = document.getElementById('logList');
-  if (snap.empty) { list.innerHTML='<div class="empty"><div class="empty-icon">📊</div>No runs yet.</div>'; return; }
-  const latest = snap.docs[0].data();
-  document.getElementById('lastRunTime').textContent = formatTs(latest.timestamp);
-  document.getElementById('lastRunStatus').textContent = latest.error ? '⚠ Failed' : '✓ Success';
-  document.getElementById('lastRunChanges').textContent = latest.changes_count??'—';
-  list.innerHTML = snap.docs.map(d => {
-    const r=d.data();
-    return `<div class="log-row">
-      <span class="log-time">${formatTs(r.timestamp)}</span>
-      <span class="log-msg ${r.error?'log-error':''}">${r.error?'⚠ '+r.error:r.message||'Run completed'}</span>
-      <span class="log-count">${r.changes_count!=null?r.changes_count+' updates':''}</span>
-    </div>`;
-  }).join('');
-});
-
-// ── AI RECS ──
-onSnapshot(query(collection(db,'pricing_recommendations'),where('status','==','pending')), snap => {
-  const card=document.getElementById('recsCard'), list=document.getElementById('recsList'), badge=document.getElementById('recsBadge');
-  badge.textContent=snap.size+' pending'; card.style.display=snap.empty?'none':'';
-  list.innerHTML = snap.docs.map(d => {
-    const r=d.data(); const arrow=r.type==='raise_ceiling'?'↑':'↓'; const color=r.type==='raise_ceiling'?'var(--green)':'var(--accent)';
-    return `<div class="event-row">
-      <div style="min-width:80px;font-weight:700;color:${color};font-size:18px">${arrow}</div>
-      <div class="event-info">
-        <div class="event-name">${PROP_LABELS[r.property]||r.property} — ${r.season||''} ${r.type?.replace('_',' ')}</div>
-        <div class="event-venue">${r.current} → ${r.suggested} ${(r.currency||'gel').toUpperCase()} · ${r.reason||''}</div>
-      </div>
-      <div class="event-actions">
-        <button class="btn btn-approve" onclick="applyRec('${d.id}','${r.property}','${r.season}','${r.currency}','${r.type}',${r.suggested})">Apply</button>
-        <button class="btn btn-dismiss" onclick="dismissRec('${d.id}')">Dismiss</button>
-      </div>
-    </div>`;
-  }).join('');
-});
-
-window.applyRec = async (id,prop,season,currency,type,value) => {
-  const rules=currency==='eur'?eurRules:priceRules;
-  if (!rules[prop]) rules[prop]={};
-  if (!rules[prop][season]) rules[prop][season]={min:0,max:0};
-  if (type==='raise_ceiling'||type==='lower_ceiling') rules[prop][season].max=value;
-  if (type==='raise_floor'||type==='lower_floor') rules[prop][season].min=value;
-  await saveRules(); await updateDoc(doc(db,'pricing_recommendations',id),{status:'applied'});
-  renderSeasonGrid(); showToast('Recommendation applied','success');
-};
-window.dismissRec = async (id) => { await updateDoc(doc(db,'pricing_recommendations',id),{status:'dismissed'}); showToast('Dismissed'); };
-
-// ── CLAUDE PROPOSALS ──
-onSnapshot(query(collection(db,'pricing_proposals'),where('status','==','pending')), snap => {
-  const card=document.getElementById('proposalsCard');
-  const list=document.getElementById('propsList');
-  const badge=document.getElementById('propsBadge');
-  badge.textContent=snap.size+' pending';
-  card.style.display=snap.empty?'none':'';
-  list.innerHTML=snap.docs.map(d => {
-    const r=d.data();
-    const pct=r.change_pct||0;
-    const sign=pct>=0?'+':'';
-    const color=pct>=0?'var(--green)':'var(--red)';
-    const typeLabel=(r.type||'').replace(/([A-Z])/g,' $1').toLowerCase();
-    return `<div class="event-row">
-      <div style="min-width:72px;font-family:var(--mono);font-weight:700;font-size:15px;color:${color}">${sign}${pct.toFixed(1)}%</div>
-      <div class="event-info">
-        <div class="event-name">${PROP_LABELS[r.property]||r.property} — ${SEASON_LABELS[r.season]||r.season} ${typeLabel}</div>
-        <div class="event-venue">${r.current} → ${r.suggested} · ${r.reasoning||''}</div>
-      </div>
-      <div class="event-actions" id="actions-${d.id}">
-        <button class="btn btn-approve" onclick="applyProposal('${d.id}','${r.property}','${r.season}','${r.type}',${r.suggested})">Apply</button>
-        <button class="btn btn-dismiss" onclick="showRejectPanel('${d.id}')">Reject</button>
-      </div>
-    </div>`;
-  }).join('');
-});
-
-// Show today's daily summary if available
-(async () => {
-  try {
-    const today = new Date().toISOString().slice(0,10);
-    const markerSnap = await getDocs(query(collection(db,'pricing_proposals'),where('type','==','run_marker'),where('date','==',today),limit(1)));
-    if (!markerSnap.empty) {
-      const summary=markerSnap.docs[0].data().summary||'';
-      if (summary) {
-        const el=document.getElementById('propsSummary');
-        el.style.display='';
-        el.textContent='Claude: '+summary;
-        document.getElementById('proposalsCard').style.display='';
-      }
-    }
-  } catch(e) {}
+// Fetch admin PIN from Firestore, then show overlay or app
+(async()=>{
+  try{
+    const pinSnap=await getDoc(doc(db,"hk_pins","admin"));
+    if(pinSnap.exists()) ADMIN_PIN=pinSnap.data().pin||null;
+  }catch(e){/* fail open */}
+  if(!ADMIN_PIN||sessionStorage.getItem("pricing_auth")==="1"){
+    document.getElementById("pinOverlay").style.display="none";
+    document.getElementById("app").style.display="block";
+    init();
+  }
 })();
 
-window.applyProposal = async (id, prop, season, ptype, value) => {
-  try {
-    const rulesSnap = await getDoc(doc(db,'pricing_config','rules'));
-    const rules = rulesSnap.exists() ? rulesSnap.data() : {};
-    if (ptype==='startPrice') {
-      if (!rules.startPrices) rules.startPrices={};
-      if (!rules.startPrices[prop]) rules.startPrices[prop]={};
-      rules.startPrices[prop][season]=value;
-      startPrices[prop]=rules.startPrices[prop];
-    } else if (ptype==='floor') {
-      if (!rules.priceRules) rules.priceRules={};
-      if (!rules.priceRules[prop]) rules.priceRules[prop]={};
-      if (!rules.priceRules[prop][season]) rules.priceRules[prop][season]={};
-      rules.priceRules[prop][season].min=value;
-      if (priceRules[prop]?.[season]) priceRules[prop][season].min=value;
-    } else if (ptype==='ceiling') {
-      if (!rules.priceRules) rules.priceRules={};
-      if (!rules.priceRules[prop]) rules.priceRules[prop]={};
-      if (!rules.priceRules[prop][season]) rules.priceRules[prop][season]={};
-      rules.priceRules[prop][season].max=value;
-      if (priceRules[prop]?.[season]) priceRules[prop][season].max=value;
-    } else if (ptype==='startPriceEur') {
-      if (!rules.startPricesEur) rules.startPricesEur={};
-      if (!rules.startPricesEur[prop]) rules.startPricesEur[prop]={};
-      rules.startPricesEur[prop][season]=value;
-      startPricesEur[prop]=rules.startPricesEur[prop];
-    } else if (ptype==='floorEur') {
-      if (!rules.eurRules) rules.eurRules={};
-      if (!rules.eurRules[prop]) rules.eurRules[prop]={};
-      if (!rules.eurRules[prop][season]) rules.eurRules[prop][season]={};
-      rules.eurRules[prop][season].min=value;
-      if (eurRules[prop]?.[season]) eurRules[prop][season].min=value;
-    } else if (ptype==='ceilingEur') {
-      if (!rules.eurRules) rules.eurRules={};
-      if (!rules.eurRules[prop]) rules.eurRules[prop]={};
-      if (!rules.eurRules[prop][season]) rules.eurRules[prop][season]={};
-      rules.eurRules[prop][season].max=value;
-      if (eurRules[prop]?.[season]) eurRules[prop][season].max=value;
-    }
-    await setDoc(doc(db,'pricing_config','rules'), rules, {merge:true});
-    await updateDoc(doc(db,'pricing_proposals',id), {status:'approved'});
-    renderSeasonGrid();
-    showToast('Proposal applied','success');
-  } catch(e) { showToast('Error: '+e.message,'error'); }
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmtRel = ts => {
+  if(!ts) return "—";
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  const m = Math.round((Date.now()-d.getTime())/60000);
+  if (m<1) return "just now";
+  if (m<60) return m+" min ago";
+  const h = Math.round(m/60);
+  if (h<24) return h+" h ago";
+  return d.toLocaleDateString();
 };
-const _savedActions = {};
-const REJECT_REASONS = ['Not enough data yet',"Price didn't convert at this level",'Market uncertainty','Other'];
+const nextRun = () => {
+  const now = new Date();
+  for (const h of RUN_HOURS_UTC){
+    const t = new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate(),h,0,0));
+    if (t>now) return t;
+  }
+  return new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+1,RUN_HOURS_UTC[0]));
+};
+const isoDate = d => d.toISOString().slice(0,10);
 
-window.showRejectPanel = (id) => {
-  const el = document.getElementById('actions-' + id);
-  if (!el) return;
-  _savedActions[id] = el.innerHTML;
-  const chips = REJECT_REASONS.map(r =>
-    `<button class="reject-chip" onclick="pickRejectReason('${id}',this,\`${r}\`)">${r}</button>`
-  ).join('');
-  el.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:6px;min-width:280px;align-items:flex-end">
-      <div style="font-size:11px;color:var(--muted);font-weight:600;align-self:flex-start">Why rejecting? (optional)</div>
-      <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-start;width:100%">${chips}</div>
-      <input id="reject-txt-${id}" type="text" placeholder="Add reason..." style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:var(--font);color:var(--text);background:var(--white)">
-      <div style="display:flex;gap:6px">
-        <button class="btn" style="font-size:12px;padding:4px 10px" onclick="cancelRejectPanel('${id}')">Cancel</button>
-        <button class="btn btn-dismiss" style="font-size:12px;padding:4px 10px;color:var(--red);border-color:var(--red)" onclick="confirmReject('${id}')">Confirm reject</button>
-      </div>
-    </div>`;
+/* ---------- init ---------- */
+async function init(){
+  document.getElementById("propSelect").onchange=e=>{activeProp=e.target.value;renderRules();renderDates();};
+  const from=new Date(), to=new Date(); to.setDate(to.getDate()+30);
+  $("dFrom").value=isoDate(from); $("dTo").value=isoDate(to);
+  $("btnRange").onclick = loadSnapshots;
+  $("btnToggle").onclick = ()=>{listMinimized=!listMinimized;$("btnToggle").textContent=listMinimized?"Expand":"Minimize";renderDates();};
+  loadEngineStatus();
+  await loadRules();
+  loadLocks().then(loadSnapshots);
+  loadProposals();
+  loadEvents();
+  $("seasonToggle").onclick=function(){const b=$("seasonBody");const open=b.style.display!=="none";b.style.display=open?"none":"block";this.textContent=open?"Expand":"Minimize";};
+  $("histToggle").onclick=function(){const h=$("history");const open=h.style.display!=="none";h.style.display=open?"none":"block";this.textContent=open?"Show":"Hide";if(!open)loadHistory();};
+}
+
+async function logChange(type,detail){
+  try{ await setDoc(doc(collection(db,"pricing_changes")),{ts:new Date(),type,detail}); }catch(e){console.warn(e);}
+}
+async function loadHistory(){
+  const el=$("history");
+  try{
+    const qs=await getDocs(query(collection(db,"pricing_changes"),orderBy("ts","desc"),limit(40)));
+    if(qs.empty){el.innerHTML='<div class="muted">No changes logged yet</div>';return;}
+    el.innerHTML=[...qs.docs].map(d=>{const x=d.data();
+      return `<div class="hist-row"><span>${esc(x.detail)}</span><span class="hist-when">${fmtRel(x.ts)}</span></div>`;}).join("");
+  }catch(e){ el.innerHTML=`<div class="muted">Error: ${esc(e.message)}</div>`; }
+}
+
+
+/* ---------- engine status ---------- */
+async function loadEngineStatus(){
+  const el=$("engineStatus");
+  try{
+    const qs=await getDocs(query(collection(db,"pricing_log"),orderBy("timestamp","desc"),limit(1)));
+    if(qs.empty){el.innerHTML='<span class="muted">No runs logged yet</span>';return;}
+    const d=qs.docs[0].data();
+    const errs = d.error;
+    const status = errs ? `<span class="err">⚠ ${esc(errs)}</span>` : `<span class="ok">OK</span>`;
+    const nr = nextRun();
+    el.innerHTML =
+      `<span>Last run <b>${fmtRel(d.timestamp)}</b></span>`+
+      `<span>Next <b>${String(nr.getUTCHours()).padStart(2,"0")}:00 UTC</b></span>`+
+      `<span>Changes <b>${d.changes_count ?? d.price_changes ?? d.changes ?? "—"}</b></span>`+
+      `<span>${status}</span>`;
+  }catch(e){ el.innerHTML=`<span class="err">Status error: ${esc(e.message)}</span>`; }
+}
+
+const SEASON_META={low:"Low",mid:"Mid",high:"High",peak:"Peak",new_year:"New Year",xmas_low:"Xmas low"};
+const MONTH_NAMES=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+let brushSeason="high";
+function renderSeasonPicker(monthMap,onPaint){
+  const chips=document.getElementById("seasonChips");
+  chips.innerHTML=Object.entries(SEASON_META).map(([k,v])=>`<span class="schip s-${k} ${k===brushSeason?'sel':''}" data-s="${k}">${v}</span>`).join("");
+  chips.querySelectorAll(".schip").forEach(c=>c.onclick=()=>{brushSeason=c.dataset.s;renderSeasonPicker(monthMap,onPaint);});
+  const grid=document.getElementById("monthGrid");
+  grid.innerHTML=MONTH_NAMES.map((n,i)=>{
+    const s=monthMap[i+1]||"low";
+    return `<div class="month s-${s}" data-m="${i+1}">${n}<small>${SEASON_META[s]||s}</small></div>`;
+  }).join("");
+  grid.querySelectorAll(".month").forEach(m=>m.onclick=()=>{
+    monthMap[Number(m.dataset.m)]=brushSeason;
+    onPaint(Number(m.dataset.m),brushSeason);
+    renderSeasonPicker(monthMap,onPaint);
+  });
+}
+
+let monthMap={};
+function initSeasonPicker(){
+  monthMap={};
+  const src=rules.monthSeasons||{};
+  MONTH_NAMES.forEach((n,i)=>{ monthMap[i+1]=src[i+1]??src[String(i+1)]??src[n]??src[n.toLowerCase()]??"low"; });
+  renderSeasonPicker(monthMap,(m,season)=>{
+    pendingEdits["month|"+m]=season;
+    const n=Object.keys(pendingEdits).length;
+    document.getElementById("saveMsg").textContent=`${n} unsaved change${n>1?"s":""}`;
+    document.getElementById("saveBar").classList.add("show");
+  });
+}
+/* ---------- season rules ---------- */
+async function loadRules(){
+  try{
+    const snap=await getDoc(doc(db,"pricing_config","rules"));
+    rules = snap.exists()? snap.data() : {};
+    initSeasonPicker();
+    renderRules();
+  }catch(e){
+    $("seasonTable").querySelector("tbody").innerHTML=`<tr><td colspan="7" class="loading">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function getVal(obj,prop,season){ return obj?.[prop]?.[season] ?? obj?.[prop] ?? null; }
+
+function renderRules(){
+  if(!rules) return;
+  const tb=$("seasonTable").querySelector("tbody"); tb.innerHTML="";
+  const props = activeProp==="ALL" ? PROPERTIES : [activeProp];
+  props.forEach(p=>{
+    SEASONS.forEach(s=>{
+      const gBase=getVal(rules.startPrices,p,s), gFloor=rules.priceRules?.[p]?.[s]?.min ?? getVal(rules.priceRules?.floors,p,s),
+            gCeil=rules.priceRules?.[p]?.[s]?.max ?? getVal(rules.priceRules?.ceilings,p,s),
+            eBase=getVal(rules.startPricesEur,p,s), eFloor=rules.eurRules?.[p]?.[s]?.min, eCeil=rules.eurRules?.[p]?.[s]?.max;
+      if([gBase,gFloor,gCeil,eBase,eFloor,eCeil].every(v=>v==null)) return; // skip undefined combos
+      const tr=document.createElement("tr");
+      tr.innerHTML = `<td style="white-space:nowrap">${p} · ${s}</td>`
+        + cfgCell(p,s,"gel","base",gBase, GEL_PROPS.includes(p))
+        + cfgCell(p,s,"gel","floor",gFloor, GEL_PROPS.includes(p))
+        + cfgCell(p,s,"gel","ceil",gCeil, GEL_PROPS.includes(p))
+        + cfgCell(p,s,"eur","base",eBase, EUR_PROPS.includes(p))
+        + cfgCell(p,s,"eur","floor",eFloor, EUR_PROPS.includes(p))
+        + cfgCell(p,s,"eur","ceil",eCeil, EUR_PROPS.includes(p));
+      tb.appendChild(tr);
+    });
+  });
+  if(!tb.children.length) tb.innerHTML='<tr><td colspan="7" class="loading">No rules found for this filter — check pricing_config/rules structure</td></tr>';
+  tb.querySelectorAll("input.cfg").forEach(i=>i.addEventListener("input",onEdit));
+}
+
+function cfgCell(p,s,cur,field,val,enabled){
+  if(!enabled) return `<td class="muted">—</td>`;
+  const key=`${p}|${s}|${cur}|${field}`;
+  const v = pendingEdits[key] ?? val ?? "";
+  return `<td><input class="cfg ${key in pendingEdits?'dirty':''}" data-key="${key}" type="number" value="${v}"></td>`;
+}
+
+function onEdit(e){
+  const k=e.target.dataset.key;
+  pendingEdits[k]=e.target.value===""?null:Number(e.target.value);
+  e.target.classList.add("dirty");
+  const n=Object.keys(pendingEdits).length;
+  $("saveMsg").textContent=`${n} unsaved change${n>1?"s":""} to season rules`;
+  $("saveBar").classList.add("show");
+}
+
+window.discardChanges = ()=>{ pendingEdits={}; $("saveBar").classList.remove("show"); renderRules(); };
+
+window.saveChanges = async ()=>{
+  const upd={};
+  for(const [k,v] of Object.entries(pendingEdits)){
+    if(k.startsWith("month|")){ upd["monthSeasons."+k.split("|")[1]]=v; continue; }
+    const [p,s,cur,field]=k.split("|");
+    let path;
+    if(cur==="gel") path = field==="base" ? `startPrices.${p}.${s}` : `priceRules.${p}.${s}.${field==="floor"?"min":"max"}`;
+    else path = field==="base" ? `startPricesEur.${p}.${s}` : `eurRules.${p}.${s}.${field==="floor"?"min":"max"}`;
+    upd[path]=v;
+  }
+  try{
+    await updateDoc(doc(db,"pricing_config","rules"),upd);
+    logChange("rules_edit","Manual edit: "+Object.entries(upd).map(([k,v])=>k+" → "+v).join(", "));
+    pendingEdits={};
+    $("saveBar").classList.remove("show");
+    await loadRules();
+  }catch(e){ alert("Save failed: "+e.message); }
 };
 
-window.pickRejectReason = (id, btn, reason) => {
-  document.querySelectorAll(`#actions-${id} .reject-chip`).forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('reject-txt-' + id).value = reason;
-};
+/* ---------- manual locks ---------- */
+async function loadLocks(){
+  try{
+    const qs=await getDocs(collection(db,"pricing_locks"));
+    qs.forEach(d=>{const x=d.data(); if(x.manual_lock) locks[d.id]=true;});
+  }catch(e){/* collection may not exist yet */}
+}
 
-window.cancelRejectPanel = (id) => {
-  const el = document.getElementById('actions-' + id);
-  if (el && _savedActions[id]) { el.innerHTML = _savedActions[id]; delete _savedActions[id]; }
-};
+/* ---------- date list ---------- */
+async function loadSnapshots(){
+  $("dateList").innerHTML='<div class="loading">Loading…</div>';
+  const from=$("dFrom").value, to=$("dTo").value;
+  try{
+    const qs=await getDocs(query(collection(db,"pricing_snapshots"),
+      where("date",">=",from), where("date","<=",to), orderBy("date"), limit(400)));
+    // keep latest snapshot per property+date
+    const map={};
+    qs.forEach(d=>{
+      const x=d.data(); const k=(x.property||x.prop||"?")+"_"+x.date;
+      const t=x.ts ? (x.ts.toMillis ? x.ts.toMillis() : new Date(x.ts).getTime()) : 0;
+      if(!map[k] || t>=map[k]._t) map[k]={...x,_t:t};
+    });
+    snapshots=Object.values(map).sort((a,b)=>a.date.localeCompare(b.date)||String(a.property).localeCompare(String(b.property)));
+    renderDates();
+  }catch(e){ $("dateList").innerHTML=`<div class="loading">Error: ${esc(e.message)}<br><span style="font-size:.72rem">If this is an index error, open the link in the browser console to create it.</span></div>`; console.error(e); }
+}
 
-window.confirmReject = async (id) => {
-  const reason = (document.getElementById('reject-txt-' + id)?.value || '').trim();
-  const update = {status: 'rejected', rejected_at: new Date().toISOString()};
-  if (reason) update.rejection_reason = reason;
-  await updateDoc(doc(db,'pricing_proposals',id), update);
-  delete _savedActions[id];
-  showToast('Proposal rejected');
-};
+function occBadge(s){
+  const avail=s.available ?? s.avail, total=s.total_units ?? s.total;
+  if(avail!=null && total!=null){
+    const occ = total ? (total-avail)/total : 0;
+    const cls = occ>=1?"b-green":occ>0?"b-amber":"b-red";
+    return `<span class="badge ${cls}">${total-avail}/${total}</span>`;
+  }
+  if(s.occupancy_pct!=null){
+    const occ=s.occupancy_pct/100;
+    const cls=occ>=0.99?"b-green":occ>0?"b-amber":"b-red";
+    return `<span class="badge ${cls}">${Math.round(s.occupancy_pct)}%</span>`;
+  }
+  return "";
+}
 
-// ── ACTIONS ──
-window.approveEvent = async (id) => { const mult=parseFloat(document.getElementById(`m-${id}`)?.value||1.35); await updateDoc(doc(db,'pricing_events',id),{status:'approved',multiplier:mult}); showToast('Event approved','success'); };
-window.dismissEvent = async (id) => { await updateDoc(doc(db,'pricing_events',id),{status:'dismissed'}); showToast('Dismissed'); };
-window.removeEvent = async (id) => { if (!confirm('Remove this event premium?')) return; await deleteDoc(doc(db,'pricing_events',id)); showToast('Removed'); };
-window.addManualEvent = async () => {
-  const date=document.getElementById('manualDate').value, label=document.getElementById('manualLabel').value.trim(), mult=parseFloat(document.getElementById('manualMult').value);
-  if (!date||!label) { showToast('Enter date and name','error'); return; }
-  await setDoc(doc(db,'pricing_events','event_'+date),{label,multiplier:mult,status:'manual',venue:'',source:'manual',found_at:new Date().toISOString()});
-  document.getElementById('manualDate').value=''; document.getElementById('manualLabel').value='';
-  showToast('Event added','success');
-};
-window.triggerRun = async () => {
-  const btn=document.getElementById('runBtn'); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Running...';
-  try {
-    const snap=await getDoc(doc(db,'globals','config')); const token=snap.data()?.githubToken||'';
-    const resp=await fetch('https://api.github.com/repos/nikavibliani-alt/app/actions/workflows/pricing_engine.yml/dispatches',{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({ref:'main'})});
-    if (resp.status===204) showToast('Engine triggered — check log in ~2 min','success'); else throw new Error(`GitHub ${resp.status}`);
-  } catch(e) { showToast('Error: '+e.message,'error'); }
-  finally { setTimeout(()=>{ btn.disabled=false; btn.innerHTML='▶ Run Now'; },5000); }
-};
+function renderDates(){
+  const el=$("dateList");
+  if(listMinimized){ el.innerHTML=`<div class="muted">${snapshots.length} rows hidden</div>`; return; }
+  const rows = snapshots.filter(s=>activeProp==="ALL"||s.property===activeProp||s.prop===activeProp);
+  if(!rows.length){ el.innerHTML='<div class="loading">No snapshots in range</div>'; return; }
+  el.innerHTML = rows.map((s,i)=>{
+    const prop=s.property||s.prop||"";
+    const manual = locks[prop+"_"+s.date]||locks[s.date] ? '<span class="badge b-gray">Manual</span>' : "";
+    const ev = s.event_name||s.event ? `<span class="badge b-teal">${esc(s.event_name||s.event)}${s.event_multiplier?" ×"+s.event_multiplier:""}</span>` : "";
+    const gel = s.price_gel ?? s.price ?? null, eur = s.price_eur ?? null;
+    return `<div class="dl-row" data-i="${i}">
+      <span class="dl-date">${s.date}</span>
+      <span class="dl-prop">${esc(prop)}</span>
+      ${occBadge(s)} ${ev} ${manual}
+      <span class="dl-reason">${esc(s.reason||"")}</span>
+      <span class="dl-price">${gel!=null?gel+" ₾":""}</span>
+      <span class="dl-eur">${eur!=null?eur+" €":""}</span>
+    </div>
+    <div class="trace" id="trace-${i}"></div>`;
+  }).join("");
+  el.querySelectorAll(".dl-row").forEach(r=>r.onclick=()=>{
+    const i=r.dataset.i, t=$("trace-"+i), s=rows[i];
+    if(t.style.display==="block"){t.style.display="none";return;}
+    t.textContent = s.trace ? Object.entries(s.trace).map(([k,v])=>k+": "+v).join("\n")
+                  : (s.reason ? "reason: "+s.reason : "No trace data (available after Session 2 deploy)");
+    t.style.display="block";
+  });
+}
 
-// ── HELPERS ──
-function formatDate(s) { if (!s||s.length<10) return s||'—'; const d=new Date(s+'T12:00:00'); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
-function formatTs(ts) { if (!ts) return '—'; const d=ts.toDate?ts.toDate():new Date(ts); return d.toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}); }
-function showToast(msg,type='') { const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast show ${type}`; setTimeout(()=>t.className='toast',3000); }
+/* ---------- proposals ---------- */
+const REJECT_REASONS=["Not enough data yet","Price didn't convert at this level","Market uncertainty","Other"];
+async function loadProposals(){
+  const el=$("proposals");
+  try{
+    const qs=await getDocs(query(collection(db,"pricing_proposals"),orderBy("ts","desc"),limit(25)));
+    const items=[];
+    qs.forEach(d=>{
+      const x={id:d.id,...d.data()};
+      if(x.type==="run_marker") return; // skip daily run markers
+      items.push(x);
+    });
+    const pending=items.filter(x=>x.status==="pending");
+    const recent=items.filter(x=>x.status!=="pending").slice(0,5);
+    if(!items.length){el.innerHTML='<div class="muted">No proposals yet</div>';return;}
+    el.innerHTML = pending.map(p=>propCard(p,true)).join("") +
+      (recent.length?`<div class="muted" style="margin:.5rem 0 .3rem">Recent</div>`+recent.map(p=>propCard(p,false)).join(""):"");
+    el.querySelectorAll("[data-approve]").forEach(b=>b.onclick=()=>approveProposal(b.dataset.approve));
+    el.querySelectorAll("[data-reject]").forEach(b=>b.onclick=()=>{
+      const sel=el.querySelector(`select[data-sel="${b.dataset.reject}"]`);
+      if(sel.style.display!=="inline-block"){sel.style.display="inline-block";b.textContent="Confirm reject";return;}
+      rejectProposal(b.dataset.reject, sel.value);
+    });
+  }catch(e){ el.innerHTML=`<div class="muted">Error: ${esc(e.message)}</div>`; }
+}
+function propLabel(p){
+  // Support both engine fields (type/suggested/current) and any future schema
+  const ptype = p.type || p.field || "";
+  const isEur = ptype.toLowerCase().includes("eur");
+  const baseType = ptype.replace(/Eur$/i,"").toLowerCase();
+  const cur = p.current ?? p.current_value;
+  const sug = p.suggested ?? p.proposed_value;
+  const dir = sug > cur ? "Raise" : "Lower";
+  const f = {startprice:"base price",floor:"floor",ceiling:"ceiling"}[baseType] || ptype;
+  const pct = p.change_pct!=null ? Math.abs(Math.round(p.change_pct))+"%" : "";
+  const sym = isEur ? "€" : "₾";
+  return `${dir} ${p.property} ${f} ${pct} · ${p.season} · ${cur}${sym} → ${sug}${sym}`;
+}
+function propCard(p,actions){
+  const autoSt = p.status==="auto_applied";
+  const st = (p.status==="approved"||autoSt)
+    ? `<span class="badge b-green">approved${autoSt?" · auto":""}</span>`
+    : p.status==="rejected" ? '<span class="badge b-red">rejected</span>' : "";
+  return `<div class="prop-item">
+    <div class="prop-head">${esc(propLabel(p))} ${st}</div>
+    <div class="prop-reason">${esc(p.reasoning||"")}</div>
+    ${actions?`<div class="prop-actions">
+      <button class="btn btn-small btn-primary" data-approve="${p.id}">Approve</button>
+      <button class="btn btn-small" data-reject="${p.id}">Reject</button>
+      <select data-sel="${p.id}">${REJECT_REASONS.map(r=>`<option>${r}</option>`).join("")}</select>
+    </div>`:""}
+  </div>`;
+}
+async function approveProposal(id){
+  const ref=doc(db,"pricing_proposals",id);
+  const snap=await getDoc(ref); const p=snap.data();
+  const ptype = p.type || p.field || "";
+  const suggested = p.suggested ?? p.proposed_value;
+  let path;
+  if(ptype==="startPrice")    path=`startPrices.${p.property}.${p.season}`;
+  else if(ptype==="startPriceEur") path=`startPricesEur.${p.property}.${p.season}`;
+  else if(ptype==="floor")    path=`priceRules.${p.property}.${p.season}.min`;
+  else if(ptype==="ceiling")  path=`priceRules.${p.property}.${p.season}.max`;
+  else if(ptype==="floorEur") path=`eurRules.${p.property}.${p.season}.min`;
+  else if(ptype==="ceilingEur") path=`eurRules.${p.property}.${p.season}.max`;
+  else { alert("Unknown proposal type: "+ptype); return; }
+  try{
+    await updateDoc(doc(db,"pricing_config","rules"),{[path]:suggested});
+    await updateDoc(ref,{status:"approved",approved_at:new Date()});
+    logChange("proposal_approved","Approved: "+propLabel(p));
+    loadProposals(); loadRules();
+  }catch(e){ alert("Approve failed: "+e.message); }
+}
+async function rejectProposal(id,reason){
+  try{
+    await updateDoc(doc(db,"pricing_proposals",id),{status:"rejected",rejection_reason:reason,rejected_at:new Date()});
+    logChange("proposal_rejected","Rejected ("+reason+")");
+    loadProposals();
+  }catch(e){ alert("Reject failed: "+e.message); }
+}
 
-// ── INIT ──
-selectSeason('peak');
-loadRules();
+/* ---------- events ---------- */
+async function loadEvents(){
+  const el=$("events");
+  try{
+    const qs=await getDocs(query(collection(db,"pricing_events"),limit(60)));
+    const items=[];
+    qs.forEach(d=>{
+      const x={id:d.id,...d.data()};
+      // date may be in doc ID (event_YYYY-MM-DD) or as a field
+      if(!x.date) x.date=d.id.replace(/^event_/,"");
+      items.push(x);
+    });
+    const today=isoDate(new Date());
+    const upcoming=items
+      .filter(x=>x.date>=today && x.status!=="dismissed")
+      .sort((a,b)=>a.date.localeCompare(b.date))
+      .slice(0,30);
+    if(!upcoming.length){el.innerHTML='<div class="muted">No upcoming events</div>';return;}
+    el.innerHTML=upcoming.map(ev=>`<div class="ev-row">
+      <span>${esc(ev.label||ev.name||"Event")}<br><span class="ev-meta">${ev.date} · ×${ev.multiplier||1.35}</span></span>
+      <span>${ev.status==="approved"||ev.status==="manual"?'<span class="badge b-green">approved</span>'
+        : ev.status==="rejected"?'<span class="badge b-red">rejected</span>'
+        : `<button class="btn btn-small btn-primary" data-eva="${ev.id}">Approve</button>
+           <button class="btn btn-small" data-evr="${ev.id}">Reject</button>`}</span>
+    </div>`).join("");
+    el.querySelectorAll("[data-eva]").forEach(b=>b.onclick=async()=>{await updateDoc(doc(db,"pricing_events",b.dataset.eva),{status:"approved"});loadEvents();});
+    el.querySelectorAll("[data-evr]").forEach(b=>b.onclick=async()=>{await updateDoc(doc(db,"pricing_events",b.dataset.evr),{status:"rejected"});loadEvents();});
+  }catch(e){ el.innerHTML=`<div class="muted">Error: ${esc(e.message)}</div>`; }
+}
 </script>
 </body>
 </html>

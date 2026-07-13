@@ -613,6 +613,17 @@ def main():
     except Exception:
         pass
 
+    # Log urgent cancellation runs to pricing_changes for history card
+    if urgent and _db_for_ai:
+        try:
+            _db_for_ai.collection("pricing_changes").add({
+                "ts":     datetime.now(),
+                "type":   "urgent_run",
+                "detail": f"Urgent cancellation reprice — props={urgent_props or 'all'}, dates={urgent_dates or 'near-term'}",
+            })
+        except Exception:
+            pass
+
     # Record any new booking outcomes before computing new prices
     if _db_for_ai:
         record_outcomes(raw)

@@ -314,6 +314,24 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict
         except Exception as e:
             print(f"  Warning: could not write auto-applied rules: {e}", file=sys.stderr)
 
+    # Log auto-applied proposals to pricing_changes for history card
+    if auto_applied:
+        auto_labels = [
+            f"{p.get('property')} {p.get('season')} {p.get('type')} {p.get('current')}→{p.get('suggested')}"
+            for p in proposals if (
+                p.get("property") and p.get("season") and p.get("type")
+                and abs((p.get("suggested", 0) - p.get("current", 1)) / (p.get("current", 1) or 1) * 100) <= 5.0
+            )
+        ]
+        try:
+            db.collection("pricing_changes").add({
+                "ts":     datetime.now(),
+                "type":   "auto_applied",
+                "detail": f"Auto-applied {auto_applied} Claude proposal(s): {', '.join(auto_labels[:5])}",
+            })
+        except Exception:
+            pass
+
     if pending_count:
         print(f"  {pending_count} proposals queued for manual approval in pricing.html.")
 
