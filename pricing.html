@@ -127,11 +127,19 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-title">Season and currency rules</div>
-        <div style="overflow-x:auto"><table id="seasonTable"><thead>
-          <tr><th>Property · season</th><th>Base ₾</th><th>Floor ₾</th><th>Ceil ₾</th><th>Base €</th><th>Floor €</th><th>Ceil €</th></tr>
-        </thead><tbody><tr><td colspan="7" class="loading">Loading…</td></tr></tbody></table></div>
+      <div class="card" id="gelCard">
+        <div class="card-title">Prices GEL ₾</div>
+        <div id="gelChips" class="season-chips" style="padding:.5rem 1.25rem .1rem;gap:.35rem"></div>
+        <div style="overflow-x:auto"><table id="gelTable"><thead>
+          <tr><th>Property</th><th>Base ₾</th><th>Floor ₾</th><th>Ceil ₾</th></tr>
+        </thead><tbody><tr><td colspan="4" class="loading">Loading…</td></tr></tbody></table></div>
+      </div>
+      <div class="card" id="eurCard">
+        <div class="card-title">Prices EUR €</div>
+        <div id="eurChips" class="season-chips" style="padding:.5rem 1.25rem .1rem;gap:.35rem"></div>
+        <div style="overflow-x:auto"><table id="eurTable"><thead>
+          <tr><th>Property</th><th>Base €</th><th>Floor €</th><th>Ceil €</th></tr>
+        </thead><tbody><tr><td colspan="4" class="loading">Loading…</td></tr></tbody></table></div>
       </div>
 
       <div class="card">
@@ -320,10 +328,18 @@ function renderSeasonPicker(monthMap,onPaint){
 }
 
 let monthMap={};
+let activeSeason="peak";
+
+// Properties shown in each card when All is selected
+const GEL_CARD=["ROOMS","MAXELA","BIG_APT","FREEDOM"];
+const EUR_CARD=["BIG_APT","FREEDOM","ORBE_1","ORBE_2"];
+
 function initSeasonPicker(){
   monthMap={};
   const src=rules.monthSeasons||{};
   MONTH_NAMES.forEach((n,i)=>{ monthMap[i+1]=src[i+1]??src[String(i+1)]??src[n]??src[n.toLowerCase()]??"low"; });
+  // Default to current month's season
+  activeSeason = monthMap[new Date().getMonth()+1] || "peak";
   renderSeasonPicker(monthMap,(m,season)=>{
     pendingEdits["month|"+m]=season;
     const n=Object.keys(pendingEdits).length;
@@ -339,34 +355,61 @@ async function loadRules(){
     initSeasonPicker();
     renderRules();
   }catch(e){
-    $("seasonTable").querySelector("tbody").innerHTML=`<tr><td colspan="7" class="loading">Error: ${esc(e.message)}</td></tr>`;
+    $("gelTable").querySelector("tbody").innerHTML=`<tr><td colspan="4" class="loading">Error: ${esc(e.message)}</td></tr>`;
+    $("eurTable").querySelector("tbody").innerHTML=`<tr><td colspan="4" class="loading">Error: ${esc(e.message)}</td></tr>`;
   }
 }
 
 function getVal(obj,prop,season){ return obj?.[prop]?.[season] ?? obj?.[prop] ?? null; }
 
+function getGelProps(){
+  if(activeProp==="ALL") return GEL_CARD;
+  return GEL_PROPS.includes(activeProp) ? [activeProp] : [];
+}
+function getEurProps(){
+  if(activeProp==="ALL") return EUR_CARD;
+  return EUR_PROPS.includes(activeProp) ? [activeProp] : [];
+}
+
+function renderRuleChips(containerId){
+  const el=$(containerId);
+  el.innerHTML=SEASONS.map(s=>
+    `<span class="schip s-${s} ${s===activeSeason?"sel":""}" data-s="${s}">${SEASON_META[s]}</span>`
+  ).join("");
+  el.querySelectorAll(".schip").forEach(c=>c.onclick=()=>{ activeSeason=c.dataset.s; renderRules(); });
+}
+
 function renderRules(){
   if(!rules) return;
-  const tb=$("seasonTable").querySelector("tbody"); tb.innerHTML="";
-  const props = activeProp==="ALL" ? PROPERTIES : [activeProp];
+  const gelProps=getGelProps(), eurProps=getEurProps();
+  $("gelCard").style.display=gelProps.length?"":"none";
+  $("eurCard").style.display=eurProps.length?"":"none";
+  if(gelProps.length){ renderRuleChips("gelChips"); renderPriceTable("gelTable",gelProps,"gel"); }
+  if(eurProps.length){ renderRuleChips("eurChips"); renderPriceTable("eurTable",eurProps,"eur"); }
+}
+
+function renderPriceTable(tableId,props,cur){
+  const s=activeSeason;
+  const tb=$(tableId).querySelector("tbody"); tb.innerHTML="";
   props.forEach(p=>{
-    SEASONS.forEach(s=>{
-      const gBase=getVal(rules.startPrices,p,s), gFloor=rules.priceRules?.[p]?.[s]?.min ?? getVal(rules.priceRules?.floors,p,s),
-            gCeil=rules.priceRules?.[p]?.[s]?.max ?? getVal(rules.priceRules?.ceilings,p,s),
-            eBase=getVal(rules.startPricesEur,p,s), eFloor=rules.eurRules?.[p]?.[s]?.min, eCeil=rules.eurRules?.[p]?.[s]?.max;
-      if([gBase,gFloor,gCeil,eBase,eFloor,eCeil].every(v=>v==null)) return; // skip undefined combos
-      const tr=document.createElement("tr");
-      tr.innerHTML = `<td style="white-space:nowrap">${p} · ${s}</td>`
-        + cfgCell(p,s,"gel","base",gBase, GEL_PROPS.includes(p))
-        + cfgCell(p,s,"gel","floor",gFloor, GEL_PROPS.includes(p))
-        + cfgCell(p,s,"gel","ceil",gCeil, GEL_PROPS.includes(p))
-        + cfgCell(p,s,"eur","base",eBase, EUR_PROPS.includes(p))
-        + cfgCell(p,s,"eur","floor",eFloor, EUR_PROPS.includes(p))
-        + cfgCell(p,s,"eur","ceil",eCeil, EUR_PROPS.includes(p));
-      tb.appendChild(tr);
-    });
+    let v1,v2,v3;
+    if(cur==="gel"){
+      v1=getVal(rules.startPrices,p,s);
+      v2=rules.priceRules?.[p]?.[s]?.min ?? getVal(rules.priceRules?.floors,p,s);
+      v3=rules.priceRules?.[p]?.[s]?.max ?? getVal(rules.priceRules?.ceilings,p,s);
+    } else {
+      v1=getVal(rules.startPricesEur,p,s);
+      v2=rules.eurRules?.[p]?.[s]?.min;
+      v3=rules.eurRules?.[p]?.[s]?.max;
+    }
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td style="white-space:nowrap;font-weight:500">${p}</td>`
+      +cfgCell(p,s,cur,"base",v1,true)
+      +cfgCell(p,s,cur,"floor",v2,true)
+      +cfgCell(p,s,cur,"ceil",v3,true);
+    tb.appendChild(tr);
   });
-  if(!tb.children.length) tb.innerHTML='<tr><td colspan="7" class="loading">No rules found for this filter — check pricing_config/rules structure</td></tr>';
+  if(!tb.children.length) tb.innerHTML=`<tr><td colspan="4" class="muted">No data</td></tr>`;
   tb.querySelectorAll("input.cfg").forEach(i=>i.addEventListener("input",onEdit));
 }
 
