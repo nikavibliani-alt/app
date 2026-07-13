@@ -193,8 +193,20 @@ def get_multiplier(event: dict) -> float:
 def scan_and_update(config_path: str = "config.json", dry_run: bool = False) -> dict:
     print("Scanning for Tbilisi/Rustavi events via SerpAPI...")
 
-    today    = datetime.now().date()
-    max_date = today + timedelta(days=90)
+    today     = datetime.now().date()
+    today_str = today.strftime("%Y-%m-%d")
+    max_date  = today + timedelta(days=90)
+
+    # Once-per-day gate: skip if already scanned today
+    if not dry_run:
+        try:
+            _db = get_firestore_client()
+            _ls = _db.collection("pricing_events").document("last_scan").get()
+            if _ls.exists and _ls.to_dict().get("scanned_at") == today_str:
+                print(f"  Already scanned today ({today_str}) — skipping SerpAPI calls.")
+                return {}
+        except Exception as _e:
+            print(f"  Warning: could not check last_scan: {_e}", file=sys.stderr)
 
     found_events = {}
 
@@ -231,6 +243,13 @@ def scan_and_update(config_path: str = "config.json", dry_run: bool = False) -> 
 
     if not found_events:
         print("  No major events found.")
+        if not dry_run:
+            try:
+                get_firestore_client().collection("pricing_events").document("last_scan").set(
+                    {"scanned_at": today_str, "ts": datetime.now().isoformat()}
+                )
+            except Exception:
+                pass
         return {}
 
     if dry_run:
@@ -274,6 +293,9 @@ def scan_and_update(config_path: str = "config.json", dry_run: bool = False) -> 
                     f"— Maxela Pricing Engine"
                 )
             )
+
+        collection.document("last_scan").set({"scanned_at": today_str, "ts": datetime.now().isoformat()})
+        print(f"  Scan gate updated: scanned_at = {today_str}")
 
     except Exception as e:
         print(f"  Firestore error: {e}", file=sys.stderr)
