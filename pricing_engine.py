@@ -32,7 +32,11 @@ from event_scanner import scan_and_update as scan_events
 import os
 from ai_pricing import get_booking_velocity
 from claude_pricing import claude_write_daily_proposal
-from price_tracker import snapshot_prices, record_outcomes
+from price_tracker import (
+    snapshot_prices, record_outcomes,
+    load_experiment_locks, detect_manual_experiments,
+    update_engine_prices_in_locks, record_experiment_outcome,
+)
 from velocity_engine import compute_prices_velocity
 
 # ---------------------------------------------------------------------------
@@ -654,6 +658,15 @@ def main():
         print("  Loading booking velocity...")
         velocity = get_booking_velocity(_db_for_ai)
 
+    # Load and detect manual experiment locks before computing prices
+    experiment_locks = {}
+    if _db_for_ai:
+        today_iso   = today.strftime("%Y-%m-%d")
+        date_to_iso = (today + timedelta(days=window)).strftime("%Y-%m-%d")
+        print("  Checking for manual price experiments...")
+        experiment_locks = load_experiment_locks(_db_for_ai, today_iso, date_to_iso)
+        experiment_locks = detect_manual_experiments(_db_for_ai, raw, experiment_locks)
+
     # Claude daily strategy analyst — runs once per day, updates config before velocity engine
     # Skipped for urgent/cancellation runs to keep them fast
     if _db_for_ai and not urgent:
@@ -662,7 +675,7 @@ def main():
 
     # Run velocity engine as baseline for all properties
     print("  Running velocity-adjusted pricing engine...")
-    results = compute_prices_velocity(raw, config, velocity)
+    results = compute_prices_velocity(raw, config, velocity, experiment_locks=experiment_locks)
 
     # Filter to urgent properties only when in urgent mode
     if urgent and urgent_props:
@@ -686,9 +699,22 @@ def main():
     print(f"Writing {total_updates} date updates to MiniHotel...")
     write_prices(payload)
     print("Write OK.")
-    # Snapshot prices for learning
+
     if _db_for_ai:
+        # Record completed manual experiments before snapshotting
+        for rt, dates in results.items():
+            for d in dates:
+                if d.get("_experiment_released"):
+                    record_experiment_outcome(
+                        _db_for_ai, rt, d["date"],
+                        d["_experiment_lock"],
+                        booked=d.get("_experiment_booked", False),
+                    )
+        # Update last_engine_price baseline for future experiment detection
+        update_engine_prices_in_locks(_db_for_ai, results, experiment_locks)
+        # Snapshot prices for learning
         snapshot_prices(results)
+
     print("Syncing channels...")
     sync_channels(results)
     print("Done.")

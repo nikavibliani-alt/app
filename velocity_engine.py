@@ -206,6 +206,7 @@ def compute_prices_velocity(
     raw_data: list,
     config: dict,
     velocity: dict,
+    experiment_locks: dict = None,
 ) -> dict:
     """
     Main pricing function using velocity-adjusted dynamic pricing.
@@ -272,6 +273,72 @@ def compute_prices_velocity(
                     "skip": True, "reason": "fully booked (avail=0)",
                 })
                 continue
+
+            # ── MANUAL EXPERIMENT LOCK ──
+            _experiment_released = False
+            _experiment_booked   = False
+            _experiment_lock     = None
+            lock = (experiment_locks or {}).get(rt, {}).get(date_str)
+
+            if lock and lock.get("manual_lock", False):
+                manual_price         = lock.get("manual_price", prices["gel"])
+                manual_avail_at_set  = lock.get("manual_avail_at_set", avail)
+                baseline_gel         = lock.get("baseline_price", manual_price)
+                baseline_eur         = lock.get("baseline_price_eur", prices["eur"])
+                _experiment_lock     = lock
+
+                # Timeout: past next 12:00 UTC after the experiment was set
+                timed_out = False
+                manual_set_at_str = lock.get("manual_set_at", "")
+                if manual_set_at_str:
+                    try:
+                        set_time  = datetime.fromisoformat(manual_set_at_str)
+                        next_noon = set_time.replace(hour=12, minute=0, second=0, microsecond=0)
+                        if set_time.hour >= 12:
+                            next_noon += timedelta(days=1)
+                        timed_out = datetime.now() >= next_noon
+                    except Exception:
+                        pass
+
+                if avail >= manual_avail_at_set and not timed_out:
+                    # No booking yet and not timed out — hold the lock, skip this date
+                    print(
+                        f"  Manual experiment active for {rt} {date_str} — "
+                        f"locked at {manual_price:.0f} GEL, avail unchanged at {avail}"
+                    )
+                    results[rt].append({
+                        "date":          date_str,
+                        "days_ahead":    days,
+                        "current_gel":   prices["gel"],
+                        "proposed_gel":  prices["gel"],
+                        "current_eur":   prices["eur"],
+                        "proposed_eur":  prices["eur"],
+                        "occupancy_pct": (total_units - avail) / total_units * 100,
+                        "season":        get_season(date_str, config),
+                        "skip":          True,
+                        "reason":        f"manual experiment locked at {manual_price:.0f} GEL",
+                    })
+                    continue
+
+                # Booking happened or timed out — release the lock
+                _experiment_released = True
+                _experiment_booked   = avail < manual_avail_at_set
+                prev_avail           = manual_avail_at_set
+
+                if _experiment_booked:
+                    print(
+                        f"  Manual experiment concluded for {rt} {date_str} — "
+                        f"{prev_avail}→{avail} booked at {manual_price:.0f} GEL, "
+                        f"resuming from baseline"
+                    )
+                else:
+                    print(
+                        f"  Manual experiment timed out for {rt} {date_str} — "
+                        f"no booking, resuming from {manual_price:.0f} GEL"
+                    )
+
+                # Engine continues FROM baseline_price (= manual_price), not last_engine_price
+                prices = {**prices, "gel": baseline_gel, "eur": baseline_eur}
 
             # Get boundaries
             floor_gel   = config.get("floor_prices_gel",   {}).get(rt, {}).get(season, 0)
@@ -432,7 +499,7 @@ def compute_prices_velocity(
             gel_changed = abs(proposed_gel - prices["gel"]) >= 1
             eur_changed = abs(proposed_eur - prices["eur"]) >= 1
 
-            results[rt].append({
+            entry = {
                 "date":          date_str,
                 "days_ahead":    days,
                 "current_gel":   prices["gel"],
@@ -444,6 +511,11 @@ def compute_prices_velocity(
                 "skip":          False,
                 "changed":       gel_changed or eur_changed,
                 "reason":        gel_reason or f"occ={occ_pct:.0f}% score={score:.0f}",
-            })
+            }
+            if _experiment_released:
+                entry["_experiment_released"] = True
+                entry["_experiment_booked"]   = _experiment_booked
+                entry["_experiment_lock"]     = _experiment_lock
+            results[rt].append(entry)
 
     return results
