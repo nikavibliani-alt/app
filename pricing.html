@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
 <title>Pricing — Maxela</title>
 <style>
 :root{
@@ -13,7 +13,7 @@
   --status-red:#9B2C2C;--bg-red:#FBE4E4;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text-main);line-height:1.5;padding:1.5rem;padding-bottom:5rem}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text-main);line-height:1.5;padding:1.5rem;padding-bottom:5rem;touch-action:manipulation}
 .container{max-width:1400px;margin:0 auto}
 header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem}
 h1{font-size:1.4rem;font-weight:600;letter-spacing:-.01em}
@@ -87,7 +87,16 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
 .muted{color:var(--text-muted);font-size:.8rem}
 #pinOverlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
 #pinBox{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-card);padding:2rem;text-align:center;box-shadow:var(--shadow)}
-#pinBox input{font-size:1.2rem;padding:.5rem;width:140px;text-align:center;border:1px solid var(--border);border-radius:6px;letter-spacing:.3em;margin:.8rem 0}
+.pin-dots{display:flex;gap:.7rem;justify-content:center;margin:.9rem 0 .8rem}
+.pin-dot{width:13px;height:13px;border-radius:50%;border:2px solid #ccc;background:transparent;transition:background .12s,border-color .12s}
+.pin-dot.filled{background:var(--primary);border-color:var(--primary)}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem;max-width:220px;margin:0 auto}
+.pin-key{font-size:1.25rem;font-weight:600;padding:0;height:56px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);cursor:pointer;touch-action:manipulation;user-select:none;transition:background .1s}
+.pin-key:active{background:#EFEFEF}
+.pin-key-back{font-size:1rem;font-weight:400;color:var(--text-muted)}
+.pin-key-empty{border-color:transparent;background:transparent;pointer-events:none}
+@keyframes pin-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+.pin-shake{animation:pin-shake .35s ease}
 .loading{text-align:center;padding:1.5rem;color:var(--text-muted);font-size:.85rem}
 </style>
 </head>
@@ -95,17 +104,38 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
 
 <div id="pinOverlay">
   <div id="pinBox">
-    <div style="font-weight:600;font-size:1.05rem">Pricing admin</div>
-    <input type="password" id="pinInput" inputmode="numeric" maxlength="6" placeholder="PIN">
-    <div><button class="btn btn-primary" onclick="checkPin()">Enter</button></div>
-    <div id="pinErr" style="color:var(--status-red);font-size:.78rem;margin-top:.5rem"></div>
+    <div style="font-weight:600;font-size:1.05rem;margin-bottom:.25rem">Pricing admin</div>
+    <div class="pin-dots" id="pinDots">
+      <span class="pin-dot" id="pd0"></span>
+      <span class="pin-dot" id="pd1"></span>
+      <span class="pin-dot" id="pd2"></span>
+      <span class="pin-dot" id="pd3"></span>
+    </div>
+    <div id="pinErr" style="color:var(--status-red);font-size:.78rem;min-height:1.1em;margin-bottom:.4rem"></div>
+    <div class="pin-grid">
+      <button class="pin-key" onclick="pinKey('1')">1</button>
+      <button class="pin-key" onclick="pinKey('2')">2</button>
+      <button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button>
+      <button class="pin-key" onclick="pinKey('5')">5</button>
+      <button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button>
+      <button class="pin-key" onclick="pinKey('8')">8</button>
+      <button class="pin-key" onclick="pinKey('9')">9</button>
+      <button class="pin-key pin-key-empty" disabled></button>
+      <button class="pin-key" onclick="pinKey('0')">0</button>
+      <button class="pin-key pin-key-back" onclick="pinBack()">⌫</button>
+    </div>
   </div>
 </div>
 
 <div class="container" id="app" style="display:none">
   <header>
     <h1>Pricing</h1>
-    <div class="engine-status" id="engineStatus"><span class="muted">Loading engine status…</span></div>
+    <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+      <div class="engine-status" id="engineStatus"><span class="muted">Loading engine status…</span></div>
+      <button class="btn btn-small" id="logoutBtn" style="display:none;color:var(--text-muted)" onclick="logout()">Log out</button>
+    </div>
   </header>
 
   <div style="margin-bottom:1.25rem">
@@ -211,18 +241,71 @@ let listMinimized = false;
 let ADMIN_PIN = null;       // loaded from hk_pins/admin
 
 /* ---------- auth ---------- */
-window.checkPin = () => {
-  const v = document.getElementById("pinInput").value;
-  if (!ADMIN_PIN || v === ADMIN_PIN) {
-    sessionStorage.setItem("pricing_auth","1");
-    document.getElementById("pinOverlay").style.display="none";
-    document.getElementById("app").style.display="block";
-    init();
-  } else {
-    document.getElementById("pinErr").textContent = "Wrong PIN";
-  }
+const AUTH_KEY = "pricing_device_auth";
+const AUTH_TTL = 90 * 24 * 60 * 60 * 1000; // 90 days in ms
+
+function isDeviceAuthed() {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    if (!raw) return false;
+    const { exp } = JSON.parse(raw);
+    return Date.now() < exp;
+  } catch { return false; }
+}
+
+function grantAccess() {
+  try { localStorage.setItem(AUTH_KEY, JSON.stringify({ exp: Date.now() + AUTH_TTL })); } catch {}
+  document.getElementById("logoutBtn").style.display = "inline-block";
+  document.getElementById("pinOverlay").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  init();
+}
+
+window.logout = () => {
+  try { localStorage.removeItem(AUTH_KEY); } catch {}
+  location.reload();
 };
-document.getElementById("pinInput").addEventListener("keydown",e=>{if(e.key==="Enter")window.checkPin();});
+
+let pinBuf = "";
+
+function renderDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById("pd" + i).classList.toggle("filled", i < pinBuf.length);
+  }
+}
+
+window.pinKey = d => {
+  if (pinBuf.length >= 4) return;
+  pinBuf += d;
+  renderDots();
+  if (pinBuf.length === 4) submitPin();
+};
+
+window.pinBack = () => {
+  pinBuf = pinBuf.slice(0, -1);
+  renderDots();
+  document.getElementById("pinErr").textContent = "";
+};
+
+function submitPin() {
+  if (!ADMIN_PIN || pinBuf === ADMIN_PIN) {
+    grantAccess();
+  } else {
+    const box = document.getElementById("pinBox");
+    box.classList.remove("pin-shake");
+    void box.offsetWidth; // reflow to restart animation
+    box.classList.add("pin-shake");
+    document.getElementById("pinErr").textContent = "Wrong PIN";
+    pinBuf = "";
+    renderDots();
+  }
+}
+
+document.addEventListener("keydown", e => {
+  if (document.getElementById("pinOverlay").style.display === "none") return;
+  if (e.key >= "0" && e.key <= "9") { window.pinKey(e.key); }
+  else if (e.key === "Backspace") { window.pinBack(); }
+});
 
 // Fetch admin PIN from Firestore, then show overlay or app
 (async()=>{
@@ -230,10 +313,8 @@ document.getElementById("pinInput").addEventListener("keydown",e=>{if(e.key==="E
     const pinSnap=await getDoc(doc(db,"hk_pins","admin"));
     if(pinSnap.exists()) ADMIN_PIN=pinSnap.data().pin||null;
   }catch(e){/* fail open */}
-  if(!ADMIN_PIN||sessionStorage.getItem("pricing_auth")==="1"){
-    document.getElementById("pinOverlay").style.display="none";
-    document.getElementById("app").style.display="block";
-    init();
+  if(!ADMIN_PIN || isDeviceAuthed()){
+    grantAccess();
   }
 })();
 
