@@ -165,6 +165,21 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
           <div class="season-chips" id="seasonChips"></div>
           <div class="months" id="monthGrid"></div>
           <div class="muted" style="margin-top:.6rem;font-size:.74rem">Pick a season above, then click months to assign it.</div>
+          <div style="margin-top:.9rem;border-top:1px solid var(--border);padding-top:.7rem">
+            <div style="font-size:.82rem;font-weight:600;margin-bottom:.4rem">Exact date ranges <span class="muted" style="font-weight:400;font-size:.72rem">— override month settings</span></div>
+            <div id="dateOverrideList"></div>
+            <div style="margin-top:.45rem;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+              <input type="text" id="orFrom" placeholder="MM-DD" maxlength="5" style="width:64px;padding:.22rem .35rem;border:1px solid var(--border);border-radius:4px;font-size:.8rem">
+              <span class="muted">–</span>
+              <input type="text" id="orTo" placeholder="MM-DD" maxlength="5" style="width:64px;padding:.22rem .35rem;border:1px solid var(--border);border-radius:4px;font-size:.8rem">
+              <span class="muted">→</span>
+              <select id="orSeason" style="padding:.22rem .35rem;font-size:.8rem;border:1px solid var(--border);border-radius:4px;background:var(--card-bg)">
+                <option value="low">Low</option><option value="mid">Mid</option><option value="high">High</option>
+                <option value="peak">Peak</option><option value="new_year">New Year</option><option value="xmas_low">Xmas low</option>
+              </select>
+              <button class="btn btn-small btn-primary" onclick="addDateOverride()">+ Add</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -173,7 +188,7 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
         <p style="font-size:.72rem;color:var(--text-muted);margin:-.4rem 0 .6rem">Engine moves prices toward Start, never below Minimum or above Maximum.</p>
         <div id="gelChips" class="season-chips"></div>
         <div style="overflow-x:auto"><table id="gelTable"><thead>
-          <tr><th>Property</th><th>Start price ₾</th><th>Minimum ₾</th><th>Maximum ₾</th></tr>
+          <tr><th>Property</th><th>Minimum ₾</th><th>Start price ₾</th><th>Maximum ₾</th></tr>
         </thead><tbody><tr><td colspan="4" class="loading">Loading…</td></tr></tbody></table></div>
       </div>
       <div class="card" id="eurCard">
@@ -181,7 +196,7 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
         <p style="font-size:.72rem;color:var(--text-muted);margin:-.4rem 0 .6rem">Engine moves prices toward Start, never below Minimum or above Maximum.</p>
         <div id="eurChips" class="season-chips"></div>
         <div style="overflow-x:auto"><table id="eurTable"><thead>
-          <tr><th>Property</th><th>Start price €</th><th>Minimum €</th><th>Maximum €</th></tr>
+          <tr><th>Property</th><th>Minimum €</th><th>Start price €</th><th>Maximum €</th></tr>
         </thead><tbody><tr><td colspan="4" class="loading">Loading…</td></tr></tbody></table></div>
       </div>
 
@@ -332,6 +347,9 @@ document.addEventListener("keydown", e => {
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
 const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const TZ = "Asia/Tbilisi";
+const fmtTbilisi = (d, opts={hour:"2-digit",minute:"2-digit"}) =>
+  new Intl.DateTimeFormat("en-GB",{timeZone:TZ,...opts}).format(d instanceof Date?d:d.toDate?d.toDate():new Date(d));
 const fmtRel = ts => {
   if(!ts) return "—";
   const d = ts.toDate ? ts.toDate() : new Date(ts);
@@ -340,7 +358,7 @@ const fmtRel = ts => {
   if (m<60) return m+" min ago";
   const h = Math.round(m/60);
   if (h<24) return h+" h ago";
-  return d.toLocaleDateString();
+  return fmtTbilisi(d,{day:"numeric",month:"short",timeZone:TZ});
 };
 const nextRun = () => {
   const now = new Date();
@@ -413,7 +431,7 @@ async function loadEngineStatus(){
     const nr = nextRun();
     el.innerHTML =
       `<span>Last run <b>${fmtRel(d.timestamp)}</b></span>`+
-      `<span>Next <b>${String(nr.getUTCHours()).padStart(2,"0")}:00 UTC</b></span>`+
+      `<span>Next <b>${fmtTbilisi(nr)}</b></span>`+
       `<span>Changes <b>${d.changes_count ?? d.price_changes ?? d.changes ?? "—"}</b></span>`+
       `<span>${status}</span>`;
   }catch(e){ el.innerHTML=`<span class="err">Status error: ${esc(e.message)}</span>`; }
@@ -480,6 +498,7 @@ async function loadRules(){
     deriveCardProps();
     initSeasonPicker();
     renderRules();
+    renderDateOverrides();
   }catch(e){
     $("gelTable").querySelector("tbody").innerHTML=`<tr><td colspan="4" class="loading">Error: ${esc(e.message)}</td></tr>`;
     $("eurTable").querySelector("tbody").innerHTML=`<tr><td colspan="4" class="loading">Error: ${esc(e.message)}</td></tr>`;
@@ -548,8 +567,8 @@ function renderPriceTable(tableId,props,cur,season){
     }
     const tr=document.createElement("tr");
     tr.innerHTML=`<td style="white-space:nowrap;font-weight:500">${p}</td>`
-      +cfgCell(p,s,cur,"base",v1,true)
       +cfgCell(p,s,cur,"floor",v2,true)
+      +cfgCell(p,s,cur,"base",v1,true)
       +cfgCell(p,s,cur,"ceil",v3,true);
     tb.appendChild(tr);
   });
@@ -573,11 +592,12 @@ function onEdit(e){
   $("saveBar").classList.add("show");
 }
 
-window.discardChanges = ()=>{ pendingEdits={}; $("saveBar").classList.remove("show"); renderRules(); };
+window.discardChanges = ()=>{ pendingEdits={}; $("saveBar").classList.remove("show"); renderRules(); renderDateOverrides(); };
 
 window.saveChanges = async ()=>{
   const upd={};
   for(const [k,v] of Object.entries(pendingEdits)){
+    if(k==="dateOverrides"){ upd["dateOverrides"]=v; continue; }
     if(k.startsWith("month|")){ upd["monthSeasons."+k.split("|")[1]]=v; continue; }
     const [p,s,cur,field]=k.split("|");
     let path;
@@ -592,6 +612,50 @@ window.saveChanges = async ()=>{
     $("saveBar").classList.remove("show");
     await loadRules();
   }catch(e){ alert("Save failed: "+e.message); }
+};
+
+/* ---------- date overrides ---------- */
+const MONTH_SHORT=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function fmtMD(md){const[m,d]=md.split("-");return d.replace(/^0/,"")+" "+MONTH_SHORT[(parseInt(m)||1)-1];}
+
+function renderDateOverrides(){
+  const el=$("dateOverrideList");
+  if(!el) return;
+  const overrides=pendingEdits["dateOverrides"]??rules?.dateOverrides??[];
+  if(!overrides.length){
+    el.innerHTML='<div class="muted" style="font-size:.75rem">No date ranges set</div>';
+    return;
+  }
+  el.innerHTML=overrides.map((ov,i)=>`
+    <div style="display:flex;gap:.5rem;align-items:center;padding:.2rem 0;font-size:.8rem">
+      <span>${fmtMD(ov.from)} – ${fmtMD(ov.to)}</span>
+      <span class="muted">→</span>
+      <span class="schip s-${ov.season}" style="padding:.1rem .4rem;min-height:unset;font-size:.72rem;pointer-events:none">${esc(SEASON_META[ov.season]||ov.season)}</span>
+      <button onclick="removeDateOverride(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.9rem;padding:.1rem .2rem;line-height:1" title="Remove">✕</button>
+    </div>`).join("");
+}
+
+window.addDateOverride=()=>{
+  const frm=$("orFrom").value.trim(), to=$("orTo").value.trim(), season=$("orSeason").value;
+  if(!/^\d{2}-\d{2}$/.test(frm)||!/^\d{2}-\d{2}$/.test(to)){alert("Use MM-DD format, e.g. 12-30");return;}
+  const current=[...(pendingEdits["dateOverrides"]??rules?.dateOverrides??[])];
+  current.push({from:frm,to,season});
+  pendingEdits["dateOverrides"]=current;
+  const n=Object.keys(pendingEdits).length;
+  $("saveMsg").textContent=`${n} unsaved change${n>1?"s":""}`;
+  $("saveBar").classList.add("show");
+  $("orFrom").value=""; $("orTo").value="";
+  renderDateOverrides();
+};
+
+window.removeDateOverride=i=>{
+  const current=[...(pendingEdits["dateOverrides"]??rules?.dateOverrides??[])];
+  current.splice(i,1);
+  pendingEdits["dateOverrides"]=current;
+  const n=Object.keys(pendingEdits).length;
+  $("saveMsg").textContent=`${n} unsaved change${n>1?"s":""}`;
+  $("saveBar").classList.add("show");
+  renderDateOverrides();
 };
 
 /* ---------- manual locks ---------- */

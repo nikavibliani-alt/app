@@ -82,7 +82,19 @@ def load_config(path="config.json"):
 
 
 def get_season(date_str: str, config: dict) -> str:
-    md = date_str[5:]
+    md = date_str[5:]  # "MM-DD"
+    # Firestore dateOverrides take priority (recurring yearly, cross-year aware)
+    for ov in config.get("dateOverrides", []):
+        frm, to = ov.get("from", ""), ov.get("to", "")
+        if not frm or not to or not ov.get("season"):
+            continue
+        if frm <= to:
+            if frm <= md <= to:
+                return ov["season"]
+        else:  # wraps across year boundary (e.g. 12-30 → 01-07)
+            if md >= frm or md <= to:
+                return ov["season"]
+    # Fall back to static season ranges from config.json
     for season in config["seasons"]:
         for start, end in season["ranges"]:
             if start <= md <= end:
@@ -684,6 +696,8 @@ def main():
                         if rt not in config["ceiling_prices_eur"]: config["ceiling_prices_eur"][rt] = {}
                         config["floor_prices_eur"][rt][s] = vals.get("min", 0)
                         config["ceiling_prices_eur"][rt][s] = vals.get("max", 0)
+            if rules_data.get("dateOverrides") is not None:
+                config["dateOverrides"] = rules_data["dateOverrides"]
             print(f"  Loaded pricing rules from Firestore.")
         except Exception as _bpe:
             print(f"  Warning: could not load pricing rules: {_bpe}", file=sys.stderr)
