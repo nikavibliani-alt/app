@@ -54,11 +54,21 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
 .dl-price{font-weight:600;white-space:nowrap}
 .dl-eur{color:var(--text-muted);white-space:nowrap}
 .trace{display:none;background:#F7F9F9;border-radius:6px;margin:.2rem 0 .5rem;padding:.6rem .8rem;font-family:ui-monospace,Menlo,monospace;font-size:.72rem;color:#444;white-space:pre-wrap}
-.prop-item{border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem;margin-bottom:.6rem}
-.prop-head{font-size:.82rem;font-weight:600;margin-bottom:.2rem}
-.prop-reason{font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem}
-.prop-actions{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
-.prop-actions select{padding:.2rem .3rem;font-size:.72rem;border:1px solid var(--border);border-radius:4px;display:none}
+.prop-row{display:flex;align-items:flex-start;gap:.5rem;padding:.4rem 0;border-bottom:1px solid var(--border)}
+.prop-row:last-of-type{border-bottom:none}
+.prop-summary{font-weight:600;font-size:.82rem}
+.prop-stag{font-size:.68rem;font-weight:600;padding:.1rem .35rem;border-radius:3px;background:var(--sc,#bbb);color:#fff;white-space:nowrap;vertical-align:middle}
+.prop-why{font-size:.72rem;color:var(--primary);cursor:pointer;border:none;background:none;padding:0}
+.prop-why:hover{text-decoration:underline}
+.prop-reasoning{display:none;font-size:.75rem;color:var(--text-muted);padding:.3rem .5rem;background:#F7F9F9;border-radius:5px;margin:.2rem 0 .3rem;line-height:1.4}
+.prop-btns{display:flex;gap:.3rem;flex-shrink:0;align-items:center;padding-top:.1rem}
+.prop-btn-ok{width:30px;height:30px;border-radius:5px;border:1.5px solid var(--primary);background:transparent;color:var(--primary);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .1s,color .1s}
+.prop-btn-ok:hover{background:var(--primary);color:#fff}
+.prop-btn-no{width:30px;height:30px;border-radius:5px;border:1.5px solid var(--border);background:transparent;color:var(--text-muted);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .1s,color .1s}
+.prop-btn-no:hover{border-color:#aaa;color:#444}
+.prop-reject-wrap{display:none;gap:.3rem;align-items:center;margin:.25rem 0 .3rem;flex-wrap:wrap}
+.prop-reject-wrap select{font-size:.75rem;padding:.2rem .3rem;border:1px solid var(--border);border-radius:4px}
+.prop-recent{font-size:.78rem;color:var(--text-muted);padding:.15rem 0;line-height:1.4}
 .ev-row{display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:.5rem 0;border-bottom:1px solid var(--border);font-size:.82rem}
 .ev-row:last-child{border-bottom:none}
 .ev-meta{color:var(--text-muted);font-size:.74rem}
@@ -76,9 +86,10 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
 .s-peak{--sc:#A65D57}
 .s-new_year{--sc:#75689E}
 .s-xmas_low{--sc:#4E8D8D}
-.schip{background:var(--card-bg);border:1px solid var(--border);color:#444;border-radius:6px}
-.schip::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--sc);margin-right:6px}
-.schip.sel{border-color:var(--sc);background:#FAFAFA;color:#222}
+.schip{background:var(--card-bg);border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:.3rem .6rem;font-size:.75rem;font-weight:500;cursor:pointer;user-select:none;touch-action:manipulation;display:inline-flex;align-items:center;min-height:40px;white-space:nowrap;transition:background .12s,color .12s,border-color .12s}
+.schip::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--sc);margin-right:5px;flex-shrink:0;transition:background .12s}
+.schip.sel{background:var(--sc);border-color:var(--sc);color:#fff}
+.schip.sel::before{background:rgba(255,255,255,.65)}
 .month{background:var(--card-bg);color:#333;border-bottom:3px solid var(--sc)}
 .month small{color:var(--sc)}
 .hist-row{display:flex;gap:.6rem;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid var(--border);font-size:.78rem}
@@ -159,16 +170,18 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
 
       <div class="card" id="gelCard">
         <div class="card-title">Prices GEL ₾</div>
-        <div id="gelChips" class="season-chips" style="padding:.5rem 1.25rem .1rem;gap:.35rem"></div>
+        <p style="font-size:.72rem;color:var(--text-muted);margin:-.4rem 0 .6rem">Engine moves prices toward Start, never below Minimum or above Maximum.</p>
+        <div id="gelChips" class="season-chips"></div>
         <div style="overflow-x:auto"><table id="gelTable"><thead>
-          <tr><th>Property</th><th>Base ₾</th><th>Floor ₾</th><th>Ceil ₾</th></tr>
+          <tr><th>Property</th><th>Start price ₾</th><th>Minimum ₾</th><th>Maximum ₾</th></tr>
         </thead><tbody><tr><td colspan="4" class="loading">Loading…</td></tr></tbody></table></div>
       </div>
       <div class="card" id="eurCard">
         <div class="card-title">Prices EUR €</div>
-        <div id="eurChips" class="season-chips" style="padding:.5rem 1.25rem .1rem;gap:.35rem"></div>
+        <p style="font-size:.72rem;color:var(--text-muted);margin:-.4rem 0 .6rem">Engine moves prices toward Start, never below Minimum or above Maximum.</p>
+        <div id="eurChips" class="season-chips"></div>
         <div style="overflow-x:auto"><table id="eurTable"><thead>
-          <tr><th>Property</th><th>Base €</th><th>Floor €</th><th>Ceil €</th></tr>
+          <tr><th>Property</th><th>Start price €</th><th>Minimum €</th><th>Maximum €</th></tr>
         </thead><tbody><tr><td colspan="4" class="loading">Loading…</td></tr></tbody></table></div>
       </div>
 
@@ -365,8 +378,27 @@ async function loadHistory(){
   try{
     const qs=await getDocs(query(collection(db,"pricing_changes"),orderBy("ts","desc"),limit(40)));
     if(qs.empty){el.innerHTML='<div class="muted">No changes logged yet</div>';return;}
-    el.innerHTML=[...qs.docs].map(d=>{const x=d.data();
-      return `<div class="hist-row"><span>${esc(x.detail)}</span><span class="hist-when">${fmtRel(x.ts)}</span></div>`;}).join("");
+    const items=[...qs.docs].map(d=>({id:d.id,...d.data()}));
+    const hasEngineRuns=items.some(x=>x.type==="engine_run");
+    let html=items.map(x=>{
+      if(x.type==="engine_run"){
+        const changes=x.changes||[];
+        const changesHtml=changes.map(c=>{
+          const sym=c.currency==="eur"?"€":"₾";
+          return `<div style="padding:.1rem 0;font-size:.72rem;color:var(--text-muted)">${esc(c.property)} · ${c.date} · ${c.old}${sym} → ${c.new}${sym}</div>`;
+        }).join("")||'<div style="font-size:.72rem;color:var(--text-muted)">No detail</div>';
+        return `<div class="hist-row" style="flex-direction:column;align-items:flex-start;gap:.15rem;cursor:pointer" onclick="const d=this.querySelector('.eng-ch');d.style.display=d.style.display==='block'?'none':'block'">
+          <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+            <span style="font-weight:500">${esc(x.detail||((x.changes?.length??0)+" prices changed"))}</span>
+            <span class="hist-when">${fmtRel(x.ts)}</span>
+          </div>
+          <div class="eng-ch" style="display:none;width:100%;padding-top:.2rem">${changesHtml}</div>
+        </div>`;
+      }
+      return `<div class="hist-row"><span>${esc(x.detail)}</span><span class="hist-when">${fmtRel(x.ts)}</span></div>`;
+    }).join("");
+    if(!hasEngineRuns) html+=`<div class="muted" style="margin-top:.5rem;font-size:.75rem">Engine change logging starts after next engine deploy</div>`;
+    el.innerHTML=html;
   }catch(e){ el.innerHTML=`<div class="muted">Error: ${esc(e.message)}</div>`; }
 }
 
@@ -409,7 +441,8 @@ function renderSeasonPicker(monthMap,onPaint){
 }
 
 let monthMap={};
-let activeSeason="peak";
+let activeSeasonGel="peak";
+let activeSeasonEur="peak";
 
 // Properties shown in each card when All is selected
 const GEL_CARD=["ROOMS","MAXELA","BIG_APT","FREEDOM"];
@@ -419,8 +452,9 @@ function initSeasonPicker(){
   monthMap={};
   const src=rules.monthSeasons||{};
   MONTH_NAMES.forEach((n,i)=>{ monthMap[i+1]=src[i+1]??src[String(i+1)]??src[n]??src[n.toLowerCase()]??"low"; });
-  // Default to current month's season
-  activeSeason = monthMap[new Date().getMonth()+1] || "peak";
+  const curSeason = monthMap[new Date().getMonth()+1] || "peak";
+  activeSeasonGel = curSeason;
+  activeSeasonEur = curSeason;
   renderSeasonPicker(monthMap,(m,season)=>{
     pendingEdits["month|"+m]=season;
     const n=Object.keys(pendingEdits).length;
@@ -452,12 +486,30 @@ function getEurProps(){
   return EUR_PROPS.includes(activeProp) ? [activeProp] : [];
 }
 
-function renderRuleChips(containerId){
+function renderRuleChips(containerId, cur){
+  const activeSeason = cur==="gel" ? activeSeasonGel : activeSeasonEur;
   const el=$(containerId);
   el.innerHTML=SEASONS.map(s=>
     `<span class="schip s-${s} ${s===activeSeason?"sel":""}" data-s="${s}">${SEASON_META[s]}</span>`
   ).join("");
-  el.querySelectorAll(".schip").forEach(c=>c.onclick=()=>{ activeSeason=c.dataset.s; renderRules(); });
+  el.querySelectorAll(".schip").forEach(c=>c.onclick=()=>{
+    if(cur==="gel"){ activeSeasonGel=c.dataset.s; renderGelCard(); }
+    else { activeSeasonEur=c.dataset.s; renderEurCard(); }
+  });
+}
+
+function renderGelCard(){
+  if(!rules) return;
+  const gelProps=getGelProps();
+  renderRuleChips("gelChips","gel");
+  renderPriceTable("gelTable",gelProps,"gel",activeSeasonGel);
+}
+
+function renderEurCard(){
+  if(!rules) return;
+  const eurProps=getEurProps();
+  renderRuleChips("eurChips","eur");
+  renderPriceTable("eurTable",eurProps,"eur",activeSeasonEur);
 }
 
 function renderRules(){
@@ -465,12 +517,12 @@ function renderRules(){
   const gelProps=getGelProps(), eurProps=getEurProps();
   $("gelCard").style.display=gelProps.length?"":"none";
   $("eurCard").style.display=eurProps.length?"":"none";
-  if(gelProps.length){ renderRuleChips("gelChips"); renderPriceTable("gelTable",gelProps,"gel"); }
-  if(eurProps.length){ renderRuleChips("eurChips"); renderPriceTable("eurTable",eurProps,"eur"); }
+  if(gelProps.length){ renderRuleChips("gelChips","gel"); renderPriceTable("gelTable",gelProps,"gel",activeSeasonGel); }
+  if(eurProps.length){ renderRuleChips("eurChips","eur"); renderPriceTable("eurTable",eurProps,"eur",activeSeasonEur); }
 }
 
-function renderPriceTable(tableId,props,cur){
-  const s=activeSeason;
+function renderPriceTable(tableId,props,cur,season){
+  const s=season||activeSeasonGel;
   const tb=$(tableId).querySelector("tbody"); tb.innerHTML="";
   props.forEach(p=>{
     let v1,v2,v3;
@@ -604,6 +656,19 @@ function renderDates(){
 
 /* ---------- proposals ---------- */
 const REJECT_REASONS=["Not enough data yet","Price didn't convert at this level","Market uncertainty","Other"];
+
+function propSummary(p){
+  const ptype=p.type||p.field||"";
+  const isEur=ptype.toLowerCase().includes("eur");
+  const baseType=ptype.replace(/Eur$/i,"").toLowerCase();
+  const cur=p.current??p.current_value;
+  const sug=p.suggested??p.proposed_value;
+  const sym=isEur?"€":"₾";
+  const f={startprice:"start price",floor:"minimum",ceiling:"maximum"}[baseType]||ptype;
+  const pct=p.change_pct!=null?(p.change_pct>0?"+":"")+Math.round(p.change_pct)+"%":"";
+  return `${esc(p.property)} ${f}: ${cur}${sym} → ${sug}${sym}${pct?" ("+pct+")":""}`;
+}
+
 async function loadProposals(){
   const el=$("proposals");
   try{
@@ -611,49 +676,61 @@ async function loadProposals(){
     const items=[];
     qs.forEach(d=>{
       const x={id:d.id,...d.data()};
-      if(x.type==="run_marker") return; // skip daily run markers
+      if(x.type==="run_marker") return;
       items.push(x);
     });
+    if(!items.length){el.innerHTML='<div class="muted">No proposals yet</div>';return;}
     const pending=items.filter(x=>x.status==="pending");
     const recent=items.filter(x=>x.status!=="pending").slice(0,5);
-    if(!items.length){el.innerHTML='<div class="muted">No proposals yet</div>';return;}
-    el.innerHTML = pending.map(p=>propCard(p,true)).join("") +
-      (recent.length?`<div class="muted" style="margin:.5rem 0 .3rem">Recent</div>`+recent.map(p=>propCard(p,false)).join(""):"");
+
+    let html='';
+    pending.forEach(p=>{
+      html+=`<div class="prop-row" id="prow-${p.id}">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
+            <span class="prop-summary">${propSummary(p)}</span>
+            <span class="prop-stag s-${p.season||""}">${esc(p.season||"")}</span>
+            <button class="prop-why" data-why="${p.id}">why?</button>
+          </div>
+          <div class="prop-reasoning" id="why-${p.id}">${esc(p.reasoning||"No reasoning provided.")}</div>
+          <div class="prop-reject-wrap" id="rjwrap-${p.id}">
+            <select id="rjsel-${p.id}">${REJECT_REASONS.map(r=>`<option>${esc(r)}</option>`).join("")}</select>
+            <button class="btn btn-small" data-confirm="${p.id}">Confirm reject</button>
+          </div>
+        </div>
+        <div class="prop-btns">
+          <button class="prop-btn-ok" data-approve="${p.id}" title="Approve">✓</button>
+          <button class="prop-btn-no" data-reject="${p.id}" title="Reject">✗</button>
+        </div>
+      </div>`;
+    });
+
+    if(recent.length){
+      html+=`<div class="muted" style="margin:.6rem 0 .2rem;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">Recent</div>`;
+      recent.forEach(p=>{
+        const autoSt=p.status==="auto_applied";
+        const icon=(p.status==="approved"||autoSt)?"✓":"✗";
+        const lbl=autoSt?`auto · ${propSummary(p)}`:propSummary(p);
+        html+=`<div class="prop-recent">${icon} ${lbl} · <span style="opacity:.7">${fmtRel(p.ts)}</span></div>`;
+      });
+    }
+
+    el.innerHTML=html;
+
+    el.querySelectorAll("[data-why]").forEach(b=>b.onclick=()=>{
+      const d=$("why-"+b.dataset.why);
+      const show=d.style.display!=="block";
+      d.style.display=show?"block":"none";
+      b.textContent=show?"hide":"why?";
+    });
     el.querySelectorAll("[data-approve]").forEach(b=>b.onclick=()=>approveProposal(b.dataset.approve));
     el.querySelectorAll("[data-reject]").forEach(b=>b.onclick=()=>{
-      const sel=el.querySelector(`select[data-sel="${b.dataset.reject}"]`);
-      if(sel.style.display!=="inline-block"){sel.style.display="inline-block";b.textContent="Confirm reject";return;}
-      rejectProposal(b.dataset.reject, sel.value);
+      const w=$("rjwrap-"+b.dataset.reject);
+      w.style.display="flex";
+      b.style.display="none";
     });
+    el.querySelectorAll("[data-confirm]").forEach(b=>b.onclick=()=>rejectProposal(b.dataset.confirm,$("rjsel-"+b.dataset.confirm).value));
   }catch(e){ el.innerHTML=`<div class="muted">Error: ${esc(e.message)}</div>`; }
-}
-function propLabel(p){
-  // Support both engine fields (type/suggested/current) and any future schema
-  const ptype = p.type || p.field || "";
-  const isEur = ptype.toLowerCase().includes("eur");
-  const baseType = ptype.replace(/Eur$/i,"").toLowerCase();
-  const cur = p.current ?? p.current_value;
-  const sug = p.suggested ?? p.proposed_value;
-  const dir = sug > cur ? "Raise" : "Lower";
-  const f = {startprice:"base price",floor:"floor",ceiling:"ceiling"}[baseType] || ptype;
-  const pct = p.change_pct!=null ? Math.abs(Math.round(p.change_pct))+"%" : "";
-  const sym = isEur ? "€" : "₾";
-  return `${dir} ${p.property} ${f} ${pct} · ${p.season} · ${cur}${sym} → ${sug}${sym}`;
-}
-function propCard(p,actions){
-  const autoSt = p.status==="auto_applied";
-  const st = (p.status==="approved"||autoSt)
-    ? `<span class="badge b-green">approved${autoSt?" · auto":""}</span>`
-    : p.status==="rejected" ? '<span class="badge b-red">rejected</span>' : "";
-  return `<div class="prop-item">
-    <div class="prop-head">${esc(propLabel(p))} ${st}</div>
-    <div class="prop-reason">${esc(p.reasoning||"")}</div>
-    ${actions?`<div class="prop-actions">
-      <button class="btn btn-small btn-primary" data-approve="${p.id}">Approve</button>
-      <button class="btn btn-small" data-reject="${p.id}">Reject</button>
-      <select data-sel="${p.id}">${REJECT_REASONS.map(r=>`<option>${r}</option>`).join("")}</select>
-    </div>`:""}
-  </div>`;
 }
 async function approveProposal(id){
   const ref=doc(db,"pricing_proposals",id);
@@ -671,7 +748,7 @@ async function approveProposal(id){
   try{
     await updateDoc(doc(db,"pricing_config","rules"),{[path]:suggested});
     await updateDoc(ref,{status:"approved",approved_at:new Date()});
-    logChange("proposal_approved","Approved: "+propLabel(p));
+    logChange("proposal_approved","Approved: "+propSummary(p));
     loadProposals(); loadRules();
   }catch(e){ alert("Approve failed: "+e.message); }
 }

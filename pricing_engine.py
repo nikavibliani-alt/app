@@ -466,6 +466,33 @@ def write_firestore_log(results: dict, dry_run: bool, error: str = None, trigger
 
         db.collection("pricing_log").add(entry)
         print("  Log written to Firestore.")
+
+        # Write engine_run summary to pricing_changes for the history card
+        if not dry_run and results:
+            all_changes = []
+            for rt, dates in results.items():
+                for d in dates:
+                    if d.get("skip") or not d.get("changed"):
+                        continue
+                    if abs(d.get("proposed_gel", 0) - d.get("current_gel", 0)) >= 1:
+                        all_changes.append({"property": rt, "date": d["date"],
+                                            "old": d["current_gel"], "new": d["proposed_gel"], "currency": "gel"})
+                    if abs(d.get("proposed_eur", 0) - d.get("current_eur", 0)) >= 1:
+                        all_changes.append({"property": rt, "date": d["date"],
+                                            "old": d["current_eur"], "new": d["proposed_eur"], "currency": "eur"})
+            all_changes.sort(key=lambda x: abs(x["new"] - x["old"]), reverse=True)
+            extra = len(all_changes) - 50
+            kept = all_changes[:50]
+            detail = f"{total_changes} prices changed" + (f" (+{extra} more)" if extra > 0 else "")
+            try:
+                db.collection("pricing_changes").add({
+                    "ts":      datetime.now(),
+                    "type":    "engine_run",
+                    "detail":  detail,
+                    "changes": kept,
+                })
+            except Exception as ce:
+                print(f"  Warning: could not write pricing_changes: {ce}", file=sys.stderr)
     except Exception as e:
         print(f"  Firestore log error: {e}", file=sys.stderr)
 
