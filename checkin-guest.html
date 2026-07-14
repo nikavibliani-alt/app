@@ -985,7 +985,7 @@ function levenshtein(a,b){
   return m[b.length][a.length];
 }
 function normalizePhone(p){return(p||'').replace(/\D/g,'').slice(-7);}
-function _nameWords(s){return(s||'').toLowerCase().trim().replace(/\s+/g,' ').split(' ').filter(w=>w.length>1);}
+function _nameWords(s){return(s||'').toLowerCase().trim().split(/[\s,.\-]+/).filter(w=>w.length>2);}
 function nameMatch(input,resGuest){
   const iw=_nameWords(input),rw=_nameWords(resGuest);
   if(!iw.length||!rw.length)return false;
