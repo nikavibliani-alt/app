@@ -240,8 +240,6 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const PROPERTIES = ["ROOMS","MAXELA","BIG_APT","FREEDOM","ORBE_1","ORBE_2"];
-const EUR_PROPS = ["BIG_APT","FREEDOM","ORBE_1","ORBE_2"];
-const GEL_PROPS = ["ROOMS","MAXELA","BIG_APT","FREEDOM","ORBE_1"];
 const SEASONS = ["low","mid","high","peak","new_year","xmas_low"];
 const RUN_HOURS_UTC = [0,5,9,12,18];
 
@@ -444,9 +442,21 @@ let monthMap={};
 let activeSeasonGel="peak";
 let activeSeasonEur="peak";
 
-// Properties shown in each card when All is selected
-const GEL_CARD=["ROOMS","MAXELA","BIG_APT","FREEDOM"];
-const EUR_CARD=["BIG_APT","FREEDOM","ORBE_1","ORBE_2"];
+// Fallbacks — used when rules doc is empty or a property has no data yet
+const GEL_CARD_FALLBACK=["ROOMS","MAXELA","BIG_APT","FREEDOM","ORBE_1"];
+const EUR_CARD_FALLBACK=["BIG_APT","FREEDOM","ORBE_1","ORBE_2"];
+// Derived from live rules after loadRules(); updated each time rules reload
+let gelCardProps=GEL_CARD_FALLBACK;
+let eurCardProps=EUR_CARD_FALLBACK;
+
+function deriveCardProps(){
+  const hasGel=p=>!!(rules.startPrices?.[p]||rules.priceRules?.[p]);
+  const hasEur=p=>!!(rules.startPricesEur?.[p]||rules.eurRules?.[p]);
+  const gd=PROPERTIES.filter(hasGel);
+  const ed=PROPERTIES.filter(hasEur);
+  gelCardProps=gd.length?gd:GEL_CARD_FALLBACK;
+  eurCardProps=ed.length?ed:EUR_CARD_FALLBACK;
+}
 
 function initSeasonPicker(){
   monthMap={};
@@ -467,6 +477,7 @@ async function loadRules(){
   try{
     const snap=await getDoc(doc(db,"pricing_config","rules"));
     rules = snap.exists()? snap.data() : {};
+    deriveCardProps();
     initSeasonPicker();
     renderRules();
   }catch(e){
@@ -478,12 +489,12 @@ async function loadRules(){
 function getVal(obj,prop,season){ return obj?.[prop]?.[season] ?? obj?.[prop] ?? null; }
 
 function getGelProps(){
-  if(activeProp==="ALL") return GEL_CARD;
-  return GEL_PROPS.includes(activeProp) ? [activeProp] : [];
+  if(activeProp==="ALL") return gelCardProps;
+  return gelCardProps.includes(activeProp)?[activeProp]:[];
 }
 function getEurProps(){
-  if(activeProp==="ALL") return EUR_CARD;
-  return EUR_PROPS.includes(activeProp) ? [activeProp] : [];
+  if(activeProp==="ALL") return eurCardProps;
+  return eurCardProps.includes(activeProp)?[activeProp]:[];
 }
 
 function renderRuleChips(containerId, cur){
