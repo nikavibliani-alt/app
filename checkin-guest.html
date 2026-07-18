@@ -686,6 +686,7 @@ let passportFile=null;
 let searchMode='name';
 let passportScanResult=null;
 let _uploadResetTimer=null;
+let _uploadAborted=false;
 let _geminiKey='';
 let guestId=null;
 let guestData=null;
@@ -1136,6 +1137,7 @@ async function finishRegistration_(bestRes,formData){
 }
 
 window.submitRegistration=async function(){
+  _uploadAborted=false;
   const bookingRef=searchMode==='number'?(document.getElementById('r-booking-id')?.value||'').trim().replace(/\s+/g,''):'';
   const name    =searchMode==='name'?(document.getElementById('r-name')?.value||'').trim():'';
   const arrival =searchMode==='name'?(document.getElementById('r-arrival')?.value||''):'';
@@ -1205,7 +1207,7 @@ window.submitRegistration=async function(){
     clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
     btn.disabled=false;
     document.getElementById('t-submit-btn').textContent=t('sb');
-    alert('Upload failed — please try again.');
+    if(!_uploadAborted){toast('Upload failed — please try again.');}
   }
 }
 
@@ -1235,7 +1237,7 @@ window.handleReupload = async function(input) {
       if(!passportScanResult)return;
       try{await setDoc(doc(db,'checkin_guests',guestId),{passportScanResult},{merge:true});}catch(e){}
     });
-  } catch(e) { toast('Upload failed'); }
+  } catch(e) { if(!_uploadAborted)toast('Upload failed'); }
 };
 
 window.handlePassportReupload=async function(input){
@@ -2230,6 +2232,7 @@ document.addEventListener('keydown',e=>{
 });
 
 window.logout=function(){
+  _uploadAborted=true;
   document.getElementById('cur-sp')?.remove();
   localStorage.removeItem('maxela_apt_id');
   localStorage.removeItem('maxela_guest_id');
