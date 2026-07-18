@@ -2281,6 +2281,24 @@ async function init(){
       if(snap.exists()){
         guestId=savedGuest;guestData={...snap.data(),id:savedGuest};
         try{const as=await getDoc(doc(db,'checkin_apartments',aptId));if(as.exists())aptData=as.data();}catch(e){}
+        // If the reservation was moved to a different room after registration, update aptId
+        // before showHome() so the reservations subscription queries the correct roomCode.
+        try{
+          const _resId=guestData.matchedReservationId;
+          if(_resId){
+            const _resSnap=await getDoc(doc(db,'reservations',_resId));
+            if(_resSnap.exists()){
+              const _newRoom=_resSnap.data().roomCode;
+              if(_newRoom&&_newRoom!==aptId){
+                aptId=_newRoom;
+                guestData={...guestData,aptId:_newRoom};
+                localStorage.setItem('maxela_apt_id',_newRoom);
+                try{const _as=await getDoc(doc(db,'checkin_apartments',_newRoom));if(_as.exists())aptData=_as.data();}catch(e){}
+                setDoc(doc(db,'checkin_guests',savedGuest),{aptId:_newRoom},{merge:true}).catch(()=>{});
+              }
+            }
+          }
+        }catch(e){}
         document.getElementById('loading').style.display='none';
         document.getElementById('app').style.display='block';
         showHome();
