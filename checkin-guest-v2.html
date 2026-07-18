@@ -618,47 +618,8 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
       </div>
     </div>
 
-    <div class="auth-section" style="margin-top:16px;">
-      <div class="auth-section__label"><span id="t-passport-title">Passport photo</span><span class="count">REQUIRED</span></div>
-      <div class="auth-photo" id="passport-zone" onclick="document.getElementById('passport-input').click()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M8 6l1.5-2h5L16 6"/><circle cx="12" cy="13" r="3.5"/></svg>
-        <div class="t" id="t-passport-hint">Tap to add passport photo</div>
-        <div class="s">PHOTO OF ID PAGE · ANY ANGLE</div>
-        <img id="passport-preview">
-      </div>
-      <input type="file" id="passport-input" accept="image/*" style="display:none;" onchange="handlePassport(this)">
-      <div id="passport-scan-status" style="display:none;" class="scan-status"></div>
-    </div>
-
-    <div class="rules-checks">
-      <div class="rule-item" id="rule-noise" onclick="toggleRule('noise')">
-        <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <div class="rule-em">🔇</div>
-        <div class="rule-body">
-          <div class="rule-title">No parties or excessive noise</div>
-          <div class="rule-sub" id="rule-noise-sub">Quiet hours after 10 PM.</div>
-        </div>
-      </div>
-      <div class="rule-item smoking" id="rule-smoke" onclick="toggleRule('smoke')">
-        <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <div class="rule-em">🚭</div>
-        <div class="rule-body">
-          <div class="rule-title">No smoking inside the apartment</div>
-          <div class="rule-sub">Strictly prohibited indoors. Fine applies.</div>
-        </div>
-      </div>
-      <div class="rule-item" id="rule-care" onclick="toggleRule('care')">
-        <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <div class="rule-em">🏠</div>
-        <div class="rule-body">
-          <div class="rule-title">Take care of the apartment</div>
-          <div class="rule-sub">Don't damage property or lose entrance cards. Replacement fees apply.</div>
-        </div>
-      </div>
-    </div>
-
-    <button class="auth-cta" id="submit-btn" onclick="submitRegistration()" disabled>
-      <span id="t-submit-btn">Verify booking</span>
+    <button class="auth-cta" id="search-btn" onclick="window.searchReservation()">
+      <span id="t-search-btn">Find my booking</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M9 6l6 6-6 6"/></svg>
     </button>
 
@@ -673,6 +634,93 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
       </div>
     </div>
 
+    <div class="auth-foot">
+      <div class="lang-switcher">
+        <button class="lang-btn active" onclick="setLang('en')">EN</button>
+        <button class="lang-btn ka" onclick="setLang('ka')">ქარ</button>
+        <button class="lang-btn" onclick="setLang('ru')">RU</button>
+        <button class="lang-btn ar" onclick="setLang('ar')">ع</button>
+      </div>
+      <div class="foot__mark">Maxela Apartments · Tbilisi</div>
+    </div>
+  </div>
+
+  <!-- RULES PAGE -->
+  <div class="page" id="page-rules">
+    <div class="reg-top">
+      <div class="reg-brand">Maxela</div>
+      <h2 class="reg-welcome" style="font-size:26px;">House Rules</h2>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin:0 24px 4px;text-align:center;">Please read and accept before your stay</p>
+    <div class="rules-checks">
+      <div class="rule-item" id="rule-noise" onclick="window.toggleRule('noise')">
+        <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="rule-em">🔇</div>
+        <div class="rule-body">
+          <div class="rule-title">No parties or excessive noise</div>
+          <div class="rule-sub" id="rule-noise-sub">Quiet hours after 10 PM.</div>
+        </div>
+      </div>
+      <div class="rule-item smoking" id="rule-smoke" onclick="window.toggleRule('smoke')">
+        <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="rule-em">🚭</div>
+        <div class="rule-body">
+          <div class="rule-title">No smoking inside the apartment</div>
+          <div class="rule-sub">Strictly prohibited indoors. Fine applies.</div>
+        </div>
+      </div>
+      <div class="rule-item" id="rule-care" onclick="window.toggleRule('care')">
+        <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="rule-em">🏠</div>
+        <div class="rule-body">
+          <div class="rule-title">Take care of the apartment</div>
+          <div class="rule-sub">Don't damage property or lose entrance cards. Replacement fees apply.</div>
+        </div>
+      </div>
+    </div>
+    <button class="auth-cta" id="rules-continue-btn" onclick="window.proceedFromRules()" disabled>
+      <span id="t-rules-btn">I agree — Continue</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    <div class="auth-foot">
+      <div class="lang-switcher">
+        <button class="lang-btn active" onclick="setLang('en')">EN</button>
+        <button class="lang-btn ka" onclick="setLang('ka')">ქარ</button>
+        <button class="lang-btn" onclick="setLang('ru')">RU</button>
+        <button class="lang-btn ar" onclick="setLang('ar')">ع</button>
+      </div>
+      <div class="foot__mark">Maxela Apartments · Tbilisi</div>
+    </div>
+  </div>
+
+  <!-- PASSPORT PAGE -->
+  <div class="page" id="page-passport">
+    <div class="reg-top">
+      <div class="reg-brand">Maxela</div>
+      <h2 class="reg-welcome" style="font-size:26px;">Passport Photo</h2>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin:0 24px 16px;text-align:center;">Required for check-in verification</p>
+    <div class="auth-section">
+      <div class="auth-section__label"><span id="t-passport-title">Passport photo</span><span class="count">REQUIRED</span></div>
+      <div class="auth-photo" id="passport-zone" onclick="document.getElementById('passport-input').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M8 6l1.5-2h5L16 6"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <div class="t" id="t-passport-hint">Tap to add passport photo</div>
+        <div class="s">PHOTO OF ID PAGE · ANY ANGLE</div>
+        <img id="passport-preview">
+      </div>
+      <input type="file" id="passport-input" accept="image/*" style="display:none;" onchange="handlePassport(this)">
+      <div id="passport-scan-status" style="display:none;" class="scan-status"></div>
+    </div>
+    <div class="auth-trust">
+      <div class="auth-trust__row">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+        <span><b>Encrypted &amp; private.</b> Used once to verify, then auto-deleted after check-out.</span>
+      </div>
+    </div>
+    <button class="auth-cta" id="passport-continue-btn" onclick="window.submitPassport()" disabled>
+      <span id="t-passport-submit-btn">Continue to your stay</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
     <div class="auth-foot">
       <div class="lang-switcher">
         <button class="lang-btn active" onclick="setLang('en')">EN</button>
@@ -810,6 +858,12 @@ let guestSvcs=null; // cached services array from checkin_admin/config
 let _pendingMatches=[];
 let allMatchedReservations=[];
 
+function _showPage(pageId){
+  document.querySelectorAll('#app .page').forEach(p=>p.classList.remove('active'));
+  const pg=document.getElementById(pageId);
+  if(pg){pg.classList.add('active');window.scrollTo(0,0);}
+}
+
 const T={
   en:{ac:'Access Code',vf:'Valid from',vt:'to',ttp:'Tap to copy',cp2:'Code generation pending — please contact host',chc:'Please contact host for your access code',
 ws:'Welcome — please complete your check-in',yi:'Your information',fn:'Full name',gu:'Guests',na:'Nationality',ct:'Contact',cnu:'Your number / username',pt:'Passport / ID photo',ph:'Tap to take a photo or upload from gallery',sb:'Complete registration',gl:'Welcome back',tc:'Check-in Details',tcs:'Instructions, door code & photos',tw:'WiFi & Internet',tws:'Network name & password',tsv:'Services',tsvs:'Cleaning, laundry, tours & more',tr:'Recommendations',trs:'Best places nearby',tru:'House Rules',trus:'Please read before your stay',tco:'Contact Us',tcos:"We're here 24/7",lt:'Not available yet',ls:'Your room is being prepared. Instructions will unlock automatically at 3:00 PM.',cl:'Available in',dc:'Door code',wn:'WiFi name',wp:'Password',cp:'Copy',cpd:'Copied!',hi:'How to check in',hr:'House rules',rs:'Request sent!',rf:'Failed to send',sn:'Notes (optional)',snh:'Any special instructions...',sr:'Send request',ca:'Cancel',mr:'My requests',nr:'No requests yet',pe:'Pending',dn:'Done',cwa:'WhatsApp',cwas:'Chat with us directly on WhatsApp',rg:'Registered! Loading your stay...',elevatorTitle:'Elevator & Entrance Code',elevatorHint:'Same code for building entrance and elevator. Enter the code then press #.',elevatorToday:'Code for today,',elevatorUpdating:'Elevator code updating — please contact host if needed',checkinTitle:'Welcome to your stay',checkinSub:"Just a few details and you'll have everything you need for your stay.",checkinKicker:'GUEST CHECK-IN',searchInstructions:'Enter your Booking.com or Expedia confirmation number OR your full name to find your booking.',resNumber:'Booking.com / Expedia confirmation number',resPlaceholder:'Booking.com / Expedia confirmation number',fullName:'Booking Name',namePlaceholder:'Name on your booking',arrivalDate:'Check-in Date',selectDate:'Select your check-in date',phoneLabel:'Phone / username',guestsLabel:'Guests',fields:'fields',tlo:'Location & Parking',tlos:'Address, maps & parking',wyb:'What You Booked'},
@@ -850,7 +904,7 @@ window.toggleRule=function(id){
   _rules[id]=!_rules[id];
   document.getElementById('rule-'+id)?.classList.toggle('checked',_rules[id]);
   const ok=_rules.noise&&_rules.smoke&&_rules.care;
-  const btn=document.getElementById('submit-btn');
+  const btn=document.getElementById('rules-continue-btn');
   if(btn)btn.disabled=!ok;
 };
 function _updateRulesForApt(){
@@ -983,7 +1037,7 @@ function applyTranslations(){
     't-search-instructions':'searchInstructions','t-res-number':'resNumber',
     't-your-info':'yi','t-full-name':'fullName','t-guests':'guestsLabel',
     't-nationality':'na','t-contact-title':'ct','t-contact-num':'phoneLabel',
-    't-passport-title':'pt','t-passport-hint':'ph','t-submit-btn':'sb','t-greeting-label':'gl',
+    't-passport-title':'pt','t-passport-hint':'ph','t-greeting-label':'gl',
     'r-arrival-ph':'selectDate'
   };
   Object.entries(map).forEach(([id,k])=>{const el=document.getElementById(id);if(el)el.textContent=t(k);});
@@ -1021,6 +1075,8 @@ window.handlePassport=function(input){
     p.src=e.target.result;p.style.display='block';
     document.getElementById('passport-zone').classList.add('has-photo');
     document.getElementById('t-passport-hint').textContent='Photo selected ✓';
+    const pcb=document.getElementById('passport-continue-btn');
+    if(pcb)pcb.disabled=false;
     scanPassport(file);
   };
   reader.readAsDataURL(file);
@@ -1175,13 +1231,6 @@ async function finishRegistration_(bestRes,formData){
     try{const s=await getDoc(doc(db,'checkin_apartments',aptId));if(s.exists())aptData=s.data();}catch(e){}
     document.getElementById('home-apt-name').textContent=APT_NAMES[aptId]||aptId;
   }
-  document.getElementById('t-submit-btn').textContent='Uploading...';
-  clearTimeout(_uploadResetTimer);
-  _uploadResetTimer=setTimeout(()=>{
-    const b=document.getElementById('submit-btn');const s=document.getElementById('t-submit-btn');
-    if(b&&b.disabled){b.disabled=false;if(s)s.textContent=t('sb');}
-    _uploadResetTimer=null;
-  },15000);
   // Fire scan async — don't block page transition
   const scanPromise=(passportFile&&!passportScanResult)?scanPassport(passportFile):Promise.resolve();
   // Upload with 30s timeout
@@ -1215,8 +1264,8 @@ async function finishRegistration_(bestRes,formData){
   toast(t('rg'),3000);
   showHome();
   clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
-  const _sb=document.getElementById('submit-btn');const _st=document.getElementById('t-submit-btn');
-  if(_sb)_sb.disabled=false;if(_st)_st.textContent=t('sb');
+  const _sb=document.getElementById('passport-continue-btn');const _st=document.getElementById('t-passport-submit-btn');
+  if(_sb)_sb.disabled=false;if(_st)_st.textContent='Continue to your stay';
   // Update Firestore with real scan result once AI finishes (background)
   scanPromise.then(async()=>{
     if(!passportScanResult)return;
@@ -1229,7 +1278,7 @@ async function finishRegistration_(bestRes,formData){
   });
 }
 
-window.submitRegistration=async function(){
+window.searchReservation=async function(){
   _uploadAborted=false;
   const bookingRef=searchMode==='number'?(document.getElementById('r-booking-id')?.value||'').trim().replace(/\s+/g,''):'';
   const name    =searchMode==='name'?(document.getElementById('r-name')?.value||'').trim():'';
@@ -1241,10 +1290,9 @@ window.submitRegistration=async function(){
   if(searchMode==='number'&&!bookingRef){alert('Please enter your reservation number');return;}
   if(!contact){alert('Please enter your WhatsApp or Telegram number');return;}
   if(searchMode==='name'&&!arrival){alert('Please enter your arrival date');return;}
-  if(!passportFile){alert('Please upload your passport or ID photo');return;}
-  const btn=document.getElementById('submit-btn');
+  const btn=document.getElementById('search-btn');
   btn.disabled=true;
-  document.getElementById('t-submit-btn').textContent='Verifying...';
+  document.getElementById('t-search-btn').textContent='Verifying...';
   try{
     const {getDocs:_getDocs}=await import('https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js');
     const resSnap=aptId
@@ -1281,7 +1329,7 @@ window.submitRegistration=async function(){
     });
     if(!allMatches.length){
       btn.disabled=false;
-      document.getElementById('t-submit-btn').textContent=t('sb');
+      document.getElementById('t-search-btn').textContent='Find my booking';
       const errDiv=document.getElementById('reg-verify-error');
       if(errDiv){errDiv.style.display='';return;}
       const wrap=document.getElementById('page-register');
@@ -1295,14 +1343,45 @@ window.submitRegistration=async function(){
     }
     allMatches.sort((a,b)=>b.score-a.score);
     allMatchedReservations=allMatches.map(m=>m.res);
-    await finishRegistration_(allMatches[0].res,{name:name||(allMatches[0].res?.guest)||bookingRef,guests,nationality,contact,contactType,arrival});
+    _pendingReg={name:name||(allMatches[0].res?.guest||'')||bookingRef,guests,nationality,contact,contactType,arrival};
+    _pendingMatches=[...allMatches];
+    btn.disabled=false;
+    document.getElementById('t-search-btn').textContent='Find my booking';
+    _showPage('page-rules');
+  }catch(e){
+    btn.disabled=false;
+    document.getElementById('t-search-btn').textContent='Find my booking';
+    if(!_uploadAborted){toast('Verification failed — please try again.');}
+  }
+}
+
+window.proceedFromRules=function(){
+  if(!(_rules.noise&&_rules.smoke&&_rules.care))return;
+  _showPage('page-passport');
+};
+
+window.submitPassport=async function(){
+  _uploadAborted=false;
+  if(!passportFile){toast('Please upload your passport or ID photo');return;}
+  const btn=document.getElementById('passport-continue-btn');
+  btn.disabled=true;
+  document.getElementById('t-passport-submit-btn').textContent='Uploading...';
+  clearTimeout(_uploadResetTimer);
+  _uploadResetTimer=setTimeout(()=>{
+    const b=document.getElementById('passport-continue-btn');
+    const s=document.getElementById('t-passport-submit-btn');
+    if(b&&b.disabled){b.disabled=false;if(s)s.textContent='Continue to your stay';}
+    _uploadResetTimer=null;
+  },15000);
+  try{
+    await finishRegistration_(_pendingMatches[0].res,_pendingReg);
   }catch(e){
     clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
     btn.disabled=false;
-    document.getElementById('t-submit-btn').textContent=t('sb');
+    document.getElementById('t-passport-submit-btn').textContent='Continue to your stay';
     if(!_uploadAborted){toast('Upload failed — please try again.');}
   }
-}
+};
 
 function renderPassportBanner(){
   document.getElementById('passport-warning-banner')?.remove();
@@ -1364,8 +1443,7 @@ function needsElevatorCode(){
 }
 
 function showBlockedScreen(){
-  document.getElementById('page-register').classList.remove('active');
-  document.getElementById('page-home').classList.add('active');
+  _showPage('page-home');
   const greeting=document.querySelector('#page-home .greeting');
   const wyb=document.getElementById('what-you-booked');
   const menuLabel=document.querySelector('#page-home .menu-label');
@@ -1382,8 +1460,7 @@ function showBlockedScreen(){
 
 function showHome(){
   if(guestData?.blocked===true){showBlockedScreen();return;}
-  document.getElementById('page-register').classList.remove('active');
-  document.getElementById('page-home').classList.add('active');
+  _showPage('page-home');
   const _guestName=allMatchedReservations[0]?.guest||activeReservation?.guest||(guestData?.name&&!/^\d+$/.test(guestData.name)?guestData.name:null)||'Guest';
   document.getElementById('home-guest-name').textContent=_guestName;
 
@@ -2393,9 +2470,6 @@ window.logout=function(){
   passportFile=null;passportScanResult=null;
   stopUnlockPoller();_hkTodayData=null;
   aptId=params.get('apt')||'';
-  document.getElementById('page-home').classList.remove('active');
-  const reg=document.getElementById('page-register');
-  reg.classList.add('active');
   document.getElementById('reg-verify-error')?.remove();
   ['r-name','r-contact','r-arrival','r-arrival-display'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';el.classList&&el.classList.remove('invalid');}});
   // Reset passport upload zone
@@ -2406,15 +2480,20 @@ window.logout=function(){
   if(hint)hint.textContent='Tap to upload passport / ID';
   const scanStatus=document.getElementById('passport-scan-status');
   if(scanStatus){scanStatus.style.display='none';scanStatus.className='scan-status';}
-  // Reset house-rules checkboxes and submit button
+  // Reset house-rules checkboxes
   _rules.noise=false;_rules.smoke=false;_rules.care=false;
   ['noise','smoke','care'].forEach(r=>document.getElementById('rule-'+r)?.classList.remove('checked'));
+  const _rcb=document.getElementById('rules-continue-btn');if(_rcb)_rcb.disabled=true;
+  // Reset passport page button
+  const _pcb=document.getElementById('passport-continue-btn');if(_pcb)_pcb.disabled=true;
+  const _pt=document.getElementById('t-passport-submit-btn');if(_pt)_pt.textContent='Continue to your stay';
   clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
-  const _lsb=document.getElementById('submit-btn');const _lst=document.getElementById('t-submit-btn');
-  if(_lsb)_lsb.disabled=true;if(_lst)_lst.textContent=t('sb');
+  const _lsb=document.getElementById('search-btn');if(_lsb)_lsb.disabled=false;
   // Clear any passport banner from home page
   document.getElementById('passport-warning-banner')?.remove();
   document.getElementById('passport-warn-banner')?.remove();
+  _pendingReg=null;_pendingMatches=[];
+  _showPage('page-register');
   if(!aptId){
     document.getElementById('auth-apt').style.display='none';
   }else{
@@ -2505,7 +2584,7 @@ function setupDateInput(){
   const hidden=document.getElementById('r-arrival');
   const display=document.getElementById('r-arrival-display');
   const calBtn=document.getElementById('r-arrival-cal-btn');
-  if(hidden){hidden.min=today;hidden.max=maxStr;}
+  if(hidden){hidden.max=maxStr;}
   if(!display)return;
 
   // Auto-format as user types: digits only, insert " / " after day and month
