@@ -485,7 +485,8 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 .qr-fullscreen-hint{color:#fff;font-size:13px;letter-spacing:0.04em;font-family:var(--sans);}
 /* ── V2 LAYOUT: 390px centered card ── */
 .page{width:100%;max-width:390px;background:#FFFFFF;min-height:100vh;box-shadow:0 0 0 1px rgba(0,0,0,0.05),0 4px 40px rgba(0,0,0,0.10);}
-.subpage{position:fixed;top:0;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:390px;inset:auto;background:var(--bg);z-index:100;overflow-y:auto;animation:slideIn 0.25s cubic-bezier(0.4,0,0.2,1);}
+@keyframes slideInSubpage{from{transform:translateX(calc(-50% + 100vw));}to{transform:translateX(-50%);}}
+.subpage{position:fixed;top:0;left:50%;width:min(100vw,390px);height:100%;transform:translateX(-50%);background:#FFFFFF;z-index:100;overflow-y:auto;animation:slideInSubpage 0.25s cubic-bezier(0.4,0,0.2,1);}
 /* ── V2 REGISTER PAGE HEADER ── */
 .reg-top{text-align:center;padding:52px 24px 16px;}
 .reg-brand{font-family:var(--serif);font-size:13px;letter-spacing:0.24em;text-transform:uppercase;font-weight:500;color:var(--ink);margin-bottom:16px;}
