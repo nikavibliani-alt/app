@@ -757,7 +757,6 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
       </div>
     </div>
     <div id="what-you-booked"></div>
-    <div class="menu-label"><h3>Your stay</h3></div>
     <div class="tiles" id="tiles-grid"></div>
     <div class="foot">
       <div class="lang-switcher">
@@ -768,6 +767,36 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
       </div>
       <div class="foot__mark">Maxela Apartments · Tbilisi</div>
     </div>
+  </div>
+
+  <!-- CONTENT PAGES (hash navigation) -->
+  <div class="page" id="page-content-checkin">
+    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-checkin">Check-in Details</div></div>
+    <div class="subpage-body" id="pg-body-checkin"></div>
+  </div>
+  <div class="page" id="page-content-wifi">
+    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-wifi">WiFi &amp; Internet</div></div>
+    <div class="subpage-body" id="pg-body-wifi"></div>
+  </div>
+  <div class="page" id="page-content-services">
+    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-services">Services</div></div>
+    <div class="subpage-body" id="pg-body-services"></div>
+  </div>
+  <div class="page" id="page-content-recs">
+    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-recs">Recommendations</div></div>
+    <div class="subpage-body" id="pg-body-recs"></div>
+  </div>
+  <div class="page" id="page-content-rules">
+    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-rules">House Rules</div></div>
+    <div class="subpage-body" id="pg-body-rules"></div>
+  </div>
+  <div class="page" id="page-content-contact">
+    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-contact">Contact Us</div></div>
+    <div class="subpage-body" id="pg-body-contact"></div>
+  </div>
+  <div class="page" id="page-content-location">
+    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-location">Location &amp; Parking</div></div>
+    <div class="subpage-body" id="pg-body-location"></div>
   </div>
 
 </div>
@@ -864,6 +893,27 @@ function _showPage(pageId){
   const pg=document.getElementById(pageId);
   if(pg){pg.classList.add('active');window.scrollTo(0,0);}
 }
+
+const _CONTENT_TYPES=['checkin','wifi','services','recs','rules','contact','location'];
+
+function _navToContent(type,title,body){
+  const titleEl=document.getElementById('pg-title-'+type);
+  const bodyEl=document.getElementById('pg-body-'+type);
+  if(titleEl)titleEl.textContent=title;
+  if(bodyEl)bodyEl.innerHTML=body;
+  _showPage('page-content-'+type);
+  history.pushState({page:type},'',window.location.pathname+window.location.search+'#'+type);
+  window.scrollTo(0,0);
+}
+
+window.addEventListener('popstate',function(){
+  const hash=window.location.hash.replace('#','');
+  if(!hash||hash==='home'){
+    _showPage('page-home');
+  }else if(_CONTENT_TYPES.includes(hash)){
+    _showPage('page-content-'+hash);
+  }
+});
 
 const T={
   en:{ac:'Access Code',vf:'Valid from',vt:'to',ttp:'Tap to copy',cp2:'Code generation pending — please contact host',chc:'Please contact host for your access code',
@@ -1548,6 +1598,12 @@ function renderTiles(){
       <div><div class="tile__title">${t('tw')}</div><div class="tile__sub">${t('tws')}</div></div>
       <div style="display:flex;align-items:center;gap:8px;">${ssid?`<span class="ssid">${esc(ssid)}</span>`:''}<div class="tile__arrow">${_ARR}</div></div>
     </div>
+    <div class="tile" onclick="window.openPage('location')">
+      <div class="tile__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>
+      <div class="tile__title">${t('tlo')}</div>
+      <div class="tile__sub">${t('tlos')}</div>
+      <div class="tile__arrow">${_ARR}</div>
+    </div>
     <div class="tile" onclick="window.openPage('services')">
       <div class="tile__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V10.5a6 6 0 0 1 12 0V16l1.5 2.5h-15L6 16z"/><path d="M10 21h4"/></svg></div>
       <div class="tile__title">${t('tsv')}</div>
@@ -1570,12 +1626,6 @@ function renderTiles(){
       <div class="tile__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 1 1-3.4-6.55L21 4l-1.45 3.4A7.97 7.97 0 0 1 21 12z"/></svg></div>
       <div class="tile__title">${t('tco')}</div>
       <div class="tile__sub">${t('tcos')}</div>
-      <div class="tile__arrow">${_ARR}</div>
-    </div>
-    <div class="tile" onclick="window.openPage('location')">
-      <div class="tile__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>
-      <div class="tile__title">${t('tlo')}</div>
-      <div class="tile__sub">${t('tlos')}</div>
       <div class="tile__arrow">${_ARR}</div>
     </div>`;
 }
@@ -1715,7 +1765,7 @@ function _renderWybCard(cat){
   const pillsHtml=amenities.length?`<div class="wyb-amenities">${amenities.map(a=>`<span class="wyb-pill">${esc(a)}</span>`).join('')}</div>`:'';
   const chevron=`<svg class="wyb-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
   el.innerHTML=`<div class="wyb-card">
-    <div class="menu-label" style="padding:10px 16px 0;font-size:11px;">${t('wyb')}</div>
+    <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);padding:14px 16px 6px;">${t('wyb')}</div>
     <div class="wyb-header" onclick="window.wybToggle()">
       <div class="wyb-header-text">
         <div class="wyb-name">${esc(cat.name||'')}</div>
@@ -1983,7 +2033,7 @@ try{
     </div>`;
   }
 
-  openSubpage(titles[type]||t('tlo'),body);
+  _navToContent(type,titles[type]||t('tlo'),body);
   // Render QR code after DOM is ready
   if(type==='checkin'&&needsElevatorCode()){
     const updAt=elevatorData?.updatedAt?.seconds||0;
@@ -2007,7 +2057,7 @@ function fmtCheckinAvailable(res){
 
 function openLocked(res){
   const r=res||activeReservation;
-  openSubpage(t('tc'),`<div class="locked-card">
+  _navToContent('checkin',t('tc'),`<div class="locked-card">
     <div class="lc-icon">🔒</div>
     <div class="lc-title">${t('lt')}</div>
     <div class="lc-sub" style="margin-bottom:0">${t('ls')}</div>
@@ -2494,6 +2544,7 @@ window.logout=function(){
   document.getElementById('passport-warning-banner')?.remove();
   document.getElementById('passport-warn-banner')?.remove();
   _pendingReg=null;_pendingMatches=[];
+  if(window.location.hash)history.replaceState(null,'',window.location.pathname+window.location.search);
   _showPage('page-register');
   if(!aptId){
     document.getElementById('auth-apt').style.display='none';
