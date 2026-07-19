@@ -1825,85 +1825,36 @@ try{
   if(type==='checkin'){
     const embed=ytEmbed(d.videoUrl||'');
     const _WA_BTN=`<a class="contact-btn" href="https://wa.me/${WA}" target="_blank" style="width:100%;justify-content:center;"><div class="cb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div><div><div class="cb-title">WhatsApp</div></div></a>`;
-    // ── Access code: Tuya password > legacy doorCode > contact host ──────────
-    const vis=await getGuestCfg();
-    const propVis=vis[aptPropType()]||{};
-    const showAccessCode=!aptId.startsWith('0-')&&propVis.access_code!==false;
-    const r=activeReservation;
-    let codeBlock='';
-    if(showAccessCode){
-      if(r&&r.tuyaPassword){
-        const validFrom=formatTbilisiTime(r.tuyaEffectiveTime);
-        const validTo  =formatTbilisiTime(r.tuyaInvalidTime);
-        codeBlock=buildCodeHero({
-          kind:'apartment',labelText:t('ac'),code:r.tuyaPassword,
-          statusLabel:'VALID UNTIL',statusTime:esc(validTo),
-          infoText:esc(t('vf')+' '+validFrom),
-        });
-      }else if(r&&r.tuyaError){
-        codeBlock=buildContactHero({kind:'apartment',labelText:t('ac'),message:t('cp2')});
-      }else if(d.doorCode){
-        codeBlock=buildCodeHero({kind:'apartment',labelText:'Apartment door code',code:d.doorCode,statusLabel:'Apartment door code',statusTime:'',infoText:''});
-      }else{
-        codeBlock=buildContactHero({kind:'apartment',labelText:t('ac'),message:t('chc')});
-      }
-    }
-    // ── Elevator / Entrance code (floors 6 & 7 only) ─────────────────────────
-    let elevatorBlock='';
-    if(needsElevatorCode()){
-      const MONTHS_EL={
-        en:['January','February','March','April','May','June','July','August','September','October','November','December'],
-        ka:['იანვარი','თებერვალი','მარტი','აპრილი','მაისი','ივნისი','ივლისი','აგვისტო','სექტემბერი','ოქტომბერი','ნოემბერი','დეკემბერი'],
-        ru:['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'],
-        ar:['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'],
-      };
-      const todayParts=tbilisiToday().split('-');
-      const todayDay=parseInt(todayParts[2],10);
-      const todayMonthIdx=parseInt(todayParts[1],10)-1;
-      const todayLabel=`${todayDay} ${(MONTHS_EL[lang]||MONTHS_EL.en)[todayMonthIdx]}`;
-      const updatedAt=elevatorData?.updatedAt?.seconds||0;
-      const isStale=!updatedAt||(Date.now()/1000-updatedAt>36*3600);
-      if(elevatorData?.code&&!isStale){
-        elevatorBlock=buildCodeHero({
-          kind:'entrance',labelText:t('elevatorTitle'),
-          code:elevatorData.code,copyCode:elevatorData.code+'#',suffix:'#',
-          statusLabel:esc(t('elevatorToday')),statusTime:esc(todayLabel),
-          infoText:esc(t('elevatorHint')),
-        });
-      }else{
-        elevatorBlock=buildContactHero({kind:'entrance',labelText:t('elevatorTitle'),message:t('elevatorUpdating')});
-      }
-    }
-    // Build v2 code blocks (cleaner dark/light card style)
+    // ── Elevator & Entrance code card (combined QR + numeric) ────────────────
     let v2ElevatorBlock='';
     if(needsElevatorCode()){
-      const updatedAt=elevatorData?.updatedAt?.seconds||0;
-      const isStale=!updatedAt||(Date.now()/1000-updatedAt>36*3600);
-      const MONTHS_EL2={en:['January','February','March','April','May','June','July','August','September','October','November','December'],ka:['იანვარი','თებერვალი','მარტი','აპრილი','მაისი','ივნისი','ივლისი','აგვისტო','სექტემბერი','ოქტომბერი','ნოემბერი','დეკემბერი'],ru:['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'],ar:['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']};
-      const tp2=tbilisiToday().split('-');
-      const tdLabel=`${parseInt(tp2[2],10)} ${(MONTHS_EL2[lang]||MONTHS_EL2.en)[parseInt(tp2[1],10)-1]}`;
-      if(elevatorData?.code&&!isStale){
-        v2ElevatorBlock=`<div class="v2-code-dark"><div class="v2-code-label">${esc(t('elevatorTitle'))}</div><div class="v2-code-val">${esc(elevatorData.code)}#</div><div class="v2-code-sub">${esc(t('elevatorToday'))} ${esc(tdLabel)}</div></div><div style="font-size:11px;font-style:italic;color:var(--muted);margin-bottom:16px;">${esc(t('elevatorHint'))}</div>`;
-        // QR code section
-        const qrData=elevatorData?.qrCode||null;
-        if(qrData){
-          v2ElevatorBlock+=`<div class="v2-qr-wrap"><div class="v2-qr-label">QR Code</div><div class="v2-qr-box" id="v2-qr-target"></div><div class="v2-qr-hint">Tap to open fullscreen</div></div>`;
-        }else{
-          v2ElevatorBlock+=`<div class="v2-qr-wrap"><div class="v2-qr-label">QR Code</div><div class="v2-qr-placeholder">QR code not available today</div></div>`;
-        }
+      const _updAt=elevatorData?.updatedAt?.seconds||0;
+      const _isStale=!_updAt||(Date.now()/1000-_updAt>36*3600);
+      const _MONTHS={en:['January','February','March','April','May','June','July','August','September','October','November','December'],ka:['იანვარი','თებერვალი','მარტი','აპრილი','მაისი','ივნისი','ივლისი','აგვისტო','სექტემბერი','ოქტომბერი','ნოემბერი','დეკემბერი'],ru:['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'],ar:['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']};
+      const _tp=tbilisiToday().split('-');
+      const _tdLabel=`${parseInt(_tp[2],10)} ${(_MONTHS[lang]||_MONTHS.en)[parseInt(_tp[1],10)-1]}`;
+      const _elLbl=`<div style="font-family:var(--mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8C8C8A;margin-bottom:16px;">${esc(t('elevatorTitle'))}</div>`;
+      if(elevatorData?.code&&!_isStale){
+        const _hasQr=!!(elevatorData.qrCode);
+        const _qrEl=_hasQr
+          ?`<div id="v2-qr-target" style="width:200px;height:200px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:#fff;" title="Tap to expand"><span style="font-size:12px;color:#8C8C8A;">QR code loading...</span></div>`
+          :`<div style="width:200px;height:200px;margin:0 auto 16px;background:#fff;border:1px solid #E0D8D0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;font-size:12px;color:#8C8C8A;line-height:1.5;">QR code not available today</div>`;
+        v2ElevatorBlock=`<div style="background:#F5F5F5;border:1px solid #E0D8D0;padding:20px;margin-bottom:12px;">${_elLbl}${_qrEl}<div style="text-align:center;font-family:var(--mono);font-size:26px;color:#2C2C2A;letter-spacing:0.08em;margin-bottom:6px;">${esc(elevatorData.code)}#</div><div style="text-align:center;font-size:12px;color:#8C8C8A;margin-bottom:8px;">${esc(t('elevatorToday'))} ${esc(_tdLabel)}</div><div style="text-align:center;font-size:11px;color:#8C8C8A;font-style:italic;">Use only on check-in and check-out day</div></div>`;
       }else{
-        v2ElevatorBlock=`<div class="v2-code-dark"><div class="v2-code-label">${esc(t('elevatorTitle'))}</div><div class="v2-code-sub" style="font-size:14px;color:rgba(255,255,255,0.7);">${esc(t('elevatorUpdating'))}</div></div>`;
+        v2ElevatorBlock=`<div style="background:#F5F5F5;border:1px solid #E0D8D0;padding:20px;margin-bottom:12px;">${_elLbl}<div style="font-size:14px;color:var(--muted);text-align:center;">${esc(t('elevatorUpdating'))}</div></div>`;
       }
     }
+    // ── Apartment door code card ──────────────────────────────────────────────
     let v2DoorBlock='';
     const rv2=activeReservation;
     const showAccessCode2=!aptId.startsWith('0-')&&((await getGuestCfg())[aptPropType()]||{}).access_code!==false;
     if(showAccessCode2){
+      const _dlbl=`<div style="font-family:var(--mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8C8C8A;margin-bottom:12px;">APARTMENT DOOR CODE</div>`;
       if(rv2&&rv2.tuyaPassword){
         const vto=formatTbilisiTime(rv2.tuyaInvalidTime);
-        v2DoorBlock=`<div class="v2-code-light"><div class="v2-code-label">${esc(t('ac'))}</div><div class="v2-code-val">${esc(rv2.tuyaPassword)}</div>${vto?`<div style="font-size:11px;color:var(--muted);margin-top:8px;font-family:var(--mono);">Valid until ${esc(vto)}</div>`:''}</div>`;
+        v2DoorBlock=`<div style="background:#F5F5F5;border:1px solid #E0D8D0;padding:20px;margin-bottom:16px;">${_dlbl}<div style="font-family:var(--mono);font-size:26px;color:#2C2C2A;letter-spacing:0.08em;margin-bottom:4px;">${esc(rv2.tuyaPassword)}</div>${vto?`<div style="font-size:12px;color:#8C8C8A;margin-top:6px;">Valid until ${esc(vto)}</div>`:''}</div>`;
       }else if(d.doorCode){
-        v2DoorBlock=`<div class="v2-code-light"><div class="v2-code-label">${esc(t('dc'))}</div><div class="v2-code-val">${esc(d.doorCode)}</div></div>`;
+        v2DoorBlock=`<div style="background:#F5F5F5;border:1px solid #E0D8D0;padding:20px;margin-bottom:16px;">${_dlbl}<div style="font-family:var(--mono);font-size:26px;color:#2C2C2A;letter-spacing:0.08em;">${esc(d.doorCode)}</div></div>`;
       }else{
         v2DoorBlock=`<div style="padding:20px 0;color:var(--muted);font-size:14px;">${esc(t('chc'))}</div>`;
       }
