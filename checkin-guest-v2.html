@@ -1588,6 +1588,8 @@ function showHome(){
     });
   }
   // Subscribe to elevator code for floors 6 & 7
+  console.log('QRCode library:', typeof QRCode);
+  console.log('needsElevatorCode:', needsElevatorCode(), 'aptId:', aptId);
   if(needsElevatorCode()){
     onSnapshot(doc(db,'globals','elevator_code'),snap=>{
       elevatorData=snap.exists()?snap.data():null;

@@ -368,8 +368,12 @@ async function render(){
     ||(body.innerHTML=`<div style="text-align:center;padding:3rem;color:#B8B6B2;font-size:14px;">Check-in details not set up yet</div>`);
 
   // ── Fetch elevator QR from RTDB ───────────────────────────────────────
+  console.log('QRCode library:', typeof QRCode);
+  console.log('needsElevatorCode:', needsElevatorCode(), 'aptId:', aptId);
   if(needsElevatorCode()){
+    console.log('elevator-qr element:', document.getElementById('elevator-qr'));
     fetch(RTDB_URL).then(r=>r.json()).then(data=>{
+      console.log('RTDB elevator data:', JSON.stringify(data));
       if(data&&data.qr_code){
         const canvas=document.getElementById('elevator-qr');
         if(canvas){
@@ -393,7 +397,8 @@ async function render(){
         if(ph)ph.style.display='flex';
         if(data&&data.code){_elevatorCode=data.code;const el=document.getElementById('elevator-code-num');if(el)el.textContent=data.code+'#';}
       }
-    }).catch(()=>{
+    }).catch(err=>{
+      console.log('RTDB fetch error:', err.message);
       // Fallback: Firestore globals/elevator_code
       getDoc(doc(db,'globals','elevator_code')).then(snap=>{
         const canvas=document.getElementById('elevator-qr');
