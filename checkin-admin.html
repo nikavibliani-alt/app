@@ -436,7 +436,7 @@ input:checked+.slider:before{transform:translateX(20px);}
 
 <div class="tabs">
   <button class="tab active" data-tab="apartments" onclick="switchTab('apartments')">Apartments</button>
-  <button class="tab" data-tab="guests" onclick="switchTab('guests')">Guests</button>
+  <button class="tab" data-tab="guests" onclick="switchTab('guests')">Guests<span id="sf-badge" style="display:none;margin-left:6px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;vertical-align:middle;"></span></button>
   <button class="tab" data-tab="requests" onclick="switchTab('requests')">Requests</button>
   <button class="tab" data-tab="hkpins" onclick="switchTab('hkpins')">HK Pins</button>
   <button class="tab" data-tab="guestsettings" onclick="switchTab('guestsettings')">Guest Page Settings</button>
@@ -532,6 +532,7 @@ const APARTMENTS=[
 let aptData={}; // Firebase data per apartment
 let guestData=[]; // All guest registrations
 let hkStatusData={}; // hk_status docs keyed by "{roomCode}_{date}"
+let searchFailures=[]; // Unresolved failed guest searches
 let currentTab='apartments';
 let hkPinsData={shartava:'',centre:'',admin:''};
 const CHECK_IN_HOUR=15; // Default check-in hour Tbilisi (UTC+4, no DST)
@@ -767,6 +768,45 @@ function renderGuests(){
     .slice(0,50);
 
   let html='<div class="page">';
+
+  // Failed Searches section
+  if(searchFailures.length){
+    html+=`<div class="card" style="margin-bottom:16px;border:1px solid #fca5a5;">
+      <div class="card-body" style="padding:12px 16px 14px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:#dc2626;margin-bottom:10px;">&#9888; Failed Searches (${searchFailures.length} unresolved)</div>`;
+    searchFailures.forEach(f=>{
+      const ts=f.timestamp?.toDate?f.timestamp.toDate():null;
+      const timeStr=ts?ts.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
+      const rawDigits=(f.input_contact||'').replace(/\D/g,'');
+      const normDigits=rawDigits&&(rawDigits.length<11||rawDigits.startsWith('5'))?'995'+rawDigits:rawDigits;
+      const inputInfo=[
+        f.input_name?`Name: <b>${esc(f.input_name)}</b>`:'',
+        f.input_booking_ref?`Ref: <b>${esc(f.input_booking_ref)}</b>`:'',
+        f.input_date?`Arrival: <b>${esc(f.input_date)}</b>`:'',
+      ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+      const bestInfo=f.best_match_name
+        ?`Closest: <b>${esc(f.best_match_name)}</b>${f.best_match_room?' ('+esc(f.best_match_room)+')':''} score ${f.best_match_score||0}`
+        :'No close match found';
+      const waMsg=encodeURIComponent(`Hi, I tried to check in online but couldn't find my booking. Name: ${f.input_name||'—'}, arrival: ${f.input_date||'—'}${f.input_booking_ref?', ref: '+f.input_booking_ref:''}.`);
+      const contactBtn=normDigits
+        ?(f.input_contact_type==='tg'
+          ?`<a href="https://t.me/+${normDigits}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:12px;">Contact (TG)</a>`
+          :`<a href="https://wa.me/${normDigits}?text=${waMsg}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:12px;background:#25D366;color:#fff;border-color:#25D366;">WhatsApp</a>`)
+        :'';
+      html+=`<div style="border-top:1px solid #fecaca;padding:10px 0 6px;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;margin-bottom:3px;">${inputInfo||'(no input)'}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">${bestInfo} &nbsp;·&nbsp; ${timeStr}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${contactBtn}
+            <button class="btn btn-sm" onclick="window.resolveSearchFailure('${f.id}')" style="font-size:12px;">Mark Resolved</button>
+          </div>
+        </div>
+      </div>`;
+    });
+    html+=`</div></div>`;
+  }
+
   html+=`<div class="card" style="margin-bottom:16px;">
     <div class="card-body" style="padding:12px 16px 14px;">
       <div style="font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Reservation Lookup</div>
@@ -1348,6 +1388,13 @@ window.unblockGuest=async function(guestId){
   }catch(e){toast('Failed: '+e.message);}
 }
 
+window.resolveSearchFailure=async function(failureId){
+  try{
+    await updateDoc(doc(db,'search_failures',failureId),{resolved:true,resolvedAt:serverTimestamp()});
+    toast('Marked resolved ✓');
+  }catch(e){toast('Failed: '+e.message);}
+}
+
 function buildScanBadge(sr){
   if(!sr)return'';
   if(sr.valid)return`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">✅ Valid</span>`;
@@ -1844,6 +1891,13 @@ onSnapshot(query(collection(db,'hk_status'),where('date','==',_hkToday)),snap=>{
   hkStatusData={};
   snap.docs.forEach(d=>{hkStatusData[d.id]=d.data();});
   if(currentTab!=='apartments'&&currentTab!=='hkpins'&&currentTab!=='guestsettings'&&currentTab!=='requests')renderGuests();
+});
+
+onSnapshot(query(collection(db,'search_failures'),where('resolved','==',false)),snap=>{
+  searchFailures=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.timestamp?.seconds||0)-(a.timestamp?.seconds||0));
+  const badge=document.getElementById('sf-badge');
+  if(badge){badge.textContent=searchFailures.length;badge.style.display=searchFailures.length?'':'none';}
+  if(currentTab==='guests')renderGuests();
 });
 
 

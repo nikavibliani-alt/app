@@ -1366,6 +1366,7 @@ window.searchReservation=async function(){
       ?await _getDocs(query(collection(db,'reservations'),where('roomCode','==',aptId)))
       :await _getDocs(collection(db,'reservations'));
     const allMatches=[];
+    let _bestMatch=null,_bestScore=0;
     resSnap.forEach(d=>{
       const r={id:d.id,...d.data()};
       if((r.status||'').toUpperCase()==='CANCELLED')return;
@@ -1392,9 +1393,25 @@ window.searchReservation=async function(){
           else if(refNm)score=2;
         }
       }
+      if(score>_bestScore){_bestScore=score;_bestMatch=r;}
       if(score>=3)allMatches.push({res:r,score});
     });
     if(!allMatches.length){
+      try{
+        await addDoc(collection(db,'search_failures'),{
+          input_name:name||'',
+          input_date:arrival||'',
+          input_booking_ref:bookingRef||'',
+          input_contact:contact||'',
+          input_contact_type:contactType||'wa',
+          search_mode:searchMode||'name',
+          best_match_name:_bestMatch?((_bestMatch.guest||_bestMatch.guestName||'')):'',
+          best_match_score:_bestScore,
+          best_match_room:_bestMatch?(_bestMatch.roomCode||''):'',
+          timestamp:serverTimestamp(),
+          resolved:false,
+        });
+      }catch(_){}
       btn.disabled=false;
       document.getElementById('t-search-btn').textContent='Find my booking';
       const errDiv=document.getElementById('reg-verify-error');
