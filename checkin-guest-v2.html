@@ -905,6 +905,7 @@ function _navToContent(type,title,body){
   _showPage('page-content-'+type);
   history.pushState({page:type},'',window.location.pathname+window.location.search+'#'+type);
   window.scrollTo(0,0);
+  _saveSession();
 }
 
 window.addEventListener('popstate',function(){
@@ -914,6 +915,7 @@ window.addEventListener('popstate',function(){
   }else if(_CONTENT_TYPES.includes(hash)){
     _showPage('page-content-'+hash);
   }
+  _saveSession();
 });
 
 const T={
@@ -1315,6 +1317,7 @@ async function finishRegistration_(bestRes,formData){
   _pendingReg=null;_pendingMatches=[];
   toast(t('rg'),3000);
   showHome();
+  _saveSession();
   clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
   const _sb=document.getElementById('passport-continue-btn');const _st=document.getElementById('t-passport-submit-btn');
   if(_sb)_sb.disabled=false;if(_st)_st.textContent='Continue to your stay';
@@ -1488,6 +1491,11 @@ window.handlePassportReupload=async function(input){
     }catch(e){}
   });
 };
+
+function _saveSession(){
+  if(!guestId||!aptId)return;
+  try{localStorage.setItem('maxela_v2_session',JSON.stringify({guestId,aptId,hash:window.location.hash,savedAt:Date.now()}));}catch(e){}
+}
 
 function needsElevatorCode(){
   return /^(0|6|7)-/.test(aptId);
@@ -2482,6 +2490,7 @@ window.logout=function(){
   document.getElementById('cur-sp')?.remove();
   localStorage.removeItem('maxela_apt_id');
   localStorage.removeItem('maxela_guest_id');
+  localStorage.removeItem('maxela_v2_session');
   if(aptId)localStorage.removeItem('maxela_g_'+aptId);
   guestId=null;guestData=null;aptData=null;activeReservation=null;
   passportFile=null;passportScanResult=null;
@@ -2554,6 +2563,14 @@ async function init(){
         document.getElementById('loading').style.display='none';
         document.getElementById('app').style.display='block';
         showHome();
+        // Restore subpage: prefer URL hash (preserved by browser on refresh), fall back to saved session hash
+        const _rh=(()=>{
+          const _uh=window.location.hash.replace('#','');
+          if(_CONTENT_TYPES.includes(_uh))return _uh;
+          try{const _s=JSON.parse(localStorage.getItem('maxela_v2_session')||'{}');if(Date.now()-(_s.savedAt||0)<86400000){const _sh=(_s.hash||'').replace('#','');if(_CONTENT_TYPES.includes(_sh))return _sh;}}catch(e){}
+          return '';
+        })();
+        if(_rh)window.openPage(_rh);
         return;
       }
     }catch(e){}
