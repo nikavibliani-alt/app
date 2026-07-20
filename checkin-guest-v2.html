@@ -812,11 +812,25 @@ import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app
 import{getFirestore,doc,setDoc,getDoc,collection,addDoc,onSnapshot,serverTimestamp,query,where}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getStorage,ref,uploadBytes,getDownloadURL}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
 async function uploadToFirebaseStorage(file){
-  const storage=getStorage();
-  const path='passport_uploads/'+crypto.randomUUID()+'/'+crypto.randomUUID();
-  const storageRef=ref(storage,path);
-  await uploadBytes(storageRef,file);
-  return getDownloadURL(storageRef);
+  try{
+    console.log('Starting upload, file:',file.name,file.size,file.type);
+    const storage=getStorage();
+    console.log('Storage app:',storage.app.name);
+    const path='passport_uploads/'+crypto.randomUUID()+'/'+crypto.randomUUID();
+    console.log('Path:',path);
+    const storageRef=ref(storage,path);
+    console.log('Ref created');
+    const snapshot=await uploadBytes(storageRef,file);
+    console.log('Upload done:',snapshot.ref.fullPath);
+    const url=await getDownloadURL(storageRef);
+    console.log('URL:',url);
+    return url;
+  }catch(err){
+    console.log('Upload error code:',err.code);
+    console.log('Upload error message:',err.message);
+    console.log('Upload error full:',JSON.stringify(err));
+    throw err;
+  }
 }
 
 const fb=initializeApp({
