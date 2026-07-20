@@ -770,10 +770,6 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
   </div>
 
   <!-- CONTENT PAGES (hash navigation) -->
-  <div class="page" id="page-content-checkin">
-    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-checkin">Check-in Details</div></div>
-    <div class="subpage-body" id="pg-body-checkin"></div>
-  </div>
   <div class="page" id="page-content-wifi">
     <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-wifi">WiFi &amp; Internet</div></div>
     <div class="subpage-body" id="pg-body-wifi"></div>
@@ -895,7 +891,7 @@ function _showPage(pageId){
   if(pg){pg.classList.add('active');window.scrollTo(0,0);}
 }
 
-const _CONTENT_TYPES=['checkin','wifi','services','recs','rules','contact','location'];
+const _CONTENT_TYPES=['wifi','services','recs','rules','contact','location'];
 
 function _navToContent(type,title,body){
   const titleEl=document.getElementById('pg-title-'+type);
@@ -1596,7 +1592,7 @@ function renderTiles(){
   const _ARR=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
   const ssid=(aptData&&aptData.wifiName)?aptData.wifiName:'';
   document.getElementById('tiles-grid').innerHTML=`
-    <div class="tile checkin-tile${u?'':' locked'}" onclick="window.openPage('checkin')">
+    <div class="tile checkin-tile${u?'':' locked'}" onclick="window.location.href='checkin-details.html'">
       <div class="tile__icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L21 2"/><path d="M15.5 7.5l3 3"/><path d="M18 5l2.5 2.5"/></svg></div>
       <div><div class="tile__title">${t('tc')}</div><div class="tile__sub">${t('tcs')}</div></div>
       <div class="tile__arrow">${_ARR}</div>
@@ -1819,44 +1815,10 @@ try{
   // populated from the registration search and has correct checkin/checkout dates.
   // Fall back to activeReservation only if no match found.
   const pageRes=allMatchedReservations.find(r=>r.roomCode===aptId)||activeReservation;
-  if((type==='checkin'||type==='wifi')&&!isUnlocked()){openLocked(pageRes);return;}
+  if(type==='wifi'&&!isUnlocked()){openLocked(pageRes);return;}
   const d=aptData||{};
-  const titles={checkin:t('tc'),wifi:t('tw'),services:t('tsv'),recs:t('tr'),rules:t('tru'),contact:t('tco')};
+  const titles={wifi:t('tw'),services:t('tsv'),recs:t('tr'),rules:t('tru'),contact:t('tco')};
   let body='';
-
-  if(type==='checkin'){
-    const embed=ytEmbed(d.videoUrl||'');
-    const _WA_BTN=`<a class="contact-btn" href="https://wa.me/${WA}" target="_blank" style="width:100%;justify-content:center;"><div class="cb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div><div><div class="cb-title">WhatsApp</div></div></a>`;
-    // ── Elevator & Entrance code card ────────────────────────────────────────
-    let v2ElevatorBlock='';
-    if(needsElevatorCode()){
-      v2ElevatorBlock=`<div style="background:#FAFAF9;border:1px solid #E0D8D0;padding:24px 20px;margin-bottom:12px;"><div style="font-size:12px;color:#8C8C8A;text-align:center;margin-bottom:16px;">Scan QR code to access building entrance and elevator</div><div style="display:flex;justify-content:center;"><canvas id="elevator-qr" style="cursor:pointer;" title="Tap to expand"></canvas></div><div id="elevator-qr-placeholder" style="display:none;width:180px;height:180px;margin:0 auto;background:#fff;border:1px solid #E0D8D0;align-items:center;justify-content:center;text-align:center;padding:16px;font-size:12px;color:#8C8C8A;line-height:1.5;">QR code not available</div><div style="font-size:10px;color:#8C8C8A;text-align:center;text-transform:uppercase;letter-spacing:0.08em;margin-top:8px;">QR code changes daily</div><div style="height:1px;background:#E0D8D0;margin:16px 0;"></div><div id="elevator-expires" style="text-align:center;font-size:11px;color:#8C8C8A;margin-bottom:6px;min-height:16px;"></div><div id="elevator-code-num" style="text-align:center;font-family:var(--mono);font-size:22px;color:#2C2C2A;letter-spacing:0.08em;margin-bottom:6px;min-height:28px;"></div><div style="text-align:center;font-size:10px;color:#8C8C8A;font-style:italic;">Use only on check-in and check-out day</div></div>`;
-    }
-    // ── Apartment door code card ──────────────────────────────────────────────
-    let v2DoorBlock='';
-    const rv2=activeReservation;
-    const showAccessCode2=!aptId.startsWith('0-')&&((await getGuestCfg())[aptPropType()]||{}).access_code!==false;
-    if(showAccessCode2){
-      const _dlbl=`<div style="font-family:var(--mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8C8C8A;margin-bottom:12px;">APARTMENT DOOR CODE</div>`;
-      if(rv2&&rv2.tuyaPassword){
-        const vto=formatTbilisiTime(rv2.tuyaInvalidTime);
-        v2DoorBlock=`<div style="background:#F5F5F5;border:1px solid #E0D8D0;padding:20px;margin-bottom:16px;">${_dlbl}<div style="font-family:var(--mono);font-size:26px;color:#2C2C2A;letter-spacing:0.08em;margin-bottom:4px;">${esc(rv2.tuyaPassword)}</div>${vto?`<div style="font-size:12px;color:#8C8C8A;margin-top:6px;">Valid until ${esc(vto)}</div>`:''}</div>`;
-      }else if(d.doorCode){
-        v2DoorBlock=`<div style="background:#F5F5F5;border:1px solid #E0D8D0;padding:20px;margin-bottom:16px;">${_dlbl}<div style="font-family:var(--mono);font-size:26px;color:#2C2C2A;letter-spacing:0.08em;">${esc(d.doorCode)}</div></div>`;
-      }else{
-        v2DoorBlock=`<div style="padding:20px 0;color:var(--muted);font-size:14px;">${esc(t('chc'))}</div>`;
-      }
-    }
-    body=`${v2ElevatorBlock}${v2DoorBlock}`
-    +(d.instructions?`<div class="section-title">${t('hi')}</div><div class="instr-text">${esc(resolveElevatorCode(d.instructions))}</div>`:'')
-    +(()=>{if(!(d.photos||[]).length)return'';window._lbPhotos=d.photos;const caps=d.photoCaptions||[];window._lbCaps=caps;return`<div class="tour">${d.photos.map((src,i)=>{const cap=resolveElevatorCode((caps[i]||'').trim());return`<div class="tour-item"><div class="tour-item__media"><img src="${src}" onclick="window.openLightbox(window._lbPhotos,${i})"></div><div class="tour-item__body"><div class="tour-item__num">${i+1}</div><div class="tour-item__txt"><div class="t">${esc(cap)}</div></div></div></div>`;}).join('')}</div>`;})()
-    +(embed?`<div class="section-title">Video</div><div class="video-wrap">${
-      isCloudinaryVideo(d.videoUrl||'')?
-      `<video src="${embed}" controls playsinline style="width:100%;height:100%;border-radius:var(--r);" controlsList="nodownload">Your browser does not support video.</video>`:
-      `<iframe src="${embed}" allowfullscreen></iframe>`
-    }</div>`:'');
-    if(!body)body=`<div style="text-align:center;padding:3rem;color:var(--hint);font-size:14px;">Check-in details not set up yet</div>`;
-  }
 
   if(type==='wifi'){
     body=`<div class="info-card">
@@ -1973,49 +1935,6 @@ try{
   }
 
   _navToContent(type,titles[type]||t('tlo'),body);
-  // Fetch elevator QR + code from Realtime Database after DOM is ready
-  if(type==='checkin'&&needsElevatorCode()){
-    const _RTDB='https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json';
-    fetch(_RTDB).then(r=>r.json()).then(data=>{
-      console.log('Realtime DB elevator_code data:', JSON.stringify(data));
-      if(data&&data.qr_code){
-        const canvas=document.getElementById('elevator-qr');
-        if(canvas){
-          QRCode.toCanvas(canvas,data.qr_code,{width:180,color:{dark:'#2C2C2A',light:'#FAFAF9'}},(err)=>{
-            if(!err) canvas.onclick=()=>_openQrFullscreen(data.qr_code);
-          });
-        }
-        if(data.expires_at){
-          const el=document.getElementById('elevator-expires');
-          if(el){const exp=new Date(parseInt(data.expires_at));el.textContent='Valid until '+exp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
-        }
-        if(data.code){
-          const el=document.getElementById('elevator-code-num');
-          if(el)el.textContent=data.code+'#';
-        }
-      }else{
-        // No QR data — show placeholder, hide canvas
-        const canvas=document.getElementById('elevator-qr');
-        const ph=document.getElementById('elevator-qr-placeholder');
-        if(canvas)canvas.style.display='none';
-        if(ph)ph.style.display='flex';
-        if(data&&data.code){const el=document.getElementById('elevator-code-num');if(el)el.textContent=data.code+'#';}
-      }
-    }).catch((err)=>{
-      console.log('Realtime DB fetch error:', err);
-      // Fallback to Firestore globals/elevator_code
-      getDoc(doc(db,'globals','elevator_code')).then(snap=>{
-        const canvas=document.getElementById('elevator-qr');
-        const ph=document.getElementById('elevator-qr-placeholder');
-        if(canvas)canvas.style.display='none';
-        if(ph)ph.style.display='flex';
-        if(snap.exists()&&snap.data().code){
-          const el=document.getElementById('elevator-code-num');
-          if(el)el.textContent=snap.data().code+'#';
-        }
-      }).catch(()=>{});
-    });
-  }
 }catch(e){console.error('openPage error:',e);toast('Could not open page. Please try again.');}}
 
 function fmtCheckinAvailable(res){
@@ -2031,7 +1950,7 @@ function fmtCheckinAvailable(res){
 
 function openLocked(res){
   const r=res||activeReservation;
-  _navToContent('checkin',t('tc'),`<div class="locked-card">
+  _navToContent('wifi',t('tw'),`<div class="locked-card">
     <div class="lc-icon">🔒</div>
     <div class="lc-title">${t('lt')}</div>
     <div class="lc-sub" style="margin-bottom:0">${t('ls')}</div>

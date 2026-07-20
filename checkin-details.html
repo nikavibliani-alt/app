@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Check-in Details — Maxela</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#FAFAF9;
+  --surface:#FFFFFF;
+  --surface-2:#F5F3F0;
+  --ink:#2C2C2A;
+  --ink-2:#5C5A56;
+  --muted:#8C8C8A;
+  --hint:#B8B6B2;
+  --line:#E0D8D0;
+  --line-2:#EDE8E2;
+  --red:#c0392b;
+  --serif:'Playfair Display',Georgia,serif;
+  --sans:'Inter',system-ui,sans-serif;
+  --mono:'Courier New',monospace;
+  --r:16px;
+  --rs:12px;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;display:flex;justify-content:center;min-height:100vh;}
+#app{width:100%;max-width:390px;background:#fff;min-height:100vh;box-shadow:0 0 0 1px rgba(0,0,0,.05),0 4px 40px rgba(0,0,0,.10);position:relative;}
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spinner{width:22px;height:22px;border:2px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin 0.8s linear infinite;}
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:13px;padding:8px 18px;border-radius:20px;z-index:9999;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;}
+
+/* Header */
+.page-header{background:var(--surface);border-bottom:1px solid var(--line);padding:1rem 1.25rem;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;}
+.back-btn{width:36px;height:36px;border-radius:2px;background:transparent;border:1px solid var(--line);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink);font-size:20px;flex-shrink:0;line-height:1;}
+.page-title{font-family:var(--serif);font-size:18px;font-weight:400;letter-spacing:-0.01em;}
+
+/* Content */
+.page-body{padding:1.25rem;}
+
+/* Section title */
+.section-title{font-family:var(--serif);font-size:16px;font-weight:400;margin-bottom:0.75rem;letter-spacing:-0.005em;margin-top:1rem;}
+.section-title:first-child{margin-top:0;}
+.instr-text{font-size:14px;line-height:1.8;color:var(--ink);white-space:pre-wrap;margin-bottom:1rem;}
+
+/* Tour walkthrough */
+.tour{margin:0 0 1rem;display:flex;flex-direction:column;gap:18px;}
+.tour-item{background:var(--surface);border:1px solid var(--line-2);border-radius:20px;overflow:hidden;}
+.tour-item__media{height:280px;position:relative;background:var(--line-2);}
+.tour-item__media img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;cursor:pointer;}
+.tour-item__body{padding:14px 18px 16px;display:grid;grid-template-columns:28px 1fr;gap:12px;align-items:start;}
+.tour-item__num{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--ink-2);background:var(--bg);}
+.tour-item__txt .t{font-size:14px;line-height:1.35;color:var(--ink);}
+@media(max-width:480px){.tour-item__media{height:220px;}}
+
+/* Video */
+.video-wrap{border-radius:var(--r);overflow:hidden;margin-bottom:1rem;aspect-ratio:16/9;background:var(--surface-2);}
+.video-wrap iframe{width:100%;height:100%;border:none;}
+
+/* Locked */
+.locked-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:2.5rem 1.5rem;text-align:center;margin-bottom:1rem;}
+.lc-icon{font-size:36px;margin-bottom:12px;}
+.lc-title{font-family:var(--serif);font-size:20px;font-weight:400;margin-bottom:8px;}
+.lc-sub{font-size:14px;color:var(--muted);line-height:1.6;}
+
+/* Lightbox */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:60px 24px;}
+.lightbox.hidden{display:none;}
+.lb-img{max-width:90vw;max-height:75vh;object-fit:contain;border-radius:var(--rs);user-select:none;flex-shrink:0;}
+.lb-close{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:100000;}
+.lb-prev,.lb-next{position:fixed;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1000;transition:background .15s;}
+.lb-prev{left:12px;}.lb-next{right:12px;}
+.lb-counter{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.6);font-size:13px;font-family:var(--mono);z-index:100000;}
+.lb-caption{max-width:600px;width:100%;text-align:center;color:rgba(255,255,255,.95);font-size:17px;line-height:1.5;padding:0 16px;}
+.lb-caption.hidden,.lb-prev.hidden,.lb-next.hidden{display:none;}
+
+/* QR fullscreen */
+.qr-fullscreen{position:fixed;inset:0;background:#000;z-index:99999;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.qr-fullscreen.hidden{display:none;}
+.qr-fullscreen-inner{background:#fff;padding:32px;display:flex;flex-direction:column;align-items:center;gap:16px;}
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div></div>
+<div class="toast" id="toast"></div>
+
+<!-- Lightbox -->
+<div class="lightbox hidden" id="lightbox" onclick="if(event.target===this)window.closeLightbox()">
+  <button class="lb-close" onclick="window.closeLightbox()">×</button>
+  <button class="lb-prev hidden" id="lb-prev" onclick="window.lbMove(-1)">‹</button>
+  <img class="lb-img" id="lb-img" src="" alt="">
+  <button class="lb-next hidden" id="lb-next" onclick="window.lbMove(1)">›</button>
+  <div class="lb-counter" id="lb-counter"></div>
+  <div class="lb-caption hidden" id="lb-caption"></div>
+</div>
+
+<!-- QR fullscreen -->
+<div class="qr-fullscreen hidden" id="qr-fullscreen-overlay" onclick="document.getElementById('qr-fullscreen-overlay').classList.add('hidden')">
+  <button onclick="event.stopPropagation();document.getElementById('qr-fullscreen-overlay').classList.add('hidden')" style="position:absolute;top:20px;right:20px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer;line-height:1;padding:8px;z-index:1;">×</button>
+  <div class="qr-fullscreen-inner">
+    <canvas id="qr-fullscreen-canvas"></canvas>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <div class="page-header">
+    <button class="back-btn" onclick="window.history.back()">←</button>
+    <div class="page-title">Check-in Details</div>
+  </div>
+  <div class="page-body" id="page-body"></div>
+</div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import{getFirestore,doc,getDoc,collection,query,where,getDocs}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+const fb=initializeApp({
+  apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
+  authDomain:"sleepy-5c962.firebaseapp.com",
+  projectId:"sleepy-5c962",
+  storageBucket:"sleepy-5c962.firebasestorage.app",
+  messagingSenderId:"152940098906",
+  appId:"1:152940098906:web:bf245230d705c0a62c2f63"
+});
+const db=getFirestore(fb);
+
+const WA='995593000724';
+const RTDB_URL='https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json';
+
+const APT_NAMES={
+  '0-1':'Triple Room with Private Bathroom','0-2':'Triple Room with Private Bathroom',
+  '0-3':'Triple Room with Private Bathroom','0-4':'Triple Room with Private Bathroom',
+  '0-5':'Triple Room with Private Bathroom',
+  '6-1':'Superior Apartment','6-2':'Superior Apartment','6-4':'Superior Apartment',
+  '6-3':'3-Bedroom Apartment',
+  '7-1':'Superior Apartment','7-2':'Superior Apartment','7-3':'Superior Apartment','7-4':'Superior Apartment',
+  'tab-1':'Tabidze Studio','tab-2':'Tabidze Studio','tab-3':'Tabidze Studio',
+  'orb-1':'Orbeliani Suite','orb-2':'Orbeliani Suite','orb-3':'Orbeliani Studio',
+};
+
+const ROOM_TO_PROP={
+  '0-1':'ROOMS','0-2':'ROOMS','0-3':'ROOMS','0-4':'ROOMS','0-5':'ROOMS',
+  '6-1':'MAXELA','6-2':'MAXELA','6-4':'MAXELA','6-3':'BIG_APT',
+  '7-1':'MAXELA','7-2':'MAXELA','7-3':'MAXELA','7-4':'MAXELA',
+  'tab-1':'FREEDOM','tab-2':'FREEDOM','tab-3':'FREEDOM',
+  'orb-1':'ORBE_1','orb-2':'ORBE_1','orb-3':'ORBE_2',
+};
+
+let lang='en';
+let guestData=null;
+let aptData=null;
+let aptId='';
+let guestId='';
+let activeReservation=null;
+let _hkTodayData=null;
+let _elevatorCode='';
+let lbPhotos=[];
+let lbCaps=[];
+let lbIndex=0;
+
+// ── Translations (check-in details only) ──────────────────────────────────
+const T={
+  en:{tc:'Check-in Details',hi:'How to check in',lt:'Not available yet',
+    ls:'Your room is being prepared. Instructions will unlock automatically at 3:00 PM.',
+    cl:'Available in',chc:'Please contact host for your access code',cp:'Copy',cpd:'Copied!'},
+  ka:{tc:'ჩეკინის დეტალები',hi:'როგორ შეხვიდეთ',lt:'ჯერ მიუწვდომელია',
+    ls:'ოთახი მზადდება. ინსტრუქცია გამოჩნდება 15:00 საათზე.',
+    cl:'დარჩა',chc:'კოდისთვის დაუკავშირდით ჰოსტს',cp:'კოპირება',cpd:'დაკოპირდა!'},
+  ru:{tc:'Детали заезда',hi:'Как заселиться',lt:'Пока недоступно',
+    ls:'Номер готовится. Инструкции откроются в 15:00.',
+    cl:'Доступно через',chc:'Свяжитесь с хозяином для получения кода',cp:'Копировать',cpd:'Скопировано!'},
+  ar:{tc:'تفاصيل الوصول',hi:'كيفية تسجيل الوصول',lt:'غير متاح بعد',
+    ls:'غرفتك قيد التجهيز. ستظهر التعليمات في الساعة 3:00 مساءً.',
+    cl:'متاح في',chc:'تواصل مع المضيف للحصول على الرمز',cp:'نسخ',cpd:'تم النسخ!'},
+};
+function t(k){return T[lang]?.[k]||T.en?.[k]||k;}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function toast(msg,dur=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),dur);}
+
+function tbilisiToday(){return new Date(Date.now()+4*3600*1000).toISOString().slice(0,10);}
+function tbilisiHour(){return new Date(Date.now()+4*3600*1000).getUTCHours();}
+function getCheckInHour(){return parseInt((aptData?.checkInTime||'15:00').split(':')[0],10)||15;}
+function needsElevatorCode(){return /^(0|6|7)-/.test(aptId);}
+function aptPropType(){return ROOM_TO_PROP[aptId]||'ROOMS';}
+
+function formatTbilisiTime(unixSec){
+  if(!unixSec)return '';
+  const MONTHS={en:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    ka:['იანვ','თებ','მარ','აპრ','მაი','ივნ','ივლ','აგვ','სექ','ოქტ','ნოე','დეკ'],
+    ru:['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'],
+    ar:['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']};
+  const tb=new Date(unixSec*1000+4*3600*1000);
+  const day=tb.getUTCDate();
+  const mon=(MONTHS[lang]||MONTHS.en)[tb.getUTCMonth()];
+  const hh=String(tb.getUTCHours()).padStart(2,'0');
+  const mm=String(tb.getUTCMinutes()).padStart(2,'0');
+  const at={en:'at',ka:',',ru:'в',ar:'الساعة'}[lang]||'at';
+  return lang==='ka'?`${day} ${mon}, ${hh}:${mm}`:`${day} ${mon} ${at} ${hh}:${mm}`;
+}
+
+function isUnlocked(){
+  if(!guestData)return false;
+  const today=tbilisiToday();
+  const arrival=guestData.arrivalDate||activeReservation?.checkin||activeReservation?.checkIn||'';
+  if(!arrival)return false;
+  if(today>arrival)return true;
+  if(today<arrival)return false;
+  if(guestData.manualUnlock)return true;
+  const hour=tbilisiHour();
+  if(hour>=getCheckInHour())return true;
+  if(hour>=11&&_hkTodayData?.done===true)return true;
+  return false;
+}
+
+function fmtCheckinAvailable(){
+  const ci=activeReservation?.checkin||activeReservation?.checkIn||'';
+  if(!ci)return '';
+  const p=ci.split('-');
+  if(p.length<3)return ci;
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return`${parseInt(p[2])} ${months[parseInt(p[1])-1]||p[1]} at ${String(getCheckInHour()).padStart(2,'0')}:00`;
+}
+
+function isCloudinaryVideo(url){return url&&url.includes('cloudinary.com')&&(url.includes('/video/')||url.match(/\.(mp4|mov|webm|avi)/i));}
+function ytEmbed(url){
+  if(!url)return null;
+  if(isCloudinaryVideo(url))return url;
+  const yt=(url||'').match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if(yt)return`https://www.youtube.com/embed/${yt[1]}`;
+  return null;
+}
+
+function resolveElevatorCode(text){
+  if(!text||!text.includes('#elevatorcode'))return text;
+  return text.replace(/#elevatorcode/g,_elevatorCode||'contact host');
+}
+
+function _openQrFullscreen(qrText){
+  const overlay=document.getElementById('qr-fullscreen-overlay');
+  if(!overlay)return;
+  const canvas=document.getElementById('qr-fullscreen-canvas');
+  if(canvas){canvas.width=0;canvas.height=0;QRCode.toCanvas(canvas,qrText,{width:280,color:{dark:'#000000',light:'#FFFFFF'}});}
+  overlay.classList.remove('hidden');
+}
+
+// ── Lightbox ──────────────────────────────────────────────────────────────
+function updateLightbox(){
+  const img=document.getElementById('lb-img');
+  const counter=document.getElementById('lb-counter');
+  const prev=document.getElementById('lb-prev');
+  const next=document.getElementById('lb-next');
+  if(img)img.src=lbPhotos[lbIndex];
+  if(counter)counter.textContent=(lbIndex+1)+' / '+lbPhotos.length;
+  if(prev)prev.classList.toggle('hidden',lbIndex===0);
+  if(next)next.classList.toggle('hidden',lbIndex===lbPhotos.length-1);
+  const capEl=document.getElementById('lb-caption');
+  const capText=resolveElevatorCode((lbCaps[lbIndex]||'').trim());
+  if(capEl){capEl.textContent=capText;capEl.classList.toggle('hidden',!capText);}
+}
+window.openLightbox=function(photos,index){
+  if(!photos||!photos.length)return;
+  lbPhotos=Array.isArray(photos)?photos:[photos];
+  lbCaps=window._lbCaps||[];
+  lbIndex=index||0;
+  updateLightbox();
+  const lb=document.getElementById('lightbox');
+  if(lb){lb.classList.remove('hidden');lb.style.display='flex';}
+  document.body.style.overflow='hidden';
+};
+window.closeLightbox=function(){
+  const lb=document.getElementById('lightbox');
+  if(lb){lb.classList.add('hidden');lb.style.display='none';}
+  document.body.style.overflow='';
+};
+window.lbMove=function(dir){
+  lbIndex=Math.max(0,Math.min(lbPhotos.length-1,lbIndex+dir));
+  updateLightbox();
+};
+let lbTouchX=0;
+document.addEventListener('touchstart',e=>{if(!document.getElementById('lightbox').classList.contains('hidden'))lbTouchX=e.touches[0].clientX;});
+document.addEventListener('touchend',e=>{
+  if(document.getElementById('lightbox').classList.contains('hidden'))return;
+  const diff=lbTouchX-e.changedTouches[0].clientX;
+  if(Math.abs(diff)>50)window.lbMove(diff>0?1:-1);
+});
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('lightbox').classList.contains('hidden'))return;
+  if(e.key==='ArrowLeft')window.lbMove(-1);
+  if(e.key==='ArrowRight')window.lbMove(1);
+  if(e.key==='Escape')window.closeLightbox();
+});
+
+// ── Render ────────────────────────────────────────────────────────────────
+async function render(){
+  const d=aptData||{};
+  const body=document.getElementById('page-body');
+  if(!body)return;
+
+  if(!isUnlocked()){
+    body.innerHTML=`<div class="locked-card">
+      <div class="lc-icon">🔒</div>
+      <div class="lc-title">${t('lt')}</div>
+      <div class="lc-sub">${t('ls')}</div>
+      <div style="margin-top:14px;font-size:17px;font-weight:500;color:var(--ink);">Available from ${esc(fmtCheckinAvailable())}</div>
+    </div>`;
+    return;
+  }
+
+  // ── Elevator card ─────────────────────────────────────────────────────
+  let elevBlock='';
+  if(needsElevatorCode()){
+    elevBlock=`<div style="background:#FAFAF9;border:1px solid #E0D8D0;padding:24px 20px;margin-bottom:12px;">
+      <div style="font-size:12px;color:#8C8C8A;text-align:center;margin-bottom:16px;">Scan QR code to access building entrance and elevator</div>
+      <div style="display:flex;justify-content:center;"><canvas id="elevator-qr" style="cursor:pointer;" title="Tap to expand"></canvas></div>
+      <div id="elevator-qr-placeholder" style="display:none;width:180px;height:180px;margin:0 auto;background:#fff;border:1px solid #E0D8D0;align-items:center;justify-content:center;text-align:center;padding:16px;font-size:12px;color:#8C8C8A;line-height:1.5;">QR code not available</div>
+      <div style="font-size:10px;color:#8C8C8A;text-align:center;text-transform:uppercase;letter-spacing:0.08em;margin-top:8px;">QR code changes daily</div>
+      <div style="height:1px;background:#E0D8D0;margin:16px 0;"></div>
+      <div id="elevator-expires" style="text-align:center;font-size:11px;color:#8C8C8A;margin-bottom:6px;min-height:16px;"></div>
+      <div id="elevator-code-num" style="text-align:center;font-family:'Courier New',monospace;font-size:22px;color:#2C2C2A;letter-spacing:0.08em;margin-bottom:6px;min-height:28px;"></div>
+      <div style="text-align:center;font-size:10px;color:#8C8C8A;font-style:italic;">Use only on check-in and check-out day</div>
+    </div>`;
+  }
+
+  // ── Door code card ────────────────────────────────────────────────────
+  let doorBlock='';
+  const showDoor=!aptId.startsWith('0-');
+  if(showDoor){
+    const _dlbl=`<div style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8C8C8A;margin-bottom:12px;">APARTMENT DOOR CODE</div>`;
+    if(activeReservation?.tuyaPassword){
+      const vto=formatTbilisiTime(activeReservation.tuyaInvalidTime);
+      doorBlock=`<div style="background:#F5F5F5;border:1px solid #E0D8D0;padding:20px;margin-bottom:16px;">${_dlbl}<div style="font-family:'Courier New',monospace;font-size:26px;color:#2C2C2A;letter-spacing:0.08em;margin-bottom:4px;">${esc(activeReservation.tuyaPassword)}</div>${vto?`<div style="font-size:12px;color:#8C8C8A;margin-top:6px;">Valid until ${esc(vto)}</div>`:''}</div>`;
+    }else if(d.doorCode){
+      doorBlock=`<div style="background:#F5F5F5;border:1px solid #E0D8D0;padding:20px;margin-bottom:16px;">${_dlbl}<div style="font-family:'Courier New',monospace;font-size:26px;color:#2C2C2A;letter-spacing:0.08em;">${esc(d.doorCode)}</div></div>`;
+    }else{
+      doorBlock=`<div style="padding:20px 0;color:#8C8C8A;font-size:14px;">${esc(t('chc'))}</div>`;
+    }
+  }
+
+  // ── Instructions + photos ─────────────────────────────────────────────
+  const instrHtml=d.instructions?`<div class="section-title">${t('hi')}</div><div class="instr-text">${esc(resolveElevatorCode(d.instructions))}</div>`:'';
+
+  let photosHtml='';
+  if((d.photos||[]).length){
+    window._lbPhotos=d.photos;
+    const caps=d.photoCaptions||[];
+    window._lbCaps=caps;
+    photosHtml=`<div class="tour">${d.photos.map((src,i)=>{
+      const cap=resolveElevatorCode((caps[i]||'').trim());
+      return`<div class="tour-item"><div class="tour-item__media"><img src="${src}" onclick="window.openLightbox(window._lbPhotos,${i})"></div><div class="tour-item__body"><div class="tour-item__num">${i+1}</div><div class="tour-item__txt"><div class="t">${esc(cap)}</div></div></div></div>`;
+    }).join('')}</div>`;
+  }
+
+  // ── Video ─────────────────────────────────────────────────────────────
+  const embed=ytEmbed(d.videoUrl||'');
+  const videoHtml=embed?`<div class="section-title">Video</div><div class="video-wrap">${
+    isCloudinaryVideo(d.videoUrl||'')?
+    `<video src="${embed}" controls playsinline style="width:100%;height:100%;" controlsList="nodownload">Your browser does not support video.</video>`:
+    `<iframe src="${embed}" allowfullscreen></iframe>`
+  }</div>`:'';
+
+  body.innerHTML=elevBlock+doorBlock+instrHtml+photosHtml+videoHtml
+    ||(body.innerHTML=`<div style="text-align:center;padding:3rem;color:#B8B6B2;font-size:14px;">Check-in details not set up yet</div>`);
+
+  // ── Fetch elevator QR from RTDB ───────────────────────────────────────
+  if(needsElevatorCode()){
+    fetch(RTDB_URL).then(r=>r.json()).then(data=>{
+      if(data&&data.qr_code){
+        const canvas=document.getElementById('elevator-qr');
+        if(canvas){
+          QRCode.toCanvas(canvas,data.qr_code,{width:180,color:{dark:'#2C2C2A',light:'#FAFAF9'}},(err)=>{
+            if(!err)canvas.onclick=()=>_openQrFullscreen(data.qr_code);
+          });
+        }
+        if(data.expires_at){
+          const el=document.getElementById('elevator-expires');
+          if(el){const exp=new Date(parseInt(data.expires_at));el.textContent='Valid until '+exp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+        }
+        if(data.code){
+          _elevatorCode=data.code;
+          const el=document.getElementById('elevator-code-num');
+          if(el)el.textContent=data.code+'#';
+        }
+      }else{
+        const canvas=document.getElementById('elevator-qr');
+        const ph=document.getElementById('elevator-qr-placeholder');
+        if(canvas)canvas.style.display='none';
+        if(ph)ph.style.display='flex';
+        if(data&&data.code){_elevatorCode=data.code;const el=document.getElementById('elevator-code-num');if(el)el.textContent=data.code+'#';}
+      }
+    }).catch(()=>{
+      // Fallback: Firestore globals/elevator_code
+      getDoc(doc(db,'globals','elevator_code')).then(snap=>{
+        const canvas=document.getElementById('elevator-qr');
+        const ph=document.getElementById('elevator-qr-placeholder');
+        if(canvas)canvas.style.display='none';
+        if(ph)ph.style.display='flex';
+        if(snap.exists()&&snap.data().code){
+          _elevatorCode=snap.data().code;
+          const el=document.getElementById('elevator-code-num');
+          if(el)el.textContent=snap.data().code+'#';
+        }
+      }).catch(()=>{});
+    });
+  }
+}
+
+// ── Session restore & init ────────────────────────────────────────────────
+async function init(){
+  // Read session from localStorage
+  let savedGuestId='';
+  let savedAptId='';
+  try{
+    const sess=JSON.parse(localStorage.getItem('maxela_v2_session')||'{}');
+    if(sess.guestId&&sess.aptId&&(Date.now()-(sess.savedAt||0)<86400000)){
+      savedGuestId=sess.guestId;
+      savedAptId=sess.aptId;
+    }
+  }catch(e){}
+  // Fallback to legacy keys
+  if(!savedGuestId){
+    savedAptId=savedAptId||localStorage.getItem('maxela_apt_id')||'';
+    savedGuestId=localStorage.getItem('maxela_guest_id')
+      ||(savedAptId?localStorage.getItem('maxela_g_'+savedAptId):'')||'';
+  }
+
+  if(!savedGuestId||!savedAptId){
+    window.location.href='checkin-guest-v2.html';
+    return;
+  }
+
+  aptId=savedAptId;
+  guestId=savedGuestId;
+
+  // Detect language from URL or localStorage
+  const params=new URLSearchParams(window.location.search);
+  lang=params.get('lang')||localStorage.getItem('maxela_lang')||'en';
+
+  try{
+    // Load guest data
+    const gSnap=await getDoc(doc(db,'checkin_guests',guestId));
+    if(!gSnap.exists()){window.location.href='checkin-guest-v2.html';return;}
+    guestData={...gSnap.data(),id:guestId};
+
+    // Load apt data
+    try{const aSnap=await getDoc(doc(db,'checkin_apartments',aptId));if(aSnap.exists())aptData=aSnap.data();}catch(e){}
+
+    // Load active reservation (one with tuyaPassword for door code)
+    try{
+      const rSnap=await getDocs(query(collection(db,'reservations'),where('roomCode','==',aptId)));
+      if(!rSnap.empty){
+        const docs=rSnap.docs.map(d=>({id:d.id,...d.data()}));
+        activeReservation=docs.find(r=>r.tuyaPassword)||docs[0]||null;
+      }
+    }catch(e){}
+
+    // Try HK status for today
+    try{
+      const hkKey=aptId+'_'+tbilisiToday();
+      const hkSnap=await getDoc(doc(db,'hk_status',hkKey));
+      _hkTodayData=hkSnap.exists()?hkSnap.data():null;
+    }catch(e){}
+
+  }catch(e){
+    window.location.href='checkin-guest-v2.html';
+    return;
+  }
+
+  document.getElementById('loading').style.display='none';
+  document.getElementById('app').style.display='block';
+  await render();
+}
+
+init();
+</script>
+</body>
+</html>
