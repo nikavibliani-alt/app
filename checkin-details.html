@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -104,7 +104,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15p
 <div class="qr-fullscreen hidden" id="qr-fullscreen-overlay" onclick="document.getElementById('qr-fullscreen-overlay').classList.add('hidden')">
   <button onclick="event.stopPropagation();document.getElementById('qr-fullscreen-overlay').classList.add('hidden')" style="position:absolute;top:20px;right:20px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer;line-height:1;padding:8px;z-index:1;">×</button>
   <div class="qr-fullscreen-inner">
-    <canvas id="qr-fullscreen-canvas"></canvas>
+    <div id="qr-fullscreen-canvas"></div>
   </div>
 </div>
 
@@ -244,8 +244,11 @@ function resolveElevatorCode(text){
 function _openQrFullscreen(qrText){
   const overlay=document.getElementById('qr-fullscreen-overlay');
   if(!overlay)return;
-  const canvas=document.getElementById('qr-fullscreen-canvas');
-  if(canvas){canvas.width=0;canvas.height=0;QRCode.toCanvas(canvas,qrText,{width:280,color:{dark:'#000000',light:'#FFFFFF'}});}
+  const container=document.getElementById('qr-fullscreen-canvas');
+  if(container){
+    container.innerHTML='';
+    new QRCode(container,{text:qrText,width:280,height:280,colorDark:'#000000',colorLight:'#FFFFFF'});
+  }
   overlay.classList.remove('hidden');
 }
 
@@ -368,18 +371,18 @@ async function render(){
     ||(body.innerHTML=`<div style="text-align:center;padding:3rem;color:#B8B6B2;font-size:14px;">Check-in details not set up yet</div>`);
 
   // ── Fetch elevator QR from RTDB ───────────────────────────────────────
-  console.log('QRCode library:', typeof QRCode);
-  console.log('needsElevatorCode:', needsElevatorCode(), 'aptId:', aptId);
   if(needsElevatorCode()){
-    console.log('elevator-qr element:', document.getElementById('elevator-qr'));
     fetch(RTDB_URL).then(r=>r.json()).then(data=>{
-      console.log('RTDB elevator data:', JSON.stringify(data));
       if(data&&data.qr_code){
         const canvas=document.getElementById('elevator-qr');
         if(canvas){
-          QRCode.toCanvas(canvas,data.qr_code,{width:180,color:{dark:'#2C2C2A',light:'#FAFAF9'}},(err)=>{
-            if(!err)canvas.onclick=()=>_openQrFullscreen(data.qr_code);
-          });
+          canvas.style.display='none';
+          const qrDiv=document.createElement('div');
+          qrDiv.style.cssText='display:flex;justify-content:center;';
+          canvas.parentNode.insertBefore(qrDiv,canvas);
+          new QRCode(qrDiv,{text:data.qr_code,width:180,height:180,colorDark:'#2C2C2A',colorLight:'#FAFAF9'});
+          qrDiv.onclick=()=>_openQrFullscreen(data.qr_code);
+          qrDiv.style.cursor='pointer';
         }
         if(data.expires_at){
           const el=document.getElementById('elevator-expires');
@@ -397,8 +400,7 @@ async function render(){
         if(ph)ph.style.display='flex';
         if(data&&data.code){_elevatorCode=data.code;const el=document.getElementById('elevator-code-num');if(el)el.textContent=data.code+'#';}
       }
-    }).catch(err=>{
-      console.log('RTDB fetch error:', err.message);
+    }).catch(()=>{
       // Fallback: Firestore globals/elevator_code
       getDoc(doc(db,'globals','elevator_code')).then(snap=>{
         const canvas=document.getElementById('elevator-qr');
