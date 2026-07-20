@@ -904,14 +904,25 @@ function _navToContent(type,title,body){
   _saveSession();
 }
 
+function _onReturnHome(){
+  _showPage('page-home');
+  if(typeof renderTiles==='function')renderTiles();
+}
+
 window.addEventListener('popstate',function(){
   const hash=window.location.hash.replace('#','');
   if(!hash||hash==='home'){
-    _showPage('page-home');
+    _onReturnHome();
   }else if(_CONTENT_TYPES.includes(hash)){
     _showPage('page-content-'+hash);
   }
   _saveSession();
+});
+
+window.addEventListener('hashchange',function(){
+  if(window.location.hash==='#home'||window.location.hash===''){
+    _onReturnHome();
+  }
 });
 
 const T={
