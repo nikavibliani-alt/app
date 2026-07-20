@@ -636,18 +636,13 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,doc,setDoc,getDoc,collection,addDoc,onSnapshot,serverTimestamp,query,where}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-// Cloudinary for uploads
-const CLOUD='dlkjizhya';
-const PRESET='maxela_uploads';
-async function uploadToCloudinary(file,folder){
-  const fd=new FormData();
-  fd.append('file',file);
-  fd.append('upload_preset',PRESET);
-  fd.append('folder',folder);
-  const res=await fetch('https://api.cloudinary.com/v1_1/'+CLOUD+'/auto/upload',{method:'POST',body:fd});
-  const d=await res.json();
-  if(d.secure_url)return d.secure_url;
-  throw new Error(d.error?.message||'Upload failed');
+import{getStorage,ref,uploadBytes,getDownloadURL}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
+async function uploadToFirebaseStorage(file){
+  const storage=getStorage();
+  const path='passport_uploads/'+crypto.randomUUID()+'/'+crypto.randomUUID();
+  const storageRef=ref(storage,path);
+  await uploadBytes(storageRef,file);
+  return getDownloadURL(storageRef);
 }
 
 const fb=initializeApp({
@@ -1094,7 +1089,7 @@ async function finishRegistration_(bestRes,formData){
   // Upload with 30s timeout
   const uploadWithTimeout=new Promise(async(resolve,reject)=>{
     const timer=setTimeout(()=>reject(new Error('Upload timed out after 30 seconds')),30000);
-    try{const url=await uploadToCloudinary(passportFile,'maxela/guests/'+aptId);clearTimeout(timer);resolve(url);}
+    try{const url=await uploadToFirebaseStorage(passportFile);clearTimeout(timer);resolve(url);}
     catch(e){clearTimeout(timer);reject(e);}
   });
   const passportUrl=await uploadWithTimeout;
@@ -1230,7 +1225,7 @@ window.handleReupload = async function(input) {
   const file = input.files[0];
   if (!file) return;
   try {
-    const url = await uploadToCloudinary(file, 'maxela/guests/' + aptId);
+    const url = await uploadToFirebaseStorage(file);
     await setDoc(doc(db, 'checkin_guests', guestId), { passportUrl: url, passportScanResult: {} }, { merge: true });
     toast('Document received — verifying...');
     scanPassport(file).then(async()=>{
@@ -1247,7 +1242,7 @@ window.handlePassportReupload=async function(input){
   const el=document.getElementById('passport-warn-banner');
   if(el)el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon">⏳</div><div class="passport-banner__body"><div class="passport-banner__title">Uploading...</div></div></div>`;
   let newUrl=guestData?.passportUrl||null;
-  try{newUrl=await uploadToCloudinary(file,'maxela/guests/'+aptId);}catch(e){}
+  try{newUrl=await uploadToFirebaseStorage(file);}catch(e){}
   if(guestId&&newUrl){
     const update={passportUrl:newUrl,passportScanResult:{},passportUpdatedAt:serverTimestamp()};
     try{await setDoc(doc(db,'checkin_guests',guestId),update,{merge:true});}catch(e){}
