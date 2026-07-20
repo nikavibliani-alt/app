@@ -1969,6 +1969,7 @@ try{
   if(type==='checkin'&&needsElevatorCode()){
     const _RTDB='https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json';
     fetch(_RTDB).then(r=>r.json()).then(data=>{
+      console.log('Realtime DB elevator_code data:', JSON.stringify(data));
       if(data&&data.qr_code){
         const canvas=document.getElementById('elevator-qr');
         if(canvas){
@@ -1992,7 +1993,8 @@ try{
         if(ph)ph.style.display='flex';
         if(data&&data.code){const el=document.getElementById('elevator-code-num');if(el)el.textContent=data.code+'#';}
       }
-    }).catch(()=>{
+    }).catch((err)=>{
+      console.log('Realtime DB fetch error:', err);
       // Fallback to Firestore globals/elevator_code
       getDoc(doc(db,'globals','elevator_code')).then(snap=>{
         const canvas=document.getElementById('elevator-qr');
