@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -804,8 +804,9 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 <div id="subpages"></div>
 
 <div class="qr-fullscreen hidden" id="qr-fullscreen-overlay" onclick="document.getElementById('qr-fullscreen-overlay').classList.add('hidden')">
+  <button onclick="event.stopPropagation();document.getElementById('qr-fullscreen-overlay').classList.add('hidden')" style="position:absolute;top:20px;right:20px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer;line-height:1;padding:8px;z-index:1;">×</button>
   <div class="qr-fullscreen-inner">
-    <div id="qr-fullscreen-inner"></div>
+    <canvas id="qr-fullscreen-canvas"></canvas>
   </div>
   <div class="qr-fullscreen-hint">Tap anywhere to close</div>
 </div>
@@ -1489,8 +1490,7 @@ window.handlePassportReupload=async function(input){
 };
 
 function needsElevatorCode(){
-  const elevatorRooms=['6-1','6-2','6-3','6-4','7-1','7-2','7-4'];
-  return elevatorRooms.includes(aptId);
+  return /^(0|6|7)-/.test(aptId);
 }
 
 function showBlockedScreen(){
@@ -1688,21 +1688,15 @@ function buildContactHero({labelText,message,kind='apartment'}){
 </div>`;
 }
 
-function renderQrCode(containerId, text){
-  const el=document.getElementById(containerId);
-  if(!el)return;
-  el.innerHTML='';
-  try{
-    new QRCode(el,{text:text,width:128,height:128,colorDark:'#2C2C2A',colorLight:'#FFFFFF',correctLevel:QRCode.CorrectLevel.M});
-    el.style.cursor='pointer';
-    el.onclick=()=>{
-      const overlay=document.getElementById('qr-fullscreen-overlay');
-      if(!overlay)return;
-      const inner=document.getElementById('qr-fullscreen-inner');
-      if(inner){inner.innerHTML='';try{new QRCode(inner,{text:text,width:256,height:256,colorDark:'#000000',colorLight:'#FFFFFF',correctLevel:QRCode.CorrectLevel.M});}catch(e){}}
-      overlay.classList.remove('hidden');
-    };
-  }catch(e){el.innerHTML='<div class="v2-qr-placeholder">QR code not available</div>';}
+function _openQrFullscreen(qrText){
+  const overlay=document.getElementById('qr-fullscreen-overlay');
+  if(!overlay)return;
+  const canvas=document.getElementById('qr-fullscreen-canvas');
+  if(canvas){
+    canvas.width=0;canvas.height=0;
+    QRCode.toCanvas(canvas,qrText,{width:280,color:{dark:'#000000',light:'#FFFFFF'}});
+  }
+  overlay.classList.remove('hidden');
 }
 
 // Maps room code → property type key used in checkin_admin/config.visibility
@@ -1825,23 +1819,10 @@ try{
   if(type==='checkin'){
     const embed=ytEmbed(d.videoUrl||'');
     const _WA_BTN=`<a class="contact-btn" href="https://wa.me/${WA}" target="_blank" style="width:100%;justify-content:center;"><div class="cb-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg></div><div><div class="cb-title">WhatsApp</div></div></a>`;
-    // ── Elevator & Entrance code card (combined QR + numeric) ────────────────
+    // ── Elevator & Entrance code card ────────────────────────────────────────
     let v2ElevatorBlock='';
     if(needsElevatorCode()){
-      const _updAt=elevatorData?.updatedAt?.seconds||0;
-      const _isStale=!_updAt||(Date.now()/1000-_updAt>36*3600);
-      const _MONTHS={en:['January','February','March','April','May','June','July','August','September','October','November','December'],ka:['იანვარი','თებერვალი','მარტი','აპრილი','მაისი','ივნისი','ივლისი','აგვისტო','სექტემბერი','ოქტომბერი','ნოემბერი','დეკემბერი'],ru:['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'],ar:['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']};
-      const _tp=tbilisiToday().split('-');
-      const _tdLabel=`${parseInt(_tp[2],10)} ${(_MONTHS[lang]||_MONTHS.en)[parseInt(_tp[1],10)-1]}`;
-      if(elevatorData?.code&&!_isStale){
-        const _hasQr=!!(elevatorData.qrCode);
-        const _qrEl=_hasQr
-          ?`<div id="v2-qr-target" style="width:180px;height:180px;margin:0 auto;display:flex;align-items:center;justify-content:center;cursor:pointer;background:#fff;" title="Tap to expand"><span style="font-size:12px;color:#8C8C8A;">QR code loading...</span></div>`
-          :`<div style="width:180px;height:180px;margin:0 auto;background:#fff;border:1px solid #E0D8D0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;font-size:12px;color:#8C8C8A;line-height:1.5;">QR code not available</div>`;
-        v2ElevatorBlock=`<div style="background:#FAFAF9;border:1px solid #E0D8D0;padding:24px 20px;margin-bottom:12px;"><div style="font-size:12px;color:#8C8C8A;text-align:center;margin-bottom:16px;">Scan QR code to access building entrance and elevator</div>${_qrEl}<div style="font-size:10px;color:#8C8C8A;text-align:center;text-transform:uppercase;letter-spacing:0.08em;margin-top:8px;">QR code changes daily</div><div style="height:1px;background:#E0D8D0;margin:16px 0;"></div><div style="text-align:center;font-family:var(--mono);font-size:22px;color:#2C2C2A;letter-spacing:0.08em;margin-bottom:6px;">${esc(elevatorData.code)}#</div><div style="text-align:center;font-size:11px;color:#8C8C8A;margin-bottom:8px;">${esc(t('elevatorToday'))} ${esc(_tdLabel)}</div><div style="text-align:center;font-size:10px;color:#8C8C8A;font-style:italic;">Use only on check-in and check-out day</div></div>`;
-      }else{
-        v2ElevatorBlock=`<div style="background:#FAFAF9;border:1px solid #E0D8D0;padding:24px 20px;margin-bottom:12px;"><div style="font-size:14px;color:var(--muted);text-align:center;">${esc(t('elevatorUpdating'))}</div></div>`;
-      }
+      v2ElevatorBlock=`<div style="background:#FAFAF9;border:1px solid #E0D8D0;padding:24px 20px;margin-bottom:12px;"><div style="font-size:12px;color:#8C8C8A;text-align:center;margin-bottom:16px;">Scan QR code to access building entrance and elevator</div><div style="display:flex;justify-content:center;"><canvas id="elevator-qr" style="cursor:pointer;" title="Tap to expand"></canvas></div><div id="elevator-qr-placeholder" style="display:none;width:180px;height:180px;margin:0 auto;background:#fff;border:1px solid #E0D8D0;align-items:center;justify-content:center;text-align:center;padding:16px;font-size:12px;color:#8C8C8A;line-height:1.5;">QR code not available</div><div style="font-size:10px;color:#8C8C8A;text-align:center;text-transform:uppercase;letter-spacing:0.08em;margin-top:8px;">QR code changes daily</div><div style="height:1px;background:#E0D8D0;margin:16px 0;"></div><div id="elevator-expires" style="text-align:center;font-size:11px;color:#8C8C8A;margin-bottom:6px;min-height:16px;"></div><div id="elevator-code-num" style="text-align:center;font-family:var(--mono);font-size:22px;color:#2C2C2A;letter-spacing:0.08em;margin-bottom:6px;min-height:28px;"></div><div style="text-align:center;font-size:10px;color:#8C8C8A;font-style:italic;">Use only on check-in and check-out day</div></div>`;
     }
     // ── Apartment door code card ──────────────────────────────────────────────
     let v2DoorBlock='';
@@ -1984,13 +1965,46 @@ try{
   }
 
   _navToContent(type,titles[type]||t('tlo'),body);
-  // Render QR code after DOM is ready
+  // Fetch elevator QR + code from Realtime Database after DOM is ready
   if(type==='checkin'&&needsElevatorCode()){
-    const updAt=elevatorData?.updatedAt?.seconds||0;
-    const qrText=elevatorData?.qrCode||null;
-    if(qrText&&!(Date.now()/1000-updAt>36*3600)){
-      requestAnimationFrame(()=>{try{renderQrCode('v2-qr-target',qrText);}catch(e){}});
-    }
+    const _RTDB='https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json';
+    fetch(_RTDB).then(r=>r.json()).then(data=>{
+      if(data&&data.qr_code){
+        const canvas=document.getElementById('elevator-qr');
+        if(canvas){
+          QRCode.toCanvas(canvas,data.qr_code,{width:180,color:{dark:'#2C2C2A',light:'#FAFAF9'}},(err)=>{
+            if(!err) canvas.onclick=()=>_openQrFullscreen(data.qr_code);
+          });
+        }
+        if(data.expires_at){
+          const el=document.getElementById('elevator-expires');
+          if(el){const exp=new Date(parseInt(data.expires_at));el.textContent='Valid until '+exp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+        }
+        if(data.code){
+          const el=document.getElementById('elevator-code-num');
+          if(el)el.textContent=data.code+'#';
+        }
+      }else{
+        // No QR data — show placeholder, hide canvas
+        const canvas=document.getElementById('elevator-qr');
+        const ph=document.getElementById('elevator-qr-placeholder');
+        if(canvas)canvas.style.display='none';
+        if(ph)ph.style.display='flex';
+        if(data&&data.code){const el=document.getElementById('elevator-code-num');if(el)el.textContent=data.code+'#';}
+      }
+    }).catch(()=>{
+      // Fallback to Firestore globals/elevator_code
+      getDoc(doc(db,'globals','elevator_code')).then(snap=>{
+        const canvas=document.getElementById('elevator-qr');
+        const ph=document.getElementById('elevator-qr-placeholder');
+        if(canvas)canvas.style.display='none';
+        if(ph)ph.style.display='flex';
+        if(snap.exists()&&snap.data().code){
+          const el=document.getElementById('elevator-code-num');
+          if(el)el.textContent=snap.data().code+'#';
+        }
+      }).catch(()=>{});
+    });
   }
 }catch(e){console.error('openPage error:',e);toast('Could not open page. Please try again.');}}
 
