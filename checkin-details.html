@@ -160,6 +160,7 @@ let guestId='';
 let activeReservation=null;
 let _hkTodayData=null;
 let _elevatorCode='';
+let isPreviewMode=false;
 let lbPhotos=[];
 let lbCaps=[];
 let lbIndex=0;
@@ -317,7 +318,7 @@ async function render(){
   const body=document.getElementById('page-body');
   if(!body)return;
 
-  if(!isUnlocked()){
+  if(!isPreviewMode&&!isUnlocked()){
     body.innerHTML=`<div class="locked-card">
       <div class="lc-icon">🔒</div>
       <div class="lc-title">${t('lt')}</div>
@@ -459,6 +460,7 @@ async function init(){
   const _isPreview=urlParams.get('preview')==='true'
     ||(()=>{try{return sessionStorage.getItem('maxela_preview')==='true';}catch(e){return false;}})();
   if(_isPreview){
+    isPreviewMode=true;
     const previewApt=urlParams.get('apt')
       ||(()=>{try{return sessionStorage.getItem('maxela_preview_apt')||'';}catch(e){return '';}})()||'';
     aptId=previewApt;
@@ -478,7 +480,7 @@ async function init(){
 
     const banner=document.createElement('div');
     banner.style.cssText='position:fixed;top:0;left:0;width:100%;background:#2C2C2A;color:#fff;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;text-align:center;padding:6px 12px;z-index:9999;';
-    banner.textContent='Preview Mode — '+previewApt;
+    banner.textContent='PREVIEW MODE — Viewing as guest in '+previewApt+'. Lock bypass active.';
     document.body.prepend(banner);
 
     document.getElementById('loading').style.display='none';
