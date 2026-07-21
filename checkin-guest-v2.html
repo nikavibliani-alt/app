@@ -810,19 +810,19 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,doc,setDoc,getDoc,collection,addDoc,onSnapshot,serverTimestamp,query,where}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-import{getStorage,ref,uploadBytes}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
-// Storage rules: allow write: if true; allow read: if false;
-// getDownloadURL is skipped — read is blocked by design. URL is constructed
-// from the path so admin can retrieve via Admin SDK using the stored path.
+import{getStorage,ref,uploadBytes,getDownloadURL}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
+// Storage rules (set in Firebase Console):
+//   match /passport_uploads/{allPaths=**} {
+//     allow write: if true;
+//     allow read: if true;  // unguessable UUID paths — same model as Cloudinary
+//   }
 async function uploadToFirebaseStorage(file){
   try{
     const storage=getStorage();
     const path='passport_uploads/'+crypto.randomUUID()+'/'+crypto.randomUUID();
     const storageRef=ref(storage,path);
     await uploadBytes(storageRef,file);
-    const bucket='sleepy-5c962.firebasestorage.app';
-    const encodedPath=encodeURIComponent(path);
-    return`https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
+    return await getDownloadURL(storageRef);
   }catch(err){
     console.log('Upload error:',err.code,err.message);
     throw err;
