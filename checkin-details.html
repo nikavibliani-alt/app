@@ -407,17 +407,19 @@ async function render(){
           const el=document.getElementById('elevator-expires');
           if(el){const exp=new Date(parseInt(data.expires_at));el.textContent='Valid until '+exp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
         }
-        if(data.code){
-          _elevatorCode=data.code;
+        const displayCode=data.display_code||data.code||'';
+        if(displayCode){
+          _elevatorCode=displayCode;
           const el=document.getElementById('elevator-code-num');
-          if(el)el.textContent=data.code+'#';
+          if(el)el.textContent=displayCode+'#';
         }
       }else{
         const canvas=document.getElementById('elevator-qr');
         const ph=document.getElementById('elevator-qr-placeholder');
         if(canvas)canvas.style.display='none';
         if(ph)ph.style.display='flex';
-        if(data&&data.code){_elevatorCode=data.code;const el=document.getElementById('elevator-code-num');if(el)el.textContent=data.code+'#';}
+        const displayCode=data?(data.display_code||data.code||''):'';
+        if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
       }
     }).catch(()=>{
       // Fallback: Firestore globals/elevator_code
@@ -426,10 +428,10 @@ async function render(){
         const ph=document.getElementById('elevator-qr-placeholder');
         if(canvas)canvas.style.display='none';
         if(ph)ph.style.display='flex';
-        if(snap.exists()&&snap.data().code){
-          _elevatorCode=snap.data().code;
-          const el=document.getElementById('elevator-code-num');
-          if(el)el.textContent=snap.data().code+'#';
+        if(snap.exists()){
+          const sd=snap.data();
+          const displayCode=sd.display_code||sd.code||'';
+          if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
         }
       }).catch(()=>{});
     });
