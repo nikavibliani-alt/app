@@ -453,6 +453,40 @@ async function render(){
 
 // ── Session restore & init ────────────────────────────────────────────────
 async function init(){
+  const urlParams=new URLSearchParams(window.location.search);
+
+  // ── Admin preview mode ──────────────────────────────────────────────────
+  const _isPreview=urlParams.get('preview')==='true'
+    ||(()=>{try{return sessionStorage.getItem('maxela_preview')==='true';}catch(e){return false;}})();
+  if(_isPreview){
+    const previewApt=urlParams.get('apt')
+      ||(()=>{try{return sessionStorage.getItem('maxela_preview_apt')||'';}catch(e){return '';}})()||'';
+    aptId=previewApt;
+    lang=urlParams.get('lang')||localStorage.getItem('maxela_lang')||'en';
+
+    try{const aSnap=await getDoc(doc(db,'checkin_apartments',aptId));if(aSnap.exists())aptData=aSnap.data();}catch(e){}
+    try{
+      const rSnap=await getDocs(query(collection(db,'reservations'),where('roomCode','==',aptId)));
+      if(!rSnap.empty){
+        const _today=new Date().toISOString().slice(0,10);
+        const _docs=rSnap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
+        const _upcoming=_docs.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=_today;});
+        const _pool=_upcoming.length?_upcoming:_docs;
+        activeReservation=_pool.find(r=>r.tuyaPassword)||_pool[0]||null;
+      }
+    }catch(e){}
+
+    const banner=document.createElement('div');
+    banner.style.cssText='position:fixed;top:0;left:0;width:100%;background:#2C2C2A;color:#fff;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;text-align:center;padding:6px 12px;z-index:9999;';
+    banner.textContent='Preview Mode — '+previewApt;
+    document.body.prepend(banner);
+
+    document.getElementById('loading').style.display='none';
+    document.getElementById('app').style.display='block';
+    await render();
+    return;
+  }
+
   // Read session from localStorage
   let savedGuestId='';
   let savedAptId='';
@@ -479,8 +513,7 @@ async function init(){
   guestId=savedGuestId;
 
   // Detect language from URL or localStorage
-  const params=new URLSearchParams(window.location.search);
-  lang=params.get('lang')||localStorage.getItem('maxela_lang')||'en';
+  lang=urlParams.get('lang')||localStorage.getItem('maxela_lang')||'en';
 
   try{
     // Load guest data
