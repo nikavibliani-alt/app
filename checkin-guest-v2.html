@@ -1258,8 +1258,11 @@ window.switchApt=async function(newRoomCode){
   if(newRoomCode===aptId)return;
   aptId=newRoomCode;
   _hkTodayData=null; // reset HK cache for new apt
-  // Pin activeReservation to the selected apt immediately
-  activeReservation=allMatchedReservations.find(r=>r.roomCode===newRoomCode)||null;
+  // Pin activeReservation to the selected apt — prefer upcoming/current, fall back to any match
+  const _swToday=new Date().toISOString().slice(0,10);
+  const _swCandidates=allMatchedReservations.filter(r=>r.roomCode===newRoomCode&&(r.status||'').toUpperCase()!=='CANCELLED');
+  const _swUpcoming=_swCandidates.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=_swToday;});
+  activeReservation=(_swUpcoming.length?_swUpcoming:_swCandidates).sort((a,b)=>{const ca=a.checkin||a.checkIn||'',cb=b.checkin||b.checkIn||'';return ca<cb?-1:ca>cb?1:0;})[0]||null;
   localStorage.setItem('maxela_apt_id',aptId);
   try{
     const s=await getDoc(doc(db,'checkin_apartments',aptId));
@@ -1599,19 +1602,24 @@ function showHome(){
     onSnapshot(
       query(collection(db,'reservations'),where('roomCode','==',aptId)),
       snap=>{
-        const all=snap.docs.map(d=>({id:d.id,...d.data()}));
-        // If guest has a matchedReservationId, pin to that reservation
+        const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
+        // If guest has a matchedReservationId, pin to it only if it's current/upcoming
         const matchedId=guestData?.matchedReservationId;
         if(matchedId){
-          activeReservation=all.find(r=>r.id===matchedId)||null;
+          const matched=all.find(r=>r.id===matchedId);
+          const co=matched?.checkout||matched?.checkOut||'';
+          if(matched&&co>=today)activeReservation=matched;
         }
         if(!activeReservation){
-          // Fall back: nearest upcoming or current reservation, preferring one with tuyaPassword
-          const matches=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>today;});
-          const withPassword=matches.filter(r=>r.tuyaPassword);
-          const sorted=(withPassword.length?withPassword:matches)
-            .sort((a,b)=>((a.checkin||a.checkIn||'')<(b.checkin||b.checkIn||''))?-1:1);
-          activeReservation=sorted[0]||null;
+          // Pick nearest upcoming/current reservation — checkin closest to today, prefer one with tuyaPassword
+          const upcoming=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=today;});
+          const withPassword=upcoming.filter(r=>r.tuyaPassword);
+          const pool=withPassword.length?withPassword:upcoming;
+          activeReservation=pool.sort((a,b)=>{
+            const ca=a.checkin||a.checkIn||'';
+            const cb=b.checkin||b.checkIn||'';
+            return ca<cb?-1:ca>cb?1:0;
+          })[0]||null;
         }
         renderTiles();
       }
