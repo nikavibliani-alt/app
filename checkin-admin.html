@@ -1030,7 +1030,10 @@ window.openAptDrawer=function(aptId){
         <div class="apt-editor-title">${esc(apt.code)}</div>
         <div class="apt-editor-sub">${esc(apt.name)}</div>
       </div>
-      <button class="apt-save-btn" onclick="window.saveAptData('${aptId}')">Save changes</button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="apt-test-btn" onclick="window.open('checkin-guest-v2.html?preview=true&apt=${aptId}','_blank')" style="font-size:12px;padding:6px 12px;">Preview Guest View</button>
+        <button class="apt-save-btn" onclick="window.saveAptData('${aptId}')">Save changes</button>
+      </div>
     </div>
 
     <div class="apt-card">

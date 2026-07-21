@@ -2482,6 +2482,36 @@ window.logout=function(){
 }
 
 async function init(){
+  // ── Admin preview mode ────────────────────────────────────────────────
+  if(params.get('preview')==='true'){
+    const previewApt=params.get('apt')||'';
+    aptId=previewApt;
+    try{const s=await getDoc(doc(db,'checkin_apartments',aptId));aptData=s.exists()?s.data():null;}catch(e){}
+    document.getElementById('loading').style.display='none';
+    document.getElementById('app').style.display='block';
+    // Preview banner
+    const banner=document.createElement('div');
+    banner.style.cssText='position:fixed;top:0;left:0;width:100%;background:#2C2C2A;color:#fff;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;text-align:center;padding:6px 12px;z-index:9999;';
+    banner.textContent='Preview Mode — '+previewApt;
+    document.body.prepend(banner);
+    showHome();
+    // Subscribe to reservations so tiles render correctly
+    const today=new Date().toISOString().slice(0,10);
+    if(aptId){
+      onSnapshot(query(collection(db,'reservations'),where('roomCode','==',aptId)),snap=>{
+        const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
+        const matches=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>today;});
+        const withPw=matches.filter(r=>r.tuyaPassword);
+        activeReservation=(withPw.length?withPw:matches).sort((a,b)=>((a.checkin||a.checkIn||'')<(b.checkin||b.checkIn||''))?-1:1)[0]||null;
+        renderTiles();
+      });
+    }
+    if(needsElevatorCode()){
+      onSnapshot(doc(db,'globals','elevator_code'),snap=>{elevatorData=snap.exists()?snap.data():null;renderTiles();});
+    }
+    return;
+  }
+
   // Try to restore session from localStorage (works with or without ?apt= in URL)
   try{allMatchedReservations=JSON.parse(localStorage.getItem('maxela_all_res')||'[]');}catch(e){allMatchedReservations=[];}
   const savedApt=localStorage.getItem('maxela_apt_id');
