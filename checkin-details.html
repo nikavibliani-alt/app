@@ -382,10 +382,26 @@ async function render(){
   body.innerHTML=elevBlock+doorBlock+instrHtml+photosHtml+videoHtml
     ||(body.innerHTML=`<div style="text-align:center;padding:3rem;color:#B8B6B2;font-size:14px;">Check-in details not set up yet</div>`);
 
-  // ── Fetch elevator QR from RTDB ───────────────────────────────────────
+  // ── Fetch elevator QR from RTDB, with Firestore manual-override check ───
   if(needsElevatorCode()){
-    fetch(RTDB_URL).then(r=>r.json()).then(data=>{
-      if(data&&data.qr_code){
+    fetch(RTDB_URL).then(r=>r.json()).then(async data=>{
+      // Check if admin has set a newer manual override in Firestore
+      let fsData=null;
+      try{const fsSnap=await getDoc(doc(db,'globals','elevator_code'));if(fsSnap.exists())fsData=fsSnap.data();}catch(_){}
+      const rtdbTs=data?parseInt(data.updatedAt||0):0;
+      const fsTs=fsData?.updatedAt?.seconds?fsData.updatedAt.seconds*1000:(parseInt(fsData?.updatedAt||0));
+      const useFirestore=fsData&&fsTs>rtdbTs;
+
+      if(useFirestore){
+        // Admin manual override is newer — show code only, no QR
+        const canvas=document.getElementById('elevator-qr');
+        const ph=document.getElementById('elevator-qr-placeholder');
+        if(canvas)canvas.style.display='none';
+        if(ph)ph.style.display='flex';
+        const displayCode=fsData.display_code||fsData.code||'';
+        if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
+      }else if(data&&data.qr_code){
+        // RTDB data is current — show QR + code
         const qrCode=data.qr_code;
         const canvas=document.getElementById('elevator-qr');
         if(canvas){
@@ -408,21 +424,18 @@ async function render(){
           if(el){const exp=new Date(parseInt(data.expires_at));el.textContent='Valid until '+exp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
         }
         const displayCode=data.display_code||data.code||'';
-        if(displayCode){
-          _elevatorCode=displayCode;
-          const el=document.getElementById('elevator-code-num');
-          if(el)el.textContent=displayCode+'#';
-        }
+        if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
       }else{
+        // No QR in RTDB — show placeholder + code if available
         const canvas=document.getElementById('elevator-qr');
         const ph=document.getElementById('elevator-qr-placeholder');
         if(canvas)canvas.style.display='none';
         if(ph)ph.style.display='flex';
-        const displayCode=data?(data.display_code||data.code||''):'';
+        const displayCode=data?(data.display_code||data.code||''):(fsData?.display_code||fsData?.code||'');
         if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
       }
     }).catch(()=>{
-      // Fallback: Firestore globals/elevator_code
+      // Network error — fall back to Firestore entirely
       getDoc(doc(db,'globals','elevator_code')).then(snap=>{
         const canvas=document.getElementById('elevator-qr');
         const ph=document.getElementById('elevator-qr-placeholder');

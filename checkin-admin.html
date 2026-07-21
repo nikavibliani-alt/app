@@ -533,6 +533,7 @@ let aptData={}; // Firebase data per apartment
 let guestData=[]; // All guest registrations
 let hkStatusData={}; // hk_status docs keyed by "{roomCode}_{date}"
 let searchFailures=[]; // Unresolved failed guest searches
+let _sfExpanded=false; // Failed searches section expand state
 let currentTab='apartments';
 let hkPinsData={shartava:'',centre:'',admin:''};
 const CHECK_IN_HOUR=15; // Default check-in hour Tbilisi (UTC+4, no DST)
@@ -769,41 +770,44 @@ function renderGuests(){
 
   let html='<div class="page">';
 
-  // Failed Searches section
+  // Failed Searches section — collapsed by default
   if(searchFailures.length){
-    html+=`<div class="card" style="margin-bottom:16px;border:1px solid #fca5a5;">
-      <div class="card-body" style="padding:12px 16px 14px;">
-        <div style="font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:#dc2626;margin-bottom:10px;">&#9888; Failed Searches (${searchFailures.length} unresolved)</div>`;
-    searchFailures.forEach(f=>{
-      const ts=f.timestamp?.toDate?f.timestamp.toDate():null;
-      const timeStr=ts?ts.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
-      const rawDigits=(f.input_contact||'').replace(/\D/g,'');
-      const normDigits=rawDigits&&(rawDigits.length<11||rawDigits.startsWith('5'))?'995'+rawDigits:rawDigits;
-      const inputInfo=[
-        f.input_name?`Name: <b>${esc(f.input_name)}</b>`:'',
-        f.input_booking_ref?`Ref: <b>${esc(f.input_booking_ref)}</b>`:'',
-        f.input_date?`Arrival: <b>${esc(f.input_date)}</b>`:'',
-      ].filter(Boolean).join(' &nbsp;·&nbsp; ');
-      const bestInfo=f.best_match_name
-        ?`Closest: <b>${esc(f.best_match_name)}</b>${f.best_match_room?' ('+esc(f.best_match_room)+')':''} score ${f.best_match_score||0}`
-        :'No close match found';
-      const waMsg=encodeURIComponent(`Hi, I tried to check in online but couldn't find my booking. Name: ${f.input_name||'—'}, arrival: ${f.input_date||'—'}${f.input_booking_ref?', ref: '+f.input_booking_ref:''}.`);
-      const contactBtn=normDigits
-        ?(f.input_contact_type==='tg'
-          ?`<a href="https://t.me/+${normDigits}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:12px;">Contact (TG)</a>`
-          :`<a href="https://wa.me/${normDigits}?text=${waMsg}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:12px;background:#25D366;color:#fff;border-color:#25D366;">WhatsApp</a>`)
-        :'';
-      html+=`<div style="border-top:1px solid #fecaca;padding:10px 0 6px;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">
-        <div style="flex:1;min-width:0;">
+    html+=`<div class="card" style="margin-bottom:16px;border:1px solid #fecaca;">
+      <div class="card-body" style="padding:10px 16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:8px;" onclick="window.toggleFailedSearches()">
+          <div style="font-size:12px;font-weight:700;color:#dc2626;">&#9888; Failed Searches (${searchFailures.length} unresolved)</div>
+          <button class="btn btn-sm" style="font-size:11px;padding:3px 10px;flex-shrink:0;">${_sfExpanded?'▲ Hide':'▼ Show'}</button>
+        </div>`;
+    if(_sfExpanded){
+      searchFailures.forEach(f=>{
+        const ts=f.timestamp?.toDate?f.timestamp.toDate():null;
+        const timeStr=ts?ts.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
+        const rawDigits=(f.input_contact||'').replace(/\D/g,'');
+        const normDigits=rawDigits&&(rawDigits.length<11||rawDigits.startsWith('5'))?'995'+rawDigits:rawDigits;
+        const inputInfo=[
+          f.input_name?`Name: <b>${esc(f.input_name)}</b>`:'',
+          f.input_booking_ref?`Ref: <b>${esc(f.input_booking_ref)}</b>`:'',
+          f.input_date?`Arrival: <b>${esc(f.input_date)}</b>`:'',
+        ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+        const bestInfo=f.best_match_name
+          ?`Closest: <b>${esc(f.best_match_name)}</b>${f.best_match_room?' ('+esc(f.best_match_room)+')':''} score ${f.best_match_score||0}`
+          :'No close match found';
+        const waMsg=encodeURIComponent(`Hi, I tried to check in online but couldn't find my booking. Name: ${f.input_name||'—'}, arrival: ${f.input_date||'—'}${f.input_booking_ref?', ref: '+f.input_booking_ref:''}.`);
+        const contactBtn=normDigits
+          ?(f.input_contact_type==='tg'
+            ?`<a href="https://t.me/+${normDigits}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:12px;">Contact (TG)</a>`
+            :`<a href="https://wa.me/${normDigits}?text=${waMsg}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:12px;background:#25D366;color:#fff;border-color:#25D366;">WhatsApp</a>`)
+          :'';
+        html+=`<div style="border-top:1px solid #fecaca;padding:10px 0 6px;">
           <div style="font-size:13px;margin-bottom:3px;">${inputInfo||'(no input)'}</div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">${bestInfo} &nbsp;·&nbsp; ${timeStr}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             ${contactBtn}
             <button class="btn btn-sm" onclick="window.resolveSearchFailure('${f.id}')" style="font-size:12px;">Mark Resolved</button>
           </div>
-        </div>
-      </div>`;
-    });
+        </div>`;
+      });
+    }
     html+=`</div></div>`;
   }
 
@@ -1031,7 +1035,7 @@ window.openAptDrawer=function(aptId){
         <div class="apt-editor-sub">${esc(apt.name)}</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <button class="apt-test-btn" onclick="window.open('checkin-guest-v2.html?preview=true&apt=${aptId}','_blank')" style="font-size:12px;padding:6px 12px;">Preview Guest View</button>
+        <button class="apt-test-btn" onclick="window.open('checkin-guest-v2.html?preview=true&apt='+window._currentAptId,'_blank')" style="font-size:12px;padding:6px 12px;">Preview Guest View</button>
         <button class="apt-save-btn" onclick="window.saveAptData('${aptId}')">Save changes</button>
       </div>
     </div>
@@ -1397,6 +1401,8 @@ window.resolveSearchFailure=async function(failureId){
     toast('Marked resolved ✓');
   }catch(e){toast('Failed: '+e.message);}
 }
+
+window.toggleFailedSearches=function(){_sfExpanded=!_sfExpanded;renderGuests();}
 
 function buildScanBadge(sr){
   if(!sr)return'';
