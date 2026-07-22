@@ -40,8 +40,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .admin-sidebar.collapsed .sidebar-logo{align-items:center;padding:12px 0;}
 .admin-sidebar.collapsed .logo,.admin-sidebar.collapsed .admin-badge{display:none;}
 .admin-sidebar.collapsed .sidebar-collapse-btn{justify-content:center;padding:11px 0;}
-.admin-main{margin-left:240px;min-height:100vh;transition:margin-left 0.2s ease;}
-.admin-sidebar.collapsed+.admin-main{margin-left:56px;}
+.admin-main{margin-left:240px;width:calc(100% - 240px);min-height:100vh;transition:margin-left 0.2s ease,width 0.2s ease;box-sizing:border-box;overflow-x:hidden;}
+.admin-sidebar.collapsed+.admin-main{margin-left:56px;width:calc(100% - 56px);}
 @keyframes spin{to{transform:rotate(360deg);}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 
@@ -50,7 +50,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;font-size:13px;padding:8px 18px;border-radius:20px;z-index:9999;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;}
 .toast.show{opacity:1;}
 
-.main{max-width:900px;margin:0 auto;padding:1.5rem;}
+.main{max-width:1200px;margin:0 auto;padding:24px 32px;}
 .main:has(.go-root){max-width:none;padding:0;}
 .page{animation:fadeIn 0.2s ease;}
 .hamburger-btn{display:none;position:fixed;top:12px;left:12px;z-index:102;background:#fff;border:1px solid var(--border);border-radius:8px;width:40px;height:40px;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.1);}
@@ -272,7 +272,7 @@ input:checked+.slider:before{transform:translateX(20px);}
   .admin-sidebar.collapsed .sidebar-label,.admin-sidebar.collapsed .sidebar-collapse-label{display:inline;}
   .admin-sidebar.collapsed .sidebar-logo{align-items:flex-start;padding:16px 14px;}
   .admin-sidebar.collapsed .logo,.admin-sidebar.collapsed .admin-badge{display:block;}
-  .admin-main{margin-left:0;padding-top:60px;}
+  .admin-main{margin-left:0;width:100%;padding-top:60px;}
   .hamburger-btn{display:flex;}
 
   /* ── Main container ── */
@@ -596,6 +596,10 @@ window.toggleMobileSidebar=function(){
     if(sb){sb.classList.add('collapsed');const icon=document.getElementById('sidebar-collapse-icon');if(icon)icon.setAttribute('points','9 18 15 12 9 6');}
   }
 })();
+(function(){
+  const t=localStorage.getItem('adminActiveTab');
+  if(t)document.querySelectorAll('.sidebar-item[data-tab]').forEach(el=>el.classList.toggle('active',el.dataset.tab===t));
+})();
 
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDoc,getDocs,query,where,orderBy,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
@@ -656,7 +660,8 @@ let guestData=[]; // All guest registrations
 let hkStatusData={}; // hk_status docs keyed by "{roomCode}_{date}"
 let searchFailures=[]; // Unresolved failed guest searches
 let _sfExpanded=false; // Failed searches section expand state
-let currentTab='apartments';
+let currentTab=localStorage.getItem('adminActiveTab')||'apartments';
+let _goSearchTimer=null;
 let hkPinsData={shartava:'',centre:'',admin:''};
 const CHECK_IN_HOUR=15; // Default check-in hour Tbilisi (UTC+4, no DST)
 let currentDrawerApt=null;
@@ -719,7 +724,7 @@ let gsSectionLabels={};
 let gsRoomCategories={};
 let gsLocationInfo={};
 let gsElevatorData=null;
-let _guestsTab='today';
+let _guestsTab='today'; // valid: today/current/upcoming/failures
 let _goPendingOnly=false;
 
 // ── HELPERS ───────────────────────────────────────
@@ -741,6 +746,7 @@ window.closeDrawer=function(){
 // ── TAB SWITCHING ─────────────────────────────────
 window.switchTab=function(tab){
   currentTab=tab;
+  localStorage.setItem('adminActiveTab',tab);
   document.querySelectorAll('.sidebar-item[data-tab]').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
   document.getElementById('adminSidebar')?.classList.remove('mob-open');
   document.getElementById('mob-overlay')?.classList.remove('open');
@@ -1023,17 +1029,6 @@ function renderGuests(){
         ${rows}
       </div>
     </div>`;
-  }else{
-    tabContent=`<div class="go-table-wrap">
-      <div class="go-table-hd"><div class="go-table-title">Search Archive</div></div>
-      <div style="padding:16px 24px 12px;">
-        <input type="text" class="go-search" id="archive-search-input"
-          placeholder="Search by guest name, room, or reservation number..."
-          oninput="window.archiveSearch()" autocomplete="off"
-          style="width:100%;font-size:14px;">
-      </div>
-      <div id="archive-results"><div class="go-empty">Type to search reservations</div></div>
-    </div>`;
   }
 
   const oldCount=guestData.filter(g=>{const sub=g.submittedAt?.toDate?g.submittedAt.toDate():null;return sub&&(new Date()-sub)>7*24*60*60*1000;}).length;
@@ -1047,14 +1042,17 @@ function renderGuests(){
       </div>
     </header>
     ${pendingCount>0?`<div class="go-banner"><div class="go-banner-text"><strong style="color:#b45309">${pendingCount} pending —</strong> today's arrivals haven't submitted their online check-in form.</div><button class="go-btn" style="${pendingBtnStyle}" onclick="window.goPendingFilter()">${_goPendingOnly?'Showing Missing Forms Only':'Show Missing Forms Only'}</button></div>`:''}
-    <nav class="go-inner-tabs">
+    <input type="text" id="go-search-input" placeholder="Search reservations by name, room, or booking number…" oninput="window.goSearch()" autocomplete="off" style="width:100%;padding:10px 14px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;outline:none;transition:border-color .15s;margin-bottom:12px;display:block;" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e7eb'">
+    <div id="go-search-results" style="display:none;"></div>
+    <nav class="go-inner-tabs" id="go-inner-tabs">
       <button class="${tabCls('today')}" onclick="window.switchGuestsTab('today')">Today's Schedule ${badge(todayCount)}</button>
       <button class="${tabCls('current')}" onclick="window.switchGuestsTab('current')">Current Guests ${badge(inHouseCount)}</button>
       <button class="${tabCls('upcoming')}" onclick="window.switchGuestsTab('upcoming')">Upcoming (7 Days) ${badge(upcomingCount)}</button>
       <button class="${tabCls('failures')}" onclick="window.switchGuestsTab('failures')">Failed Searches ${badge(failuresCount,true)}</button>
-      <button class="${tabCls('archive')}" onclick="window.switchGuestsTab('archive')">Search Archive</button>
     </nav>
-    ${tabContent}
+    <div id="go-tab-content">
+      ${tabContent}
+    </div>
   </div>`;
 }
 
@@ -1067,67 +1065,73 @@ window.goPendingFilter=function(){
   renderGuests();
 };
 
-window.archiveSearch=function(){
-  const input=document.getElementById('archive-search-input');
-  const container=document.getElementById('archive-results');
-  if(!input||!container)return;
-  const q=input.value.trim().toLowerCase();
-  if(q.length<2){
-    container.innerHTML='<div class="go-empty">Type at least 2 characters to search</div>';
-    return;
-  }
-  const all=_resCache||[];
-  const results=all.filter(r=>
-    (r.guest||'').toLowerCase().includes(q)||
-    (r.roomCode||'').toLowerCase().includes(q)||
-    (r.reservationNumber||'').toLowerCase().includes(q)||
-    (r.bookingId||'').toLowerCase().includes(q)
-  ).slice(0,25);
-  if(!results.length){
-    container.innerHTML='<div class="go-empty">No reservations found</div>';
-    return;
-  }
-  function getArchiveForm(r){
-    return guestData.find(g=>g.matchedReservationId===r.id||g.matchedReservationId===r.reservationNumber)||
-           guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||null;
-  }
-  function fmtD(s){if(!s)return'—';return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{month:'short',day:'numeric',year:'numeric'});}
-  function nightsA(r){return Math.max(0,Math.round((new Date(r.checkout+'T00:00:00Z')-new Date(r.checkin+'T00:00:00Z'))/(864e5)));}
-  function waHrefA(form){
-    const raw=(form?.contact||'').replace(/\D/g,'');
-    if(!raw)return null;
-    return'https://wa.me/'+(raw.length<11||raw.startsWith('5')?'995'+raw:raw);
-  }
-  const COLS='60px 1fr 150px 130px 210px';
-  const colHead=`<div class="go-col-row" style="grid-template-columns:${COLS}"><div class="go-col-head">ROOM</div><div class="go-col-head">GUEST</div><div class="go-col-head">CONTACT</div><div class="go-col-head">STATUS</div><div class="go-col-head" style="text-align:right">ACTIONS</div></div>`;
-  const rows=results.map(r=>{
-    const form=getArchiveForm(r);
-    const cancelled=(r.status||'').toUpperCase()==='CANCELLED';
-    const statusLabel=cancelled?'CANCELLED':form?'FORM FILLED':'NO FORM';
-    const statusCls=cancelled?'go-pill-red':form?'go-pill-confirmed':'go-pill-pending';
-    const n=nightsA(r);
-    const datesLine=`${fmtD(r.checkin)} → ${fmtD(r.checkout)} (${n} night${n!==1?'s':''})`;
-    const ref=r.reservationNumber||r.bookingId||'';
-    const src=r.source||r.channel||'';
-    const srcLine=[src,ref?'#'+ref:''].filter(Boolean).join(' ');
-    const wa=waHrefA(form);
-    const waBtn=wa
-      ?`<a class="go-action" href="${wa}" target="_blank" rel="noopener">WhatsApp</a>`
-      :`<button class="go-action" disabled style="opacity:.35;cursor:not-allowed;">WhatsApp</button>`;
-    const detailsBtn=form?`<button class="go-action" onclick="window.viewGuest('${form.id}')">Details</button>`:'';
-    return`<div class="go-row" style="grid-template-columns:${COLS}">
-      <div class="go-room">${esc(r.roomCode||'—')}</div>
-      <div style="min-width:0">
-        <div class="go-guest-name">${esc(r.guest||'—')}</div>
-        ${srcLine?`<div class="go-guest-sub">${esc(srcLine)}</div>`:''}
-        <div class="go-guest-dates">${esc(datesLine)}</div>
-      </div>
-      <div class="go-contact">${esc(form?.contact||'—')}</div>
-      <div><span class="go-pill ${statusCls}">${statusLabel}</span></div>
-      <div class="go-actions">${waBtn}${detailsBtn}</div>
-    </div>`;
-  }).join('');
-  container.innerHTML=`<div class="go-scroll">${colHead}${rows}</div>`;
+window.goSearch=function(){
+  clearTimeout(_goSearchTimer);
+  _goSearchTimer=setTimeout(()=>{
+    const input=document.getElementById('go-search-input');
+    const results=document.getElementById('go-search-results');
+    const tabs=document.getElementById('go-inner-tabs');
+    const tabContent=document.getElementById('go-tab-content');
+    if(!input||!results)return;
+    const q=input.value.trim().toLowerCase();
+    if(q.length<2){
+      results.style.display='none';
+      results.innerHTML='';
+      if(tabs)tabs.style.display='';
+      if(tabContent)tabContent.style.display='';
+      return;
+    }
+    if(tabs)tabs.style.display='none';
+    if(tabContent)tabContent.style.display='none';
+    results.style.display='';
+    _loadResCache();
+    const all=_resCache||[];
+    if(!all.length){
+      results.innerHTML='<div class="go-empty">Loading reservations…</div>';
+      return;
+    }
+    const matched=all.filter(r=>
+      (r.guest||'').toLowerCase().includes(q)||
+      (r.roomCode||'').toLowerCase().includes(q)||
+      (r.reservationNumber||'').toLowerCase().includes(q)||
+      (r.bookingId||'').toLowerCase().includes(q)
+    ).slice(0,50);
+    if(!matched.length){
+      results.innerHTML='<div class="go-table-wrap"><div class="go-empty">No reservations found</div></div>';
+      return;
+    }
+    function getSearchForm(r){
+      return guestData.find(g=>g.matchedReservationId===r.id||g.matchedReservationId===r.reservationNumber)||
+             guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||null;
+    }
+    function fmtD(s){if(!s)return'—';return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{month:'short',day:'numeric',year:'numeric'});}
+    function nightsS(r){return Math.max(0,Math.round((new Date(r.checkout+'T00:00:00Z')-new Date(r.checkin+'T00:00:00Z'))/(864e5)));}
+    function waHrefS(form){const raw=(form?.contact||'').replace(/\D/g,'');if(!raw)return null;return'https://wa.me/'+(raw.length<11||raw.startsWith('5')?'995'+raw:raw);}
+    const COLS='60px 1fr 150px 130px 210px';
+    const colHead=`<div class="go-col-row" style="grid-template-columns:${COLS}"><div class="go-col-head">ROOM</div><div class="go-col-head">GUEST</div><div class="go-col-head">CONTACT</div><div class="go-col-head">STATUS</div><div class="go-col-head" style="text-align:right">ACTIONS</div></div>`;
+    const rows=matched.map(r=>{
+      const form=getSearchForm(r);
+      const cancelled=(r.status||'').toUpperCase()==='CANCELLED';
+      const statusLabel=cancelled?'CANCELLED':form?'FORM FILLED':'NO FORM';
+      const statusCls=cancelled?'go-pill-red':form?'go-pill-confirmed':'go-pill-pending';
+      const n=nightsS(r);
+      const datesLine=`${fmtD(r.checkin)} → ${fmtD(r.checkout)} (${n} night${n!==1?'s':''})`;
+      const ref=r.reservationNumber||r.bookingId||'';
+      const src=r.source||r.channel||'';
+      const srcLine=[src,ref?'#'+ref:''].filter(Boolean).join(' ');
+      const wa=waHrefS(form);
+      const waBtn=wa?`<a class="go-action" href="${wa}" target="_blank" rel="noopener">WhatsApp</a>`:`<button class="go-action" disabled style="opacity:.35;cursor:not-allowed;">WhatsApp</button>`;
+      const detailsBtn=form?`<button class="go-action" onclick="window.viewGuest('${form.id}')">Details</button>`:'';
+      return`<div class="go-row" style="grid-template-columns:${COLS}">
+        <div class="go-room">${esc(r.roomCode||'—')}</div>
+        <div style="min-width:0"><div class="go-guest-name">${esc(r.guest||'—')}</div>${srcLine?`<div class="go-guest-sub">${esc(srcLine)}</div>`:''}<div class="go-guest-dates">${esc(datesLine)}</div></div>
+        <div class="go-contact">${esc(form?.contact||'—')}</div>
+        <div><span class="go-pill ${statusCls}">${statusLabel}</span></div>
+        <div class="go-actions">${waBtn}${detailsBtn}</div>
+      </div>`;
+    }).join('');
+    results.innerHTML=`<div class="go-table-wrap"><div class="go-table-hd"><div class="go-table-title">Search Results</div><div class="go-table-count">${matched.length} FOUND</div></div><div class="go-scroll">${colHead}${rows}</div></div>`;
+  },300);
 };
 
 // ── RESERVATION LOOKUP ────────────────────────────
