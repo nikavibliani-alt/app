@@ -51,7 +51,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .toast.show{opacity:1;}
 
 .main{max-width:900px;margin:0 auto;padding:1.5rem;}
+.main:has(.go-root){max-width:none;padding:0;}
 .page{animation:fadeIn 0.2s ease;}
+.hamburger-btn{display:none;position:fixed;top:12px;left:12px;z-index:102;background:#fff;border:1px solid var(--border);border-radius:8px;width:40px;height:40px;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.1);}
+.mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:99;cursor:pointer;}
+.mob-overlay.open{display:block;}
 
 /* Cards */
 .section-title{font-size:16px;font-weight:600;margin-bottom:1rem;letter-spacing:-0.01em;}
@@ -259,14 +263,17 @@ input:checked+.slider:before{transform:translateX(20px);}
 .apt-copy-btn{padding:8px 16px;border:1px solid var(--apt-border);border-radius:6px;background:var(--apt-white);font-size:13px;font-weight:500;cursor:pointer;color:var(--apt-text);flex-shrink:0;box-shadow:var(--apt-shadow);transition:all .2s;font-family:inherit;}
 .apt-copy-btn:hover{background:#f9fafb;}
 @media(max-width:768px){
-  /* ── Sidebar: collapsed on mobile ── */
-  .admin-sidebar{width:56px;}
-  .admin-sidebar .sidebar-item{justify-content:center;padding:11px 0;}
-  .admin-sidebar .sidebar-label,.admin-sidebar .sidebar-collapse-label{display:none;}
-  .admin-sidebar .sidebar-logo{align-items:center;padding:12px 0;}
-  .admin-sidebar .logo,.admin-sidebar .admin-badge{display:none;}
-  .admin-sidebar .sidebar-collapse-btn{justify-content:center;padding:11px 0;}
-  .admin-main{margin-left:56px;}
+  /* ── Mobile: sidebar hidden behind hamburger ── */
+  .admin-sidebar{transform:translateX(-100%);width:240px;box-shadow:0 4px 20px rgba(0,0,0,0.15);}
+  .admin-sidebar.mob-open{transform:translateX(0);}
+  .admin-sidebar.collapsed{width:240px;transform:translateX(-100%);}
+  .admin-sidebar.collapsed.mob-open{transform:translateX(0);}
+  .admin-sidebar.collapsed .sidebar-item,.admin-sidebar.collapsed .sidebar-collapse-btn{justify-content:flex-start;padding:11px 16px;}
+  .admin-sidebar.collapsed .sidebar-label,.admin-sidebar.collapsed .sidebar-collapse-label{display:inline;}
+  .admin-sidebar.collapsed .sidebar-logo{align-items:flex-start;padding:16px 14px;}
+  .admin-sidebar.collapsed .logo,.admin-sidebar.collapsed .admin-badge{display:block;}
+  .admin-main{margin-left:0;padding-top:60px;}
+  .hamburger-btn{display:flex;}
 
   /* ── Main container ── */
   .main{padding:0.75rem;}
@@ -292,13 +299,13 @@ input:checked+.slider:before{transform:translateX(20px);}
   .svc-edit-form.open{grid-template-columns:1fr;}
   .form-row{grid-template-columns:1fr;}
 
-  /* ── Guests tab: stacked single-column ── */
-  .guest-row{flex-wrap:wrap;align-items:flex-start;row-gap:8px;padding:12px;}
-  .guest-row > div:first-child{flex:0 0 100%;}
-  .g-thumb{display:none;}
-  .unlock-badge{order:2;align-self:center;}
-  .guest-actions{width:100%;flex-wrap:wrap;gap:6px;margin-top:4px;}
-  .guest-actions .btn{flex:1;min-height:44px;font-size:13px;justify-content:center;}
+  /* ── Guest Operations: card layout on mobile ── */
+  .go-root{padding:16px 16px 40px;}
+  .go-header{flex-direction:column;align-items:flex-start;}
+  .go-col-row{display:none!important;}
+  .go-row{display:flex!important;flex-direction:column;gap:6px;padding:14px 16px;}
+  .go-actions{justify-content:flex-start;flex-wrap:wrap;}
+  .go-action{min-height:38px;display:inline-flex;align-items:center;}
 
   /* ── Drawer: full width on mobile ── */
   .drawer{width:100vw;}
@@ -423,7 +430,7 @@ input:checked+.slider:before{transform:translateX(20px);}
 .go-room{font-size:13px;font-weight:700;color:#111827;font-variant-numeric:tabular-nums;}
 .go-guest-name{font-size:13.5px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .go-guest-sub{font-size:12px;color:#6b7280;margin-top:2px;}
-.go-dates{font-size:12.5px;color:#374151;}
+.go-guest-dates{font-size:11.5px;color:#9ca3af;margin-top:3px;}
 .go-contact{font-size:12.5px;color:#374151;}
 .go-pill{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;border:1px solid transparent;display:inline-block;}
 .go-pill-pending{background:#fffbeb;color:#b45309;border-color:#fde68a;}
@@ -490,6 +497,10 @@ input:checked+.slider:before{transform:translateX(20px);}
   <div class="drawer-footer" id="drawer-footer"></div>
 </div>
 
+<button class="hamburger-btn" id="hamburger-btn" onclick="toggleMobileSidebar()" aria-label="Menu">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+</button>
+<div class="mob-overlay" id="mob-overlay" onclick="toggleMobileSidebar()"></div>
 <div class="admin-layout">
 <nav class="admin-sidebar" id="adminSidebar">
   <div class="sidebar-logo">
@@ -572,6 +583,12 @@ window.toggleSidebar=function(){
   localStorage.setItem('adminSidebarCollapsed',collapsed?'1':'');
   const icon=document.getElementById('sidebar-collapse-icon');
   if(icon)icon.setAttribute('points',collapsed?'9 18 15 12 9 6':'15 18 9 12 15 6');
+};
+window.toggleMobileSidebar=function(){
+  const sb=document.getElementById('adminSidebar');
+  const ov=document.getElementById('mob-overlay');
+  const isOpen=sb.classList.toggle('mob-open');
+  if(ov)ov.classList.toggle('open',isOpen);
 };
 (function(){
   if(localStorage.getItem('adminSidebarCollapsed')==='1'){
@@ -725,6 +742,8 @@ window.closeDrawer=function(){
 window.switchTab=function(tab){
   currentTab=tab;
   document.querySelectorAll('.sidebar-item[data-tab]').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  document.getElementById('adminSidebar')?.classList.remove('mob-open');
+  document.getElementById('mob-overlay')?.classList.remove('open');
   render();
 }
 
@@ -882,11 +901,19 @@ function renderGuests(){
     if(gs.cls==='unlocked')return{label:'UNLOCKED',cls:'go-pill-confirmed'};
     return{label:'AWAITING UNLOCK',cls:'go-pill-info'};
   }
-  function nightCount(r){return Math.round((new Date(r.checkout+'T00:00:00Z')-new Date(r.checkin+'T00:00:00Z'))/(864e5));}
+  function fmtDate(s){
+    if(!s)return'—';
+    return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{month:'short',day:'numeric'});
+  }
+  function nightCount(r){return Math.max(0,Math.round((new Date(r.checkout+'T00:00:00Z')-new Date(r.checkin+'T00:00:00Z'))/(864e5)));}
   function datesStr(r,sub){
-    if(sub==='arrival')return'Today → '+r.checkout+' ('+nightCount(r)+' nights)';
-    if(sub==='departure')return r.checkin+' → Today';
-    return(r.checkin||'—')+' → '+(r.checkout||'—');
+    const ci=fmtDate(r.checkin);
+    const co=fmtDate(r.checkout);
+    const n=nightCount(r);
+    const nLabel=n+' night'+(n!==1?'s':'');
+    if(sub==='arrival')return`Today → ${co} (${nLabel})`;
+    if(sub==='departure')return`${ci} → Today`;
+    return`${ci} → ${co} (${nLabel})`;
   }
   function contactDisplay(r){
     const form=getForm(r);
@@ -896,36 +923,46 @@ function renderGuests(){
     const form=getForm(r);
     const raw=(form?.contact||'').replace(/\D/g,'');
     if(!raw)return null;
-    const norm=raw&&(raw.length<11||raw.startsWith('5'))?'995'+raw:raw;
+    const norm=raw.length<11||raw.startsWith('5')?'995'+raw:raw;
     return'https://wa.me/'+norm;
   }
   function actionsHtml(r,sub){
     const form=getForm(r);
     const wa=waHref(r);
-    const waBtn=wa?`<a class="go-action" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`:'';
+    const waBtn=wa
+      ?`<a class="go-action" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`
+      :`<button class="go-action" disabled style="opacity:.35;cursor:not-allowed;" onclick="event.stopPropagation()">WhatsApp</button>`;
     const {label}=resStatusInfo(r);
     let extra='';
     if(label==='AWAITING UNLOCK'&&form){
       extra=`<button class="go-action go-action-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Grant Access</button>`;
     }else if(label==='UNLOCKED'){
       extra=`<a class="go-action" href="checkin-guest-v2.html?apt=${encodeURIComponent(r.roomCode||'')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View Page</a>`;
+    }else if(sub==='departure'){
+      extra='';
     }else if(form){
       extra=`<button class="go-action" onclick="event.stopPropagation();window.viewGuest('${form.id}')">Details</button>`;
     }
     return`<div class="go-actions">${waBtn}${extra}</div>`;
   }
-  const COLS='70px 1fr 190px 150px 130px 220px';
+  const COLS='60px 1fr 150px 130px 210px';
   function colHeaders(){
-    return`<div class="go-col-row" style="grid-template-columns:${COLS}"><div class="go-col-head">ROOM</div><div class="go-col-head">GUEST</div><div class="go-col-head">DATES</div><div class="go-col-head">CONTACT</div><div class="go-col-head">STATUS</div><div class="go-col-head" style="text-align:right">ACTIONS</div></div>`;
+    return`<div class="go-col-row" style="grid-template-columns:${COLS}"><div class="go-col-head">ROOM</div><div class="go-col-head">GUEST</div><div class="go-col-head">CONTACT</div><div class="go-col-head">STATUS</div><div class="go-col-head" style="text-align:right">ACTIONS</div></div>`;
   }
   function tableRow(r,sub){
     const {label,cls}=resStatusInfo(r);
     const form=getForm(r);
     const clickAttr=form?`onclick="window.viewGuest('${form.id}')" style="cursor:pointer"`:'';
+    const src=r.source||r.channel||'';
+    const guestCnt=r.guests>1?` · ${r.guests} guests`:'';
+    const sourceLine=src?(src+guestCnt):guestCnt.trim();
     return`<div class="go-row" style="grid-template-columns:${COLS}" ${clickAttr}>
       <div class="go-room">${esc(r.roomCode||r.room||'—')}</div>
-      <div style="min-width:0"><div class="go-guest-name">${esc(r.guest||'—')}</div><div class="go-guest-sub">${esc(r.source||r.channel||'')}</div></div>
-      <div class="go-dates">${esc(datesStr(r,sub))}</div>
+      <div style="min-width:0">
+        <div class="go-guest-name">${esc(r.guest||'—')}</div>
+        ${sourceLine?`<div class="go-guest-sub">${esc(sourceLine)}</div>`:''}
+        <div class="go-guest-dates">${esc(datesStr(r,sub))}</div>
+      </div>
       <div class="go-contact">${contactDisplay(r)}</div>
       <div><span class="go-pill ${cls}">${label}</span></div>
       ${actionsHtml(r,sub)}
