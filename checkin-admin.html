@@ -975,11 +975,15 @@ function renderGuests(){
     </div>`;
   }
 
+  const ROOM_ORDER=['0-1','0-2','0-3','0-4','0-5','6-1','6-2','6-3','6-4','7-1','7-2','7-4','tab-1','tab-2','tab-3','orb-1','orb-2','orb-3'];
+  function roomSortKey(r){const i=ROOM_ORDER.indexOf((r.roomCode||'').toLowerCase());return i>=0?i:ROOM_ORDER.length+(r.roomCode||'').toLowerCase();}
+  function byRoom(a,b){const ka=roomSortKey(a),kb=roomSortKey(b);return ka<kb?-1:ka>kb?1:0;}
+
   const nonCancelled=res.filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
-  const arrivals=nonCancelled.filter(r=>r.checkin===today);
-  const departures=nonCancelled.filter(r=>r.checkout===today&&r.checkin!==today);
-  const inHouse=nonCancelled.filter(r=>r.checkin<today&&r.checkout>today);
-  const upcoming=nonCancelled.filter(r=>r.checkin>today&&r.checkin<=in7);
+  const arrivals=nonCancelled.filter(r=>r.checkin===today).sort(byRoom);
+  const departures=nonCancelled.filter(r=>r.checkout===today&&r.checkin!==today).sort(byRoom);
+  const inHouse=nonCancelled.filter(r=>r.checkin<today&&r.checkout>today).sort(byRoom);
+  const upcoming=nonCancelled.filter(r=>r.checkin>today&&r.checkin<=in7).sort(byRoom);
   const pendingCount=arrivals.filter(r=>!getForm(r)).length;
   const todayCount=arrivals.length+departures.length;
   const inHouseCount=inHouse.length;
@@ -1090,12 +1094,14 @@ window.goSearch=function(){
       results.innerHTML='<div class="go-empty">Loading reservations…</div>';
       return;
     }
+    const _RO=['0-1','0-2','0-3','0-4','0-5','6-1','6-2','6-3','6-4','7-1','7-2','7-4','tab-1','tab-2','tab-3','orb-1','orb-2','orb-3'];
+    function _rk(r){const i=_RO.indexOf((r.roomCode||'').toLowerCase());return i>=0?i:_RO.length+(r.roomCode||'').toLowerCase();}
     const matched=all.filter(r=>
       (r.guest||'').toLowerCase().includes(q)||
       (r.roomCode||'').toLowerCase().includes(q)||
       (r.reservationNumber||'').toLowerCase().includes(q)||
       (r.bookingId||'').toLowerCase().includes(q)
-    ).slice(0,50);
+    ).sort((a,b)=>{const ka=_rk(a),kb=_rk(b);return ka<kb?-1:ka>kb?1:0;}).slice(0,50);
     if(!matched.length){
       results.innerHTML='<div class="go-table-wrap"><div class="go-empty">No reservations found</div></div>';
       return;
