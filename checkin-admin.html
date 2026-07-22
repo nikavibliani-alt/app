@@ -963,7 +963,7 @@ function renderGuests(){
     if(label==='AWAITING UNLOCK'&&form){
       extra=`<button class="go-action go-action-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Grant Access</button>`;
     }else if(label==='UNLOCKED'){
-      extra=`<a class="go-action" href="checkin-guest-v2.html?apt=${encodeURIComponent(r.roomCode||'')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View Page</a>`;
+      extra=`<a class="go-action" href="checkin-guest-v2.html?preview=true&apt=${encodeURIComponent(r.roomCode||'')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View Page</a>`;
     }else if(sub==='departure'){
       extra='';
     }else if(form){
