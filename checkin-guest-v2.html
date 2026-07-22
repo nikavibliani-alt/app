@@ -1207,16 +1207,49 @@ function levenshtein(a,b){
 }
 function normalizePhone(p){return(p||'').replace(/\D/g,'').slice(-7);}
 function _nameWords(s){return(s||'').toLowerCase().trim().split(/[\s,.\-]+/).filter(w=>w.length>2);}
+
+// ── Arabic transliteration for name matching ──────────────────────────────────
+// Arabic letters → rough Latin equivalents (consonants only; short vowels
+// are absent in unvocalised Arabic text, hence we compare consonant skeletons).
+const _AR={
+  'ا':'a','أ':'a','إ':'i','آ':'a','ب':'b','ت':'t','ث':'th','ج':'j','ح':'h',
+  'خ':'kh','د':'d','ذ':'dh','ر':'r','ز':'z','س':'s','ش':'sh','ص':'s','ض':'d',
+  'ط':'t','ظ':'z','ع':'a','غ':'gh','ف':'f','ق':'q','ك':'k','ل':'l','م':'m',
+  'ن':'n','ه':'h','و':'w','ي':'y','ى':'a','ة':'h','ئ':'y','ؤ':'w','ء':'',
+  'ً':'','ٌ':'','ٍ':'','َ':'','ُ':'','ِ':'',
+  'ّ':'','ْ':''
+};
+function _translit(s){return(s||'').split('').map(c=>_AR[c]!==undefined?_AR[c]:c).join('');}
+function isArabic(s){return/[؀-ۿ]/.test(s||'');}
+// Strip vowels for consonant-skeleton comparison (handles missing short vowels)
+function _csk(s){return s.replace(/[aeiouy]/g,'');}
+
 function nameMatch(input,resGuest){
   const iw=_nameWords(input),rw=_nameWords(resGuest);
   if(!iw.length||!rw.length)return false;
   let matched=0;
   for(const a of iw){if(rw.some(b=>levenshtein(a,b)<=2)){matched++;if(matched>=2)return true;}}
+  // Arabic: transliterate → compare consonant skeletons to handle missing short vowels
+  if(isArabic(input)){
+    const tw=_nameWords(_translit(input));
+    let tm=0;
+    for(const a of tw){
+      const ac=_csk(a);
+      if(ac.length>=2&&rw.some(b=>{const bc=_csk(b);return bc.length>=2&&(ac===bc||levenshtein(ac,bc)<=1);})){
+        tm++;if(tm>=2)return true;
+      }
+    }
+  }
   return false;
 }
 function partialNameMatch(input,resGuest){
   const iw=_nameWords(input),rw=_nameWords(resGuest);
-  return iw.some(a=>rw.some(b=>levenshtein(a,b)<=2));
+  if(iw.some(a=>rw.some(b=>levenshtein(a,b)<=2)))return true;
+  if(isArabic(input)){
+    const tw=_nameWords(_translit(input));
+    if(tw.some(a=>{const ac=_csk(a);return ac.length>=2&&rw.some(b=>{const bc=_csk(b);return bc.length>=2&&(ac===bc||levenshtein(ac,bc)<=1);});}))return true;
+  }
+  return false;
 }
 
 function normGuestId(n){return(n||'').toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'').slice(0,40);}
@@ -1316,7 +1349,7 @@ async function finishRegistration_(bestRes,formData){
   // For number-based bookings arrival is '' — fall back to reservation checkin date
   const arrivalDate=arrival||bestRes?.checkin||bestRes?.checkIn||'';
   const docId=`${aptId}_${arrivalDate||Date.now()}`;
-  const data={aptId,name,guests,nationality,contact,contactType:ct,passportUrl,
+  const data={aptId,name,nameRoman:bestRes?.guest||'',guests,nationality,contact,contactType:ct,passportUrl,
     passportScanResult:{},arrivalDate,
     matchedReservationId:bestRes?.id||null,manualUnlock:false};
   const existing=await getDoc(doc(db,'checkin_guests',docId));
@@ -1386,12 +1419,14 @@ window.searchReservation=async function(){
            ref===String(r.reservationNumber||'').replace(/\s+/g,'').toUpperCase()) score=10;
       }
       if(score<10){
+        const isAr=isArabic(name);
         const nm=name?nameMatch(name,r.guest||r.guestName||''):false;
         const dateOk=arrival&&arrival===ci;
         const partial=name?partialNameMatch(name,r.guest||r.guestName||''):false;
         if(nm&&dateOk)score=3;
         else if(nm)score=2;
-        else if(dateOk&&partial)score=2;
+        // Arabic: single-word consonant match + correct date is strong enough signal
+        else if(dateOk&&partial)score=isAr?3:2;
         // Also try the bookingRef as a name if no name provided
         if(!name&&bookingRef&&score===0){
           const refNm=nameMatch(bookingRef,r.guest||r.guestName||'');

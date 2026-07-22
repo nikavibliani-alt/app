@@ -856,7 +856,8 @@ window.refreshGuestData=function(){
 
 function resolveDisplayName(g){
   if(!g)return'';
-  // Use entered name if non-empty, regardless of script (Arabic, Georgian, Latin, etc.)
+  // Prefer English reservation name (stored on registration) for admin clarity
+  if((g.nameRoman||'').trim())return g.nameRoman.trim();
   if((g.name||'').trim())return g.name.trim();
   const res=g.matchedReservationId?(_resCache||[]).find(r=>r.id===g.matchedReservationId):null;
   return res?.guest||'';
