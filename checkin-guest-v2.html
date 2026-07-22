@@ -2533,20 +2533,27 @@ async function init(){
         // before showHome() so the reservations subscription queries the correct roomCode.
         try{
           const _resId=guestData.matchedReservationId;
+          console.log('[RoomCheck] guestDoc aptId=', guestData.aptId, '| stored aptId=', aptId, '| matchedReservationId=', _resId);
           if(_resId){
             const _resSnap=await getDoc(doc(db,'reservations',_resId));
+            console.log('[RoomCheck] reservation exists=', _resSnap.exists(), '| reservation roomCode=', _resSnap.data()?.roomCode);
             if(_resSnap.exists()){
               const _newRoom=_resSnap.data().roomCode;
               if(_newRoom&&_newRoom!==aptId){
+                console.log('[RoomCheck] Mismatch! Correcting aptId from', aptId, '→', _newRoom);
                 aptId=_newRoom;
                 guestData={...guestData,aptId:_newRoom};
                 localStorage.setItem('maxela_apt_id',_newRoom);
                 try{const _as=await getDoc(doc(db,'checkin_apartments',_newRoom));if(_as.exists())aptData=_as.data();}catch(e){}
                 setDoc(doc(db,'checkin_guests',savedGuest),{aptId:_newRoom},{merge:true}).catch(()=>{});
+              }else{
+                console.log('[RoomCheck] Room matches — no correction needed');
               }
             }
+          }else{
+            console.log('[RoomCheck] No matchedReservationId — cannot auto-correct room');
           }
-        }catch(e){}
+        }catch(e){console.error('[RoomCheck] Error during room check:', e);}
         document.getElementById('loading').style.display='none';
         document.getElementById('app').style.display='block';
         showHome();
