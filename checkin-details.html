@@ -383,72 +383,79 @@ async function render(){
   body.innerHTML=elevBlock+doorBlock+instrHtml+photosHtml+videoHtml
     ||(body.innerHTML=`<div style="text-align:center;padding:3rem;color:#B8B6B2;font-size:14px;">Check-in details not set up yet</div>`);
 
-  // ── Fetch elevator QR from RTDB, with Firestore manual-override check ───
-  if(needsElevatorCode()){
-    fetch(RTDB_URL).then(r=>r.json()).then(async data=>{
-      // Check if admin has set a newer manual override in Firestore
-      let fsData=null;
-      try{const fsSnap=await getDoc(doc(db,'globals','elevator_code'));if(fsSnap.exists())fsData=fsSnap.data();}catch(_){}
-      const rtdbTs=data?parseInt(data.updatedAt||0):0;
-      const fsTs=fsData?.updatedAt?.seconds?fsData.updatedAt.seconds*1000:(parseInt(fsData?.updatedAt||0));
-      const useFirestore=fsData&&fsTs>rtdbTs;
+  if(needsElevatorCode()){fetchElevatorCode();}
+}
 
-      if(useFirestore){
-        // Admin manual override is newer — show code only, no QR
-        const canvas=document.getElementById('elevator-qr');
-        const ph=document.getElementById('elevator-qr-placeholder');
-        if(canvas)canvas.style.display='none';
-        if(ph)ph.style.display='flex';
-        const displayCode=fsData.display_code||fsData.code||'';
-        if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
-      }else if(data&&data.qr_code){
-        // RTDB data is current — show QR + code
-        const qrCode=data.qr_code;
-        const canvas=document.getElementById('elevator-qr');
-        if(canvas){
-          canvas.style.display='none';
-          const qrDiv=document.createElement('div');
-          qrDiv.style.cssText='display:flex;justify-content:center;cursor:pointer;';
-          canvas.parentNode.insertBefore(qrDiv,canvas);
-          qrDiv.onclick=()=>_openQrFullscreen(qrCode);
-          if(typeof QRCode==='undefined'){
-            const s=document.createElement('script');
-            s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-            s.onload=()=>renderQR(qrCode,qrDiv);
-            document.head.appendChild(s);
-          }else{
-            renderQR(qrCode,qrDiv);
-          }
+async function fetchElevatorCode(){
+  // Fetch from RTDB, compare with Firestore manual override, use whichever is newer
+  try{
+    const data=await fetch(RTDB_URL).then(r=>r.json());
+    let fsData=null;
+    try{const fsSnap=await getDoc(doc(db,'globals','elevator_code'));if(fsSnap.exists())fsData=fsSnap.data();}catch(_){}
+    const rtdbTs=data?parseInt(data.updatedAt||0):0;
+    const fsTs=fsData?.updatedAt?.seconds?fsData.updatedAt.seconds*1000:parseInt(fsData?.updatedAt||0);
+    const useFirestore=fsData&&fsTs>rtdbTs;
+
+    if(useFirestore){
+      // Admin manual override is newer — show code only, no QR
+      const canvas=document.getElementById('elevator-qr');
+      const ph=document.getElementById('elevator-qr-placeholder');
+      if(canvas)canvas.style.display='none';
+      if(ph)ph.style.display='flex';
+      const displayCode=fsData.display_code||fsData.code||'';
+      if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
+    }else if(data&&data.qr_code){
+      // RTDB data is current — show QR + code
+      const qrCode=data.qr_code;
+      const canvas=document.getElementById('elevator-qr');
+      if(canvas){
+        canvas.style.display='none';
+        // Remove stale qrDiv from previous interval fetch
+        const existing=document.getElementById('elevator-qr-rendered');
+        if(existing)existing.remove();
+        const qrDiv=document.createElement('div');
+        qrDiv.id='elevator-qr-rendered';
+        qrDiv.style.cssText='display:flex;justify-content:center;cursor:pointer;';
+        canvas.parentNode.insertBefore(qrDiv,canvas);
+        qrDiv.onclick=()=>_openQrFullscreen(qrCode);
+        if(typeof QRCode==='undefined'){
+          const s=document.createElement('script');
+          s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+          s.onload=()=>renderQR(qrCode,qrDiv);
+          document.head.appendChild(s);
+        }else{
+          renderQR(qrCode,qrDiv);
         }
-        if(data.expires_at){
-          const el=document.getElementById('elevator-expires');
-          if(el){const exp=new Date(parseInt(data.expires_at));el.textContent='Code valid today · Changes daily at '+exp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
-        }
-        const displayCode=data.display_code||data.code||'';
-        if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
-      }else{
-        // No QR in RTDB — show placeholder + code if available
-        const canvas=document.getElementById('elevator-qr');
-        const ph=document.getElementById('elevator-qr-placeholder');
-        if(canvas)canvas.style.display='none';
-        if(ph)ph.style.display='flex';
-        const displayCode=data?(data.display_code||data.code||''):(fsData?.display_code||fsData?.code||'');
+      }
+      if(data.expires_at){
+        const el=document.getElementById('elevator-expires');
+        if(el){const exp=new Date(parseInt(data.expires_at));el.textContent='QR code and entrance code change daily · Next update at '+exp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:true});}
+      }
+      const displayCode=data.display_code||data.code||'';
+      if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
+    }else{
+      // No QR in RTDB — show placeholder + any code available
+      const canvas=document.getElementById('elevator-qr');
+      const ph=document.getElementById('elevator-qr-placeholder');
+      if(canvas)canvas.style.display='none';
+      if(ph)ph.style.display='flex';
+      const displayCode=data?(data.display_code||data.code||''):(fsData?.display_code||fsData?.code||'');
+      if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
+    }
+  }catch(err){
+    // Network error — fall back to Firestore entirely
+    try{
+      const snap=await getDoc(doc(db,'globals','elevator_code'));
+      const canvas=document.getElementById('elevator-qr');
+      const ph=document.getElementById('elevator-qr-placeholder');
+      if(canvas)canvas.style.display='none';
+      if(ph)ph.style.display='flex';
+      if(snap.exists()){
+        const sd=snap.data();
+        const displayCode=sd.display_code||sd.code||'';
         if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
       }
-    }).catch(()=>{
-      // Network error — fall back to Firestore entirely
-      getDoc(doc(db,'globals','elevator_code')).then(snap=>{
-        const canvas=document.getElementById('elevator-qr');
-        const ph=document.getElementById('elevator-qr-placeholder');
-        if(canvas)canvas.style.display='none';
-        if(ph)ph.style.display='flex';
-        if(snap.exists()){
-          const sd=snap.data();
-          const displayCode=sd.display_code||sd.code||'';
-          if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
-        }
-      }).catch(()=>{});
-    });
+    }catch(_){}
   }
 }
 
@@ -553,6 +560,8 @@ async function init(){
 }
 
 init();
+// Refresh elevator code every 5 minutes in case guest leaves page open
+setInterval(()=>{if(needsElevatorCode())fetchElevatorCode();},5*60*1000);
 </script>
 </body>
 </html>

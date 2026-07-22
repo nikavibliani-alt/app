@@ -1581,21 +1581,41 @@ async function loadGuestSettings(){
 }
 
 async function loadElevatorCode(){
-  try{
-    const snap=await getDoc(doc(db,'globals','elevator_code'));
-    gsElevatorData=snap.exists()?snap.data():null;
-  }catch(e){console.warn('Elevator code load error:',e);}
+  // Fetch from both RTDB and Firestore; use whichever is more recent
+  let rtdbData=null;
+  let fsData=null;
+  try{rtdbData=await fetch('https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json').then(r=>r.json());}catch(e){}
+  try{const snap=await getDoc(doc(db,'globals','elevator_code'));if(snap.exists())fsData=snap.data();}catch(e){console.warn('Elevator code load error:',e);}
+  const rtdbTs=rtdbData?parseInt(rtdbData.updatedAt||0):0;
+  const fsTs=fsData?.updatedAt?.seconds?fsData.updatedAt.seconds*1000:parseInt(fsData?.updatedAt||0);
+  if(rtdbData&&rtdbTs>=fsTs){
+    // RTDB is current — normalise into gsElevatorData shape
+    gsElevatorData={
+      code:rtdbData.display_code||rtdbData.code||'',
+      updatedAt:{seconds:Math.floor(rtdbTs/1000)},
+      _source:'rtdb',
+    };
+  }else if(fsData){
+    gsElevatorData={...fsData,_source:'firestore'};
+  }else{
+    gsElevatorData=null;
+  }
 }
 
 function gsPopulateElevatorCard(){
   const inp=document.getElementById('gsElevatorInput');
   const age=document.getElementById('gsElevatorAge');
   if(!inp||!age)return;
-  if(gsElevatorData?.code)inp.value=gsElevatorData.code;
+  const currentCode=gsElevatorData?.code||'';
+  if(currentCode)inp.value=currentCode;
   if(gsElevatorData?.updatedAt){
     const sec=gsElevatorData.updatedAt.seconds||0;
-    const diffH=Math.round((Date.now()/1000-sec)/3600);
-    age.textContent=diffH<1?'Updated just now':`Updated ${diffH} hour${diffH!==1?'s':''} ago`;
+    const diffMin=Math.round((Date.now()/1000-sec)/60);
+    const diffH=Math.floor(diffMin/60);
+    const src=gsElevatorData._source==='rtdb'?' (live)':' (manual)';
+    if(diffMin<2)age.textContent='Updated just now'+src;
+    else if(diffMin<60)age.textContent=`Updated ${diffMin} min ago`+src;
+    else age.textContent=`Updated ${diffH} hour${diffH!==1?'s':''} ago`+src;
   }else{
     age.textContent='Not yet set';
   }
