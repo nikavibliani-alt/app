@@ -19,6 +19,29 @@
   --r:10px;--rs:7px;--rsm:4px;
 }
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;padding-bottom:4rem;}
+.admin-layout{display:flex;min-height:100vh;}
+.admin-sidebar{width:240px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:width 0.2s ease;overflow:hidden;}
+.admin-sidebar.collapsed{width:56px;}
+.sidebar-logo{padding:16px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0;min-width:240px;}
+.logo{font-size:16px;font-weight:700;letter-spacing:-0.02em;white-space:nowrap;}
+.logo span{color:var(--accent);}
+.admin-badge{font-size:10px;font-weight:600;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);padding:2px 8px;border-radius:20px;letter-spacing:0.04em;text-transform:uppercase;width:fit-content;white-space:nowrap;}
+.sidebar-nav{flex:1;overflow-y:auto;padding:6px 0;}
+.sidebar-item{width:100%;display:flex;align-items:center;gap:10px;padding:11px 16px;background:none;border:none;border-left:3px solid transparent;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;text-align:left;transition:all 0.15s;box-sizing:border-box;}
+.sidebar-item:hover{background:var(--bg);color:var(--text);}
+.sidebar-item.active{color:#111827;border-left-color:#111827;background:#f3f4f6;font-weight:600;}
+.sidebar-item svg{flex-shrink:0;}
+.sidebar-label{flex:1;}
+.sidebar-bottom{padding:6px 0;border-top:1px solid var(--border);flex-shrink:0;}
+.sidebar-collapse-btn{width:100%;display:flex;align-items:center;gap:10px;padding:11px 16px;background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;box-sizing:border-box;}
+.sidebar-collapse-btn:hover{background:var(--bg);}
+.admin-sidebar.collapsed .sidebar-item{justify-content:center;padding:11px 0;}
+.admin-sidebar.collapsed .sidebar-label,.admin-sidebar.collapsed .sidebar-collapse-label{display:none;}
+.admin-sidebar.collapsed .sidebar-logo{align-items:center;padding:12px 0;}
+.admin-sidebar.collapsed .logo,.admin-sidebar.collapsed .admin-badge{display:none;}
+.admin-sidebar.collapsed .sidebar-collapse-btn{justify-content:center;padding:11px 0;}
+.admin-main{margin-left:240px;min-height:100vh;transition:margin-left 0.2s ease;}
+.admin-sidebar.collapsed+.admin-main{margin-left:56px;}
 @keyframes spin{to{transform:rotate(360deg);}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 
@@ -26,15 +49,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .spinner{width:22px;height:22px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
 .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;font-size:13px;padding:8px 18px;border-radius:20px;z-index:9999;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;}
 .toast.show{opacity:1;}
-
-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
-.logo{font-size:16px;font-weight:700;letter-spacing:-0.02em;}
-.logo span{color:var(--accent);}
-.admin-badge{font-size:11px;font-weight:600;background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border);padding:3px 10px;border-radius:20px;letter-spacing:0.04em;text-transform:uppercase;}
-
-.tabs{display:flex;gap:2px;padding:0 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);}
-.tab{padding:10px 16px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;background:none;border-top:none;border-left:none;border-right:none;font-family:'DM Sans',sans-serif;}
-.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
 
 .main{max-width:900px;margin:0 auto;padding:1.5rem;}
 .page{animation:fadeIn 0.2s ease;}
@@ -176,17 +190,18 @@ input:checked+.slider:before{transform:translateX(20px);}
   --apt-red:#dc2626;--apt-red-bg:#fef2f2;
   --apt-radius:8px;--apt-shadow:0 1px 2px 0 rgba(0,0,0,.05);
 }
-.main:has(.apt-layout){padding:0;max-width:none;margin:0;overflow:hidden;}
-.apt-layout{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 92px);}
-.apt-sidebar{background:var(--apt-white);border-right:1px solid var(--apt-border);overflow-y:auto;padding:16px 12px;}
+.main:has(.apt-layout){padding:0;max-width:none;margin:0;}
+.apt-layout{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
 .apt-group-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--apt-muted);padding:4px 8px;margin:16px 0 8px;}
 .apt-group-label:first-child{margin-top:0;}
-.apt-room-card{padding:10px 12px;border-radius:6px;cursor:pointer;border:1px solid transparent;margin-bottom:4px;transition:all .15s ease;}
-.apt-room-card:hover{background:var(--apt-bg);border-color:var(--apt-border);}
-.apt-room-card.active{background:var(--apt-white);border-color:var(--apt-border);box-shadow:var(--apt-shadow);}
-.apt-room-code{font-size:14px;font-weight:600;margin-bottom:4px;color:var(--apt-text);}
-.apt-room-name{font-size:12px;color:var(--apt-muted);margin-bottom:8px;}
-.apt-room-pills{display:flex;flex-wrap:wrap;gap:4px;}
+.apt-pill-row{background:var(--apt-white);border-bottom:1px solid var(--apt-border);padding:10px 16px;overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;}
+.apt-pill-groups{display:flex;flex-direction:column;gap:8px;min-width:max-content;}
+.apt-group-row{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;}
+.apt-group-row-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--apt-muted);white-space:nowrap;min-width:160px;flex-shrink:0;}
+.apt-room-btn{padding:5px 12px;border-radius:20px;cursor:pointer;border:1px solid var(--apt-border);font-size:12.5px;font-weight:500;background:var(--apt-white);color:#374151;transition:all .15s ease;white-space:nowrap;font-family:inherit;display:inline-flex;align-items:center;gap:5px;}
+.apt-room-btn:hover{background:var(--apt-bg);border-color:#d1d5db;}
+.apt-room-btn.active{background:#111827;border-color:#111827;color:#fff;}
+.apt-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 .apt-pill{font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px;white-space:nowrap;border:1px solid transparent;}
 .apt-pill-ok{background:var(--apt-green-bg);color:var(--apt-green);border-color:#a7f3d0;}
 .apt-pill-warn{background:var(--apt-amber-bg);color:var(--apt-amber);border-color:#fde68a;}
@@ -244,10 +259,14 @@ input:checked+.slider:before{transform:translateX(20px);}
 .apt-copy-btn{padding:8px 16px;border:1px solid var(--apt-border);border-radius:6px;background:var(--apt-white);font-size:13px;font-weight:500;cursor:pointer;color:var(--apt-text);flex-shrink:0;box-shadow:var(--apt-shadow);transition:all .2s;font-family:inherit;}
 .apt-copy-btn:hover{background:#f9fafb;}
 @media(max-width:768px){
-  /* ── Tab bar: single scrollable line ── */
-  .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0 0.75rem;gap:0;scrollbar-width:none;}
-  .tabs::-webkit-scrollbar{display:none;}
-  .tab{white-space:nowrap;padding:10px 12px;font-size:12px;flex-shrink:0;}
+  /* ── Sidebar: collapsed on mobile ── */
+  .admin-sidebar{width:56px;}
+  .admin-sidebar .sidebar-item{justify-content:center;padding:11px 0;}
+  .admin-sidebar .sidebar-label,.admin-sidebar .sidebar-collapse-label{display:none;}
+  .admin-sidebar .sidebar-logo{align-items:center;padding:12px 0;}
+  .admin-sidebar .logo,.admin-sidebar .admin-badge{display:none;}
+  .admin-sidebar .sidebar-collapse-btn{justify-content:center;padding:11px 0;}
+  .admin-main{margin-left:56px;}
 
   /* ── Main container ── */
   .main{padding:0.75rem;}
@@ -261,12 +280,9 @@ input:checked+.slider:before{transform:translateX(20px);}
   /* ── Touch targets ── */
   .btn{min-height:44px;}
 
-  /* ── Apartments tab: single-column toggle ── */
-  .apt-layout{grid-template-columns:1fr;height:auto;}
-  .apt-sidebar{border-right:none;border-bottom:1px solid var(--apt-border);max-height:none;padding:12px 8px;}
-  .apt-editor.mob-hidden{display:none;}
-  .apt-sidebar.mob-hidden{display:none;}
-  .apt-back-btn{display:flex;align-items:center;gap:5px;background:none;border:none;color:var(--apt-muted);font-size:14px;font-weight:500;cursor:pointer;margin-bottom:16px;padding:8px 0;min-height:44px;font-family:inherit;}
+  /* ── Apartments tab ── */
+  .apt-layout{height:auto;overflow:visible;}
+  .apt-pill-row{max-height:200px;}
   .apt-editor-content{padding:16px;}
   .apt-editor-header{flex-wrap:wrap;gap:8px;}
   .apt-editor-title{font-size:18px;}
@@ -374,6 +390,54 @@ input:checked+.slider:before{transform:translateX(20px);}
 .gs-save-settings-btn { padding:8px 20px; border-radius:var(--gs-radius-md); border:none; background:var(--gs-green); color:white; font-size:13px; font-weight:700; cursor:pointer; transition:opacity 0.15s; }
 .gs-save-settings-btn:hover { opacity:0.9; }
 
+/* ── GUEST OPERATIONS ── */
+.go-root{padding:28px 32px 60px;max-width:1280px;margin:0 auto;}
+.go-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:18px;border-bottom:1px solid #e5e7eb;flex-wrap:wrap;gap:16px;}
+.go-title{font-size:18px;font-weight:700;letter-spacing:-0.01em;color:#111827;margin:0;}
+.go-sub{font-size:12.5px;color:#6b7280;margin:3px 0 0;}
+.go-header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.go-btn{background:#fff;color:#374151;border:1px solid #e5e7eb;padding:8px 14px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.go-btn:hover{background:#f3f4f6;border-color:#d1d5db;}
+.go-btn-danger{color:#b91c1c;border-color:#fecaca;}
+.go-btn-danger:hover{background:#fef2f2;}
+.go-banner{background:#fff;border:1px solid #e5e7eb;border-left:3px solid #d97706;padding:10px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;}
+.go-banner-text{font-size:12.5px;color:#374151;}
+.go-inner-tabs{display:flex;border-bottom:1px solid #e5e7eb;gap:0;overflow-x:auto;}
+.go-tab{padding:10px 14px;font-size:13px;font-weight:600;background:transparent;border:none;border-bottom:2px solid transparent;color:#6b7280;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;font-family:inherit;}
+.go-tab:hover{color:#374151;}
+.go-tab.active{border-bottom-color:#111827;color:#111827;}
+.go-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;}
+.go-tab.active .go-badge{background:#111827;color:#fff;border-color:#111827;}
+.go-badge-red{background:#fef2f2!important;color:#b91c1c!important;border:1px solid #fecaca!important;}
+.go-tab.active .go-badge-red{background:#b91c1c!important;color:#fff!important;border-color:#b91c1c!important;}
+.go-table-wrap{background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-top:20px;margin-bottom:24px;}
+.go-table-hd{padding:16px 24px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:10px;}
+.go-table-title{font-size:13px;font-weight:700;color:#111827;flex:1;}
+.go-table-count{font-size:11px;color:#9ca3af;font-weight:600;letter-spacing:0.03em;text-transform:uppercase;}
+.go-scroll{overflow-x:auto;}
+.go-col-row{display:grid;gap:12px;padding:9px 24px;border-bottom:1px solid #e5e7eb;background:#fcfcfc;}
+.go-row{display:grid;gap:12px;padding:12px 24px;border-bottom:1px solid #e5e7eb;transition:background 0.1s;}
+.go-row:hover{background:#fafafa;}
+.go-row:last-child{border-bottom:none;}
+.go-col-head{font-size:10.5px;font-weight:700;color:#9ca3af;letter-spacing:0.05em;}
+.go-room{font-size:13px;font-weight:700;color:#111827;font-variant-numeric:tabular-nums;}
+.go-guest-name{font-size:13.5px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.go-guest-sub{font-size:12px;color:#6b7280;margin-top:2px;}
+.go-dates{font-size:12.5px;color:#374151;}
+.go-contact{font-size:12.5px;color:#374151;}
+.go-pill{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap;border:1px solid transparent;display:inline-block;}
+.go-pill-pending{background:#fffbeb;color:#b45309;border-color:#fde68a;}
+.go-pill-confirmed{background:#f0fdf4;color:#15803d;border-color:#bbf7d0;}
+.go-pill-muted{background:#f3f4f6;color:#6b7280;border-color:#e5e7eb;}
+.go-pill-info{background:#f3f4f6;color:#111827;border-color:#d1d5db;}
+.go-pill-red{background:#fef2f2;color:#b91c1c;border-color:#fecaca;}
+.go-actions{display:flex;align-items:center;gap:8px;justify-content:flex-end;}
+.go-action{background:#fff;color:#374151;border:1px solid #e5e7eb;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit;text-decoration:none;display:inline-block;transition:background 0.1s;}
+.go-action:hover{background:#f3f4f6;border-color:#d1d5db;}
+.go-action-primary{background:#111827;color:#fff;border-color:#111827;}
+.go-action-primary:hover{background:#1f2937;}
+.go-empty{padding:40px 24px;text-align:center;color:#9ca3af;font-size:13px;}
+
 /* ── ADMIN LOCK SCREEN ── */
 @keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-8px);}40%{transform:translateX(8px);}60%{transform:translateX(-6px);}80%{transform:translateX(6px);}}
 .admin-authed #lock-screen{display:none;}
@@ -426,23 +490,50 @@ input:checked+.slider:before{transform:translateX(20px);}
   <div class="drawer-footer" id="drawer-footer"></div>
 </div>
 
-<header>
-  <div class="logo">Maxela <span>Check-in</span></div>
-  <div style="display:flex;align-items:center;gap:14px;">
+<div class="admin-layout">
+<nav class="admin-sidebar" id="adminSidebar">
+  <div class="sidebar-logo">
+    <div class="logo">Maxela <span>Check-in</span></div>
     <div class="admin-badge">Admin Panel</div>
-    <button class="signout-link" onclick="adminSignOut()">Sign out</button>
   </div>
-</header>
-
-<div class="tabs">
-  <button class="tab active" data-tab="apartments" onclick="switchTab('apartments')">Apartments</button>
-  <button class="tab" data-tab="guests" onclick="switchTab('guests')">Guests<span id="sf-badge" style="display:none;margin-left:6px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;vertical-align:middle;"></span></button>
-  <button class="tab" data-tab="requests" onclick="switchTab('requests')">Requests</button>
-  <button class="tab" data-tab="hkpins" onclick="switchTab('hkpins')">HK Pins</button>
-  <button class="tab" data-tab="guestsettings" onclick="switchTab('guestsettings')">Guest Page Settings</button>
-</div>
-
+  <div class="sidebar-nav">
+    <button class="sidebar-item active" data-tab="apartments" onclick="switchTab('apartments')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span class="sidebar-label">Apartments</span>
+    </button>
+    <button class="sidebar-item" data-tab="guests" onclick="switchTab('guests')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="sidebar-label">Guests</span>
+      <span id="sf-badge" style="display:none;background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;"></span>
+    </button>
+    <button class="sidebar-item" data-tab="requests" onclick="switchTab('requests')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      <span class="sidebar-label">Requests</span>
+    </button>
+    <button class="sidebar-item" data-tab="hkpins" onclick="switchTab('hkpins')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <span class="sidebar-label">HK Pins</span>
+    </button>
+    <button class="sidebar-item" data-tab="guestsettings" onclick="switchTab('guestsettings')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M2 12h2M20 12h2"/></svg>
+      <span class="sidebar-label">Guest Page Settings</span>
+    </button>
+  </div>
+  <div class="sidebar-bottom">
+    <button class="sidebar-item" onclick="adminSignOut()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span class="sidebar-label">Sign out</span>
+    </button>
+    <button class="sidebar-collapse-btn" onclick="toggleSidebar()">
+      <svg id="sidebar-collapse-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      <span class="sidebar-collapse-label">Collapse</span>
+    </button>
+  </div>
+</nav>
+<div class="admin-main">
 <div class="main" id="main"></div>
+</div>
+</div>
 
 <script type="module">
 // ── Admin auth ──────────────────────────────────────────────────────────
@@ -474,6 +565,20 @@ window.adminSignOut=function(){
   localStorage.removeItem('maxela_admin_auth');
   location.reload();
 };
+
+window.toggleSidebar=function(){
+  const sb=document.getElementById('adminSidebar');
+  const collapsed=sb.classList.toggle('collapsed');
+  localStorage.setItem('adminSidebarCollapsed',collapsed?'1':'');
+  const icon=document.getElementById('sidebar-collapse-icon');
+  if(icon)icon.setAttribute('points',collapsed?'9 18 15 12 9 6':'15 18 9 12 15 6');
+};
+(function(){
+  if(localStorage.getItem('adminSidebarCollapsed')==='1'){
+    const sb=document.getElementById('adminSidebar');
+    if(sb){sb.classList.add('collapsed');const icon=document.getElementById('sidebar-collapse-icon');if(icon)icon.setAttribute('points','9 18 15 12 9 6');}
+  }
+})();
 
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDoc,getDocs,query,where,orderBy,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
@@ -597,6 +702,8 @@ let gsSectionLabels={};
 let gsRoomCategories={};
 let gsLocationInfo={};
 let gsElevatorData=null;
+let _guestsTab='today';
+let _goPendingOnly=false;
 
 // ── HELPERS ───────────────────────────────────────
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -617,7 +724,7 @@ window.closeDrawer=function(){
 // ── TAB SWITCHING ─────────────────────────────────
 window.switchTab=function(tab){
   currentTab=tab;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',(t.dataset.tab||t.textContent.toLowerCase())===tab));
+  document.querySelectorAll('.sidebar-item[data-tab]').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
   render();
 }
 
@@ -632,41 +739,36 @@ function render(){
 
 function renderApartments(){
   const groups={};
+  const groupOrder=[];
   APARTMENTS.forEach(a=>{
-    if(!groups[a.group])groups[a.group]=[];
+    if(!groups[a.group]){groups[a.group]=[];groupOrder.push(a.group);}
     groups[a.group].push(a);
   });
 
-  let sidebarHtml='';
-  Object.entries(groups).forEach(([grp,apts])=>{
-    sidebarHtml+=`<div class="apt-group-label">${esc(grp)}</div>`;
+  let pillHtml='<div class="apt-pill-groups">';
+  groupOrder.forEach(grp=>{
+    const apts=groups[grp];
+    pillHtml+=`<div class="apt-group-row"><div class="apt-group-row-label">${esc(grp)}</div>`;
     apts.forEach(a=>{
       const d=aptData[a.id]||{};
       const hasCode=!!(d.tuyaDeviceId||d.doorCode);
-      const hasInstructions=!!d.instructions;
-      const photoCount=(d.photos||[]).length;
-      sidebarHtml+=`<div class="apt-room-card" id="apt-card-${a.id}" onclick="window.openAptDrawer('${a.id}')">
-        <div class="apt-room-code">${esc(a.code)}</div>
-        <div class="apt-room-name">${esc(a.name)}</div>
-        <div class="apt-room-pills">
-          <span class="apt-pill ${hasCode?'apt-pill-ok':'apt-pill-err'}">${hasCode?'Code ✓':'No code'}</span>
-          <span class="apt-pill ${hasInstructions?'apt-pill-ok':'apt-pill-warn'}">${hasInstructions?'Steps ✓':'No steps'}</span>
-          <span class="apt-pill ${photoCount>0?'apt-pill-ok':'apt-pill-warn'}">${photoCount>0?photoCount+' photos':'No photos'}</span>
-        </div>
-      </div>`;
+      const dotColor=hasCode?'#10b981':'#ef4444';
+      const isActive=window._currentAptId===a.id;
+      pillHtml+=`<button class="apt-room-btn${isActive?' active':''}" id="apt-pill-${a.id}" onclick="window.openAptDrawer('${a.id}')"><span class="apt-dot" style="background:${isActive?'#fff':dotColor};"></span>${esc(a.code)}</button>`;
     });
+    pillHtml+='</div>';
   });
+  pillHtml+='</div>';
 
-  const isMob=window.innerWidth<768;
   document.getElementById('main').innerHTML=`<div class="apt-layout">
-    <div class="apt-sidebar" id="aptSidebar">${sidebarHtml}</div>
-    <div class="apt-editor${isMob?' mob-hidden':''}" id="aptEditor">
+    <div class="apt-pill-row">${pillHtml}</div>
+    <div class="apt-editor" id="aptEditor">
       <div class="apt-empty">
         <div class="apt-empty-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         </div>
         <div style="font-size:15px;font-weight:600;color:#374151;margin-bottom:6px">Select a room</div>
-        <div style="font-size:13px">Choose any room from the left panel to edit its check-in setup</div>
+        <div style="font-size:13px">Choose any room from the pills above to edit its check-in setup</div>
       </div>
     </div>
   </div>`;
@@ -763,145 +865,167 @@ function guestStatus(g){
 }
 
 function renderGuests(){
-  const today=new Date().toISOString().split('T')[0];
-  const recent=guestData
-    .sort((a,b)=>b.submittedAt?.seconds-a.submittedAt?.seconds)
-    .slice(0,50);
+  _loadResCache();
+  const now=new Date(Date.now()+4*3600*1000); // Tbilisi UTC+4
+  const today=now.toISOString().slice(0,10);
+  const in7=new Date(now.getTime()+7*24*3600*1000).toISOString().slice(0,10);
+  const res=_resCache||[];
 
-  let html='<div class="page">';
-
-  // Failed Searches section — collapsed by default
-  if(searchFailures.length){
-    html+=`<div class="card" style="margin-bottom:16px;border:1px solid #fecaca;">
-      <div class="card-body" style="padding:10px 16px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:8px;" onclick="window.toggleFailedSearches()">
-          <div style="font-size:12px;font-weight:700;color:#dc2626;">&#9888; Failed Searches (${searchFailures.length} unresolved)</div>
-          <button class="btn btn-sm" style="font-size:11px;padding:3px 10px;flex-shrink:0;">${_sfExpanded?'▲ Hide':'▼ Show'}</button>
-        </div>`;
-    if(_sfExpanded){
-      searchFailures.forEach(f=>{
-        const ts=f.timestamp?.toDate?f.timestamp.toDate():null;
-        const timeStr=ts?ts.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
-        const rawDigits=(f.input_contact||'').replace(/\D/g,'');
-        const normDigits=rawDigits&&(rawDigits.length<11||rawDigits.startsWith('5'))?'995'+rawDigits:rawDigits;
-        const inputInfo=[
-          f.input_name?`Name: <b>${esc(f.input_name)}</b>`:'',
-          f.input_booking_ref?`Ref: <b>${esc(f.input_booking_ref)}</b>`:'',
-          f.input_date?`Arrival: <b>${esc(f.input_date)}</b>`:'',
-        ].filter(Boolean).join(' &nbsp;·&nbsp; ');
-        const bestInfo=f.best_match_name
-          ?`Closest: <b>${esc(f.best_match_name)}</b>${f.best_match_room?' ('+esc(f.best_match_room)+')':''} score ${f.best_match_score||0}`
-          :'No close match found';
-        const waMsg=encodeURIComponent(`Hi, I tried to check in online but couldn't find my booking. Name: ${f.input_name||'—'}, arrival: ${f.input_date||'—'}${f.input_booking_ref?', ref: '+f.input_booking_ref:''}.`);
-        const contactBtn=normDigits
-          ?(f.input_contact_type==='tg'
-            ?`<a href="https://t.me/+${normDigits}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:12px;">Contact (TG)</a>`
-            :`<a href="https://wa.me/${normDigits}?text=${waMsg}" target="_blank" rel="noopener" class="btn btn-sm" style="text-decoration:none;font-size:12px;background:#25D366;color:#fff;border-color:#25D366;">WhatsApp</a>`)
-          :'';
-        html+=`<div style="border-top:1px solid #fecaca;padding:10px 0 6px;">
-          <div style="font-size:13px;margin-bottom:3px;">${inputInfo||'(no input)'}</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">${bestInfo} &nbsp;·&nbsp; ${timeStr}</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            ${contactBtn}
-            <button class="btn btn-sm" onclick="window.resolveSearchFailure('${f.id}')" style="font-size:12px;">Mark Resolved</button>
-          </div>
-        </div>`;
-      });
+  function getForm(r){
+    return guestData.find(g=>g.matchedReservationId===r.id)||
+           guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||null;
+  }
+  function resStatusInfo(r){
+    const form=getForm(r);
+    if(!form)return{label:'NO FORM',cls:'go-pill-pending'};
+    const gs=guestStatus(form);
+    if(gs.cls==='unlocked')return{label:'UNLOCKED',cls:'go-pill-confirmed'};
+    return{label:'AWAITING UNLOCK',cls:'go-pill-info'};
+  }
+  function nightCount(r){return Math.round((new Date(r.checkout+'T00:00:00Z')-new Date(r.checkin+'T00:00:00Z'))/(864e5));}
+  function datesStr(r,sub){
+    if(sub==='arrival')return'Today → '+r.checkout+' ('+nightCount(r)+' nights)';
+    if(sub==='departure')return r.checkin+' → Today';
+    return(r.checkin||'—')+' → '+(r.checkout||'—');
+  }
+  function contactDisplay(r){
+    const form=getForm(r);
+    return esc(form?.contact||'—');
+  }
+  function waHref(r){
+    const form=getForm(r);
+    const raw=(form?.contact||'').replace(/\D/g,'');
+    if(!raw)return null;
+    const norm=raw&&(raw.length<11||raw.startsWith('5'))?'995'+raw:raw;
+    return'https://wa.me/'+norm;
+  }
+  function actionsHtml(r,sub){
+    const form=getForm(r);
+    const wa=waHref(r);
+    const waBtn=wa?`<a class="go-action" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`:'';
+    const {label}=resStatusInfo(r);
+    let extra='';
+    if(label==='AWAITING UNLOCK'&&form){
+      extra=`<button class="go-action go-action-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Grant Access</button>`;
+    }else if(label==='UNLOCKED'){
+      extra=`<a class="go-action" href="checkin-guest-v2.html?apt=${encodeURIComponent(r.roomCode||'')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View Page</a>`;
+    }else if(form){
+      extra=`<button class="go-action" onclick="event.stopPropagation();window.viewGuest('${form.id}')">Details</button>`;
     }
-    html+=`</div></div>`;
+    return`<div class="go-actions">${waBtn}${extra}</div>`;
+  }
+  const COLS='70px 1fr 190px 150px 130px 220px';
+  function colHeaders(){
+    return`<div class="go-col-row" style="grid-template-columns:${COLS}"><div class="go-col-head">ROOM</div><div class="go-col-head">GUEST</div><div class="go-col-head">DATES</div><div class="go-col-head">CONTACT</div><div class="go-col-head">STATUS</div><div class="go-col-head" style="text-align:right">ACTIONS</div></div>`;
+  }
+  function tableRow(r,sub){
+    const {label,cls}=resStatusInfo(r);
+    const form=getForm(r);
+    const clickAttr=form?`onclick="window.viewGuest('${form.id}')" style="cursor:pointer"`:'';
+    return`<div class="go-row" style="grid-template-columns:${COLS}" ${clickAttr}>
+      <div class="go-room">${esc(r.roomCode||r.room||'—')}</div>
+      <div style="min-width:0"><div class="go-guest-name">${esc(r.guest||'—')}</div><div class="go-guest-sub">${esc(r.source||r.channel||'')}</div></div>
+      <div class="go-dates">${esc(datesStr(r,sub))}</div>
+      <div class="go-contact">${contactDisplay(r)}</div>
+      <div><span class="go-pill ${cls}">${label}</span></div>
+      ${actionsHtml(r,sub)}
+    </div>`;
   }
 
-  html+=`<div class="card" style="margin-bottom:16px;">
-    <div class="card-body" style="padding:12px 16px 14px;">
-      <div style="font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Reservation Lookup</div>
-      <input type="text" class="form-input" id="res-lookup-input" placeholder="Search by guest name..." oninput="window.resLookupSearch()" autocomplete="off" style="width:100%;box-sizing:border-box;font-size:16px;margin-bottom:0;">
-      <div id="res-lookup-results" style="display:none;margin-top:8px;border-radius:12px;overflow:hidden;border:1px solid var(--border);width:100%;box-sizing:border-box;"></div>
-    </div>
-  </div>`;
-  if(!recent.length){
-    html+=`<div style="text-align:center;padding:3rem;color:var(--hint);">
-      <div style="font-size:32px;margin-bottom:12px;">👤</div>
-      <div style="font-size:14px;font-weight:500;color:var(--muted);">No guest registrations yet</div>
-    </div>`;
-  } else {
-    const oldCount=guestData.filter(g=>{const sub=g.submittedAt?.toDate?g.submittedAt.toDate():null;return sub&&(new Date()-sub)>7*24*60*60*1000;}).length;
-    html+=`<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;">
-      <button class="btn btn-sm" onclick="window.cleanDuplicateGuests()">🔁 Clean duplicates</button>
-      <button class="btn btn-red btn-sm" onclick="window.deleteOldGuests()"${!oldCount?' disabled':''}>🗑 Delete old (${oldCount})</button>
-    </div>`;
-    html+=`<div class="card"><div class="card-body" style="padding:0;">`;
-    recent.forEach(g=>{
-      const apt=APARTMENTS.find(a=>a.id===g.aptId);
-      const _gres=g.matchedReservationId?(_resCache||[]).find(r=>r.id===g.matchedReservationId):null;
-      const _curRoom=_gres?.roomCode||null;
-      const _isMoved=!!(_curRoom&&_curRoom!==g.aptId);
-      const _curApt=_isMoved?APARTMENTS.find(a=>a.id===_curRoom):null;
-      const displayName=resolveDisplayName(g)||'—';
-      // Fix 4: status from guestStatus helper (Tbilisi time, hk_status, configurable hour)
-      const {label:statusLabel,cls:statusCls}=guestStatus(g);
-      const submittedAt=g.submittedAt?.toDate?g.submittedAt.toDate():null;
-      const timeStr=submittedAt?submittedAt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+submittedAt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
-      const sr=g.passportScanResult;
-      const hasScan=sr&&Object.keys(sr).length>0;
-      const adminApproved=hasScan&&sr.overrideByAdmin===true;
-      const badPassport=hasScan&&sr.valid===false&&!adminApproved;
-      const passportBadge=!hasScan
-        ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);">NO SCAN</span>`
-        :(sr.valid===false&&!adminApproved
-          ?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);" title="${esc(sr.reason||'')}">⚠ BAD ID</span>`
-          :`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">✓ ID OK</span>`);
-      const aiLabel=hasScan?(sr.isPassport===false?'not a passport':sr.valid===true?'valid':'suspicious'):null;
-      const passportStatus=hasScan?'<div style="font-size:11px;color:var(--muted);margin-top:3px;">AI: '+aiLabel+'</div>':'';
-      const ctIcon=g.contactType==='tg'
-        ?`<span style="font-size:9px;font-weight:700;color:#0088cc;background:#e8f5fe;border:1px solid #90cdf4;padding:1px 5px;border-radius:4px;">TG</span>`
-        :`<span style="font-size:9px;font-weight:700;color:#25D366;background:#f0fff4;border:1px solid #86efac;padding:1px 5px;border-radius:4px;">WA</span>`;
-      // type-aware contact link (wa → wa.me + WA Business, tg → t.me)
-      const rawDigits=(g.contact||'').replace(/\D/g,'');
+  const nonCancelled=res.filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
+  const arrivals=nonCancelled.filter(r=>r.checkin===today);
+  const departures=nonCancelled.filter(r=>r.checkout===today&&r.checkin!==today);
+  const inHouse=nonCancelled.filter(r=>r.checkin<today&&r.checkout>today);
+  const upcoming=nonCancelled.filter(r=>r.checkin>today&&r.checkin<=in7);
+  const pendingCount=arrivals.filter(r=>!getForm(r)).length;
+  const todayCount=arrivals.length+departures.length;
+  const inHouseCount=inHouse.length;
+  const upcomingCount=upcoming.length;
+  const failuresCount=searchFailures.length;
+
+  function badge(n,red){return`<span class="go-badge${red?' go-badge-red':''}">${n}</span>`;}
+  const t=_guestsTab;
+  function tabCls(id){return'go-tab'+(t===id?' active':'');}
+
+  const shownArrivals=_goPendingOnly?arrivals.filter(r=>!getForm(r)):arrivals;
+  const pendingBtnStyle=_goPendingOnly?'background:#111827;color:#fff;border-color:#111827;':'';
+
+  let tabContent='';
+  if(t==='today'){
+    const arrHtml=shownArrivals.length?shownArrivals.map(r=>tableRow(r,'arrival')).join(''):`<div class="go-empty">No arrivals today</div>`;
+    const depHtml=departures.length?departures.map(r=>tableRow(r,'departure')).join(''):`<div class="go-empty">No departures today</div>`;
+    tabContent=`
+      <div class="go-table-wrap"><div class="go-table-hd"><div class="go-table-title">Arrivals</div><div class="go-table-count">${shownArrivals.length} TODAY</div></div><div class="go-scroll">${colHeaders()}${arrHtml}</div></div>
+      <div class="go-table-wrap"><div class="go-table-hd"><div class="go-table-title">Departures</div><div class="go-table-count">${departures.length} TODAY</div></div><div class="go-scroll">${colHeaders()}${depHtml}</div></div>`;
+  }else if(t==='current'){
+    const rows=inHouse.length?inHouse.map(r=>tableRow(r,'inhouse')).join(''):`<div class="go-empty">No guests currently in-house</div>`;
+    tabContent=`<div class="go-table-wrap"><div class="go-table-hd"><div class="go-table-title">Currently In-House</div><div class="go-table-count">${inHouseCount} GUESTS</div></div><div class="go-scroll">${colHeaders()}${rows}</div></div>`;
+  }else if(t==='upcoming'){
+    const rows=upcoming.length?upcoming.map(r=>tableRow(r,'upcoming')).join(''):`<div class="go-empty">No arrivals in the next 7 days</div>`;
+    tabContent=`<div class="go-table-wrap"><div class="go-table-hd"><div class="go-table-title">Upcoming Arrivals</div><div class="go-table-count">NEXT 7 DAYS</div></div><div class="go-scroll">${colHeaders()}${rows}</div></div>`;
+  }else if(t==='failures'){
+    let rows=searchFailures.length?searchFailures.map(f=>{
+      const ts=f.timestamp?.toDate?f.timestamp.toDate():null;
+      const timeStr=ts?ts.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
+      const rawDigits=(f.input_contact||'').replace(/\D/g,'');
       const normDigits=rawDigits&&(rawDigits.length<11||rawDigits.startsWith('5'))?'995'+rawDigits:rawDigits;
-      const _stop='event.stopPropagation()';
-      const contactLink=normDigits&&g.contactType==='wa'
-        ?`<a href="https://wa.me/${normDigits}" target="_blank" rel="noopener" onclick="${_stop}">${esc(g.contact||'—')}</a>`+
-          `<a href="https://api.whatsapp.com/send?phone=${normDigits}" target="_blank" rel="noopener" onclick="${_stop}" style="font-size:10px;color:#25D366;font-weight:600;white-space:nowrap;text-decoration:none;border:1px solid #86efac;background:#f0fff4;border-radius:4px;padding:1px 5px;">WA Biz</a>`
-        :normDigits&&g.contactType==='tg'
-        ?`<a href="https://t.me/+${normDigits}" target="_blank" rel="noopener" onclick="${_stop}">${esc(g.contact||'—')}</a>`
-        :esc(g.contact||'—');
-      const passportThumb=g.passportUrl
-        ?`<a class="g-thumb" href="${esc(g.passportUrl)}" target="_blank" title="View passport" onclick="event.stopPropagation()" style="flex-shrink:0;cursor:pointer;"><img src="${esc(g.passportUrl)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:2px solid ${badPassport?'var(--red)':'var(--border)'};display:block;"></a>`
-        :`<div class="g-thumb" style="width:48px;height:48px;border-radius:6px;background:var(--surface2);flex-shrink:0;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;">📷</div>`;
-      const isBlocked=!!g.blocked;
-      const resNumShort=g.matchedReservationId?(g.matchedReservationId.length>8?'…'+g.matchedReservationId.slice(-6):g.matchedReservationId):'';
-      const blockedBadge=isBlocked?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);">BLOCKED</span>`:'';
-      const rowStyle=isBlocked?'background:#fff0f0;border-left:3px solid var(--red);':(badPassport?'background:var(--red-bg);border-left:3px solid var(--red);':'');
-      // Fix 3: entire card is clickable; action buttons stop propagation
-      html+=`<div class="guest-row" style="cursor:pointer;${rowStyle}" onclick="window.viewGuest('${g.id}')">
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
-            ${_isMoved
-              ?`<span class="guest-apt" style="opacity:.55;text-decoration:line-through;">${esc(apt?.code||g.aptId)}</span><span style="font-size:11px;color:var(--muted);padding:0 2px;">→</span><span class="guest-apt">${esc(_curApt?.code||_curRoom)}</span><span style="font-size:9px;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fde68a;padding:1px 5px;border-radius:4px;white-space:nowrap;">MOVED</span>`
-              :`<span class="guest-apt">${esc(apt?.code||g.aptId)}</span>`}
-            <span class="guest-name">${esc(displayName)}</span>
-            ${blockedBadge}
-            ${passportBadge}
-          </div>
-          ${passportStatus}
-          <div class="guest-meta">${g.guests||1} guest${(g.guests||1)>1?'s':''} · ${ctIcon} ${contactLink} · ${esc(g.arrivalDate||'—')} · ${timeStr}${resNumShort?' · #'+esc(resNumShort):''}</div>
-        </div>
-        ${passportThumb}
-        <span class="unlock-badge ${statusCls}">${statusLabel}</span>
-        <div class="guest-actions">
-          ${!g.manualUnlock?`<button class="btn btn-sm btn-green" onclick="event.stopPropagation();window.unlockGuest('${g.id}')">Unlock</button>`:''}
-          ${isBlocked
-            ?`<button class="btn btn-sm btn-green" onclick="event.stopPropagation();window.unblockGuest('${g.id}')">Unblock</button>`
-            :`<button class="btn btn-sm btn-red" onclick="event.stopPropagation();window.blockGuest('${g.id}')">Block</button>`}
-          <button class="btn btn-sm btn-red" onclick="event.stopPropagation();window.deleteGuest('${g.id}')">Delete</button>
-        </div>
+      const waMsg=encodeURIComponent(`Hi, I tried to check in online but couldn't find my booking. Name: ${f.input_name||'—'}, arrival: ${f.input_date||'—'}${f.input_booking_ref?', ref: '+f.input_booking_ref:''}.`);
+      const inputInfo=[f.input_name,f.input_booking_ref,f.input_date].filter(Boolean).join(' · ')||'(no input)';
+      const waLink=normDigits?`<a class="go-action" href="https://wa.me/${normDigits}?text=${waMsg}" target="_blank" rel="noopener">WhatsApp</a>`:'';
+      return`<div style="display:grid;grid-template-columns:1fr 150px 160px 120px 220px;min-width:850px;align-items:center;gap:12px;padding:14px 24px;border-bottom:1px solid #e5e7eb;transition:background .1s" onmouseover="this.style.background='#fafafa'" onmouseout="this.style.background=''">
+        <div style="font-size:13.5px;font-weight:600;color:#1f2937">"${esc(inputInfo)}"</div>
+        <div style="font-size:12.5px;color:#374151">${esc(timeStr)}</div>
+        <div style="font-size:12.5px;color:#374151;font-variant-numeric:tabular-nums">${esc(f.input_contact||'—')}</div>
+        <span class="go-pill go-pill-red">UNRESOLVED</span>
+        <div class="go-actions">${waLink}<button class="go-action go-btn-danger" onclick="window.resolveSearchFailure('${f.id}')">Mark Resolved</button></div>
       </div>`;
-    });
-    html+=`</div></div>`;
+    }).join(''):`<div class="go-empty">No unresolved search failures</div>`;
+    tabContent=`<div class="go-table-wrap"><div class="go-table-hd"><div class="go-table-title" style="color:#b91c1c">Unresolved Search Failures</div></div>
+      <div class="go-scroll">
+        <div style="display:grid;grid-template-columns:1fr 150px 160px 120px 220px;min-width:850px;gap:12px;padding:9px 24px;border-bottom:1px solid #e5e7eb;background:#fcfcfc"><div class="go-col-head">QUERY</div><div class="go-col-head">LOGGED</div><div class="go-col-head">CONTACT</div><div class="go-col-head">STATUS</div><div class="go-col-head" style="text-align:right">ACTIONS</div></div>
+        ${rows}
+      </div>
+    </div>`;
+  }else{
+    tabContent=`<div class="go-table-wrap"><div class="go-table-hd"><div class="go-table-title">Historical Stays Archive</div></div>
+      <div style="padding:16px 24px;">
+        <div style="margin-bottom:10px;"><input type="text" class="go-search" id="res-lookup-input" placeholder="Search by guest name..." oninput="window.resLookupSearch()" autocomplete="off" style="width:100%;max-width:400px;font-size:14px;"></div>
+        <div id="res-lookup-results" style="display:none;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;"></div>
+        <div style="margin-top:16px;color:#9ca3af;font-size:13px;">Use the search field above to locate past reservations by guest name.</div>
+      </div>
+    </div>`;
   }
-  html+='</div>';
-  document.getElementById('main').innerHTML=html;
+
+  const oldCount=guestData.filter(g=>{const sub=g.submittedAt?.toDate?g.submittedAt.toDate():null;return sub&&(new Date()-sub)>7*24*60*60*1000;}).length;
+
+  document.getElementById('main').innerHTML=`<div class="go-root page">
+    <header class="go-header">
+      <div><h1 class="go-title">Guest Operations</h1><p class="go-sub">Maxela Apartments — Front Desk &amp; Access Control</p></div>
+      <div class="go-header-actions">
+        <button class="go-btn" onclick="window.cleanDuplicateGuests()">Clean Duplicates</button>
+        <button class="go-btn go-btn-danger" onclick="window.deleteOldGuests()"${!oldCount?' disabled':''}>Delete Old (${oldCount})</button>
+      </div>
+    </header>
+    ${pendingCount>0?`<div class="go-banner"><div class="go-banner-text"><strong style="color:#b45309">${pendingCount} pending —</strong> today's arrivals haven't submitted their online check-in form.</div><button class="go-btn" style="${pendingBtnStyle}" onclick="window.goPendingFilter()">${_goPendingOnly?'Showing Missing Forms Only':'Show Missing Forms Only'}</button></div>`:''}
+    <nav class="go-inner-tabs">
+      <button class="${tabCls('today')}" onclick="window.switchGuestsTab('today')">Today's Schedule ${badge(todayCount)}</button>
+      <button class="${tabCls('current')}" onclick="window.switchGuestsTab('current')">Current Guests ${badge(inHouseCount)}</button>
+      <button class="${tabCls('upcoming')}" onclick="window.switchGuestsTab('upcoming')">Upcoming (7 Days) ${badge(upcomingCount)}</button>
+      <button class="${tabCls('failures')}" onclick="window.switchGuestsTab('failures')">Failed Searches ${badge(failuresCount,true)}</button>
+      <button class="${tabCls('archive')}" onclick="window.switchGuestsTab('archive')">Search Archive</button>
+    </nav>
+    ${tabContent}
+  </div>`;
 }
+
+window.switchGuestsTab=function(tab){
+  _guestsTab=tab;
+  renderGuests();
+};
+window.goPendingFilter=function(){
+  _goPendingOnly=!_goPendingOnly;
+  renderGuests();
+};
 
 // ── RESERVATION LOOKUP ────────────────────────────
 let _resCache=null;
@@ -982,10 +1106,10 @@ window.openAptDrawer=function(aptId){
   window._currentAptId=aptId;
   const d=aptData[aptId]||{};
 
-  // Mark sidebar card active
-  document.querySelectorAll('.apt-room-card').forEach(c=>c.classList.remove('active'));
-  const sidebarCard=document.getElementById('apt-card-'+aptId);
-  if(sidebarCard){sidebarCard.classList.add('active');sidebarCard.scrollIntoView({block:'nearest'});}
+  // Mark pill active
+  document.querySelectorAll('.apt-room-btn').forEach(c=>{c.classList.remove('active');const d=c.querySelector('.apt-dot');if(d){const parentAptId=c.id.replace('apt-pill-','');const pd=aptData[parentAptId]||{};const hasCode=!!(pd.tuyaDeviceId||pd.doorCode);d.style.background=hasCode?'#10b981':'#ef4444';}});
+  const pill=document.getElementById('apt-pill-'+aptId);
+  if(pill){pill.classList.add('active');const dot=pill.querySelector('.apt-dot');if(dot)dot.style.background='#fff';pill.scrollIntoView({block:'nearest',inline:'nearest'});}
 
   const photoCount=(d.photos||[]).length;
   const guestUrl=window.location.origin+window.location.pathname.replace('checkin-admin.html','')+'checkin-guest.html?apt='+aptId;
@@ -1018,17 +1142,8 @@ window.openAptDrawer=function(aptId){
 
   const editorEl=document.getElementById('aptEditor');
   if(!editorEl)return;
-  // Mobile: hide sidebar, reveal editor
-  const isMob=window.innerWidth<768;
-  if(isMob){
-    const sb=document.getElementById('aptSidebar');
-    if(sb)sb.classList.add('mob-hidden');
-    editorEl.classList.remove('mob-hidden');
-  }
-  const backBtn=isMob?`<button class="apt-back-btn" onclick="window.aptMobileBack()">← Back</button>`:'';
   editorEl.innerHTML=`
   <div class="apt-editor-content">
-    ${backBtn}
     <div class="apt-editor-header">
       <div>
         <div class="apt-editor-title">${esc(apt.code)}</div>
@@ -1143,15 +1258,6 @@ window.openAptDrawer=function(aptId){
     <div style="height:32px"></div>
   </div>`;
 }
-
-window.aptMobileBack=function(){
-  const sb=document.getElementById('aptSidebar');
-  const ed=document.getElementById('aptEditor');
-  if(sb)sb.classList.remove('mob-hidden');
-  if(ed)ed.classList.add('mob-hidden');
-  window._currentAptId=null;
-  document.querySelectorAll('.apt-room-card').forEach(c=>c.classList.remove('active'));
-};
 
 window.uploadVideo=async function(aptId,input){
   const file=input.files[0];if(!file)return;
@@ -1283,17 +1389,13 @@ window.saveAptData=async function(aptId){
     await setDoc(doc(db,'checkin_apartments',aptId),data);
     aptData[aptId]={...aptData[aptId],...data};
     toast('Saved ✓');
-    // Refresh sidebar pill states in place
+    // Refresh pill dot state in place
     const d=aptData[aptId];
-    const cardEl=document.getElementById('apt-card-'+aptId);
-    if(cardEl){
+    const pillEl=document.getElementById('apt-pill-'+aptId);
+    if(pillEl){
       const hasCode=!!(d.tuyaDeviceId||d.doorCode);
-      const hasInstructions=!!d.instructions;
-      const photoCount=(d.photos||[]).length;
-      cardEl.querySelector('.apt-room-pills').innerHTML=`
-        <span class="apt-pill ${hasCode?'apt-pill-ok':'apt-pill-err'}">${hasCode?'Code ✓':'No code'}</span>
-        <span class="apt-pill ${hasInstructions?'apt-pill-ok':'apt-pill-warn'}">${hasInstructions?'Steps ✓':'No steps'}</span>
-        <span class="apt-pill ${photoCount>0?'apt-pill-ok':'apt-pill-warn'}">${photoCount>0?photoCount+' photos':'No photos'}</span>`;
+      const dot=pillEl.querySelector('.apt-dot');
+      if(dot)dot.style.background=pillEl.classList.contains('active')?'#fff':(hasCode?'#10b981':'#ef4444');
     }
   }catch(e){toast('Failed to save');}
 }
@@ -1401,8 +1503,6 @@ window.resolveSearchFailure=async function(failureId){
     toast('Marked resolved ✓');
   }catch(e){toast('Failed: '+e.message);}
 }
-
-window.toggleFailedSearches=function(){_sfExpanded=!_sfExpanded;renderGuests();}
 
 function buildScanBadge(sr){
   if(!sr)return'';
@@ -2683,7 +2783,7 @@ window.setReqStatus=async function(id,status){
 
 function updateRequestsBadge(){
   const pending=reqData.filter(r=>(r.status||'PENDING')==='PENDING').length;
-  const btn=document.querySelector('.tab[data-tab="requests"]');
+  const btn=document.querySelector('.sidebar-item[data-tab="requests"]');
   if(!btn)return;
   const existing=btn.querySelector('.req-badge');
   if(existing)existing.remove();
@@ -2691,7 +2791,7 @@ function updateRequestsBadge(){
     const badge=document.createElement('span');
     badge.className='req-badge';
     badge.textContent=pending;
-    badge.style.cssText='display:inline-flex;align-items:center;justify-content:center;background:#ef4444;color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:50%;margin-left:6px;vertical-align:middle;padding:0 2px;';
+    badge.style.cssText='display:inline-flex;align-items:center;justify-content:center;background:#ef4444;color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:50%;margin-left:auto;padding:0 2px;';
     btn.appendChild(badge);
   }
 }
