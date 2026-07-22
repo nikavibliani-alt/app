@@ -339,7 +339,7 @@ async function render(){
       <div style="height:1px;background:#E0D8D0;margin:16px 0;"></div>
       <div id="elevator-expires" style="text-align:center;font-size:11px;color:#8C8C8A;margin-bottom:6px;min-height:16px;"></div>
       <div id="elevator-code-num" style="text-align:center;font-family:'Courier New',monospace;font-size:22px;color:#2C2C2A;letter-spacing:0.08em;margin-bottom:6px;min-height:28px;"></div>
-      <div style="text-align:center;font-size:10px;color:#8C8C8A;font-style:italic;">Use only on check-in and check-out day</div>
+      <div style="text-align:center;font-size:10px;color:#8C8C8A;font-style:italic;">If you're unable to scan the QR code, use the elevator code above instead.</div>
     </div>`;
   }
 
@@ -422,7 +422,7 @@ async function render(){
         }
         if(data.expires_at){
           const el=document.getElementById('elevator-expires');
-          if(el){const exp=new Date(parseInt(data.expires_at));el.textContent='Valid until '+exp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+          if(el){const exp=new Date(parseInt(data.expires_at));el.textContent='Code valid today · Changes daily at '+exp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
         }
         const displayCode=data.display_code||data.code||'';
         if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
