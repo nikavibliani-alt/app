@@ -898,6 +898,7 @@ function renderGuests(){
 
   function getForm(r){
     return guestData.find(g=>g.matchedReservationId===r.id)||
+           guestData.find(g=>g.matchedReservationId===r.reservationNumber)||
            guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||null;
   }
   function resStatusInfo(r){
@@ -921,16 +922,24 @@ function renderGuests(){
     if(sub==='departure')return`${ci} → Today`;
     return`${ci} → ${co} (${nLabel})`;
   }
-  function contactDisplay(r){
+  function resolvePhone(r){
     const form=getForm(r);
-    return esc(form?.contact||'—');
+    return(form?.contact||r.phone||r.guest_phone||r.guestPhone||'').trim()||null;
+  }
+  function normalizeWaPhone(raw){
+    if(!raw)return null;
+    const hasPlus=raw.startsWith('+');
+    const digits=(hasPlus?raw.slice(1):raw).replace(/\D/g,'');
+    if(!digits)return null;
+    // Georgian mobile: 9 digits starting with 5 → prepend 995
+    if(digits.length===9&&digits.startsWith('5'))return'995'+digits;
+    return digits;
+  }
+  function contactDisplay(r){
+    return esc(resolvePhone(r)||'—');
   }
   function waHref(r){
-    const form=getForm(r);
-    const raw=(form?.contact||'').replace(/\D/g,'');
-    if(!raw)return null;
-    const norm=raw.length<11||raw.startsWith('5')?'995'+raw:raw;
-    return'https://wa.me/'+norm;
+    return(n=>n?'https://wa.me/'+n:null)(normalizeWaPhone(resolvePhone(r)));
   }
   function actionsHtml(r,sub){
     const form=getForm(r);
@@ -1110,9 +1119,10 @@ window.goSearch=function(){
       return guestData.find(g=>g.matchedReservationId===r.id||g.matchedReservationId===r.reservationNumber)||
              guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||null;
     }
+    function resolveSearchPhone(r){const f=getSearchForm(r);return(f?.contact||r.phone||r.guest_phone||r.guestPhone||'').trim()||null;}
+    function waHrefS(r){const raw=resolveSearchPhone(r);if(!raw)return null;const hasPlus=raw.startsWith('+');const digits=(hasPlus?raw.slice(1):raw).replace(/\D/g,'');if(!digits)return null;const norm=digits.length===9&&digits.startsWith('5')?'995'+digits:digits;return'https://wa.me/'+norm;}
     function fmtD(s){if(!s)return'—';return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{month:'short',day:'numeric',year:'numeric'});}
     function nightsS(r){return Math.max(0,Math.round((new Date(r.checkout+'T00:00:00Z')-new Date(r.checkin+'T00:00:00Z'))/(864e5)));}
-    function waHrefS(form){const raw=(form?.contact||'').replace(/\D/g,'');if(!raw)return null;return'https://wa.me/'+(raw.length<11||raw.startsWith('5')?'995'+raw:raw);}
     const COLS='60px 1fr 150px 130px 210px';
     const colHead=`<div class="go-col-row" style="grid-template-columns:${COLS}"><div class="go-col-head">ROOM</div><div class="go-col-head">GUEST</div><div class="go-col-head">CONTACT</div><div class="go-col-head">STATUS</div><div class="go-col-head" style="text-align:right">ACTIONS</div></div>`;
     const rows=matched.map(r=>{
@@ -1125,13 +1135,13 @@ window.goSearch=function(){
       const ref=r.reservationNumber||r.bookingId||'';
       const src=r.source||r.channel||'';
       const srcLine=[src,ref?'#'+ref:''].filter(Boolean).join(' ');
-      const wa=waHrefS(form);
+      const wa=waHrefS(r);
       const waBtn=wa?`<a class="go-action" href="${wa}" target="_blank" rel="noopener">WhatsApp</a>`:`<button class="go-action" disabled style="opacity:.35;cursor:not-allowed;">WhatsApp</button>`;
       const detailsBtn=form?`<button class="go-action" onclick="window.viewGuest('${form.id}')">Details</button>`:'';
       return`<div class="go-row" style="grid-template-columns:${COLS}">
         <div class="go-room">${esc(r.roomCode||'—')}</div>
         <div style="min-width:0"><div class="go-guest-name">${esc(r.guest||'—')}</div>${srcLine?`<div class="go-guest-sub">${esc(srcLine)}</div>`:''}<div class="go-guest-dates">${esc(datesLine)}</div></div>
-        <div class="go-contact">${esc(form?.contact||'—')}</div>
+        <div class="go-contact">${esc(resolveSearchPhone(r)||'—')}</div>
         <div><span class="go-pill ${statusCls}">${statusLabel}</span></div>
         <div class="go-actions">${waBtn}${detailsBtn}</div>
       </div>`;
