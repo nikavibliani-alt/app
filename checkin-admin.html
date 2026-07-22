@@ -845,11 +845,21 @@ window.deleteOldGuests=async function(){
   }catch(e){toast('Delete failed: '+e.message);}
 };
 
+window.refreshGuestData=function(){
+  // Force re-fetch of reservations cache and re-render
+  _resCache=null;
+  _resLoading=false;
+  _loadResCache();
+  renderGuests();
+  toast('Refreshing…');
+};
+
 function resolveDisplayName(g){
   if(!g)return'';
-  if(/[a-zA-Z]/.test(g.name||''))return g.name||'';
+  // Use entered name if non-empty, regardless of script (Arabic, Georgian, Latin, etc.)
+  if((g.name||'').trim())return g.name.trim();
   const res=g.matchedReservationId?(_resCache||[]).find(r=>r.id===g.matchedReservationId):null;
-  return res?.guest||g.name||'';
+  return res?.guest||'';
 }
 
 function guestStatus(g){
@@ -1050,6 +1060,7 @@ function renderGuests(){
     <header class="go-header">
       <div><h1 class="go-title">Guest Operations</h1><p class="go-sub">Maxela Apartments — Front Desk &amp; Access Control</p></div>
       <div class="go-header-actions">
+        <button class="go-btn" onclick="window.refreshGuestData()">↻ Refresh</button>
         <button class="go-btn" onclick="window.cleanDuplicateGuests()">Clean Duplicates</button>
         <button class="go-btn go-btn-danger" onclick="window.deleteOldGuests()"${!oldCount?' disabled':''}>Delete Old (${oldCount})</button>
       </div>
