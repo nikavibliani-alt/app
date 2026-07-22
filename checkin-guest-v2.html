@@ -925,11 +925,8 @@ window.addEventListener('popstate',function(){
   _saveSession();
 });
 
-window.addEventListener('hashchange',function(){
-  if(window.location.hash==='#home'||window.location.hash===''){
-    _onReturnHome();
-  }
-});
+// hashchange removed — popstate already handles hash-based back-navigation.
+// Having both caused _onReturnHome() to fire twice per back-press, flickering the home screen.
 
 const T={
   en:{ac:'Access Code',vf:'Valid from',vt:'to',ttp:'Tap to copy',cp2:'Code generation pending — please contact host',chc:'Please contact host for your access code',
@@ -1001,6 +998,7 @@ let _hkTodayData=null; // null = not yet fetched
 let _hkFetching=false;
 let _unlockPollTimer=null; // 30s lightweight time-only re-check
 let _hkPollTimer=null;    // 60s Firestore HK fetch
+let _homeSnaps=[];        // unsubscribe fns for onSnapshot listeners registered in showHome()
 
 async function refreshHkToday(){
   if(_hkFetching||!aptId)return;
@@ -1269,18 +1267,22 @@ window.switchApt=async function(newRoomCode){
     const s=await getDoc(doc(db,'checkin_apartments',aptId));
     aptData=s.exists()?s.data():null;
   }catch(e){aptData=null;}
+  // Clear previous home listeners before subscribing for the new apt
+  _homeSnaps.forEach(unsub=>unsub());
+  _homeSnaps=[];
+
   renderGreetingApt();
   renderTiles();
   // Restart elevator subscription if this apt needs it
   if(needsElevatorCode()){
-    onSnapshot(doc(db,'globals','elevator_code'),snap=>{
+    _homeSnaps.push(onSnapshot(doc(db,'globals','elevator_code'),snap=>{
       elevatorData=snap.exists()?snap.data():null;
       renderTiles();
-    });
+    }));
   }
   // Restart reservation subscription for the new apt
   const today=new Date().toISOString().slice(0,10);
-  onSnapshot(
+  _homeSnaps.push(onSnapshot(
     query(collection(db,'reservations'),where('roomCode','==',aptId)),
     snap=>{
       const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
@@ -1291,7 +1293,7 @@ window.switchApt=async function(newRoomCode){
       activeReservation=sorted[0]||null;
       renderTiles();
     }
-  );
+  ));
 };
 
 async function finishRegistration_(bestRes,formData){
@@ -1573,6 +1575,11 @@ function showHome(){
     return;
   }
 
+  // Tear down any onSnapshot listeners from a previous showHome() call before
+  // registering new ones — prevents accumulation across logins / apt switches.
+  _homeSnaps.forEach(unsub=>unsub());
+  _homeSnaps=[];
+
   renderGreetingApt();
   document.getElementById('t-greeting-label').textContent=t('gl');
   renderTiles();
@@ -1580,27 +1587,27 @@ function showHome(){
   renderWhatYouBooked();
   renderPassportBanner();
   if(guestId){
-    onSnapshot(doc(db,'checkin_guests',guestId),snap=>{
+    _homeSnaps.push(onSnapshot(doc(db,'checkin_guests',guestId),snap=>{
       if(snap.exists()){
         guestData={...snap.data(),id:guestId};
         if(guestData.blocked===true){showBlockedScreen();return;}
         renderTiles();renderPassportBanner();
       }
-    });
-    onSnapshot(collection(db,'checkin_requests'),snap=>{
+    }));
+    _homeSnaps.push(onSnapshot(collection(db,'checkin_requests'),snap=>{
       myRequests=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.guestId===guestId);
-    });
+    }));
   }
   // Subscribe to elevator code for floors 6 & 7
   if(needsElevatorCode()){
-    onSnapshot(doc(db,'globals','elevator_code'),snap=>{
+    _homeSnaps.push(onSnapshot(doc(db,'globals','elevator_code'),snap=>{
       elevatorData=snap.exists()?snap.data():null;
-    });
+    }));
   }
   // Subscribe to reservations for this apartment — find the active one with a Tuya password
   if(aptId){
     const today=new Date().toISOString().slice(0,10);
-    onSnapshot(
+    _homeSnaps.push(onSnapshot(
       query(collection(db,'reservations'),where('roomCode','==',aptId)),
       snap=>{
         const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
@@ -1624,7 +1631,7 @@ function showHome(){
         }
         renderTiles();
       }
-    );
+    ));
   }
 }
 
@@ -2506,21 +2513,7 @@ async function init(){
     banner.style.cssText='position:fixed;top:0;left:0;width:100%;background:#2C2C2A;color:#fff;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;text-align:center;padding:6px 12px;z-index:9999;';
     banner.textContent='Preview Mode — '+previewApt;
     document.body.prepend(banner);
-    showHome();
-    // Subscribe to reservations so tiles render correctly
-    const today=new Date().toISOString().slice(0,10);
-    if(aptId){
-      onSnapshot(query(collection(db,'reservations'),where('roomCode','==',aptId)),snap=>{
-        const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
-        const matches=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>today;});
-        const withPw=matches.filter(r=>r.tuyaPassword);
-        activeReservation=(withPw.length?withPw:matches).sort((a,b)=>((a.checkin||a.checkIn||'')<(b.checkin||b.checkIn||''))?-1:1)[0]||null;
-        renderTiles();
-      });
-    }
-    if(needsElevatorCode()){
-      onSnapshot(doc(db,'globals','elevator_code'),snap=>{elevatorData=snap.exists()?snap.data():null;renderTiles();});
-    }
+    showHome(); // showHome() handles all onSnapshot subscriptions via _homeSnaps
     return;
   }
 
