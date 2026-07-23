@@ -999,6 +999,8 @@ let _hkFetching=false;
 let _unlockPollTimer=null; // 30s lightweight time-only re-check
 let _hkPollTimer=null;    // 60s Firestore HK fetch
 let _homeSnaps=[];        // unsubscribe fns for onSnapshot listeners registered in showHome()
+let _rtTimer=null;        // debounce timer for renderTiles — prevents DOM thrash from rapid snapshot fires
+let _homeLoading=false;   // guard: prevents concurrent showHome() invocations
 
 async function refreshHkToday(){
   if(_hkFetching||!aptId)return;
@@ -1588,7 +1590,13 @@ function showBlockedScreen(){
 }
 
 function showHome(){
-  if(guestData?.blocked===true){showBlockedScreen();return;}
+  if(_homeLoading)return;
+  _homeLoading=true;
+  // Tear down any listeners from a previous showHome() call — must happen before
+  // any early returns so stale snapshot listeners never accumulate.
+  _homeSnaps.forEach(u=>u());
+  _homeSnaps=[];
+  if(guestData?.blocked===true){_homeLoading=false;showBlockedScreen();return;}
   _showPage('page-home');
   const _guestName=allMatchedReservations[0]?.guest||activeReservation?.guest||(guestData?.name&&!/^\d+$/.test(guestData.name)?guestData.name:null)||'Guest';
   document.getElementById('home-guest-name').textContent=_guestName;
@@ -1607,13 +1615,8 @@ function showHome(){
         <div style="font-size:22px;font-weight:600;color:var(--ink);margin-bottom:10px;letter-spacing:-0.01em;">Thank you for staying with us!</div>
         <div style="font-size:15px;color:var(--muted);line-height:1.7;">Safe travels. We hope to see you again soon.</div>
       </div>`;
-    return;
+    _homeLoading=false;return;
   }
-
-  // Tear down any onSnapshot listeners from a previous showHome() call before
-  // registering new ones — prevents accumulation across logins / apt switches.
-  _homeSnaps.forEach(unsub=>unsub());
-  _homeSnaps=[];
 
   renderGreetingApt();
   document.getElementById('t-greeting-label').textContent=t('gl');
@@ -1668,9 +1671,17 @@ function showHome(){
       }
     ));
   }
+  _homeLoading=false;
 }
 
+// Debounced entry point — all callers go here. Coalesces rapid snapshot-triggered
+// calls into a single DOM update 50ms later, preventing tiles from being destroyed
+// mid-tap and becoming unclickable on mobile.
 function renderTiles(){
+  clearTimeout(_rtTimer);
+  _rtTimer=setTimeout(_renderTilesNow,50);
+}
+function _renderTilesNow(){
   if(_hkTodayData===null&&!_hkFetching)refreshHkToday(); // kick off first fetch if not started
   const u=isUnlocked();
   const _ARR=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
