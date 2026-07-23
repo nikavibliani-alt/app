@@ -1635,6 +1635,27 @@ function showHome(){
     _homeSnaps.push(onSnapshot(collection(db,'checkin_requests'),snap=>{
       myRequests=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.guestId===guestId);
     }));
+    // Watch the matched reservation by ID — catches room reassignments in real time
+    const _matchedResId=guestData?.matchedReservationId;
+    if(_matchedResId){
+      _homeSnaps.push(onSnapshot(doc(db,'reservations',_matchedResId),snap=>{
+        if(!snap.exists())return;
+        const _newRoom=snap.data().roomCode;
+        if(_newRoom&&_newRoom!==aptId){
+          console.log('[RoomFix] Real-time correction from',aptId,'to',_newRoom);
+          const _prev=aptId;
+          aptId=_newRoom;
+          guestData={...guestData,aptId:_newRoom};
+          localStorage.setItem('maxela_apt_id',_newRoom);
+          if(_prev)localStorage.removeItem('maxela_g_'+_prev);
+          setDoc(doc(db,'checkin_guests',guestId),{aptId:_newRoom},{merge:true}).catch(()=>{});
+          getDoc(doc(db,'checkin_apartments',_newRoom))
+            .then(s=>{if(s.exists())aptData=s.data();})
+            .catch(()=>{})
+            .finally(()=>{_homeLoading=false;showHome();});
+        }
+      }));
+    }
   }
   // Subscribe to elevator code for floors 6 & 7
   if(needsElevatorCode()){
@@ -2575,31 +2596,28 @@ async function init(){
       if(snap.exists()){
         guestId=savedGuest;guestData={...snap.data(),id:savedGuest};
         try{const as=await getDoc(doc(db,'checkin_apartments',aptId));if(as.exists())aptData=as.data();}catch(e){}
-        // If the reservation was moved to a different room after registration, update aptId
-        // before showHome() so the reservations subscription queries the correct roomCode.
+        // Always fetch the matched reservation to catch room reassignments done after check-in.
+        // Compare against BOTH localStorage aptId and guestData.aptId — correct if either mismatches.
         try{
           const _resId=guestData.matchedReservationId;
-          console.log('[RoomCheck] guestDoc aptId=', guestData.aptId, '| stored aptId=', aptId, '| matchedReservationId=', _resId);
           if(_resId){
             const _resSnap=await getDoc(doc(db,'reservations',_resId));
-            console.log('[RoomCheck] reservation exists=', _resSnap.exists(), '| reservation roomCode=', _resSnap.data()?.roomCode);
             if(_resSnap.exists()){
               const _newRoom=_resSnap.data().roomCode;
-              if(_newRoom&&_newRoom!==aptId){
-                console.log('[RoomCheck] Mismatch! Correcting aptId from', aptId, '→', _newRoom);
+              const _storedRoom=aptId;
+              const _guestDocRoom=guestData.aptId||'';
+              if(_newRoom&&(_newRoom!==_storedRoom||_newRoom!==_guestDocRoom)){
+                console.log('[RoomFix] Corrected from',_storedRoom||_guestDocRoom,'to',_newRoom);
+                if(_storedRoom&&_storedRoom!==_newRoom)localStorage.removeItem('maxela_g_'+_storedRoom);
                 aptId=_newRoom;
                 guestData={...guestData,aptId:_newRoom};
                 localStorage.setItem('maxela_apt_id',_newRoom);
                 try{const _as=await getDoc(doc(db,'checkin_apartments',_newRoom));if(_as.exists())aptData=_as.data();}catch(e){}
                 setDoc(doc(db,'checkin_guests',savedGuest),{aptId:_newRoom},{merge:true}).catch(()=>{});
-              }else{
-                console.log('[RoomCheck] Room matches — no correction needed');
               }
             }
-          }else{
-            console.log('[RoomCheck] No matchedReservationId — cannot auto-correct room');
           }
-        }catch(e){console.error('[RoomCheck] Error during room check:', e);}
+        }catch(e){console.error('[RoomFix] Error during room check:',e);}
         document.getElementById('loading').style.display='none';
         document.getElementById('app').style.display='block';
         showHome();

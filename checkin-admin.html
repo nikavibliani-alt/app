@@ -1782,10 +1782,39 @@ window.viewGuest=function(guestId){
       </div>
     </div>
     ${passportHtml}
-    ${!g.manualUnlock?`<button class="btn btn-green" style="width:100%;margin-top:1rem;min-height:44px;" onclick="window.unlockGuest('${guestId}');closeDrawer()">Unlock check-in now</button>`:''}`;
+    ${!g.manualUnlock?`<button class="btn btn-green" style="width:100%;margin-top:1rem;min-height:44px;" onclick="window.unlockGuest('${guestId}');closeDrawer()">Unlock check-in now</button>`:''}
+    <hr style="margin:1.25rem 0;border:none;border-top:1px solid var(--border);">
+    <div class="form-group">
+      <div class="form-label">Change Room</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+        <select id="drawer-room-select" style="padding:8px 10px;border:1px solid var(--border);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--text);background:var(--surface);cursor:pointer;min-width:120px;min-height:38px;">
+          ${['0-1','0-2','0-3','0-4','0-5','6-1','6-2','6-3','6-4','7-1','7-2','7-4','tab-1','tab-2','tab-3','orb-1','orb-2','orb-3'].map(r=>`<option value="${r}"${r===(g.aptId||'')?` selected`:``}>${r}</option>`).join('')}
+        </select>
+        <button class="btn btn-primary" style="min-height:38px;padding:0 16px;" onclick="window.moveGuest('${guestId}')">Move Guest</button>
+      </div>
+    </div>`;
   document.getElementById('drawer-footer').innerHTML=`<button style="flex:1;padding:10px 20px;border-radius:8px;background:#ffffff;color:#374151;border:1px solid #e5e7eb;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;min-height:44px;" onclick="closeDrawer()">Close</button>`;
   openDrawer();
 }
+
+window.moveGuest=async function(guestId){
+  const newRoom=document.getElementById('drawer-room-select')?.value;
+  if(!newRoom)return;
+  const g=guestData.find(x=>x.id===guestId);
+  if(!g)return;
+  if(newRoom===g.aptId){toast('Already in room '+newRoom);return;}
+  try{
+    await setDoc(doc(db,'checkin_guests',guestId),{aptId:newRoom},{merge:true});
+    if(g.matchedReservationId){
+      await updateDoc(doc(db,'reservations',g.matchedReservationId),{roomCode:newRoom,manualRoom:true});
+    }
+    toast('Guest moved to '+newRoom);
+    window.viewGuest(guestId);
+  }catch(e){
+    console.error('[MoveGuest] Error:',e);
+    toast('Error: '+e.message);
+  }
+};
 
 // ── GUEST PAGE SETTINGS ───────────────────────────
 async function loadGuestSettings(){
