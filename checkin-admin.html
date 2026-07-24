@@ -968,12 +968,20 @@ function renderGuests(){
     if(digits.length===9&&digits.startsWith('5'))return'995'+digits;
     return digits;
   }
-  function buildWaUrl(phone,guestName,hasForm){
+  function buildWaUrl(phone,guestName,hasForm,roomCode){
     if(!phone)return null;
     const base='https://wa.me/'+phone;
     if(hasForm)return base; // existing form → plain chat, no pre-fill
     const firstName=(guestName||'').split(/\s+/)[0]||'';
-    const msg='Hello '+firstName+',\n\nWelcome to Maxela Apartments! 🏠\n\nTo access your check-in instructions, door code, WiFi details, and our services, please complete your online check-in:\n\n👉 https://app.maxelaapartments.com/checkin-guest.html\n\nIt only takes 2 minutes. Once completed, everything you need for your stay will be available instantly.\n\nLooking forward to welcoming you!\nMaxela Apartments Team';
+    const rc=(roomCode||'').toLowerCase();
+    let msg;
+    if(rc.startsWith('tab-')){
+      msg='Hello '+firstName+',\n\nWelcome to Freedom Square Studios!\n\nTo access your check-in instructions, door code and WiFi details, please complete your online check-in:\n\nhttps://app.maxelaapartments.com/checkin-guest.html\n\nIt only takes 2 minutes. Once completed, everything you need for your stay will be available instantly.\n\nLooking forward to welcoming you!\nFreedom Square Studios Team';
+    }else if(rc.startsWith('orb-')){
+      msg='Hello '+firstName+',\n\nWelcome to Midamo Orbeliani!\n\nTo access your check-in instructions and WiFi details, please complete your online check-in:\n\nhttps://app.maxelaapartments.com/checkin-guest.html\n\nIt only takes 2 minutes.\n\nLooking forward to welcoming you!\nMidamo Orbeliani Team';
+    }else{
+      msg='Hello '+firstName+',\n\nWelcome to Maxela Apartments! 🏠\n\nTo access your check-in instructions, door code, WiFi details, and our services, please complete your online check-in:\n\n👉 https://app.maxelaapartments.com/checkin-guest.html\n\nIt only takes 2 minutes. Once completed, everything you need for your stay will be available instantly.\n\nLooking forward to welcoming you!\nMaxela Apartments Team';
+    }
     return base+'?text='+encodeURIComponent(msg);
   }
   function contactDisplay(r){
@@ -984,7 +992,7 @@ function renderGuests(){
     const {label}=resStatusInfo(r);
     const phone=normalizeWaPhone(resolvePhone(r));
     const guestName=_stripRoomNum(r.guest||'');
-    const wa=buildWaUrl(phone,guestName,!!form);
+    const wa=buildWaUrl(phone,guestName,!!form,r.roomCode);
     const waBtn=wa
       ?`<a class="go-action" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`
       :`<button class="go-action" disabled style="opacity:.35;cursor:not-allowed;" onclick="event.stopPropagation()">WhatsApp</button>`;
@@ -1054,7 +1062,7 @@ function renderGuests(){
     const {label,cls}=groupStatusInfo(grp);
     const rawPhone=(form?.contact||grp.reduce((p,r)=>p||r.phone||r.guest_phone||r.guestPhone||'','')||'').trim();
     const phoneNorm=normalizeWaPhone(rawPhone||null);
-    const wa=buildWaUrl(phoneNorm,name,label!=='NO FORM');
+    const wa=buildWaUrl(phoneNorm,name,label!=='NO FORM',grp[0].roomCode);
     const waBtn=wa
       ?`<a class="go-action" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`
       :`<button class="go-action" disabled style="opacity:.35;cursor:not-allowed;" onclick="event.stopPropagation()">WhatsApp</button>`;
