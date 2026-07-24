@@ -1006,7 +1006,7 @@ function renderGuests(){
     return`<div class="go-row" style="grid-template-columns:${COLS}" ${clickAttr}>
       <div class="go-room">${esc(r.roomCode||r.room||'—')}</div>
       <div style="min-width:0">
-        <div class="go-guest-name">${esc(r.guest||'—')}${multiRoomBadge}</div>
+        <div class="go-guest-name">${esc(_stripRoomNum(r.guest||'')||'—')}${multiRoomBadge}</div>
         ${sourceLine?`<div class="go-guest-sub">${esc(sourceLine)}</div>`:''}
         <div class="go-guest-dates">${esc(datesStr(r,sub))}</div>
       </div>
@@ -1735,6 +1735,23 @@ function _guestGroup(g){
   }
   return group;
 }
+// Find all reservations in _resCache belonging to the same multi-room booking as g.
+// Uses same 3 methods as _guestGroup but operates on _resCache (reservations) not guestData.
+function _siblingRes(g){
+  const gRes=g.matchedReservationId?(_resCache||[]).find(r=>r.id===g.matchedReservationId):null;
+  const gCleanName=_stripRoomNum(gRes?.guest||g.nameRoman||g.name||'').toLowerCase();
+  const gCheckin=g.arrivalDate||gRes?.checkin||'';
+  const gBaseId=_baseResId(g.matchedReservationId);
+  const gBaseNum=_baseResNum(g);
+  return(_resCache||[]).filter(r=>{
+    if((r.status||'').toUpperCase()==='CANCELLED')return false;
+    if(gBaseId&&gBaseId.length>=4&&_baseResId(r.id)===gBaseId)return true;
+    const rBaseNum=(r.reservationNumber||'').replace(/_\d{3,4}$/,'');
+    if(gBaseNum&&gBaseNum.length>=4&&rBaseNum===gBaseNum)return true;
+    const rClean=_stripRoomNum(r.guest||'').toLowerCase();
+    return gCleanName&&gCleanName.length>3&&rClean===gCleanName&&gCheckin&&r.checkin===gCheckin;
+  });
+}
 let _drawerPrimaryId=null; // tracks which guestId last opened the drawer
 
 window.lockGuest=async function(guestId){
@@ -1766,11 +1783,17 @@ window.lockRoomDrawer=async function(docId){
 window.deleteGuestGroup=async function(primaryId){
   const primary=guestData.find(x=>x.id===primaryId);if(!primary)return;
   const group=_guestGroup(primary);
+  // Also find forms linked to sibling reservations (handles case where only one doc exists)
+  const sibs=_siblingRes(primary);
+  const extraForms=sibs.flatMap(r=>
+    guestData.filter(x=>x.matchedReservationId===r.id||(x.aptId===r.roomCode&&x.arrivalDate===r.checkin))
+  );
+  const allIds=[...new Set([...group.map(x=>x.id),...extraForms.map(x=>x.id)])];
   const displayName=resolveDisplayName(primary)||'this guest';
-  const suffix=group.length>1?` (${group.length} linked check-in records — all rooms)`:'';
+  const suffix=allIds.length>1?` (${allIds.length} linked check-in records — all rooms)`:'';
   if(!confirm(`Delete this check-in entry${suffix} for ${displayName}? This cannot be undone.`))return;
   try{
-    await Promise.all(group.map(x=>deleteDoc(doc(db,'checkin_guests',x.id))));
+    await Promise.all(allIds.map(id=>deleteDoc(doc(db,'checkin_guests',id))));
     toast('Deleted ✓');
     _drawerPrimaryId=null;
     closeDrawer();
@@ -1781,7 +1804,8 @@ window.viewGuest=function(guestId){
   const g=guestData.find(x=>x.id===guestId);if(!g)return;
   _drawerPrimaryId=guestId;
   const group=_guestGroup(g);
-  const isMulti=group.length>1;
+  const sibRes=_siblingRes(g);
+  const isMulti=group.length>1||sibRes.length>1;
 
   const displayName=resolveDisplayName(g)||'—';
   const {label:statusLabel,cls:statusCls}=guestStatus(g);
@@ -1846,9 +1870,31 @@ window.viewGuest=function(guestId){
 
   if(isMulti){
     // ── MERGED MULTI-ROOM VIEW ────────────────────────────────────────────
-    const roomCodes=group.map(x=>{const a=APARTMENTS.find(a=>a.id===x.aptId);return a?.code||x.aptId;}).join(' · ');
+    // Use sibling reservations (from _resCache) as the room list when available —
+    // this handles the case where only one checkin_guests doc exists for a multi-room booking.
+    const useResRooms=sibRes.length>1;
+    const roomCodes=useResRooms
+      ?sibRes.map(r=>r.roomCode).join(' · ')
+      :group.map(x=>{const a=APARTMENTS.find(a=>a.id===x.aptId);return a?.code||x.aptId;}).join(' · ');
     document.getElementById('drawer-title').textContent='Guest — '+roomCodes;
-    const perRoomRows=group.map(x=>{
+    const perRoomRows=(useResRooms?sibRes.map(r=>{
+      // Find matching checkin_guests doc for this room (may not exist)
+      const form=guestData.find(x=>x.matchedReservationId===r.id)||
+                 guestData.find(x=>x.aptId===r.roomCode&&x.arrivalDate===r.checkin)||null;
+      const {label:sLabel,cls:sCls}=form?guestStatus(form):{label:'No form',cls:'waiting'};
+      const accessBtn=form
+        ?(form.manualUnlock
+          ?`<button class="btn btn-sm btn-red" style="flex-shrink:0;" onclick="window.lockRoomDrawer('${form.id}')">Lock</button>`
+          :`<button class="btn btn-sm btn-green" style="flex-shrink:0;" onclick="window.unlockRoomDrawer('${form.id}')">Unlock</button>`)
+        :'';
+      return`<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface2);border-radius:var(--rs);margin-bottom:6px;">
+        <div style="flex:1;min-width:0;">
+          <span style="font-weight:700;font-size:13px;font-family:'DM Mono',monospace;">${esc(r.roomCode)}</span>
+        </div>
+        <span class="unlock-badge ${sCls}" style="flex-shrink:0;">${sLabel}</span>
+        ${accessBtn}
+      </div>`;
+    }):group.map(x=>{
       const apt=APARTMENTS.find(a=>a.id===x.aptId);
       const {label:sLabel,cls:sCls}=guestStatus(x);
       const accessBtn=x.manualUnlock
@@ -1862,7 +1908,7 @@ window.viewGuest=function(guestId){
         <span class="unlock-badge ${sCls}" style="flex-shrink:0;">${sLabel}</span>
         ${accessBtn}
       </div>`;
-    }).join('');
+    })).join('');
     document.getElementById('drawer-body').innerHTML=`
       <div class="form-group">
         <div class="form-label">Full name</div>

@@ -1293,10 +1293,14 @@ window.switchApt=async function(newRoomCode){
   aptId=newRoomCode;
   _hkTodayData=null; // reset HK cache for new apt
   // Pin activeReservation to the selected apt — prefer upcoming/current, fall back to any match
-  const _swToday=new Date().toISOString().slice(0,10);
+  const _swToday=tbilisiToday();
   const _swCandidates=allMatchedReservations.filter(r=>r.roomCode===newRoomCode&&(r.status||'').toUpperCase()!=='CANCELLED');
-  const _swUpcoming=_swCandidates.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=_swToday;});
-  activeReservation=(_swUpcoming.length?_swUpcoming:_swCandidates).sort((a,b)=>{const ca=a.checkin||a.checkIn||'',cb=b.checkin||b.checkIn||'';return ca<cb?-1:ca>cb?1:0;})[0]||null;
+  const _swValid=_swCandidates.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=_swToday;});
+  const _swCurrent=_swValid.filter(r=>{const ci=r.checkin||r.checkIn||'';return ci&&ci<=_swToday;});
+  const _swUpcoming=_swValid.filter(r=>{const ci=r.checkin||r.checkIn||'';return !ci||ci>_swToday;});
+  const _swPool=(_swCurrent.length?_swCurrent:_swUpcoming.length?_swUpcoming:_swCandidates);
+  activeReservation=_swPool.sort((a,b)=>{const ca=a.checkin||a.checkIn||'',cb=b.checkin||b.checkIn||'';return ca<cb?-1:ca>cb?1:0;})[0]||null;
+  console.log('[ResvSelect] switchApt selected:',activeReservation?.checkin,activeReservation?.checkout,activeReservation?.roomCode);
   localStorage.setItem('maxela_apt_id',aptId);
   try{
     const s=await getDoc(doc(db,'checkin_apartments',aptId));
@@ -1316,16 +1320,20 @@ window.switchApt=async function(newRoomCode){
     }));
   }
   // Restart reservation subscription for the new apt
-  const today=new Date().toISOString().slice(0,10);
   _homeSnaps.push(onSnapshot(
     query(collection(db,'reservations'),where('roomCode','==',aptId)),
     snap=>{
+      const today=tbilisiToday();
       const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
-      // Include upcoming reservations (checkin in future) and current stays
-      const matches=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>today;});
-      const withPw=matches.filter(r=>r.tuyaPassword);
-      const sorted=(withPw.length?withPw:matches).sort((a,b)=>((a.checkin||a.checkIn||'')<(b.checkin||b.checkIn||''))?-1:1);
-      activeReservation=sorted[0]||null;
+      const valid=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=today;});
+      const current=valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return ci&&ci<=today;});
+      const upcoming=valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return !ci||ci>today;});
+      function pickBest(pool){
+        const withPw=pool.filter(r=>r.tuyaPassword);
+        return(withPw.length?withPw:pool).sort((a,b)=>((a.checkin||a.checkIn||'')<(b.checkin||b.checkIn||''))?-1:1)[0]||null;
+      }
+      activeReservation=pickBest(current)||pickBest(upcoming);
+      console.log('[ResvSelect] Selected:',activeReservation?.checkin,activeReservation?.checkout,activeReservation?.roomCode);
       renderTiles();
     }
   ));
@@ -1692,29 +1700,33 @@ function showHome(){
   }
   // Subscribe to reservations for this apartment — find the active one with a Tuya password
   if(aptId){
-    const today=new Date().toISOString().slice(0,10);
     _homeSnaps.push(onSnapshot(
       query(collection(db,'reservations'),where('roomCode','==',aptId)),
       snap=>{
+        const today=tbilisiToday();
         const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
-        // If guest has a matchedReservationId, pin to it only if it's current/upcoming
-        const matchedId=guestData?.matchedReservationId;
-        if(matchedId){
-          const matched=all.find(r=>r.id===matchedId);
-          const co=matched?.checkout||matched?.checkOut||'';
-          if(matched&&co>=today)activeReservation=matched;
-        }
-        if(!activeReservation){
-          // Pick nearest upcoming/current reservation — checkin closest to today, prefer one with tuyaPassword
-          const upcoming=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=today;});
-          const withPassword=upcoming.filter(r=>r.tuyaPassword);
-          const pool=withPassword.length?withPassword:upcoming;
-          activeReservation=pool.sort((a,b)=>{
-            const ca=a.checkin||a.checkIn||'';
-            const cb=b.checkin||b.checkIn||'';
+        // Never use a reservation where checkout is in the past
+        const valid=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=today;});
+        // Prefer: current stay (checkin <= today <= checkout), then upcoming (checkin > today)
+        const current=valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return ci&&ci<=today;});
+        const upcoming=valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return !ci||ci>today;});
+        function pickBest(pool){
+          const withPw=pool.filter(r=>r.tuyaPassword);
+          return(withPw.length?withPw:pool).sort((a,b)=>{
+            const ca=a.checkin||a.checkIn||'',cb=b.checkin||b.checkIn||'';
             return ca<cb?-1:ca>cb?1:0;
           })[0]||null;
         }
+        // If guest has a matchedReservationId, pin to it first (only if not expired)
+        const matchedId=guestData?.matchedReservationId;
+        let picked=null;
+        if(matchedId){
+          const matched=valid.find(r=>r.id===matchedId);
+          if(matched)picked=matched;
+        }
+        if(!picked)picked=pickBest(current)||pickBest(upcoming);
+        activeReservation=picked;
+        console.log('[ResvSelect] Selected:',activeReservation?.checkin,activeReservation?.checkout,activeReservation?.roomCode);
         renderTiles();
       }
     ));
