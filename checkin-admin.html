@@ -907,11 +907,30 @@ function renderGuests(){
   const in7=new Date(now.getTime()+7*24*3600*1000).toISOString().slice(0,10);
   const res=_resCache||[];
 
-  function getForm(r){
-    return guestData.find(g=>g.matchedReservationId===r.id)||
-           guestData.find(g=>g.matchedReservationId===r.reservationNumber)||
-           guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||null;
+  // Build cross-room form map: if a guest booked 2 rooms and only filled one form,
+  // we still want both reservation rows to show as filled.
+  const _formById=new Map(); // resId → form (direct matches)
+  for(const r of res){
+    if(_formById.has(r.id))continue;
+    const f=guestData.find(g=>g.matchedReservationId===r.id)||
+            guestData.find(g=>g.matchedReservationId===r.reservationNumber)||
+            guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||null;
+    if(f)_formById.set(r.id,f);
   }
+  // Cross-room pass: group by "same guest name + checkin date" → share form across rooms
+  const _byGuestCheckin=new Map();
+  for(const r of res){
+    const key=(r.guest||'').toLowerCase()+'|'+(r.checkin||'');
+    if(!_byGuestCheckin.has(key))_byGuestCheckin.set(key,[]);
+    _byGuestCheckin.get(key).push(r);
+  }
+  for(const group of _byGuestCheckin.values()){
+    if(group.length<2)continue;
+    const shared=group.reduce((f,r)=>f||_formById.get(r.id),null);
+    if(shared)for(const r of group)if(!_formById.has(r.id))_formById.set(r.id,shared);
+  }
+  function isMultiRoom(r){return(_byGuestCheckin.get((r.guest||'').toLowerCase()+'|'+(r.checkin||''))||[]).length>1;}
+  function getForm(r){return _formById.get(r.id)||null;}
   function resStatusInfo(r){
     const form=getForm(r);
     if(!form)return{label:'NO FORM',cls:'go-pill-pending'};
@@ -982,10 +1001,11 @@ function renderGuests(){
     const src=r.source||r.channel||'';
     const guestCnt=r.guests>1?` · ${r.guests} guests`:'';
     const sourceLine=src?(src+guestCnt):guestCnt.trim();
+    const multiRoomBadge=isMultiRoom(r)?`<span class="go-pill go-pill-info" style="font-size:9px;padding:1px 5px;margin-left:5px;vertical-align:middle;">MULTI-ROOM</span>`:'';
     return`<div class="go-row" style="grid-template-columns:${COLS}" ${clickAttr}>
       <div class="go-room">${esc(r.roomCode||r.room||'—')}</div>
       <div style="min-width:0">
-        <div class="go-guest-name">${esc(r.guest||'—')}</div>
+        <div class="go-guest-name">${esc(r.guest||'—')}${multiRoomBadge}</div>
         ${sourceLine?`<div class="go-guest-sub">${esc(sourceLine)}</div>`:''}
         <div class="go-guest-dates">${esc(datesStr(r,sub))}</div>
       </div>
@@ -1814,6 +1834,39 @@ window.moveGuest=async function(guestId){
     console.error('[MoveGuest] Error:',e);
     toast('Error: '+e.message);
   }
+};
+
+// ── ONE-TIME UTILITY: fix Nasir Mammadov missing 6-4 form ─────────────────
+// Call window.fixNasirMultiRoom() from browser console on the admin page.
+window.fixNasirMultiRoom=async function(){
+  try{
+    // Find Nasir's primary form (0-5 room)
+    const snap=await getDocs(collection(db,'checkin_guests'));
+    const primary=snap.docs.find(d=>{
+      const n=(d.data().name||d.data().nameRoman||'').toLowerCase();
+      return n.includes('nasir')&&(d.data().aptId==='0-5'||d.data().aptId==='0-4');
+    });
+    if(!primary){toast('Nasir primary doc not found');console.warn('fixNasirMultiRoom: primary not found');return;}
+    const pData=primary.data();
+    console.log('Found primary:',primary.id,pData);
+    // Find the 6-4 reservation for Nasir by guest name
+    await _loadResCache();
+    const res64=(_resCache||[]).find(r=>r.roomCode==='6-4'&&(r.guest||'').toLowerCase().includes('nasir'));
+    if(!res64){toast('6-4 reservation for Nasir not found');console.warn('fixNasirMultiRoom: 6-4 reservation not found');return;}
+    console.log('Found 6-4 reservation:',res64.id,res64);
+    // Create linked form doc for 6-4
+    const newId=`6-4_${pData.arrivalDate||Date.now()}`;
+    const newData={...pData,aptId:'6-4',matchedReservationId:res64.id,primaryGuestId:primary.id};
+    delete newData.id;
+    const ex=await getDoc(doc(db,'checkin_guests',newId));
+    if(ex.exists()){
+      await setDoc(doc(db,'checkin_guests',newId),{...newData,updatedAt:serverTimestamp()},{merge:true});
+    }else{
+      await setDoc(doc(db,'checkin_guests',newId),{...newData,submittedAt:serverTimestamp()});
+    }
+    toast('Created 6-4 form for Nasir: '+newId);
+    console.log('fixNasirMultiRoom: done →',newId);
+  }catch(e){toast('Error: '+e.message);console.error(e);}
 };
 
 // ── GUEST PAGE SETTINGS ───────────────────────────

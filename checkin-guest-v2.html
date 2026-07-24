@@ -1367,6 +1367,27 @@ async function finishRegistration_(bestRes,formData){
   localStorage.setItem('maxela_guest_id',guestId);
   localStorage.setItem('maxela_g_'+aptId,guestId);
   localStorage.setItem('maxela_all_res',JSON.stringify(allMatchedReservations));
+  // For multi-room bookings: save a linked form doc for every additional room
+  // so both rooms show as filled in admin without requiring a second form fill.
+  if(allMatchedReservations.length>1){
+    const otherRes=allMatchedReservations.filter(r=>
+      r.id!==bestRes?.id&&r.roomCode&&(r.status||'').toUpperCase()!=='CANCELLED'
+    );
+    for(const r of otherRes){
+      const _xApt=r.roomCode;
+      const _xArr=arrival||r.checkin||r.checkIn||'';
+      const _xId=`${_xApt}_${_xArr||Date.now()}`;
+      const _xData={...data,aptId:_xApt,matchedReservationId:r.id||null,primaryGuestId:guestId};
+      try{
+        const _xEx=await getDoc(doc(db,'checkin_guests',_xId));
+        if(_xEx.exists()){
+          await setDoc(doc(db,'checkin_guests',_xId),{..._xData,updatedAt:serverTimestamp()},{merge:true});
+        }else{
+          await setDoc(doc(db,'checkin_guests',_xId),{..._xData,submittedAt:serverTimestamp()});
+        }
+      }catch(e){console.warn('[MultiRoom] Failed to save extra form for',_xApt,e);}
+    }
+  }
   _pendingReg=null;_pendingMatches=[];
   toast(t('rg'),3000);
   showHome();
