@@ -1428,6 +1428,7 @@ window.searchReservation=async function(){
       ?await _getDocs(query(collection(db,'reservations'),where('roomCode','==',aptId)))
       :await _getDocs(collection(db,'reservations'));
     const allMatches=[];
+    const allScored=[];
     let _bestMatch=null,_bestScore=0;
     resSnap.forEach(d=>{
       const r={id:d.id,...d.data()};
@@ -1459,7 +1460,11 @@ window.searchReservation=async function(){
       }
       if(score>_bestScore){_bestScore=score;_bestMatch=r;}
       if(score>=3)allMatches.push({res:r,score});
+      allScored.push({guest:r.guest||r.guestName||'',room:r.roomCode||'',checkin:ci,score});
     });
+    console.log('Scored reservations:',allScored.map(r=>({name:r.guest,score:r.score})));
+    console.log('[DEBUG] input name:',JSON.stringify(name),'arrival:',arrival,'mode:',searchMode);
+    console.log('[DEBUG] total docs:',allScored.length,'matches (score>=3):',allMatches.length,'bestScore:',_bestScore,'bestMatch:',_bestMatch?.guest||'none');
     if(!allMatches.length){
       try{
         await addDoc(collection(db,'search_failures'),{
