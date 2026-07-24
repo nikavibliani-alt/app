@@ -854,13 +854,14 @@ window.refreshGuestData=function(){
   toast('Refreshing…');
 };
 
+function _stripRoomNum(s){return(s||'').replace(/\s+0\d+\s+/,' ').replace(/\s+/,' ').trim();}
+
 function resolveDisplayName(g){
   if(!g)return'';
-  // Prefer English reservation name (stored on registration) for admin clarity
-  if((g.nameRoman||'').trim())return g.nameRoman.trim();
-  if((g.name||'').trim())return g.name.trim();
+  if((g.nameRoman||'').trim())return _stripRoomNum(g.nameRoman.trim());
+  if((g.name||'').trim())return _stripRoomNum(g.name.trim());
   const res=g.matchedReservationId?(_resCache||[]).find(r=>r.id===g.matchedReservationId):null;
-  return res?.guest||'';
+  return _stripRoomNum(res?.guest||'');
 }
 
 function guestStatus(g){
@@ -920,7 +921,7 @@ function renderGuests(){
   // Cross-room pass: group by "same guest name + checkin date" → share form across rooms
   const _byGuestCheckin=new Map();
   for(const r of res){
-    const key=(r.guest||'').toLowerCase()+'|'+(r.checkin||'');
+    const key=_stripRoomNum(r.guest||'').toLowerCase()+'|'+(r.checkin||'');
     if(!_byGuestCheckin.has(key))_byGuestCheckin.set(key,[]);
     _byGuestCheckin.get(key).push(r);
   }
@@ -929,7 +930,7 @@ function renderGuests(){
     const shared=group.reduce((f,r)=>f||_formById.get(r.id),null);
     if(shared)for(const r of group)if(!_formById.has(r.id))_formById.set(r.id,shared);
   }
-  function isMultiRoom(r){return(_byGuestCheckin.get((r.guest||'').toLowerCase()+'|'+(r.checkin||''))||[]).length>1;}
+  function isMultiRoom(r){return(_byGuestCheckin.get(_stripRoomNum(r.guest||'').toLowerCase()+'|'+(r.checkin||''))||[]).length>1;}
   function getForm(r){return _formById.get(r.id)||null;}
   function resStatusInfo(r){
     const form=getForm(r);
@@ -1700,19 +1701,37 @@ window.closeImgLightbox=function(){
 };
 
 // ── Multi-room grouping helpers ──────────────────────────────────────────
-// Strip Booking.com sub-room suffix (_001, _002, _003) to get the base booking ID.
 function _baseResId(id){return(id||'').replace(/_\d{3,4}$/,'');}
-// Return all checkin_forms docs belonging to the same booking as g.
+function _baseResNum(g){
+  const res=g.matchedReservationId?(_resCache||[]).find(r=>r.id===g.matchedReservationId):null;
+  return(res?.reservationNumber||'').replace(/_\d{3,4}$/,'');
+}
 function _guestGroup(g){
-  const base=_baseResId(g.matchedReservationId);
+  const baseId=_baseResId(g.matchedReservationId);
+  const baseNum=_baseResNum(g);
+  const gRes=g.matchedReservationId?(_resCache||[]).find(r=>r.id===g.matchedReservationId):null;
+  const gCleanName=_stripRoomNum(gRes?.guest||g.nameRoman||g.name||'').toLowerCase();
+  const gCheckin=g.arrivalDate||gRes?.checkin||'';
   const seen=new Set([g.id]);
   const group=[g];
   for(const x of guestData){
     if(seen.has(x.id))continue;
-    const sameBase=base&&base.length>=4&&_baseResId(x.matchedReservationId)===base;
+    // Method A: base Firestore doc ID suffix
+    const sameBaseId=baseId&&baseId.length>=4&&_baseResId(x.matchedReservationId)===baseId;
+    // Method B: base reservationNumber from _resCache (handles _001/_002 suffix)
+    const xBaseNum=_baseResNum(x);
+    const sameBaseNum=baseNum&&baseNum.length>=4&&xBaseNum===baseNum;
+    // Method C: same stripped guest name + checkin date
+    const xRes=x.matchedReservationId?(_resCache||[]).find(r=>r.id===x.matchedReservationId):null;
+    const xCleanName=_stripRoomNum(xRes?.guest||x.nameRoman||x.name||'').toLowerCase();
+    const xCheckin=x.arrivalDate||xRes?.checkin||'';
+    const sameName=gCleanName&&gCleanName.length>3&&xCleanName===gCleanName;
+    const sameDate=gCheckin&&xCheckin&&gCheckin===xCheckin;
+    const sameNameDate=sameName&&sameDate;
+    // Method D: primaryGuestId links
     const linkedTo=x.primaryGuestId===g.id;
     const isLinkedFrom=g.primaryGuestId&&(x.id===g.primaryGuestId||x.primaryGuestId===g.primaryGuestId);
-    if(sameBase||linkedTo||isLinkedFrom){seen.add(x.id);group.push(x);}
+    if(sameBaseId||sameBaseNum||sameNameDate||linkedTo||isLinkedFrom){seen.add(x.id);group.push(x);}
   }
   return group;
 }
