@@ -960,25 +960,34 @@ function renderGuests(){
   function normalizeWaPhone(raw){
     if(!raw)return null;
     const hasPlus=raw.startsWith('+');
-    const digits=(hasPlus?raw.slice(1):raw).replace(/\D/g,'');
+    let digits=(hasPlus?raw.slice(1):raw).replace(/\D/g,'');
     if(!digits)return null;
+    // Strip international dialing prefix (00 → same as +)
+    if(digits.startsWith('00'))digits=digits.slice(2);
     // Georgian mobile: 9 digits starting with 5 → prepend 995
     if(digits.length===9&&digits.startsWith('5'))return'995'+digits;
     return digits;
   }
+  function buildWaUrl(phone,guestName,hasForm){
+    if(!phone)return null;
+    const base='https://wa.me/'+phone;
+    if(hasForm)return base; // existing form → plain chat, no pre-fill
+    const firstName=(guestName||'').split(/\s+/)[0]||'';
+    const msg='Hello '+firstName+',\n\nWelcome to Maxela Apartments! 🏠\n\nTo access your check-in instructions, door code, WiFi details, and our services, please complete your online check-in:\n\n👉 https://app.maxelaapartments.com/checkin-guest.html\n\nIt only takes 2 minutes. Once completed, everything you need for your stay will be available instantly.\n\nLooking forward to welcoming you!\nMaxela Apartments Team';
+    return base+'?text='+encodeURIComponent(msg);
+  }
   function contactDisplay(r){
     return esc(resolvePhone(r)||'—');
   }
-  function waHref(r){
-    return(n=>n?'https://wa.me/'+n:null)(normalizeWaPhone(resolvePhone(r)));
-  }
   function actionsHtml(r,sub){
     const form=getForm(r);
-    const wa=waHref(r);
+    const {label}=resStatusInfo(r);
+    const phone=normalizeWaPhone(resolvePhone(r));
+    const guestName=_stripRoomNum(r.guest||'');
+    const wa=buildWaUrl(phone,guestName,!!form);
     const waBtn=wa
       ?`<a class="go-action" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`
       :`<button class="go-action" disabled style="opacity:.35;cursor:not-allowed;" onclick="event.stopPropagation()">WhatsApp</button>`;
-    const {label}=resStatusInfo(r);
     let extra='';
     if(label==='AWAITING UNLOCK'&&form){
       extra=`<button class="go-action go-action-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Grant Access</button>`;
@@ -1044,7 +1053,8 @@ function renderGuests(){
     const clickAttr=form?`onclick="window.viewGuest('${form.id}')" style="cursor:pointer"`:'';
     const {label,cls}=groupStatusInfo(grp);
     const rawPhone=(form?.contact||grp.reduce((p,r)=>p||r.phone||r.guest_phone||r.guestPhone||'','')||'').trim();
-    const wa=(n=>n?'https://wa.me/'+n:null)(normalizeWaPhone(rawPhone||null));
+    const phoneNorm=normalizeWaPhone(rawPhone||null);
+    const wa=buildWaUrl(phoneNorm,name,label!=='NO FORM');
     const waBtn=wa
       ?`<a class="go-action" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`
       :`<button class="go-action" disabled style="opacity:.35;cursor:not-allowed;" onclick="event.stopPropagation()">WhatsApp</button>`;
