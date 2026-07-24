@@ -2096,6 +2096,8 @@ try{
 function fmtCheckinAvailable(res){
   const ci=(res||activeReservation)?.checkin||(res||activeReservation)?.checkIn||'';
   if(!ci)return '';
+  const today=tbilisiToday();
+  if(ci<today)return '';
   const p=ci.split('-');
   if(p.length<3)return ci;
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -2106,11 +2108,15 @@ function fmtCheckinAvailable(res){
 
 function openLocked(res){
   const r=res||activeReservation;
+  const dateStr=fmtCheckinAvailable(r);
+  const availMsg=dateStr
+    ?`Available from ${esc(dateStr)}`
+    :`Check-in instructions will be available on your check-in day from ${String(getCheckInHour()).padStart(2,'0')}:00`;
   _navToContent('wifi',t('tw'),`<div class="locked-card">
     <div class="lc-icon">🔒</div>
     <div class="lc-title">${t('lt')}</div>
     <div class="lc-sub" style="margin-bottom:0">${t('ls')}</div>
-    <div style="margin-top:14px;font-size:17px;font-weight:500;color:var(--ink);">Available from ${esc(fmtCheckinAvailable(r))}</div>
+    <div style="margin-top:14px;font-size:17px;font-weight:500;color:var(--ink);">${availMsg}</div>
   </div>`);
 }
 
