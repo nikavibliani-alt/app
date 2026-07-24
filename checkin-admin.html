@@ -1020,36 +1020,95 @@ function renderGuests(){
   function roomSortKey(r){const i=ROOM_ORDER.indexOf((r.roomCode||'').toLowerCase());return i>=0?i:ROOM_ORDER.length+(r.roomCode||'').toLowerCase();}
   function byRoom(a,b){const ka=roomSortKey(a),kb=roomSortKey(b);return ka<kb?-1:ka>kb?1:0;}
 
+  // Group reservations with the same base reservation number into one row
+  function groupByBaseNum(list){
+    const map=new Map();const order=[];
+    for(const r of list){
+      const base=(r.reservationNumber||r.id||'').replace(/_\d+$/,'');
+      if(!map.has(base)){map.set(base,[]);order.push(base);}
+      map.get(base).push(r);
+    }
+    return order.map(b=>map.get(b));
+  }
+  function groupStatusInfo(grp){
+    const forms=grp.map(r=>getForm(r));
+    if(forms.some(f=>!f))return{label:'NO FORM',cls:'go-pill-pending'};
+    if(forms.every(f=>guestStatus(f).cls==='unlocked'))return{label:'UNLOCKED',cls:'go-pill-confirmed'};
+    return{label:'AWAITING UNLOCK',cls:'go-pill-info'};
+  }
+  function mergedRow(grp,sub){
+    const sorted=[...grp].sort(byRoom);
+    const roomStr=sorted.map(r=>r.roomCode||r.room||'—').join(' · ');
+    const name=_stripRoomNum(grp[0].guest||'')||'—';
+    const form=grp.reduce((f,r)=>f||getForm(r),null);
+    const clickAttr=form?`onclick="window.viewGuest('${form.id}')" style="cursor:pointer"`:'';
+    const {label,cls}=groupStatusInfo(grp);
+    const rawPhone=(form?.contact||grp.reduce((p,r)=>p||r.phone||r.guest_phone||r.guestPhone||'','')||'').trim();
+    const wa=(n=>n?'https://wa.me/'+n:null)(normalizeWaPhone(rawPhone||null));
+    const waBtn=wa
+      ?`<a class="go-action" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`
+      :`<button class="go-action" disabled style="opacity:.35;cursor:not-allowed;" onclick="event.stopPropagation()">WhatsApp</button>`;
+    let extra='';
+    if(label==='AWAITING UNLOCK'&&form){
+      extra=`<button class="go-action go-action-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Grant Access</button>`;
+    }else if(sub!=='departure'&&form){
+      extra=`<button class="go-action" onclick="event.stopPropagation();window.viewGuest('${form.id}')">Details</button>`;
+    }
+    const src=grp[0].source||grp[0].channel||'';
+    const totalGuests=grp.reduce((s,r)=>s+(r.guests||1),0);
+    const guestCnt=totalGuests>1?` · ${totalGuests} guests`:'';
+    const sourceLine=src?(src+guestCnt):guestCnt.trim();
+    const multiRoomBadge=`<span class="go-pill go-pill-info" style="font-size:9px;padding:1px 5px;margin-left:5px;vertical-align:middle;">MULTI-ROOM</span>`;
+    return`<div class="go-row" style="grid-template-columns:${COLS}" ${clickAttr}>
+      <div class="go-room" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(roomStr)}</div>
+      <div style="min-width:0">
+        <div class="go-guest-name">${esc(name)}${multiRoomBadge}</div>
+        ${sourceLine?`<div class="go-guest-sub">${esc(sourceLine)}</div>`:''}
+        <div class="go-guest-dates">${esc(datesStr(grp[0],sub))}</div>
+      </div>
+      <div class="go-contact">${esc(rawPhone||'—')}</div>
+      <div><span class="go-pill ${cls}">${label}</span></div>
+      <div class="go-actions">${waBtn}${extra}</div>
+    </div>`;
+  }
+  function renderGroups(groups,sub){
+    return groups.map(g=>g.length>1?mergedRow(g,sub):tableRow(g[0],sub)).join('');
+  }
+
   const nonCancelled=res.filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
   const arrivals=nonCancelled.filter(r=>r.checkin===today).sort(byRoom);
   const departures=nonCancelled.filter(r=>r.checkout===today&&r.checkin!==today).sort(byRoom);
   const inHouse=nonCancelled.filter(r=>r.checkin<today&&r.checkout>today).sort(byRoom);
   const upcoming=nonCancelled.filter(r=>r.checkin>today&&r.checkin<=in7).sort(byRoom);
-  const pendingCount=arrivals.filter(r=>!getForm(r)).length;
-  const todayCount=arrivals.length+departures.length;
-  const inHouseCount=inHouse.length;
-  const upcomingCount=upcoming.length;
+  const arrivalGroups=groupByBaseNum(arrivals);
+  const departureGroups=groupByBaseNum(departures);
+  const inHouseGroups=groupByBaseNum(inHouse);
+  const upcomingGroups=groupByBaseNum(upcoming);
+  const pendingCount=arrivalGroups.filter(g=>g.some(r=>!getForm(r))).length;
+  const todayCount=arrivalGroups.length+departureGroups.length;
+  const inHouseCount=inHouseGroups.length;
+  const upcomingCount=upcomingGroups.length;
   const failuresCount=searchFailures.length;
 
   function badge(n,red){return`<span class="go-badge${red?' go-badge-red':''}">${n}</span>`;}
   const t=_guestsTab;
   function tabCls(id){return'go-tab'+(t===id?' active':'');}
 
-  const shownArrivals=_goPendingOnly?arrivals.filter(r=>!getForm(r)):arrivals;
+  const shownArrivalGroups=_goPendingOnly?arrivalGroups.filter(g=>g.some(r=>!getForm(r))):arrivalGroups;
   const pendingBtnStyle=_goPendingOnly?'background:#111827;color:#fff;border-color:#111827;':'';
 
   let tabContent='';
   if(t==='today'){
-    const arrHtml=shownArrivals.length?shownArrivals.map(r=>tableRow(r,'arrival')).join(''):`<div class="go-empty">No arrivals today</div>`;
-    const depHtml=departures.length?departures.map(r=>tableRow(r,'departure')).join(''):`<div class="go-empty">No departures today</div>`;
+    const arrHtml=shownArrivalGroups.length?renderGroups(shownArrivalGroups,'arrival'):`<div class="go-empty">No arrivals today</div>`;
+    const depHtml=departureGroups.length?renderGroups(departureGroups,'departure'):`<div class="go-empty">No departures today</div>`;
     tabContent=`
-      <div class="go-table-wrap"><div class="go-table-hd"><div class="go-table-title">Arrivals</div><div class="go-table-count">${shownArrivals.length} TODAY</div></div><div class="go-scroll">${colHeaders()}${arrHtml}</div></div>
-      <div class="go-table-wrap"><div class="go-table-hd"><div class="go-table-title">Departures</div><div class="go-table-count">${departures.length} TODAY</div></div><div class="go-scroll">${colHeaders()}${depHtml}</div></div>`;
+      <div class="go-table-wrap"><div class="go-table-hd"><div class="go-table-title">Arrivals</div><div class="go-table-count">${shownArrivalGroups.length} TODAY</div></div><div class="go-scroll">${colHeaders()}${arrHtml}</div></div>
+      <div class="go-table-wrap"><div class="go-table-hd"><div class="go-table-title">Departures</div><div class="go-table-count">${departureGroups.length} TODAY</div></div><div class="go-scroll">${colHeaders()}${depHtml}</div></div>`;
   }else if(t==='current'){
-    const rows=inHouse.length?inHouse.map(r=>tableRow(r,'inhouse')).join(''):`<div class="go-empty">No guests currently in-house</div>`;
+    const rows=inHouseGroups.length?renderGroups(inHouseGroups,'inhouse'):`<div class="go-empty">No guests currently in-house</div>`;
     tabContent=`<div class="go-table-wrap"><div class="go-table-hd"><div class="go-table-title">Currently In-House</div><div class="go-table-count">${inHouseCount} GUESTS</div></div><div class="go-scroll">${colHeaders()}${rows}</div></div>`;
   }else if(t==='upcoming'){
-    const rows=upcoming.length?upcoming.map(r=>tableRow(r,'upcoming')).join(''):`<div class="go-empty">No arrivals in the next 7 days</div>`;
+    const rows=upcomingGroups.length?renderGroups(upcomingGroups,'upcoming'):`<div class="go-empty">No arrivals in the next 7 days</div>`;
     tabContent=`<div class="go-table-wrap"><div class="go-table-hd"><div class="go-table-title">Upcoming Arrivals</div><div class="go-table-count">NEXT 7 DAYS</div></div><div class="go-scroll">${colHeaders()}${rows}</div></div>`;
   }else if(t==='failures'){
     let rows=searchFailures.length?searchFailures.map(f=>{
