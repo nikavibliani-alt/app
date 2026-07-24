@@ -1306,6 +1306,7 @@ window.switchApt=async function(newRoomCode){
     const s=await getDoc(doc(db,'checkin_apartments',aptId));
     aptData=s.exists()?s.data():null;
   }catch(e){aptData=null;}
+  console.log('[SwitchApt] Now showing room:',aptId,'aptData:',aptData?.wifiName);
   // Clear previous home listeners before subscribing for the new apt
   _homeSnaps.forEach(unsub=>unsub());
   _homeSnaps=[];
@@ -1319,10 +1320,13 @@ window.switchApt=async function(newRoomCode){
       renderTiles();
     }));
   }
-  // Restart reservation subscription for the new apt
+  // Restart reservation subscription for the new apt.
+  // Capture the room we subscribed for — if aptId changes again before this fires, ignore.
+  const _snapRoom=aptId;
   _homeSnaps.push(onSnapshot(
-    query(collection(db,'reservations'),where('roomCode','==',aptId)),
+    query(collection(db,'reservations'),where('roomCode','==',_snapRoom)),
     snap=>{
+      if(aptId!==_snapRoom)return; // user switched room again; stale snapshot, ignore
       const today=tbilisiToday();
       const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
       const valid=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=today;});
