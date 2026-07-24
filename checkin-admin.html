@@ -1699,18 +1699,82 @@ window.closeImgLightbox=function(){
   document.body.style.overflow='';
 };
 
+// ── Multi-room grouping helpers ──────────────────────────────────────────
+// Strip Booking.com sub-room suffix (_001, _002, _003) to get the base booking ID.
+function _baseResId(id){return(id||'').replace(/_\d{3,4}$/,'');}
+// Return all checkin_forms docs belonging to the same booking as g.
+function _guestGroup(g){
+  const base=_baseResId(g.matchedReservationId);
+  const seen=new Set([g.id]);
+  const group=[g];
+  for(const x of guestData){
+    if(seen.has(x.id))continue;
+    const sameBase=base&&base.length>=4&&_baseResId(x.matchedReservationId)===base;
+    const linkedTo=x.primaryGuestId===g.id;
+    const isLinkedFrom=g.primaryGuestId&&(x.id===g.primaryGuestId||x.primaryGuestId===g.primaryGuestId);
+    if(sameBase||linkedTo||isLinkedFrom){seen.add(x.id);group.push(x);}
+  }
+  return group;
+}
+let _drawerPrimaryId=null; // tracks which guestId last opened the drawer
+
+window.lockGuest=async function(guestId){
+  if(!confirm('Revoke check-in access for this room?'))return;
+  try{
+    await updateDoc(doc(db,'checkin_guests',guestId),{manualUnlock:false});
+    const g=guestData.find(x=>x.id===guestId);if(g)g.manualUnlock=false;
+    toast('Access revoked');
+    if(_drawerPrimaryId)window.viewGuest(_drawerPrimaryId);else closeDrawer();
+  }catch(e){toast('Failed: '+e.message);}
+};
+// Quiet unlock/lock for per-room rows in merged drawer — no confirm, refreshes drawer
+window.unlockRoomDrawer=async function(docId){
+  try{
+    await updateDoc(doc(db,'checkin_guests',docId),{manualUnlock:true,unlockedAt:serverTimestamp()});
+    const g=guestData.find(x=>x.id===docId);if(g)g.manualUnlock=true;
+    toast('Unlocked ✓');
+    if(_drawerPrimaryId)window.viewGuest(_drawerPrimaryId);
+  }catch(e){toast('Failed: '+e.message);}
+};
+window.lockRoomDrawer=async function(docId){
+  try{
+    await updateDoc(doc(db,'checkin_guests',docId),{manualUnlock:false});
+    const g=guestData.find(x=>x.id===docId);if(g)g.manualUnlock=false;
+    toast('Access revoked');
+    if(_drawerPrimaryId)window.viewGuest(_drawerPrimaryId);
+  }catch(e){toast('Failed: '+e.message);}
+};
+window.deleteGuestGroup=async function(primaryId){
+  const primary=guestData.find(x=>x.id===primaryId);if(!primary)return;
+  const group=_guestGroup(primary);
+  const displayName=resolveDisplayName(primary)||'this guest';
+  const suffix=group.length>1?` (${group.length} linked check-in records — all rooms)`:'';
+  if(!confirm(`Delete this check-in entry${suffix} for ${displayName}? This cannot be undone.`))return;
+  try{
+    await Promise.all(group.map(x=>deleteDoc(doc(db,'checkin_guests',x.id))));
+    toast('Deleted ✓');
+    _drawerPrimaryId=null;
+    closeDrawer();
+  }catch(e){toast('Delete failed: '+e.message);}
+};
+
 window.viewGuest=function(guestId){
   const g=guestData.find(x=>x.id===guestId);if(!g)return;
-  const apt=APARTMENTS.find(a=>a.id===g.aptId);
+  _drawerPrimaryId=guestId;
+  const group=_guestGroup(g);
+  const isMulti=group.length>1;
+
   const displayName=resolveDisplayName(g)||'—';
-  // Fix 4: status badge
   const {label:statusLabel,cls:statusCls}=guestStatus(g);
-  const sr=g.passportScanResult;
+  // Passport comes from whichever group member has one
+  const srDoc=group.find(x=>x.passportUrl)||g;
+  const sr=srDoc.passportScanResult;
   const badge=buildScanBadge(sr);
+  const passportGuestId=srDoc.id;
 
   const alertBtn=(sr&&sr.valid===false&&!sr?.overrideByAdmin)
     ?`<div style="margin-top:8px;padding:10px 12px;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--rs);font-size:12px;color:var(--amber);"><strong>AI reason:</strong> ${esc(sr.reason||'No reason given')}</div>
-      <button class="btn btn-amber btn-sm" style="margin-top:8px;width:100%;min-height:44px;" onclick="window.alertPassport('${guestId}')">⚠️ Send alert email</button>`
+      <button class="btn btn-amber btn-sm" style="margin-top:8px;width:100%;min-height:44px;" onclick="window.alertPassport('${passportGuestId}')">⚠️ Send alert email</button>`
     :'';
   const adminStatusHtml=sr?.overrideByAdmin===true
     ?`<div style="margin-top:8px;display:flex;align-items:center;gap:6px;"><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);">Admin: Approved ✓</span></div>`
@@ -1719,20 +1783,20 @@ window.viewGuest=function(guestId){
     :'';
   const passportActionBtns=sr
     ?`<div style="display:flex;gap:8px;margin-top:12px;">
-        <button class="btn btn-green" style="flex:1;min-height:44px;font-size:13px;" onclick="window.passportActionInDrawer('${guestId}',true)">✓ Approve</button>
-        <button class="btn btn-red" style="flex:1;min-height:44px;font-size:13px;" onclick="window.passportActionInDrawer('${guestId}',false)">✕ Reject</button>
+        <button class="btn btn-green" style="flex:1;min-height:44px;font-size:13px;" onclick="window.passportActionInDrawer('${passportGuestId}',true)">✓ Approve</button>
+        <button class="btn btn-red" style="flex:1;min-height:44px;font-size:13px;" onclick="window.passportActionInDrawer('${passportGuestId}',false)">✕ Reject</button>
       </div>`
     :'';
   const scanBlock=alertBtn+adminStatusHtml+passportActionBtns;
 
-  const passportHtml=g.passportUrl
+  const passportHtml=srDoc.passportUrl
     ?`<div class="form-group">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
           <div class="form-label" style="margin:0;">Passport photo</div>
           ${badge||'<span style="font-size:11px;color:var(--hint);">Not scanned</span>'}
         </div>
-        <div class="passport-full-wrap" onclick="window.openImgLightbox('${esc(g.passportUrl)}')">
-          <img src="${esc(g.passportUrl)}" class="passport-full-img" alt="Passport">
+        <div class="passport-full-wrap" onclick="window.openImgLightbox('${esc(srDoc.passportUrl)}')">
+          <img src="${esc(srDoc.passportUrl)}" class="passport-full-img" alt="Passport">
           <div class="passport-tap-hint">Tap to view full screen</div>
         </div>
         ${scanBlock}
@@ -1756,64 +1820,119 @@ window.viewGuest=function(guestId){
     ?submittedAt.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' '+submittedAt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
     :'—';
 
-  document.getElementById('drawer-title').textContent='Guest — '+(apt?.code||g.aptId);
-  document.getElementById('drawer-body').innerHTML=`
-    <div class="form-group">
-      <div class="form-label">Full name</div>
-      <div style="font-size:16px;font-weight:700;">${esc(displayName)}</div>
-    </div>
-    <div class="form-row">
+  // Shared footer with Delete + Close
+  const drawerFooter=`
+    <button style="padding:10px 14px;border-radius:8px;background:#fff;color:#b91c1c;border:1px solid #fecaca;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;min-height:44px;" onclick="window.deleteGuestGroup('${guestId}')">Delete</button>
+    <button style="flex:1;padding:10px 20px;border-radius:8px;background:#ffffff;color:#374151;border:1px solid #e5e7eb;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;min-height:44px;" onclick="closeDrawer()">Close</button>`;
+
+  if(isMulti){
+    // ── MERGED MULTI-ROOM VIEW ────────────────────────────────────────────
+    const roomCodes=group.map(x=>{const a=APARTMENTS.find(a=>a.id===x.aptId);return a?.code||x.aptId;}).join(' · ');
+    document.getElementById('drawer-title').textContent='Guest — '+roomCodes;
+    const perRoomRows=group.map(x=>{
+      const apt=APARTMENTS.find(a=>a.id===x.aptId);
+      const {label:sLabel,cls:sCls}=guestStatus(x);
+      const accessBtn=x.manualUnlock
+        ?`<button class="btn btn-sm btn-red" style="flex-shrink:0;" onclick="window.lockRoomDrawer('${x.id}')">Lock</button>`
+        :`<button class="btn btn-sm btn-green" style="flex-shrink:0;" onclick="window.unlockRoomDrawer('${x.id}')">Unlock</button>`;
+      return`<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface2);border-radius:var(--rs);margin-bottom:6px;">
+        <div style="flex:1;min-width:0;">
+          <span style="font-weight:700;font-size:13px;font-family:'DM Mono',monospace;">${esc(apt?.code||x.aptId)}</span>
+          <span style="font-size:11px;color:var(--muted);margin-left:6px;">${esc(apt?.name||'')}</span>
+        </div>
+        <span class="unlock-badge ${sCls}" style="flex-shrink:0;">${sLabel}</span>
+        ${accessBtn}
+      </div>`;
+    }).join('');
+    document.getElementById('drawer-body').innerHTML=`
       <div class="form-group">
-        <div class="form-label">Apartment</div>
-        <div style="font-weight:600;font-family:'DM Mono',monospace;">${esc(apt?.code||g.aptId||'—')}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(apt?.name||'')}</div>
+        <div class="form-label">Full name</div>
+        <div style="font-size:16px;font-weight:700;">${esc(displayName)}</div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <div class="form-label">Arrival date</div>
+          <div style="font-weight:600;">${esc(g.arrivalDate||'—')}</div>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Guests</div>
+          <div style="font-weight:600;">${g.guests||1} guest${(g.guests||1)>1?'s':''}</div>
+        </div>
       </div>
       <div class="form-group">
-        <div class="form-label">Reservation #</div>
-        <div style="font-weight:600;font-family:'DM Mono',monospace;font-size:12px;word-break:break-all;">${esc(g.matchedReservationId||'—')}</div>
+        <div class="form-label">Contact</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${ctIcon}${contactDisplay}</div>
       </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <div class="form-label">Arrival date</div>
-        <div style="font-weight:600;">${esc(g.arrivalDate||'—')}</div>
-      </div>
-      <div class="form-group">
-        <div class="form-label">Guests</div>
-        <div style="font-weight:600;">${g.guests||1} guest${(g.guests||1)>1?'s':''}</div>
-      </div>
-    </div>
-    <div class="form-group">
-      <div class="form-label">Contact</div>
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-        ${ctIcon}
-        ${contactDisplay}
-      </div>
-    </div>
-    ${g.nationality?`<div class="form-group"><div class="form-label">Nationality</div><div style="font-weight:500;">${esc(g.nationality)}</div></div>`:''}
-    <div class="form-row">
-      <div class="form-group">
-        <div class="form-label">Status</div>
-        <span class="unlock-badge ${statusCls}">${statusLabel}</span>
-      </div>
+      ${g.nationality?`<div class="form-group"><div class="form-label">Nationality</div><div style="font-weight:500;">${esc(g.nationality)}</div></div>`:''}
       <div class="form-group">
         <div class="form-label">Registered</div>
         <div style="font-size:12px;color:var(--muted);">${timeStr}</div>
       </div>
-    </div>
-    ${passportHtml}
-    ${!g.manualUnlock?`<button class="btn btn-green" style="width:100%;margin-top:1rem;min-height:44px;" onclick="window.unlockGuest('${guestId}');closeDrawer()">Unlock check-in now</button>`:''}
-    <hr style="margin:1.25rem 0;border:none;border-top:1px solid var(--border);">
-    <div class="form-group">
-      <div class="form-label">Change Room</div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;">
-        <select id="drawer-room-select" style="padding:8px 10px;border:1px solid var(--border);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--text);background:var(--surface);cursor:pointer;min-width:120px;min-height:38px;">
-          ${['0-1','0-2','0-3','0-4','0-5','6-1','6-2','6-3','6-4','7-1','7-2','7-4','tab-1','tab-2','tab-3','orb-1','orb-2','orb-3'].map(r=>`<option value="${r}"${r===(g.aptId||'')?` selected`:``}>${r}</option>`).join('')}
-        </select>
-        <button class="btn btn-primary" style="min-height:38px;padding:0 16px;" onclick="window.moveGuest('${guestId}')">Move Guest</button>
+      ${passportHtml}
+      <hr style="margin:1.25rem 0;border:none;border-top:1px solid var(--border);">
+      <div class="form-group">
+        <div class="form-label" style="margin-bottom:8px;">Rooms</div>
+        ${perRoomRows}
+      </div>`;
+  }else{
+    // ── SINGLE-ROOM VIEW ─────────────────────────────────────────────────
+    const apt=APARTMENTS.find(a=>a.id===g.aptId);
+    document.getElementById('drawer-title').textContent='Guest — '+(apt?.code||g.aptId);
+    document.getElementById('drawer-body').innerHTML=`
+      <div class="form-group">
+        <div class="form-label">Full name</div>
+        <div style="font-size:16px;font-weight:700;">${esc(displayName)}</div>
       </div>
-    </div>`;
-  document.getElementById('drawer-footer').innerHTML=`<button style="flex:1;padding:10px 20px;border-radius:8px;background:#ffffff;color:#374151;border:1px solid #e5e7eb;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;min-height:44px;" onclick="closeDrawer()">Close</button>`;
+      <div class="form-row">
+        <div class="form-group">
+          <div class="form-label">Apartment</div>
+          <div style="font-weight:600;font-family:'DM Mono',monospace;">${esc(apt?.code||g.aptId||'—')}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${esc(apt?.name||'')}</div>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Reservation #</div>
+          <div style="font-weight:600;font-family:'DM Mono',monospace;font-size:12px;word-break:break-all;">${esc(g.matchedReservationId||'—')}</div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <div class="form-label">Arrival date</div>
+          <div style="font-weight:600;">${esc(g.arrivalDate||'—')}</div>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Guests</div>
+          <div style="font-weight:600;">${g.guests||1} guest${(g.guests||1)>1?'s':''}</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Contact</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${ctIcon}${contactDisplay}</div>
+      </div>
+      ${g.nationality?`<div class="form-group"><div class="form-label">Nationality</div><div style="font-weight:500;">${esc(g.nationality)}</div></div>`:''}
+      <div class="form-row">
+        <div class="form-group">
+          <div class="form-label">Status</div>
+          <span class="unlock-badge ${statusCls}">${statusLabel}</span>
+        </div>
+        <div class="form-group">
+          <div class="form-label">Registered</div>
+          <div style="font-size:12px;color:var(--muted);">${timeStr}</div>
+        </div>
+      </div>
+      ${passportHtml}
+      ${!g.manualUnlock?`<button class="btn btn-green" style="width:100%;margin-top:1rem;min-height:44px;" onclick="window.unlockGuest('${guestId}');closeDrawer()">Unlock check-in now</button>`:''}
+      <hr style="margin:1.25rem 0;border:none;border-top:1px solid var(--border);">
+      <div class="form-group">
+        <div class="form-label">Change Room</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+          <select id="drawer-room-select" style="padding:8px 10px;border:1px solid var(--border);border-radius:var(--rs);font-size:13px;font-family:inherit;color:var(--text);background:var(--surface);cursor:pointer;min-width:120px;min-height:38px;">
+            ${['0-1','0-2','0-3','0-4','0-5','6-1','6-2','6-3','6-4','7-1','7-2','7-4','tab-1','tab-2','tab-3','orb-1','orb-2','orb-3'].map(r=>`<option value="${r}"${r===(g.aptId||'')?` selected`:``}>${r}</option>`).join('')}
+          </select>
+          <button class="btn btn-primary" style="min-height:38px;padding:0 16px;" onclick="window.moveGuest('${guestId}')">Move Guest</button>
+        </div>
+      </div>`;
+  }
+  document.getElementById('drawer-footer').innerHTML=drawerFooter;
   openDrawer();
 }
 
