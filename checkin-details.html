@@ -496,21 +496,35 @@ async function init(){
     return;
   }
 
-  // Read session from localStorage
+  // Read session from localStorage — URL ?apt= takes highest priority
   let savedGuestId='';
   let savedAptId='';
-  try{
-    const sess=JSON.parse(localStorage.getItem('maxela_v2_session')||'{}');
-    if(sess.guestId&&sess.aptId&&(Date.now()-(sess.savedAt||0)<86400000)){
-      savedGuestId=sess.guestId;
-      savedAptId=sess.aptId;
+  const _urlApt=urlParams.get('apt');
+  if(_urlApt){
+    savedAptId=_urlApt;
+    // Still need guestId from session/localStorage
+    try{
+      const sess=JSON.parse(localStorage.getItem('maxela_v2_session')||'{}');
+      if(sess.guestId&&(Date.now()-(sess.savedAt||0)<86400000))savedGuestId=sess.guestId;
+    }catch(e){}
+    if(!savedGuestId){
+      savedGuestId=localStorage.getItem('maxela_guest_id')
+        ||(savedAptId?localStorage.getItem('maxela_g_'+savedAptId):'')||'';
     }
-  }catch(e){}
-  // Fallback to legacy keys
-  if(!savedGuestId){
-    savedAptId=savedAptId||localStorage.getItem('maxela_apt_id')||'';
-    savedGuestId=localStorage.getItem('maxela_guest_id')
-      ||(savedAptId?localStorage.getItem('maxela_g_'+savedAptId):'')||'';
+  }else{
+    try{
+      const sess=JSON.parse(localStorage.getItem('maxela_v2_session')||'{}');
+      if(sess.guestId&&sess.aptId&&(Date.now()-(sess.savedAt||0)<86400000)){
+        savedGuestId=sess.guestId;
+        savedAptId=sess.aptId;
+      }
+    }catch(e){}
+    // Fallback to legacy keys
+    if(!savedGuestId){
+      savedAptId=savedAptId||localStorage.getItem('maxela_apt_id')||'';
+      savedGuestId=localStorage.getItem('maxela_guest_id')
+        ||(savedAptId?localStorage.getItem('maxela_g_'+savedAptId):'')||'';
+    }
   }
 
   if(!savedGuestId||!savedAptId){

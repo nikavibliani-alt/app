@@ -1302,6 +1302,7 @@ window.switchApt=async function(newRoomCode){
   activeReservation=_swPool.sort((a,b)=>{const ca=a.checkin||a.checkIn||'',cb=b.checkin||b.checkIn||'';return ca<cb?-1:ca>cb?1:0;})[0]||null;
   console.log('[ResvSelect] switchApt selected:',activeReservation?.checkin,activeReservation?.checkout,activeReservation?.roomCode);
   localStorage.setItem('maxela_apt_id',aptId);
+  try{const _sess=JSON.parse(localStorage.getItem('maxela_v2_session')||'{}');_sess.aptId=aptId;_sess.savedAt=Date.now();localStorage.setItem('maxela_v2_session',JSON.stringify(_sess));}catch(e){}
   try{
     const s=await getDoc(doc(db,'checkin_apartments',aptId));
     aptData=s.exists()?s.data():null;
@@ -1750,7 +1751,7 @@ function _renderTilesNow(){
   const u=isUnlocked();
   const _ARR=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
   const ssid=(aptData&&aptData.wifiName)?aptData.wifiName:'';
-  const _detailsUrl='checkin-details.html'+(isPreview?'?preview=true&apt='+encodeURIComponent(aptId):'');
+  const _detailsUrl='checkin-details.html?apt='+encodeURIComponent(aptId)+(isPreview?'&preview=true':'');
   document.getElementById('tiles-grid').innerHTML=`
     <div class="tile checkin-tile${u?'':' locked'}" onclick="window.location.href='${_detailsUrl}'">
       <div class="tile__icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L21 2"/><path d="M15.5 7.5l3 3"/><path d="M18 5l2.5 2.5"/></svg></div>
