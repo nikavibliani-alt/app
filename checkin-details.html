@@ -187,8 +187,46 @@ function toast(msg,dur=2500){const el=document.getElementById('toast');el.textCo
 function tbilisiToday(){return new Date(Date.now()+4*3600*1000).toISOString().slice(0,10);}
 function tbilisiHour(){return new Date(Date.now()+4*3600*1000).getUTCHours();}
 function getCheckInHour(){return parseInt((aptData?.checkInTime||'15:00').split(':')[0],10)||15;}
-function needsElevatorCode(){return /^(0|6|7)-/.test(aptId);}
+function needsElevatorCode(){
+  // Gate 1: only Shartava floors 6 & 7. NEVER 0-x / tab-x / orb-x.
+  if(!['6-1','6-2','6-3','6-4','7-1','7-2','7-4'].includes(aptId))return false;
+  // Gate 2: admin "Elevator / Entrance Code" toggle (Guest Page Settings)
+  return sectionVisible('elevator_code');
+}
 function aptPropType(){return ROOM_TO_PROP[aptId]||'ROOMS';}
+// checkin_admin/config uses ORBELIANI (not ORBE_1/ORBE_2) as the orb property key
+function aptPropTypeForConfig(){
+  if(aptId.startsWith('orb-'))return 'ORBELIANI';
+  return aptPropType();
+}
+
+// ── Guest Page Settings (checkin_admin/config, written by checkin-admin.html) ──
+let guestCfg=null;          // full config doc
+let guestCfgVisibility=null; // config.visibility {PROP:{checkin,access_code,elevator_code,...}}
+async function loadGuestCfg(){
+  if(guestCfg)return guestCfg;
+  try{
+    const snap=await getDoc(doc(db,'checkin_admin','config'));
+    guestCfg=snap.exists()?snap.data():{};
+    guestCfgVisibility=guestCfg.visibility||null;
+  }catch(e){guestCfg={};}
+  return guestCfg;
+}
+// Missing key or unloaded config ⇒ visible (fail open)
+function sectionVisible(key){
+  const v=guestCfgVisibility;
+  if(!v)return true;
+  const prop=aptPropTypeForConfig();
+  const scope=(v[prop]&&typeof v[prop]==='object')?v[prop]:v;
+  return scope[key]!==false;
+}
+// True once admin has explicitly saved visibility for this property
+function visibilityConfigured(){
+  const v=guestCfgVisibility;
+  if(!v)return false;
+  const prop=aptPropTypeForConfig();
+  return !!(v[prop]&&typeof v[prop]==='object');
+}
 
 function formatTbilisiTime(unixSec){
   if(!unixSec)return '';
@@ -222,6 +260,7 @@ function isUnlocked(){
 function fmtCheckinAvailable(){
   const ci=activeReservation?.checkin||activeReservation?.checkIn||'';
   if(!ci)return '';
+  if(ci<tbilisiToday())return ''; // never show a check-in date in the past
   const p=ci.split('-');
   if(p.length<3)return ci;
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -323,7 +362,7 @@ async function render(){
       <div class="lc-icon">🔒</div>
       <div class="lc-title">${t('lt')}</div>
       <div class="lc-sub">${t('ls')}</div>
-      <div style="margin-top:14px;font-size:17px;font-weight:500;color:var(--ink);">Available from ${esc(fmtCheckinAvailable())}</div>
+      <div style="margin-top:14px;font-size:17px;font-weight:500;color:var(--ink);">${(()=>{const _d=fmtCheckinAvailable();return _d?('Available from '+esc(_d)):('Check-in instructions will be available on your check-in day from '+String(getCheckInHour()).padStart(2,'0')+':00');})()}</div>
     </div>`;
     return;
   }
@@ -344,8 +383,10 @@ async function render(){
   }
 
   // ── Door code card ────────────────────────────────────────────────────
+  // Admin "Access Code / Door Lock" toggle is authoritative once configured
+  // (ROOMS default = off). Fallback to the legacy "not ground floor" rule.
   let doorBlock='';
-  const showDoor=!aptId.startsWith('0-');
+  const showDoor=visibilityConfigured()?sectionVisible('access_code'):!aptId.startsWith('0-');
   if(showDoor){
     const _dlbl=`<div style="font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#8C8C8A;margin-bottom:12px;">APARTMENT DOOR CODE</div>`;
     if(activeReservation?.tuyaPassword){
@@ -477,11 +518,14 @@ async function init(){
     try{
       const rSnap=await getDocs(query(collection(db,'reservations'),where('roomCode','==',aptId)));
       if(!rSnap.empty){
-        const _today=new Date().toISOString().slice(0,10);
+        const _today=tbilisiToday();
         const _docs=rSnap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
-        const _upcoming=_docs.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=_today;});
-        const _pool=_upcoming.length?_upcoming:_docs;
-        activeReservation=_pool.find(r=>r.tuyaPassword)||_pool[0]||null;
+        const _valid=_docs.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=_today;});
+        const _cur=_valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return ci&&ci<=_today;});
+        const _up=_valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return !ci||ci>_today;})
+          .sort((a,b)=>{const ca=a.checkin||a.checkIn||'',cb=b.checkin||b.checkIn||'';return ca<cb?-1:ca>cb?1:0;});
+        const _pb=pool=>{const pw=pool.filter(r=>r.tuyaPassword);return (pw.length?pw:pool)[0]||null;};
+        activeReservation=_pb(_cur)||_pb(_up);
       }
     }catch(e){}
 
@@ -490,6 +534,7 @@ async function init(){
     banner.textContent='PREVIEW MODE — Viewing as guest in '+previewApt+'. Lock bypass active.';
     document.body.prepend(banner);
 
+    await loadGuestCfg(); // visibility toggles apply in preview too
     document.getElementById('loading').style.display='none';
     document.getElementById('app').style.display='block';
     await render();
@@ -548,11 +593,20 @@ async function init(){
     try{const aSnap=await getDoc(doc(db,'checkin_apartments',aptId));if(aSnap.exists())aptData=aSnap.data();}catch(e){}
 
     // Load active reservation (one with tuyaPassword for door code)
+    // Rules: never CANCELLED, never checkout < today; prefer current stay, then upcoming.
     try{
       const rSnap=await getDocs(query(collection(db,'reservations'),where('roomCode','==',aptId)));
       if(!rSnap.empty){
-        const docs=rSnap.docs.map(d=>({id:d.id,...d.data()}));
-        activeReservation=docs.find(r=>r.tuyaPassword)||docs[0]||null;
+        const _today=tbilisiToday();
+        const docs=rSnap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
+        const valid=docs.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=_today;});
+        const current=valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return ci&&ci<=_today;});
+        const upcoming=valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return !ci||ci>_today;})
+          .sort((a,b)=>{const ca=a.checkin||a.checkIn||'',cb=b.checkin||b.checkIn||'';return ca<cb?-1:ca>cb?1:0;});
+        const pickBest=pool=>{const pw=pool.filter(r=>r.tuyaPassword);return (pw.length?pw:pool)[0]||null;};
+        // Pin to the guest's matched reservation if it's still valid
+        const matchedId=guestData?.matchedReservationId;
+        activeReservation=(matchedId&&valid.find(r=>r.id===matchedId))||pickBest(current)||pickBest(upcoming);
       }
     }catch(e){}
 
@@ -562,6 +616,9 @@ async function init(){
       const hkSnap=await getDoc(doc(db,'hk_status',hkKey));
       _hkTodayData=hkSnap.exists()?hkSnap.data():null;
     }catch(e){}
+
+    // Guest Page Settings (visibility toggles for elevator/door code)
+    await loadGuestCfg();
 
   }catch(e){
     window.location.href='checkin-guest-v2.html';
