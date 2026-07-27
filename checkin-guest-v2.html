@@ -1229,8 +1229,9 @@ function _csk(s){return s.replace(/[aeiouy]/g,'');}
 function nameMatch(input,resGuest){
   const iw=_nameWords(input),rw=_nameWords(resGuest);
   if(!iw.length||!rw.length)return false;
-  let matched=0;
-  for(const a of iw){if(rw.some(b=>levenshtein(a,b)<=2)){matched++;if(matched>=2)return true;}}
+  function _wMatch(words){let m=0;for(const a of words){if(rw.some(b=>levenshtein(a,b)<=2)){m++;if(m>=2)return true;}}return false;}
+  if(_wMatch(iw))return true;
+  if(iw.length>1&&_wMatch([...iw].reverse()))return true;
   // Arabic: transliterate → compare consonant skeletons to handle missing short vowels
   if(isArabic(input)){
     const tw=_nameWords(_translit(input));
@@ -1247,6 +1248,7 @@ function nameMatch(input,resGuest){
 function partialNameMatch(input,resGuest){
   const iw=_nameWords(input),rw=_nameWords(resGuest);
   if(iw.some(a=>rw.some(b=>levenshtein(a,b)<=2)))return true;
+  if(iw.length>1&&[...iw].reverse().some(a=>rw.some(b=>levenshtein(a,b)<=2)))return true;
   if(isArabic(input)){
     const tw=_nameWords(_translit(input));
     if(tw.some(a=>{const ac=_csk(a);return ac.length>=2&&rw.some(b=>{const bc=_csk(b);return bc.length>=2&&(ac===bc||levenshtein(ac,bc)<=1);});}))return true;
@@ -2737,7 +2739,7 @@ async function init(){
         const _rh=(()=>{
           const _uh=window.location.hash.replace('#','');
           if(_CONTENT_TYPES.includes(_uh))return _uh;
-          try{const _s=JSON.parse(localStorage.getItem('maxela_v2_session')||'{}');if(Date.now()-(_s.savedAt||0)<86400000){const _sh=(_s.hash||'').replace('#','');if(_CONTENT_TYPES.includes(_sh))return _sh;}}catch(e){}
+          try{const _s=JSON.parse(localStorage.getItem('maxela_v2_session')||'{}');if(Date.now()-(_s.savedAt||0)<2592000000){const _sh=(_s.hash||'').replace('#','');if(_CONTENT_TYPES.includes(_sh))return _sh;}}catch(e){}
           return '';
         })();
         if(_rh)window.openPage(_rh);
