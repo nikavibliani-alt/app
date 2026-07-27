@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Search Debugger — Maxela Admin</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:system-ui,'DM Sans',sans-serif;background:#fafafa;color:#111827;font-size:14px;line-height:1.5;}
+
+/* Lock screen */
+@keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-8px);}40%{transform:translateX(8px);}60%{transform:translateX(-6px);}80%{transform:translateX(6px);}}
+.admin-authed #lock-screen{display:none;}
+#lock-screen{position:fixed;inset:0;background:#fff;display:flex;align-items:center;justify-content:center;z-index:10000;}
+.lock-box{width:320px;text-align:center;padding:0 16px;}
+.lock-title{font-size:20px;font-weight:700;color:#111827;margin-bottom:6px;}
+.lock-sub{font-size:13px;color:#6b7280;margin-bottom:28px;}
+.lock-input{width:100%;height:44px;padding:0 14px;border:1px solid #e5e7eb;border-radius:8px;font-size:16px;color:#111827;background:#f9fafb;outline:none;transition:border-color .15s;text-align:center;letter-spacing:.1em;margin-bottom:10px;font-family:inherit;}
+.lock-input:focus{border-color:#2563eb;background:#fff;}
+.lock-input.shake{animation:shake .4s ease;}
+.lock-btn{width:100%;height:44px;background:#111827;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s;font-family:inherit;}
+.lock-btn:hover{opacity:.85;}
+.lock-error{font-size:13px;color:#dc2626;margin-top:10px;min-height:18px;}
+
+/* App shell */
+#app{display:none;min-height:100vh;padding:32px 16px 64px;}
+.container{max-width:820px;margin:0 auto;}
+h1{font-size:20px;font-weight:700;color:#111827;margin-bottom:20px;}
+
+/* Card */
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px 24px;margin-bottom:16px;}
+
+/* Form */
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:5px;letter-spacing:.06em;text-transform:uppercase;}
+.field input{width:100%;height:40px;padding:0 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;color:#111827;background:#fff;outline:none;transition:border-color .15s;font-family:inherit;}
+.field input:focus{border-color:#2563eb;}
+
+/* Mode toggle */
+.toggle-group{display:flex;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;width:fit-content;margin-bottom:16px;}
+.toggle-btn{padding:8px 20px;font-size:13px;font-weight:500;color:#6b7280;background:#fff;border:none;cursor:pointer;font-family:inherit;transition:background .12s,color .12s;}
+.toggle-btn+.toggle-btn{border-left:1px solid #e5e7eb;}
+.toggle-btn.active{background:#111827;color:#fff;}
+
+/* Run button */
+.run-btn{height:40px;padding:0 24px;background:#111827;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s;}
+.run-btn:hover{opacity:.85;}
+.run-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+/* Summary bar */
+.summary{font-size:13px;color:#6b7280;padding:10px 4px;margin-bottom:4px;}
+.summary b{color:#111827;}
+.summary .pass-count{color:#15803d;font-weight:700;}
+.summary .fail-count{color:#b91c1c;font-weight:700;}
+
+/* Result row */
+.result-row{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 20px;margin-bottom:10px;}
+.result-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;}
+.result-name{font-weight:600;font-size:14px;color:#111827;}
+.result-meta{font-size:12px;color:#6b7280;margin-top:2px;}
+.score-badge{min-width:40px;height:28px;padding:0 10px;border-radius:6px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.score-pass{background:#dcfce7;color:#15803d;}
+.score-fail{background:#fee2e2;color:#b91c1c;}
+
+/* Bool chips */
+.bool-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.chip{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;font-family:monospace;}
+.chip-t{background:#dcfce7;color:#15803d;}
+.chip-f{background:#f1f5f9;color:#64748b;}
+
+/* Token breakdown */
+.token-section{background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;}
+.tok-label{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+.tok-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;align-items:flex-start;}
+.tok-pill{display:inline-flex;flex-direction:column;align-items:center;gap:2px;}
+.tok-word{font-size:12px;font-weight:600;padding:3px 10px;border-radius:5px;font-family:monospace;}
+.tok-inp-matched{background:#bbf7d0;color:#15803d;}
+.tok-inp-unmatched{background:#e5e7eb;color:#374151;}
+.tok-res-matched{background:#bbf7d0;color:#15803d;}
+.tok-res-base{background:#dbeafe;color:#1e40af;}
+.tok-dist{font-size:10px;color:#9ca3af;line-height:1;}
+
+/* Pair table */
+.pair-wrap{margin-top:12px;overflow-x:auto;}
+.pair-table{width:100%;border-collapse:collapse;font-size:12px;}
+.pair-table th{text-align:left;color:#6b7280;font-weight:700;padding:5px 10px;border-bottom:1px solid #e5e7eb;white-space:nowrap;}
+.pair-table td{padding:5px 10px;color:#374151;border-bottom:1px solid #f3f4f6;font-family:monospace;}
+.pair-table tr:last-child td{border-bottom:none;}
+.match-yes{color:#15803d;font-weight:600;}
+.match-no{color:#b91c1c;}
+
+/* Why explanation */
+.why{margin-top:12px;font-size:12px;font-weight:500;padding:8px 12px;border-radius:6px;}
+.why-pass{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}
+.why-near{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;}
+.why-fail{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}
+</style>
+</head>
+<body>
+
+<script>
+(function(){
+  try{
+    var s=localStorage.getItem('maxela_admin_authed')||'';
+    if(s.startsWith('yes_')&&Date.now()-parseInt(s.slice(4),10)<7776000000)
+      document.documentElement.classList.add('admin-authed');
+  }catch(e){}
+})();
+</script>
+
+<div id="lock-screen">
+  <div class="lock-box">
+    <div class="lock-title">Search Debugger</div>
+    <div class="lock-sub">Enter password to continue</div>
+    <input class="lock-input" type="password" id="lock-input" placeholder="Password"
+           onkeydown="if(event.key==='Enter')doUnlock()">
+    <button class="lock-btn" onclick="doUnlock()">Enter</button>
+    <div class="lock-error" id="lock-error"></div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="container">
+    <h1>Search Debugger</h1>
+    <div class="card">
+      <div class="field">
+        <label id="name-label">Guest name (as guest would type it)</label>
+        <input type="text" id="inp-name" placeholder="e.g. ALZAHRANi NAIF" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Arrival date</label>
+        <input type="date" id="inp-date">
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:6px;letter-spacing:.06em;text-transform:uppercase;">Mode</div>
+        <div class="toggle-group">
+          <button class="toggle-btn active" id="mode-name" onclick="setMode('name')">Guest Name</button>
+          <button class="toggle-btn" id="mode-ref" onclick="setMode('ref')">Reservation Number</button>
+        </div>
+      </div>
+      <button class="run-btn" id="run-btn" onclick="runTest()">Run Test</button>
+    </div>
+    <div id="results"></div>
+  </div>
+</div>
+
+<script>
+window.doUnlock=function(){
+  var inp=document.getElementById('lock-input');
+  var err=document.getElementById('lock-error');
+  if(inp.value==='maxela2026'){
+    localStorage.setItem('maxela_admin_authed','yes_'+Date.now());
+    document.documentElement.classList.add('admin-authed');
+    document.getElementById('lock-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+  }else{
+    inp.classList.remove('shake');
+    void inp.offsetWidth;
+    inp.classList.add('shake');
+    inp.value='';
+    err.textContent='Incorrect password';
+    setTimeout(function(){err.textContent='';},3000);
+  }
+};
+
+if(document.documentElement.classList.contains('admin-authed')){
+  document.getElementById('app').style.display='block';
+}
+
+window.setMode=function(m){
+  window._dbgMode=m;
+  document.getElementById('mode-name').classList.toggle('active',m==='name');
+  document.getElementById('mode-ref').classList.toggle('active',m==='ref');
+  var lbl=document.getElementById('name-label');
+  var inp=document.getElementById('inp-name');
+  if(m==='name'){
+    lbl.textContent='Guest name (as guest would type it)';
+    inp.placeholder='e.g. ALZAHRANi NAIF';
+  }else{
+    lbl.textContent='Reservation number / booking ID';
+    inp.placeholder='e.g. ABC-123456';
+  }
+};
+window._dbgMode='name';
+</script>
+
+<script type="module">
+import{initializeApp}from'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js';
+import{getFirestore,collection,getDocs}from'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
+
+const db=getFirestore(initializeApp({
+  apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
+  authDomain:"sleepy-5c962.firebaseapp.com",
+  projectId:"sleepy-5c962",
+  storageBucket:"sleepy-5c962.firebasestorage.app",
+  messagingSenderId:"152940098906",
+  appId:"1:152940098906:web:bf245230d705c0a62c2f63"
+}));
+
+// ── Exact copies of scoring functions from checkin-guest-v2.html ──────────
+
+function levenshtein(a,b){
+  const m=[];
+  for(let i=0;i<=b.length;i++)m[i]=[i];
+  for(let j=0;j<=a.length;j++)m[0][j]=j;
+  for(let i=1;i<=b.length;i++){
+    for(let j=1;j<=a.length;j++){
+      m[i][j]=b.charAt(i-1)===a.charAt(j-1)?m[i-1][j-1]:Math.min(m[i-1][j-1]+1,m[i][j-1]+1,m[i-1][j]+1);
+    }
+  }
+  return m[b.length][a.length];
+}
+
+function _nameWords(s){return(s||'').toLowerCase().trim().split(/[\s,.\-]+/).filter(w=>w.length>2);}
+
+const _AR={
+  'ا':'a','أ':'a','إ':'i','آ':'a','ب':'b','ت':'t','ث':'th','ج':'j','ح':'h',
+  'خ':'kh','د':'d','ذ':'dh','ر':'r','ز':'z','س':'s','ش':'sh','ص':'s','ض':'d',
+  'ط':'t','ظ':'z','ع':'a','غ':'gh','ف':'f','ق':'q','ك':'k','ل':'l','م':'m',
+  'ن':'n','ه':'h','و':'w','ي':'y','ى':'a','ة':'h','ئ':'y','ؤ':'w','ء':'',
+  'ً':'','ٌ':'','ٍ':'','َ':'','ُ':'','ِ':'','ّ':'','ْ':''
+};
+function _translit(s){return(s||'').split('').map(c=>_AR[c]!==undefined?_AR[c]:c).join('');}
+function isArabic(s){return/[؀-ۿ]/.test(s||'');}
+function _csk(s){return s.replace(/[aeiouy]/g,'');}
+
+function nameMatch(input,resGuest){
+  const iw=_nameWords(input),rw=_nameWords(resGuest);
+  if(!iw.length||!rw.length)return false;
+  function _wMatch(words){let m=0;for(const a of words){if(rw.some(b=>levenshtein(a,b)<=2)){m++;if(m>=2)return true;}}return false;}
+  if(_wMatch(iw))return true;
+  if(iw.length>1&&_wMatch([...iw].reverse()))return true;
+  if(isArabic(input)){
+    const tw=_nameWords(_translit(input));
+    let tm=0;
+    for(const a of tw){
+      const ac=_csk(a);
+      if(ac.length>=2&&rw.some(b=>{const bc=_csk(b);return bc.length>=2&&(ac===bc||levenshtein(ac,bc)<=1);})){
+        tm++;if(tm>=2)return true;
+      }
+    }
+  }
+  return false;
+}
+
+function partialNameMatch(input,resGuest){
+  const iw=_nameWords(input),rw=_nameWords(resGuest);
+  if(iw.some(a=>rw.some(b=>levenshtein(a,b)<=2)))return true;
+  if(iw.length>1&&[...iw].reverse().some(a=>rw.some(b=>levenshtein(a,b)<=2)))return true;
+  if(isArabic(input)){
+    const tw=_nameWords(_translit(input));
+    if(tw.some(a=>{const ac=_csk(a);return ac.length>=2&&rw.some(b=>{const bc=_csk(b);return bc.length>=2&&(ac===bc||levenshtein(ac,bc)<=1);});}))return true;
+  }
+  return false;
+}
+
+// ── Score one reservation ────────────────────────────────────────────────
+
+function scoreReservation(name,arrival,bookingRef,r){
+  const guestName=r.guest||r.guestName||'';
+  const ci=r.checkin||r.checkIn||'';
+  const isAr=isArabic(name);
+  let score=0,nm=false,partial=false,dateOk=false;
+
+  if(bookingRef){
+    const ref=bookingRef.toUpperCase();
+    if(ref===(r.bookingId||'').replace(/\s+/g,'').toUpperCase()||
+       ref===String(r.reservationNumber||'').replace(/\s+/g,'').toUpperCase())
+      score=10;
+  }
+  if(score<10){
+    nm=name?nameMatch(name,guestName):false;
+    dateOk=!!(arrival&&arrival===ci);
+    partial=name?partialNameMatch(name,guestName):false;
+    if(nm&&dateOk) score=3;
+    else if(nm) score=2;
+    else if(dateOk&&partial) score=isAr?3:2;
+    if(!name&&bookingRef&&score===0){
+      const refNm=nameMatch(bookingRef,guestName);
+      if(refNm&&dateOk) score=3;
+      else if(refNm) score=2;
+    }
+  }
+
+  // Token breakdown
+  const iw=_nameWords(name||bookingRef||'');
+  const rw=_nameWords(guestName);
+  const tokenPairs=iw.map(a=>{
+    let bestDist=Infinity,bestB='—';
+    for(const b of rw){const d=levenshtein(a,b);if(d<bestDist){bestDist=d;bestB=b;}}
+    return{a,b:bestB,dist:bestDist===Infinity?null:bestDist,matched:bestDist<=2};
+  });
+  const matchedRwSet=new Set(tokenPairs.filter(p=>p.matched).map(p=>p.b));
+
+  // Plain-English explanation
+  let why='',whyCls='why-fail';
+  if(score===10){
+    why='Passed: exact booking reference / reservation number match';whyCls='why-pass';
+  }else if(score===3&&nm&&dateOk){
+    why='Passed: ≥2 name tokens matched + date match';whyCls='why-pass';
+  }else if(score===3&&dateOk&&partial&&isAr){
+    why='Passed: Arabic partial token match + date match';whyCls='why-pass';
+  }else if(score===3&&dateOk&&partial){
+    why='Passed: partial name match + date match';whyCls='why-pass';
+  }else if(score===2&&nm){
+    why='Near miss (score 2): ≥2 tokens matched but no date provided — needs date to reach score 3';whyCls='why-near';
+  }else if(score===2&&dateOk&&partial){
+    why='Near miss (score 2): partial match + date, but full nameMatch needs ≥2 tokens';whyCls='why-near';
+  }else{
+    const mc=tokenPairs.filter(p=>p.matched).length;
+    if(mc===0) why='Failed: no input tokens matched any reservation token (all edit distances >2)';
+    else if(mc===1) why='Failed: only 1 token matched — nameMatch requires ≥2; no date to trigger partial path';
+    else why=`Failed: score=${score} (threshold is ≥3)`;
+  }
+
+  return{score,nm,partial,dateOk,tokenPairs,iw,rw,matchedRwSet,guestName,ci,roomCode:r.roomCode||'',why,whyCls};
+}
+
+// ── Render ───────────────────────────────────────────────────────────────
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function chip(v,label){
+  return`<span class="chip ${v?'chip-t':'chip-f'}">${label}: ${v?'✓':'✗'}</span>`;
+}
+
+function renderRow(d){
+  const scoreCls=d.score>=3?'score-pass':'score-fail';
+
+  const inputPills=d.tokenPairs.length
+    ? d.tokenPairs.map(p=>`<span class="tok-pill">
+        <span class="tok-word ${p.matched?'tok-inp-matched':'tok-inp-unmatched'}">${esc(p.a)}</span>
+        ${p.matched?`<span class="tok-dist">→${esc(p.b)} (d=${p.dist})</span>`:'<span class="tok-dist">no match</span>'}
+      </span>`).join('')
+    : '<span style="color:#9ca3af;font-size:12px">(no tokens — word shorter than 3 chars?)</span>';
+
+  const resPills=d.rw.length
+    ? d.rw.map(w=>`<span class="tok-word ${d.matchedRwSet.has(w)?'tok-res-matched':'tok-res-base'}">${esc(w)}</span>`).join(' ')
+    : '<span style="color:#9ca3af;font-size:12px">(none)</span>';
+
+  const pairRows=d.tokenPairs.map(p=>`<tr>
+    <td>${esc(p.a)}</td>
+    <td>${esc(p.b)}</td>
+    <td>${p.dist===null?'—':p.dist}</td>
+    <td class="${p.matched?'match-yes':'match-no'}">${p.matched?'✓ match':'✗ no match'} (threshold ≤2)</td>
+  </tr>`).join('');
+
+  return`<div class="result-row">
+    <div class="result-header">
+      <div>
+        <div class="result-name">${esc(d.guestName)||'<span style="color:#9ca3af">(no name in reservation)</span>'}</div>
+        <div class="result-meta">${esc(d.roomCode)||'—'} &middot; check-in ${esc(d.ci)}</div>
+      </div>
+      <div class="score-badge ${scoreCls}">${d.score}</div>
+    </div>
+    <div class="bool-row">
+      ${chip(d.nm,'nameMatch')}${chip(d.partial,'partialMatch')}${chip(d.dateOk,'dateMatch')}
+    </div>
+    <div class="token-section">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px;">
+        <div>
+          <div class="tok-label">Input tokens</div>
+          <div class="tok-list">${inputPills}</div>
+        </div>
+        <div>
+          <div class="tok-label">Reservation tokens</div>
+          <div class="tok-list">${resPills}</div>
+        </div>
+      </div>
+      ${pairRows?`<div class="pair-wrap"><table class="pair-table">
+        <thead><tr><th>Input token</th><th>Closest reservation token</th><th>Edit distance</th><th>Result</th></tr></thead>
+        <tbody>${pairRows}</tbody>
+      </table></div>`:''}
+    </div>
+    <div class="why ${d.whyCls}">${d.why}</div>
+  </div>`;
+}
+
+// ── Run ──────────────────────────────────────────────────────────────────
+
+window.runTest=async function(){
+  const mode=window._dbgMode||'name';
+  const rawInput=document.getElementById('inp-name').value.trim();
+  const arrival=document.getElementById('inp-date').value||'';
+  const name=mode==='name'?rawInput:'';
+  const bookingRef=mode==='ref'?rawInput:'';
+
+  const btn=document.getElementById('run-btn');
+  const resDiv=document.getElementById('results');
+
+  if(!rawInput){
+    resDiv.innerHTML='<div class="card" style="color:#6b7280;">Enter a name or reference number to test.</div>';
+    return;
+  }
+
+  btn.disabled=true;btn.textContent='Loading…';
+  resDiv.innerHTML='';
+
+  try{
+    const snap=await getDocs(collection(db,'reservations'));
+    const rows=[];
+    snap.forEach(d=>{
+      const r={id:d.id,...d.data()};
+      if((r.status||'').toUpperCase()==='CANCELLED')return;
+      const ci=r.checkin||r.checkIn||'';
+      if(!ci)return;
+      rows.push(scoreReservation(name,arrival,bookingRef,r));
+    });
+
+    rows.sort((a,b)=>b.score-a.score||a.guestName.localeCompare(b.guestName));
+
+    const passed=rows.filter(r=>r.score>=3).length;
+    const summary=`<div class="summary">
+      <b>${rows.length}</b> reservations scored &nbsp;·&nbsp;
+      <span class="pass-count">${passed} passed</span> (score ≥ 3) &nbsp;·&nbsp;
+      <span class="fail-count">${rows.length-passed} below threshold</span>
+    </div>`;
+
+    resDiv.innerHTML=summary+rows.map(renderRow).join('');
+  }catch(e){
+    resDiv.innerHTML=`<div class="card" style="color:#dc2626;">Error: ${esc(e.message)}</div>`;
+    console.error(e);
+  }finally{
+    btn.disabled=false;btn.textContent='Run Test';
+  }
+};
+</script>
+</body>
+</html>
