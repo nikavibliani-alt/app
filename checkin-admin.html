@@ -32,6 +32,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .sidebar-item.active{color:#111827;border-left-color:#111827;background:#f3f4f6;font-weight:600;}
 .sidebar-item svg{flex-shrink:0;}
 .sidebar-label{flex:1;}
+.sidebar-item--external{color:#4b5563;}
+.sidebar-item--external:hover{color:#111827;}
+.sidebar-external-icon{flex-shrink:0;opacity:.5;}
+.sidebar-item--external:hover .sidebar-external-icon{opacity:.8;}
+.admin-sidebar.collapsed .sidebar-external-icon{display:none;}
 .sidebar-bottom{padding:6px 0;border-top:1px solid var(--border);flex-shrink:0;}
 .sidebar-collapse-btn{width:100%;display:flex;align-items:center;gap:10px;padding:11px 16px;background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;box-sizing:border-box;}
 .sidebar-collapse-btn:hover{background:var(--bg);}
@@ -528,6 +533,11 @@ input:checked+.slider:before{transform:translateX(20px);}
     <button class="sidebar-item" data-tab="guestsettings" onclick="switchTab('guestsettings')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M2 12h2M20 12h2"/></svg>
       <span class="sidebar-label">Guest Page Settings</span>
+    </button>
+    <button class="sidebar-item sidebar-item--external" onclick="window.open('admin-search-test.html','_blank')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span class="sidebar-label">Search Debugger</span>
+      <svg class="sidebar-external-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
     </button>
   </div>
   <div class="sidebar-bottom">
