@@ -1424,6 +1424,28 @@ async function finishRegistration_(bestRes,formData){
 }
 
 window.searchReservation=async function(){
+  // Reset ALL state from any previous attempt before running a new search.
+  // Prevents stale guestData/passportFile/UI from a failed first attempt
+  // leaving the passport page in a broken state (disabled button, old upload).
+  guestData=null;
+  allMatchedReservations=[];
+  activeReservation=null;
+  aptId='';
+  _uploadAborted=true; // abort any in-flight upload/scan callbacks
+  clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
+  passportFile=null;
+  passportScanResult=null;
+  // Reset passport page UI to its initial state
+  document.getElementById('passport-zone')?.classList.remove('has-photo');
+  const _pi=document.getElementById('passport-input');if(_pi)_pi.value='';
+  const _pp=document.getElementById('passport-preview');if(_pp){_pp.src='';_pp.style.display='none';}
+  const _ph=document.getElementById('t-passport-hint');if(_ph)_ph.textContent='Tap to upload passport / ID';
+  // passport-continue-btn starts disabled in HTML; restore that if a previous attempt left it enabled/spinning
+  const _pcb=document.getElementById('passport-continue-btn');if(_pcb)_pcb.disabled=true;
+  const _pst=document.getElementById('t-passport-submit-btn');if(_pst)_pst.textContent='Continue to your stay';
+  // Reset search button in case a previous attempt left it in a bad state
+  const _sb=document.getElementById('search-btn');if(_sb)_sb.disabled=false;
+  const _sbt=document.getElementById('t-search-btn');if(_sbt)_sbt.textContent='Find my booking';
   _uploadAborted=false;
   const bookingRef=searchMode==='number'?(document.getElementById('r-booking-id')?.value||'').trim().replace(/\s+/g,''):'';
   const name    =searchMode==='name'?(document.getElementById('r-name')?.value||'').trim():'';
