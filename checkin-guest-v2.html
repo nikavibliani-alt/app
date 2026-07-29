@@ -573,11 +573,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
     </div>
 
     <div style="padding:16px 24px 0;">
-      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Find your reservation using your name or booking number</p>
-      <div class="search-tab-bar">
-        <button class="search-tab active" id="tab-name" onclick="window.setSearchMode('name')">Guest Name</button>
-        <button class="search-tab" id="tab-number" onclick="window.setSearchMode('number')">Reservation Number</button>
-      </div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;" id="t-search-instructions">Enter your name as it appears on your booking confirmation, along with your check-in date</p>
     </div>
 
     <div class="auth-section">
@@ -599,12 +595,6 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
               </button>
             </div>
             <p style="font-size:12px;color:var(--muted);margin-top:4px;">The date your stay begins — as shown on your booking confirmation</p>
-          </div>
-        </div>
-        <div id="search-number-section" style="display:none;">
-          <div class="auth-row">
-            <span class="auth-row__label" id="t-res-number">Booking.com / Expedia confirmation number</span>
-            <input type="text" class="form-input" id="r-booking-id" placeholder="Enter your reservation number" autocomplete="off">
           </div>
         </div>
         <div class="auth-row">
@@ -862,7 +852,6 @@ const APT_NAMES={
 let lang='en';
 let contactType='wa';
 let passportFile=null;
-let searchMode='name';
 let passportScanResult=null;
 let _uploadResetTimer=null;
 let _uploadAborted=false;
@@ -1101,7 +1090,6 @@ window.setLang=function(l){
 function applyTranslations(){
   const map={
     't-welcome-sub':'checkinKicker','t-checkin-title':'checkinTitle','t-checkin-sub':'checkinSub',
-    't-search-instructions':'searchInstructions','t-res-number':'resNumber',
     't-your-info':'yi','t-full-name':'fullName','t-guests':'guestsLabel',
     't-nationality':'na','t-contact-title':'ct','t-contact-num':'phoneLabel',
     't-passport-title':'pt','t-passport-hint':'ph','t-greeting-label':'gl',
@@ -1112,18 +1100,8 @@ function applyTranslations(){
   if(arrEl)arrEl.innerHTML=t('arrivalDate')+' <span style="color:var(--red)">*</span>';
   const cntEl=document.getElementById('t-field-count');
   if(cntEl)cntEl.textContent='4 '+t('fields');
-  const bkEl=document.getElementById('r-booking-id');if(bkEl)bkEl.placeholder=t('resPlaceholder');
   const nmEl=document.getElementById('r-name');if(nmEl)nmEl.placeholder=t('namePlaceholder');
 }
-
-window.setSearchMode=function(mode){
-  searchMode=mode;
-  document.getElementById('search-name-section').style.display=mode==='name'?'':'none';
-  document.getElementById('search-number-section').style.display=mode==='number'?'':'none';
-  document.querySelectorAll('.search-tab').forEach(btn=>btn.classList.remove('active'));
-  const tab=document.getElementById('tab-'+mode);
-  if(tab)tab.classList.add('active');
-};
 
 window.setContact=function(type){
   contactType=type;
@@ -1229,7 +1207,8 @@ function _csk(s){return s.replace(/[aeiouy]/g,'');}
 function nameMatch(input,resGuest){
   const iw=_nameWords(input),rw=_nameWords(resGuest);
   if(!iw.length||!rw.length)return false;
-  function _wMatch(words){let m=0;for(const a of words){if(rw.some(b=>levenshtein(a,b)<=2)){m++;if(m>=2)return true;}}return false;}
+  // Fuzzy token match (levenshtein ≤2), also tries reversed token order for last-name-first input
+  function _wMatch(words){let m=0;for(const a of words){if(rw.some(b=>levenshtein(a,b)<=2||b.includes(a)||a.includes(b))){m++;if(m>=2)return true;}}return false;}
   if(_wMatch(iw))return true;
   if(iw.length>1&&_wMatch([...iw].reverse()))return true;
   // Arabic: transliterate → compare consonant skeletons to handle missing short vowels
@@ -1247,8 +1226,8 @@ function nameMatch(input,resGuest){
 }
 function partialNameMatch(input,resGuest){
   const iw=_nameWords(input),rw=_nameWords(resGuest);
-  if(iw.some(a=>rw.some(b=>levenshtein(a,b)<=2)))return true;
-  if(iw.length>1&&[...iw].reverse().some(a=>rw.some(b=>levenshtein(a,b)<=2)))return true;
+  if(iw.some(a=>rw.some(b=>levenshtein(a,b)<=2||b.includes(a)||a.includes(b))))return true;
+  if(iw.length>1&&[...iw].reverse().some(a=>rw.some(b=>levenshtein(a,b)<=2||b.includes(a)||a.includes(b))))return true;
   if(isArabic(input)){
     const tw=_nameWords(_translit(input));
     if(tw.some(a=>{const ac=_csk(a);return ac.length>=2&&rw.some(b=>{const bc=_csk(b);return bc.length>=2&&(ac===bc||levenshtein(ac,bc)<=1);});}))return true;
@@ -1447,16 +1426,14 @@ window.searchReservation=async function(){
   const _sb=document.getElementById('search-btn');if(_sb)_sb.disabled=false;
   const _sbt=document.getElementById('t-search-btn');if(_sbt)_sbt.textContent='Find my booking';
   _uploadAborted=false;
-  const bookingRef=searchMode==='number'?(document.getElementById('r-booking-id')?.value||'').trim().replace(/\s+/g,''):'';
-  const name    =searchMode==='name'?(document.getElementById('r-name')?.value||'').trim():'';
-  const arrival =searchMode==='name'?(document.getElementById('r-arrival')?.value||''):'';
+  const name    =(document.getElementById('r-name')?.value||'').trim();
+  const arrival =(document.getElementById('r-arrival')?.value||'');
   const guests  =parseInt(document.getElementById('r-guests')?.value)||1;
   const nationality=document.getElementById('r-nationality')?.value.trim()||'';
   const contact =document.getElementById('r-contact')?.value.trim()||'';
-  if(searchMode==='name'&&!name){alert('Please enter your full name');return;}
-  if(searchMode==='number'&&!bookingRef){alert('Please enter your reservation number');return;}
+  if(!name){alert('Please enter your full name');return;}
   if(!contact){alert('Please enter your WhatsApp or Telegram number');return;}
-  if(searchMode==='name'&&!arrival){alert('Please enter your arrival date');return;}
+  if(!arrival){alert('Please enter your arrival date');return;}
   const btn=document.getElementById('search-btn');
   btn.disabled=true;
   document.getElementById('t-search-btn').textContent='Verifying...';
@@ -1474,44 +1451,39 @@ window.searchReservation=async function(){
       const ci=r.checkin||r.checkIn||'';
       if(!ci)return;
       let score=0;
-      // Booking reference exact match (reservation number, OTA ID, or portal ID)
-      if(bookingRef){
-        const ref=bookingRef.toUpperCase();
+      // Hidden fallback: if name looks like a pure booking number, try exact bookingId match
+      const _looksLikeRef=/^[A-Z0-9\-]{5,}$/i.test(name.replace(/\s/g,''));
+      if(_looksLikeRef){
+        const ref=name.replace(/\s/g,'').toUpperCase();
         if(ref===(r.bookingId||'').replace(/\s+/g,'').toUpperCase()||
            ref===String(r.reservationNumber||'').replace(/\s+/g,'').toUpperCase()) score=10;
       }
       if(score<10){
         const isAr=isArabic(name);
-        const nm=name?nameMatch(name,r.guest||r.guestName||''):false;
-        const dateOk=arrival&&arrival===ci;
-        const partial=name?partialNameMatch(name,r.guest||r.guestName||''):false;
+        const nm=nameMatch(name,r.guest||r.guestName||'');
+        const dateOk=!!(arrival&&arrival===ci);
+        const partial=partialNameMatch(name,r.guest||r.guestName||'');
         if(nm&&dateOk)score=3;
         else if(nm)score=2;
         // Arabic: single-word consonant match + correct date is strong enough signal
         else if(dateOk&&partial)score=isAr?3:2;
-        // Also try the bookingRef as a name if no name provided
-        if(!name&&bookingRef&&score===0){
-          const refNm=nameMatch(bookingRef,r.guest||r.guestName||'');
-          if(refNm&&dateOk)score=3;
-          else if(refNm)score=2;
-        }
       }
       if(score>_bestScore){_bestScore=score;_bestMatch=r;}
       if(score>=3)allMatches.push({res:r,score});
       allScored.push({guest:r.guest||r.guestName||'',room:r.roomCode||'',checkin:ci,score});
     });
     console.log('Scored reservations:',allScored.map(r=>({name:r.guest,score:r.score})));
-    console.log('[DEBUG] input name:',JSON.stringify(name),'arrival:',arrival,'mode:',searchMode);
+    console.log('[DEBUG] input name:',JSON.stringify(name),'arrival:',arrival);
     console.log('[DEBUG] total docs:',allScored.length,'matches (score>=3):',allMatches.length,'bestScore:',_bestScore,'bestMatch:',_bestMatch?.guest||'none');
     if(!allMatches.length){
       try{
         await addDoc(collection(db,'search_failures'),{
           input_name:name||'',
           input_date:arrival||'',
-          input_booking_ref:bookingRef||'',
+          input_booking_ref:'',
           input_contact:contact||'',
           input_contact_type:contactType||'wa',
-          search_mode:searchMode||'name',
+          search_mode:'name',
           best_match_name:_bestMatch?((_bestMatch.guest||_bestMatch.guestName||'')):'',
           best_match_score:_bestScore,
           best_match_room:_bestMatch?(_bestMatch.roomCode||''):'',
@@ -1534,7 +1506,7 @@ window.searchReservation=async function(){
     }
     allMatches.sort((a,b)=>b.score-a.score);
     allMatchedReservations=allMatches.map(m=>m.res);
-    _pendingReg={name:name||(allMatches[0].res?.guest||'')||bookingRef,guests,nationality,contact,contactType,arrival};
+    _pendingReg={name:name||(allMatches[0].res?.guest||''),guests,nationality,contact,contactType,arrival};
     _pendingMatches=[...allMatches];
     btn.disabled=false;
     document.getElementById('t-search-btn').textContent='Find my booking';
