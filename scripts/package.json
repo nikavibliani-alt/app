@@ -1,0 +1,7 @@
+{
+  "name": "sleepy-scripts",
+  "private": true,
+  "dependencies": {
+    "resend": "^4"
+  }
+}
