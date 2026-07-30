@@ -11,7 +11,7 @@ const STALE_MS   = 2 * 60 * 60 * 1000;  // 2 hours
 const COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6 hours between alerts
 const TZ_OFFSET  = 4 * 60 * 60 * 1000;  // UTC+4 Tbilisi
 
-const FROM = 'alerts@maxelaapartments.com';
+const FROM = 'onboarding@resend.dev';
 const TO   = 'nikavibliani@gmail.com';
 
 async function get(url) {
