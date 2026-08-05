@@ -2699,6 +2699,7 @@ async function init(){
     ||(aptId?localStorage.getItem('maxela_g_'+aptId):null);
   if(savedGuest&&savedApt&&(!aptId||aptId===savedApt)){
     aptId=aptId||savedApt;
+    let _firestoreErr=false;
     try{
       const snap=await getDoc(doc(db,'checkin_guests',savedGuest));
       if(snap.exists()){
@@ -2739,11 +2740,38 @@ async function init(){
         if(_rh)window.openPage(_rh);
         return;
       }
-    }catch(e){}
-    // Guest doc gone — clear stale session and fall through
-    localStorage.removeItem('maxela_apt_id');
-    localStorage.removeItem('maxela_guest_id');
-    if(aptId)localStorage.removeItem('maxela_g_'+aptId);
+      // snap does not exist — doc was genuinely deleted (admin purge, test cleanup)
+      // Only clear session in this confirmed case, not on network errors
+      localStorage.removeItem('maxela_apt_id');
+      localStorage.removeItem('maxela_guest_id');
+      if(aptId)localStorage.removeItem('maxela_g_'+aptId);
+    }catch(e){
+      // Firestore read failed (network timeout, offline, rules issue).
+      // DO NOT clear the session — the guest is still registered, we just can't
+      // reach Firestore right now. Show a retry screen instead.
+      _firestoreErr=true;
+      console.error('[init] Firestore read failed, preserving session for retry:',e);
+    }
+    if(_firestoreErr){
+      document.getElementById('loading').style.display='none';
+      document.getElementById('app').style.display='block';
+      // Show a non-destructive error screen with a reload button
+      const _errWrap=document.getElementById('page-register');
+      if(_errWrap){
+        const _prev=document.getElementById('_init-retry-msg');
+        if(!_prev){
+          const _msg=document.createElement('div');
+          _msg.id='_init-retry-msg';
+          _msg.style.cssText='padding:32px 24px;text-align:center;';
+          _msg.innerHTML='<div style="font-size:16px;font-weight:600;color:#1e1c1a;margin-bottom:8px;">Connection issue</div>'
+            +'<div style="font-size:14px;color:#6e6b66;margin-bottom:24px;">We couldn\'t load your stay. Your session is saved — tap retry to try again.</div>'
+            +'<button onclick="location.reload()" style="height:44px;padding:0 28px;background:#1e1c1a;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Retry</button>';
+          _errWrap.prepend(_msg);
+        }
+      }
+      _showPage('page-register');
+      return;
+    }
   }
   // No valid session — show register page
   if(aptId){
