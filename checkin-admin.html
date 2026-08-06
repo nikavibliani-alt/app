@@ -2180,22 +2180,43 @@ async function loadElevatorCode(){
     // RTDB is current — normalise into gsElevatorData shape
     gsElevatorData={
       code:rtdbData.display_code||rtdbData.code||'',
+      qrCode:rtdbData.qr_code||'',
       updatedAt:{seconds:Math.floor(rtdbTs/1000)},
       _source:'rtdb',
     };
   }else if(fsData){
-    gsElevatorData={...fsData,_source:'firestore'};
+    gsElevatorData={...fsData,qrCode:fsData.qr_code||'',_source:'firestore'};
   }else{
     gsElevatorData=null;
   }
 }
 
+function gsRenderElevatorQrPreview(text){
+  const box=document.getElementById('gsElevatorQrPreview');
+  if(!box)return;
+  if(!text){box.style.display='none';box.innerHTML='';return;}
+  box.style.display='block';
+  const draw=()=>{box.innerHTML='';new QRCode(box,{text:String(text),width:100,height:100,colorDark:'#000000',colorLight:'#FFFFFF'});};
+  if(typeof QRCode==='undefined'){
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload=draw;
+    document.head.appendChild(s);
+  }else{
+    draw();
+  }
+}
+
 function gsPopulateElevatorCard(){
   const inp=document.getElementById('gsElevatorInput');
+  const qrInp=document.getElementById('gsElevatorQrInput');
   const age=document.getElementById('gsElevatorAge');
-  if(!inp||!age)return;
+  if(!inp||!qrInp||!age)return;
   const currentCode=gsElevatorData?.code||'';
   if(currentCode)inp.value=currentCode;
+  const currentQr=gsElevatorData?.qrCode||'';
+  if(currentQr)qrInp.value=currentQr;
+  gsRenderElevatorQrPreview(currentQr);
   if(gsElevatorData?.updatedAt){
     const sec=gsElevatorData.updatedAt.seconds||0;
     const diffMin=Math.round((Date.now()/1000-sec)/60);
@@ -2211,11 +2232,27 @@ function gsPopulateElevatorCard(){
 
 window.gsUpdateElevatorCode=async function(){
   const inp=document.getElementById('gsElevatorInput');
+  const qrInp=document.getElementById('gsElevatorQrInput');
   const code=(inp?.value||'').trim();
+  const qrCode=(qrInp?.value||'').trim();
   if(!code){toast('Enter a code first');return;}
   try{
     await setDoc(doc(db,'globals','elevator_code'),{code,updatedAt:serverTimestamp()});
-    gsElevatorData={code,updatedAt:{seconds:Math.floor(Date.now()/1000)}};
+    // Written after the Firestore commit so its updatedAt sorts newer — checkin-details.html
+    // prefers RTDB over Firestore when RTDB is at least as fresh, which is what shows the QR.
+    const nowMs=Date.now();
+    const rtdbUpdates={
+      display_code:code,
+      qr_code:qrCode,
+      expires_at:String(nowMs+24*60*60*1000),
+      updatedAt:String(nowMs),
+    };
+    await fetch('https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json',{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(rtdbUpdates),
+    });
+    gsElevatorData={code,qrCode,updatedAt:{seconds:Math.floor(nowMs/1000)}};
     gsPopulateElevatorCard();
     toast('Elevator code updated ✓');
   }catch(e){toast('Failed: '+e.message);}
@@ -2235,12 +2272,18 @@ async function renderGuestSettings(){
         <span class="gs-card-title">Elevator Code</span>
         <span id="gsElevatorAge" style="font-size:12px;color:var(--gs-text-muted);margin-left:auto;"></span>
       </div>
-      <div style="padding:20px 24px;display:flex;gap:12px;align-items:center;">
-        <div style="flex:1;">
+      <div style="padding:20px 24px;display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;">
+        <div style="flex:1;min-width:140px;">
           <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gs-text-muted);margin-bottom:6px;">Current code</div>
           <input id="gsElevatorInput" class="gs-drawer-input" style="font-size:20px;font-weight:700;letter-spacing:.1em;font-family:ui-monospace,monospace;max-width:180px;" placeholder="e.g. 1234" type="text" inputmode="numeric">
         </div>
-        <button onclick="gsUpdateElevatorCode()" style="padding:11px 20px;background:var(--gs-accent);color:#fff;border:none;border-radius:var(--gs-radius-md);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;align-self:flex-end;">Update Code</button>
+        <div style="flex:1;min-width:160px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gs-text-muted);margin-bottom:6px;">QR Code Value</div>
+          <input id="gsElevatorQrInput" class="gs-drawer-input" style="font-size:20px;font-weight:700;letter-spacing:.1em;font-family:ui-monospace,monospace;max-width:180px;" placeholder="e.g. 638305" type="text" inputmode="numeric">
+          <div style="font-size:11px;color:var(--gs-text-muted);margin-top:6px;max-width:220px;">This is the value encoded in the QR image shown to guests</div>
+        </div>
+        <div id="gsElevatorQrPreview" style="display:none;width:100px;height:100px;flex-shrink:0;"></div>
+        <button onclick="gsUpdateElevatorCode()" style="padding:11px 20px;background:var(--gs-accent);color:#fff;border:none;border-radius:var(--gs-radius-md);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">Update Code</button>
       </div>
     </div>
     <div class="gs-prop-bar" id="gsPropBar">
