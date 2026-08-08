@@ -147,7 +147,7 @@ def fetch_reservations(session, from_date, to_date):
     to_iso = f"{to_date}T20:00:00.000Z"
 
     url = (
-        f"https://ssl20.minihotelpms.com/api/Reservations"
+        f"https://emea5.hotelpms.cloud/api/Reservations"
         f"?FromDate={from_iso}&ToDate={to_iso}"
     )
     print(f"Fetching reservations: {from_date} → {to_date}")
@@ -155,7 +155,10 @@ def fetch_reservations(session, from_date, to_date):
     req_headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
     print(f"[API] Request URL: {url}")
     print(f"[API] Request headers: {req_headers}")
-    print(f"[API] Cookies being sent: {dict(session.cookies)}")
+    cookies_dict = {}
+    for cookie in session.cookies:
+        cookies_dict[f"{cookie.name}@{cookie.domain}"] = cookie.value
+    print(f"[API] Cookies being sent: {cookies_dict}")
 
     r = session.get(url, headers=req_headers)
 
@@ -542,7 +545,7 @@ def fetch_guest_details(session, db, reservations):
         # Call MiniHotel detail endpoint
         try:
             resp = session.post(
-                'https://ssl20.minihotelpms.com/ajax/request_reservation_info.aspx/get_reservation_info',
+                'https://emea5.hotelpms.cloud/ajax/request_reservation_info.aspx/get_reservation_info',
                 json={'reservation_id': res_num},
                 headers={'Content-Type': 'application/json', 'Accept': 'application/json'},
             )
@@ -621,7 +624,7 @@ def fetch_booking_ids(session, db, reservations):
                 continue
 
             resp = session.get(
-                f'https://ssl20.minihotelpms.com/api/Reservations/{res_num}',
+                f'https://emea5.hotelpms.cloud/api/Reservations/{res_num}',
                 headers={'Accept': 'application/json'},
                 timeout=10,
             )

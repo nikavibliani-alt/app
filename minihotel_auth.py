@@ -10,7 +10,7 @@ import requests
 from urllib.parse import urljoin
 
 LOGIN_URL = "https://login.minihotel.cloud/login.aspx"
-DASHBOARD_URL = "https://ssl20.minihotelpms.com/Home/dashboard.aspx"
+DASHBOARD_URL = "https://emea5.hotelpms.cloud/Home/dashboard.aspx"
 
 import os
 HOTEL_CODE = os.environ.get("MINIHOTEL_HOTEL", "freedo45")
@@ -85,7 +85,7 @@ def get_session_cookie() -> str:
     cookie_str = "; ".join(
         f"{c.name}={c.value}"
         for c in session.cookies
-        if "minihotelpms.com" in (c.domain or "")
+        if "hotelpms.cloud" in (c.domain or "")
     )
     # Fallback: if domain filtering yielded nothing, take all cookies
     if not cookie_str:
