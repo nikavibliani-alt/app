@@ -69,34 +69,75 @@ def init_firestore():
 
 
 def login_minihotel():
-    """Log into MiniHotel using requests session (same as housekeeper_sync.py)."""
+    """Log into MiniHotel using requests session."""
     if not USERNAME or not PASSWORD:
         print("ERROR: MINIHOTEL_USER or MINIHOTEL_PASS not set")
         sys.exit(1)
 
     print("Logging into MiniHotel...")
     session = requests.Session()
-
-    # GET login page to scrape ASP.NET hidden fields
-    r = session.get('https://login.minihotel.cloud/login.aspx')
-    soup = BeautifulSoup(r.text, 'html.parser')
-
-    # POST login form
-    session.post('https://login.minihotel.cloud/login.aspx', data={
-        '__EVENTTARGET': 'LoginButton',
-        '__EVENTARGUMENT': '',
-        '__VIEWSTATE': soup.find('input', {'id': '__VIEWSTATE'})['value'],
-        '__VIEWSTATEGENERATOR': soup.find('input', {'id': '__VIEWSTATEGENERATOR'})['value'],
-        '__EVENTVALIDATION': soup.find('input', {'id': '__EVENTVALIDATION'})['value'],
-        'txt_hotel_code': HOTEL_CODE,
-        'txt_username': USERNAME,
-        'txt_password': PASSWORD,
-        'hdd_language': 'en',
-        'txt_agent_username': '',
-        'txt_agent_password': '',
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/124.0 Safari/537.36",
     })
 
-    print("Logged in")
+    # Step 1: GET login page to scrape ASP.NET hidden fields
+    r = session.get('https://login.minihotel.cloud/login.aspx', timeout=30)
+    print(f"[AUTH] GET login page: {r.status_code}")
+    soup = BeautifulSoup(r.text, 'html.parser')
+
+    def _field(field_id):
+        tag = soup.find('input', {'id': field_id})
+        val = tag['value'] if tag else ''
+        if not val:
+            print(f"[AUTH] WARNING: could not extract {field_id} from login page")
+        return val
+
+    viewstate       = _field('__VIEWSTATE')
+    viewstate_gen   = _field('__VIEWSTATEGENERATOR')
+    event_validation = _field('__EVENTVALIDATION')
+
+    if not viewstate:
+        raise RuntimeError("Could not extract __VIEWSTATE — MiniHotel login page structure may have changed")
+
+    # Step 2: POST credentials (LoginButton as a submit field, not __EVENTTARGET)
+    payload = {
+        'LoginButton':          'Login',
+        '__EVENTARGUMENT':      '',
+        '__VIEWSTATE':          viewstate,
+        '__VIEWSTATEGENERATOR': viewstate_gen,
+        '__EVENTVALIDATION':    event_validation,
+        'txt_hotel_code':       HOTEL_CODE,
+        'txt_username':         USERNAME,
+        'txt_password':         PASSWORD,
+        'hdd_language':         'en',
+        'txt_agent_username':   '',
+        'txt_agent_password':   '',
+    }
+
+    resp = session.post(
+        'https://login.minihotel.cloud/login.aspx',
+        data=payload,
+        allow_redirects=True,
+        timeout=30,
+    )
+    print(f"[AUTH] POST login: status={resp.status_code} final_url={resp.url}")
+
+    # Debug: show all cookies received
+    for c in session.cookies:
+        print(f"[AUTH] Cookie: {c.name}={c.value[:40]!r} domain={c.domain}")
+
+    # Verify we landed on the dashboard
+    if 'login' in resp.url.lower() or 'dashboard' not in resp.url.lower():
+        print(f"[AUTH] Login FAILED — still on {resp.url}")
+        print(f"[AUTH] Response snippet: {resp.text[:400]}")
+        raise RuntimeError(f"MiniHotel login failed — ended up at {resp.url}. Check credentials.")
+
+    if 'ASP.NET_SessionId' not in {c.name for c in session.cookies}:
+        print(f"[AUTH] WARNING: no ASP.NET_SessionId in cookies after login")
+
+    print(f"[AUTH] Login succeeded — session established")
     return session
 
 
@@ -111,7 +152,12 @@ def fetch_reservations(session, from_date, to_date):
     )
     print(f"Fetching reservations: {from_date} → {to_date}")
 
-    r = session.get(url, headers={'Accept': 'application/json', 'Content-Type': 'application/json'})
+    req_headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+    print(f"[API] Request URL: {url}")
+    print(f"[API] Request headers: {req_headers}")
+    print(f"[API] Cookies being sent: {dict(session.cookies)}")
+
+    r = session.get(url, headers=req_headers)
 
     if r.status_code != 200:
         print(f"ERROR: API returned {r.status_code}")
