@@ -265,6 +265,11 @@ const ROOMS=[
   {code:'tab-1',name:'Tab 1',group:'Centre — Tab',location:'centre'},
   {code:'tab-2',name:'Tab 2',group:'Centre — Tab',location:'centre'},
   {code:'tab-3',name:'Tab 3',group:'Centre — Tab',location:'centre'},
+  // VGL
+  {code:'vgl-st1',name:'VGL Studio 1',group:'VGL — Studios',location:'vgl'},
+  {code:'vgl-st2',name:'VGL Studio 2',group:'VGL — Studios',location:'vgl'},
+  {code:'vgl-ap3',name:'VGL Apartment 3',group:'VGL — Apartments',location:'vgl'},
+  {code:'vgl-ap4',name:'VGL Apartment 4',group:'VGL — Apartments',location:'vgl'},
 ];
 
 
@@ -340,6 +345,8 @@ function getBeddingAlert(roomCode,guests){
   if(['6-1','6-2','6-4','7-1','7-2','7-4'].includes(c))return guests>=5?'⚠️ Extra sheets needed':null;
   if(c==='6-3')return guests>=9?'⚠️ Extra sheets needed':null;
   if(['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3'].includes(c))return guests>=3?'⚠️ Extra sheets needed':null;
+  if(['vgl-st1','vgl-st2'].includes(c))return guests>=3?'⚠️ Extra sheets needed':null;
+  if(['vgl-ap3','vgl-ap4'].includes(c))return guests>=5?'⚠️ Extra sheets needed':null;
   return null;
 }
 function getTaskRooms(date){
@@ -367,15 +374,16 @@ function renderTabs(){
   el.innerHTML=html;
 }
 // ── PIN / AUTH ────────────────────────────────────────────────────────────────
-let _hkPins={shartava:'',centre:'',admin:''};
+let _hkPins={shartava:'',centre:'',vgl:'',admin:''};
 let _pinsReady=false;
-const ROLE_LABELS={shartava:'📍 Shartava',centre:'📍 Centre',admin:'📍 All Properties'};
+const ROLE_LABELS={shartava:'📍 Shartava',centre:'📍 Centre',vgl:'📍 VGL HK',admin:'📍 All Properties'};
 let _pinBuf='';
 
 function getActiveRooms(){
   const role=localStorage.getItem('hk_role')||'';
   if(role==='shartava')return ROOMS.filter(r=>r.location==='shartava');
   if(role==='centre')return ROOMS.filter(r=>r.location==='centre');
+  if(role==='vgl')return ROOMS.filter(r=>r.location==='vgl');
   return ROOMS;
 }
 function _updateDots(){
@@ -397,6 +405,7 @@ function _submitPin(){
   let matchedRole=null;
   if(_pinBuf&&_pinBuf===_hkPins.shartava)matchedRole='shartava';
   else if(_pinBuf&&_pinBuf===_hkPins.centre)matchedRole='centre';
+  else if(_pinBuf&&_pinBuf===_hkPins.vgl)matchedRole='vgl';
   else if(_pinBuf&&_pinBuf===_hkPins.admin)matchedRole='admin';
   if(matchedRole){
     localStorage.setItem('hk_role',matchedRole);
@@ -419,7 +428,7 @@ window.logout=function(){
 // Restore session from localStorage on load
 (function(){
   const role=localStorage.getItem('hk_role');
-  if(role&&ROLE_LABELS[role]){
+  if(role&&role in ROLE_LABELS){
     document.getElementById('app').style.display='';
     const lb=document.getElementById('loc-badge');if(lb)lb.textContent=ROLE_LABELS[role];
   } else {
@@ -431,6 +440,7 @@ function getCleanerName(){
   const role=localStorage.getItem('hk_role')||'';
   if(role==='shartava')return 'Shartava Team';
   if(role==='centre')return 'Centre Team';
+  if(role==='vgl')return 'VGL Team';
   if(role==='admin')return 'Admin';
   return '';
 }

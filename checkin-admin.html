@@ -672,7 +672,7 @@ let searchFailures=[]; // Unresolved failed guest searches
 let _sfExpanded=false; // Failed searches section expand state
 let currentTab=localStorage.getItem('adminActiveTab')||'apartments';
 let _goSearchTimer=null;
-let hkPinsData={shartava:'',centre:'',admin:''};
+let hkPinsData={shartava:'',centre:'',vgl:'',admin:''};
 const CHECK_IN_HOUR=15; // Default check-in hour Tbilisi (UTC+4, no DST)
 let currentDrawerApt=null;
 
@@ -2482,6 +2482,7 @@ function renderHkPins(){
   const roles=[
     {id:'shartava',label:'Shartava Team PIN',desc:'Used by Shartava housekeeping staff'},
     {id:'centre',label:'Centre Team PIN',desc:'Used by City Centre housekeeping staff'},
+    {id:'vgl',label:'VGL Team PIN',desc:'VGL Studios & Apartments housekeeping staff'},
     {id:'admin',label:'Admin PIN',desc:'Shows all rooms across both properties'}
   ];
   let html=`<div style="padding:1rem;max-width:480px;">

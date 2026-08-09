@@ -31,7 +31,7 @@ ROOM_MAP = {
     'VGL_AP3': 'vgl-ap3', 'VGL_AP4': 'vgl-ap4',
 }
 
-SKIP_ROOMS = {'VGL_ST1', 'VGL_ST2', 'VGL_AP3', 'VGL_AP4'}
+SKIP_ROOMS = set()  # No rooms skipped — VGL now synced
 VALID_STATUSES = {'OK', 'OK2', 'CL', 'WL'}
 
 # Room code (post-ROOM_MAP) → pricing property type
