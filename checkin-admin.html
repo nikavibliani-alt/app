@@ -2237,22 +2237,22 @@ window.gsUpdateElevatorCode=async function(){
   const qrCode=(qrInp?.value||'').trim();
   if(!code){toast('Enter a code first');return;}
   try{
-    await setDoc(doc(db,'globals','elevator_code'),{code,updatedAt:serverTimestamp()});
-    // Written after the Firestore commit so its updatedAt sorts newer — checkin-details.html
-    // prefers RTDB over Firestore when RTDB is at least as fresh, which is what shows the QR.
     const nowMs=Date.now();
-    const rtdbUpdates={
+    const updates={
       display_code:code,
       qr_code:qrCode,
       expires_at:String(nowMs+24*60*60*1000),
       updatedAt:String(nowMs),
     };
+    // Write to RTDB first
     await fetch('https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json',{
       method:'PATCH',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(rtdbUpdates),
+      body:JSON.stringify(updates),
     });
-    gsElevatorData={code,qrCode,updatedAt:{seconds:Math.floor(nowMs/1000)}};
+    // Write same fields to Firestore (code kept for backward compat; updatedAt as server timestamp)
+    await setDoc(doc(db,'globals','elevator_code'),{...updates,code,updatedAt:serverTimestamp()},{merge:true});
+    gsElevatorData={code,qrCode,updatedAt:{seconds:Math.floor(nowMs/1000)},_source:'manual'};
     gsPopulateElevatorCard();
     toast('Elevator code updated ✓');
   }catch(e){toast('Failed: '+e.message);}
