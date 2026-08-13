@@ -428,76 +428,59 @@ async function render(){
 }
 
 async function fetchElevatorCode(){
-  // Fetch from RTDB, compare with Firestore manual override, use whichever is newer
-  try{
-    const data=await fetch(RTDB_URL).then(r=>r.json());
-    let fsData=null;
-    try{const fsSnap=await getDoc(doc(db,'globals','elevator_code'));if(fsSnap.exists())fsData=fsSnap.data();}catch(_){}
-    const rtdbTs=data?parseInt(data.updatedAt||0):0;
-    const fsTs=fsData?.updatedAt?.seconds?fsData.updatedAt.seconds*1000:parseInt(fsData?.updatedAt||0);
-    const useFirestore=fsData&&fsTs>rtdbTs;
+  let rtdbData=null;
+  let fsData=null;
 
-    if(useFirestore){
-      // Admin manual override is newer — show code only, no QR
-      const canvas=document.getElementById('elevator-qr');
-      const ph=document.getElementById('elevator-qr-placeholder');
-      if(canvas)canvas.style.display='none';
-      if(ph)ph.style.display='flex';
-      const displayCode=fsData.display_code||fsData.code||'';
-      if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
-    }else if(data&&data.qr_code){
-      // RTDB data is current — show QR + code
-      const qrCode=data.qr_code;
-      const canvas=document.getElementById('elevator-qr');
-      if(canvas){
-        canvas.style.display='none';
-        // Remove stale qrDiv from previous interval fetch
-        const existing=document.getElementById('elevator-qr-rendered');
-        if(existing)existing.remove();
-        const qrDiv=document.createElement('div');
-        qrDiv.id='elevator-qr-rendered';
-        qrDiv.style.cssText='display:flex;justify-content:center;cursor:pointer;';
-        canvas.parentNode.insertBefore(qrDiv,canvas);
-        qrDiv.onclick=()=>_openQrFullscreen(qrCode);
-        if(typeof QRCode==='undefined'){
-          const s=document.createElement('script');
-          s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-          s.onload=()=>renderQR(qrCode,qrDiv);
-          document.head.appendChild(s);
-        }else{
-          renderQR(qrCode,qrDiv);
-        }
-      }
-      if(data.expires_at){
-        const el=document.getElementById('elevator-expires');
-        if(el){const exp=new Date(parseInt(data.expires_at));el.textContent='QR code and entrance code change daily · Next update at '+exp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:true});}
-      }
-      const displayCode=data.display_code||data.code||'';
-      if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
+  // Fetch both sources independently
+  try{const resp=await fetch(RTDB_URL);rtdbData=await resp.json();}
+  catch(e){console.log('[elevator] RTDB fetch failed:',e.message);}
+
+  try{const snap=await getDoc(doc(db,'globals','elevator_code'));if(snap.exists())fsData=snap.data();}
+  catch(e){console.log('[elevator] Firestore fetch failed:',e.message);}
+
+  // Use whichever source has a more recent updatedAt
+  const rtdbTs=rtdbData?parseInt(rtdbData.updatedAt||0):0;
+  const fsTs=fsData?.updatedAt?.seconds?fsData.updatedAt.seconds*1000:parseInt(fsData?.updatedAt||0);
+  const data=(fsData&&fsTs>rtdbTs)?fsData:rtdbData;
+
+  if(!data)return;
+
+  // Render QR if available (from either source)
+  const qrCode=data.qr_code;
+  const canvas=document.getElementById('elevator-qr');
+  const ph=document.getElementById('elevator-qr-placeholder');
+  if(qrCode){
+    if(canvas)canvas.style.display='none';
+    if(ph)ph.style.display='none';
+    const existing=document.getElementById('elevator-qr-rendered');
+    if(existing)existing.remove();
+    const qrDiv=document.createElement('div');
+    qrDiv.id='elevator-qr-rendered';
+    qrDiv.style.cssText='display:flex;justify-content:center;cursor:pointer;';
+    if(canvas)canvas.parentNode.insertBefore(qrDiv,canvas);
+    qrDiv.onclick=()=>_openQrFullscreen(qrCode);
+    if(typeof QRCode==='undefined'){
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+      s.onload=()=>renderQR(qrCode,qrDiv);
+      document.head.appendChild(s);
     }else{
-      // No QR in RTDB — show placeholder + any code available
-      const canvas=document.getElementById('elevator-qr');
-      const ph=document.getElementById('elevator-qr-placeholder');
-      if(canvas)canvas.style.display='none';
-      if(ph)ph.style.display='flex';
-      const displayCode=data?(data.display_code||data.code||''):(fsData?.display_code||fsData?.code||'');
-      if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
+      renderQR(qrCode,qrDiv);
     }
-  }catch(err){
-    // Network error — fall back to Firestore entirely
-    try{
-      const snap=await getDoc(doc(db,'globals','elevator_code'));
-      const canvas=document.getElementById('elevator-qr');
-      const ph=document.getElementById('elevator-qr-placeholder');
-      if(canvas)canvas.style.display='none';
-      if(ph)ph.style.display='flex';
-      if(snap.exists()){
-        const sd=snap.data();
-        const displayCode=sd.display_code||sd.code||'';
-        if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
-      }
-    }catch(_){}
+  }else{
+    if(canvas)canvas.style.display='none';
+    if(ph)ph.style.display='flex';
   }
+
+  // Show expiry
+  if(data.expires_at){
+    const el=document.getElementById('elevator-expires');
+    if(el){const exp=new Date(parseInt(data.expires_at));el.textContent='QR code and entrance code change daily · Next update at '+exp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:true});}
+  }
+
+  // Show display code
+  const displayCode=data.display_code||data.code||'';
+  if(displayCode){_elevatorCode=displayCode;const el=document.getElementById('elevator-code-num');if(el)el.textContent=displayCode+'#';}
 }
 
 // ── Session restore & init ────────────────────────────────────────────────
