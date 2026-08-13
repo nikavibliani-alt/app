@@ -1,0 +1,98 @@
+/* @pms/design-system — source of visual truth. Import once at app root. */
+
+:root {
+  --pms-bg: #f3f4f6;
+  --pms-bg-2: #e8eaee;
+  --pms-surface: #ffffff;
+  --pms-surface-2: #f7f8fa;
+  --pms-ink: #12161c;
+  --pms-ink-2: #3d4550;
+  --pms-muted: #5b6570;
+  --pms-hint: #8b939c;
+  --pms-line: #e3e6eb;
+  --pms-line-strong: #c9ced6;
+
+  --pms-accent: #0f6e62;
+  --pms-accent-hover: #0c5a51;
+  --pms-accent-soft: #e7f3f1;
+  --pms-accent-ink: #0a3d37;
+
+  --pms-ok: #176c45;
+  --pms-ok-soft: #e8f6ee;
+  --pms-warning: #b54708;
+  --pms-warning-soft: #fef4e8;
+  --pms-danger: #b42318;
+  --pms-danger-soft: #fdecea;
+  --pms-info: #185fa5;
+  --pms-info-soft: #e8f1fb;
+
+  --pms-font: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --pms-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --pms-fs-2xs: 0.6875rem; /* 11 */
+  --pms-fs-xs: 0.75rem;    /* 12 */
+  --pms-fs-sm: 0.8125rem;  /* 13 */
+  --pms-fs-md: 0.875rem;   /* 14 */
+  --pms-fs-lg: 1rem;       /* 16 */
+  --pms-fs-xl: 1.25rem;    /* 20 */
+  --pms-fs-2xl: 1.5rem;    /* 24 */
+  --pms-fs-3xl: 2rem;      /* 32 */
+
+  --pms-lh: 1.45;
+  --pms-lh-tight: 1.2;
+
+  --pms-space-1: 4px;
+  --pms-space-2: 8px;
+  --pms-space-3: 12px;
+  --pms-space-4: 16px;
+  --pms-space-5: 20px;
+  --pms-space-6: 24px;
+  --pms-space-8: 32px;
+  --pms-space-12: 48px;
+
+  --pms-radius-sm: 6px;
+  --pms-radius: 8px;
+  --pms-radius-lg: 12px;
+  --pms-radius-full: 999px;
+
+  --pms-shadow-sm: 0 1px 2px rgba(18, 22, 28, 0.06);
+  --pms-shadow: 0 1px 3px rgba(18, 22, 28, 0.08), 0 1px 2px rgba(18, 22, 28, 0.04);
+  --pms-shadow-md: 0 8px 24px rgba(18, 22, 28, 0.08);
+
+  --pms-nav-w: 240px;
+  --pms-topbar-h: 52px;
+  --pms-focus: 0 0 0 3px var(--pms-accent-soft), 0 0 0 5px var(--pms-accent);
+
+  --pms-gel: "₾";
+  --pms-eur: "€";
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --pms-motion: 0ms;
+  }
+}
+
+html {
+  --pms-motion: 120ms;
+}
+
+.pms-root {
+  font-family: var(--pms-font);
+  font-size: var(--pms-fs-md);
+  line-height: var(--pms-lh);
+  color: var(--pms-ink);
+  background: var(--pms-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.pms-mono,
+.pms-money,
+.pms-date {
+  font-family: var(--pms-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.pms-money {
+  letter-spacing: -0.02em;
+}
