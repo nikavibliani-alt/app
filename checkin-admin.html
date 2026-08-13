@@ -2185,7 +2185,8 @@ async function loadElevatorCode(){
       _source:'rtdb',
     };
   }else if(fsData){
-    gsElevatorData={...fsData,qrCode:fsData.qr_code||'',_source:'firestore'};
+    // When Firestore wins, fall back to RTDB's qr_code if Firestore record predates the dual-write fix
+    gsElevatorData={...fsData,qrCode:fsData.qr_code||rtdbData?.qr_code||'',_source:'firestore'};
   }else{
     gsElevatorData=null;
   }
