@@ -1697,6 +1697,16 @@ function showHome(){
           localStorage.setItem('maxela_apt_id',_newRoom);
           if(_prev)localStorage.removeItem('maxela_g_'+_prev);
           setDoc(doc(db,'checkin_guests',guestId),{aptId:_newRoom},{merge:true}).catch(()=>{});
+          (async()=>{try{
+            const _arrDate=guestData.arrivalDate||'';
+            const _newDocId=`${_newRoom}_${_arrDate||Date.now()}`;
+            const _existing=await getDoc(doc(db,'checkin_guests',_newDocId));
+            if(!_existing.exists()){
+              const {id:_,submittedAt:_s,..._baseData}=guestData;
+              await setDoc(doc(db,'checkin_guests',_newDocId),{..._baseData,aptId:_newRoom,movedFrom:_prev,submittedAt:serverTimestamp()});
+              console.log('[RoomFix] Created new doc',_newDocId);
+            }
+          }catch(_e){console.error('[RoomFix] new doc error',_e);}})();
           getDoc(doc(db,'checkin_apartments',_newRoom))
             .then(s=>{if(s.exists())aptData=s.data();})
             .catch(()=>{})
@@ -2779,6 +2789,16 @@ async function init(){
                   localStorage.setItem('maxela_apt_id',_newRoom);
                   try{const _as=await getDoc(doc(db,'checkin_apartments',_newRoom));if(_as.exists())aptData=_as.data();}catch(e){}
                   setDoc(doc(db,'checkin_guests',savedGuest),{aptId:_newRoom},{merge:true}).catch(()=>{});
+                  try{
+                    const _arrDate=guestData.arrivalDate||'';
+                    const _newDocId=`${_newRoom}_${_arrDate||Date.now()}`;
+                    const _existing=await getDoc(doc(db,'checkin_guests',_newDocId));
+                    if(!_existing.exists()){
+                      const {id:_,..._baseData}=guestData;
+                      await setDoc(doc(db,'checkin_guests',_newDocId),{..._baseData,aptId:_newRoom,movedFrom:_storedRoom||_guestDocRoom,submittedAt:serverTimestamp()});
+                      console.log('[RoomFix] Created new doc',_newDocId);
+                    }
+                  }catch(_e){console.error('[RoomFix] new doc error',_e);}
                 }
               }
             }

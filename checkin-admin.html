@@ -925,7 +925,8 @@ function renderGuests(){
     if(_formById.has(r.id))continue;
     const f=guestData.find(g=>g.matchedReservationId===r.id)||
             guestData.find(g=>g.matchedReservationId===r.reservationNumber)||
-            guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||null;
+            guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||
+            guestData.find(g=>{const gn=_stripRoomNum((g.nameRoman||g.name||'').trim()).toLowerCase();const rn=_stripRoomNum(r.guest||'').toLowerCase();return gn&&rn&&gn===rn&&g.arrivalDate===r.checkin;})||null;
     if(f)_formById.set(r.id,f);
   }
   // Cross-room pass: group by "same guest name + checkin date" → share form across rooms
@@ -1237,7 +1238,8 @@ window.goSearch=function(){
     }
     function getSearchForm(r){
       return guestData.find(g=>g.matchedReservationId===r.id||g.matchedReservationId===r.reservationNumber)||
-             guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||null;
+             guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||
+             guestData.find(g=>{const gn=_stripRoomNum((g.nameRoman||g.name||'').trim()).toLowerCase();const rn=_stripRoomNum(r.guest||'').toLowerCase();return gn&&rn&&gn===rn&&g.arrivalDate===r.checkin;})||null;
     }
     function resolveSearchPhone(r){const f=getSearchForm(r);return(f?.contact||r.phone||r.guest_phone||r.guestPhone||'').trim()||null;}
     function waHrefS(r){const raw=resolveSearchPhone(r);if(!raw)return null;const hasPlus=raw.startsWith('+');const digits=(hasPlus?raw.slice(1):raw).replace(/\D/g,'');if(!digits)return null;const norm=digits.length===9&&digits.startsWith('5')?'995'+digits:digits;return'https://wa.me/'+norm;}
@@ -1967,7 +1969,9 @@ window.viewGuest=function(guestId){
     const perRoomRows=(useResRooms?sibRes.map(r=>{
       // Find matching checkin_guests doc for this room (may not exist)
       const form=guestData.find(x=>x.matchedReservationId===r.id)||
-                 guestData.find(x=>x.aptId===r.roomCode&&x.arrivalDate===r.checkin)||null;
+                 guestData.find(x=>x.matchedReservationId===r.reservationNumber)||
+                 guestData.find(x=>x.aptId===r.roomCode&&x.arrivalDate===r.checkin)||
+                 guestData.find(x=>{const gn=_stripRoomNum((x.nameRoman||x.name||'').trim()).toLowerCase();const rn=_stripRoomNum(r.guest||'').toLowerCase();return gn&&rn&&gn===rn&&x.arrivalDate===r.checkin;})||null;
       const {label:sLabel,cls:sCls}=form?guestStatus(form):{label:'No form',cls:'waiting'};
       const accessBtn=form
         ?(form.manualUnlock
