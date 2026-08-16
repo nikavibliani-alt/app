@@ -1031,8 +1031,9 @@ function renderGuests(){
     const guestCnt=r.guests>1?` · ${r.guests} guests`:'';
     const sourceLine=src?(src+guestCnt):guestCnt.trim();
     const multiRoomBadge=isMultiRoom(r)?`<span class="go-pill go-pill-info" style="font-size:9px;padding:1px 5px;margin-left:5px;vertical-align:middle;">MULTI-ROOM</span>`:'';
+    const displayRoom=form?.aptId||r.roomCode||r.room||'—';
     return`<div class="go-row" style="grid-template-columns:${COLS}" ${clickAttr}>
-      <div class="go-room">${esc(r.roomCode||r.room||'—')}</div>
+      <div class="go-room">${esc(displayRoom)}</div>
       <div style="min-width:0">
         <div class="go-guest-name">${esc(_stripRoomNum(r.guest||'')||'—')}${multiRoomBadge}</div>
         ${sourceLine?`<div class="go-guest-sub">${esc(sourceLine)}</div>`:''}
@@ -1066,7 +1067,7 @@ function renderGuests(){
   }
   function mergedRow(grp,sub){
     const sorted=[...grp].sort(byRoom);
-    const roomStr=sorted.map(r=>r.roomCode||r.room||'—').join(' · ');
+    const roomStr=sorted.map(r=>{const _f=getForm(r);return _f?.aptId||r.roomCode||r.room||'—';}).join(' · ');
     const name=_stripRoomNum(grp[0].guest||'')||'—';
     const form=grp.reduce((f,r)=>f||getForm(r),null);
     const clickAttr=form?`onclick="window.viewGuest('${form.id}')" style="cursor:pointer"`:'';
@@ -1261,7 +1262,7 @@ window.goSearch=function(){
       const waBtn=wa?`<a class="go-action" href="${wa}" target="_blank" rel="noopener">WhatsApp</a>`:`<button class="go-action" disabled style="opacity:.35;cursor:not-allowed;">WhatsApp</button>`;
       const detailsBtn=form?`<button class="go-action" onclick="window.viewGuest('${form.id}')">Details</button>`:'';
       return`<div class="go-row" style="grid-template-columns:${COLS}">
-        <div class="go-room">${esc(r.roomCode||'—')}</div>
+        <div class="go-room">${esc(form?.aptId||r.roomCode||'—')}</div>
         <div style="min-width:0"><div class="go-guest-name">${esc(r.guest||'—')}</div>${srcLine?`<div class="go-guest-sub">${esc(srcLine)}</div>`:''}<div class="go-guest-dates">${esc(datesLine)}</div></div>
         <div class="go-contact">${esc(resolveSearchPhone(r)||'—')}</div>
         <div><span class="go-pill ${statusCls}">${statusLabel}</span></div>
