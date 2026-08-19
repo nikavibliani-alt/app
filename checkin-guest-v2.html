@@ -1448,7 +1448,6 @@ window.searchReservation=async function(){
     const resSnap=aptId
       ?await _getDocs(query(collection(db,'reservations'),where('roomCode','==',aptId)))
       :await _getDocs(collection(db,'reservations'));
-    const allMatches=[];
     const allScored=[];
     let _bestMatch=null,_bestScore=0;
     resSnap.forEach(d=>{
@@ -1475,13 +1474,22 @@ window.searchReservation=async function(){
         else if(dateOk&&partial)score=isAr?3:2;
       }
       if(score>_bestScore){_bestScore=score;_bestMatch=r;}
-      if(score>=3)allMatches.push({res:r,score});
       allScored.push({guest:r.guest||r.guestName||'',room:r.roomCode||'',checkin:ci,score});
     });
     console.log('Scored reservations:',allScored.map(r=>({name:r.guest,score:r.score})));
     console.log('[DEBUG] input name:',JSON.stringify(name),'arrival:',arrival);
-    console.log('[DEBUG] total docs:',allScored.length,'matches (score>=3):',allMatches.length,'bestScore:',_bestScore,'bestMatch:',_bestMatch?.guest||'none');
-    if(!allMatches.length){
+    console.log('[DEBUG] total docs:',allScored.length,'bestScore:',_bestScore,'bestMatch:',_bestMatch?.guest||'none');
+    // SECURITY: only ONE reservation — the single highest-scoring match — is ever treated
+    // as "this guest". We used to also pull in every OTHER reservation that fuzzy-matched
+    // the typed name + arrival date (score>=3), intending to catch true multi-room bookings.
+    // But two different guests (e.g. family members sharing a surname, or two unrelated
+    // guests who both typed "Mohammad ...") arriving on the same day can BOTH clear that
+    // fuzzy bar, which silently merged a stranger's room into this guest's session and
+    // wrote this guest's passport/contact data onto the stranger's checkin_guests doc.
+    // Real multi-room bookings share the exact same MiniHotel reservationNumber, so once
+    // we've picked the single best match by name+date, we look up siblings by that exact
+    // reservationNumber only — never by fuzzy name again.
+    if(_bestScore<3||!_bestMatch){
       try{
         await addDoc(collection(db,'search_failures'),{
           input_name:name||'',
@@ -1510,10 +1518,20 @@ window.searchReservation=async function(){
       wrap.appendChild(errEl);
       return;
     }
-    allMatches.sort((a,b)=>b.score-a.score);
-    allMatchedReservations=allMatches.map(m=>m.res);
-    _pendingReg={name:name||(allMatches[0].res?.guest||''),guests,nationality,contact,contactType,arrival};
-    _pendingMatches=[...allMatches];
+    // Build the multi-room sibling group strictly by exact reservationNumber match —
+    // NEVER by name/date fuzzy match — so a different guest's room can't be pulled in.
+    let group=[_bestMatch];
+    const _primaryRn=String(_bestMatch.reservationNumber||'').trim();
+    if(_primaryRn){
+      try{
+        const sibSnap=await _getDocs(query(collection(db,'reservations'),where('reservationNumber','==',_primaryRn)));
+        const sibs=sibSnap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
+        if(sibs.length)group=sibs;
+      }catch(e){console.warn('[MultiRoom] sibling lookup failed, using single match',e);}
+    }
+    allMatchedReservations=group;
+    _pendingReg={name:name||(_bestMatch.guest||''),guests,nationality,contact,contactType,arrival};
+    _pendingMatches=[{res:_bestMatch,score:_bestScore}];
     btn.disabled=false;
     document.getElementById('t-search-btn').textContent='Find my booking';
     _showPage('page-rules');

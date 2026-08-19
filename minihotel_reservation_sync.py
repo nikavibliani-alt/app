@@ -525,21 +525,28 @@ def fetch_guest_details(session, db, reservations):
 
     for r in targets:
         res_num = str(r.get('reservationNumber', '')).strip()
-        member_id = r.get('memberId', '')
-        doc_id = f"{res_num}_{member_id}" if member_id else res_num
-        if not doc_id:
+        if not res_num:
             continue
 
-        # Skip if phone already stored
-        doc_ref = coll.document(doc_id)
+        # Find every Firestore doc for this reservationNumber (handles both the
+        # single-doc case and multi-room bookings, whose doc IDs are suffixed
+        # with either memberId or roomCode by sync_to_firestore — never assume
+        # which suffix was used, always look up by the reservationNumber field
+        # so we don't accidentally write phone/email into a stray, wrong doc).
         try:
-            snap = doc_ref.get()
-            if snap.exists and snap.to_dict().get('phone'):
-                skipped += 1
-                continue
+            docs = list(coll.where('reservationNumber', '==', res_num).stream())
         except Exception as e:
-            print(f"  Firestore read error for {doc_id}: {e}")
+            print(f"  Firestore read error for {res_num}: {e}")
             errors += 1
+            continue
+        if not docs:
+            skipped += 1
+            continue
+        doc_id = ",".join(d.id for d in docs)
+
+        # Skip if phone already stored on all matching docs
+        if all(d.to_dict().get('phone') for d in docs):
+            skipped += 1
             continue
 
         # Call MiniHotel detail endpoint
@@ -572,7 +579,8 @@ def fetch_guest_details(session, db, reservations):
             if guest_count is not None: update['guestCount'] = guest_count
 
             if update:
-                doc_ref.set(update, merge=True)
+                for d in docs:
+                    d.reference.set(update, merge=True)
                 print(f"  {doc_id}: phone={phone or '—'} email={email or '—'} country={country or '—'}")
                 updated += 1
             else:
