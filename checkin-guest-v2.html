@@ -1306,6 +1306,9 @@ window.switchApt=async function(newRoomCode){
   // Restart reservation subscription for the new apt.
   // Capture the room we subscribed for — if aptId changes again before this fires, ignore.
   const _snapRoom=aptId;
+  // Pin the reservation ID we selected from allMatchedReservations above so the onSnapshot
+  // callback cannot overwrite activeReservation with a different guest's record.
+  const _targetResId=activeReservation?.id||null;
   _homeSnaps.push(onSnapshot(
     query(collection(db,'reservations'),where('roomCode','==',_snapRoom)),
     snap=>{
@@ -1319,7 +1322,10 @@ window.switchApt=async function(newRoomCode){
         const withPw=pool.filter(r=>r.tuyaPassword);
         return(withPw.length?withPw:pool).sort((a,b)=>((a.checkin||a.checkIn||'')<(b.checkin||b.checkIn||''))?-1:1)[0]||null;
       }
-      activeReservation=pickBest(current)||pickBest(upcoming);
+      let picked=null;
+      if(_targetResId){const matched=valid.find(r=>r.id===_targetResId);if(matched)picked=matched;}
+      if(!picked)picked=pickBest(current)||pickBest(upcoming);
+      activeReservation=picked;
       console.log('[ResvSelect] Selected:',activeReservation?.checkin,activeReservation?.checkout,activeReservation?.roomCode);
       renderTiles();
     }
@@ -1743,7 +1749,11 @@ function showHome(){
         // If guest has a matchedReservationId, pin to it first (only if not expired)
         const matchedId=guestData?.matchedReservationId;
         let picked=null;
-        if(matchedId){
+        // For multi-room guests who switched to a secondary room, matchedReservationId refers to the
+        // primary room and won't match here. Check allMatchedReservations for the current aptId first.
+        const _knownIds=allMatchedReservations.filter(r=>r.roomCode===aptId).map(r=>r.id).filter(Boolean);
+        if(_knownIds.length){const _m=valid.find(r=>_knownIds.includes(r.id));if(_m)picked=_m;}
+        if(!picked&&matchedId){
           const matched=valid.find(r=>r.id===matchedId);
           if(matched)picked=matched;
         }
@@ -2645,8 +2655,9 @@ window.logout=function(){
   localStorage.removeItem('maxela_apt_id');
   localStorage.removeItem('maxela_guest_id');
   localStorage.removeItem('maxela_v2_session');
+  localStorage.removeItem('maxela_all_res');
   if(aptId)localStorage.removeItem('maxela_g_'+aptId);
-  guestId=null;guestData=null;aptData=null;activeReservation=null;
+  guestId=null;guestData=null;aptData=null;activeReservation=null;allMatchedReservations=[];
   passportFile=null;passportScanResult=null;
   stopUnlockPoller();_hkTodayData=null;
   aptId=params.get('apt')||'';
@@ -2755,7 +2766,9 @@ async function init(){
       // Firestore confirmed doc is gone (admin purge / test cleanup) — safe to clear
       localStorage.removeItem('maxela_apt_id');
       localStorage.removeItem('maxela_guest_id');
+      localStorage.removeItem('maxela_all_res');
       if(aptId)localStorage.removeItem('maxela_g_'+aptId);
+      allMatchedReservations=[];
       // falls through to show register page below
     }
 
@@ -2769,7 +2782,9 @@ async function init(){
         if(Date.now()>_coMs){
           console.log('[init] Session expired past checkout — clearing');
           localStorage.removeItem('maxela_apt_id');localStorage.removeItem('maxela_guest_id');
+          localStorage.removeItem('maxela_all_res');
           if(aptId)localStorage.removeItem('maxela_g_'+aptId);
+          allMatchedReservations=[];
           // falls through to register page
         }else{
           // Session valid — restore home screen
