@@ -271,6 +271,18 @@ def sync_to_firestore(db, reservations):
         existing = ref.get()
         payload = dict(doc)
         if existing.exists and existing.to_dict().get('manualRoom'):
+            existing_data = existing.to_dict()
+            frozen_room = existing_data.get('roomCode')
+            live_room = payload.get('roomCode')
+            if frozen_room and live_room and frozen_room != live_room:
+                # manualRoom permanently blocks roomCode updates from here on — that's
+                # intentional for one-off overrides, but if MiniHotel's live room has since
+                # diverged from the frozen value, this doc will silently show the WRONG room
+                # forever unless a human notices. Surface it loudly every run instead of
+                # letting it drift unseen.
+                print(f"  ⚠️  MANUALROOM DRIFT: {doc_id} ({doc.get('guest')}) is frozen at "
+                      f"roomCode='{frozen_room}' but MiniHotel now shows '{live_room}'. "
+                      f"If this is stale, clear manualRoom or update roomCode by hand.")
             payload.pop('roomCode', None)
             payload.pop('allRooms', None)
             payload.pop('minihotelRoom', None)
@@ -305,16 +317,27 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
     active_res_nums = set()     # all reservation numbers — no room/status filtering
     active_room_pairs = set()   # "{rn}_{roomCode}" for known-room entries
     active_checkin_keys = set() # "{roomCode}_{checkin}" for old-doc cleanup (unchanged)
+    rooms_by_rn = {}            # rn -> set of currently-valid room codes (for plain-doc self-heal)
     room_code_values = set(ROOM_MAP.values())
 
     for r in api_reservations:
         rn = str(r.get('reservationNumber', '') or '').strip()
         if rn:
             active_res_nums.add(rn)
+        # BUG FIX: only count a room as "active" for this reservation if the row's
+        # status is actually valid. Previously this had no status filter, so a
+        # superseded/historical row MiniHotel still echoes back for a reservation
+        # that had a room change (e.g. a stale line for the OLD room) kept counting
+        # as "active" forever — which masked the fact that the OLD room assignment
+        # was stale, so the orphan-cleanup below never removed it and the wrong
+        # room kept showing to guests indefinitely.
+        if r.get('status', '') not in VALID_STATUSES:
+            continue
         room_code = ROOM_MAP.get(r.get('roomNumber', ''))
         checkin = parse_date(r.get('checkIn'))
         if room_code and rn:
             active_room_pairs.add(f"{rn}_{room_code}")
+            rooms_by_rn.setdefault(rn, set()).add(room_code)
         if room_code and checkin:
             active_checkin_keys.add(f"{room_code}_{checkin}")
 
@@ -374,6 +397,31 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
                     stale_deleted += 1
                     op_count += 1
                     print(f"  Stale orphan deleted: {doc_id} | {data.get('guest')} | {data.get('roomCode')}")
+            elif doc_id == rn:
+                # BUG FIX: plain (non-suffixed) docs — the normal case for a single-room
+                # reservation, e.g. Juan's doc "007005004" — were previously EXEMPT from
+                # any staleness check at all. If MiniHotel's room for this reservation
+                # changed and, for whatever reason (a manualRoom flag set at some point,
+                # or a doc-ID naming change across syncs), sync_to_firestore's normal
+                # merge write stopped landing on this doc, the stored roomCode could
+                # silently go stale forever with nothing here ever catching it. Self-heal
+                # it: if we know the single currently-valid room for this reservation
+                # and it doesn't match what's stored, correct it — unless manualRoom is
+                # set, in which case we leave it alone (that's a deliberate override) but
+                # the drift warning in sync_to_firestore already flags it loudly.
+                live_rooms = rooms_by_rn.get(rn)
+                stored_room = data.get('roomCode')
+                if (live_rooms and len(live_rooms) == 1 and not data.get('manualRoom')):
+                    correct_room = next(iter(live_rooms))
+                    if stored_room and stored_room != correct_room:
+                        batch.update(doc.reference, {
+                            'roomCode': correct_room,
+                            'allRooms': correct_room,
+                            'syncedAt': firestore.SERVER_TIMESTAMP,
+                        })
+                        op_count += 1
+                        print(f"  Self-healed stale roomCode: {doc_id} | {data.get('guest')} | "
+                              f"{stored_room} → {correct_room}")
 
         if op_count > 0 and op_count % 450 == 0:
             batch.commit()
