@@ -1979,12 +1979,21 @@ window.viewGuest=function(guestId){
           ?`<button class="btn btn-sm btn-red" style="flex-shrink:0;" onclick="window.lockRoomDrawer('${form.id}')">Lock</button>`
           :`<button class="btn btn-sm btn-green" style="flex-shrink:0;" onclick="window.unlockRoomDrawer('${form.id}')">Unlock</button>`)
         :'';
-      return`<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface2);border-radius:var(--rs);margin-bottom:6px;">
-        <div style="flex:1;min-width:0;">
+      return`<div style="display:flex;flex-direction:column;gap:6px;padding:10px 12px;background:var(--surface2);border-radius:var(--rs);margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <span style="font-weight:700;font-size:13px;font-family:'DM Mono',monospace;">${esc(r.roomCode)}</span>
+          ${r.manualRoom?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;background:#fef3c7;color:#92400e;letter-spacing:.04em;">MANUAL</span>`:''}
+          <span style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;">${esc(r.reservationNumber||r.id||'')}</span>
         </div>
-        <span class="unlock-badge ${sCls}" style="flex-shrink:0;">${sLabel}</span>
-        ${accessBtn}
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span class="unlock-badge ${sCls}" style="flex-shrink:0;">${sLabel}</span>
+          ${accessBtn}
+          <select id="room-fix-${esc(r.id)}" style="padding:4px 8px;border:1px solid var(--border);border-radius:var(--rs);font-size:12px;font-family:inherit;color:var(--text);background:var(--surface);cursor:pointer;">
+            ${['0-1','0-2','0-3','0-4','0-5','6-1','6-2','6-3','6-4','7-1','7-2','7-4','tab-1','tab-2','tab-3','orb-1','orb-2','orb-3'].map(rc=>`<option value="${rc}"${rc===r.roomCode?' selected':''}>${rc}</option>`).join('')}
+          </select>
+          <button class="btn btn-sm" onclick="window.moveRoomInGroup('${esc(r.id)}','${esc(form?.id||'')}',document.getElementById('room-fix-${esc(r.id)}').value)">Fix</button>
+          <button class="btn btn-sm btn-red" onclick="window.deleteOrphanRes('${esc(r.id)}')">Delete doc</button>
+        </div>
       </div>`;
     }):group.map(x=>{
       const apt=APARTMENTS.find(a=>a.id===x.aptId);
@@ -1992,13 +2001,20 @@ window.viewGuest=function(guestId){
       const accessBtn=x.manualUnlock
         ?`<button class="btn btn-sm btn-red" style="flex-shrink:0;" onclick="window.lockRoomDrawer('${x.id}')">Lock</button>`
         :`<button class="btn btn-sm btn-green" style="flex-shrink:0;" onclick="window.unlockRoomDrawer('${x.id}')">Unlock</button>`;
-      return`<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface2);border-radius:var(--rs);margin-bottom:6px;">
-        <div style="flex:1;min-width:0;">
+      return`<div style="display:flex;flex-direction:column;gap:6px;padding:10px 12px;background:var(--surface2);border-radius:var(--rs);margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <span style="font-weight:700;font-size:13px;font-family:'DM Mono',monospace;">${esc(apt?.code||x.aptId)}</span>
-          <span style="font-size:11px;color:var(--muted);margin-left:6px;">${esc(apt?.name||'')}</span>
+          <span style="font-size:11px;color:var(--muted);">${esc(apt?.name||'')}</span>
+          <span style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;">${esc(x.id)}</span>
         </div>
-        <span class="unlock-badge ${sCls}" style="flex-shrink:0;">${sLabel}</span>
-        ${accessBtn}
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span class="unlock-badge ${sCls}" style="flex-shrink:0;">${sLabel}</span>
+          ${accessBtn}
+          <select id="room-fix-${esc(x.id)}" style="padding:4px 8px;border:1px solid var(--border);border-radius:var(--rs);font-size:12px;font-family:inherit;color:var(--text);background:var(--surface);cursor:pointer;">
+            ${['0-1','0-2','0-3','0-4','0-5','6-1','6-2','6-3','6-4','7-1','7-2','7-4','tab-1','tab-2','tab-3','orb-1','orb-2','orb-3'].map(rc=>`<option value="${rc}"${rc===x.aptId?' selected':''}>${rc}</option>`).join('')}
+          </select>
+          <button class="btn btn-sm" onclick="window.moveRoomInGroup('${esc(x.matchedReservationId||'')}','${esc(x.id)}',document.getElementById('room-fix-${esc(x.id)}').value)">Fix</button>
+        </div>
       </div>`;
     })).join('');
     document.getElementById('drawer-body').innerHTML=`
@@ -2108,6 +2124,32 @@ window.moveGuest=async function(guestId){
     window.viewGuest(guestId);
   }catch(e){
     console.error('[MoveGuest] Error:',e);
+    toast('Error: '+e.message);
+  }
+};
+
+window.moveRoomInGroup=async function(resDocId,formId,newRoom){
+  if(!newRoom){toast('No room selected');return;}
+  try{
+    if(resDocId)await updateDoc(doc(db,'reservations',resDocId),{roomCode:newRoom,allRooms:newRoom,manualRoom:true});
+    if(formId)await setDoc(doc(db,'checkin_guests',formId),{aptId:newRoom},{merge:true});
+    toast('Room updated to '+newRoom);
+    if(_drawerPrimaryId)window.viewGuest(_drawerPrimaryId);
+  }catch(e){
+    console.error('[MoveRoomInGroup] Error:',e);
+    toast('Error: '+e.message);
+  }
+};
+
+window.deleteOrphanRes=async function(resDocId){
+  if(!resDocId)return;
+  if(!confirm('Delete reservation doc “'+resDocId+'”?\n\nOnly use this on a stale or duplicate reservation doc — NOT a real guest booking. This cannot be undone.'))return;
+  try{
+    await deleteDoc(doc(db,'reservations',resDocId));
+    toast('Deleted reservation '+resDocId);
+    if(_drawerPrimaryId)window.viewGuest(_drawerPrimaryId);
+  }catch(e){
+    console.error('[DeleteOrphanRes] Error:',e);
     toast('Error: '+e.message);
   }
 };
