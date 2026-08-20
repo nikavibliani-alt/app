@@ -222,12 +222,38 @@ def transform_reservation(r):
     }
 
 
+def propagate_room_change(db, reservation_doc_id, reservation_number, new_room):
+    """Propagate a roomCode correction into checkin_guests.aptId.
+
+    Queries checkin_guests where matchedReservationId matches either the doc ID
+    or the raw reservationNumber, then updates aptId on any stale docs found.
+    """
+    cg = db.collection('checkin_guests')
+    updated = 0
+    seen = set()
+    search_ids = list(dict.fromkeys(i for i in [reservation_doc_id, reservation_number] if i))
+    for sid in search_ids:
+        for snap in cg.where('matchedReservationId', '==', sid).get():
+            if snap.id in seen:
+                continue
+            seen.add(snap.id)
+            d = snap.to_dict()
+            old_apt = d.get('aptId', '')
+            if old_apt != new_room:
+                snap.reference.update({'aptId': new_room})
+                name = d.get('name') or d.get('nameRoman') or '?'
+                print(f"  [propagate] {snap.id} | {name} | aptId: '{old_apt}' → '{new_room}'")
+                updated += 1
+    return updated
+
+
 def sync_to_firestore(db, reservations):
     """Write/update reservations in Firestore using reservationNumber as doc ID."""
     coll = db.collection('reservations')
     batch = db.batch()
     count = 0
     skipped = 0
+    pending_propagations = []
 
     # Detect which reservation numbers appear more than once with different valid rooms
     res_num_counts = {}
@@ -270,6 +296,13 @@ def sync_to_firestore(db, reservations):
         ref = coll.document(doc_id)
         existing = ref.get()
         payload = dict(doc)
+        if existing.exists:
+            _ed = existing.to_dict()
+            if not _ed.get('manualRoom'):
+                _old = _ed.get('roomCode', '')
+                _new = payload.get('roomCode', '')
+                if _old and _new and _old != _new:
+                    pending_propagations.append((doc_id, res_num, _new))
         if existing.exists and existing.to_dict().get('manualRoom'):
             existing_data = existing.to_dict()
             frozen_room = existing_data.get('roomCode')
@@ -299,6 +332,9 @@ def sync_to_firestore(db, reservations):
 
     if count % 450 != 0:
         batch.commit()
+
+    for _did, _rn, _room in pending_propagations:
+        propagate_room_change(db, _did, _rn, _room)
 
     print(f"Synced {count} reservations, skipped {skipped}")
     return count
@@ -353,6 +389,7 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
     cancelled = 0
     stale_deleted = 0
     near_term_cancellations = []  # {checkin, property_type} for urgent reprice trigger
+    self_heal_propagations = []
 
     today = datetime.datetime.utcnow().date()
     cutoff_14d = (today + datetime.timedelta(days=14)).strftime('%Y-%m-%d')
@@ -420,6 +457,7 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
                             'syncedAt': firestore.SERVER_TIMESTAMP,
                         })
                         op_count += 1
+                        self_heal_propagations.append((doc_id, rn, correct_room))
                         print(f"  Self-healed stale roomCode: {doc_id} | {data.get('guest')} | "
                               f"{stored_room} → {correct_room}")
 
@@ -430,6 +468,10 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
 
     if op_count % 450 != 0:
         batch.commit()
+
+    for _did, _rn, _room in self_heal_propagations:
+        propagate_room_change(db, _did, _rn, _room)
+
     print(f"Detected {cancelled} cancellations, deleted {stale_deleted} stale room-move orphans")
     return near_term_cancellations
 
