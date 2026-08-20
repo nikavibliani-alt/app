@@ -2,14 +2,15 @@
 
 > **READ THIS FILE before every major step.**  
 > Used by Cursor Cloud Agent and Claude / Claude Code.  
-> Do not start coding a section until it is claimed below and the system model in §2–§4 is still accurate.
+> Do not start coding a section until it is claimed below and the system model in §2–§5 is still accurate.
 
-**Status:** System model agreed in principle — visual design NOT started  
-**Primary file:** `checkin-guest-v2.html`  
-**Do not touch:** `checkin-admin.html`, `minihotel_reservation_sync.py`  
-**Related (may change later):** `checkin-details.html` (content likely moves into home)  
+**Status:** Host decisions locked (§7) — sandbox build next; production URL unchanged until cutover  
+**Sandbox file (build here):** `checkin-guest-sandbox.html` *(create when Phase 1 opens — do not overwrite live guest page yet)*  
+**Production file / final URL:** `checkin-guest-v2.html` → https://app.maxelaapartments.com/checkin-guest-v2.html  
+**Admin file (separate track):** `checkin-admin.html`  
+**Do not touch without claim:** `minihotel_reservation_sync.py`  
+**Related:** `checkin-details.html` (content moves into guest home; production link stays guest v2)  
 **Firebase project:** `sleepy-5c962`  
-**Live URL:** https://app.maxelaapartments.com/checkin-guest-v2.html  
 **Spec audit:** `CHECKIN_GUEST_SPEC.md` · **System map:** `CODEBASE.md`
 
 ---
@@ -19,113 +20,120 @@
 ### Rules (non-negotiable)
 
 1. **Read this file first** at the start of every session and before every PR / major edit.
-2. **Claim a workstream** in §8 before editing. Put your name/tool, date, and file list.
-3. **One owner per file at a time.** If `checkin-guest-v2.html` is claimed, the other agent does not edit it until the claim is released.
-4. **Do not redesign and rewrite logic in the same pass** unless this doc says that phase is open.
-5. **Preserve unlock / search / registration behavior** unless §4 explicitly lists a change.
+2. **Claim a workstream** in §9 before editing. Put your name/tool, date, and file list.
+3. **One owner per file at a time.** Sandbox guest file and admin file can be claimed by different agents in parallel.
+4. **Sandbox first.** Until cutover is explicitly approved, all guest redesign code goes into `checkin-guest-sandbox.html` (or agreed sandbox name). Do **not** replace `checkin-guest-v2.html` mid-design.
+5. **Do not redesign and rewrite unlock/search logic in the same pass** unless this doc says that phase is open.
 6. **Update this doc** when you finish a chunk: mark the workstream done, note what changed, link commit/PR.
-7. **Conflicts:** Prefer updating this doc and stopping over “fixing” overlapping CSS/HTML by force.
+7. **Conflicts:** Prefer updating this doc and stopping over force-merging overlapping CSS/HTML.
 
 ### Preferred split (default)
 
 | Agent | Owns by default | Does not own |
 |-------|-----------------|--------------|
-| **Cursor** | Information architecture, home shell (locked countdown + unlocked check-in surface), coordination docs, wiring `isUnlocked` → home content | Deep services modal redesign, admin panel |
-| **Claude / Claude Code** | Services section / services page UX, copy & translations polish, merging tour/instructions content from `checkin-details.html` once Cursor shells the home | Changing unlock math, reservation search, Firestore schema |
+| **Cursor** | This doc, guest sandbox shell (countdown + access codes home), cutover plan | Deep services copy/modals unless claimed; admin until admin track opens |
+| **Claude / Claude Code** | Porting check-in tour/instructions into sandbox unlocked region; Airport shuttle + tours UI; copy/i18n | Changing unlock math / search; overwriting production `checkin-guest-v2.html` before cutover |
 
-If either agent needs the other’s file: **update §8 claim**, wait until the other releases, then proceed.
+Admin redesign is a **separate track** (§8). Claim `admin-*` workstreams before touching `checkin-admin.html`.
 
 ---
 
-## 1. Product problem (why we are redesigning)
+## 1. Product problem
 
 ### What happens today
 
 1. Guest enters name + check-in date → system finds reservation.
-2. After rules + passport, guest lands on a **tile menu** (Check-in Details, WiFi, Services, Location & Parking, etc.).
-3. Check-in instructions live behind **Check-in Details** (`checkin-details.html`) — a second page guests must discover.
-4. Guests **do not click** those tiles. They **WhatsApp the host** asking for check-in details.
+2. After rules + passport, guest lands on a **tile menu**.
+3. Check-in instructions live behind **Check-in Details** (`checkin-details.html`).
+4. Guests **do not click** those tiles. They **WhatsApp the host**.
 
 ### Root cause
 
-The page is structured like an **app dashboard**. Guests treat it like a **key + instructions**. They need the answer on the first screen after registration — not a menu of options.
+The page is a dashboard. Guests need a **daily key**: door password + elevator QR/code. Those must live on the main screen.
 
 ### Success criteria
 
-- After booking is found and registration completes, the **main screen answers “how do I get in?”** without requiring another click.
-- **Before unlock time:** main screen shows a clear **countdown** and states that check-in details appear here when the countdown ends (so guests stop texting early).
-- **After unlock:** main screen **is** the check-in instructions (codes, steps, elevator/QR as applicable).
-- **Services** are easy to find on/near that main screen (exact UI TBD — design phase later).
-- Host receives fewer “where are my check-in details?” messages for guests who already completed registration.
+- Same final link guests already use (`checkin-guest-v2.html` / live URL).
+- After registration, **main screen = check-in / access**, not a menu.
+- **Locked:** countdown + “details unlock on this page when the timer ends.”
+- **Unlocked:** door code + elevator (QR and/or numeric) + arrival steps on that same page.
+- Guests return to this page throughout the stay for **door password** and **elevator**.
+- Secondary: **location + parking**, plus **Airport shuttle** and **tours** only (not full services catalog on main).
+- WiFi is deprioritized (not a main-page priority).
+- Host gets fewer “where are my details?” messages.
 
 ---
 
-## 2. Target guest flow (system — not visual)
-
-Registration funnel stays. **Home meaning changes.**
+## 2. Target guest flow (system)
 
 ```
 Loading
-  → Register (name + date [+ contact/guests as today])
-  → House rules (3 checkboxes)
-  → Passport upload
-  → HOME (new role — see §3)
-       ├─ LOCKED state  → countdown + “details unlock here at …”
-       └─ UNLOCKED state → check-in instructions as the page itself
+  → Register (name + date + contact/guests as today)
+  → House rules (required)
+  → Passport upload (required before arrival / before home)
+  → HOME
+       ├─ LOCKED   → countdown + message (details unlock HERE)
+       │              + secondary: location/parking, airport shuttle, tours, contact
+       └─ UNLOCKED → THIS PAGE IS the key:
+                      door/smart-lock password (always prominent)
+                      elevator code + QR (when room needs it)
+                      check-in walkthrough / photos / video
+                      + same secondary links
 ```
 
-Returning guests with valid `localStorage` still go straight to HOME (same as today).
+Returning guests with valid session → straight to HOME.
 
-### Explicitly unchanged in v1 of this redesign
+### Explicitly unchanged unless host asks later
 
-- `searchReservation()` scoring and sibling matching  
+- `searchReservation()` scoring / sibling matching  
 - Rules → passport order  
-- `finishRegistration_()` Firestore / Storage writes  
-- `isUnlocked()` rules (see §4)  
-- Admin visibility config shape in `checkin_admin/config`  
-- Multi-room `switchApt()` behavior (must still work on new home)  
-- Blocked / post-checkout / preview modes (must still work)
+- `finishRegistration_()` writes  
+- `isUnlocked()` math (§4)  
+- Multi-room `switchApt()`  
+- Blocked / post-checkout / preview  
 
 ---
 
-## 3. New home information architecture
+## 3. Home information architecture (LOCKED by host 2026-08-20)
 
-### 3.1 Main screen = Check-in (not a menu)
+### 3.1 Primary job: access codes guests reuse
 
-| State | What the guest sees first | What they must NOT need to do |
-|-------|---------------------------|-------------------------------|
-| **Locked** | Countdown to unlock + short message: check-in details will appear **on this page** at that time | Click “Check-in Details”, open another HTML file, or guess a tile |
-| **Unlocked** | Check-in instructions content (door/access code, elevator if needed, step photos/video as today in `checkin-details.html`) | Navigate away to get codes |
+| Priority | Content | Notes |
+|----------|---------|--------|
+| **P0** | Smart-lock / door password | Guests need this constantly — always above the fold when unlocked |
+| **P0** | Elevator QR **or** numeric code | Rooms that need elevator (`needsElevatorCode()`); both entry methods matter |
+| **P0** | Arrival instructions / tour | From today’s `checkin-details.html` content, inlined on home when unlocked |
+| **P1** | Location & parking | Keep; apartment address + parking |
+| **P1** | Airport shuttle | Keep as a service entry on/near main |
+| **P1** | Tours (city tour) | Keep as a service entry on/near main |
+| **P2 / hide from main** | WiFi | Not important for this redesign — do not feature on main; may remain deep/hidden via admin visibility |
+| **P2 / hide from main** | Cleaning, laundry, other services | Not on main catalog for v1 |
+| **P2** | Recommendations, full house-rules page | Not primary; optional later |
 
-### 3.2 Secondary content (still available, not primary)
+### 3.2 Locked vs unlocked
 
-Order of priority on/near home (system priority — layout TBD in design phase):
+| State | Main screen |
+|-------|-------------|
+| **Locked** | Countdown + clear copy that **check-in details unlock on this same page**. No door/elevator codes yet. Secondary: location/parking + shuttle/tours + contact OK. |
+| **Unlocked** | Same page reveals door password, elevator QR/code, instructions. No navigation to another HTML file required. |
 
-1. **Check-in / access** (primary — always above the fold when unlocked)  
-2. **Services** (elevated — host wants a better services presence on main; design later)  
-3. WiFi, Location & Parking, Recommendations, House Rules, Contact  
+### 3.3 Production link + sandbox
 
-WiFi / location may remain as secondary links or compact sections. They must not compete with check-in for the first viewport.
+| Stage | File | URL |
+|-------|------|-----|
+| **Design / build** | `checkin-guest-sandbox.html` | e.g. `/checkin-guest-sandbox.html` (sandbox only) |
+| **Cutover (end)** | Contents promoted into `checkin-guest-v2.html` | **Same live link** guests already have |
+| **After cutover** | `checkin-details.html` | Redirect or shim to guest home — do not leave a second “real” check-in UI |
 
-### 3.3 Fate of `checkin-details.html`
-
-**Decision (proposed — confirm before coding):**
-
-- Phase A: Home renders the same content `checkin-details.html` already shows (locked card / tour / codes), so guests never need that URL.
-- Phase B: `checkin-details.html` either redirects to `checkin-guest-v2.html` home or stays as a deep-link compatibility shim for old messages/bookmarks.
-
-Do **not** delete `checkin-details.html` until Phase A works and old links are handled.
+Until cutover is host-approved: **never** replace production guest page with unfinished redesign.
 
 ### 3.4 Tile menu
 
-The current 2-column tile dashboard is **not** the primary IA after redesign.  
-Tiles may remain as a compact “more” area below check-in + services, or be replaced — **design decision later**. System rule: nothing critical for arrival lives only behind a tile.
+Tile-first dashboard is retired as the mental model. Secondary items become compact links/sections under the access area — exact UI in design phase.
 
 ---
 
-## 4. Unlock system (keep behavior; change presentation)
-
-Source of truth today: `isUnlocked()` in `checkin-guest-v2.html` (mirrored in `checkin-details.html`).
+## 4. Unlock system (behavior kept; presentation changes)
 
 ```
 today > arrival                          → UNLOCKED
@@ -137,137 +145,154 @@ today === arrival:
   else                                   → LOCKED
 ```
 
-Times use Tbilisi (`tbilisiToday` / `tbilisiHour`).  
-`aptData.checkInTime` drives the hour when set.
+### Presentation
 
-### Presentation rules for redesign
-
-| Condition | Main screen |
-|-----------|-------------|
-| Locked, before arrival day | Show unlock date/time (“Available on 15 Aug at 15:00”) — countdown optional if multi-day away |
-| Locked, on arrival day before hour | **Live countdown** + “Check-in details will appear on this page when the timer ends” |
-| Unlocked (time or HK early or manual) | Show full check-in instructions immediately; no fake lock |
-| Blocked | Keep existing “Access Revoked” behavior |
-| Post-checkout | Keep existing thank-you / expired behavior |
-
-### Polling (keep)
-
-- Unlock poller (~30s) and HK poll (~60s) already exist — home must **auto-flip** from countdown → instructions without refresh when `isUnlocked()` becomes true.
-
-### What NOT to change in unlock math (unless product asks)
-
-- Do not move unlock earlier by default.  
-- Do not show door codes while locked.  
-- Do not remove `manualUnlock` or HK early unlock.
+- On arrival day before unlock: **live countdown** + “details appear on this page when the timer ends.”
+- Before arrival day: show unlock date/time (“Available on 15 Aug at 15:00”).
+- Pollers must auto-flip locked → unlocked without refresh.
+- **Never** show door/elevator secrets while locked.
 
 ---
 
-## 5. Services (system notes — design later)
+## 5. Services scope on guest main (LOCKED)
 
-Host requirement: **better services presence on the main page**, not buried as an equal tile.
+**On / near main page only:**
 
-**System constraints to preserve while redesigning UI later:**
+1. Airport shuttle / transfer (`airport_transfer`)  
+2. Tours / city tour (`city_tour` or equivalent admin service id)
 
-- Reads: `checkin_admin/config.services`, `laundryItems`, visibility flags  
-- Writes: `checkin_requests` + `service_requests` via existing `submitService()`  
-- Modals: `#svc-modal`, `#req-detail-modal`  
-- WhatsApp handoff must remain a user-gesture open  
+**Not featured on main for this redesign:** WiFi, cleaning, laundry, generic “all services” grid.
 
-**Design phase deferred.** When opened, claim workstream `services-ui` in §8. Do not invent new Firestore collections for v1.
+Existing `submitService()` / WhatsApp handoff / `checkin_requests` stay. Design of shuttle + tours UI is a later claimed workstream.
 
----
-
-## 6. Phased delivery (code only after phase opens)
-
-| Phase | Goal | Code? | Owner (default) |
-|-------|------|-------|-----------------|
-| **0 — System agreement** | This doc; confirm IA + unlock presentation | Docs only | Cursor + host |
-| **1 — Home shell** | Replace tile-first home with locked countdown / unlocked check-in host region; wire `isUnlocked` + poller | Yes — careful, minimal visual | Cursor |
-| **2 — Inline check-in content** | Port `checkin-details.html` render logic into home unlocked region | Yes | Claude (or Cursor if free) |
-| **3 — Services elevation** | Services block on/near main; improve services UX | Yes | Claude |
-| **4 — Secondary IA + polish** | WiFi/location/recs placement, copy, motion, brand | Yes | Shared — claim first |
-| **5 — Compatibility** | Redirect/shim `checkin-details.html`; verify multi-room, preview, blocked | Yes | Whoever finishes Phase 2 |
-
-**Do not start Phase 1 coding until host confirms §7.**
+Admin “Guest Page Settings” visibility should eventually align with this IA (admin track).
 
 ---
 
-## 7. Decisions needed from host (before code)
+## 6. Phased delivery
 
-Answer these so agents do not guess:
-
-1. **Registration still required before home?** (Assume YES — rules + passport stay.)  
-2. **Before unlock, can guests still open WiFi / location / services / contact?**  
-   - A) Yes, secondary links below countdown  
-   - B) Only contact host until unlock  
-   - C) Something else  
-3. **Confirm unlock message intent:** “Details appear on this same page when countdown ends” — correct?  
-4. **`checkin-details.html`:** keep as redirect later, or keep full duplicate for a while?  
-5. **Services on main:** compact list on home vs. large section vs. single CTA into services — pick after Phase 1, or state preference now.
+| Phase | Goal | Where | Code? |
+|-------|------|-------|-------|
+| **0 — System agreement** | This doc + host decisions | Docs | Docs only — **DONE enough to proceed** |
+| **1 — Sandbox shell** | Copy/adapt guest app into sandbox; home = locked countdown / unlocked access host region | `checkin-guest-sandbox.html` | Yes |
+| **2 — Inline check-in** | Port `checkin-details` content into unlocked home; door + elevator QR/code prominent | sandbox | Yes |
+| **3 — Secondary** | Location/parking + Airport shuttle + Tours on/near main | sandbox | Yes |
+| **4 — Visual design** | Brand, motion, typography polish | sandbox | Yes — after shell works |
+| **5 — Cutover** | Promote sandbox → `checkin-guest-v2.html` (same URL); shim `checkin-details.html` | production files | Yes — **host approve first** |
+| **A — Admin redesign** | Parallel track (§8) | `checkin-admin.html` (prefer admin sandbox if risky) | Separate claims |
 
 ---
 
-## 8. Workstream claims (edit this table)
+## 7. Host decisions (answered 2026-08-20)
 
-| Workstream | Status | Owner | Files | Notes / PR |
-|------------|--------|-------|-------|------------|
-| `docs-coord` | **active** | Cursor | `GUEST_CHECKIN_REDESIGN.md` | Creating shared protocol |
-| `home-shell` | blocked on §7 | — | `checkin-guest-v2.html` | Phase 1 |
-| `inline-checkin` | blocked on Phase 1 | — | `checkin-guest-v2.html`, maybe `checkin-details.html` | Phase 2 |
-| `services-ui` | blocked on design | — | `checkin-guest-v2.html` | Phase 3 |
-| `visual-design` | not started | — | CSS in guest v2 | After system phases |
-| `compat-redirect` | blocked on Phase 2 | — | `checkin-details.html` | Phase 5 |
+| # | Question | Answer |
+|---|----------|--------|
+| 1 | Rules + passport before home? | **YES** — required before arrival / before home |
+| 2 | What secondary while/after? | **Location & parking** yes. Services on main: **Airport shuttle + tours only**. WiFi not important. |
+| 3 | Details unlock where? | **Same page** |
+| 4 | Final link vs sandbox? | **Same production link at the end**; build in a **sandbox** until design is ready |
+| 5 | Frequent use? | **YES** — elevator QR or code + smart-lock door password; page is a daily key |
+| 6 | Admin redesign? | **YES** — wanted; tracked in §8 (needs problem list from host) |
 
-**Claim format when you take work:**
+---
+
+## 8. Admin side (known today + redesign track)
+
+Yes — admin exists and is mapped. File: **`checkin-admin.html`** (~3.4k lines). Password lock screen, then sidebar:
+
+| Tab | Role |
+|-----|------|
+| **Apartments** | Per-room editor: WiFi, instructions, photos, rules, recommendations, check-in time, etc. (`checkin_apartments`) |
+| **Guests** | Today’s reservations + check-in forms, passport review, unlock/block, WhatsApp links, failed searches |
+| **Requests** | Guest service requests (`checkin_requests`) |
+| **HK Pins** | Housekeeping PIN management |
+| **Guest Page Settings** | Visibility toggles, services catalog, laundry items, section labels, room categories, location info (`checkin_admin/config`) |
+
+Shared design language: DM Sans / DM Mono, green accent admin chrome (different from guest Playfair/Inter).
+
+### Admin redesign status
+
+**Wanted by host — problem statement not yet written.**
+
+Do **not** start admin visual redesign until host lists pain points (same process as guest). Suggested next step: short callout from host — what is slow, confusing, or missing in admin daily use.
+
+### Admin ↔ guest coupling (important)
+
+Guest main IA change means **Guest Page Settings** should eventually:
+
+- Default/hide WiFi on guest main  
+- Feature Airport shuttle + Tours  
+- Treat check-in / access as the home surface (not a tile toggle only)
+
+That config work belongs in the admin track after guest sandbox IA is stable — or a small config pass claimed explicitly.
+
+### Admin coordination
+
+| Rule | |
+|------|--|
+| Prefer `checkin-admin-sandbox.html` if redesign is large | Same pattern as guest |
+| Do not break live ops admin without cutover plan | Host uses this daily |
+| Claim `admin-*` in §9 | Parallel OK with guest sandbox if different files |
+
+---
+
+## 9. Workstream claims
+
+| Workstream | Status | Owner | Files | Notes |
+|------------|--------|-------|-------|-------|
+| `docs-coord` | **active** | Cursor | `GUEST_CHECKIN_REDESIGN.md` | Decisions locked; sandbox plan |
+| `guest-sandbox-shell` | ready to open | — | `checkin-guest-sandbox.html` | Phase 1 — claim before coding |
+| `inline-checkin-access` | blocked on Phase 1 | — | sandbox | Door + elevator + tour |
+| `secondary-location-services` | blocked on Phase 1 | — | sandbox | Parking/location + shuttle + tours |
+| `guest-visual-design` | blocked on shell | — | sandbox CSS | Phase 4 |
+| `guest-cutover` | blocked | — | `checkin-guest-v2.html`, `checkin-details.html` | Host approve |
+| `admin-problem-brief` | waiting on host | — | docs | List admin pains first |
+| `admin-redesign` | blocked on brief | — | `checkin-admin.html` or sandbox | Separate track |
+
+**Claim example:**
 
 ```
-| `home-shell` | active | Claude Code | checkin-guest-v2.html | Started 2026-08-20 — only #page-home locked region |
-```
-
-**Release format when done:**
-
-```
-| `home-shell` | done | Claude Code | checkin-guest-v2.html | PR #… — countdown wired to isUnlocked |
+| `guest-sandbox-shell` | active | Cursor | checkin-guest-sandbox.html | 2026-08-20 — Phase 1 only |
 ```
 
 ---
 
-## 9. Fragile areas (do not regress)
+## 10. Fragile areas (do not regress)
 
-From `CHECKIN_GUEST_SPEC.md` — treat as landmines:
-
-- `searchReservation()` sibling match = exact `reservationNumber` only  
-- Multi-room `activeReservation` pinning in `showHome()` / `switchApt()` (`_targetResId`, `_knownIds`)  
+- `searchReservation()` siblings = exact `reservationNumber` only  
+- Multi-room pinning (`_targetResId`, `_knownIds`) in `showHome` / `switchApt`  
 - `_homeLoading` + `_homeSnaps` teardown  
 - Session clear on missing guest / checkout expiry  
-- `needsElevatorCode()` room list (note: `7-3` missing today)
+- `needsElevatorCode()` list (note: `7-3` missing today — flag, don’t silent-fix in redesign)  
+- Elevator stale check (~36h) → “contact host”  
 
-Any home rewrite must re-test: single room, multi-room switch, locked→unlocked flip, logout, preview `?preview=true`.
-
----
-
-## 10. Out of scope for this redesign
-
-- Admin panel UI (`checkin-admin.html`)  
-- Reservation sync (`minihotel_reservation_sync.py`)  
-- New Firebase collections / schema migrations  
-- Multi-tenancy path changes  
-- Changing Georgian passport requirement  
+Retest: single room, multi-room switch, locked→unlocked flip, logout, preview, elevator rooms vs non-elevator rooms.
 
 ---
 
-## 11. Changelog (agents append)
+## 11. Out of scope (for now)
+
+- Changing unlock hour policy  
+- New Firestore collections  
+- Multi-tenancy paths  
+- Removing passport requirement  
+- Full services marketplace  
+
+---
+
+## 12. Changelog
 
 | Date | Who | Change |
 |------|-----|--------|
-| 2026-08-20 | Cursor | Created doc: problem, IA, unlock presentation, phases, claim protocol |
+| 2026-08-20 | Cursor | Initial coordination doc |
+| 2026-08-20 | Cursor | Locked host decisions §7; sandbox vs same URL; P0 door+elevator; services trimmed; admin track §8 |
 
 ---
 
 ## Quick checklist before any major step
 
-- [ ] I re-read §1–§4 of this file  
-- [ ] My workstream is claimed in §8  
+- [ ] I re-read §1–§5 and §7  
+- [ ] Guest work is in **sandbox**, not production, unless this is cutover  
+- [ ] My workstream is claimed in §9  
 - [ ] I am not editing a file another agent claimed  
-- [ ] I am not changing unlock/search/registration unless listed in an open phase  
-- [ ] I will update §8 and §11 when finished  
+- [ ] I will update §9 and §12 when finished  
