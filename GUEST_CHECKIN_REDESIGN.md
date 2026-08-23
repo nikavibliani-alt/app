@@ -72,7 +72,7 @@ Loading
        A Waiting   → countdown (details unlock HERE)
        B Arriving  → full codes + walkthrough + "I'm checked in"
        C Staying   → door + elevator + floor/door photo + WiFi (walkthrough hidden)
-       D Leaving   → same daily key + "I've checked out" (checkout day, no noon lock)
+       D Leaving   → daily key + "I've checked out" (until 20:00 or tap)
        → Done
 ```
 
