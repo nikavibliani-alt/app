@@ -2,7 +2,7 @@
 """
 whatsapp_automation.py
 
-Send WhatsApp messages via YCloud for automated reminders.
+Send WhatsApp messages via Meta Cloud API for automated reminders.
 
 Usage:
   python3 whatsapp_automation.py --job checkin_reminder
@@ -11,8 +11,8 @@ Usage:
 
 Requires env vars:
   FIREBASE_SERVICE_ACCOUNT  — base64-encoded service account JSON
-  YCLOUD_API_KEY            — YCloud API key
-  YCLOUD_PHONE_NUMBER       — WhatsApp Business sender number (e.g. +995XXXXXXXXX)
+  META_ACCESS_TOKEN         — Meta Graph API access token
+  META_PHONE_NUMBER_ID      — WhatsApp Business phone number ID
 """
 
 import os, sys, json, base64, datetime, argparse
@@ -20,10 +20,10 @@ import requests
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-YCLOUD_API_KEY    = os.environ.get('YCLOUD_API_KEY', '')
-YCLOUD_PHONE      = os.environ.get('YCLOUD_PHONE_NUMBER', '')
-YCLOUD_SEND_URL   = 'https://api.ycloud.com/v2/whatsapp/messages'
-TZ_OFFSET_HOURS   = 4  # UTC+4 (Tbilisi)
+META_ACCESS_TOKEN    = os.environ.get('META_ACCESS_TOKEN', '')
+META_PHONE_NUMBER_ID = os.environ.get('META_PHONE_NUMBER_ID', '')
+META_SEND_URL        = 'https://graph.facebook.com/v19.0/{phone_number_id}/messages'
+TZ_OFFSET_HOURS      = 4  # UTC+4 (Tbilisi)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -80,18 +80,18 @@ def already_sent(db, reservation_number, job):
 
 def send_whatsapp(to_phone, template_name, variables):
     """
-    POST to YCloud API. Returns the response JSON on success, None on failure.
+    POST to Meta Cloud API. Returns the response JSON on success, None on failure.
     variables is a list of strings mapped to template body parameters in order.
     """
-    if not YCLOUD_API_KEY:
-        print("ERROR: YCLOUD_API_KEY not set")
+    if not META_ACCESS_TOKEN:
+        print("ERROR: META_ACCESS_TOKEN not set")
         return None
-    if not YCLOUD_PHONE:
-        print("ERROR: YCLOUD_PHONE_NUMBER not set")
+    if not META_PHONE_NUMBER_ID:
+        print("ERROR: META_PHONE_NUMBER_ID not set")
         return None
 
     payload = {
-        "from": YCLOUD_PHONE,
+        "messaging_product": "whatsapp",
         "to": to_phone,
         "type": "template",
         "template": {
@@ -106,10 +106,10 @@ def send_whatsapp(to_phone, template_name, variables):
 
     try:
         resp = requests.post(
-            YCLOUD_SEND_URL,
+            META_SEND_URL.format(phone_number_id=META_PHONE_NUMBER_ID),
             json=payload,
             headers={
-                "X-API-Key": YCLOUD_API_KEY,
+                "Authorization": f"Bearer {META_ACCESS_TOKEN}",
                 "Content-Type": "application/json",
             },
             timeout=15,
@@ -117,18 +117,18 @@ def send_whatsapp(to_phone, template_name, variables):
         resp.raise_for_status()
         return resp.json()
     except requests.RequestException as e:
-        print(f"  YCloud API error: {e}")
+        print(f"  Meta Cloud API error: {e}")
         return None
 
 
-def write_message_record(db, reservation_number, guest_name, phone, job, status, ycloud_id=''):
+def write_message_record(db, reservation_number, guest_name, phone, job, status, meta_message_id=''):
     db.collection('whatsapp_messages').add({
         'reservationNumber': str(reservation_number),
         'guestName': guest_name,
         'phone': phone,
         'job': job,
         'status': status,
-        'ycloudMessageId': ycloud_id,
+        'metaMessageId': meta_message_id,
         'createdAt': firestore.SERVER_TIMESTAMP,
     })
 
@@ -219,8 +219,8 @@ def job_checkin_reminder(db):
         result = send_whatsapp(phone, 'checkin_reminder', [first, room_desc])
 
         if result:
-            write_message_record(db, rn, guest, phone, 'checkin_reminder', 'sent', result.get('id', ''))
-            print(f"  ✓ sent  id={result.get('id', '')}")
+            write_message_record(db, rn, guest, phone, 'checkin_reminder', 'sent', (result.get('messages') or [{}])[0].get('id', ''))
+            print(f"  ✓ sent  id={(result.get('messages') or [{}])[0].get('id', '')}")
             sent += 1
         else:
             write_message_record(db, rn, guest, phone, 'checkin_reminder', 'failed')
@@ -275,8 +275,8 @@ def job_midstay(db):
         result = send_whatsapp(phone, 'midstay_checkin', [name])
 
         if result:
-            write_message_record(db, rn, name, phone, 'midstay', 'sent', result.get('id', ''))
-            print(f"  ✓ sent  id={result.get('id', '')}")
+            write_message_record(db, rn, name, phone, 'midstay', 'sent', (result.get('messages') or [{}])[0].get('id', ''))
+            print(f"  ✓ sent  id={(result.get('messages') or [{}])[0].get('id', '')}")
             sent += 1
         else:
             write_message_record(db, rn, name, phone, 'midstay', 'failed')
@@ -347,8 +347,8 @@ def job_checkout(db):
         result = send_whatsapp(phone, 'checkout_reminder', [name])
 
         if result:
-            write_message_record(db, rn, name, phone, 'checkout', 'sent', result.get('id', ''))
-            print(f"  ✓ sent  id={result.get('id', '')}")
+            write_message_record(db, rn, name, phone, 'checkout', 'sent', (result.get('messages') or [{}])[0].get('id', ''))
+            print(f"  ✓ sent  id={(result.get('messages') or [{}])[0].get('id', '')}")
             sent += 1
         else:
             write_message_record(db, rn, name, phone, 'checkout', 'failed')
@@ -361,7 +361,7 @@ def job_checkout(db):
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description='WhatsApp automation via YCloud')
+    parser = argparse.ArgumentParser(description='WhatsApp automation via Meta Cloud API')
     parser.add_argument('--job', required=True,
                         choices=['checkin_reminder', 'midstay', 'checkout'],
                         help='Which message job to run')
