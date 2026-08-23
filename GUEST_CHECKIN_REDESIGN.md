@@ -127,9 +127,115 @@ Returning guests with valid session → straight to HOME.
 
 Until cutover is host-approved: **never** replace production guest page with unfinished redesign.
 
-### 3.4 Tile menu
+### 3.4 Tile menu — RETIRED
 
-Tile-first dashboard is retired as the mental model. Secondary items become compact links/sections under the access area — exact UI in design phase.
+The current home (see host screenshot 2026-08-23) is **wrong**:
+
+- Greeting + “What You Booked” + long list of equal tiles (WiFi, location, services, maps…)
+- No countdown, no “instructions unlock here” message
+- Guest thinks registration is done → texts host immediately
+- Arabic/Georgian mix in tile labels adds confusion
+
+**Replace entirely** with the layout in §3.5.
+
+### 3.5 Home screen layout (LOCKED — host 2026-08-23)
+
+One page, two states. **No tile grid.** No separate `checkin-details.html` click required.
+
+#### Structure (top → bottom)
+
+```
+┌─────────────────────────────────────┐
+│ Maxela          [lang] [sign out]   │  ← slim top bar (keep)
+├─────────────────────────────────────┤
+│ Welcome back, Latifa                │  ← short greeting + apt name (1 line)
+├─────────────────────────────────────┤
+│                                     │
+│   ╔═══════════════════════════╗     │
+│   ║  LOCKED: COUNTDOWN HERO   ║     │  ← dominates viewport
+│   ║  or                       ║     │
+│   ║  UNLOCKED: ACCESS CODES   ║     │
+│   ╚═══════════════════════════╝     │
+│                                     │
+├─────────────────────────────────────┤
+│ [Location] [Airport] [Tours]        │  ← 3 tabs, always visible
+├─────────────────────────────────────┤
+│  (tab panel content)                │
+└─────────────────────────────────────┘
+```
+
+#### LOCKED state — countdown hero (must be impossible to miss)
+
+**Purpose:** Stop “I filled the form, where are my instructions?” WhatsApps.
+
+| Element | Spec |
+|---------|------|
+| **Headline** | Large, plain language — not small muted text |
+| **Countdown** | Big numeric timer `HH:MM:SS` (on check-in day) OR “Unlocks 15 Aug at 15:00” (before check-in day) |
+| **Subline** | Explicit: instructions appear **on this page** — no other app, no message to host |
+| **Visual** | Gold accent border/background on hero card; countdown in large mono numerals |
+| **Remove** | “What You Booked” collapsible above the fold (move below tabs or drop from locked view) |
+| **Remove** | WiFi tile, generic Services tile, Recommendations, duplicate map tiles |
+
+**Draft copy (EN — translate all 4 langs before ship):**
+
+- Headline: **Your check-in instructions unlock here**
+- Subline (check-in day): **Come back to this page at check-in time. Your door code and arrival steps will appear automatically — you do not need to message us.**
+- Above countdown: **Available in**
+- Before check-in day: **Your instructions unlock on [date] at [time] on this page.**
+
+#### UNLOCKED state — same page, hero swaps
+
+Countdown hero **replaced in place** by access stack (no navigation):
+
+1. **Door / smart-lock password** — largest, copy button, always on top  
+2. **Elevator** — QR fullscreen + numeric code (rooms that need it)  
+3. **How to check in** — photo/video walkthrough (from today’s `checkin-details.html`)
+
+Guest returns to this same URL throughout stay for door + elevator.
+
+#### Three tabs (always visible below hero)
+
+Host requirement: **Airport Shuttle · Tours · Location & Parking** — very visible, not buried.
+
+| Tab | Content | Available when locked? |
+|-----|---------|------------------------|
+| **Location & Parking** | Address, Google Maps, parking — default/ first tab | **YES** — guests need this before arrival |
+| **Airport Shuttle** | Transfer request (existing `airport_transfer` service flow) | **YES** |
+| **Tours** | City tour request (existing `city_tour` service flow) | **YES** |
+
+- Tab bar: full-width, 3 equal segments, sticky below hero on scroll  
+- Default tab on first visit after registration: **Location & Parking** (most useful while waiting)  
+- WiFi, cleaning, laundry, full services grid: **not in tabs** for v1  
+
+#### What we are NOT building on home (v1)
+
+- Tile grid as primary navigation  
+- WiFi as a main tile  
+- “Check-in Details” as separate page/link  
+- Equal-weight menu of 6+ options  
+
+### 3.6 Screens we are NOT redesigning (host 2026-08-23)
+
+| Screen | Status |
+|--------|--------|
+| **Register** (name + date) | Keep layout — **one copy fix only** (§3.7) |
+| **House rules** | Keep |
+| **Passport upload** | Keep |
+| **Home** | **Full redesign** (§3.5) |
+
+### 3.7 Registration copy fix (small — do with sandbox or quick patch)
+
+**Problem:** Guests enter first name only; search needs full name.
+
+| Element | Today (EN) | Change to |
+|---------|------------|-----------|
+| Field label `#t-full-name` | “Booking Name” | **“Full name”** |
+| Instructions `#t-search-instructions` | “Enter your name as it appears…” | **“Enter your full name (first and last) as it appears on your booking confirmation, along with your check-in date”** |
+| Placeholder | “Name on your booking” | **“First and last name on your booking”** |
+
+Update `T.en/ka/ru/ar` keys: `fullName`, `searchInstructions`, `namePlaceholder`.  
+Safe to ship as a tiny production patch independent of home redesign.
 
 ---
 
@@ -285,7 +391,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | Date | Who | Change |
 |------|-----|--------|
 | 2026-08-20 | Cursor | Initial coordination doc |
-| 2026-08-20 | Cursor | Locked host decisions §7; sandbox vs same URL; P0 door+elevator; services trimmed; admin track §8 |
+| 2026-08-23 | Cursor | Home screen wireframe §3.5: countdown hero + 3 tabs; registration copy fix §3.7 |
 
 ---
 
