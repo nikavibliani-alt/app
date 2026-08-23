@@ -56,10 +56,9 @@ The page is a dashboard. Guests need a **daily key**: door password + elevator Q
 - Same final link guests already use (`checkin-guest-v2.html` / live URL).
 - After registration, **main screen = check-in / access**, not a menu.
 - **Locked:** countdown + “details unlock on this page when the timer ends.”
-- **Unlocked:** door code + elevator (QR and/or numeric) + arrival steps on that same page.
-- Guests return to this page throughout the stay for **door password** and **elevator**.
-- Secondary: **location + parking**, plus **Airport shuttle** and **tours** only (not full services catalog on main).
-- WiFi is deprioritized (not a main-page priority).
+- **First unlock:** full walkthrough + **I'm checked in**; then **daily key** (door, elevator QR/code, floor + door photo, WiFi).
+- **Checkout day:** codes stay (no noon lock) + **I've checked out** button.
+- Tabs: Location & parking · Airport shuttle · Tours.
 - Host gets fewer “where are my details?” messages.
 
 ---
@@ -68,20 +67,16 @@ The page is a dashboard. Guests need a **daily key**: door password + elevator Q
 
 ```
 Loading
-  → Register (name + date + contact/guests as today)
-  → House rules (required)
-  → Passport upload (required before arrival / before home)
+  → Register → House rules → Passport
   → HOME
-       ├─ LOCKED   → countdown + message (details unlock HERE)
-       │              + secondary: location/parking, airport shuttle, tours, contact
-       └─ UNLOCKED → THIS PAGE IS the key:
-                      door/smart-lock password (always prominent)
-                      elevator code + QR (when room needs it)
-                      check-in walkthrough / photos / video
-                      + same secondary links
+       A Waiting   → countdown (details unlock HERE)
+       B Arriving  → full codes + walkthrough + "I'm checked in"
+       C Staying   → door + elevator + floor/door photo + WiFi (walkthrough hidden)
+       D Leaving   → same daily key + "I've checked out" (checkout day, no noon lock)
+       → Done
 ```
 
-Returning guests with valid session → straight to HOME.
+Tabs always: Location & Parking · Airport Shuttle · Tours.
 
 ### Explicitly unchanged unless host asks later
 
@@ -349,8 +344,11 @@ Existing `submitService()` / WhatsApp handoff / `checkin_requests` stay.
 | 2 | What secondary while/after? | **Location & parking** yes. Services on main: **Airport shuttle + tours only**. WiFi not important. |
 | 3 | Details unlock where? | **Same page** |
 | 4 | Final link vs sandbox? | **Same production link at the end**; build in a **sandbox** until design is ready |
-| 5 | Frequent use? | **YES** — elevator QR or code + smart-lock door password; page is a daily key |
-| 6 | Admin redesign? | **YES** — wanted; tracked in §8 (needs problem list from host) |
+| 5 | Frequent use? | **YES** — elevator QR/code + door password + floor/door photo + WiFi daily; full walkthrough only until Checked in |
+| 6 | Admin redesign? | **YES** — tracked in §8 |
+| 7 | Checked in button? | **YES** — collapses walkthrough; keeps daily key |
+| 8 | Checkout day? | Codes stay all day (no noon lock) + **I've checked out** button |
+| 9 | WiFi? | **YES** — visible on home after unlock (hero daily key) |
 
 ---
 
@@ -444,6 +442,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 |------|-----|--------|
 | 2026-08-20 | Cursor | Initial coordination doc |
 | 2026-08-23 | Cursor | Home screen wireframe §3.5: countdown hero + 3 tabs; registration copy fix §3.7 |
+| 2026-08-23 | Cursor | Stay lifecycle A–D: Checked in / Checked out buttons; WiFi daily; no noon checkout lock; walkthrough collapses after check-in |
 
 ---
 
