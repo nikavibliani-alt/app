@@ -454,11 +454,117 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-23 | Cursor | Stay lifecycle A–D: Checked in / Checked out buttons; WiFi daily; no noon checkout lock; walkthrough collapses after check-in |
 | 2026-08-23 | Cursor | Locked checkout expiry: **20:00 Tbilisi** on checkout day if guest never taps Checked out |
 | 2026-08-23 | Claude Code | Phase 1 `guest-sandbox-shell` done: `checkin-guest-sandbox.html` created (copy of `checkin-guest-v2.html`, `#page-home` rebuilt per §3.5 — countdown hero + shared daily-key hero (door/elevator/WiFi/floor) + walkthrough placeholder + Checked in/out CTAs + 3 tabs). `applyHomePhase()`, `window.guestCheckedIn/guestCheckedOut/isStayEnded` added; JS module otherwise unchanged (pure additions, verified by diff). Register/rules/passport untouched. |
-| 2026-08-24 | Claude Code | Added sandbox dev toolbar (`#sb-toolbar`) to `checkin-guest-sandbox.html` — jump to any screen/phase/state with full mock guest/reservation/apartment/elevator data, zero Firebase dependency (`_sbBuildMocks()`, `_sbRenderHomeForPhase()`, `_sbShowScreen()`, `_sbGoPhase()`, `_sbToggle()`). Added §13 Sandbox & Current Build State and §14 Prompts & Build Log. |
+| 2026-08-24 | Claude Code | Added sandbox dev toolbar (`#sb-toolbar`) to `checkin-guest-sandbox.html` — jump to any screen/phase/state with full mock guest/reservation/apartment/elevator data, zero Firebase dependency (`_sbBuildMocks()`, `_sbRenderHomeForPhase()`, `_sbShowScreen()`, `_sbGoPhase()`, `_sbToggle()`). Added §14 Sandbox & Current Build State and §15 Prompts & Build Log (renumbered from §13/§14 on 2026-08-24 to make room for §13 Design Tokens & Rules). |
+| 2026-08-24 | Claude Code | **Color fix:** home-screen hero card was shipped dark/inverted (black background, white text, gold `#C4A882` CTA) — reverted to the correct system: white cards (`#FFFFFF`), dark text (`#2C2C2A`/`#8C8C8A`), dark-filled primary CTA (`#2C2C2A`/`#fff`), no gold anywhere as a background. Split "I've checked out" into its own lighter-bordered "destructive/confirm" style, distinct from the bold primary "I'm checked in". Fixed the same gold-background violation on the dev toolbar's active-state buttons. Added §13 Design Tokens & Rules to lock this down for future work. |
 
 ---
 
-## 13. Sandbox & Current Build State (2026-08-24 — Claude Code)
+## 13. Design Tokens & Rules (2026-08-24 — Claude Code)
+
+> **Read this before touching any CSS in `checkin-guest-sandbox.html`.** This section is the
+> single source of truth for typography, color, and component styling on the redesigned home
+> screen. It exists because the first Phase 1 build shipped a dark/inverted hero card with a
+> gold CTA button — both wrong. This section locks the correction so it never regresses.
+
+### 13.1 Typography
+
+| Use | Font | Notes |
+|-----|------|-------|
+| Headings, guest name (`#home-guest-name`), property name, brand wordmark, modal titles | **Playfair Display**, italic | `font-family:var(--serif)` — already loaded via Google Fonts link in `<head>` |
+| All body copy, labels, buttons, inputs, tabs, nav | **Inter** | `font-family:var(--sans)` |
+| Monospace — door code, elevator code, WiFi password, countdown, all mono labels (`DOOR CODE`, `WIFI`, etc.) | **Courier New** / system monospace stack | `font-family:var(--mono)` — the file does **not** load DM Mono; do not reference it. If a true monospace upgrade is wanted later, swap the `--mono` token, don't hardcode a new font-family per element. |
+
+**Size scale actually used on the redesigned home screen:**
+
+| Element | Size | Weight |
+|---------|------|--------|
+| Guest name (`.greeting__name`) | 38px | 400 (Playfair default) |
+| Hero waiting headline | 24px | 400 italic |
+| Countdown digits | 44px | 500 |
+| Door/elevator code digits (`.dk-code`) | 36px | 400 (mono default) |
+| WiFi value (`.dk-wifi-val`) | 14px | 400 |
+| Section mono labels (`DOOR CODE`, `WIFI`, `FLOOR & DOOR`, `NETWORK`, `PASSWORD`) | 9.5–10.5px | uppercase, `letter-spacing:0.10–0.14em` |
+| Primary CTA button text | 16px | 600 |
+| Tab bar labels | 12.5px | 500 (600 when active) |
+| Tab panel body copy | 13.5px | 400 |
+| Subline / muted body (`.hero-waiting__sub`, `.hero-cta__checkout-label`) | 11–13px | 400 |
+
+### 13.2 Color rules (explicit — no ambiguity)
+
+| Token | Hex | Where it IS used | Where it is NEVER used |
+|-------|-----|-------------------|-------------------------|
+| `--bg` (page background) | `#FAFAF9` | `<body>` background | Never on a card |
+| Card background | `#FFFFFF` | Every card on the home screen: `.hero-card` (all 4 phase states — waiting, daily-key, thank-you), tab panels | Never `--ink` or any dark color as a card background |
+| `--ink` | `#2C2C2A` | All primary text; primary CTA button **background**; toolbar active-state background | Never a card background |
+| `--ink-2` | `#4A4A48` | Secondary text (e.g. `.hero-cta__link` "Show arrival instructions") | — |
+| `--muted` | `#8C8C8A` | Muted labels, subline copy, mono section labels (`DOOR CODE`, `WIFI`, etc.) | — |
+| `--line` | `#E0D8D0` | Borders — row dividers (`.dk-wifi-row`), dashed walkthrough placeholder border, the "I've checked out" button's border | — |
+| `--accent` / gold | `#C4A882` | **Thin decorative borders and small dots only** (pre-existing v2 elements outside the home screen: `.pulse` dot, `.auth-greet .kicker .pip` dot, focus-border on inputs). **Never used anywhere in the redesigned home screen (`#page-home`).** | **NEVER a background on any button or card. NEVER a CTA color. This is the rule that was violated and is now fixed — do not reintroduce it.** |
+| Success green | `--green` `#2d6b50` / `--green-bg` `#edf5f0` / `--green-border` `#8ecdb0` | Copy-button `.copied` success state only | — |
+
+**Explicit statement:** every background on the redesigned home screen (`#page-home`) is either `#FAFAF9` (page) or `#FFFFFF` (card). Every piece of text is `#2C2C2A` (ink) or `#8C8C8A` (muted) or `#4A4A48` (ink-2 for secondary links). There is no dark/inverted surface anywhere in the current build.
+
+### 13.3 Button styles (exact CSS — three categories, do not merge them)
+
+**Primary CTA** — "I'm checked in", "Continue", "Find my booking", "I agree — Continue":
+```css
+background: #2C2C2A;
+color: #fff;
+border-radius: 24px;   /* var(--rxl) */
+padding: 16px;
+width: 100%;
+font-size: 16px;
+font-weight: 600;
+border: none;
+```
+Class in sandbox: `.hero-cta__btn` (used by `#btn-checked-in`).
+
+**Secondary** — "Show arrival instructions" link, all copy buttons (door/elevator/WiFi×2):
+```css
+background: #fff;
+color: #2C2C2A;
+border: 1.5px solid #2C2C2A;
+border-radius: 24px;   /* pill */
+padding: 12px 20px;    /* copy buttons use a fixed 44px height instead — see .dk-copy */
+```
+Class in sandbox: `.dk-copy` (copy buttons — 44px height for touch-target compliance, not the 12px/20px padding literally, but same white/ink-border/ink-text look). `.hero-cta__link` (the "Show arrival instructions" text link) uses `--ink-2` text with no border/background — it's a link, not a button, so it doesn't carry the full bordered-pill treatment.
+
+**Destructive/confirm** — "I've checked out" only:
+```css
+background: #fff;
+color: #2C2C2A;
+border: 1.5px solid #E0D8D0;   /* var(--line) — lighter than the ink-bordered secondary style */
+border-radius: 24px;
+padding: 16px;
+width: 100%;
+```
+Class in sandbox: `.hero-cta__btn.hero-cta__btn--confirm` (used by `#btn-checked-out`). This is visually calmer than the Secondary style (light-gray border, not ink border) because confirming checkout is a lower-urgency, less-frequent action than the daily copy/CTA interactions.
+
+**Never merge Primary and Destructive/confirm into the same visual weight.** "I'm checked in" is the dominant action of Phase B and must read as the boldest thing on screen; "I've checked out" is a quieter confirmation on checkout day.
+
+### 13.4 Card styles
+
+**Standard card** (`.hero-card`, used for all 4 hero states — waiting, daily-key with arriving/staying/leaving content, and thank-you):
+```css
+background: #fff;
+border-radius: 12px;   /* var(--r) */
+box-shadow: 0 2px 12px rgba(0,0,0,0.06);   /* var(--shadow-card) */
+padding: 24px;
+```
+
+**No dark/inverted cards anywhere on the home screen.** If a future design pass wants a dark accent surface, it must be proposed and locked here first — do not add one directly in CSS.
+
+### 13.5 What Cursor (or any future agent) should NEVER do
+
+- **Never** use gold (`var(--accent)` / `#C4A882`) as a button or card background. Gold is thin-border/small-dot/wordmark-accent only, and only on pages outside the redesigned home screen.
+- **Never** build a dark/inverted hero card. Every card on `#page-home` is white with dark text.
+- **Never** add a drop shadow heavier than `0 2px 12px rgba(0,0,0,0.06)` (`--shadow-card`). No `box-shadow` values with larger blur, spread, or opacity on home-screen cards.
+- **Never** introduce a color not in the §13.2 token table. If a new color is genuinely needed, add it here first with a name, hex, and explicit usage rule — don't drop a raw hex or a new `rgba(255,255,255,…)` value into a rule.
+- **Never** change a JS-referenced element ID (`hero-door-code`, `hero-elevator`, `hero-wifi-name`, `hero-wifi-pass`, `hero-door-photo`, `hero-walkthrough`, `btn-checked-in`, `btn-checked-out`, `hero-checkout-label`, `hero-thankyou`, `countdown-display`, `tab-location`/`tab-shuttle`/`tab-tours`, `panel-location`/`panel-shuttle`/`panel-tours`, any `sb-*` toolbar ID) or a dynamic class the JS toggles (`phase-waiting`/`phase-arriving`/`phase-staying`/`phase-leaving`, `.active`, `.copied`, `.show`). Colors and spacing are safe to restyle; renaming IDs or classes breaks the JS.
+
+---
+
+## 14. Sandbox & Current Build State (2026-08-24 — Claude Code)
 
 ### 13.1 Sandbox file
 
@@ -467,7 +573,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 - **Pushed URL:** once pushed to `main`, same static hosting pattern as `checkin-guest-v2.html` → `https://app.maxelaapartments.com/checkin-guest-sandbox.html`
 - **Dev toolbar:** a fixed black bar pinned to the bottom of the viewport, visible always in this file (no `?sandbox=true` gate — sandbox-only, never ports to v2). Three rows:
   - **Screens** — jumps straight to Loading / Register / Rules / Passport / Home, bypassing all Firebase/session checks (`_showPage()` directly).
-  - **Phase (Home only)** — Waiting / Arriving / Staying / Leaving / Checkout Done. Clicking a phase button also switches to Home. Injects full mock guest/reservation/apartment/elevator data (§13.3) so every code, WiFi field, and CTA renders with real-looking content — no login, no real reservation needed.
+  - **Phase (Home only)** — Waiting / Arriving / Staying / Leaving / Checkout Done. Clicking a phase button also switches to Home. Injects full mock guest/reservation/apartment/elevator data (§14.3) so every code, WiFi field, and CTA renders with real-looking content — no login, no real reservation needed.
   - **State** — Multi-room, Elevator code, Manual unlock toggles. Re-renders whatever phase is currently on screen immediately so the effect is visible without re-clicking a phase button.
   - "hide" button collapses the bar to just its header if it's blocking a screenshot.
 
@@ -487,7 +593,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 
 | Phase | Status |
 |-------|--------|
-| A — Waiting | Built — headline, live `HH:MM:SS` countdown, subline. Countdown only counts down on the actual check-in day (see §13.4 known issue). |
+| A — Waiting | Built — headline, live `HH:MM:SS` countdown, subline. Countdown only counts down on the actual check-in day (see §14.4 known issue). |
 | B — Arriving | Built — door code, elevator code + QR (if applicable), WiFi, floor label, walkthrough **placeholder**, "I'm checked in" CTA |
 | C — Staying | Built — same daily key as B minus walkthrough; "Show arrival instructions" link (placeholder toggle) |
 | D — Leaving | Built — same daily key as C + checkout date label + "I've checked out" CTA |
@@ -586,11 +692,11 @@ Use the dev toolbar to flip through all of the above live — no login or real r
 
 ---
 
-## 14. Prompts & Build Log
+## 15. Prompts & Build Log
 
 ### Phase 1 — Sandbox Shell
 
-The exact Claude Code prompt that produced the first version of `checkin-guest-sandbox.html` (§13, `guest-sandbox-shell` workstream):
+The exact Claude Code prompt that produced the first version of `checkin-guest-sandbox.html` (§14, `guest-sandbox-shell` workstream):
 
 ```
 Read these files in this order before doing anything else:

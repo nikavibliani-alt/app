@@ -527,15 +527,15 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 
 /* Hero section wrapper */
 .hero-section{padding:0 16px;margin-bottom:8px;}
-.hero-card{background:var(--ink);color:#fff;border-radius:var(--r);padding:24px;margin-bottom:16px;box-shadow:var(--shadow-card);}
+.hero-card{background:#FFFFFF;color:var(--ink);border-radius:var(--r);padding:24px;margin-bottom:16px;box-shadow:var(--shadow-card);}
 .hero-card *{color:inherit;}
 
 /* Phase A — waiting */
 .hero-waiting{display:none;text-align:center;padding:36px 24px;}
 #page-home.phase-waiting .hero-waiting{display:block;}
 .hero-waiting__headline{font-family:var(--serif);font-style:italic;font-size:24px;line-height:1.25;margin-bottom:20px;}
-.hero-waiting__countdown{font-family:var(--mono);font-size:44px;font-weight:500;letter-spacing:0.08em;font-variant-numeric:tabular-nums;margin-bottom:16px;}
-.hero-waiting__sub{font-size:13px;line-height:1.6;color:rgba(255,255,255,0.65);max-width:280px;margin:0 auto;}
+.hero-waiting__countdown{font-family:var(--mono);font-size:44px;font-weight:500;letter-spacing:0.08em;font-variant-numeric:tabular-nums;margin-bottom:16px;color:var(--ink);}
+.hero-waiting__sub{font-size:13px;line-height:1.6;color:var(--muted);max-width:280px;margin:0 auto;}
 
 /* Daily key (phases B/C/D share this single block — never duplicate IDs) */
 .hero-daily-key{display:none;}
@@ -545,30 +545,31 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 
 .dk-row{margin-bottom:20px;}
 .dk-row:last-of-type{margin-bottom:0;}
-.dk-label{font-family:var(--mono);font-size:10.5px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.55);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
-.dk-code{font-family:var(--mono);font-size:36px;letter-spacing:0.15em;font-variant-numeric:tabular-nums;margin-bottom:8px;}
-.dk-copy{height:44px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);border-radius:999px;color:#fff;font-family:var(--mono);font-size:11px;cursor:pointer;}
-.dk-copy.copied{background:rgba(94,196,140,0.35);border-color:rgba(94,196,140,0.6);}
-.dk-wifi-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,0.12);}
+.dk-label{font-family:var(--mono);font-size:10.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
+.dk-code{font-family:var(--mono);font-size:36px;letter-spacing:0.15em;font-variant-numeric:tabular-nums;margin-bottom:8px;color:var(--ink);}
+.dk-copy{height:44px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;background:#FFFFFF;border:1.5px solid var(--ink);border-radius:999px;color:var(--ink);font-family:var(--mono);font-size:11px;cursor:pointer;}
+.dk-copy.copied{background:var(--green-bg);border-color:var(--green-border);color:var(--green);}
+.dk-wifi-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);}
 .dk-wifi-row:first-of-type{border-top:none;}
-.dk-wifi-sublabel{font-family:var(--mono);font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-bottom:2px;}
-.dk-wifi-val{font-family:var(--mono);font-size:14px;}
+.dk-wifi-sublabel{font-family:var(--mono);font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
+.dk-wifi-val{font-family:var(--mono);font-size:14px;color:var(--ink);}
 .dk-floor-photo{width:100%;border-radius:var(--rsm);margin-top:10px;display:none;object-fit:cover;max-height:180px;}
-.dk-floor-text{font-size:13px;color:rgba(255,255,255,0.8);}
+.dk-floor-text{font-size:13px;color:var(--ink);}
 
 /* Full walkthrough — Phase 2 placeholder, visible only in phase-arriving */
-.hero-walkthrough{display:none;margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.12);}
+.hero-walkthrough{display:none;margin-top:20px;padding-top:20px;border-top:1px solid var(--line);}
 #page-home.phase-arriving .hero-walkthrough{display:block;}
-.hero-walkthrough__placeholder{font-size:12.5px;color:rgba(255,255,255,0.55);text-align:center;padding:18px 12px;border:1px dashed rgba(255,255,255,0.25);border-radius:var(--rsm);}
+.hero-walkthrough__placeholder{font-size:12.5px;color:var(--muted);text-align:center;padding:18px 12px;border:1px dashed var(--line);border-radius:var(--rsm);}
 
 /* CTA blocks — one visible per phase */
 .hero-cta{display:none;margin-top:22px;}
 #page-home.phase-arriving .hero-cta--arriving,
 #page-home.phase-staying .hero-cta--staying,
 #page-home.phase-leaving .hero-cta--leaving{display:block;}
-.hero-cta__btn{border-radius:var(--rxl);width:100%;background:var(--accent);color:var(--ink);font-weight:600;padding:16px;font-size:16px;border:none;cursor:pointer;font-family:var(--sans);}
-.hero-cta__link{background:none;border:none;color:rgba(255,255,255,0.75);font-family:var(--sans);font-size:13px;text-decoration:underline;cursor:pointer;padding:4px 0;}
-.hero-cta__checkout-label{font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-bottom:10px;text-align:center;}
+.hero-cta__btn{border-radius:var(--rxl);width:100%;background:#2C2C2A;color:#FFFFFF;font-weight:600;padding:16px;font-size:16px;border:none;cursor:pointer;font-family:var(--sans);}
+.hero-cta__btn--confirm{background:#FFFFFF;color:#2C2C2A;border:1.5px solid var(--line);}
+.hero-cta__link{background:none;border:none;color:var(--ink-2);font-family:var(--sans);font-size:13px;text-decoration:underline;cursor:pointer;padding:4px 0;}
+.hero-cta__checkout-label{font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;text-align:center;}
 .hero-thankyou{display:none;text-align:center;padding:40px 20px;}
 .hero-thankyou.show{display:block;}
 
@@ -603,7 +604,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
   transition:background .12s,color .12s;
 }
 #sb-toolbar button.sb-btn:hover{background:#444;}
-#sb-toolbar button.sb-btn.sb-active{background:var(--accent);color:var(--ink);border-color:var(--accent);font-weight:700;}
+#sb-toolbar button.sb-btn.sb-active{background:#2C2C2A;color:#fff;border-color:#2C2C2A;font-weight:700;}
 #sb-toolbar .sb-row.sb-phase-row{opacity:0.4;pointer-events:none;}
 #sb-toolbar .sb-row.sb-phase-row.sb-enabled{opacity:1;pointer-events:auto;}
 #sb-toolbar button.sb-toggle-off{background:#3a1f1f;border-color:#5c2b2b;}
@@ -910,7 +911,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         </div>
         <div class="hero-cta hero-cta--leaving">
           <div class="hero-cta__checkout-label" id="hero-checkout-label">Checkout today</div>
-          <button class="hero-cta__btn" id="btn-checked-out" onclick="window.guestCheckedOut()">I've checked out</button>
+          <button class="hero-cta__btn hero-cta__btn--confirm" id="btn-checked-out" onclick="window.guestCheckedOut()">I've checked out</button>
         </div>
       </div>
 
@@ -918,7 +919,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
       <div class="hero-card hero-thankyou" id="hero-thankyou">
         <div style="font-size:40px;margin-bottom:14px;">🌟</div>
         <div style="font-family:var(--serif);font-size:22px;margin-bottom:8px;">Safe travels!</div>
-        <div style="font-size:13.5px;color:rgba(255,255,255,0.7);">Hope to see you again soon.</div>
+        <div style="font-size:13.5px;color:var(--muted);">Hope to see you again soon.</div>
       </div>
 
     </div>
@@ -3312,7 +3313,7 @@ window.switchHomeTab=function(id){
 
 // ══════════════════════════════════════════════════════════════════
 // SANDBOX DEV TOOLBAR — jump to any screen/phase/state without Firebase.
-// Never ports to checkin-guest-v2.html at cutover (§13 GUEST_CHECKIN_REDESIGN.md).
+// Never ports to checkin-guest-v2.html at cutover (§14 GUEST_CHECKIN_REDESIGN.md).
 // ══════════════════════════════════════════════════════════════════
 let _sbMockActive=false;              // true once toolbar has injected mock data
 let _sbState={multiRoom:false,elevator:true,manualUnlock:false};
@@ -3327,7 +3328,7 @@ function _sbAddDays(dateStr,n){
 // Builds every module-scoped var real Firebase data would normally populate
 // (guestId, guestData, aptData, activeReservation, elevatorData, allMatchedReservations)
 // so the rest of the app (renderGreetingApt/_renderHeroContent/applyHomePhase/tiles)
-// runs completely unchanged against fake data. See §13.3 for the field reference.
+// runs completely unchanged against fake data. See §14.3 for the field reference.
 function _sbBuildMocks(phase){
   _sbMockActive=true;
   const today=tbilisiToday();
