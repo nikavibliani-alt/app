@@ -7,8 +7,8 @@ const MONITOR_URL   = `${FIREBASE_BASE}/elevator_monitor.json`;
 const LAST_ALERT_URL = `${FIREBASE_BASE}/elevator_monitor/last_alert_sent.json`;
 const WAS_STALE_URL  = `${FIREBASE_BASE}/elevator_monitor/was_stale.json`;
 
-const STALE_MS   = 2 * 60 * 60 * 1000;  // 2 hours
-const COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6 hours between alerts
+const STALE_MS   = 26 * 60 * 60 * 1000;  // 26 hours (one full cycle + 2h buffer)
+const COOLDOWN_MS = 24 * 60 * 60 * 1000; // max one alert per 24 hours
 const TZ_OFFSET  = 4 * 60 * 60 * 1000;  // UTC+4 Tbilisi
 
 const FROM = 'onboarding@resend.dev';
