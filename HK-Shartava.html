@@ -764,6 +764,10 @@ window.toggleDone=async function(roomCode,dateStr){
       cleaner:getCleanerName(),updatedAt:serverTimestamp()
     });
     toast(!current?'✓ Marked as cleaned!':'Marked as pending');
+    if(!current){
+      const snap=await getDocs(query(collection(db,'checkin_guests'),where('aptId','==',roomCode),where('arrivalDate','==',dateStr)));
+      snap.forEach(d=>updateDoc(d.ref,{manualUnlock:true,unlockedAt:serverTimestamp()}));
+    }
   }catch(e){toast('Save failed');cleaningStatus[key]=current;render();}
 }
 

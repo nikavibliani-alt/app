@@ -160,7 +160,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,collection,doc,setDoc,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,collection,doc,setDoc,updateDoc,getDocs,query,where,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -308,6 +308,10 @@ window.toggleDone=async function(roomCode,dateStr){
       cleaner,updatedAt:serverTimestamp()
     });
     toast(!current?'✓ Marked as cleaned!':'Marked as pending');
+    if(!current){
+      const snap=await getDocs(query(collection(db,'checkin_guests'),where('aptId','==',roomCode),where('arrivalDate','==',dateStr)));
+      snap.forEach(d=>updateDoc(d.ref,{manualUnlock:true,unlockedAt:serverTimestamp()}));
+    }
   }catch(e){toast('Save failed');cleaningStatus[key]=current;render();}
 }
 
