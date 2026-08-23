@@ -96,26 +96,38 @@ Returning guests with valid session → straight to HOME.
 
 ## 3. Home information architecture (LOCKED by host 2026-08-20)
 
-### 3.1 Primary job: access codes guests reuse
+### 3.1 Primary job: daily key + first-arrival walkthrough
 
 | Priority | Content | Notes |
 |----------|---------|--------|
-| **P0** | Smart-lock / door password | Guests need this constantly — always above the fold when unlocked |
-| **P0** | Elevator QR **or** numeric code | Rooms that need elevator (`needsElevatorCode()`); both entry methods matter |
-| **P0** | Arrival instructions / tour | From today’s `checkin-details.html` content, inlined on home when unlocked |
-| **P1** | Location & parking | Keep; apartment address + parking |
-| **P1** | Airport shuttle | Keep as a service entry on/near main |
-| **P1** | Tours (city tour) | Keep as a service entry on/near main |
-| **P2 / hide from main** | WiFi | Not important for this redesign — do not feature on main; may remain deep/hidden via admin visibility |
-| **P2 / hide from main** | Cleaning, laundry, other services | Not on main catalog for v1 |
-| **P2** | Recommendations, full house-rules page | Not primary; optional later |
+| **P0 daily** | Smart-lock / door password | Always above the fold after unlock — entire stay |
+| **P0 daily** | Elevator QR **and** numeric code | Rooms that need elevator; both methods |
+| **P0 daily** | Floor info + apartment door picture | So guest finds the right door every day |
+| **P0 daily** | WiFi name + password | Visible on home after unlock (copy buttons) — host 2026-08-23 |
+| **P0 first arrival only** | Full check-in walkthrough | Street arrows, elevator photos, video — **hide after guest taps Checked in** |
+| **P1 tabs** | Location & parking · Airport shuttle · Tours | Always-visible tab bar |
+| **P2 / hide** | Cleaning, laundry, generic services grid, recommendations | Not on main for v1 |
 
-### 3.2 Locked vs unlocked
+### 3.2 Stay lifecycle (LOCKED — host 2026-08-23)
 
-| State | Main screen |
-|-------|-------------|
-| **Locked** | Countdown + clear copy that **check-in details unlock on this same page**. No door/elevator codes yet. Secondary: location/parking + shuttle/tours + contact OK. |
-| **Unlocked** | Same page reveals door password, elevator QR/code, instructions. No navigation to another HTML file required. |
+Home is **not** just locked vs unlocked. Four guest-facing phases:
+
+| Phase | When | What guest sees |
+|-------|------|-----------------|
+| **A — Waiting** | Before check-in unlock time | Countdown hero + 3 tabs. No codes. |
+| **B — Arriving** | Unlocked, guest has **not** tapped Checked in | Full access: door + elevator + WiFi + **full walkthrough** (street → elevator → door) + big **I'm checked in** button |
+| **C — Staying** | After **I'm checked in** | Compact daily key only: door code, elevator QR/code, floor + door photo, WiFi. Walkthrough **collapsed/hidden**. Tabs use freed space. |
+| **D — Leaving** | Checkout **day** (all day — **not** locked at noon) | Same daily key as C (codes still needed for late checkout) + **I've checked out** button. |
+
+**After checked out / stay ended:** thank-you / access ended (exact cutover time TBD in §4.1 — **not** 12:00 noon).
+
+```
+Waiting (countdown)
+  → Arriving (full instructions + "I'm checked in")
+  → Staying (daily key only)
+  → Leaving (daily key + "I've checked out")  ← still has elevator/door on checkout day
+  → Done
+```
 
 ### 3.3 Production link + sandbox
 
@@ -146,74 +158,85 @@ One page, two states. **No tile grid.** No separate `checkin-details.html` click
 
 ```
 ┌─────────────────────────────────────┐
-│ Maxela          [lang] [sign out]   │  ← slim top bar (keep)
+│ Maxela          [lang] [sign out]   │
 ├─────────────────────────────────────┤
-│ Welcome back, Latifa                │  ← short greeting + apt name (1 line)
+│ Welcome, Latifa · Apt name          │
 ├─────────────────────────────────────┤
-│                                     │
-│   ╔═══════════════════════════╗     │
-│   ║  LOCKED: COUNTDOWN HERO   ║     │  ← dominates viewport
-│   ║  or                       ║     │
-│   ║  UNLOCKED: ACCESS CODES   ║     │
-│   ╚═══════════════════════════╝     │
-│                                     │
+│  HERO (phase A/B/C/D — see below)   │
 ├─────────────────────────────────────┤
-│ [Location] [Airport] [Tours]        │  ← 3 tabs, always visible
+│ [Location] [Airport] [Tours]        │  ← always visible
 ├─────────────────────────────────────┤
-│  (tab panel content)                │
+│  (tab panel)                        │
 └─────────────────────────────────────┘
 ```
 
-#### LOCKED state — countdown hero (must be impossible to miss)
+#### Phase A — Waiting (LOCKED) — countdown hero
 
 **Purpose:** Stop “I filled the form, where are my instructions?” WhatsApps.
 
 | Element | Spec |
 |---------|------|
-| **Headline** | Large, plain language — not small muted text |
-| **Countdown** | Big numeric timer `HH:MM:SS` (on check-in day) OR “Unlocks 15 Aug at 15:00” (before check-in day) |
-| **Subline** | Explicit: instructions appear **on this page** — no other app, no message to host |
-| **Visual** | Gold accent border/background on hero card; countdown in large mono numerals |
-| **Remove** | “What You Booked” collapsible above the fold (move below tabs or drop from locked view) |
-| **Remove** | WiFi tile, generic Services tile, Recommendations, duplicate map tiles |
+| **Headline** | Large: **Your check-in instructions unlock here** |
+| **Countdown** | Big `HH:MM:SS` on check-in day · or **Unlocks [date] at [time]** before that day |
+| **Subline** | Come back to **this page** at check-in time. Door code appears automatically — do not message us. |
+| **No codes** | Door / elevator / WiFi secrets hidden |
 
-**Draft copy (EN — translate all 4 langs before ship):**
+#### Phase B — Arriving (unlocked, not yet Checked in)
 
-- Headline: **Your check-in instructions unlock here**
-- Subline (check-in day): **Come back to this page at check-in time. Your door code and arrival steps will appear automatically — you do not need to message us.**
-- Above countdown: **Available in**
-- Before check-in day: **Your instructions unlock on [date] at [time] on this page.**
+Hero becomes the **full arrival kit**:
 
-#### UNLOCKED state — same page, hero swaps
+1. Door / smart-lock password (largest + copy)  
+2. Elevator QR + numeric code (if needed)  
+3. WiFi name + password (copy)  
+4. Floor info + apartment door picture  
+5. **Full walkthrough** — street arrows, building entrance, elevator photos/video (from `checkin-details.html`)  
+6. Primary CTA: **I'm checked in** (or **Checked in**)
 
-Countdown hero **replaced in place** by access stack (no navigation):
+Tapping **I'm checked in**:
 
-1. **Door / smart-lock password** — largest, copy button, always on top  
-2. **Elevator** — QR fullscreen + numeric code (rooms that need it)  
-3. **How to check in** — photo/video walkthrough (from today’s `checkin-details.html`)
+- Writes to Firestore `checkin_guests/{guestId}` e.g. `guestConfirmedCheckin: true`, `guestConfirmedCheckinAt: serverTimestamp`  
+- Flips UI to Phase C without leaving the page  
+- Host/admin can see guest confirmed arrival (admin track later)
 
-Guest returns to this same URL throughout stay for door + elevator.
+#### Phase C — Staying (after Checked in) — daily key only
 
-#### Three tabs (always visible below hero)
+**Hide** street arrows / outdoor path / elevator walkthrough photos (space freed for tabs + breathing room).
 
-Host requirement: **Airport Shuttle · Tours · Location & Parking** — very visible, not buried.
+**Keep visible every day:**
 
-| Tab | Content | Available when locked? |
-|-----|---------|------------------------|
-| **Location & Parking** | Address, Google Maps, parking — default/ first tab | **YES** — guests need this before arrival |
-| **Airport Shuttle** | Transfer request (existing `airport_transfer` service flow) | **YES** |
-| **Tours** | City tour request (existing `city_tour` service flow) | **YES** |
+| Keep | Why |
+|------|-----|
+| Door / smart-lock password | Re-enter apartment |
+| Elevator QR + code | Building access |
+| Floor + apartment door picture | Find the right door |
+| WiFi name + password | Connectivity |
 
-- Tab bar: full-width, 3 equal segments, sticky below hero on scroll  
-- Default tab on first visit after registration: **Location & Parking** (most useful while waiting)  
-- WiFi, cleaning, laundry, full services grid: **not in tabs** for v1  
+Optional: small link “Show arrival instructions again” if guest needs a refresh — default collapsed.
+
+#### Phase D — Leaving (checkout day)
+
+- **Do not** lock codes at 12:00 noon. Late checkouts still need elevator + door.  
+- Show checkout date clearly: **Checkout today** / checkout time if we have one.  
+- Button: **I've checked out** (or **Checked out**).  
+- On tap: write `guestConfirmedCheckout: true` (+ timestamp); show thank-you; stop showing codes (or show short grace — see §4.1).  
+- Until they tap (or grace ends): **same daily key as Phase C**.
+
+#### Three tabs (always visible below hero — all phases A–D)
+
+| Tab | Content | When locked (A)? |
+|-----|---------|------------------|
+| **Location & Parking** | Address, maps, parking — default tab | YES |
+| **Airport Shuttle** | `airport_transfer` request flow | YES |
+| **Tours** | `city_tour` request flow | YES |
+
+WiFi lives in the **hero daily key**, not as a fourth tab.
 
 #### What we are NOT building on home (v1)
 
 - Tile grid as primary navigation  
-- WiFi as a main tile  
-- “Check-in Details” as separate page/link  
-- Equal-weight menu of 6+ options  
+- “Check-in Details” as a separate page guests must discover  
+- Locking access at noon on checkout day  
+- Full walkthrough every day after guest already arrived  
 
 ### 3.6 Screens we are NOT redesigning (host 2026-08-23)
 
@@ -239,11 +262,13 @@ Safe to ship as a tiny production patch independent of home redesign.
 
 ---
 
-## 4. Unlock system (behavior kept; presentation changes)
+## 4. Unlock + stay-end system
+
+### 4.1 Check-in unlock (KEEP existing math)
 
 ```
-today > arrival                          → UNLOCKED
-today < arrival                          → LOCKED
+today > arrival                          → UNLOCKED (Phase B or C)
+today < arrival                          → LOCKED (Phase A)
 today === arrival:
   manualUnlock === true                  → UNLOCKED
   hour >= checkInHour (default 15)       → UNLOCKED
@@ -251,27 +276,54 @@ today === arrival:
   else                                   → LOCKED
 ```
 
-### Presentation
+- Pollers auto-flip A → B without refresh.  
+- **Never** show door / elevator / WiFi secrets while locked.
 
-- On arrival day before unlock: **live countdown** + “details appear on this page when the timer ends.”
-- Before arrival day: show unlock date/time (“Available on 15 Aug at 15:00”).
-- Pollers must auto-flip locked → unlocked without refresh.
-- **Never** show door/elevator secrets while locked.
+### 4.2 Checkout / access end (CHANGE vs “lock at noon”)
+
+**Host rule:** Guests need elevator QR + codes on checkout day; some check out late. **Do not revoke access at 12:00 noon.**
+
+| Rule | Decision |
+|------|----------|
+| Checkout **day** | Stay in Phase D — codes **remain available all day** |
+| **I've checked out** button | Appears on checkout day; guest confirms leaving |
+| After guest taps Checked out | Thank-you; hide codes (session can clear) |
+| If guest never taps | **Proposed default:** keep codes until **end of checkout day (23:59 Tbilisi)** then thank-you / expire — *host confirm* |
+| Today’s production session expiry | `checkout + 1 day` in `init()` — redesign may tighten to end of checkout day after button exists; do not silently break mid-stay |
+
+**Open decision for host:** If guest never taps “I've checked out”, when should codes disappear?  
+A) Midnight end of checkout day (Tbilisi)  
+B) Keep current `checkout + 1 day`  
+C) Fixed hour e.g. 20:00 on checkout day  
+
+### 4.3 New Firestore fields (guest-driven)
+
+On `checkin_guests/{guestId}` (merge writes only):
+
+| Field | Set when |
+|-------|----------|
+| `guestConfirmedCheckin` | Guest taps **I'm checked in** |
+| `guestConfirmedCheckinAt` | serverTimestamp |
+| `guestConfirmedCheckout` | Guest taps **I've checked out** |
+| `guestConfirmedCheckoutAt` | serverTimestamp |
+
+Admin can later show these on Guests tab. No new collections.
 
 ---
 
-## 5. Services scope on guest main (LOCKED)
+## 5. Services + WiFi scope (LOCKED)
 
-**On / near main page only:**
+**Hero (after unlock):** WiFi name + password (daily).
+
+**Tabs only:**
 
 1. Airport shuttle / transfer (`airport_transfer`)  
-2. Tours / city tour (`city_tour` or equivalent admin service id)
+2. Tours / city tour (`city_tour`)  
+3. Location & Parking  
 
-**Not featured on main for this redesign:** WiFi, cleaning, laundry, generic “all services” grid.
+**Not on main:** cleaning, laundry, generic “all services” grid.
 
-Existing `submitService()` / WhatsApp handoff / `checkin_requests` stay. Design of shuttle + tours UI is a later claimed workstream.
-
-Admin “Guest Page Settings” visibility should eventually align with this IA (admin track).
+Existing `submitService()` / WhatsApp handoff / `checkin_requests` stay.
 
 ---
 
