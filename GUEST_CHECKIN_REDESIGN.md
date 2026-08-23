@@ -57,7 +57,7 @@ The page is a dashboard. Guests need a **daily key**: door password + elevator Q
 - After registration, **main screen = check-in / access**, not a menu.
 - **Locked:** countdown + “details unlock on this page when the timer ends.”
 - **First unlock:** full walkthrough + **I'm checked in**; then **daily key** (door, elevator QR/code, floor + door photo, WiFi).
-- **Checkout day:** codes stay (no noon lock) + **I've checked out** button.
+- **Checkout day:** codes until **20:00 Tbilisi** or guest taps **I've checked out** (no noon lock).
 - Tabs: Location & parking · Airport shuttle · Tours.
 - Host gets fewer “where are my details?” messages.
 
@@ -112,7 +112,7 @@ Home is **not** just locked vs unlocked. Four guest-facing phases:
 | **A — Waiting** | Before check-in unlock time | Countdown hero + 3 tabs. No codes. |
 | **B — Arriving** | Unlocked, guest has **not** tapped Checked in | Full access: door + elevator + WiFi + **full walkthrough** (street → elevator → door) + big **I'm checked in** button |
 | **C — Staying** | After **I'm checked in** | Compact daily key only: door code, elevator QR/code, floor + door photo, WiFi. Walkthrough **collapsed/hidden**. Tabs use freed space. |
-| **D — Leaving** | Checkout **day** (all day — **not** locked at noon) | Same daily key as C (codes still needed for late checkout) + **I've checked out** button. |
+| **D — Leaving** | Checkout **day** until 20:00 or tap | Same daily key as C + **I've checked out** button. Codes until **20:00 Tbilisi** if guest never taps. |
 
 **After checked out / stay ended:** thank-you / access ended (exact cutover time TBD in §4.1 — **not** 12:00 noon).
 
@@ -280,16 +280,24 @@ today === arrival:
 
 | Rule | Decision |
 |------|----------|
-| Checkout **day** | Stay in Phase D — codes **remain available all day** |
+| Checkout **day** | Phase D — codes stay until guest checks out **or 20:00 Tbilisi** (whichever first) |
 | **I've checked out** button | Appears on checkout day; guest confirms leaving |
-| After guest taps Checked out | Thank-you; hide codes (session can clear) |
-| If guest never taps | **Proposed default:** keep codes until **end of checkout day (23:59 Tbilisi)** then thank-you / expire — *host confirm* |
-| Today’s production session expiry | `checkout + 1 day` in `init()` — redesign may tighten to end of checkout day after button exists; do not silently break mid-stay |
+| After guest taps Checked out | Thank-you; hide codes; session may clear |
+| Guest never taps Checked out | Codes expire at **20:00 Tbilisi on checkout day** → thank-you / access ended |
+| **Not** allowed | Locking codes at 12:00 noon on checkout day |
 
-**Open decision for host:** If guest never taps “I've checked out”, when should codes disappear?  
-A) Midnight end of checkout day (Tbilisi)  
-B) Keep current `checkout + 1 day`  
-C) Fixed hour e.g. 20:00 on checkout day  
+**Implementation note:** Use `tbilisiHour()` + checkout date from reservation (`activeReservation.checkout` / `guestData.checkoutDate`). Replace production `init()` rule of `checkout + 1 day` with this at cutover.
+
+```
+function isStayEnded(){
+  if(guestConfirmedCheckout) return true;
+  const co = checkoutDate; // YYYY-MM-DD
+  const today = tbilisiToday();
+  if(today > co) return true;
+  if(today === co && tbilisiHour() >= 20) return true;
+  return false;
+}
+```
 
 ### 4.3 New Firestore fields (guest-driven)
 
@@ -349,6 +357,7 @@ Existing `submitService()` / WhatsApp handoff / `checkin_requests` stay.
 | 7 | Checked in button? | **YES** — collapses walkthrough; keeps daily key |
 | 8 | Checkout day? | Codes stay all day (no noon lock) + **I've checked out** button |
 | 9 | WiFi? | **YES** — visible on home after unlock (hero daily key) |
+| 10 | If never taps Checked out? | **20:00 Tbilisi on checkout day** — then codes expire |
 
 ---
 
@@ -443,6 +452,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-20 | Cursor | Initial coordination doc |
 | 2026-08-23 | Cursor | Home screen wireframe §3.5: countdown hero + 3 tabs; registration copy fix §3.7 |
 | 2026-08-23 | Cursor | Stay lifecycle A–D: Checked in / Checked out buttons; WiFi daily; no noon checkout lock; walkthrough collapses after check-in |
+| 2026-08-23 | Cursor | Locked checkout expiry: **20:00 Tbilisi** on checkout day if guest never taps Checked out |
 
 ---
 
