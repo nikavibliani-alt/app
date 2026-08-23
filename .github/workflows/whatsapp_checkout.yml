@@ -24,6 +24,7 @@ jobs:
       - name: Run checkout reminder
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          YCLOUD_API_KEY: ${{ secrets.YCLOUD_API_KEY }}
-          YCLOUD_PHONE_NUMBER: ${{ secrets.YCLOUD_PHONE_NUMBER }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          META_PHONE_NUMBER_ID: ${{ secrets.META_PHONE_NUMBER_ID }}
+          META_WABA_ID: ${{ secrets.META_WABA_ID }}
         run: python3 whatsapp_automation.py --job checkout
