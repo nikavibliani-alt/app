@@ -341,7 +341,7 @@ Existing `submitService()` / WhatsApp handoff / `checkin_requests` stay.
 | # | Question | Answer |
 |---|----------|--------|
 | 1 | Rules + passport before home? | **YES** — required before arrival / before home |
-| 2 | What secondary while/after? | **Location & parking** yes. Services on main: **Airport shuttle + tours only**. WiFi not important. |
+| 2 | What secondary while/after? | Tabs: **Location & parking · Airport shuttle · Tours**. WiFi on **hero daily key** (not a tab). |
 | 3 | Details unlock where? | **Same page** |
 | 4 | Final link vs sandbox? | **Same production link at the end**; build in a **sandbox** until design is ready |
 | 5 | Frequent use? | **YES** — elevator QR/code + door password + floor/door photo + WiFi daily; full walkthrough only until Checked in |
