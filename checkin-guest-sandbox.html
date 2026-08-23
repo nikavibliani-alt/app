@@ -874,7 +874,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
           <div class="dk-label"><span>Elevator code</span></div>
           <div class="dk-code" id="hero-elevator-code" style="font-size:28px;">— — — —</div>
           <button class="dk-copy" onclick="window.copySth(document.getElementById('hero-elevator-code').textContent,this)">Copy</button>
-          <div id="hero-elevator-qr" style="margin-top:10px;"><canvas id="hero-elevator-qr-canvas"></canvas></div>
+          <div id="hero-elevator-qr" style="display:none;margin-top:10px;"><canvas id="hero-elevator-qr-canvas" width="96" height="96"></canvas></div>
         </div>
 
         <div class="dk-row">
@@ -3179,9 +3179,17 @@ function _renderHeroContent(){
         const isStale=!updatedAt||(Date.now()/1000-updatedAt>36*3600);
         codeEl.textContent=(!isStale&&elevatorData?.code)?elevatorData.code:'Contact host';
       }
+      // Box stays hidden (see HTML) until the QR actually draws — a slow/blocked
+      // CDN script must never leave a ~150px dead gap in the card (FINDING-001).
       const qrCanvas=document.getElementById('hero-elevator-qr-canvas');
+      const qrWrap=document.getElementById('hero-elevator-qr');
       if(qrCanvas&&elevatorData?.code&&window.QRCode){
-        try{QRCode.toCanvas(qrCanvas,String(elevatorData.code),{width:96,color:{dark:'#000000',light:'#FFFFFF'}});}catch(e){}
+        try{
+          QRCode.toCanvas(qrCanvas,String(elevatorData.code),{width:96,color:{dark:'#000000',light:'#FFFFFF'}});
+          if(qrWrap)qrWrap.style.display='';
+        }catch(e){if(qrWrap)qrWrap.style.display='none';}
+      }else if(qrWrap){
+        qrWrap.style.display='none';
       }
     }else{
       elevWrap.style.display='none';
