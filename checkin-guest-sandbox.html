@@ -578,6 +578,35 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 .tab-btn.active{border-bottom:2px solid var(--ink);font-weight:600;color:var(--ink);}
 .tab-panel{display:none;padding:18px 4px;font-size:13.5px;color:var(--ink-2);line-height:1.6;}
 .tab-panel.active{display:block;}
+
+/* ══════════════════════════════════════════════════════════════════
+   SANDBOX — dev toolbar (jump to any screen/phase/state, no Firebase)
+   Sandbox-only: never ports to checkin-guest-v2.html at cutover.
+   ══════════════════════════════════════════════════════════════════ */
+#sb-toolbar{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:min(100vw,390px);background:#1a1a1a;color:#fff;
+  padding:8px;z-index:99999;font-size:11px;font-family:var(--mono),monospace;
+  box-shadow:0 -4px 20px rgba(0,0,0,0.3);
+  max-height:44vh;overflow-y:auto;
+}
+#sb-toolbar.collapsed .sb-row{display:none;}
+#sb-toolbar .sb-head{display:flex;align-items:center;justify-content:space-between;padding:2px 4px 6px;}
+#sb-toolbar .sb-title{font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#C4A882;}
+#sb-toolbar .sb-collapse-btn{background:#333;border:none;color:#fff;border-radius:999px;padding:2px 9px;font-size:11px;cursor:pointer;font-family:inherit;}
+#sb-toolbar .sb-row{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:3px 2px;}
+#sb-toolbar .sb-row-label{color:#888;font-size:9.5px;letter-spacing:0.08em;text-transform:uppercase;margin-right:4px;flex:none;width:100%;margin-bottom:1px;}
+#sb-toolbar button.sb-btn{
+  background:#333;color:#fff;border:1px solid #444;border-radius:999px;
+  padding:5px 10px;margin:2px;font-size:11px;font-family:inherit;cursor:pointer;
+  transition:background .12s,color .12s;
+}
+#sb-toolbar button.sb-btn:hover{background:#444;}
+#sb-toolbar button.sb-btn.sb-active{background:var(--accent);color:var(--ink);border-color:var(--accent);font-weight:700;}
+#sb-toolbar .sb-row.sb-phase-row{opacity:0.4;pointer-events:none;}
+#sb-toolbar .sb-row.sb-phase-row.sb-enabled{opacity:1;pointer-events:auto;}
+#sb-toolbar button.sb-toggle-off{background:#3a1f1f;border-color:#5c2b2b;}
+#sb-toolbar button.sb-toggle-on{background:#1f3a26;border-color:#2b5c3a;}
 </style>
 </head>
 <body>
@@ -3225,12 +3254,13 @@ function applyHomePhase(){
 
 window.guestCheckedIn=async function(){
   if(!guestId)return;
+  guestData={...(guestData||{}),guestConfirmedCheckin:true};
+  if(_sbMockActive){applyHomePhase();toast('Welcome! Enjoy your stay.');return;} // sandbox mock guest — skip Firestore write
   try{
     await setDoc(doc(db,'checkin_guests',guestId),{
       guestConfirmedCheckin:true,
       guestConfirmedCheckinAt:serverTimestamp()
     },{merge:true});
-    guestData={...(guestData||{}),guestConfirmedCheckin:true};
     applyHomePhase();
     toast('Welcome! Enjoy your stay.');
   }catch(e){
@@ -3241,12 +3271,13 @@ window.guestCheckedIn=async function(){
 
 window.guestCheckedOut=async function(){
   if(!guestId)return;
+  guestData={...(guestData||{}),guestConfirmedCheckout:true};
+  if(_sbMockActive){toast('Safe travels! Hope to see you again.');applyHomePhase();return;} // sandbox mock guest — skip Firestore write
   try{
     await setDoc(doc(db,'checkin_guests',guestId),{
       guestConfirmedCheckout:true,
       guestConfirmedCheckoutAt:serverTimestamp()
     },{merge:true});
-    guestData={...(guestData||{}),guestConfirmedCheckout:true};
     toast('Safe travels! Hope to see you again.');
     applyHomePhase(); // isStayEnded() now true → shows #hero-thankyou
   }catch(e){
@@ -3270,6 +3301,148 @@ window.switchHomeTab=function(id){
   document.getElementById('panel-'+id)?.classList.add('active');
 };
 
+// ══════════════════════════════════════════════════════════════════
+// SANDBOX DEV TOOLBAR — jump to any screen/phase/state without Firebase.
+// Never ports to checkin-guest-v2.html at cutover (§13 GUEST_CHECKIN_REDESIGN.md).
+// ══════════════════════════════════════════════════════════════════
+let _sbMockActive=false;              // true once toolbar has injected mock data
+let _sbState={multiRoom:false,elevator:true,manualUnlock:false};
+let _sbCurrentPhase='arriving';       // last phase requested via toolbar
+
+function _sbAddDays(dateStr,n){
+  const p=dateStr.split('-').map(Number);
+  const d=new Date(p[0],p[1]-1,p[2]+n);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+// Builds every module-scoped var real Firebase data would normally populate
+// (guestId, guestData, aptData, activeReservation, elevatorData, allMatchedReservations)
+// so the rest of the app (renderGreetingApt/_renderHeroContent/applyHomePhase/tiles)
+// runs completely unchanged against fake data. See §13.3 for the field reference.
+function _sbBuildMocks(phase){
+  _sbMockActive=true;
+  const today=tbilisiToday();
+  aptId=_sbState.elevator?'6-2':'0-4';
+  guestId='SANDBOX_DEV_GUEST';
+
+  let checkin=today,checkout=_sbAddDays(today,2);
+  if(phase==='waiting'){checkin=_sbAddDays(today,1);checkout=_sbAddDays(today,4);}
+  else if(phase==='leaving'||phase==='checkoutdone'){checkin=_sbAddDays(today,-1);checkout=today;}
+
+  const primaryRes={
+    id:'MOCK001',roomCode:aptId,checkin,checkIn:checkin,checkout,checkOut:checkout,
+    tuyaPassword:'1234#',guest:'Latifa Al Mansoori',status:'CONFIRMED'
+  };
+
+  activeReservation=primaryRes;
+  guestData={
+    name:'Latifa Al Mansoori',
+    nameRoman:'Latifa Al Mansoori',
+    aptId,
+    arrivalDate:checkin,
+    checkoutDate:checkout,
+    matchedReservationId:'MOCK001',
+    manualUnlock:_sbState.manualUnlock,
+    blocked:false,
+    guestConfirmedCheckin:(phase==='staying'||phase==='leaving'||phase==='checkoutdone'),
+    guestConfirmedCheckout:(phase==='checkoutdone')
+  };
+  aptData={
+    wifiName:'Maxela_Guest',
+    wifiPass:'welcome2024',
+    checkInTime:'15:00',
+    rules:{apartment:'Please keep noise low after 22:00.'},
+    recommendations:{shartava:[]}
+  };
+  elevatorData={code:'4521',display_code:'4521#',updatedAt:{seconds:Date.now()/1000}};
+  allMatchedReservations=[primaryRes];
+  if(_sbState.multiRoom){
+    allMatchedReservations.push({...primaryRes,id:'MOCK002',roomCode:'6-1'});
+  }
+}
+
+function _sbRenderHomeForPhase(phase){
+  _sbBuildMocks(phase);
+  _showPage('page-home');
+  document.getElementById('home-guest-name').textContent=guestData.name;
+  renderGreetingApt();
+
+  const home=document.getElementById('page-home');
+  home.classList.remove('phase-waiting','phase-arriving','phase-staying','phase-leaving');
+  document.getElementById('hero-thankyou')?.classList.remove('show');
+
+  if(phase==='checkoutdone'){
+    document.getElementById('hero-thankyou')?.classList.add('show');
+  }else{
+    home.classList.add('phase-'+phase);
+    _renderHeroContent();
+    if(phase==='waiting')_startCountdownTick();
+  }
+  _sbCurrentPhase=phase;
+  _sbSyncActiveButtons();
+}
+
+function _sbSyncActiveButtons(){
+  const onHome=document.getElementById('page-home')?.classList.contains('active');
+  document.querySelectorAll('#sb-toolbar [data-sb-screen]').forEach(b=>{
+    b.classList.toggle('sb-active',b.dataset.sbScreen==='home'?onHome:false);
+  });
+  document.querySelectorAll('#sb-toolbar [data-sb-phase]').forEach(b=>{
+    b.classList.toggle('sb-active',onHome&&b.dataset.sbPhase===_sbCurrentPhase);
+  });
+  document.getElementById('sb-phase-row')?.classList.toggle('sb-enabled',!!onHome);
+}
+
+window._sbShowScreen=function(screen){
+  document.getElementById('app').style.display='block';
+  if(screen==='loading'){
+    document.getElementById('loading').style.display='flex';
+    _sbSyncActiveButtons();
+    return;
+  }
+  document.getElementById('loading').style.display='none';
+  if(screen==='home'){
+    _sbRenderHomeForPhase(_sbCurrentPhase||'arriving');
+    return;
+  }
+  _showPage('page-'+screen); // register / rules / passport — bypasses all Firebase checks
+  _sbSyncActiveButtons();
+};
+
+window._sbGoPhase=function(phase){
+  document.getElementById('app').style.display='block';
+  document.getElementById('loading').style.display='none';
+  _sbRenderHomeForPhase(phase);
+};
+
+window._sbToggle=function(key){
+  _sbState[key]=!_sbState[key];
+  // Map state key → toolbar button id + label
+  const meta={
+    multiRoom:{id:'sb-toggle-multiroom',label:'Multi-room'},
+    elevator:{id:'sb-toggle-elevator',label:'Elevator'},
+    manualUnlock:{id:'sb-toggle-manualunlock',label:'Manual unlock'}
+  }[key];
+  const el=document.getElementById(meta.id);
+  if(el){
+    const on=_sbState[key];
+    el.textContent=meta.label+': '+(on?'ON':'OFF');
+    el.classList.toggle('sb-toggle-on',on);
+    el.classList.toggle('sb-toggle-off',!on);
+  }
+  // Re-render whatever is currently on screen so the toggle is visible immediately
+  if(document.getElementById('page-home')?.classList.contains('active')){
+    _sbRenderHomeForPhase(_sbCurrentPhase);
+  }
+};
+
+window._sbToggleCollapse=function(){
+  const tb=document.getElementById('sb-toolbar');
+  const btn=tb.querySelector('.sb-collapse-btn');
+  const collapsed=tb.classList.toggle('collapsed');
+  btn.textContent=collapsed?'show':'hide';
+};
+
 init();
 setupDateInput();
 </script>
@@ -3281,6 +3454,42 @@ setupDateInput();
   <button class="lb-next" id="lb-next" onclick="window.lbMove(1)">›</button>
   <div class="lb-counter" id="lb-counter"></div>
   <div class="lb-caption hidden" id="lb-caption"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SANDBOX DEV TOOLBAR — jump to any screen/phase/state, no Firebase.
+     Sandbox-only. Does NOT port to checkin-guest-v2.html at cutover.
+     ══════════════════════════════════════════════════════════════════ -->
+<div id="sb-toolbar">
+  <div class="sb-head">
+    <span class="sb-title">⚙ Sandbox dev toolbar</span>
+    <button class="sb-collapse-btn" onclick="window._sbToggleCollapse()">hide</button>
+  </div>
+
+  <div class="sb-row">
+    <span class="sb-row-label">Screens</span>
+    <button class="sb-btn" data-sb-screen="loading" onclick="window._sbShowScreen('loading')">Loading</button>
+    <button class="sb-btn" data-sb-screen="register" onclick="window._sbShowScreen('register')">Register</button>
+    <button class="sb-btn" data-sb-screen="rules" onclick="window._sbShowScreen('rules')">Rules</button>
+    <button class="sb-btn" data-sb-screen="passport" onclick="window._sbShowScreen('passport')">Passport</button>
+    <button class="sb-btn" data-sb-screen="home" onclick="window._sbShowScreen('home')">Home</button>
+  </div>
+
+  <div class="sb-row sb-phase-row" id="sb-phase-row">
+    <span class="sb-row-label">Phase (Home only)</span>
+    <button class="sb-btn" data-sb-phase="waiting" onclick="window._sbGoPhase('waiting')">Waiting</button>
+    <button class="sb-btn" data-sb-phase="arriving" onclick="window._sbGoPhase('arriving')">Arriving</button>
+    <button class="sb-btn" data-sb-phase="staying" onclick="window._sbGoPhase('staying')">Staying</button>
+    <button class="sb-btn" data-sb-phase="leaving" onclick="window._sbGoPhase('leaving')">Leaving</button>
+    <button class="sb-btn" data-sb-phase="checkoutdone" onclick="window._sbGoPhase('checkoutdone')">Checkout Done</button>
+  </div>
+
+  <div class="sb-row">
+    <span class="sb-row-label">State</span>
+    <button class="sb-btn sb-toggle-off" id="sb-toggle-multiroom" onclick="window._sbToggle('multiRoom')">Multi-room: OFF</button>
+    <button class="sb-btn sb-toggle-on" id="sb-toggle-elevator" onclick="window._sbToggle('elevator')">Elevator: ON</button>
+    <button class="sb-btn sb-toggle-off" id="sb-toggle-manualunlock" onclick="window._sbToggle('manualUnlock')">Manual unlock: OFF</button>
+  </div>
 </div>
 </body>
 </html>

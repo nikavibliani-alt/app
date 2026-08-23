@@ -454,6 +454,317 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-23 | Cursor | Stay lifecycle A–D: Checked in / Checked out buttons; WiFi daily; no noon checkout lock; walkthrough collapses after check-in |
 | 2026-08-23 | Cursor | Locked checkout expiry: **20:00 Tbilisi** on checkout day if guest never taps Checked out |
 | 2026-08-23 | Claude Code | Phase 1 `guest-sandbox-shell` done: `checkin-guest-sandbox.html` created (copy of `checkin-guest-v2.html`, `#page-home` rebuilt per §3.5 — countdown hero + shared daily-key hero (door/elevator/WiFi/floor) + walkthrough placeholder + Checked in/out CTAs + 3 tabs). `applyHomePhase()`, `window.guestCheckedIn/guestCheckedOut/isStayEnded` added; JS module otherwise unchanged (pure additions, verified by diff). Register/rules/passport untouched. |
+| 2026-08-24 | Claude Code | Added sandbox dev toolbar (`#sb-toolbar`) to `checkin-guest-sandbox.html` — jump to any screen/phase/state with full mock guest/reservation/apartment/elevator data, zero Firebase dependency (`_sbBuildMocks()`, `_sbRenderHomeForPhase()`, `_sbShowScreen()`, `_sbGoPhase()`, `_sbToggle()`). Added §13 Sandbox & Current Build State and §14 Prompts & Build Log. |
+
+---
+
+## 13. Sandbox & Current Build State (2026-08-24 — Claude Code)
+
+### 13.1 Sandbox file
+
+- **File:** `checkin-guest-sandbox.html` (repo root, same host as production)
+- **Open locally:** `open checkin-guest-sandbox.html` — no server needed for the static HTML/CSS, but the app is an ES module (`<script type="module">`) that talks to real Firestore, so `file://` works for browsing UI only; use any static server (`python3 -m http.server`) if you need `init()`'s real Firebase calls to run without CORS/module-script quirks.
+- **Pushed URL:** once pushed to `main`, same static hosting pattern as `checkin-guest-v2.html` → `https://app.maxelaapartments.com/checkin-guest-sandbox.html`
+- **Dev toolbar:** a fixed black bar pinned to the bottom of the viewport, visible always in this file (no `?sandbox=true` gate — sandbox-only, never ports to v2). Three rows:
+  - **Screens** — jumps straight to Loading / Register / Rules / Passport / Home, bypassing all Firebase/session checks (`_showPage()` directly).
+  - **Phase (Home only)** — Waiting / Arriving / Staying / Leaving / Checkout Done. Clicking a phase button also switches to Home. Injects full mock guest/reservation/apartment/elevator data (§13.3) so every code, WiFi field, and CTA renders with real-looking content — no login, no real reservation needed.
+  - **State** — Multi-room, Elevator code, Manual unlock toggles. Re-renders whatever phase is currently on screen immediately so the effect is visible without re-clicking a phase button.
+  - "hide" button collapses the bar to just its header if it's blocking a screenshot.
+
+### 13.2 What is built (Phase 1 current state)
+
+**Screens** — all 5 exist and are reachable via the toolbar:
+
+| Screen | Status |
+|--------|--------|
+| Loading (`#loading`) | Unchanged from v2 |
+| Register (`#page-register`) | Unchanged from v2 (copy fix §3.7 **not yet applied** — still says "Booking Name") |
+| Rules (`#page-rules`) | Unchanged from v2 |
+| Passport (`#page-passport`) | Unchanged from v2 |
+| Home (`#page-home`) | **Fully redesigned** per §3.5 |
+
+**Phases (Home):**
+
+| Phase | Status |
+|-------|--------|
+| A — Waiting | Built — headline, live `HH:MM:SS` countdown, subline. Countdown only counts down on the actual check-in day (see §13.4 known issue). |
+| B — Arriving | Built — door code, elevator code + QR (if applicable), WiFi, floor label, walkthrough **placeholder**, "I'm checked in" CTA |
+| C — Staying | Built — same daily key as B minus walkthrough; "Show arrival instructions" link (placeholder toggle) |
+| D — Leaving | Built — same daily key as C + checkout date label + "I've checked out" CTA |
+| Checkout Done (terminal, not one of the official 4 phases) | Built — thank-you card, driven by `isStayEnded()`/`guestConfirmedCheckout` |
+
+**Real vs mocked in the daily-key hero:**
+
+| Element | Source when live | Source in toolbar mock |
+|---------|-------------------|--------------------------|
+| Door code | `activeReservation.tuyaPassword` (real Firestore) | `'1234#'` |
+| Elevator code + QR | `globals/elevator_code` (real, 36h stale check) | `'4521'`, fake `updatedAt` = now |
+| WiFi name/pass | `checkin_apartments/{aptId}` (real) | `'Maxela_Guest'` / `'welcome2024'` |
+| Floor label | Derived from `aptId` prefix (real logic either way) | Derived from mocked `aptId` |
+| Door photo | `aptData.doorPhotoUrl` — **field doesn't exist yet anywhere**, always hidden | Always hidden (no mock value set) |
+| Walkthrough | Static placeholder text | Same placeholder text |
+| Location/Shuttle/Tours tab panels | Static placeholder text ("— Phase 3") | Same placeholder text |
+
+**Not yet built (later phases):**
+- Phase 2 — real walkthrough content ported from `checkin-details.html` (street arrows, elevator photos/video) into `#hero-walkthrough`
+- Phase 3 — real Location & Parking / Airport Shuttle / Tours content in the 3 tab panels (currently placeholder text only)
+- Phase 4 — visual/brand polish pass on the whole hero + toolbar-verified phases
+- Registration copy fix (§3.7) — not applied in sandbox yet, still pending
+
+### 13.3 Mock data reference
+
+Toolbar mock values (see `_sbBuildMocks()` in the script, right above `init()`):
+
+```js
+guestId = 'SANDBOX_DEV_GUEST';
+aptId   = elevatorToggle ? '6-2' : '0-4';   // toggled by State → Elevator
+
+activeReservation = {
+  id: 'MOCK001', roomCode: aptId,
+  checkin, checkIn: checkin, checkout, checkOut: checkout,  // dates shift per phase — see below
+  tuyaPassword: '1234#',
+  guest: 'Latifa Al Mansoori',
+  status: 'CONFIRMED'
+};
+
+guestData = {
+  name: 'Latifa Al Mansoori',
+  nameRoman: 'Latifa Al Mansoori',
+  aptId,
+  arrivalDate: checkin,
+  checkoutDate: checkout,
+  matchedReservationId: 'MOCK001',
+  manualUnlock: manualUnlockToggle,           // State → Manual unlock
+  blocked: false,
+  guestConfirmedCheckin: (phase is staying/leaving/checkoutDone),
+  guestConfirmedCheckout: (phase is checkoutDone)
+};
+
+aptData = {
+  wifiName: 'Maxela_Guest',
+  wifiPass: 'welcome2024',
+  checkInTime: '15:00',
+  rules: { apartment: 'Please keep noise low after 22:00.' },
+  recommendations: { shartava: [] }
+};
+
+elevatorData = { code: '4521', display_code: '4521#', updatedAt: { seconds: Date.now()/1000 } };
+
+allMatchedReservations = [activeReservation];
+// + a second { ...activeReservation, id:'MOCK002', roomCode:'6-1' } when State → Multi-room is ON
+```
+
+**Dates per phase** (`checkin`/`checkout` relative to `tbilisiToday()`):
+
+| Phase requested | `checkin` | `checkout` |
+|------------------|-----------|------------|
+| waiting | today + 1 | today + 4 |
+| arriving / staying | today | today + 2 |
+| leaving / checkoutdone | today − 1 | today |
+
+### 13.4 Known issues in sandbox
+
+- **Countdown shows `00:00:00` in Phase A.** `timeUntilCheckin()` (unchanged from v2, per §2 "explicitly unchanged") only returns a real countdown on the actual check-in day — it returns `0` on any other day. The toolbar mocks `checkin = today + 1` for the Waiting phase, so the countdown is always `0` when jumped to via the toolbar. This is not a sandbox bug — it reproduces v2's real behavior; the "Unlocks [date] at [time]" fallback copy from §3.5 Phase A spec is **not yet implemented** for the multi-day-out case (real gap, needs a follow-up prompt).
+- **Door photo never renders.** No apartment record anywhere (Firestore or mock) has a `doorPhotoUrl` field yet — `#hero-door-photo` is always `display:none`. Needs an admin-side field before this can show real content.
+- **`#tiles-grid` and `#what-you-booked` are still in the DOM, just hidden (`display:none`).** `renderTiles()` / `_renderTilesNow()` / `showBlockedScreen()` / `renderWhatYouBooked()` write to them unconditionally (unchanged JS) — removing the elements would throw. Not visible to users, safe to ignore.
+- **Pre-existing duplicate `id="home-apt-name"`** (3 occurrences: one static + two inside `renderGreetingApt()` template-literal strings) — same as `checkin-guest-v2.html`, only one copy is ever in the live DOM at once, not a regression from this work.
+
+**New IDs added vs `checkin-guest-v2.html`** (all in `#page-home` or the toolbar, nothing renamed or removed):
+`countdown-display`, `hero-door-code`, `hero-door-copy`, `hero-elevator`, `hero-elevator-code`, `hero-elevator-qr`, `hero-elevator-qr-canvas`, `hero-wifi-name`, `hero-wifi-pass`, `hero-floor-info`, `hero-door-photo`, `hero-walkthrough`, `btn-checked-in`, `btn-show-walkthrough`, `hero-checkout-label`, `btn-checked-out`, `hero-thankyou`, `tab-location`/`tab-shuttle`/`tab-tours`, `panel-location`/`panel-shuttle`/`panel-tours`, `sb-toolbar` and its children (`sb-phase-row`, `sb-toggle-multiroom`, `sb-toggle-elevator`, `sb-toggle-manualunlock`).
+
+### 13.5 Next steps for Cursor
+
+Focus visually, in this order:
+
+1. **Phase B (Arriving) daily-key card** — currently plain rows (label → big mono code → copy pill). Needs icons per code type (door/elevator/WiFi/floor), and clearer visual priority between the P0-daily door code and the rest.
+2. **Phase A (Waiting) subline/countdown** — design the "Unlocks [date] at [time]" state for guests more than a day out (see known issue above); right now there's no visual treatment for it, only the live `HH:MM:SS` on check-in day itself.
+3. **Tab bar (Phase 3 content)** — panels are plain placeholder text; once Location/Shuttle/Tours content is ported, they need real card/list layouts matching the hero's visual language.
+4. **Door photo empty state** — currently just invisible; needs a "photo coming soon" placeholder treatment for apartments without one yet.
+5. **Multi-room apt-pills under the new hero** — reused unchanged from v2's tile-menu design; confirm pill styling still reads well directly under the redesigned greeting + hero, restyle if not.
+
+Use the dev toolbar to flip through all of the above live — no login or real reservation required.
+
+---
+
+## 14. Prompts & Build Log
+
+### Phase 1 — Sandbox Shell
+
+The exact Claude Code prompt that produced the first version of `checkin-guest-sandbox.html` (§13, `guest-sandbox-shell` workstream):
+
+```
+Read these files in this order before doing anything else:
+1. GUEST_CHECKIN_REDESIGN.md — source of truth for this redesign
+2. CHECKIN_GUEST_SPEC.md — full technical audit of the current page
+3. checkin-guest-v2.html — the live production file (DO NOT EDIT THIS)
+
+---
+
+TASK: Phase 1 — guest-sandbox-shell
+
+Claim workstream `guest-sandbox-shell` in GUEST_CHECKIN_REDESIGN.md §9
+(update the table: owner = Claude Code, date = today, status = active).
+
+Create a new file: `checkin-guest-sandbox.html`
+
+This file is a COPY of checkin-guest-v2.html with the home screen
+(#page-home) rebuilt to match the new IA from §3.5 of GUEST_CHECKIN_REDESIGN.md.
+Everything else (registration, rules, passport, all JS logic) stays identical.
+
+---
+
+WHAT TO BUILD — HOME SCREEN ONLY:
+
+Replace the current #page-home contents with the new layout. The JS
+module script stays 100% unchanged. You are only changing HTML structure
+and CSS inside the home page div.
+
+NEW HOME STRUCTURE (top to bottom):
+
+1. TOP BAR
+   - Left: "Maxela" wordmark (Playfair Display italic)
+   - Right: language pill + sign out (keep existing elements, same IDs)
+
+2. GREETING
+   - "Welcome, [name]" — Playfair Display italic, large
+   - Apartment name below — Inter, muted
+   - Multi-room apt pills if applicable (keep #apt-area, .apt-pill, .apt-pills,
+     .active — JS controls these)
+
+3. HERO SECTION — 4 phases (controlled by JS via CSS classes on #page-home)
+   Add class `phase-waiting`, `phase-arriving`, `phase-staying`, `phase-leaving`
+   to #page-home. CSS shows/hides the right hero panel per phase.
+   JS will set the class — for now just build the HTML for all 4 panels
+   and show phase-arriving by default for visual testing.
+
+   PHASE A — .hero-waiting
+   - Large headline: "Your check-in instructions unlock here"
+   - Big countdown display: HH:MM:SS (id="countdown-display")
+   - Subline: "Come back to this page at check-in time.
+     Door code appears automatically — do not message us."
+   - No codes shown
+
+   PHASE B — .hero-arriving
+   - Door/smart-lock password (id="hero-door-code") — large, monospace, copy button
+   - Elevator QR + numeric code section (id="hero-elevator") — only if needsElevatorCode()
+     [keep same visibility logic, just restructure HTML]
+   - WiFi: network name (id="hero-wifi-name") + password (id="hero-wifi-pass") — copy buttons
+   - Floor info + apartment door photo (img, id="hero-door-photo")
+   - Full walkthrough section (id="hero-walkthrough") — placeholder for Phase 2
+   - Primary CTA button: "I'm checked in" (id="btn-checked-in")
+     onclick: window.guestCheckedIn() — we will implement the function
+
+   PHASE C — .hero-staying
+   - Same as B but WITHOUT #hero-walkthrough
+   - Small link: "Show arrival instructions" (id="btn-show-walkthrough",
+     onclick toggles #hero-walkthrough visibility)
+   - No "I'm checked in" button
+
+   PHASE D — .hero-leaving
+   - Same daily key as C (door + elevator + WiFi + floor photo)
+   - "Checkout today" label
+   - CTA button: "I've checked out" (id="btn-checked-out")
+     onclick: window.guestCheckedOut()
+
+4. THREE TABS (always visible, all phases)
+   Tab bar: Location & Parking | Airport Shuttle | Tours
+   (ids: tab-location, tab-shuttle, tab-tours)
+   Tab panels below (ids: panel-location, panel-shuttle, panel-tours)
+   - Location panel: placeholder text "Address and parking info — Phase 3"
+   - Shuttle panel: placeholder text "Airport shuttle booking — Phase 3"
+   - Tours panel: placeholder text "Tours and city guide — Phase 3"
+   Default active: tab-location
+
+---
+
+NEW JS FUNCTIONS TO ADD (add at bottom of script module, before closing):
+
+window.guestCheckedIn = async function() {
+  // Write guestConfirmedCheckin: true + guestConfirmedCheckinAt: serverTimestamp
+  // to checkin_guests/{guestId} (merge)
+  // Then flip #page-home class from phase-arriving to phase-staying
+  // Toast: "Welcome! Enjoy your stay."
+}
+
+window.guestCheckedOut = async function() {
+  // Write guestConfirmedCheckout: true + guestConfirmedCheckoutAt: serverTimestamp
+  // to checkin_guests/{guestId} (merge)
+  // Toast: "Safe travels! Hope to see you again."
+  // Then show a simple thank-you message (replace hero with thank-you text)
+}
+
+window.isStayEnded = function() {
+  // Per §4.2 of GUEST_CHECKIN_REDESIGN.md:
+  // if guestData.guestConfirmedCheckout === true → return true
+  // if today > checkoutDate → return true
+  // if today === checkoutDate AND tbilisiHour() >= 20 → return true
+  // return false
+}
+
+---
+
+PHASE LOGIC — add after showHome() renders, before first renderTiles():
+
+function applyHomePhase() {
+  // Reads: guestData.guestConfirmedCheckin, guestData.guestConfirmedCheckout,
+  //        isUnlocked(), isStayEnded(), tbilisiToday(), activeReservation.checkout
+  // Sets class on #page-home: phase-waiting / phase-arriving / phase-staying / phase-leaving
+  // Call this whenever guestData updates (checkin_guests onSnapshot already fires on change)
+}
+
+---
+
+CSS DIRECTION (add in <style> block, do not remove existing styles):
+
+Keep all existing CSS variables. Add:
+
+:root {
+  --r:   12px;
+  --rs:  12px;
+  --rsm: 6px;
+  --rl:  20px;
+  --rxl: 24px;
+  --shadow-card: 0 2px 12px rgba(0,0,0,0.06);
+}
+
+Hero card (.hero-card):
+  background: var(--ink); color: #fff; border-radius: var(--r);
+  padding: 24px; margin-bottom: 16px;
+
+Door code display:
+  font-family: var(--mono); font-size: 36px; letter-spacing: 0.15em;
+
+CTA buttons (phase-arriving, phase-leaving primary):
+  border-radius: var(--rxl); width: 100%; background: var(--accent);
+  color: var(--ink); font-weight: 600; padding: 16px; font-size: 16px;
+
+Tab bar:
+  display: flex; border-bottom: 1.5px solid var(--line);
+  Active tab: border-bottom: 2px solid var(--ink); font-weight: 600;
+
+---
+
+VERIFY BEFORE COMMITTING:
+1. python3 -m py_compile — N/A (HTML file), but run node --check on the
+   extracted <script type="module"> block
+2. Confirm all existing JS-referenced IDs from CHECKIN_GUEST_SPEC.md §2
+   still exist in the DOM (grep for: #loading, #page-register, #page-rules,
+   #page-passport, #page-home, #r-name, #r-arrival, #r-contact, #tiles-grid,
+   #apt-area, #svc-modal, #req-detail-modal, #qr-fullscreen-overlay,
+   #lightbox, #toast)
+3. Confirm .active, .hidden, .locked, .copied classes are not renamed
+4. Open the sandbox URL and manually test: register flow still works,
+   home shows phase-arriving by default, tabs switch, I'm checked in button
+   shows toast
+
+THEN:
+- git add checkin-guest-sandbox.html
+- Update GUEST_CHECKIN_REDESIGN.md §9 workstream table + §12 changelog
+- git commit -m "Phase 1: guest sandbox shell — new home IA (countdown + access hero + 3 tabs)"
+- git pull --rebase origin main
+- git push
+- Report: sandbox URL + what works + what is placeholder for Phase 2
+```
 
 ---
 
