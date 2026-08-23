@@ -406,7 +406,7 @@ That config work belongs in the admin track after guest sandbox IA is stable —
 | Workstream | Status | Owner | Files | Notes |
 |------------|--------|-------|-------|-------|
 | `docs-coord` | **active** | Cursor | `GUEST_CHECKIN_REDESIGN.md` | Decisions locked; sandbox plan |
-| `guest-sandbox-shell` | ready to open | — | `checkin-guest-sandbox.html` | Phase 1 — claim before coding |
+| `guest-sandbox-shell` | active | Claude Code | `checkin-guest-sandbox.html` | 2026-08-23 — Phase 1 only |
 | `inline-checkin-access` | blocked on Phase 1 | — | sandbox | Door + elevator + tour |
 | `secondary-location-services` | blocked on Phase 1 | — | sandbox | Parking/location + shuttle + tours |
 | `guest-visual-design` | blocked on shell | — | sandbox CSS | Phase 4 |
@@ -453,6 +453,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-23 | Cursor | Home screen wireframe §3.5: countdown hero + 3 tabs; registration copy fix §3.7 |
 | 2026-08-23 | Cursor | Stay lifecycle A–D: Checked in / Checked out buttons; WiFi daily; no noon checkout lock; walkthrough collapses after check-in |
 | 2026-08-23 | Cursor | Locked checkout expiry: **20:00 Tbilisi** on checkout day if guest never taps Checked out |
+| 2026-08-23 | Claude Code | Phase 1 `guest-sandbox-shell` done: `checkin-guest-sandbox.html` created (copy of `checkin-guest-v2.html`, `#page-home` rebuilt per §3.5 — countdown hero + shared daily-key hero (door/elevator/WiFi/floor) + walkthrough placeholder + Checked in/out CTAs + 3 tabs). `applyHomePhase()`, `window.guestCheckedIn/guestCheckedOut/isStayEnded` added; JS module otherwise unchanged (pure additions, verified by diff). Register/rules/passport untouched. |
 
 ---
 
