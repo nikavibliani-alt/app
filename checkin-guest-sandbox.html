@@ -547,10 +547,11 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 .dk-row:last-of-type{margin-bottom:0;}
 .dk-label{font-family:var(--mono);font-size:10.5px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.55);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
 .dk-code{font-family:var(--mono);font-size:36px;letter-spacing:0.15em;font-variant-numeric:tabular-nums;margin-bottom:8px;}
-.dk-copy{height:30px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);border-radius:999px;color:#fff;font-family:var(--mono);font-size:11px;cursor:pointer;}
+.dk-copy{height:44px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);border-radius:999px;color:#fff;font-family:var(--mono);font-size:11px;cursor:pointer;}
 .dk-copy.copied{background:rgba(94,196,140,0.35);border-color:rgba(94,196,140,0.6);}
-.dk-wifi-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid rgba(255,255,255,0.12);}
+.dk-wifi-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,0.12);}
 .dk-wifi-row:first-of-type{border-top:none;}
+.dk-wifi-sublabel{font-family:var(--mono);font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-bottom:2px;}
 .dk-wifi-val{font-family:var(--mono);font-size:14px;}
 .dk-floor-photo{width:100%;border-radius:var(--rsm);margin-top:10px;display:none;object-fit:cover;max-height:180px;}
 .dk-floor-text{font-size:13px;color:rgba(255,255,255,0.8);}
@@ -880,11 +881,11 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
         <div class="dk-row">
           <div class="dk-label"><span>WiFi</span></div>
           <div class="dk-wifi-row">
-            <span class="dk-wifi-val" id="hero-wifi-name">—</span>
+            <div><div class="dk-wifi-sublabel">Network</div><span class="dk-wifi-val" id="hero-wifi-name">—</span></div>
             <button class="dk-copy" onclick="window.copySth(document.getElementById('hero-wifi-name').textContent,this)"><span>Copy</span></button>
           </div>
           <div class="dk-wifi-row">
-            <span class="dk-wifi-val" id="hero-wifi-pass">—</span>
+            <div><div class="dk-wifi-sublabel">Password</div><span class="dk-wifi-val" id="hero-wifi-pass">—</span></div>
             <button class="dk-copy" onclick="window.copySth(document.getElementById('hero-wifi-pass').textContent,this)"><span>Copy</span></button>
           </div>
         </div>
