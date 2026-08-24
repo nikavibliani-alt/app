@@ -911,8 +911,8 @@ THEN:
 | Difference vs Sandbox 1 | Why |
 |-------------------------|-----|
 | Compact greeting (24px name, less padding) | Door code should own the first viewport, not the guest name |
-| Waiting shows **date + time** when check-in is not today (`Unlocks 25 Aug at 15:00`) | Sandbox 1 shows `00:00:00` the day before — guests still won't know when to come back |
-| Waiting copy: “They unlock **on this page**” + “You do not need to message us” | Directly attacks the WhatsApp problem |
+| Waiting shows a **live countdown** to check-in (including days before) | Guests want time remaining, not a static date card |
+| Waiting copy: short “Available in” + one plain line | Dropped italic “They unlock…” and the messaging hint |
 | Door code is its **own large card** (52px) | P0 daily key; WiFi must not compete |
 | Elevator: **QR on top**, **6-digit code under** the QR (centered stack) | Matches real building pads; code is longer than 4 digits |
 | WiFi is a compact third card | Daily, but not arrival-critical |

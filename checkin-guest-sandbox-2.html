@@ -540,19 +540,14 @@ body{padding-bottom:72px;}
 .hero-section{padding:0 16px;margin-bottom:4px;}
 .hero-card{background:#FFFFFF;color:var(--ink);border:1px solid var(--line);border-radius:var(--r);padding:22px 20px;margin-bottom:12px;box-shadow:var(--shadow-card);}
 
-/* Phase A — waiting: countdown OR unlock date (never 00:00:00) */
-.hero-waiting{display:none;text-align:center;padding:28px 18px 26px;}
+/* Phase A — waiting: always a live countdown to check-in time */
+.hero-waiting{display:none;text-align:center;padding:32px 20px 28px;}
 #page-home.phase-waiting .hero-waiting{display:block;}
-.hero-waiting__kicker{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
-.hero-waiting__headline{font-family:var(--serif);font-style:italic;font-size:26px;line-height:1.2;margin-bottom:18px;color:var(--ink);}
-.hero-waiting__countdown{font-family:var(--mono);font-size:48px;font-weight:700;letter-spacing:0.06em;font-variant-numeric:tabular-nums;margin-bottom:6px;color:var(--ink);}
-.hero-waiting__when{display:none;margin-bottom:8px;}
-.hero-waiting__when-label{font-family:var(--mono);font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
-.hero-waiting__when-date{font-family:var(--serif);font-style:italic;font-size:28px;line-height:1.2;color:var(--ink);}
-.hero-waiting.is-ahead .hero-waiting__countdown{display:none;}
-.hero-waiting.is-ahead .hero-waiting__when{display:block;}
-.hero-waiting__sub{font-size:14px;line-height:1.55;color:var(--ink);max-width:300px;margin:14px auto 0;font-weight:500;}
-.hero-waiting__hint{font-size:12.5px;line-height:1.5;color:var(--muted);max-width:300px;margin:8px auto 0;}
+.hero-waiting__label{font-family:var(--sans);font-size:13px;font-weight:600;letter-spacing:0.02em;color:var(--muted);margin-bottom:12px;}
+.hero-waiting__countdown{font-family:var(--mono);font-size:52px;font-weight:700;letter-spacing:0.06em;font-variant-numeric:tabular-nums;margin-bottom:14px;color:var(--ink);line-height:1;}
+.hero-waiting__when{display:none;}
+.hero-waiting__sub{font-family:var(--sans);font-size:15px;line-height:1.5;color:var(--ink);max-width:300px;margin:0 auto;font-weight:500;}
+.hero-waiting__hint{display:none;}
 
 /* Daily key — wrapper of stacked cards, not one equal-weight stack */
 .hero-daily-key{display:none;}
@@ -637,15 +632,15 @@ body{padding-bottom:72px;}
 .hero-thankyou{display:none;text-align:center;padding:36px 20px;}
 .hero-thankyou.show{display:block;}
 
-/* Tabs high under greeting — visible before scrolling codes */
-.home-tabs{padding:0 16px 10px;}
-.home-tabs--top{margin-bottom:4px;}
-.tab-bar{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:4px;}
-.tab-btn{flex:1;padding:10px 6px;background:none;border:none;border-radius:999px;font-family:var(--sans);font-size:11.5px;font-weight:500;color:var(--muted);cursor:pointer;}
-.tab-btn.active{background:#fff;color:var(--ink);font-weight:600;box-shadow:var(--shadow-card);border:1px solid var(--line);}
-.tab-panel{display:none;padding:12px 6px 4px;font-size:13.5px;color:var(--ink-2);line-height:1.6;}
+/* Tabs high under greeting — large enough to notice while Waiting */
+.home-tabs{padding:4px 16px 14px;}
+.home-tabs--top{margin-bottom:2px;}
+.tab-bar{display:flex;gap:6px;background:var(--bg);border:1.5px solid var(--line);border-radius:16px;padding:5px;}
+.tab-btn{flex:1;padding:14px 8px;background:none;border:none;border-radius:12px;font-family:var(--sans);font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;line-height:1.2;}
+.tab-btn.active{background:#fff;color:var(--ink);font-weight:700;box-shadow:var(--shadow-card);border:1px solid var(--line);}
+.tab-panel{display:none;padding:14px 6px 6px;font-size:14px;color:var(--ink-2);line-height:1.6;}
 .tab-panel.active{display:block;}
-.tab-empty{color:var(--muted);font-size:13px;}
+.tab-empty{color:var(--muted);font-size:14px;}
 
 /* ══════════════════════════════════════════════════════════════════
    SANDBOX — dev toolbar (jump to any screen/phase/state, no Firebase)
@@ -937,15 +932,13 @@ body{padding-bottom:72px;}
 
       <!-- Phase A — Waiting -->
       <div class="hero-card hero-waiting" id="hero-waiting">
-        <div class="hero-waiting__kicker">Check-in instructions</div>
-        <div class="hero-waiting__headline">They unlock on this page</div>
+        <div class="hero-waiting__label">Available in</div>
         <div class="hero-waiting__countdown" id="countdown-display">00:00:00</div>
-        <div class="hero-waiting__when" id="countdown-when">
+        <div class="hero-waiting__when" id="countdown-when" aria-hidden="true">
           <div class="hero-waiting__when-label">Available</div>
           <div class="hero-waiting__when-date" id="countdown-when-date">—</div>
         </div>
-        <p class="hero-waiting__sub">Come back here at check-in time. Your door code appears automatically.</p>
-        <p class="hero-waiting__hint">You do not need to message us after you fill the form.</p>
+        <p class="hero-waiting__sub">Door code and arrival steps unlock here at check-in time.</p>
       </div>
 
       <!-- Phases B/C/D — shared daily key (same IDs as sandbox 1) -->
@@ -1332,13 +1325,16 @@ function isUnlocked(){
 }
 
 function timeUntilCheckin(){
-  // Only meaningful on the check-in date itself; returns 0 on subsequent days
-  const ci=activeReservation?.checkin||activeReservation?.checkIn||'';
-  const today=tbilisiToday();
-  if(ci&&today!==ci)return 0;  // not check-in day — no countdown needed
+  // Countdown to check-in hour on arrival date (works before check-in day too)
+  const ci=guestData?.arrivalDate||activeReservation?.checkin||activeReservation?.checkIn||'';
   const now=new Date();
   const tb=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Tbilisi'}));
-  const target=new Date(tb);target.setHours(getCheckInHour(),0,0,0);
+  const target=new Date(tb);
+  if(ci&&/^\d{4}-\d{2}-\d{2}/.test(ci)){
+    const[y,m,d]=ci.split('-').map(Number);
+    target.setFullYear(y,m-1,d);
+  }
+  target.setHours(getCheckInHour(),0,0,0);
   return Math.max(0,target-tb);
 }
 const timeUntil2pm=timeUntilCheckin;
@@ -3392,19 +3388,10 @@ let _countdownTimer=null;
 function _tickCountdown(){
   const home=document.getElementById('page-home');
   const el=document.getElementById('countdown-display');
-  const wrap=document.getElementById('hero-waiting');
   if(!home||!el||!home.classList.contains('phase-waiting')){
     clearInterval(_countdownTimer);_countdownTimer=null;return;
   }
-  const ci=guestData?.arrivalDate||activeReservation?.checkin||activeReservation?.checkIn||'';
-  const today=tbilisiToday();
-  const dateEl=document.getElementById('countdown-when-date');
-  if(ci&&today!==ci){
-    wrap?.classList.add('is-ahead');
-    if(dateEl)dateEl.textContent=fmtCheckinAvailable(activeReservation)||(ci+' at '+String(getCheckInHour()).padStart(2,'0')+':00');
-    return;
-  }
-  wrap?.classList.remove('is-ahead');
+  document.getElementById('hero-waiting')?.classList.remove('is-ahead');
   el.textContent=fmtCD(timeUntilCheckin());
 }
 function _startCountdownTick(){
