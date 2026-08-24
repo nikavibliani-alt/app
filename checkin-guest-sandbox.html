@@ -6,7 +6,7 @@
 <title>Maxela Apartments</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -17,7 +17,7 @@
   --surface2:#F5F5F5;
   --ink:#2C2C2A;
   --ink-2:#4A4A48;
-  --muted:#8C8C8A;
+  --muted:#4A4A48;
   --line:#E0D8D0;
   --line-2:#E8E4E0;
   --accent:#C4A882;
@@ -41,7 +41,7 @@ html,body{height:100%;}
 body{
   font-family:var(--sans);
   background:#FAFAF9;
-  color:var(--ink);font-size:15px;line-height:1.5;min-height:100%;overflow-x:hidden;
+  color:var(--ink);font-size:15px;line-height:1.5;font-weight:400;min-height:100%;overflow-x:hidden;
   display:flex;justify-content:center;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
 }
@@ -203,7 +203,7 @@ body{
 .auth-form{background:var(--surface);border:1px solid var(--line-2);border-radius:20px;overflow:hidden;}
 .auth-row{padding:12px 18px;border-bottom:1px solid var(--line-2);display:flex;flex-direction:column;gap:6px;position:relative;}
 .auth-row:last-child{border-bottom:0;}
-.auth-row__label{font-family:var(--mono);font-size:12px;letter-spacing:0.10em;text-transform:uppercase;color:var(--muted);}
+.auth-row__label{font-family:var(--mono);font-size:12px;letter-spacing:0.10em;text-transform:uppercase;color:var(--muted);font-weight:500;}
 .auth-row .form-input{border:none;border-radius:0;background:transparent;padding:0;height:auto;font-size:17px;color:var(--ink);min-height:44px;}
 .auth-row .form-input:focus{border:none;background:transparent;outline:none;}
 input[type="date"].form-input{-webkit-appearance:none;appearance:none;font-size:17px;min-height:44px;cursor:pointer;}
@@ -216,7 +216,7 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 .auth-photo svg{width:28px;height:28px;color:var(--muted);}
 .auth-photo .t{font-size:14px;color:var(--ink);font-weight:500;}
 .auth-photo .s{font-family:var(--mono);font-size:10.5px;letter-spacing:0.10em;text-transform:uppercase;color:var(--muted);}
-.auth-cta{margin:28px 16px 0;height:56px;background:var(--ink);color:var(--bg);border-radius:16px;border:0;width:calc(100% - 32px);font-family:var(--sans);font-size:15.5px;font-weight:500;letter-spacing:-0.005em;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;box-shadow:0 8px 24px -10px oklch(0.20 0.014 60 / 0.4);}
+.auth-cta{margin:28px 16px 0;height:56px;background:var(--ink);color:var(--bg);border-radius:16px;border:0;width:calc(100% - 32px);font-family:var(--sans);font-size:15.5px;font-weight:600;letter-spacing:-0.005em;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;box-shadow:0 8px 24px -10px oklch(0.20 0.014 60 / 0.4);}
 .auth-cta svg{width:16px;height:16px;}
 .auth-cta:disabled{opacity:.5;cursor:not-allowed;}
 .auth-trust{margin:16px 22px 0;display:flex;flex-direction:column;gap:10px;}
@@ -231,7 +231,7 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 .form-card-title{font-family:var(--mono);font-size:10.5px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);font-weight:500;padding:14px 18px 0;}
 .form-group{padding:8px 18px 12px;border-bottom:1px solid var(--line-2);}
 .form-group:last-child{border-bottom:0;}
-.form-label{font-family:var(--mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:block;}
+.form-label{font-family:var(--mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);font-weight:500;margin-bottom:5px;display:block;}
 .form-input{width:100%;height:44px;padding:0 14px;border:1.5px solid var(--line);border-radius:var(--rs);font-family:var(--sans);font-size:15px;color:var(--ink);background:var(--bg);outline:none;transition:border-color 0.15s;-webkit-appearance:none;}
 .form-input:focus{border-color:var(--accent);background:#fff;}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
@@ -406,7 +406,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 .search-tab.active{background:var(--surface);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,0.1);}
 /* ── V2 DESIGN OVERRIDES ── */
 /* Headings use Playfair Display */
-.auth-greet h1,.subpage-title,.greeting__name,.ci-title h2,.modal-title,.lc-title{font-family:var(--serif)!important;}
+.auth-greet h1,.subpage-title,.greeting__name,.ci-title h2,.modal-title,.lc-title{font-family:var(--serif)!important;font-weight:600;}
 .brand{font-family:var(--serif)!important;font-style:italic;}
 /* Search tabs: underline style (replaces pill style) */
 .search-tab-bar{display:flex;gap:0;border-bottom:1px solid var(--line);margin-bottom:0;padding:0;}
@@ -462,8 +462,9 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 .menu-label{padding:24px 24px 12px;}
 /* Apt switcher pills (v2) */
 .apt-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
-.apt-pill{padding:8px 16px;border:1px solid var(--line);border-radius:999px;background:transparent;font-size:13px;color:var(--muted);cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap;}
-.apt-pill.active{background:#2C2C2A;border-color:#2C2C2A;color:#fff;}
+.apt-pill{min-height:44px;padding:10px 20px;border:2px solid #2C2C2A;border-radius:22px;background:#fff;font-size:15px;font-weight:600;color:#2C2C2A;cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap;}
+.apt-pill.active{background:#2C2C2A;border:none;color:#fff;}
+#multi-room-label{display:none;font-family:var(--sans);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.08em;margin-bottom:8px;}
 /* Code boxes v2 */
 .v2-code-dark{background:#2C2C2A;color:#fff;padding:28px 24px;margin-bottom:8px;}
 .v2-code-dark .v2-code-label{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:10px;font-family:var(--mono);}
@@ -524,6 +525,8 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 
 /* Top bar + greeting reuse existing .topbar/.greeting rules above. */
 .sb-greeting-apt{margin-top:14px;}
+/* Overrides the shared serif-title rule (font-weight:600) — guest name is bolder (700) */
+.greeting__name{font-weight:700;}
 
 /* Hero section wrapper */
 .hero-section{padding:0 16px;margin-bottom:8px;}
@@ -545,14 +548,14 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 
 .dk-row{margin-bottom:20px;}
 .dk-row:last-of-type{margin-bottom:0;}
-.dk-label{font-family:var(--mono);font-size:10.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
-.dk-code{font-family:var(--mono);font-size:36px;letter-spacing:0.15em;font-variant-numeric:tabular-nums;margin-bottom:8px;color:var(--ink);}
-.dk-copy{height:44px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;background:#FFFFFF;border:1.5px solid var(--ink);border-radius:999px;color:var(--ink);font-family:var(--mono);font-size:11px;cursor:pointer;}
+.dk-label{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
+.dk-code{font-family:var(--mono);font-size:36px;font-weight:700;letter-spacing:0.12em;font-variant-numeric:tabular-nums;margin-bottom:8px;color:var(--ink);}
+.dk-copy{height:44px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;background:#FFFFFF;border:1.5px solid var(--ink);border-radius:999px;color:var(--ink);font-family:var(--mono);font-size:11px;font-weight:600;cursor:pointer;}
 .dk-copy.copied{background:var(--green-bg);border-color:var(--green-border);color:var(--green);}
 .dk-wifi-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);}
 .dk-wifi-row:first-of-type{border-top:none;}
-.dk-wifi-sublabel{font-family:var(--mono);font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
-.dk-wifi-val{font-family:var(--mono);font-size:14px;color:var(--ink);}
+.dk-wifi-sublabel{font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
+.dk-wifi-val{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:0.12em;color:var(--ink);}
 .dk-floor-photo{width:100%;border-radius:var(--rsm);margin-top:10px;display:none;object-fit:cover;max-height:180px;}
 .dk-floor-text{font-size:13px;color:var(--ink);}
 
@@ -568,8 +571,9 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 #page-home.phase-leaving .hero-cta--leaving{display:block;}
 .hero-cta__btn{border-radius:var(--rxl);width:100%;background:#2C2C2A;color:#FFFFFF;font-weight:600;padding:16px;font-size:16px;border:none;cursor:pointer;font-family:var(--sans);}
 .hero-cta__btn--confirm{background:#FFFFFF;color:#2C2C2A;border:1.5px solid var(--line);}
+.hero-cta__btn--secondary{background:#FFFFFF;color:#2C2C2A;border:1.5px solid #2C2C2A;padding:12px 24px;}
 .hero-cta__link{background:none;border:none;color:var(--ink-2);font-family:var(--sans);font-size:13px;text-decoration:underline;cursor:pointer;padding:4px 0;}
-.hero-cta__checkout-label{font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;text-align:center;}
+.hero-cta__checkout-label{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;text-align:center;}
 .hero-thankyou{display:none;text-align:center;padding:40px 20px;}
 .hero-thankyou.show{display:block;}
 
@@ -674,7 +678,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
     </div>
 
     <div style="padding:16px 24px 0;">
-      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;" id="t-search-instructions">Enter your name as it appears on your booking confirmation, along with your check-in date</p>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;" id="t-search-instructions">Enter your full name as it appears on your booking</p>
     </div>
 
     <div class="auth-section">
@@ -682,8 +686,8 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
       <div class="auth-form">
         <div id="search-name-section">
           <div class="auth-row">
-            <span class="auth-row__label" id="t-full-name">Booking Name</span>
-            <input type="text" class="form-input" id="r-name" placeholder="Name on your booking" autocomplete="name">
+            <span class="auth-row__label" id="t-full-name">Full name</span>
+            <input type="text" class="form-input" id="r-name" placeholder="First and last name" autocomplete="name">
             <p style="font-size:12px;color:var(--muted);margin-top:4px;">The name used when the reservation was made — check your booking confirmation</p>
           </div>
           <div class="auth-row">
@@ -858,9 +862,9 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 
       <!-- Phase A — Waiting -->
       <div class="hero-card hero-waiting">
-        <div class="hero-waiting__headline">Your check-in instructions unlock here</div>
+        <div class="hero-waiting__headline">Your door code and instructions will appear here automatically.</div>
         <div class="hero-waiting__countdown" id="countdown-display">00:00:00</div>
-        <p class="hero-waiting__sub">Come back to this page at check-in time. Door code appears automatically — do not message us.</p>
+        <p class="hero-waiting__sub">Return to this page at check-in time.</p>
       </div>
 
       <!-- Phases B/C/D — shared daily key (never duplicate these IDs elsewhere) -->
@@ -917,9 +921,9 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 
       <!-- Shown after guestCheckedOut() / stay-ended -->
       <div class="hero-card hero-thankyou" id="hero-thankyou">
-        <div style="font-size:40px;margin-bottom:14px;">🌟</div>
-        <div style="font-family:var(--serif);font-size:22px;margin-bottom:8px;">Safe travels!</div>
-        <div style="font-size:13.5px;color:var(--muted);">Hope to see you again soon.</div>
+        <div style="font-family:var(--serif);font-style:italic;font-size:26px;margin-bottom:12px;">Until next time.</div>
+        <div style="font-size:15px;color:#4A4A48;line-height:1.6;margin-bottom:20px;">Your access has ended. We hope your stay was comfortable. If you left anything behind or need assistance, contact us on WhatsApp.</div>
+        <a class="hero-cta__btn hero-cta__btn--secondary" id="hero-thankyou-whatsapp" href="#" target="_blank" style="display:inline-block;width:auto;text-decoration:none;">Contact host</a>
       </div>
 
     </div>
@@ -1110,13 +1114,13 @@ window.addEventListener('popstate',function(){
 
 const T={
   en:{ac:'Access Code',vf:'Valid from',vt:'to',ttp:'Tap to copy',cp2:'Code generation pending — please contact host',chc:'Please contact host for your access code',
-ws:'Welcome — please complete your check-in',yi:'Your information',fn:'Full name',gu:'Guests',na:'Nationality',ct:'Contact',cnu:'Your number / username',pt:'Passport / ID photo',ph:'Tap to take a photo or upload from gallery',sb:'Complete registration',gl:'Welcome back',tc:'Check-in Details',tcs:'Instructions, door code & photos',tw:'WiFi & Internet',tws:'Network name & password',tsv:'Services',tsvs:'Cleaning, laundry, tours & more',tr:'Recommendations',trs:'Best places nearby',tru:'House Rules',trus:'Please read before your stay',tco:'Contact Us',tcos:"We're here 24/7",lt:'Not available yet',ls:'Your room is being prepared. Instructions will unlock automatically at 3:00 PM.',cl:'Available in',dc:'Door code',wn:'WiFi name',wp:'Password',cp:'Copy',cpd:'Copied!',hi:'How to check in',hr:'House rules',rs:'Request sent!',rf:'Failed to send',sn:'Notes (optional)',snh:'Any special instructions...',sr:'Send request',ca:'Cancel',mr:'My requests',nr:'No requests yet',pe:'Pending',dn:'Done',cwa:'WhatsApp',cwas:'Chat with us directly on WhatsApp',rg:'Registered! Loading your stay...',elevatorTitle:'Elevator & Entrance Code',elevatorHint:'Same code for building entrance and elevator. Enter the code then press #.',elevatorToday:'Code for today,',elevatorUpdating:'Elevator code updating — please contact host if needed',checkinTitle:'Welcome to your stay',checkinSub:"Just a few details and you'll have everything you need for your stay.",checkinKicker:'GUEST CHECK-IN',searchInstructions:'Enter your Booking.com or Expedia confirmation number OR your full name to find your booking.',resNumber:'Booking.com / Expedia confirmation number',resPlaceholder:'Booking.com / Expedia confirmation number',fullName:'Booking Name',namePlaceholder:'Name on your booking',arrivalDate:'Check-in Date',selectDate:'Select your check-in date',phoneLabel:'Phone / username',guestsLabel:'Guests',fields:'fields',tlo:'Location & Parking',tlos:'Address, maps & parking',wyb:'What You Booked'},
+ws:'Welcome — please complete your check-in',yi:'Your information',fn:'Full name',gu:'Guests',na:'Nationality',ct:'Contact',cnu:'Your number / username',pt:'Passport / ID photo',ph:'Tap to take a photo or upload from gallery',sb:'Complete registration',gl:'Welcome back',tc:'Check-in Details',tcs:'Instructions, door code & photos',tw:'WiFi & Internet',tws:'Network name & password',tsv:'Services',tsvs:'Cleaning, laundry, tours & more',tr:'Recommendations',trs:'Best places nearby',tru:'House Rules',trus:'Please read before your stay',tco:'Contact Us',tcos:"We're here 24/7",lt:'Not available yet',ls:'Your room is being prepared. Instructions will unlock automatically at 3:00 PM.',cl:'Available in',dc:'Door code',wn:'WiFi name',wp:'Password',cp:'Copy',cpd:'Copied!',hi:'How to check in',hr:'House rules',rs:'Request sent!',rf:'Failed to send',sn:'Notes (optional)',snh:'Any special instructions...',sr:'Send request',ca:'Cancel',mr:'My requests',nr:'No requests yet',pe:'Pending',dn:'Done',cwa:'WhatsApp',cwas:'Chat with us directly on WhatsApp',rg:'Registered! Loading your stay...',elevatorTitle:'Elevator & Entrance Code',elevatorHint:'Same code for building entrance and elevator. Enter the code then press #.',elevatorToday:'Code for today,',elevatorUpdating:'Elevator code updating — please contact host if needed',checkinTitle:'Welcome to your stay',checkinSub:"Just a few details and you'll have everything you need for your stay.",checkinKicker:'GUEST CHECK-IN',searchInstructions:'Enter your full name as it appears on your booking',resNumber:'Booking.com / Expedia confirmation number',resPlaceholder:'Booking.com / Expedia confirmation number',fullName:'Full name',namePlaceholder:'First and last name',arrivalDate:'Check-in Date',selectDate:'Select your check-in date',phoneLabel:'Phone / username',guestsLabel:'Guests',fields:'fields',tlo:'Location & Parking',tlos:'Address, maps & parking',wyb:'What You Booked'},
   ka:{ac:'კარის კოდი',vf:'მოქმედია',vt:'–',ttp:'შეეხეთ კოპირებისთვის',cp2:'კოდი მუშავდება — დაუკავშირდით ჰოსტს',chc:'კოდისთვის დაუკავშირდით ჰოსტს',
-ws:'კეთილი იყოს — გთხოვთ შეავსოთ ჩეკინი',yi:'თქვენი ინფორმაცია',fn:'სრული სახელი',gu:'სტუმრები',na:'ეროვნება',ct:'კონტაქტი',cnu:'ნომერი ან username',pt:'პასპორტის ფოტო',ph:'შეეხეთ გადასაღებად',sb:'რეგისტრაციის დასრულება',gl:'კეთილი იყოს თქვენი მობრძანება',tc:'ჩეკინის დეტალები',tcs:'ინსტრუქცია, კარის კოდი და ფოტოები',tw:'WiFi',tws:'ქსელის სახელი და პაროლი',tsv:'სერვისები',tsvs:'დასუფთავება, სამრეცხაო, ტური',tr:'რეკომენდაციები',trs:'საუკეთესო ადგილები',tru:'სახლის წესები',trus:'გთხოვთ წაიკითხოთ',tco:'დაგვიკავშირდით',tcos:'ჩვენ ყოველთვის აქ ვართ',lt:'ჯერ მიუწვდომელია',ls:'ოთახი მზადდება. ინსტრუქცია გამოჩნდება 15:00 საათზე.',cl:'დარჩა',dc:'კარის კოდი',wn:'WiFi სახელი',wp:'პაროლი',cp:'კოპირება',cpd:'დაკოპირდა!',hi:'როგორ შეხვიდეთ',hr:'სახლის წესები',rs:'მოთხოვნა გაიგზავნა!',rf:'გაგზავნა ვერ მოხერხდა',sn:'შენიშვნები',snh:'სპეციალური მოთხოვნები...',sr:'გაგზავნა',ca:'გაუქმება',mr:'ჩემი მოთხოვნები',nr:'მოთხოვნები არ არის',pe:'განხილვაში',dn:'შესრულდა',cwa:'WhatsApp',cwas:'დაგვიკავშირდით WhatsApp-ით',rg:'დარეგისტრირდით! იტვირთება...',elevatorTitle:'ლიფტისა და შესასვლელის კოდი',elevatorHint:'ეს კოდი გამოიყენება შესასვლელისა და ლიფტისთვის. შეიყვანეთ კოდი და დააჭირეთ #.',elevatorToday:'დღევანდელი კოდი,',elevatorUpdating:'ლიფტის კოდი განახლდება — საჭიროების შემთხვევაში დაუკავშირდით ჰოსტს',checkinTitle:'კეთილი იყოს თქვენი ყოფნა',checkinSub:'სულ რამდენიმე დეტალი და თქვენ გექნებათ ყველაფერი, რაც გჭირდებათ თქვენი ყოფნისთვის.',checkinKicker:'სტუმრის რეგისტრაცია',searchInstructions:'შეიყვანეთ Booking.com-ის ან Expedia-ს დადასტურების ნომერი ან სრული სახელი თქვენი ჯავშნის მოსაძებნად.',resNumber:'Booking.com / Expedia დადასტურების ნომერი',resPlaceholder:'Booking.com / Expedia დადასტურების ნომერი',fullName:'სრული სახელი',namePlaceholder:'როგორც მითითებულია თქვენს ჯავშანში',arrivalDate:'ჩასვლის თარიღი',selectDate:'აირჩიეთ ჩასვლის თარიღი',phoneLabel:'ტელეფონი / მომხმარებლის სახელი',guestsLabel:'სტუმრები',fields:'ველი',tlo:'მდებარეობა',tlos:'მისამართი და პარკინგი',wyb:'თქვენი ბინა'},
+ws:'კეთილი იყოს — გთხოვთ შეავსოთ ჩეკინი',yi:'თქვენი ინფორმაცია',fn:'სრული სახელი',gu:'სტუმრები',na:'ეროვნება',ct:'კონტაქტი',cnu:'ნომერი ან username',pt:'პასპორტის ფოტო',ph:'შეეხეთ გადასაღებად',sb:'რეგისტრაციის დასრულება',gl:'კეთილი იყოს თქვენი მობრძანება',tc:'ჩეკინის დეტალები',tcs:'ინსტრუქცია, კარის კოდი და ფოტოები',tw:'WiFi',tws:'ქსელის სახელი და პაროლი',tsv:'სერვისები',tsvs:'დასუფთავება, სამრეცხაო, ტური',tr:'რეკომენდაციები',trs:'საუკეთესო ადგილები',tru:'სახლის წესები',trus:'გთხოვთ წაიკითხოთ',tco:'დაგვიკავშირდით',tcos:'ჩვენ ყოველთვის აქ ვართ',lt:'ჯერ მიუწვდომელია',ls:'ოთახი მზადდება. ინსტრუქცია გამოჩნდება 15:00 საათზე.',cl:'დარჩა',dc:'კარის კოდი',wn:'WiFi სახელი',wp:'პაროლი',cp:'კოპირება',cpd:'დაკოპირდა!',hi:'როგორ შეხვიდეთ',hr:'სახლის წესები',rs:'მოთხოვნა გაიგზავნა!',rf:'გაგზავნა ვერ მოხერხდა',sn:'შენიშვნები',snh:'სპეციალური მოთხოვნები...',sr:'გაგზავნა',ca:'გაუქმება',mr:'ჩემი მოთხოვნები',nr:'მოთხოვნები არ არის',pe:'განხილვაში',dn:'შესრულდა',cwa:'WhatsApp',cwas:'დაგვიკავშირდით WhatsApp-ით',rg:'დარეგისტრირდით! იტვირთება...',elevatorTitle:'ლიფტისა და შესასვლელის კოდი',elevatorHint:'ეს კოდი გამოიყენება შესასვლელისა და ლიფტისთვის. შეიყვანეთ კოდი და დააჭირეთ #.',elevatorToday:'დღევანდელი კოდი,',elevatorUpdating:'ლიფტის კოდი განახლდება — საჭიროების შემთხვევაში დაუკავშირდით ჰოსტს',checkinTitle:'კეთილი იყოს თქვენი ყოფნა',checkinSub:'სულ რამდენიმე დეტალი და თქვენ გექნებათ ყველაფერი, რაც გჭირდებათ თქვენი ყოფნისთვის.',checkinKicker:'სტუმრის რეგისტრაცია',searchInstructions:'შეიყვანეთ სახელი და გვარი, როგორც ბრონირებაშია მითითებული',resNumber:'Booking.com / Expedia დადასტურების ნომერი',resPlaceholder:'Booking.com / Expedia დადასტურების ნომერი',fullName:'სრული სახელი',namePlaceholder:'სახელი და გვარი',arrivalDate:'ჩასვლის თარიღი',selectDate:'აირჩიეთ ჩასვლის თარიღი',phoneLabel:'ტელეფონი / მომხმარებლის სახელი',guestsLabel:'სტუმრები',fields:'ველი',tlo:'მდებარეობა',tlos:'მისამართი და პარკინგი',wyb:'თქვენი ბინა'},
   ru:{ac:'Код доступа',vf:'Действует с',vt:'по',ttp:'Нажмите для копирования',cp2:'Код генерируется — свяжитесь с хозяином',chc:'Свяжитесь с хозяином для получения кода',
-ws:'Добро пожаловать — завершите регистрацию',yi:'Ваши данные',fn:'Полное имя',gu:'Гостей',na:'Гражданство',ct:'Контакт',cnu:'Ваш номер или username',pt:'Фото паспорта',ph:'Нажмите для фото или загрузки',sb:'Завершить регистрацию',gl:'С возвращением',tc:'Детали заезда',tcs:'Инструкции, код двери и фото',tw:'WiFi',tws:'Имя сети и пароль',tsv:'Услуги',tsvs:'Уборка, стирка, туры и другое',tr:'Рекомендации',trs:'Лучшие места рядом',tru:'Правила проживания',trus:'Пожалуйста прочитайте',tco:'Связаться с нами',tcos:'Мы здесь круглосуточно',lt:'Пока недоступно',ls:'Номер готовится. Инструкции откроются в 15:00.',cl:'Доступно через',dc:'Код двери',wn:'Имя сети',wp:'Пароль',cp:'Копировать',cpd:'Скопировано!',hi:'Как заселиться',hr:'Правила проживания',rs:'Запрос отправлен!',rf:'Ошибка',sn:'Примечания',snh:'Особые пожелания...',sr:'Отправить',ca:'Отмена',mr:'Мои запросы',nr:'Запросов нет',pe:'В обработке',dn:'Выполнено',cwa:'WhatsApp',cwas:'Напишите нам в WhatsApp',rg:'Зарегистрировано! Загрузка...',elevatorTitle:'Код лифта и входа',elevatorHint:'Этот код используется для входа в здание и лифта. Введите код и нажмите #.',elevatorToday:'Код на сегодня,',elevatorUpdating:'Код лифта обновляется — при необходимости свяжитесь с хозяином',checkinTitle:'Добро пожаловать на ваше пребывание',checkinSub:'Всего несколько деталей, и у вас будет всё необходимое для вашего проживания.',checkinKicker:'РЕГИСТРАЦИЯ ГОСТЯ',searchInstructions:'Введите номер подтверждения Booking.com или Expedia ИЛИ ваше полное имя для поиска бронирования.',resNumber:'Номер подтверждения Booking.com / Expedia',resPlaceholder:'Номер подтверждения Booking.com / Expedia',fullName:'Полное имя',namePlaceholder:'Как указано в вашем бронировании',arrivalDate:'Дата заезда',selectDate:'Выберите дату заезда',phoneLabel:'Телефон / имя пользователя',guestsLabel:'Гости',fields:'поля',tlo:'Расположение',tlos:'Адрес, карты и парковка',wyb:'Ваш номер'},
+ws:'Добро пожаловать — завершите регистрацию',yi:'Ваши данные',fn:'Полное имя',gu:'Гостей',na:'Гражданство',ct:'Контакт',cnu:'Ваш номер или username',pt:'Фото паспорта',ph:'Нажмите для фото или загрузки',sb:'Завершить регистрацию',gl:'С возвращением',tc:'Детали заезда',tcs:'Инструкции, код двери и фото',tw:'WiFi',tws:'Имя сети и пароль',tsv:'Услуги',tsvs:'Уборка, стирка, туры и другое',tr:'Рекомендации',trs:'Лучшие места рядом',tru:'Правила проживания',trus:'Пожалуйста прочитайте',tco:'Связаться с нами',tcos:'Мы здесь круглосуточно',lt:'Пока недоступно',ls:'Номер готовится. Инструкции откроются в 15:00.',cl:'Доступно через',dc:'Код двери',wn:'Имя сети',wp:'Пароль',cp:'Копировать',cpd:'Скопировано!',hi:'Как заселиться',hr:'Правила проживания',rs:'Запрос отправлен!',rf:'Ошибка',sn:'Примечания',snh:'Особые пожелания...',sr:'Отправить',ca:'Отмена',mr:'Мои запросы',nr:'Запросов нет',pe:'В обработке',dn:'Выполнено',cwa:'WhatsApp',cwas:'Напишите нам в WhatsApp',rg:'Зарегистрировано! Загрузка...',elevatorTitle:'Код лифта и входа',elevatorHint:'Этот код используется для входа в здание и лифта. Введите код и нажмите #.',elevatorToday:'Код на сегодня,',elevatorUpdating:'Код лифта обновляется — при необходимости свяжитесь с хозяином',checkinTitle:'Добро пожаловать на ваше пребывание',checkinSub:'Всего несколько деталей, и у вас будет всё необходимое для вашего проживания.',checkinKicker:'РЕГИСТРАЦИЯ ГОСТЯ',searchInstructions:'Введите имя и фамилию, как указано в бронировании',resNumber:'Номер подтверждения Booking.com / Expedia',resPlaceholder:'Номер подтверждения Booking.com / Expedia',fullName:'Полное имя',namePlaceholder:'Имя и фамилия',arrivalDate:'Дата заезда',selectDate:'Выберите дату заезда',phoneLabel:'Телефон / имя пользователя',guestsLabel:'Гости',fields:'поля',tlo:'Расположение',tlos:'Адрес, карты и парковка',wyb:'Ваш номер'},
   ar:{ac:'رمز الوصول',vf:'صالح من',vt:'إلى',ttp:'انقر للنسخ',cp2:'جارٍ إنشاء الرمز — تواصل مع المضيف',chc:'تواصل مع المضيف للحصول على رمز الوصول',
-ws:'مرحباً — يرجى إكمال تسجيل الوصول',yi:'معلوماتك',fn:'الاسم الكامل',gu:'الضيوف',na:'الجنسية',ct:'التواصل',cnu:'رقمك أو اسم المستخدم',pt:'صورة جواز السفر',ph:'انقر للتصوير أو الرفع',sb:'إتمام التسجيل',gl:'مرحباً بعودتك',tc:'تفاصيل الوصول',tcs:'التعليمات ورمز الباب والصور',tw:'واي فاي',tws:'اسم الشبكة وكلمة المرور',tsv:'الخدمات',tsvs:'تنظيف وغسيل وجولات',tr:'التوصيات',trs:'أفضل الأماكن القريبة',tru:'قواعد المنزل',trus:'يرجى القراءة قبل إقامتك',tco:'تواصل معنا',tcos:'نحن هنا على مدار الساعة',lt:'غير متاح بعد',ls:'غرفتك قيد التجهيز. ستظهر التعليمات في الساعة 3:00 مساءً.',cl:'متاح في',dc:'رمز الباب',wn:'اسم الشبكة',wp:'كلمة المرور',cp:'نسخ',cpd:'تم النسخ!',hi:'كيفية تسجيل الوصول',hr:'قواعد المنزل',rs:'تم إرسال الطلب!',rf:'فشل الإرسال',sn:'ملاحظات',snh:'تعليمات خاصة...',sr:'إرسال الطلب',ca:'إلغاء',mr:'طلباتي',nr:'لا توجد طلبات',pe:'قيد الانتظار',dn:'تم',cwa:'واتساب',cwas:'تواصل معنا على واتساب',rg:'تم التسجيل! جارٍ التحميل...',elevatorTitle:'رمز المصعد والمدخل',elevatorHint:'نفس الرمز لمدخل المبنى والمصعد. أدخل الرمز ثم اضغط #.',elevatorToday:'رمز اليوم،',elevatorUpdating:'رمز المصعد قيد التحديث — تواصل مع المضيف إذا لزم الأمر',checkinTitle:'مرحباً بكم في إقامتكم',checkinSub:'فقط بضع تفاصيل وستحصل على كل ما تحتاجه لإقامتك.',checkinKicker:'تسجيل وصول الضيف',searchInstructions:'أدخل رقم تأكيد Booking.com أو Expedia أو اسمك الكامل للعثور على حجزك.',resNumber:'رقم تأكيد Booking.com / Expedia',resPlaceholder:'رقم تأكيد Booking.com / Expedia',fullName:'الاسم الكامل',namePlaceholder:'كما هو موضح في حجزك',arrivalDate:'تاريخ الوصول',selectDate:'اختر تاريخ وصولك',phoneLabel:'الهاتف / اسم المستخدم',guestsLabel:'الضيوف',fields:'حقول',tlo:'الموقع والمواقف',tlos:'العنوان والخرائط والمواقف',wyb:'ما حجزته'}
+ws:'مرحباً — يرجى إكمال تسجيل الوصول',yi:'معلوماتك',fn:'الاسم الكامل',gu:'الضيوف',na:'الجنسية',ct:'التواصل',cnu:'رقمك أو اسم المستخدم',pt:'صورة جواز السفر',ph:'انقر للتصوير أو الرفع',sb:'إتمام التسجيل',gl:'مرحباً بعودتك',tc:'تفاصيل الوصول',tcs:'التعليمات ورمز الباب والصور',tw:'واي فاي',tws:'اسم الشبكة وكلمة المرور',tsv:'الخدمات',tsvs:'تنظيف وغسيل وجولات',tr:'التوصيات',trs:'أفضل الأماكن القريبة',tru:'قواعد المنزل',trus:'يرجى القراءة قبل إقامتك',tco:'تواصل معنا',tcos:'نحن هنا على مدار الساعة',lt:'غير متاح بعد',ls:'غرفتك قيد التجهيز. ستظهر التعليمات في الساعة 3:00 مساءً.',cl:'متاح في',dc:'رمز الباب',wn:'اسم الشبكة',wp:'كلمة المرور',cp:'نسخ',cpd:'تم النسخ!',hi:'كيفية تسجيل الوصول',hr:'قواعد المنزل',rs:'تم إرسال الطلب!',rf:'فشل الإرسال',sn:'ملاحظات',snh:'تعليمات خاصة...',sr:'إرسال الطلب',ca:'إلغاء',mr:'طلباتي',nr:'لا توجد طلبات',pe:'قيد الانتظار',dn:'تم',cwa:'واتساب',cwas:'تواصل معنا على واتساب',rg:'تم التسجيل! جارٍ التحميل...',elevatorTitle:'رمز المصعد والمدخل',elevatorHint:'نفس الرمز لمدخل المبنى والمصعد. أدخل الرمز ثم اضغط #.',elevatorToday:'رمز اليوم،',elevatorUpdating:'رمز المصعد قيد التحديث — تواصل مع المضيف إذا لزم الأمر',checkinTitle:'مرحباً بكم في إقامتكم',checkinSub:'فقط بضع تفاصيل وستحصل على كل ما تحتاجه لإقامتك.',checkinKicker:'تسجيل وصول الضيف',searchInstructions:'أدخل اسمك الكامل كما يظهر في تأكيد الحجز',resNumber:'رقم تأكيد Booking.com / Expedia',resPlaceholder:'رقم تأكيد Booking.com / Expedia',fullName:'الاسم الكامل',namePlaceholder:'الاسم الأول والأخير',arrivalDate:'تاريخ الوصول',selectDate:'اختر تاريخ وصولك',phoneLabel:'الهاتف / اسم المستخدم',guestsLabel:'الضيوف',fields:'حقول',tlo:'الموقع والمواقف',tlos:'العنوان والخرائط والمواقف',wyb:'ما حجزته'}
 };
 
 function t(k){return T[lang]?.[k]||T.en?.[k]||k;}
@@ -1284,6 +1288,7 @@ function applyTranslations(){
     't-your-info':'yi','t-full-name':'fullName','t-guests':'guestsLabel',
     't-nationality':'na','t-contact-title':'ct','t-contact-num':'phoneLabel',
     't-passport-title':'pt','t-passport-hint':'ph','t-greeting-label':'gl',
+    't-search-instructions':'searchInstructions',
     'r-arrival-ph':'selectDate'
   };
   Object.entries(map).forEach(([id,k])=>{const el=document.getElementById(id);if(el)el.textContent=t(k);});
@@ -1446,6 +1451,7 @@ function renderGreetingApt(){
     return;
   }
   let html='<div style="font-size:13px;color:var(--muted);margin-top:6px;"><b id="home-apt-name" style="color:var(--ink);font-weight:500;">'+esc(APT_NAMES[aptId]||aptId)+'</b> · Maxela · Tbilisi</div>';
+  html+='<div id="multi-room-label" style="display:block;">Your apartments — tap to switch</div>';
   html+='<div class="apt-pills">';
   for(const res of allMatchedReservations){
     const roomLabel=res.roomCode||'';
@@ -3244,6 +3250,7 @@ function applyHomePhase(){
 
   if(window.isStayEnded()){
     document.getElementById('hero-thankyou')?.classList.add('show');
+    document.getElementById('hero-thankyou-whatsapp')?.setAttribute('href','https://wa.me/'+WA);
     return; // no phase-* class — hero-card (daily key) stays hidden, thank-you card shows instead
   }
 
@@ -3383,6 +3390,7 @@ function _sbRenderHomeForPhase(phase){
 
   if(phase==='checkoutdone'){
     document.getElementById('hero-thankyou')?.classList.add('show');
+    document.getElementById('hero-thankyou-whatsapp')?.setAttribute('href','https://wa.me/'+WA);
   }else{
     home.classList.add('phase-'+phase);
     _renderHeroContent();

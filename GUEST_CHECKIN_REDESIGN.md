@@ -456,6 +456,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-23 | Claude Code | Phase 1 `guest-sandbox-shell` done: `checkin-guest-sandbox.html` created (copy of `checkin-guest-v2.html`, `#page-home` rebuilt per §3.5 — countdown hero + shared daily-key hero (door/elevator/WiFi/floor) + walkthrough placeholder + Checked in/out CTAs + 3 tabs). `applyHomePhase()`, `window.guestCheckedIn/guestCheckedOut/isStayEnded` added; JS module otherwise unchanged (pure additions, verified by diff). Register/rules/passport untouched. |
 | 2026-08-24 | Claude Code | Added sandbox dev toolbar (`#sb-toolbar`) to `checkin-guest-sandbox.html` — jump to any screen/phase/state with full mock guest/reservation/apartment/elevator data, zero Firebase dependency (`_sbBuildMocks()`, `_sbRenderHomeForPhase()`, `_sbShowScreen()`, `_sbGoPhase()`, `_sbToggle()`). Added §14 Sandbox & Current Build State and §15 Prompts & Build Log (renumbered from §13/§14 on 2026-08-24 to make room for §13 Design Tokens & Rules). |
 | 2026-08-24 | Claude Code | **Color fix:** home-screen hero card was shipped dark/inverted (black background, white text, gold `#C4A882` CTA) — reverted to the correct system: white cards (`#FFFFFF`), dark text (`#2C2C2A`/`#8C8C8A`), dark-filled primary CTA (`#2C2C2A`/`#fff`), no gold anywhere as a background. Split "I've checked out" into its own lighter-bordered "destructive/confirm" style, distinct from the bold primary "I'm checked in". Fixed the same gold-background violation on the dev toolbar's active-state buttons. Added §13 Design Tokens & Rules to lock this down for future work. |
+| 2026-08-24 | Claude Code | **5 fixes:** Phase A copy cut to headline + one-sentence subline (no "do not message us"); multi-room apt-pills resized to 44px touch targets with a "Your apartments — tap to switch" label; `--muted` darkened `#8C8C8A`→`#4A4A48` globally + font-weight pass (guest name 700, card titles 600, labels 500, mono codes 700, buttons 600) + `0.06em` letter-spacing on redesigned-home uppercase labels; post-checkout screen rewritten (no emoji, "Until next time." + real WhatsApp "Contact host" button); registration name-field copy rewritten in EN/KA/RU/AR (and fixed a pre-existing bug where the instruction text was never wired to `applyTranslations()`). Fixed stale `### 13.x` subsection numbers left over from the earlier §13/§14 renumbering (now `### 14.1`–`14.5`); added §14.6. Details in §14.6. |
 
 ---
 
@@ -474,20 +475,27 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | All body copy, labels, buttons, inputs, tabs, nav | **Inter** | `font-family:var(--sans)` |
 | Monospace — door code, elevator code, WiFi password, countdown, all mono labels (`DOOR CODE`, `WIFI`, etc.) | **Courier New** / system monospace stack | `font-family:var(--mono)` — the file does **not** load DM Mono; do not reference it. If a true monospace upgrade is wanted later, swap the `--mono` token, don't hardcode a new font-family per element. |
 
-**Size scale actually used on the redesigned home screen:**
+**Size + weight scale actually used on the redesigned home screen** (updated 2026-08-24 — see §14.6 for the fix that made these darker/bolder):
 
 | Element | Size | Weight |
 |---------|------|--------|
-| Guest name (`.greeting__name`) | 38px | 400 (Playfair default) |
+| Guest name (`.greeting__name`, `#home-guest-name`) | 38px | **700** |
+| Card titles (`.subpage-title`, `.modal-title`, `.ci-title h2`, `.lc-title`, `.auth-greet h1`) | varies | **600** |
 | Hero waiting headline | 24px | 400 italic |
 | Countdown digits | 44px | 500 |
-| Door/elevator code digits (`.dk-code`) | 36px | 400 (mono default) |
-| WiFi value (`.dk-wifi-val`) | 14px | 400 |
-| Section mono labels (`DOOR CODE`, `WIFI`, `FLOOR & DOOR`, `NETWORK`, `PASSWORD`) | 9.5–10.5px | uppercase, `letter-spacing:0.10–0.14em` |
-| Primary CTA button text | 16px | 600 |
+| Door/elevator code digits (`.dk-code`) | 36px | **700**, `letter-spacing:0.12em` |
+| WiFi value (`.dk-wifi-val`) | 14px | **700**, `letter-spacing:0.12em` |
+| Section mono labels (`DOOR CODE`, `WIFI`, `FLOOR & DOOR`) — `.dk-label` | 10.5px | **500**, `letter-spacing:0.06em` |
+| Sub-labels (`NETWORK`, `PASSWORD`) — `.dk-wifi-sublabel` | 9.5px | **500**, `letter-spacing:0.06em` |
+| Field labels — `.auth-row__label`, `.form-label` | 9.5–12px | **500** |
+| Primary CTA button text (`.hero-cta__btn`, `.auth-cta`) | 15.5–16px | 600 |
+| Copy buttons (`.dk-copy`) | 11px | **600** |
 | Tab bar labels | 12.5px | 500 (600 when active) |
 | Tab panel body copy | 13.5px | 400 |
-| Subline / muted body (`.hero-waiting__sub`, `.hero-cta__checkout-label`) | 11–13px | 400 |
+| Subline / muted body (`.hero-waiting__sub`, `.hero-cta__checkout-label`) | 11–13px | 400 (label variants 500) |
+| Body text baseline (`body`) | 15px | **400 minimum — never lighter** |
+
+**Letter-spacing rule:** monospace codes (door/elevator/WiFi values) use `0.12em`. Uppercase mono labels on the redesigned home screen (`.dk-label`, `.dk-wifi-sublabel`, `.hero-cta__checkout-label`, `#multi-room-label`) use `0.06em` — `#multi-room-label` is the one exception at `0.08em` per its own spec. This 0.06em rule applies to the **redesigned home screen only** — pre-existing v2 uppercase labels elsewhere in the file (register/rules/passport/services/topbar) keep their original hand-tuned values (0.10–0.24em) and were intentionally left untouched.
 
 ### 13.2 Color rules (explicit — no ambiguity)
 
@@ -497,12 +505,12 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | Card background | `#FFFFFF` | Every card on the home screen: `.hero-card` (all 4 phase states — waiting, daily-key, thank-you), tab panels | Never `--ink` or any dark color as a card background |
 | `--ink` | `#2C2C2A` | All primary text; primary CTA button **background**; toolbar active-state background | Never a card background |
 | `--ink-2` | `#4A4A48` | Secondary text (e.g. `.hero-cta__link` "Show arrival instructions") | — |
-| `--muted` | `#8C8C8A` | Muted labels, subline copy, mono section labels (`DOOR CODE`, `WIFI`, etc.) | — |
+| `--muted` | `#4A4A48` (changed from `#8C8C8A` on 2026-08-24 — the lighter gray read as too faint) | Muted labels, subline copy, mono section labels (`DOOR CODE`, `WIFI`, etc.) — applies **globally**, this is a single `:root` variable used everywhere in the file, not just the home screen | — |
 | `--line` | `#E0D8D0` | Borders — row dividers (`.dk-wifi-row`), dashed walkthrough placeholder border, the "I've checked out" button's border | — |
 | `--accent` / gold | `#C4A882` | **Thin decorative borders and small dots only** (pre-existing v2 elements outside the home screen: `.pulse` dot, `.auth-greet .kicker .pip` dot, focus-border on inputs). **Never used anywhere in the redesigned home screen (`#page-home`).** | **NEVER a background on any button or card. NEVER a CTA color. This is the rule that was violated and is now fixed — do not reintroduce it.** |
 | Success green | `--green` `#2d6b50` / `--green-bg` `#edf5f0` / `--green-border` `#8ecdb0` | Copy-button `.copied` success state only | — |
 
-**Explicit statement:** every background on the redesigned home screen (`#page-home`) is either `#FAFAF9` (page) or `#FFFFFF` (card). Every piece of text is `#2C2C2A` (ink) or `#8C8C8A` (muted) or `#4A4A48` (ink-2 for secondary links). There is no dark/inverted surface anywhere in the current build.
+**Explicit statement:** every background on the redesigned home screen (`#page-home`) is either `#FAFAF9` (page) or `#FFFFFF` (card). Every piece of text is `#2C2C2A` (ink) or `#4A4A48` (muted / ink-2 — both tokens now share this hex; `--muted` is for labels/subline copy, `--ink-2` is for secondary interactive text like links). There is no dark/inverted surface anywhere in the current build.
 
 ### 13.3 Button styles (exact CSS — three categories, do not merge them)
 
@@ -527,7 +535,7 @@ border: 1.5px solid #2C2C2A;
 border-radius: 24px;   /* pill */
 padding: 12px 20px;    /* copy buttons use a fixed 44px height instead — see .dk-copy */
 ```
-Class in sandbox: `.dk-copy` (copy buttons — 44px height for touch-target compliance, not the 12px/20px padding literally, but same white/ink-border/ink-text look). `.hero-cta__link` (the "Show arrival instructions" text link) uses `--ink-2` text with no border/background — it's a link, not a button, so it doesn't carry the full bordered-pill treatment.
+Class in sandbox: `.dk-copy` (copy buttons — 44px height for touch-target compliance, not the 12px/20px padding literally, but same white/ink-border/ink-text look, `font-weight:600`). `.hero-cta__link` (the "Show arrival instructions" text link) uses `--ink-2` text with no border/background — it's a link, not a button, so it doesn't carry the full bordered-pill treatment. `.hero-cta__btn--secondary` (added 2026-08-24 for "Contact host" on the post-checkout screen) is the same Secondary style at a smaller `padding:12px 24px`, sized to its content instead of `width:100%`.
 
 **Destructive/confirm** — "I've checked out" only:
 ```css
@@ -560,13 +568,13 @@ padding: 24px;
 - **Never** build a dark/inverted hero card. Every card on `#page-home` is white with dark text.
 - **Never** add a drop shadow heavier than `0 2px 12px rgba(0,0,0,0.06)` (`--shadow-card`). No `box-shadow` values with larger blur, spread, or opacity on home-screen cards.
 - **Never** introduce a color not in the §13.2 token table. If a new color is genuinely needed, add it here first with a name, hex, and explicit usage rule — don't drop a raw hex or a new `rgba(255,255,255,…)` value into a rule.
-- **Never** change a JS-referenced element ID (`hero-door-code`, `hero-elevator`, `hero-wifi-name`, `hero-wifi-pass`, `hero-door-photo`, `hero-walkthrough`, `btn-checked-in`, `btn-checked-out`, `hero-checkout-label`, `hero-thankyou`, `countdown-display`, `tab-location`/`tab-shuttle`/`tab-tours`, `panel-location`/`panel-shuttle`/`panel-tours`, any `sb-*` toolbar ID) or a dynamic class the JS toggles (`phase-waiting`/`phase-arriving`/`phase-staying`/`phase-leaving`, `.active`, `.copied`, `.show`). Colors and spacing are safe to restyle; renaming IDs or classes breaks the JS.
+- **Never** change a JS-referenced element ID (`hero-door-code`, `hero-elevator`, `hero-wifi-name`, `hero-wifi-pass`, `hero-door-photo`, `hero-walkthrough`, `btn-checked-in`, `btn-checked-out`, `hero-checkout-label`, `hero-thankyou`, `hero-thankyou-whatsapp`, `countdown-display`, `multi-room-label`, `tab-location`/`tab-shuttle`/`tab-tours`, `panel-location`/`panel-shuttle`/`panel-tours`, any `sb-*` toolbar ID) or a dynamic class the JS toggles (`phase-waiting`/`phase-arriving`/`phase-staying`/`phase-leaving`, `.active`, `.copied`, `.show`). Colors and spacing are safe to restyle; renaming IDs or classes breaks the JS.
 
 ---
 
 ## 14. Sandbox & Current Build State (2026-08-24 — Claude Code)
 
-### 13.1 Sandbox file
+### 14.1 Sandbox file
 
 - **File:** `checkin-guest-sandbox.html` (repo root, same host as production)
 - **Open locally:** `open checkin-guest-sandbox.html` — no server needed for the static HTML/CSS, but the app is an ES module (`<script type="module">`) that talks to real Firestore, so `file://` works for browsing UI only; use any static server (`python3 -m http.server`) if you need `init()`'s real Firebase calls to run without CORS/module-script quirks.
@@ -577,7 +585,7 @@ padding: 24px;
   - **State** — Multi-room, Elevator code, Manual unlock toggles. Re-renders whatever phase is currently on screen immediately so the effect is visible without re-clicking a phase button.
   - "hide" button collapses the bar to just its header if it's blocking a screenshot.
 
-### 13.2 What is built (Phase 1 current state)
+### 14.2 What is built (Phase 1 current state)
 
 **Screens** — all 5 exist and are reachable via the toolbar:
 
@@ -617,7 +625,7 @@ padding: 24px;
 - Phase 4 — visual/brand polish pass on the whole hero + toolbar-verified phases
 - Registration copy fix (§3.7) — not applied in sandbox yet, still pending
 
-### 13.3 Mock data reference
+### 14.3 Mock data reference
 
 Toolbar mock values (see `_sbBuildMocks()` in the script, right above `init()`):
 
@@ -668,7 +676,7 @@ allMatchedReservations = [activeReservation];
 | arriving / staying | today | today + 2 |
 | leaving / checkoutdone | today − 1 | today |
 
-### 13.4 Known issues in sandbox
+### 14.4 Known issues in sandbox
 
 - **Countdown shows `00:00:00` in Phase A.** `timeUntilCheckin()` (unchanged from v2, per §2 "explicitly unchanged") only returns a real countdown on the actual check-in day — it returns `0` on any other day. The toolbar mocks `checkin = today + 1` for the Waiting phase, so the countdown is always `0` when jumped to via the toolbar. This is not a sandbox bug — it reproduces v2's real behavior; the "Unlocks [date] at [time]" fallback copy from §3.5 Phase A spec is **not yet implemented** for the multi-day-out case (real gap, needs a follow-up prompt).
 - **Door photo never renders.** No apartment record anywhere (Firestore or mock) has a `doorPhotoUrl` field yet — `#hero-door-photo` is always `display:none`. Needs an admin-side field before this can show real content.
@@ -678,7 +686,7 @@ allMatchedReservations = [activeReservation];
 **New IDs added vs `checkin-guest-v2.html`** (all in `#page-home` or the toolbar, nothing renamed or removed):
 `countdown-display`, `hero-door-code`, `hero-door-copy`, `hero-elevator`, `hero-elevator-code`, `hero-elevator-qr`, `hero-elevator-qr-canvas`, `hero-wifi-name`, `hero-wifi-pass`, `hero-floor-info`, `hero-door-photo`, `hero-walkthrough`, `btn-checked-in`, `btn-show-walkthrough`, `hero-checkout-label`, `btn-checked-out`, `hero-thankyou`, `tab-location`/`tab-shuttle`/`tab-tours`, `panel-location`/`panel-shuttle`/`panel-tours`, `sb-toolbar` and its children (`sb-phase-row`, `sb-toggle-multiroom`, `sb-toggle-elevator`, `sb-toggle-manualunlock`).
 
-### 13.5 Next steps for Cursor
+### 14.5 Next steps for Cursor
 
 Focus visually, in this order:
 
@@ -686,9 +694,27 @@ Focus visually, in this order:
 2. **Phase A (Waiting) subline/countdown** — design the "Unlocks [date] at [time]" state for guests more than a day out (see known issue above); right now there's no visual treatment for it, only the live `HH:MM:SS` on check-in day itself.
 3. **Tab bar (Phase 3 content)** — panels are plain placeholder text; once Location/Shuttle/Tours content is ported, they need real card/list layouts matching the hero's visual language.
 4. **Door photo empty state** — currently just invisible; needs a "photo coming soon" placeholder treatment for apartments without one yet.
-5. **Multi-room apt-pills under the new hero** — reused unchanged from v2's tile-menu design; confirm pill styling still reads well directly under the redesigned greeting + hero, restyle if not.
+5. ~~**Multi-room apt-pills under the new hero**~~ — **done 2026-08-24**, see §14.6 below.
 
 Use the dev toolbar to flip through all of the above live — no login or real reservation required.
+
+### 14.6 Design fixes applied — 2026-08-24
+
+Five specific fixes landed on top of the Phase 1 shell + color revert (§13). All verified live via the dev toolbar (screenshots + computed-style checks), no console errors, `node --check` clean.
+
+1. **Phase A (Waiting) copy rewritten.** Headline is now "Your door code and instructions will appear here automatically."; subline cut to one sentence, "Return to this page at check-in time." The old "do not message us" line and the longer explanation are gone. `.hero-waiting__headline` / `.hero-waiting__sub` in `checkin-guest-sandbox.html`.
+2. **Multi-room apt-pills resized to real touch targets** — 44px min-height, 15px/600-weight text, 22px radius, active = solid `#2C2C2A` no border, inactive = white with `2px solid #2C2C2A`. Added `#multi-room-label` ("Your apartments — tap to switch", 11px uppercase muted) above the pill row — only ever rendered when `allMatchedReservations.length > 1` (built directly into `renderGreetingApt()`'s multi-room branch, so it never appears in the single-room case — functionally identical to a hidden/shown element without an extra DOM node needing separate visibility JS).
+3. **Typography darkened and given real weight.**
+   - `--muted` token: `#8C8C8A` → `#4A4A48` (global — every screen, not just home).
+   - `body` gets an explicit `font-weight:400` floor.
+   - Guest name → 700 (Playfair Display 700 roman added to the Google Fonts `<link>` so it's real bold, not browser-synthesized).
+   - Card titles (`.subpage-title`, `.modal-title`, `.ci-title h2`, `.lc-title`, `.auth-greet h1`, and the shared serif-title rule) → 600.
+   - Section/field labels (`.dk-label`, `.dk-wifi-sublabel`, `.auth-row__label`, `.form-label`) → 500.
+   - Door/elevator/WiFi mono values (`.dk-code`, `.dk-wifi-val`) → 700, `letter-spacing:0.12em`.
+   - Buttons (`.auth-cta`, `.dk-copy`) → 600.
+   - Uppercase mono labels on the redesigned home screen → `letter-spacing:0.06em` (see §13.1 note on scope — pre-existing v2 labels elsewhere were left at their original values).
+4. **Post-checkout screen rewritten.** No emoji, no "thank you for staying with us." Headline "Until next time." (Playfair italic, 26px); body "Your access has ended. We hope your stay was comfortable. If you left anything behind or need assistance, contact us on WhatsApp." (`#4A4A48`, 15px, line-height 1.6); a real "Contact host" button (new `.hero-cta__btn--secondary` class — white bg, `1.5px solid #2C2C2A` border) linking to `https://wa.me/`+the existing `WA` constant, set via `setAttribute('href', …)` at render time in both `applyHomePhase()` and the toolbar's `_sbRenderHomeForPhase()`.
+5. **Registration name-field copy rewritten** in all 4 languages (EN/KA/RU/AR) — field label, input placeholder, and instruction line. Also fixed a **pre-existing bug**: `#t-search-instructions` was never wired into `applyTranslations()`'s id→key map, so the instruction text never actually changed on language switch (it silently stayed English) — added `'t-search-instructions':'searchInstructions'` to that map so all 4 languages now genuinely apply. Verified via `setLang()` in-browser for all 4 languages.
 
 ---
 
