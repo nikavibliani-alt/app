@@ -566,12 +566,16 @@ body{padding-bottom:72px;}
 .dk-card--door .dk-code{font-size:52px;letter-spacing:0.08em;line-height:1;margin:4px 0 14px;}
 .dk-copy{height:44px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;background:#FFFFFF;border:1.5px solid var(--ink);border-radius:999px;color:var(--ink);font-family:var(--mono);font-size:11px;font-weight:600;cursor:pointer;}
 .dk-copy.copied{background:var(--green-bg);border-color:var(--green-border);color:var(--green);}
-.dk-elev{display:flex;align-items:center;gap:16px;}
-.dk-elev__qr{flex:none;width:168px;height:168px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;align-items:center;justify-content:center;}
-.dk-elev__qr canvas{display:block;}
+/* Elevator: QR on top, 6-digit code underneath (matches real building pads) */
+.dk-elev{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;}
+.dk-elev__qr{display:none;width:200px;height:200px;padding:10px;background:#fff;border:1px solid var(--line);border-radius:12px;align-items:center;justify-content:center;box-sizing:border-box;}
+.dk-elev__qr canvas{display:block;max-width:100%;height:auto;}
 .dk-qr-ph{display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;letter-spacing:0.12em;color:var(--muted);background:repeating-linear-gradient(135deg,#f5f2ee 0 8px,#fff 8px 16px);border-radius:8px;}
-.dk-elev__meta{flex:1;min-width:0;}
-.dk-elev__meta .dk-code{font-size:32px;margin-bottom:12px;}
+.dk-elev__scan-hint{font-size:12px;color:var(--muted);line-height:1.45;max-width:280px;margin:0;}
+.dk-elev__meta{width:100%;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:12px;border-top:1px solid var(--line);}
+.dk-elev__meta-label{font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
+.dk-elev__meta .dk-code{font-size:26px;letter-spacing:0.16em;margin:0;word-break:break-all;}
+.dk-elev__fallback{font-size:11px;color:var(--muted);font-style:italic;line-height:1.4;max-width:280px;}
 .dk-wifi-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;}
 .dk-wifi-row + .dk-wifi-row{border-top:1px solid var(--line);}
 .dk-wifi-sublabel{font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
@@ -580,14 +584,46 @@ body{padding-bottom:72px;}
 .dk-floor-photo{width:100%;border-radius:var(--rsm);margin-top:12px;display:none;object-fit:cover;max-height:180px;}
 .dk-photo-fallback{margin-top:12px;height:120px;border:1px dashed var(--line);border-radius:var(--rsm);display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;font-size:12.5px;color:var(--muted);background:var(--bg);}
 
-.hero-walkthrough{display:none;margin:4px 0 12px;}
+/* Walkthrough — 4–6 photo steps with captions (from checkin_apartments.photos) */
+.hero-walkthrough{display:none;margin:4px 0 12px;padding:0;border:none;box-shadow:none;background:transparent;}
 #page-home.phase-arriving .hero-walkthrough{display:block;}
-.wt-title{font-family:var(--serif);font-style:italic;font-size:18px;margin-bottom:12px;}
-.wt-step{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;padding:10px 0;border-top:1px solid var(--line);}
-.wt-step:first-of-type{border-top:none;}
-.wt-num{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--ink);}
-.wt-txt{font-size:13.5px;line-height:1.4;color:var(--ink);}
-.wt-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.wt-title{font-family:var(--serif);font-style:italic;font-size:22px;margin:8px 4px 14px;}
+.wt-list{display:flex;flex-direction:column;gap:14px;}
+.wt-card{background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow-card);}
+.wt-card__media{height:220px;background:var(--bg);position:relative;}
+.wt-card__media img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer;}
+.wt-card__media .wt-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;padding:16px;text-align:center;background:repeating-linear-gradient(135deg,#f7f4f0 0 10px,#fff 10px 20px);}
+.wt-card__body{padding:14px 16px 16px;display:grid;grid-template-columns:28px 1fr;gap:12px;align-items:start;}
+.wt-num{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--ink);background:var(--bg);}
+.wt-txt{font-size:14px;line-height:1.45;color:var(--ink);}
+.wt-empty{font-size:13px;color:var(--muted);padding:8px 4px;}
+
+/* Multi-room: clear current-apartment switcher (not tiny pills) */
+.apt-switch{margin-top:10px;}
+.apt-switch__btn{
+  width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  text-align:left;padding:12px 14px;background:#fff;border:1.5px solid var(--ink);
+  border-radius:14px;cursor:pointer;font-family:var(--sans);
+}
+.apt-switch__kicker{font-family:var(--mono);font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.apt-switch__name{font-size:14px;font-weight:600;color:var(--ink);}
+.apt-switch__meta{font-size:12px;color:var(--muted);margin-top:2px;}
+.apt-switch__chev{font-size:18px;color:var(--ink);line-height:1;}
+.apt-sheet{position:fixed;inset:0;z-index:20000;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.35);}
+.apt-sheet.open{display:flex;}
+.apt-sheet__panel{width:min(100vw,390px);background:#fff;border-radius:20px 20px 0 0;padding:18px 16px 28px;max-height:70vh;overflow:auto;}
+.apt-sheet__title{font-family:var(--serif);font-style:italic;font-size:20px;margin-bottom:6px;}
+.apt-sheet__sub{font-size:13px;color:var(--muted);margin-bottom:14px;}
+.apt-sheet__opt{
+  width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:14px;border:1px solid var(--line);border-radius:14px;background:#fff;
+  margin-bottom:8px;cursor:pointer;font-family:var(--sans);text-align:left;
+}
+.apt-sheet__opt.is-current{border-color:var(--ink);background:var(--bg);}
+.apt-sheet__opt-name{font-size:14px;font-weight:600;color:var(--ink);}
+.apt-sheet__opt-meta{font-size:12px;color:var(--muted);margin-top:2px;}
+.apt-sheet__badge{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink);}
+.apt-sheet__close{width:100%;margin-top:8px;height:44px;border-radius:999px;border:1.5px solid var(--line);background:#fff;font-weight:600;cursor:pointer;}
 
 .hero-cta{display:none;margin:6px 0 8px;}
 #page-home.phase-arriving .hero-cta--arriving,
@@ -601,11 +637,13 @@ body{padding-bottom:72px;}
 .hero-thankyou{display:none;text-align:center;padding:36px 20px;}
 .hero-thankyou.show{display:block;}
 
-.home-tabs{padding:4px 16px 24px;}
+/* Tabs high under greeting — visible before scrolling codes */
+.home-tabs{padding:0 16px 10px;}
+.home-tabs--top{margin-bottom:4px;}
 .tab-bar{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:4px;}
 .tab-btn{flex:1;padding:10px 6px;background:none;border:none;border-radius:999px;font-family:var(--sans);font-size:11.5px;font-weight:500;color:var(--muted);cursor:pointer;}
 .tab-btn.active{background:#fff;color:var(--ink);font-weight:600;box-shadow:var(--shadow-card);border:1px solid var(--line);}
-.tab-panel{display:none;padding:16px 6px 8px;font-size:13.5px;color:var(--ink-2);line-height:1.6;}
+.tab-panel{display:none;padding:12px 6px 4px;font-size:13.5px;color:var(--ink-2);line-height:1.6;}
 .tab-panel.active{display:block;}
 .tab-empty{color:var(--muted);font-size:13px;}
 
@@ -871,12 +909,24 @@ body{padding-bottom:72px;}
 
     <div class="sb2-banner">Sandbox 2 · Cursor design proposal · not live</div>
     <!-- GREETING -->
-    <div class="greeting" style="padding:10px 22px 14px;">
+    <div class="greeting" style="padding:10px 22px 8px;">
       <p class="greeting__hello" id="t-greeting-label" style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Welcome</p>
       <h2 class="greeting__name" id="home-guest-name" style="font-family:var(--serif);font-size:24px;line-height:1.15;margin-bottom:0;">Guest</h2>
       <div id="apt-area" class="sb-greeting-apt">
         <div style="font-size:12px;color:var(--muted);margin-top:4px;"><b id="home-apt-name" style="color:var(--ink);font-weight:500;">Apartment</b> · Maxela · Tbilisi</div>
       </div>
+    </div>
+
+    <!-- Tabs high under greeting — Location / Airport / Tours visible before codes (Waiting included) -->
+    <div class="home-tabs home-tabs--top">
+      <div class="tab-bar">
+        <button class="tab-btn active" id="tab-location" onclick="window.switchHomeTab('location')">Location</button>
+        <button class="tab-btn" id="tab-shuttle" onclick="window.switchHomeTab('shuttle')">Airport</button>
+        <button class="tab-btn" id="tab-tours" onclick="window.switchHomeTab('tours')">Tours</button>
+      </div>
+      <div class="tab-panel active" id="panel-location"><span class="tab-empty">Address, maps and parking — coming in Phase 3</span></div>
+      <div class="tab-panel" id="panel-shuttle"><span class="tab-empty">Airport shuttle booking — coming in Phase 3</span></div>
+      <div class="tab-panel" id="panel-tours"><span class="tab-empty">Tours and city guide — coming in Phase 3</span></div>
     </div>
 
     <!-- kept for JS compat (renderWhatYouBooked / showBlockedScreen write here) — retired from IA, not shown -->
@@ -910,13 +960,16 @@ body{padding-bottom:72px;}
         <div class="dk-card" id="hero-elevator" style="display:none;">
           <div class="dk-label">Elevator &amp; entrance</div>
           <div class="dk-elev">
-            <div class="dk-elev__qr" id="hero-elevator-qr" style="display:none;">
-              <canvas id="hero-elevator-qr-canvas" width="168" height="168"></canvas>
+            <p class="dk-elev__scan-hint">Scan the QR at the building entrance and elevator</p>
+            <div class="dk-elev__qr" id="hero-elevator-qr">
+              <canvas id="hero-elevator-qr-canvas" width="180" height="180"></canvas>
               <div class="dk-qr-ph" id="hero-elevator-qr-ph">QR</div>
             </div>
             <div class="dk-elev__meta">
-              <div class="dk-code" id="hero-elevator-code">— — — —</div>
+              <div class="dk-elev__meta-label">Or type this 6-digit code</div>
+              <div class="dk-code" id="hero-elevator-code">— — — — — —</div>
               <button class="dk-copy" onclick="window.copySth(document.getElementById('hero-elevator-code').textContent,this)"><span>Copy</span></button>
+              <p class="dk-elev__fallback">QR changes daily. If you cannot scan, use the code above.</p>
             </div>
           </div>
         </div>
@@ -940,11 +993,9 @@ body{padding-bottom:72px;}
           <div class="dk-photo-fallback" id="hero-door-photo-fallback">Apartment door photo will show here</div>
         </div>
 
-        <div class="dk-card hero-walkthrough" id="hero-walkthrough">
+        <div class="hero-walkthrough" id="hero-walkthrough">
           <div class="wt-title">How to arrive</div>
-          <div class="wt-step"><div class="wt-num">1</div><div><div class="wt-txt">Street to building</div><div class="wt-sub">Photos and arrows — Phase 2</div></div></div>
-          <div class="wt-step"><div class="wt-num">2</div><div><div class="wt-txt">Elevator or entrance</div><div class="wt-sub">Use the QR or code above</div></div></div>
-          <div class="wt-step"><div class="wt-num">3</div><div><div class="wt-txt">Your apartment door</div><div class="wt-sub">Smart-lock code at the top of this page</div></div></div>
+          <div class="wt-list" id="hero-walkthrough-list"></div>
         </div>
 
         <div class="hero-cta hero-cta--arriving">
@@ -968,20 +1019,18 @@ body{padding-bottom:72px;}
 
     </div>
 
-    <!-- THREE TABS — always visible, all phases -->
-    <div class="home-tabs">
-      <div class="tab-bar">
-        <button class="tab-btn active" id="tab-location" onclick="window.switchHomeTab('location')">Location</button>
-        <button class="tab-btn" id="tab-shuttle" onclick="window.switchHomeTab('shuttle')">Airport</button>
-        <button class="tab-btn" id="tab-tours" onclick="window.switchHomeTab('tours')">Tours</button>
-      </div>
-      <div class="tab-panel active" id="panel-location"><span class="tab-empty">Address, maps and parking — coming in Phase 3</span></div>
-      <div class="tab-panel" id="panel-shuttle"><span class="tab-empty">Airport shuttle booking — coming in Phase 3</span></div>
-      <div class="tab-panel" id="panel-tours"><span class="tab-empty">Tours and city guide — coming in Phase 3</span></div>
-    </div>
-
     <!-- kept for JS compat (renderTiles()/_renderTilesNow() writes here; retired tile menu, not shown) -->
     <div class="tiles" id="tiles-grid" style="display:none;"></div>
+
+    <!-- Multi-room apartment switcher sheet -->
+    <div class="apt-sheet" id="apt-sheet" onclick="if(event.target===this)window.closeAptSheet()">
+      <div class="apt-sheet__panel" role="dialog" aria-labelledby="apt-sheet-title">
+        <div class="apt-sheet__title" id="apt-sheet-title">Your apartments</div>
+        <div class="apt-sheet__sub">Choose which apartment to view codes and instructions for</div>
+        <div id="apt-sheet-options"></div>
+        <button type="button" class="apt-sheet__close" onclick="window.closeAptSheet()">Close</button>
+      </div>
+    </div>
 
     <div class="foot">
       <div class="lang-switcher">
@@ -1484,26 +1533,52 @@ function fmtStay(s){
 function renderGreetingApt(){
   const el=document.getElementById('apt-area');
   if(!el)return;
-  const aptNameEl=document.getElementById('home-apt-name');
-  if(aptNameEl)aptNameEl.textContent=APT_NAMES[aptId]||aptId;
+  const aptName=APT_NAMES[aptId]||aptId;
+  const roomCode=aptId||'';
   if(!allMatchedReservations||allMatchedReservations.length<=1){
-    el.innerHTML='<div style="font-size:13px;color:var(--muted);margin-top:6px;"><b id="home-apt-name" style="color:var(--ink);font-weight:500;">'+esc(APT_NAMES[aptId]||aptId)+'</b> · Maxela · Tbilisi</div>';
+    el.innerHTML='<div style="font-size:13px;color:var(--muted);margin-top:6px;"><b id="home-apt-name" style="color:var(--ink);font-weight:500;">'+esc(aptName)+'</b> · Maxela · Tbilisi</div>';
     return;
   }
-  let html='<div style="font-size:13px;color:var(--muted);margin-top:6px;"><b id="home-apt-name" style="color:var(--ink);font-weight:500;">'+esc(APT_NAMES[aptId]||aptId)+'</b> · Maxela · Tbilisi</div>';
-  html+='<div id="multi-room-label" style="display:block;">Your apartments — tap to switch</div>';
-  html+='<div class="apt-pills">';
-  for(const res of allMatchedReservations){
-    const roomLabel=res.roomCode||'';
-    const active=res.roomCode===aptId;
-    html+='<button class="apt-pill'+(active?' active':'')+'" data-room="'+esc(roomLabel)+'">'+esc(roomLabel)+'</button>';
-  }
-  html+='</div>';
-  el.innerHTML=html;
-  el.querySelectorAll('.apt-pill[data-room]').forEach(btn=>{
-    btn.addEventListener('click',()=>window.switchApt(btn.dataset.room));
-  });
+  // Multi-room: full-width switcher (not tiny pills) — guests always see "current apartment" + Switch
+  el.innerHTML=
+    '<div class="apt-switch" id="multi-room-label">'+
+      '<button type="button" class="apt-switch__btn" onclick="window.openAptSheet()" aria-haspopup="dialog">'+
+        '<span>'+
+          '<div class="apt-switch__kicker">Your apartment · tap to switch</div>'+
+          '<div class="apt-switch__name" id="home-apt-name">'+esc(aptName)+'</div>'+
+          '<div class="apt-switch__meta">Room '+esc(roomCode)+' · Maxela · Tbilisi</div>'+
+        '</span>'+
+        '<span class="apt-switch__chev" aria-hidden="true">›</span>'+
+      '</button>'+
+    '</div>';
 }
+
+window.openAptSheet=function(){
+  const sheet=document.getElementById('apt-sheet');
+  const opts=document.getElementById('apt-sheet-options');
+  if(!sheet||!opts||!allMatchedReservations||allMatchedReservations.length<=1)return;
+  opts.innerHTML=allMatchedReservations.map(res=>{
+    const room=res.roomCode||'';
+    const name=APT_NAMES[room]||room;
+    const current=room===aptId;
+    return '<button type="button" class="apt-sheet__opt'+(current?' is-current':'')+'" data-room="'+esc(room)+'">'+
+      '<span><div class="apt-sheet__opt-name">'+esc(name)+'</div>'+
+      '<div class="apt-sheet__opt-meta">Room '+esc(room)+'</div></span>'+
+      (current?'<span class="apt-sheet__badge">Current</span>':'<span class="apt-sheet__chev" aria-hidden="true">›</span>')+
+    '</button>';
+  }).join('');
+  opts.querySelectorAll('.apt-sheet__opt[data-room]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      window.closeAptSheet();
+      window.switchApt(btn.dataset.room);
+    });
+  });
+  sheet.classList.add('open');
+};
+
+window.closeAptSheet=function(){
+  document.getElementById('apt-sheet')?.classList.remove('open');
+};
 
 window.switchApt=async function(newRoomCode){
   console.log('Switching to:', newRoomCode);
@@ -1522,6 +1597,15 @@ window.switchApt=async function(newRoomCode){
   console.log('[ResvSelect] switchApt selected:',activeReservation?.checkin,activeReservation?.checkout,activeReservation?.roomCode);
   localStorage.setItem('maxela_apt_id',aptId);
   try{const _sess=JSON.parse(localStorage.getItem('maxela_v2_session')||'{}');_sess.aptId=aptId;_sess.savedAt=Date.now();localStorage.setItem('maxela_v2_session',JSON.stringify(_sess));}catch(e){}
+
+  // Sandbox mock: keep mock aptData / hero; do not hit Firestore
+  if(_sbMockActive){
+    if(guestData)guestData={...guestData,aptId};
+    renderGreetingApt();
+    _renderHeroContent();
+    return;
+  }
+
   try{
     const s=await getDoc(doc(db,'checkin_apartments',aptId));
     aptData=s.exists()?s.data():null;
@@ -3237,7 +3321,7 @@ function _renderHeroContent(){
         let drawn=false;
         if(qrCanvas&&window.QRCode){
           try{
-            QRCode.toCanvas(qrCanvas,String(elevatorData.code),{width:152,color:{dark:'#2C2C2A',light:'#FFFFFF'}});
+            QRCode.toCanvas(qrCanvas,String(elevatorData.code),{width:180,color:{dark:'#2C2C2A',light:'#FFFFFF'}});
             drawn=true;
           }catch(e){drawn=false;}
         }
@@ -3266,11 +3350,42 @@ function _renderHeroContent(){
     else{photoEl.style.display='none';if(photoFb)photoFb.style.display='flex';}
   }
 
+  _renderWalkthrough();
+
   const coLbl=document.getElementById('hero-checkout-label');
   if(coLbl){
     const co=guestData?.checkoutDate||activeReservation?.checkout||activeReservation?.checkOut||'';
     coLbl.textContent=co?('Checkout today · '+co):'Checkout today';
   }
+}
+
+// Photo step cards from checkin_apartments.photos + photoCaptions (same shape as checkin-details.html)
+function _renderWalkthrough(){
+  const list=document.getElementById('hero-walkthrough-list');
+  if(!list)return;
+  const photos=aptData?.photos||[];
+  const caps=aptData?.photoCaptions||[];
+  if(!photos.length){
+    list.innerHTML='<div class="wt-empty">Arrival photos will appear here once set for this apartment.</div>';
+    window._lbPhotos=[];
+    window._lbCaps=[];
+    return;
+  }
+  window._lbPhotos=photos;
+  window._lbCaps=caps;
+  list.innerHTML=photos.map((src,i)=>{
+    const cap=resolveElevatorCode((caps[i]||'').trim())||('Step '+(i+1));
+    const media=src
+      ?'<img src="'+esc(src)+'" alt="" loading="lazy" onclick="window.openLightbox(window._lbPhotos,'+i+')">'
+      :'<div class="wt-ph">Photo '+(i+1)+'</div>';
+    return '<div class="wt-card">'+
+      '<div class="wt-card__media">'+media+'</div>'+
+      '<div class="wt-card__body">'+
+        '<div class="wt-num">'+(i+1)+'</div>'+
+        '<div class="wt-txt">'+esc(cap)+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
 }
 
 let _countdownTimer=null;
@@ -3366,6 +3481,7 @@ window.toggleArrivalInstructions=function(){
   if(!el)return;
   const on=el.style.display==='block';
   el.style.display=on?'none':'block';
+  if(!on)_renderWalkthrough();
 };
 
 window.switchHomeTab=function(id){
@@ -3426,9 +3542,25 @@ function _sbBuildMocks(phase){
     wifiPass:'welcome2024',
     checkInTime:'15:00',
     rules:{apartment:'Please keep noise low after 22:00.'},
-    recommendations:{shartava:[]}
+    recommendations:{shartava:[]},
+    // Mock 5-step photo walkthrough (same fields as checkin_apartments / checkin-details)
+    photos:[
+      'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&q=80',
+      'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80',
+      'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80',
+      'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80',
+      'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80'
+    ],
+    photoCaptions:[
+      'From the street: walk toward the glass entrance on Shartava. Look for the Maxela plaque on the right of the door.',
+      'At the entrance panel: scan the elevator QR (or type the 6-digit code below the QR on this page). Pull the door when it unlocks.',
+      'Inside the lobby: take the elevator to your floor. Use the same QR/code if the elevator asks again.',
+      'On your floor: turn left out of the elevator. Your apartment door is the second on the right — match the door photo above.',
+      'At the door: enter the smart-lock code from the top of this page, then press #. The lock opens for a few seconds.'
+    ]
   };
-  elevatorData={code:'4521',display_code:'4521#',updatedAt:{seconds:Date.now()/1000}};
+  // Real building pads use 6-digit codes (longer than door lock)
+  elevatorData={code:'384721',display_code:'384721#',updatedAt:{seconds:Date.now()/1000}};
   allMatchedReservations=[primaryRes];
   if(_sbState.multiRoom){
     allMatchedReservations.push({...primaryRes,id:'MOCK002',roomCode:'6-1'});
