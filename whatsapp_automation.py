@@ -43,8 +43,8 @@ def init_firestore():
         sys.exit(1)
     sa_json = json.loads(base64.b64decode(sa_base64))
     cred = credentials.Certificate(sa_json)
-    firebase_admin.initialize_app(cred)
-    return firestore.client()
+    firebase_admin.initialize_app(cred, {'projectId': sa_json['project_id']})
+    return firestore.client(database='(default)')
 
 
 def get_room_description(room_code):
