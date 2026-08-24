@@ -1449,13 +1449,6 @@ function applyTranslations(){
   const cntEl=document.getElementById('t-field-count');
   if(cntEl)cntEl.textContent='4 '+t('fields');
   const nmEl=document.getElementById('r-name');if(nmEl)nmEl.placeholder=t('namePlaceholder');
-  const coLbl=document.getElementById('hero-checkout-label');
-  if(coLbl&&!coLbl.dataset.hasDate){
-    const base=coLbl.textContent;
-    if(base.startsWith('Checkout')||base.startsWith('გასვ')||base.startsWith('Выезд')||base.startsWith('المغ')){
-      coLbl.textContent=t('checkoutToday');
-    }
-  }
   if(_wybCat)_renderWybCard(_wybCat);
 }
 
