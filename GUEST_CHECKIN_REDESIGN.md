@@ -406,7 +406,8 @@ That config work belongs in the admin track after guest sandbox IA is stable —
 | Workstream | Status | Owner | Files | Notes |
 |------------|--------|-------|-------|-------|
 | `docs-coord` | **active** | Cursor | `GUEST_CHECKIN_REDESIGN.md` | Decisions locked; sandbox plan |
-| `guest-sandbox-shell` | active | Claude Code | `checkin-guest-sandbox.html` | 2026-08-23 — Phase 1 only |
+| `guest-sandbox-shell` | done (Phase 1) | Claude Code | `checkin-guest-sandbox.html` | Do not overwrite while comparing |
+| `guest-sandbox-2-design` | **active** | Cursor | `checkin-guest-sandbox-2.html` | 2026-08-24 — Cursor design proposal, same IA |
 | `inline-checkin-access` | blocked on Phase 1 | — | sandbox | Door + elevator + tour |
 | `secondary-location-services` | blocked on Phase 1 | — | sandbox | Parking/location + shuttle + tours |
 | `guest-visual-design` | blocked on shell | — | sandbox CSS | Phase 4 |
@@ -456,7 +457,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-23 | Claude Code | Phase 1 `guest-sandbox-shell` done: `checkin-guest-sandbox.html` created (copy of `checkin-guest-v2.html`, `#page-home` rebuilt per §3.5 — countdown hero + shared daily-key hero (door/elevator/WiFi/floor) + walkthrough placeholder + Checked in/out CTAs + 3 tabs). `applyHomePhase()`, `window.guestCheckedIn/guestCheckedOut/isStayEnded` added; JS module otherwise unchanged (pure additions, verified by diff). Register/rules/passport untouched. |
 | 2026-08-24 | Claude Code | Added sandbox dev toolbar (`#sb-toolbar`) to `checkin-guest-sandbox.html` — jump to any screen/phase/state with full mock guest/reservation/apartment/elevator data, zero Firebase dependency (`_sbBuildMocks()`, `_sbRenderHomeForPhase()`, `_sbShowScreen()`, `_sbGoPhase()`, `_sbToggle()`). Added §14 Sandbox & Current Build State and §15 Prompts & Build Log (renumbered from §13/§14 on 2026-08-24 to make room for §13 Design Tokens & Rules). |
 | 2026-08-24 | Claude Code | **Color fix:** home-screen hero card was shipped dark/inverted (black background, white text, gold `#C4A882` CTA) — reverted to the correct system: white cards (`#FFFFFF`), dark text (`#2C2C2A`/`#8C8C8A`), dark-filled primary CTA (`#2C2C2A`/`#fff`), no gold anywhere as a background. Split "I've checked out" into its own lighter-bordered "destructive/confirm" style, distinct from the bold primary "I'm checked in". Fixed the same gold-background violation on the dev toolbar's active-state buttons. Added §13 Design Tokens & Rules to lock this down for future work. |
-| 2026-08-24 | Claude Code | **5 fixes:** Phase A copy cut to headline + one-sentence subline (no "do not message us"); multi-room apt-pills resized to 44px touch targets with a "Your apartments — tap to switch" label; `--muted` darkened `#8C8C8A`→`#4A4A48` globally + font-weight pass (guest name 700, card titles 600, labels 500, mono codes 700, buttons 600) + `0.06em` letter-spacing on redesigned-home uppercase labels; post-checkout screen rewritten (no emoji, "Until next time." + real WhatsApp "Contact host" button); registration name-field copy rewritten in EN/KA/RU/AR (and fixed a pre-existing bug where the instruction text was never wired to `applyTranslations()`). Fixed stale `### 13.x` subsection numbers left over from the earlier §13/§14 renumbering (now `### 14.1`–`14.5`); added §14.6. Details in §14.6. |
+| 2026-08-24 | Cursor | Sandbox 2 design proposal: `checkin-guest-sandbox-2.html` — compact greeting, date-or-countdown waiting, door-first stacked cards, large elevator QR, WiFi compact, door-photo empty state. Does not replace Claude sandbox 1. |
 
 ---
 
@@ -897,6 +898,28 @@ THEN:
 - git push
 - Report: sandbox URL + what works + what is placeholder for Phase 2
 ```
+
+---
+
+## 16. Sandbox 2 — Cursor design proposal (2026-08-24)
+
+**File:** `checkin-guest-sandbox-2.html`  
+**URL (after push to main):** https://app.maxelaapartments.com/checkin-guest-sandbox-2.html  
+**Does not replace** `checkin-guest-sandbox.html` (Claude / Sandbox 1). Same phases, IDs, and toolbar. Compare side by side.
+
+| Difference vs Sandbox 1 | Why |
+|-------------------------|-----|
+| Compact greeting (24px name, less padding) | Door code should own the first viewport, not the guest name |
+| Waiting shows **date + time** when check-in is not today (`Unlocks 25 Aug at 15:00`) | Sandbox 1 shows `00:00:00` the day before — guests still won't know when to come back |
+| Waiting copy: “They unlock **on this page**” + “You do not need to message us” | Directly attacks the WhatsApp problem |
+| Door code is its **own large card** (52px) | P0 daily key; WiFi must not compete |
+| Elevator is QR-left (168px) + code-right | Guests scan at the lift; 96px QR is too small |
+| WiFi is a compact third card | Daily, but not arrival-critical |
+| Floor card has a dashed empty state | Door photo field doesn't exist yet — don't hide the section |
+| Walkthrough as 3 numbered steps (still placeholder photos) | Reads as a path, not a dashed dump |
+| Tabs as pill segmented control, shorter labels | Less like a leftover underline menu |
+
+Same tokens as §13 (white cards, ink CTA). This is a **layout proposal**, not a token fight.
 
 ---
 
