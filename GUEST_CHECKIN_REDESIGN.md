@@ -919,7 +919,7 @@ THEN:
 | Floor card has a dashed empty state | Door photo field doesn't exist yet — don't hide the section |
 | Walkthrough as **photo step cards** from `photos` + `photoCaptions` (4–6 steps, lightbox) | Real check-in instructions are detailed photo guides, not 3 text lines |
 | Multi-room: **full-width “Your apartment · tap to switch”** + bottom sheet | Guests could not find tiny room pills |
-| Tabs **under greeting** (Location / Airport / Tours), above hero | Visible while Waiting and before scrolling codes |
+| Tabs **under greeting**, larger 14px labels | Visible while Waiting; easier to tap before codes |
 
 Same tokens as §13 (white cards, ink CTA). This is a **layout proposal**, not a token fight.
 

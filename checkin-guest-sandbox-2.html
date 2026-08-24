@@ -549,40 +549,60 @@ body{padding-bottom:72px;}
 .hero-waiting__sub{font-family:var(--sans);font-size:15px;line-height:1.5;color:var(--ink);max-width:300px;margin:0 auto;font-weight:500;}
 .hero-waiting__hint{display:none;}
 
-/* Daily key — wrapper of stacked cards, not one equal-weight stack */
+/* Daily key — arrival order: elevator → compact door/wifi → scroll cue → photos */
 .hero-daily-key{display:none;}
 #page-home.phase-arriving .hero-daily-key,
 #page-home.phase-staying .hero-daily-key,
 #page-home.phase-leaving .hero-daily-key{display:block;}
-.dk-card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:18px 18px 16px;margin-bottom:10px;box-shadow:var(--shadow-card);}
-.dk-card--door{padding:22px 18px 18px;}
+.dk-card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:16px 16px 14px;margin-bottom:10px;box-shadow:var(--shadow-card);}
 .dk-label{font-family:var(--mono);font-size:10.5px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
-.dk-code{font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:0.12em;font-variant-numeric:tabular-nums;color:var(--ink);}
-.dk-card--door .dk-code{font-size:52px;letter-spacing:0.08em;line-height:1;margin:4px 0 14px;}
-.dk-copy{height:44px;padding:0 16px;display:inline-flex;align-items:center;gap:6px;background:#FFFFFF;border:1.5px solid var(--ink);border-radius:999px;color:var(--ink);font-family:var(--mono);font-size:11px;font-weight:600;cursor:pointer;}
+.dk-code{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:0.12em;font-variant-numeric:tabular-nums;color:var(--ink);}
+.dk-copy{height:36px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;background:#FFFFFF;border:1.5px solid var(--ink);border-radius:999px;color:var(--ink);font-family:var(--mono);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0;}
 .dk-copy.copied{background:var(--green-bg);border-color:var(--green-border);color:var(--green);}
-/* Elevator: QR on top, 6-digit code underneath (matches real building pads) */
-.dk-elev{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;}
-.dk-elev__qr{display:none;width:200px;height:200px;padding:10px;background:#fff;border:1px solid var(--line);border-radius:12px;align-items:center;justify-content:center;box-sizing:border-box;}
+
+/* Elevator: QR on top, 6-digit code under — no copy (typed at the pad) */
+.dk-elev{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;}
+.dk-elev__qr{display:none;width:168px;height:168px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;align-items:center;justify-content:center;box-sizing:border-box;}
 .dk-elev__qr canvas{display:block;max-width:100%;height:auto;}
 .dk-qr-ph{display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;letter-spacing:0.12em;color:var(--muted);background:repeating-linear-gradient(135deg,#f5f2ee 0 8px,#fff 8px 16px);border-radius:8px;}
-.dk-elev__scan-hint{font-size:12px;color:var(--muted);line-height:1.45;max-width:280px;margin:0;}
-.dk-elev__meta{width:100%;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:12px;border-top:1px solid var(--line);}
+.dk-elev__scan-hint{font-size:12px;color:var(--muted);line-height:1.4;max-width:260px;margin:0;}
+.dk-elev__meta{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--line);}
 .dk-elev__meta-label{font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
-.dk-elev__meta .dk-code{font-size:26px;letter-spacing:0.16em;margin:0;word-break:break-all;}
-.dk-elev__fallback{font-size:11px;color:var(--muted);font-style:italic;line-height:1.4;max-width:280px;}
-.dk-wifi-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;}
-.dk-wifi-row + .dk-wifi-row{border-top:1px solid var(--line);}
-.dk-wifi-sublabel{font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
-.dk-wifi-val{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:0.08em;color:var(--ink);}
-.dk-floor-text{font-size:16px;font-weight:600;color:var(--ink);}
-.dk-floor-photo{width:100%;border-radius:var(--rsm);margin-top:12px;display:none;object-fit:cover;max-height:180px;}
-.dk-photo-fallback{margin-top:12px;height:120px;border:1px dashed var(--line);border-radius:var(--rsm);display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;font-size:12.5px;color:var(--muted);background:var(--bg);}
+.dk-elev__meta .dk-code{font-size:28px;letter-spacing:0.16em;margin:0;word-break:break-all;}
+.dk-elev__fallback{font-size:11px;color:var(--muted);line-height:1.4;max-width:280px;margin:0;}
 
-/* Walkthrough — 4–6 photo steps with captions (from checkin_apartments.photos) */
+/* Compact door + wifi in one slim card (not stacked full cards) */
+.dk-access{padding:4px 4px 2px;}
+.dk-access__row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 12px;}
+.dk-access__row + .dk-access__row{border-top:1px solid var(--line);}
+.dk-access__left{min-width:0;flex:1;}
+.dk-access__lbl{font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.dk-access__door{font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:0.12em;color:var(--ink);line-height:1.1;}
+.dk-access__wifi{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:0.02em;color:var(--ink);line-height:1.35;word-break:break-word;}
+.dk-access__wifi-sep{color:var(--muted);font-weight:500;margin:0 4px;}
+
+.dk-floor-text{font-size:15px;font-weight:600;color:var(--ink);}
+.dk-floor-photo{width:100%;border-radius:var(--rsm);margin-top:10px;display:none;object-fit:cover;max-height:140px;}
+.dk-photo-fallback{margin-top:10px;height:88px;border:1px dashed var(--line);border-radius:var(--rsm);display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;font-size:12px;color:var(--muted);background:var(--bg);}
+
+/* Scroll cue — first viewport must show more content exists below */
+.dk-scroll-cue{display:none;margin:2px 0 12px;}
+#page-home.phase-arriving .dk-scroll-cue{display:block;}
+.dk-scroll-cue__btn{
+  width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  text-align:left;padding:14px 16px;background:var(--ink);color:#fff;border:none;
+  border-radius:var(--r);cursor:pointer;font-family:var(--sans);
+  box-shadow:var(--shadow-card);
+}
+.dk-scroll-cue__kicker{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;opacity:0.7;margin-bottom:4px;}
+.dk-scroll-cue__title{font-size:15px;font-weight:600;line-height:1.25;}
+.dk-scroll-cue__chev{font-size:22px;line-height:1;opacity:0.9;animation:dkBounce 1.4s ease-in-out infinite;}
+@keyframes dkBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+
+/* Walkthrough — 4–6 photo steps with captions */
 .hero-walkthrough{display:none;margin:4px 0 12px;padding:0;border:none;box-shadow:none;background:transparent;}
 #page-home.phase-arriving .hero-walkthrough{display:block;}
-.wt-title{font-family:var(--serif);font-style:italic;font-size:22px;margin:8px 4px 14px;}
+.wt-title{font-family:var(--sans);font-size:16px;font-weight:700;margin:4px 4px 12px;color:var(--ink);}
 .wt-list{display:flex;flex-direction:column;gap:14px;}
 .wt-card{background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow-card);}
 .wt-card__media{height:220px;background:var(--bg);position:relative;}
@@ -941,42 +961,57 @@ body{padding-bottom:72px;}
         <p class="hero-waiting__sub">Door code and arrival steps unlock here at check-in time.</p>
       </div>
 
-      <!-- Phases B/C/D — shared daily key (same IDs as sandbox 1) -->
+      <!-- Phases B/C/D — arrival order: elevator → slim door/wifi → scroll cue → photos -->
       <div class="hero-daily-key">
-
-        <div class="dk-card dk-card--door">
-          <div class="dk-label">Door · smart lock</div>
-          <div class="dk-code" id="hero-door-code">— — — —</div>
-          <button class="dk-copy" id="hero-door-copy" onclick="window.copySth(document.getElementById('hero-door-code').textContent,this)"><span>Copy</span></button>
-        </div>
 
         <div class="dk-card" id="hero-elevator" style="display:none;">
           <div class="dk-label">Elevator &amp; entrance</div>
           <div class="dk-elev">
-            <p class="dk-elev__scan-hint">Scan the QR at the building entrance and elevator</p>
+            <p class="dk-elev__scan-hint">Scan at the building entrance and elevator</p>
             <div class="dk-elev__qr" id="hero-elevator-qr">
-              <canvas id="hero-elevator-qr-canvas" width="180" height="180"></canvas>
+              <canvas id="hero-elevator-qr-canvas" width="152" height="152"></canvas>
               <div class="dk-qr-ph" id="hero-elevator-qr-ph">QR</div>
             </div>
             <div class="dk-elev__meta">
               <div class="dk-elev__meta-label">Or type this 6-digit code</div>
               <div class="dk-code" id="hero-elevator-code">— — — — — —</div>
-              <button class="dk-copy" onclick="window.copySth(document.getElementById('hero-elevator-code').textContent,this)"><span>Copy</span></button>
-              <p class="dk-elev__fallback">QR changes daily. If you cannot scan, use the code above.</p>
+              <p class="dk-elev__fallback">Type it on the pad, then press #. QR changes daily.</p>
             </div>
           </div>
         </div>
 
-        <div class="dk-card">
-          <div class="dk-label">WiFi</div>
-          <div class="dk-wifi-row">
-            <div><div class="dk-wifi-sublabel">Network</div><span class="dk-wifi-val" id="hero-wifi-name">—</span></div>
-            <button class="dk-copy" onclick="window.copySth(document.getElementById('hero-wifi-name').textContent,this)"><span>Copy</span></button>
+        <div class="dk-card dk-access">
+          <div class="dk-access__row">
+            <div class="dk-access__left">
+              <div class="dk-access__lbl">Door · smart lock</div>
+              <div class="dk-access__door" id="hero-door-code">— — — —</div>
+            </div>
+            <button class="dk-copy" id="hero-door-copy" onclick="window.copySth(document.getElementById('hero-door-code').textContent,this)"><span>Copy</span></button>
           </div>
-          <div class="dk-wifi-row">
-            <div><div class="dk-wifi-sublabel">Password</div><span class="dk-wifi-val" id="hero-wifi-pass">—</span></div>
+          <div class="dk-access__row">
+            <div class="dk-access__left">
+              <div class="dk-access__lbl">WiFi</div>
+              <div class="dk-access__wifi">
+                <span id="hero-wifi-name">—</span><span class="dk-access__wifi-sep">·</span><span id="hero-wifi-pass">—</span>
+              </div>
+            </div>
             <button class="dk-copy" onclick="window.copySth(document.getElementById('hero-wifi-pass').textContent,this)"><span>Copy</span></button>
           </div>
+        </div>
+
+        <div class="dk-scroll-cue" id="dk-scroll-cue">
+          <button type="button" class="dk-scroll-cue__btn" onclick="window.scrollToArrivalSteps()">
+            <span>
+              <div class="dk-scroll-cue__kicker">Don’t stop here</div>
+              <div class="dk-scroll-cue__title" id="dk-scroll-cue-title">Scroll for photo steps — street to your door</div>
+            </span>
+            <span class="dk-scroll-cue__chev" aria-hidden="true">↓</span>
+          </button>
+        </div>
+
+        <div class="hero-walkthrough" id="hero-walkthrough">
+          <div class="wt-title">How to arrive</div>
+          <div class="wt-list" id="hero-walkthrough-list"></div>
         </div>
 
         <div class="dk-card">
@@ -984,11 +1019,6 @@ body{padding-bottom:72px;}
           <div class="dk-floor-text" id="hero-floor-info">—</div>
           <img class="dk-floor-photo" id="hero-door-photo" alt="Apartment door">
           <div class="dk-photo-fallback" id="hero-door-photo-fallback">Apartment door photo will show here</div>
-        </div>
-
-        <div class="hero-walkthrough" id="hero-walkthrough">
-          <div class="wt-title">How to arrive</div>
-          <div class="wt-list" id="hero-walkthrough-list"></div>
         </div>
 
         <div class="hero-cta hero-cta--arriving">
@@ -3317,7 +3347,7 @@ function _renderHeroContent(){
         let drawn=false;
         if(qrCanvas&&window.QRCode){
           try{
-            QRCode.toCanvas(qrCanvas,String(elevatorData.code),{width:180,color:{dark:'#2C2C2A',light:'#FFFFFF'}});
+            QRCode.toCanvas(qrCanvas,String(elevatorData.code),{width:152,color:{dark:'#2C2C2A',light:'#FFFFFF'}});
             drawn=true;
           }catch(e){drawn=false;}
         }
@@ -3382,7 +3412,16 @@ function _renderWalkthrough(){
       '</div>'+
     '</div>';
   }).join('');
+  const cueTitle=document.getElementById('dk-scroll-cue-title');
+  if(cueTitle)cueTitle.textContent='Scroll for '+photos.length+' photo steps — street to your door';
 }
+
+window.scrollToArrivalSteps=function(){
+  const el=document.getElementById('hero-walkthrough');
+  if(!el)return;
+  el.style.display='block';
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+};
 
 let _countdownTimer=null;
 function _tickCountdown(){
