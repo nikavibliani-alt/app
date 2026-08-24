@@ -465,6 +465,11 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 .apt-pill{min-height:44px;padding:10px 20px;border:2px solid #2C2C2A;border-radius:22px;background:#fff;font-size:15px;font-weight:600;color:#2C2C2A;cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap;}
 .apt-pill.active{background:#2C2C2A;border:none;color:#fff;}
 #multi-room-label{display:none;font-family:var(--sans);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.08em;margin-bottom:8px;}
+/* Sandbox 2 apartment switcher reuses #multi-room-label — must stay visible */
+#multi-room-label.apt-switch{
+  display:block;font-family:var(--sans);font-size:inherit;text-transform:none;
+  letter-spacing:normal;color:inherit;margin:10px 0 0;
+}
 /* Code boxes v2 */
 .v2-code-dark{background:#2C2C2A;color:#fff;padding:28px 24px;margin-bottom:8px;}
 .v2-code-dark .v2-code-label{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:10px;font-family:var(--mono);}
@@ -562,7 +567,7 @@ body{padding-bottom:72px;}
 
 /* Elevator: QR on top, 6-digit code under — no copy (typed at the pad) */
 .dk-elev{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;}
-.dk-elev__qr{display:none;width:168px;height:168px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;align-items:center;justify-content:center;box-sizing:border-box;}
+.dk-elev__qr{display:none;width:148px;height:148px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;align-items:center;justify-content:center;box-sizing:border-box;}
 .dk-elev__qr canvas{display:block;max-width:100%;height:auto;}
 .dk-qr-ph{display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;letter-spacing:0.12em;color:var(--muted);background:repeating-linear-gradient(135deg,#f5f2ee 0 8px,#fff 8px 16px);border-radius:8px;}
 .dk-elev__scan-hint{font-size:12px;color:var(--muted);line-height:1.4;max-width:260px;margin:0;}
@@ -571,33 +576,47 @@ body{padding-bottom:72px;}
 .dk-elev__meta .dk-code{font-size:28px;letter-spacing:0.16em;margin:0;word-break:break-all;}
 .dk-elev__fallback{font-size:11px;color:var(--muted);line-height:1.4;max-width:280px;margin:0;}
 
-/* Compact door + wifi in one slim card (not stacked full cards) */
-.dk-access{padding:4px 4px 2px;}
+/* Compact door row (WiFi moved up near greeting) */
+.dk-access{padding:2px 4px;}
 .dk-access__row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 12px;}
-.dk-access__row + .dk-access__row{border-top:1px solid var(--line);}
 .dk-access__left{min-width:0;flex:1;}
 .dk-access__lbl{font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
 .dk-access__door{font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:0.12em;color:var(--ink);line-height:1.1;}
-.dk-access__wifi{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:0.02em;color:var(--ink);line-height:1.35;word-break:break-word;}
-.dk-access__wifi-sep{color:var(--muted);font-weight:500;margin:0 4px;}
 
 .dk-floor-text{font-size:15px;font-weight:600;color:var(--ink);}
 .dk-floor-photo{width:100%;border-radius:var(--rsm);margin-top:10px;display:none;object-fit:cover;max-height:140px;}
 .dk-photo-fallback{margin-top:10px;height:88px;border:1px dashed var(--line);border-radius:var(--rsm);display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;font-size:12px;color:var(--muted);background:var(--bg);}
 
-/* Scroll cue — first viewport must show more content exists below */
-.dk-scroll-cue{display:none;margin:2px 0 12px;}
+/* Scroll cue + clipped photo peek — instructions visible on first phone screen */
+.dk-scroll-cue{display:none;margin:2px 0 0;}
 #page-home.phase-arriving .dk-scroll-cue{display:block;}
 .dk-scroll-cue__btn{
   width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;
-  text-align:left;padding:14px 16px;background:var(--ink);color:#fff;border:none;
-  border-radius:var(--r);cursor:pointer;font-family:var(--sans);
-  box-shadow:var(--shadow-card);
+  text-align:left;padding:12px 14px;background:var(--ink);color:#fff;border:none;
+  border-radius:var(--r) var(--r) 0 0;cursor:pointer;font-family:var(--sans);
 }
-.dk-scroll-cue__kicker{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;opacity:0.7;margin-bottom:4px;}
-.dk-scroll-cue__title{font-size:15px;font-weight:600;line-height:1.25;}
-.dk-scroll-cue__chev{font-size:22px;line-height:1;opacity:0.9;animation:dkBounce 1.4s ease-in-out infinite;}
+.dk-scroll-cue__kicker{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;opacity:0.7;margin-bottom:3px;}
+.dk-scroll-cue__title{font-size:14px;font-weight:600;line-height:1.25;}
+.dk-scroll-cue__chev{font-size:20px;line-height:1;opacity:0.9;animation:dkBounce 1.4s ease-in-out infinite;}
 @keyframes dkBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+.wt-peek{
+  display:none;position:relative;height:96px;overflow:hidden;margin:0 0 12px;
+  border:1px solid var(--line);border-top:none;border-radius:0 0 var(--r) var(--r);
+  background:#fff;box-shadow:var(--shadow-card);cursor:pointer;
+}
+#page-home.phase-arriving .wt-peek.has-photo{display:block;}
+.wt-peek img{width:100%;height:140px;object-fit:cover;display:block;pointer-events:none;}
+.wt-peek__fade{
+  position:absolute;left:0;right:0;bottom:0;height:56px;
+  background:linear-gradient(to bottom,rgba(247,244,240,0),var(--bg));
+  pointer-events:none;
+}
+.wt-peek__badge{
+  position:absolute;left:12px;bottom:10px;z-index:1;
+  font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--ink);background:rgba(255,255,255,0.92);border:1px solid var(--line);
+  border-radius:999px;padding:5px 10px;font-weight:600;
+}
 
 /* Walkthrough — 4–6 photo steps with captions */
 .hero-walkthrough{display:none;margin:4px 0 12px;padding:0;border:none;box-shadow:none;background:transparent;}
@@ -652,9 +671,34 @@ body{padding-bottom:72px;}
 .hero-thankyou{display:none;text-align:center;padding:36px 20px;}
 .hero-thankyou.show{display:block;}
 
-/* Tabs high under greeting — large enough to notice while Waiting */
+/* Top tools: WiFi + Location when unlocked. Airport/Tours tabs only while Waiting */
+.home-top-tools{display:none;padding:0 16px 10px;gap:8px;flex-direction:column;}
+#page-home.phase-arriving .home-top-tools,
+#page-home.phase-staying .home-top-tools,
+#page-home.phase-leaving .home-top-tools{display:flex;}
+.home-wifi-chip,.home-loc-chip{
+  width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  text-align:left;padding:11px 14px;background:#fff;border:1px solid var(--line);
+  border-radius:14px;box-shadow:var(--shadow-card);font-family:var(--sans);
+}
+.home-wifi-chip__lbl,.home-loc-chip__lbl{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:2px;
+}
+.home-wifi-chip__val{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink);word-break:break-word;}
+.home-wifi-chip__sep{color:var(--muted);margin:0 4px;font-weight:500;}
+.home-loc-chip{cursor:pointer;border:1.5px solid var(--ink);}
+.home-loc-chip__title{font-size:14px;font-weight:600;color:var(--ink);}
+.home-loc-chip__chev{font-size:18px;color:var(--ink);line-height:1;}
+.home-loc-panel{display:none;padding:10px 4px 2px;font-size:14px;color:var(--ink-2);line-height:1.55;}
+.home-loc-panel.open{display:block;}
+
 .home-tabs{padding:4px 16px 14px;}
 .home-tabs--top{margin-bottom:2px;}
+#page-home.phase-arriving .home-tabs--waiting,
+#page-home.phase-staying .home-tabs--waiting,
+#page-home.phase-leaving .home-tabs--waiting{display:none;}
+#page-home.phase-waiting .home-tabs--waiting{display:block;}
 .tab-bar{display:flex;gap:6px;background:var(--bg);border:1.5px solid var(--line);border-radius:16px;padding:5px;}
 .tab-btn{flex:1;padding:14px 8px;background:none;border:none;border-radius:12px;font-family:var(--sans);font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;line-height:1.2;}
 .tab-btn.active{background:#fff;color:var(--ink);font-weight:700;box-shadow:var(--shadow-card);border:1px solid var(--line);}
@@ -932,8 +976,30 @@ body{padding-bottom:72px;}
       </div>
     </div>
 
-    <!-- Tabs high under greeting — Location / Airport / Tours visible before codes (Waiting included) -->
-    <div class="home-tabs home-tabs--top">
+    <!-- Unlocked: WiFi + Location up top. Waiting keeps full Location/Airport/Tours tabs -->
+    <div class="home-top-tools" id="home-top-tools">
+      <div class="home-wifi-chip" id="home-wifi-chip">
+        <div>
+          <div class="home-wifi-chip__lbl">WiFi</div>
+          <div class="home-wifi-chip__val">
+            <span id="hero-wifi-name">—</span><span class="home-wifi-chip__sep">·</span><span id="hero-wifi-pass">—</span>
+          </div>
+        </div>
+        <button class="dk-copy" onclick="window.copySth(document.getElementById('hero-wifi-pass').textContent,this)"><span>Copy</span></button>
+      </div>
+      <button type="button" class="home-loc-chip" id="home-loc-chip" onclick="window.toggleHomeLocation()">
+        <span>
+          <div class="home-loc-chip__lbl">Nearby</div>
+          <div class="home-loc-chip__title">Location &amp; parking</div>
+        </span>
+        <span class="home-loc-chip__chev" aria-hidden="true">›</span>
+      </button>
+      <div class="home-loc-panel" id="home-loc-panel">
+        <span class="tab-empty">Address, maps and parking — coming in Phase 3</span>
+      </div>
+    </div>
+
+    <div class="home-tabs home-tabs--top home-tabs--waiting" id="home-tabs">
       <div class="tab-bar">
         <button class="tab-btn active" id="tab-location" onclick="window.switchHomeTab('location')">Location</button>
         <button class="tab-btn" id="tab-shuttle" onclick="window.switchHomeTab('shuttle')">Airport</button>
@@ -988,25 +1054,21 @@ body{padding-bottom:72px;}
             </div>
             <button class="dk-copy" id="hero-door-copy" onclick="window.copySth(document.getElementById('hero-door-code').textContent,this)"><span>Copy</span></button>
           </div>
-          <div class="dk-access__row">
-            <div class="dk-access__left">
-              <div class="dk-access__lbl">WiFi</div>
-              <div class="dk-access__wifi">
-                <span id="hero-wifi-name">—</span><span class="dk-access__wifi-sep">·</span><span id="hero-wifi-pass">—</span>
-              </div>
-            </div>
-            <button class="dk-copy" onclick="window.copySth(document.getElementById('hero-wifi-pass').textContent,this)"><span>Copy</span></button>
-          </div>
         </div>
 
         <div class="dk-scroll-cue" id="dk-scroll-cue">
           <button type="button" class="dk-scroll-cue__btn" onclick="window.scrollToArrivalSteps()">
             <span>
-              <div class="dk-scroll-cue__kicker">Don’t stop here</div>
+              <div class="dk-scroll-cue__kicker">Check-in instructions</div>
               <div class="dk-scroll-cue__title" id="dk-scroll-cue-title">Scroll for photo steps — street to your door</div>
             </span>
             <span class="dk-scroll-cue__chev" aria-hidden="true">↓</span>
           </button>
+        </div>
+        <div class="wt-peek" id="wt-peek" onclick="window.scrollToArrivalSteps()">
+          <img id="wt-peek-img" alt="">
+          <div class="wt-peek__fade"></div>
+          <div class="wt-peek__badge" id="wt-peek-badge">Photo steps below</div>
         </div>
 
         <div class="hero-walkthrough" id="hero-walkthrough">
@@ -3347,7 +3409,7 @@ function _renderHeroContent(){
         let drawn=false;
         if(qrCanvas&&window.QRCode){
           try{
-            QRCode.toCanvas(qrCanvas,String(elevatorData.code),{width:152,color:{dark:'#2C2C2A',light:'#FFFFFF'}});
+            QRCode.toCanvas(qrCanvas,String(elevatorData.code),{width:132,color:{dark:'#2C2C2A',light:'#FFFFFF'}});
             drawn=true;
           }catch(e){drawn=false;}
         }
@@ -3395,6 +3457,9 @@ function _renderWalkthrough(){
     list.innerHTML='<div class="wt-empty">Arrival photos will appear here once set for this apartment.</div>';
     window._lbPhotos=[];
     window._lbCaps=[];
+    const cueEmpty=document.getElementById('dk-scroll-cue');
+    if(cueEmpty)cueEmpty.style.display='none';
+    document.getElementById('wt-peek')?.classList.remove('has-photo');
     return;
   }
   window._lbPhotos=photos;
@@ -3412,8 +3477,20 @@ function _renderWalkthrough(){
       '</div>'+
     '</div>';
   }).join('');
+  const cue=document.getElementById('dk-scroll-cue');
+  if(cue)cue.style.display='';
   const cueTitle=document.getElementById('dk-scroll-cue-title');
-  if(cueTitle)cueTitle.textContent='Scroll for '+photos.length+' photo steps — street to your door';
+  if(cueTitle)cueTitle.textContent=photos.length+' photo steps — street to your door';
+  const peek=document.getElementById('wt-peek');
+  const peekImg=document.getElementById('wt-peek-img');
+  const peekBadge=document.getElementById('wt-peek-badge');
+  if(peek&&peekImg&&photos[0]){
+    peekImg.src=photos[0];
+    peek.classList.add('has-photo');
+    if(peekBadge)peekBadge.textContent=photos.length+' photo steps below';
+  }else{
+    peek?.classList.remove('has-photo');
+  }
 }
 
 window.scrollToArrivalSteps=function(){
@@ -3421,6 +3498,15 @@ window.scrollToArrivalSteps=function(){
   if(!el)return;
   el.style.display='block';
   el.scrollIntoView({behavior:'smooth',block:'start'});
+};
+
+window.toggleHomeLocation=function(){
+  const panel=document.getElementById('home-loc-panel');
+  const chip=document.getElementById('home-loc-chip');
+  if(!panel)return;
+  const open=panel.classList.toggle('open');
+  const chev=chip?.querySelector('.home-loc-chip__chev');
+  if(chev)chev.textContent=open?'˄':'›';
 };
 
 let _countdownTimer=null;
@@ -3589,7 +3675,8 @@ function _sbBuildMocks(phase){
   elevatorData={code:'384721',display_code:'384721#',updatedAt:{seconds:Date.now()/1000}};
   allMatchedReservations=[primaryRes];
   if(_sbState.multiRoom){
-    allMatchedReservations.push({...primaryRes,id:'MOCK002',roomCode:'6-1'});
+    const other=_sbState.elevator?'6-1':'0-3';
+    allMatchedReservations.push({...primaryRes,id:'MOCK002',roomCode:other});
   }
 }
 

@@ -910,16 +910,16 @@ THEN:
 
 | Difference vs Sandbox 1 | Why |
 |-------------------------|-----|
-| Compact greeting (24px name, less padding) | Door code should own the first viewport, not the guest name |
+| Compact greeting (24px name, less padding) | Codes + arrival path own the first viewport |
 | Waiting shows a **live countdown** to check-in (including days before) | Guests want time remaining, not a static date card |
 | Waiting copy: short “Available in” + one plain line | Dropped italic “They unlock…” and the messaging hint |
-| Door code is its **own large card** (52px) | P0 daily key; WiFi must not compete |
-| Elevator: **QR on top**, **6-digit code under** the QR (centered stack) | Matches real building pads; code is longer than 4 digits |
-| WiFi is a compact third card | Daily, but not arrival-critical |
-| Floor card has a dashed empty state | Door photo field doesn't exist yet — don't hide the section |
-| Walkthrough as **photo step cards** from `photos` + `photoCaptions` (4–6 steps, lightbox) | Real check-in instructions are detailed photo guides, not 3 text lines |
-| Multi-room: **full-width “Your apartment · tap to switch”** + bottom sheet | Guests could not find tiny room pills |
-| Tabs **under greeting**, larger 14px labels | Visible while Waiting; easier to tap before codes |
+| **Elevator first** (QR + 6-digit under, **no Copy**) | Building pad is typed; entrance is the arrival bottleneck |
+| Door + WiFi in **one slim card** (door not 52px hero) | Guests won’t scroll if door fills the fold; WiFi was too tall |
+| **“Don’t stop here ↓”** scroll cue into photo steps | Guests must notice walkthrough below the fold |
+| Floor/door photo **after** walkthrough | Secondary once path photos exist |
+| Walkthrough as **photo step cards** from `photos` + `photoCaptions` | Real check-in instructions are detailed photo guides |
+| Multi-room: **full-width switcher** + bottom sheet | Guests could not find tiny room pills |
+| Tabs **under greeting**, larger 14px labels | Visible while Waiting |
 
 Same tokens as §13 (white cards, ink CTA). This is a **layout proposal**, not a token fight.
 
