@@ -20,7 +20,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests beautifulsoup4 firebase-admin cryptography
+        run: pip install requests beautifulsoup4 "firebase-admin==6.9.0" cryptography
 
       - name: Run reservation sync
         env:

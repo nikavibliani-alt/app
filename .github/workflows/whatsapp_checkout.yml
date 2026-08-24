@@ -19,7 +19,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests firebase-admin
+        run: pip install requests "firebase-admin==6.9.0"
 
       - name: Run checkout reminder
         env:
