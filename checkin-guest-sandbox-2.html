@@ -1420,7 +1420,7 @@ window.setLang=function(l){
 function applyTranslations(){
   const map={
     't-welcome-sub':'checkinKicker','t-checkin-title':'checkinTitle','t-checkin-sub':'checkinSub',
-    't-nationality':'na','t-contact-title':'ct','t-contact-num':'phoneLabel',
+    't-nationality':'na','t-contact-title':'ct',
     't-passport-title':'pt','t-passport-hint':'ph','t-greeting-label':'gl',
     't-reg-hint':'searchInstructions','t-name-label':'fullName',
     't-waiting-label':'cl','t-waiting-sub':'waitingSub',
@@ -1437,6 +1437,8 @@ function applyTranslations(){
   Object.entries(map).forEach(([id,k])=>{const el=document.getElementById(id);if(el)el.textContent=t(k);});
   const arrEl=document.getElementById('t-arrival-date');
   if(arrEl)arrEl.innerHTML=t('arrivalDate')+' <span style="color:var(--red)">*</span>';
+  const contactLbl=document.getElementById('t-contact-num');
+  if(contactLbl)contactLbl.innerHTML=t('phoneLabel')+' <span style="color:var(--red)">*</span>';
   const nmEl=document.getElementById('r-name');if(nmEl)nmEl.placeholder=t('namePlaceholder');
   const arrPh=document.getElementById('r-arrival-display');if(arrPh)arrPh.placeholder=t('selectDate');
   if(_wybCat)_renderWybCard(_wybCat);
