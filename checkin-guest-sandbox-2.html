@@ -1802,10 +1802,12 @@ async function finishRegistration_(bestRes,formData){
   // Save to Firestore immediately with empty scan result placeholder; transition to home
   // For number-based bookings arrival is '' — fall back to reservation checkin date
   const arrivalDate=arrival||bestRes?.checkin||bestRes?.checkIn||'';
+  const checkoutDate=bestRes?.checkout||bestRes?.checkOut||'';
   const docId=`${aptId}_${arrivalDate||Date.now()}`;
   const data={aptId,name,nameRoman:bestRes?.guest||'',guests,nationality,contact,contactType:ct,passportUrl,
-    passportScanResult:{},arrivalDate,
-    matchedReservationId:bestRes?.id||null,manualUnlock:false,companionGuest:!!_companionGuest};
+    passportScanResult:{},arrivalDate,checkoutDate,
+    matchedReservationId:bestRes?.id||null,manualUnlock:false,companionGuest:!!_companionGuest,
+    linkedReservationNumber:_companionGuest?(String(_resParam||bestRes?.reservationNumber||'').trim()||null):null};
   const existing=await getDoc(doc(db,'checkin_guests',docId));
   if(existing.exists()){
     await setDoc(doc(db,'checkin_guests',docId),{...data,updatedAt:serverTimestamp()},{merge:true});
