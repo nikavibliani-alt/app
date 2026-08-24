@@ -407,7 +407,7 @@ That config work belongs in the admin track after guest sandbox IA is stable —
 |------------|--------|-------|-------|-------|
 | `docs-coord` | **active** | Cursor | `GUEST_CHECKIN_REDESIGN.md` | Decisions locked; sandbox plan |
 | `guest-sandbox-shell` | done (Phase 1) | Claude Code | `checkin-guest-sandbox.html` | Do not overwrite while comparing |
-| `guest-sandbox-2-design` | **active** | Cursor | `checkin-guest-sandbox-2.html` | 2026-08-24 — layout fixes: elev under QR (6-digit), photo walkthrough, apt sheet, tabs under greeting |
+| `guest-sandbox-2-design` | **active** | Cursor | `checkin-guest-sandbox-2.html` | 2026-08-24 — square multi-room tiles, Location/Parking split, companion link §17 |
 | `inline-checkin-access` | blocked on Phase 1 | — | sandbox | Door + elevator + tour |
 | `secondary-location-services` | blocked on Phase 1 | — | sandbox | Parking/location + shuttle + tours |
 | `guest-visual-design` | blocked on shell | — | sandbox CSS | Phase 4 |
@@ -459,6 +459,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-24 | Claude Code | **Color fix:** home-screen hero card was shipped dark/inverted (black background, white text, gold `#C4A882` CTA) — reverted to the correct system: white cards (`#FFFFFF`), dark text (`#2C2C2A`/`#8C8C8A`), dark-filled primary CTA (`#2C2C2A`/`#fff`), no gold anywhere as a background. Split "I've checked out" into its own lighter-bordered "destructive/confirm" style, distinct from the bold primary "I'm checked in". Fixed the same gold-background violation on the dev toolbar's active-state buttons. Added §13 Design Tokens & Rules to lock this down for future work. |
 | 2026-08-24 | Cursor | Sandbox 2 design proposal: `checkin-guest-sandbox-2.html` — compact greeting, date-or-countdown waiting, door-first stacked cards, large elevator QR, WiFi compact, door-photo empty state. Does not replace Claude sandbox 1. |
 | 2026-08-24 | Cursor | Sandbox 2 layout fixes: elevator QR stacked above 6-digit code; photo step walkthrough from `photos`/`photoCaptions`; multi-room full-width switcher + bottom sheet; tabs moved under greeting (above hero). |
+| 2026-08-24 | Cursor | Sandbox 2: square multi-room tiles; WiFi strip + Location/Parking split; removed photo peek & floor card; companion guest link §17; checked-in hint. |
 
 ---
 
@@ -914,14 +915,43 @@ THEN:
 | Waiting shows a **live countdown** to check-in (including days before) | Guests want time remaining, not a static date card |
 | Waiting copy: short “Available in” + one plain line | Dropped italic “They unlock…” and the messaging hint |
 | **Elevator first** (QR + 6-digit under, **no Copy**) | Building pad is typed; entrance is the arrival bottleneck |
-| Door + WiFi in **one slim card** (door not 52px hero) | Guests won’t scroll if door fills the fold; WiFi was too tall |
-| **“Don’t stop here ↓”** scroll cue into photo steps | Guests must notice walkthrough below the fold |
-| Floor/door photo **after** walkthrough | Secondary once path photos exist |
-| Walkthrough as **photo step cards** from `photos` + `photoCaptions` | Real check-in instructions are detailed photo guides |
-| Multi-room: **full-width switcher** + bottom sheet | Guests could not find tiny room pills |
-| Tabs **under greeting**, larger 14px labels | Visible while Waiting |
+| Door slim; **WiFi strip** + **Location | Parking** side-by-side | Unlocked: no Airport/Tours; parking opens new window (video) |
+| Multi-room **square tiles** (2–4 apartments) | Clear tap targets; no bottom sheet |
+| **Companion guest link** on home (`?res=&companion=1`, skip passport) | Every guest needs building QR; only lead uploads passport once |
+| **I'm checked in** with hint + subtle pulse | Guests should know to tap when inside |
+| Floor & door card **removed** from Sandbox 2 IA | Not needed on arriving screen |
+| Photo peek / scroll carousel **removed** | Walkthrough stays as scrollable step cards only |
+| Airport/Tours **only while Waiting** | After unlock, Location + Parking only |
 
 Same tokens as §13 (white cards, ink CTA). This is a **layout proposal**, not a token fight.
+
+---
+
+## 17. Companion guests + parking (locked product rule — 2026-08-24)
+
+**Problem:** Multi-guest bookings (families, groups) all need the **building elevator QR/code**. Only **one** guest should upload a passport (lead booker).
+
+**Rule:**
+- Lead guest: normal flow — register → house rules → **passport** → home.
+- **Companion guests:** share a link that opens the **same reservation** with **`companion=1`** — register → house rules → **skip passport** → home (QR + codes only).
+
+**Link format (Sandbox 2 prototype):**
+
+```
+https://app.maxelaapartments.com/checkin-guest-sandbox-2.html?res=BOOKING_REF&companion=1
+```
+
+`BOOKING_REF` = MiniHotel `reservationNumber` on the matched reservation (same value used for multi-room sibling lookup).
+
+**UI:** Unlocked home shows **“Copy link for other guests”** card (`#guest-invite-card`). Host/admin messaging should include this link when sending check-in instructions to groups.
+
+**Parking:** Location and Parking are **separate** buttons on unlocked home. **Parking** opens a **new browser tab** (`window.open`) — either `locationInfo[prop].parkingPageUrl` (external page) or `?view=parking&apt=ROOM` (built-in parking video page from `parkingMediaUrl`).
+
+**Admin config fields (existing / to add):**
+- `locationInfo[prop].parkingMediaUrl` — video/image (already in admin)
+- `locationInfo[prop].parkingPageUrl` — optional dedicated parking page URL (new, optional)
+
+**Cutover:** Port companion link + parking split to `checkin-guest-v2.html` with same URL params and Firestore flag `companionGuest: true`.
 
 ---
 

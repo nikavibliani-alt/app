@@ -466,10 +466,22 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 .apt-pill.active{background:#2C2C2A;border:none;color:#fff;}
 #multi-room-label{display:none;font-family:var(--sans);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.08em;margin-bottom:8px;}
 /* Sandbox 2 apartment switcher reuses #multi-room-label — must stay visible */
-#multi-room-label.apt-switch{
-  display:block;font-family:var(--sans);font-size:inherit;text-transform:none;
+#multi-room-label.apt-grid{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:8px;
+  font-family:var(--sans);font-size:inherit;text-transform:none;
   letter-spacing:normal;color:inherit;margin:10px 0 0;
 }
+#multi-room-label.apt-grid.cols-3{grid-template-columns:repeat(3,1fr);}
+#multi-room-label.apt-grid.cols-4{grid-template-columns:repeat(2,1fr);}
+.apt-tile{
+  aspect-ratio:1;max-height:84px;min-height:72px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;padding:8px;background:#fff;border:1.5px solid var(--line);
+  border-radius:14px;cursor:pointer;font-family:var(--sans);text-align:center;
+}
+.apt-tile.active{border-color:var(--ink);background:var(--bg);box-shadow:inset 0 0 0 1px var(--ink);}
+.apt-tile__room{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--ink);line-height:1;}
+.apt-tile__name{font-size:10px;color:var(--muted);line-height:1.2;padding:0 4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* Code boxes v2 */
 .v2-code-dark{background:#2C2C2A;color:#fff;padding:28px 24px;margin-bottom:8px;}
 .v2-code-dark .v2-code-label{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:10px;font-family:var(--mono);}
@@ -584,43 +596,8 @@ body{padding-bottom:72px;}
 .dk-access__door{font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:0.12em;color:var(--ink);line-height:1.1;}
 
 .dk-floor-text{font-size:15px;font-weight:600;color:var(--ink);}
-.dk-floor-photo{width:100%;border-radius:var(--rsm);margin-top:10px;display:none;object-fit:cover;max-height:140px;}
-.dk-photo-fallback{margin-top:10px;height:88px;border:1px dashed var(--line);border-radius:var(--rsm);display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;font-size:12px;color:var(--muted);background:var(--bg);}
+.hero-hidden-compat{display:none!important;}
 
-/* Scroll cue + clipped photo peek — instructions visible on first phone screen */
-.dk-scroll-cue{display:none;margin:2px 0 0;}
-#page-home.phase-arriving .dk-scroll-cue{display:block;}
-.dk-scroll-cue__btn{
-  width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;
-  text-align:left;padding:12px 14px;background:var(--ink);color:#fff;border:none;
-  border-radius:var(--r) var(--r) 0 0;cursor:pointer;font-family:var(--sans);
-}
-.dk-scroll-cue__kicker{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;opacity:0.7;margin-bottom:3px;}
-.dk-scroll-cue__title{font-size:14px;font-weight:600;line-height:1.25;}
-.dk-scroll-cue__chev{font-size:20px;line-height:1;opacity:0.9;animation:dkBounce 1.4s ease-in-out infinite;}
-@keyframes dkBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
-.wt-peek{
-  display:none;position:relative;height:96px;overflow:hidden;margin:0 0 12px;
-  border:1px solid var(--line);border-top:none;border-radius:0 0 var(--r) var(--r);
-  background:#fff;box-shadow:var(--shadow-card);cursor:pointer;
-}
-#page-home.phase-arriving .wt-peek.has-photo{display:block;}
-.wt-peek img{width:100%;height:140px;object-fit:cover;display:block;pointer-events:none;}
-.wt-peek__fade{
-  position:absolute;left:0;right:0;bottom:0;height:56px;
-  background:linear-gradient(to bottom,rgba(247,244,240,0),var(--bg));
-  pointer-events:none;
-}
-.wt-peek__badge{
-  position:absolute;left:12px;bottom:10px;z-index:1;
-  font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;
-  color:var(--ink);background:rgba(255,255,255,0.92);border:1px solid var(--line);
-  border-radius:999px;padding:5px 10px;font-weight:600;
-}
-
-/* Walkthrough — 4–6 photo steps with captions */
-.hero-walkthrough{display:none;margin:4px 0 12px;padding:0;border:none;box-shadow:none;background:transparent;}
-#page-home.phase-arriving .hero-walkthrough{display:block;}
 .wt-title{font-family:var(--sans);font-size:16px;font-weight:700;margin:4px 4px 12px;color:var(--ink);}
 .wt-list{display:flex;flex-direction:column;gap:14px;}
 .wt-card{background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow-card);}
@@ -632,38 +609,16 @@ body{padding-bottom:72px;}
 .wt-txt{font-size:14px;line-height:1.45;color:var(--ink);}
 .wt-empty{font-size:13px;color:var(--muted);padding:8px 4px;}
 
-/* Multi-room: clear current-apartment switcher (not tiny pills) */
-.apt-switch{margin-top:10px;}
-.apt-switch__btn{
-  width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;
-  text-align:left;padding:12px 14px;background:#fff;border:1.5px solid var(--ink);
-  border-radius:14px;cursor:pointer;font-family:var(--sans);
-}
-.apt-switch__kicker{font-family:var(--mono);font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
-.apt-switch__name{font-size:14px;font-weight:600;color:var(--ink);}
-.apt-switch__meta{font-size:12px;color:var(--muted);margin-top:2px;}
-.apt-switch__chev{font-size:18px;color:var(--ink);line-height:1;}
-.apt-sheet{position:fixed;inset:0;z-index:20000;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.35);}
-.apt-sheet.open{display:flex;}
-.apt-sheet__panel{width:min(100vw,390px);background:#fff;border-radius:20px 20px 0 0;padding:18px 16px 28px;max-height:70vh;overflow:auto;}
-.apt-sheet__title{font-family:var(--serif);font-style:italic;font-size:20px;margin-bottom:6px;}
-.apt-sheet__sub{font-size:13px;color:var(--muted);margin-bottom:14px;}
-.apt-sheet__opt{
-  width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:14px;border:1px solid var(--line);border-radius:14px;background:#fff;
-  margin-bottom:8px;cursor:pointer;font-family:var(--sans);text-align:left;
-}
-.apt-sheet__opt.is-current{border-color:var(--ink);background:var(--bg);}
-.apt-sheet__opt-name{font-size:14px;font-weight:600;color:var(--ink);}
-.apt-sheet__opt-meta{font-size:12px;color:var(--muted);margin-top:2px;}
-.apt-sheet__badge{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink);}
-.apt-sheet__close{width:100%;margin-top:8px;height:44px;border-radius:999px;border:1.5px solid var(--line);background:#fff;font-weight:600;cursor:pointer;}
+/* Multi-room square tiles — see #multi-room-label.apt-grid in v2 overrides */
 
 .hero-cta{display:none;margin:6px 0 8px;}
 #page-home.phase-arriving .hero-cta--arriving,
 #page-home.phase-staying .hero-cta--staying,
 #page-home.phase-leaving .hero-cta--leaving{display:block;}
+.hero-cta__hint{font-size:13px;color:var(--muted);text-align:center;line-height:1.45;margin:0 0 12px;padding:0 8px;}
 .hero-cta__btn{border-radius:var(--rxl);width:100%;background:#2C2C2A;color:#FFFFFF;font-weight:600;padding:16px;font-size:16px;border:none;cursor:pointer;font-family:var(--sans);}
+.hero-cta__btn--pulse{animation:ctaPulse 2s ease-in-out infinite;}
+@keyframes ctaPulse{0%,100%{box-shadow:0 0 0 0 rgba(44,44,42,0.25)}50%{box-shadow:0 0 0 8px rgba(44,44,42,0)}}
 .hero-cta__btn--confirm{background:#FFFFFF;color:#2C2C2A;border:1.5px solid var(--line);}
 .hero-cta__btn--secondary{background:#FFFFFF;color:#2C2C2A;border:1.5px solid #2C2C2A;padding:12px 24px;}
 .hero-cta__link{background:none;border:none;color:var(--ink-2);font-family:var(--sans);font-size:13px;text-decoration:underline;cursor:pointer;padding:8px 0;width:100%;}
@@ -671,27 +626,38 @@ body{padding-bottom:72px;}
 .hero-thankyou{display:none;text-align:center;padding:36px 20px;}
 .hero-thankyou.show{display:block;}
 
-/* Top tools: WiFi + Location when unlocked. Airport/Tours tabs only while Waiting */
-.home-top-tools{display:none;padding:0 16px 10px;gap:8px;flex-direction:column;}
-#page-home.phase-arriving .home-top-tools,
-#page-home.phase-staying .home-top-tools,
-#page-home.phase-leaving .home-top-tools{display:flex;}
-.home-wifi-chip,.home-loc-chip{
-  width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
-  text-align:left;padding:11px 14px;background:#fff;border:1px solid var(--line);
-  border-radius:14px;box-shadow:var(--shadow-card);font-family:var(--sans);
+/* Unlocked quick row: WiFi strip + Location | Parking */
+.home-quick{display:none;padding:0 16px 10px;flex-direction:column;gap:8px;}
+#page-home.phase-arriving .home-quick,
+#page-home.phase-staying .home-quick,
+#page-home.phase-leaving .home-quick{display:flex;}
+.home-wifi-strip{
+  display:flex;align-items:center;gap:8px;padding:8px 12px;
+  background:var(--bg);border:1px solid var(--line);border-radius:12px;
+  font-family:var(--mono);font-size:12px;color:var(--ink);
 }
-.home-wifi-chip__lbl,.home-loc-chip__lbl{
-  font-family:var(--mono);font-size:9.5px;letter-spacing:0.08em;text-transform:uppercase;
-  color:var(--muted);margin-bottom:2px;
+.home-wifi-strip__lbl{font-size:9.5px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);flex-shrink:0;}
+.home-wifi-strip__val{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+.home-wifi-strip__sep{color:var(--muted);margin:0 3px;}
+.home-wifi-strip .dk-copy{height:30px;padding:0 10px;font-size:10px;flex-shrink:0;}
+.home-loc-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.home-loc-btn{
+  display:flex;align-items:center;justify-content:center;
+  min-height:48px;padding:12px;background:#fff;border:1.5px solid var(--line);
+  border-radius:14px;font-family:var(--sans);font-size:14px;font-weight:600;
+  color:var(--ink);cursor:pointer;box-shadow:var(--shadow-card);
 }
-.home-wifi-chip__val{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink);word-break:break-word;}
-.home-wifi-chip__sep{color:var(--muted);margin:0 4px;font-weight:500;}
-.home-loc-chip{cursor:pointer;border:1.5px solid var(--ink);}
-.home-loc-chip__title{font-size:14px;font-weight:600;color:var(--ink);}
-.home-loc-chip__chev{font-size:18px;color:var(--ink);line-height:1;}
-.home-loc-panel{display:none;padding:10px 4px 2px;font-size:14px;color:var(--ink-2);line-height:1.55;}
-.home-loc-panel.open{display:block;}
+.home-loc-btn--park{border-color:var(--ink);}
+
+.guest-invite{display:none;margin:12px 0 4px;padding:14px 16px;background:#fff;border:1px dashed var(--line);border-radius:14px;}
+#page-home.phase-arriving .guest-invite,
+#page-home.phase-staying .guest-invite{display:block;}
+.guest-invite__title{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px;line-height:1.3;}
+.guest-invite__sub{font-size:12px;color:var(--muted);line-height:1.45;margin-bottom:10px;}
+.guest-invite__btn{
+  width:100%;height:40px;border:1.5px solid var(--ink);border-radius:999px;
+  background:#fff;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;
+}
 
 .home-tabs{padding:4px 16px 14px;}
 .home-tabs--top{margin-bottom:2px;}
@@ -976,26 +942,16 @@ body{padding-bottom:72px;}
       </div>
     </div>
 
-    <!-- Unlocked: WiFi + Location up top. Waiting keeps full Location/Airport/Tours tabs -->
-    <div class="home-top-tools" id="home-top-tools">
-      <div class="home-wifi-chip" id="home-wifi-chip">
-        <div>
-          <div class="home-wifi-chip__lbl">WiFi</div>
-          <div class="home-wifi-chip__val">
-            <span id="hero-wifi-name">—</span><span class="home-wifi-chip__sep">·</span><span id="hero-wifi-pass">—</span>
-          </div>
-        </div>
+    <!-- Unlocked: WiFi strip + Location | Parking. Waiting keeps Airport/Tours tabs -->
+    <div class="home-quick" id="home-quick">
+      <div class="home-wifi-strip">
+        <span class="home-wifi-strip__lbl">WiFi</span>
+        <span class="home-wifi-strip__val"><span id="hero-wifi-name">—</span><span class="home-wifi-strip__sep">·</span><span id="hero-wifi-pass">—</span></span>
         <button class="dk-copy" onclick="window.copySth(document.getElementById('hero-wifi-pass').textContent,this)"><span>Copy</span></button>
       </div>
-      <button type="button" class="home-loc-chip" id="home-loc-chip" onclick="window.toggleHomeLocation()">
-        <span>
-          <div class="home-loc-chip__lbl">Nearby</div>
-          <div class="home-loc-chip__title">Location &amp; parking</div>
-        </span>
-        <span class="home-loc-chip__chev" aria-hidden="true">›</span>
-      </button>
-      <div class="home-loc-panel" id="home-loc-panel">
-        <span class="tab-empty">Address, maps and parking — coming in Phase 3</span>
+      <div class="home-loc-row">
+        <button type="button" class="home-loc-btn" onclick="window.openPage('location')">Location</button>
+        <button type="button" class="home-loc-btn home-loc-btn--park" onclick="window.openParkingWindow()">Parking</button>
       </div>
     </div>
 
@@ -1056,35 +1012,26 @@ body{padding-bottom:72px;}
           </div>
         </div>
 
-        <div class="dk-scroll-cue" id="dk-scroll-cue">
-          <button type="button" class="dk-scroll-cue__btn" onclick="window.scrollToArrivalSteps()">
-            <span>
-              <div class="dk-scroll-cue__kicker">Check-in instructions</div>
-              <div class="dk-scroll-cue__title" id="dk-scroll-cue-title">Scroll for photo steps — street to your door</div>
-            </span>
-            <span class="dk-scroll-cue__chev" aria-hidden="true">↓</span>
-          </button>
-        </div>
-        <div class="wt-peek" id="wt-peek" onclick="window.scrollToArrivalSteps()">
-          <img id="wt-peek-img" alt="">
-          <div class="wt-peek__fade"></div>
-          <div class="wt-peek__badge" id="wt-peek-badge">Photo steps below</div>
-        </div>
-
         <div class="hero-walkthrough" id="hero-walkthrough">
           <div class="wt-title">How to arrive</div>
           <div class="wt-list" id="hero-walkthrough-list"></div>
         </div>
 
-        <div class="dk-card">
-          <div class="dk-label">Floor &amp; door</div>
-          <div class="dk-floor-text" id="hero-floor-info">—</div>
-          <img class="dk-floor-photo" id="hero-door-photo" alt="Apartment door">
-          <div class="dk-photo-fallback" id="hero-door-photo-fallback">Apartment door photo will show here</div>
+        <div class="guest-invite" id="guest-invite-card">
+          <div class="guest-invite__title">Other guests need the building QR too</div>
+          <div class="guest-invite__sub">Share this link — they skip passport upload and go straight to your reservation.</div>
+          <button type="button" class="guest-invite__btn" onclick="window.copyCompanionLink(this)">Copy link for other guests</button>
+        </div>
+
+        <div class="hero-hidden-compat" aria-hidden="true">
+          <span id="hero-floor-info">—</span>
+          <img id="hero-door-photo" alt="">
+          <div id="hero-door-photo-fallback"></div>
         </div>
 
         <div class="hero-cta hero-cta--arriving">
-          <button class="hero-cta__btn" id="btn-checked-in" onclick="window.guestCheckedIn()">I'm checked in</button>
+          <p class="hero-cta__hint">When you're inside the apartment, tap below so we know you've arrived.</p>
+          <button class="hero-cta__btn hero-cta__btn--pulse" id="btn-checked-in" onclick="window.guestCheckedIn()">I'm checked in</button>
         </div>
         <div class="hero-cta hero-cta--staying" style="text-align:center;">
           <button class="hero-cta__link" id="btn-show-walkthrough" onclick="window.toggleArrivalInstructions()">Show arrival instructions</button>
@@ -1106,16 +1053,6 @@ body{padding-bottom:72px;}
 
     <!-- kept for JS compat (renderTiles()/_renderTilesNow() writes here; retired tile menu, not shown) -->
     <div class="tiles" id="tiles-grid" style="display:none;"></div>
-
-    <!-- Multi-room apartment switcher sheet -->
-    <div class="apt-sheet" id="apt-sheet" onclick="if(event.target===this)window.closeAptSheet()">
-      <div class="apt-sheet__panel" role="dialog" aria-labelledby="apt-sheet-title">
-        <div class="apt-sheet__title" id="apt-sheet-title">Your apartments</div>
-        <div class="apt-sheet__sub">Choose which apartment to view codes and instructions for</div>
-        <div id="apt-sheet-options"></div>
-        <button type="button" class="apt-sheet__close" onclick="window.closeAptSheet()">Close</button>
-      </div>
-    </div>
 
     <div class="foot">
       <div class="lang-switcher">
@@ -1154,6 +1091,12 @@ body{padding-bottom:72px;}
     <div class="subpage-body" id="pg-body-location"></div>
   </div>
 
+</div>
+
+<div id="parking-only-view" style="display:none;min-height:100vh;padding:24px 20px 40px;background:var(--bg);max-width:560px;margin:0 auto;">
+  <h1 style="font-family:var(--serif);font-size:22px;margin-bottom:8px;color:var(--ink);">Parking guide</h1>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Video and directions for finding parking</p>
+  <div id="parking-only-body"></div>
 </div>
 
 <div id="subpages"></div>
@@ -1622,52 +1565,66 @@ function renderGreetingApt(){
   const el=document.getElementById('apt-area');
   if(!el)return;
   const aptName=APT_NAMES[aptId]||aptId;
-  const roomCode=aptId||'';
   if(!allMatchedReservations||allMatchedReservations.length<=1){
     el.innerHTML='<div style="font-size:13px;color:var(--muted);margin-top:6px;"><b id="home-apt-name" style="color:var(--ink);font-weight:500;">'+esc(aptName)+'</b> · Maxela · Tbilisi</div>';
     return;
   }
-  // Multi-room: full-width switcher (not tiny pills) — guests always see "current apartment" + Switch
-  el.innerHTML=
-    '<div class="apt-switch" id="multi-room-label">'+
-      '<button type="button" class="apt-switch__btn" onclick="window.openAptSheet()" aria-haspopup="dialog">'+
-        '<span>'+
-          '<div class="apt-switch__kicker">Your apartment · tap to switch</div>'+
-          '<div class="apt-switch__name" id="home-apt-name">'+esc(aptName)+'</div>'+
-          '<div class="apt-switch__meta">Room '+esc(roomCode)+' · Maxela · Tbilisi</div>'+
-        '</span>'+
-        '<span class="apt-switch__chev" aria-hidden="true">›</span>'+
-      '</button>'+
-    '</div>';
-}
-
-window.openAptSheet=function(){
-  const sheet=document.getElementById('apt-sheet');
-  const opts=document.getElementById('apt-sheet-options');
-  if(!sheet||!opts||!allMatchedReservations||allMatchedReservations.length<=1)return;
-  opts.innerHTML=allMatchedReservations.map(res=>{
+  const n=allMatchedReservations.length;
+  const gridCls='apt-grid'+(n>=4?' cols-4':n===3?' cols-3':'');
+  let html='<div id="multi-room-label" class="'+gridCls+'">';
+  for(const res of allMatchedReservations){
     const room=res.roomCode||'';
     const name=APT_NAMES[room]||room;
-    const current=room===aptId;
-    return '<button type="button" class="apt-sheet__opt'+(current?' is-current':'')+'" data-room="'+esc(room)+'">'+
-      '<span><div class="apt-sheet__opt-name">'+esc(name)+'</div>'+
-      '<div class="apt-sheet__opt-meta">Room '+esc(room)+'</div></span>'+
-      (current?'<span class="apt-sheet__badge">Current</span>':'<span class="apt-sheet__chev" aria-hidden="true">›</span>')+
+    const active=room===aptId;
+    html+='<button type="button" class="apt-tile'+(active?' active':'')+'" data-room="'+esc(room)+'">'+
+      '<span class="apt-tile__room">'+esc(room)+'</span>'+
+      '<span class="apt-tile__name">'+esc(name)+'</span>'+
     '</button>';
-  }).join('');
-  opts.querySelectorAll('.apt-sheet__opt[data-room]').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      window.closeAptSheet();
-      window.switchApt(btn.dataset.room);
-    });
+  }
+  html+='</div>';
+  el.innerHTML=html;
+  el.querySelectorAll('.apt-tile[data-room]').forEach(btn=>{
+    btn.addEventListener('click',()=>window.switchApt(btn.dataset.room));
   });
-  sheet.classList.add('open');
+}
+
+let _companionGuest=params.get('companion')==='1';
+const _resParam=(params.get('res')||'').trim();
+
+async function _getHomeLocData(){
+  const cfg=await getFullCfg();
+  const prop=aptPropTypeForConfig();
+  const locDefaults={ROOMS:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},MAXELA:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},BIG_APT:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},FREEDOM:{address:'Galaktion Tabidze St. 3/5, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},ORBELIANI:{address:'Atoneli St. 9, Tbilisi',parkingEnabled:false,parkingDesc:''}};
+  return{...(locDefaults[prop]||{}),...((cfg.locationInfo||{})[prop]||{})};
+}
+
+window.openParkingWindow=async function(){
+  try{
+    const locData=await _getHomeLocData();
+    const pageUrl=locData.parkingPageUrl;
+    if(pageUrl){window.open(pageUrl,'_blank','noopener');return;}
+    const apt=encodeURIComponent(aptId||'');
+    window.open(window.location.pathname+'?view=parking&apt='+apt,'_blank','noopener');
+  }catch(e){
+    window.open(window.location.pathname+'?view=parking','_blank','noopener');
+  }
 };
 
-window.closeAptSheet=function(){
-  document.getElementById('apt-sheet')?.classList.remove('open');
+window.buildCompanionLink=function(){
+  const rn=String(activeReservation?.reservationNumber||'').trim();
+  const base=window.location.origin+window.location.pathname;
+  if(!rn)return base+'?companion=1';
+  return base+'?res='+encodeURIComponent(rn)+'&companion=1';
 };
 
+window.copyCompanionLink=async function(btn){
+  const url=window.buildCompanionLink();
+  try{
+    await navigator.clipboard.writeText(url);
+    if(btn){const t=btn.textContent;btn.textContent='Link copied!';setTimeout(()=>{btn.textContent=t;},2000);}
+    else toast('Link copied!');
+  }catch(e){toast(url);}
+};
 window.switchApt=async function(newRoomCode){
   console.log('Switching to:', newRoomCode);
   if(newRoomCode===aptId)return;
@@ -1749,21 +1706,27 @@ async function finishRegistration_(bestRes,formData){
     document.getElementById('home-apt-name').textContent=APT_NAMES[aptId]||aptId;
   }
   // Fire scan async — don't block page transition
-  const scanPromise=(passportFile&&!passportScanResult)?scanPassport(passportFile):Promise.resolve();
-  // Upload with 30s timeout
-  const uploadWithTimeout=new Promise(async(resolve,reject)=>{
-    const timer=setTimeout(()=>reject(new Error('Upload timed out after 30 seconds')),30000);
-    try{const url=await uploadToFirebaseStorage(passportFile);clearTimeout(timer);resolve(url);}
-    catch(e){clearTimeout(timer);reject(e);}
-  });
-  const passportUrl=await uploadWithTimeout;
+  const scanPromise=(passportFile&&!passportScanResult&&!_companionGuest)?scanPassport(passportFile):Promise.resolve();
+  let passportUrl='';
+  if(_companionGuest){
+    passportUrl='';
+  }else if(passportFile){
+    const uploadWithTimeout=new Promise(async(resolve,reject)=>{
+      const timer=setTimeout(()=>reject(new Error('Upload timed out after 30 seconds')),30000);
+      try{const url=await uploadToFirebaseStorage(passportFile);clearTimeout(timer);resolve(url);}
+      catch(e){clearTimeout(timer);reject(e);}
+    });
+    passportUrl=await uploadWithTimeout;
+  }else{
+    throw new Error('Passport required');
+  }
   // Save to Firestore immediately with empty scan result placeholder; transition to home
   // For number-based bookings arrival is '' — fall back to reservation checkin date
   const arrivalDate=arrival||bestRes?.checkin||bestRes?.checkIn||'';
   const docId=`${aptId}_${arrivalDate||Date.now()}`;
   const data={aptId,name,nameRoman:bestRes?.guest||'',guests,nationality,contact,contactType:ct,passportUrl,
     passportScanResult:{},arrivalDate,
-    matchedReservationId:bestRes?.id||null,manualUnlock:false};
+    matchedReservationId:bestRes?.id||null,manualUnlock:false,companionGuest:!!_companionGuest};
   const existing=await getDoc(doc(db,'checkin_guests',docId));
   if(existing.exists()){
     await setDoc(doc(db,'checkin_guests',docId),{...data,updatedAt:serverTimestamp()},{merge:true});
@@ -1953,6 +1916,13 @@ window.searchReservation=async function(){
 
 window.proceedFromRules=function(){
   if(!(_rules.noise&&_rules.smoke&&_rules.care))return;
+  if(_companionGuest&&_pendingMatches?.[0]){
+    finishRegistration_(_pendingMatches[0].res,_pendingReg).catch(e=>{
+      console.error('[companion]',e);
+      toast('Could not complete check-in — try again');
+    });
+    return;
+  }
   _showPage('page-passport');
 };
 
@@ -3145,7 +3115,50 @@ async function loadGuestDataWithRetry(guestId,retries=3){
   return{data:null,found:null}; // null = network failure (unknown)
 }
 
+async function showParkingOnlyView(){
+  document.getElementById('loading').style.display='none';
+  document.getElementById('app').style.display='none';
+  const pv=document.getElementById('parking-only-view');
+  if(pv)pv.style.display='block';
+  const aptQ=params.get('apt')||'';
+  if(aptQ)aptId=aptQ;
+  try{
+    const locData=await _getHomeLocData();
+    const _pm=locData.parkingMediaUrl||'';
+    let media='';
+    if(_pm){
+      if(/\.(mp4|mov|webm|avi)$/i.test(_pm)||_pm.includes('/video/'))
+        media='<video controls playsinline style="width:100%;border-radius:12px;margin-top:8px;" src="'+esc(_pm)+'"></video>';
+      else media='<img src="'+esc(_pm)+'" style="width:100%;border-radius:12px;margin-top:8px;object-fit:cover;">';
+    }
+    const body=document.getElementById('parking-only-body');
+    if(body)body.innerHTML='<p style="font-size:14px;color:var(--ink);line-height:1.55;margin-bottom:12px;">'+esc(locData.parkingDesc||'Paid parking available nearby')+'</p>'+media+
+      (locData.parkingMapsUrl?'<a href="'+esc(locData.parkingMapsUrl)+'" target="_blank" rel="noopener" class="loc-parking-btn" style="margin-top:16px;display:flex;">Open parking in Maps</a>':'');
+  }catch(e){
+    const body=document.getElementById('parking-only-body');
+    if(body)body.innerHTML='<p style="color:var(--muted);">Parking guide will be available soon.</p>';
+  }
+}
+
+function _showCompanionBanner(){
+  if(!_companionGuest)return;
+  const reg=document.getElementById('page-register');
+  if(!reg||document.getElementById('companion-banner'))return;
+  const b=document.createElement('div');
+  b.id='companion-banner';
+  b.style.cssText='margin:0 16px 12px;padding:12px 14px;background:#eef6f0;border:1px solid #86efac;border-radius:12px;font-size:13px;line-height:1.45;color:var(--ink);';
+  b.textContent='Companion guest link — enter your details and accept house rules. No passport upload needed; you go straight to the building QR and codes.';
+  const anchor=reg.querySelector('.reg-top')||reg.firstChild;
+  if(anchor&&anchor.parentNode)anchor.parentNode.insertBefore(b,anchor.nextSibling);
+  else reg.prepend(b);
+}
+
 async function init(){
+  if(params.get('view')==='parking'){
+    await showParkingOnlyView();
+    return;
+  }
+  if(_companionGuest)_showCompanionBanner();
   // ── Admin preview mode ────────────────────────────────────────────────
   if(params.get('preview')==='true'){
     const previewApt=params.get('apt')||'';
@@ -3445,6 +3458,11 @@ function _renderHeroContent(){
     const co=guestData?.checkoutDate||activeReservation?.checkout||activeReservation?.checkOut||'';
     coLbl.textContent=co?('Checkout today · '+co):'Checkout today';
   }
+  const invite=document.getElementById('guest-invite-card');
+  if(invite){
+    const rn=String(activeReservation?.reservationNumber||'').trim();
+    invite.style.display=rn?'':'none';
+  }
 }
 
 // Photo step cards from checkin_apartments.photos + photoCaptions (same shape as checkin-details.html)
@@ -3457,9 +3475,6 @@ function _renderWalkthrough(){
     list.innerHTML='<div class="wt-empty">Arrival photos will appear here once set for this apartment.</div>';
     window._lbPhotos=[];
     window._lbCaps=[];
-    const cueEmpty=document.getElementById('dk-scroll-cue');
-    if(cueEmpty)cueEmpty.style.display='none';
-    document.getElementById('wt-peek')?.classList.remove('has-photo');
     return;
   }
   window._lbPhotos=photos;
@@ -3477,20 +3492,6 @@ function _renderWalkthrough(){
       '</div>'+
     '</div>';
   }).join('');
-  const cue=document.getElementById('dk-scroll-cue');
-  if(cue)cue.style.display='';
-  const cueTitle=document.getElementById('dk-scroll-cue-title');
-  if(cueTitle)cueTitle.textContent=photos.length+' photo steps — street to your door';
-  const peek=document.getElementById('wt-peek');
-  const peekImg=document.getElementById('wt-peek-img');
-  const peekBadge=document.getElementById('wt-peek-badge');
-  if(peek&&peekImg&&photos[0]){
-    peekImg.src=photos[0];
-    peek.classList.add('has-photo');
-    if(peekBadge)peekBadge.textContent=photos.length+' photo steps below';
-  }else{
-    peek?.classList.remove('has-photo');
-  }
 }
 
 window.scrollToArrivalSteps=function(){
@@ -3498,15 +3499,6 @@ window.scrollToArrivalSteps=function(){
   if(!el)return;
   el.style.display='block';
   el.scrollIntoView({behavior:'smooth',block:'start'});
-};
-
-window.toggleHomeLocation=function(){
-  const panel=document.getElementById('home-loc-panel');
-  const chip=document.getElementById('home-loc-chip');
-  if(!panel)return;
-  const open=panel.classList.toggle('open');
-  const chev=chip?.querySelector('.home-loc-chip__chev');
-  if(chev)chev.textContent=open?'˄':'›';
 };
 
 let _countdownTimer=null;
@@ -3633,7 +3625,7 @@ function _sbBuildMocks(phase){
 
   const primaryRes={
     id:'MOCK001',roomCode:aptId,checkin,checkIn:checkin,checkout,checkOut:checkout,
-    tuyaPassword:'1234#',guest:'Latifa Al Mansoori',status:'CONFIRMED'
+    tuyaPassword:'1234#',guest:'Latifa Al Mansoori',status:'CONFIRMED',reservationNumber:'MOCK12345'
   };
 
   activeReservation=primaryRes;
@@ -3677,6 +3669,7 @@ function _sbBuildMocks(phase){
   if(_sbState.multiRoom){
     const other=_sbState.elevator?'6-1':'0-3';
     allMatchedReservations.push({...primaryRes,id:'MOCK002',roomCode:other});
+    allMatchedReservations.push({...primaryRes,id:'MOCK003',roomCode:_sbState.elevator?'6-4':'0-5'});
   }
 }
 
