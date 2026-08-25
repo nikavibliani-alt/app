@@ -291,8 +291,8 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 .rule-cb svg{display:none;}
 .rule-item.checked .rule-cb svg{display:block;}
 .rule-em{font-size:20px;flex:none;}
-.rule-icon{width:22px;height:22px;flex:none;color:var(--muted);margin-top:1px;display:flex;align-items:center;justify-content:center;}
-.rule-icon svg{width:20px;height:20px;}
+.rule-icon{width:22px;height:22px;flex:none;color:var(--muted);margin-top:2px;display:flex;align-items:center;justify-content:center;align-self:flex-start;}
+.rule-icon svg{width:20px;height:20px;display:block;}
 .rule-item.smoking .rule-icon{color:var(--red);}
 .checkin-time-hint{font-size:12px;color:var(--muted);line-height:1.4;margin:-2px 0 2px;}
 .checkin-time-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:2px;}
@@ -703,8 +703,25 @@ body{padding-bottom:72px;}
   color:var(--ink);cursor:pointer;box-shadow:var(--shadow-card);
 }
 .home-loc-btn--park{border-color:var(--ink);}
+.home-svc-area{display:none;}
+#page-home.phase-staying .home-loc-row{display:none;}
+#page-home.phase-staying .home-svc-area{display:block;}
+.home-svc-scroll{
+  display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;padding:2px 0 4px;scrollbar-width:none;
+}
+.home-svc-scroll::-webkit-scrollbar{display:none;}
+.home-svc-chip{
+  flex:none;display:inline-flex;align-items:center;gap:7px;scroll-snap-align:start;
+  min-height:44px;padding:0 14px;background:#fff;border:1.5px solid var(--line);
+  border-radius:999px;font-family:var(--sans);font-size:13px;font-weight:600;
+  color:var(--ink);cursor:pointer;white-space:nowrap;box-shadow:var(--shadow-card);
+}
+.home-svc-chip svg{width:15px;height:15px;flex-shrink:0;color:var(--muted);stroke:currentColor;fill:none;}
+.home-svc-chip--all{border-color:#2C2C2A;background:#2C2C2A;color:#fff;}
+.home-svc-chip--all svg{color:#fff;opacity:0.85;}
 
-.guest-invite{display:none;margin:12px 0 4px;padding:14px 16px;background:#fff;border:1px dashed var(--line);border-radius:14px;}
+.guest-invite{display:none;margin:10px 0 0;padding:14px 16px;background:#fff;border:1px dashed var(--line);border-radius:14px;}
 #page-home.phase-arriving .guest-invite,
 #page-home.phase-staying .guest-invite{display:block;}
 
@@ -891,7 +908,7 @@ body{padding-bottom:72px;}
       </div>
       <div class="rule-item smoking" id="rule-smoke" onclick="window.toggleRule('smoke')">
         <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <div class="rule-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M7.5 16.5h7"/><path d="M14.5 16.5v-2.5c.8-.8 1.5-1.6 1.5-2.8 0-.5-.2-1-.5-1.3"/><path d="M8 8l8 8"/></svg></div>
+        <div class="rule-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M7.5 16.5h5"/><path d="M12.5 16.5v-2.2c.7-.7 1.3-1.3 1.3-2.3 0-.4-.2-.8-.5-1"/><path d="M8.5 8.5l7 7"/></svg></div>
         <div class="rule-body">
           <div class="rule-title" id="t-rule-smoke-title">No smoking inside the apartment</div>
           <div class="rule-sub" id="t-rule-smoke-sub">Strictly prohibited indoors. Fine applies.</div>
@@ -989,10 +1006,11 @@ body{padding-bottom:72px;}
 
     <!-- Unlocked: Location | Parking. Waiting uses tabs below countdown -->
     <div class="home-quick" id="home-quick">
-      <div class="home-loc-row">
+      <div class="home-loc-row" id="home-loc-row">
         <button type="button" class="home-loc-btn" id="t-btn-location" onclick="window.openPage('location')">Location</button>
         <button type="button" class="home-loc-btn home-loc-btn--park" id="t-btn-parking" onclick="window.openParkingWindow()">Parking</button>
       </div>
+      <div class="home-svc-area" id="home-svc-area"></div>
     </div>
 
     <!-- HERO — 4 phases, one shown at a time via #page-home.phase-* -->
@@ -1057,6 +1075,12 @@ body{padding-bottom:72px;}
           </div>
         </div>
 
+        <div class="guest-invite" id="guest-invite-card">
+          <div class="guest-invite__title" id="t-invite-title">Share access with your group</div>
+          <div class="guest-invite__sub" id="t-invite-sub">Other people in your booking can open a short form — same QR and codes, no passport check.</div>
+          <button type="button" class="guest-invite__btn" id="t-invite-btn" onclick="window.openCompanionForm()">Open link for group members</button>
+        </div>
+
         <div class="hero-walkthrough" id="hero-walkthrough">
           <div class="wt-door-lbl" id="t-wt-door-lbl">Your apartment door</div>
           <div class="wt-title" id="t-wt-title">How to arrive</div>
@@ -1069,12 +1093,6 @@ body{padding-bottom:72px;}
             <span class="home-wifi-strip__val"><span id="hero-wifi-name">—</span><span class="home-wifi-strip__sep">·</span><span id="hero-wifi-pass">—</span></span>
             <button class="dk-copy" onclick="window.copySth(document.getElementById('hero-wifi-pass').textContent,this)"><span id="t-wifi-copy">Copy</span></button>
           </div>
-        </div>
-
-        <div class="guest-invite" id="guest-invite-card">
-          <div class="guest-invite__title" id="t-invite-title">Share access with your group</div>
-          <div class="guest-invite__sub" id="t-invite-sub">Other people in your booking can open a short form — same QR and codes, no passport check.</div>
-          <button type="button" class="guest-invite__btn" id="t-invite-btn" onclick="window.openCompanionForm()">Open link for group members</button>
         </div>
 
         <div class="hero-hidden-compat" aria-hidden="true">
@@ -1243,21 +1261,36 @@ let _pendingMatches=[];
 let allMatchedReservations=[];
 
 function _showPage(pageId){
-  if(pageId!=='page-home')_homeScrollNudged=false;
+  if(pageId!=='page-home'){_homeScrollNudged=false;_homeScrollPhase='';}
   document.querySelectorAll('#app .page').forEach(p=>p.classList.remove('active'));
   const pg=document.getElementById(pageId);
   if(pg){pg.classList.add('active');window.scrollTo(0,0);}
 }
 
 let _homeScrollNudged=false;
+let _homeScrollPhase='';
 function _nudgeHomeScroll(){
-  if(_homeScrollNudged)return;
   const home=document.getElementById('page-home');
   if(!home||!home.classList.contains('active'))return;
+  const phase=_homePhase();
+  if(_homeScrollPhase===phase)return;
+  _homeScrollPhase=phase;
   _homeScrollNudged=true;
   requestAnimationFrame(()=>{
     requestAnimationFrame(()=>{
-      window.scrollTo({top:68,behavior:'smooth'});
+      const elev=document.getElementById('hero-elevator');
+      const elevVisible=elev&&elev.style.display!=='none'&&elev.offsetParent!==null;
+      if((phase==='arriving'||phase==='staying'||phase==='leaving')&&elevVisible){
+        const quick=document.getElementById('home-quick');
+        const greeting=document.querySelector('#page-home .greeting');
+        const peek=(quick&&quick.offsetHeight?quick.offsetHeight:0)+(greeting?greeting.offsetHeight:0)+12;
+        const top=Math.max(0,elev.offsetTop-peek);
+        window.scrollTo({top,behavior:'smooth'});
+        return;
+      }
+      if(phase==='waiting'){
+        window.scrollTo({top:68,behavior:'smooth'});
+      }
     });
   });
 }
@@ -1370,6 +1403,21 @@ function _checkInHourStart(){
   return getCheckInHour();
 }
 
+function _slotBefore15(){
+  return {value:'before-15',label:t('checkinTimeBefore15'),kind:'wide',warn:true};
+}
+function _slotLateNight(){
+  return {value:'00:00+',label:t('checkinTimeLateNight'),kind:'wide'};
+}
+function _slotNextMorning(){
+  return {value:'next-morning',label:t('checkinTimeNextMorning'),kind:'wide'};
+}
+function _slotHours(from,to){
+  const out=[];
+  for(let h=from;h<=to;h++)out.push({value:fmtHourLabel(h),label:fmtHourLabel(h),kind:'hour'});
+  return out;
+}
+
 /** Build available arrival slots from Tbilisi clock + selected check-in date. */
 function getCheckinTimeSlots(arrivalDate){
   const ci=_checkInHourStart(); // usually 15
@@ -1381,25 +1429,24 @@ function getCheckinTimeSlots(arrivalDate){
     return {slots:[],hide:true,mode:'no-date'};
   }
   if(arrivalDate>today){
-    for(let h=ci;h<=23;h++)slots.push({value:fmtHourLabel(h),label:fmtHourLabel(h),kind:'hour'});
-    slots.push({value:'00:00+',label:t('checkinTimeLateNight'),kind:'wide'});
-    slots.push({value:'next-morning',label:t('checkinTimeNextMorning'),kind:'wide'});
-    slots.push({value:'before-15',label:t('checkinTimeBefore15'),kind:'wide',warn:true});
+    slots.push(_slotBefore15());
+    slots.push(..._slotHours(ci,23));
+    slots.push(_slotLateNight());
+    slots.push(_slotNextMorning());
     return {slots,hide:false,mode:'future'};
   }
   if(arrivalDate<today){
-    // Past date — still allow picking for edge cases, but no early option
-    for(let h=ci;h<=23;h++)slots.push({value:fmtHourLabel(h),label:fmtHourLabel(h),kind:'hour'});
-    slots.push({value:'00:00+',label:t('checkinTimeLateNight'),kind:'wide'});
-    slots.push({value:'next-morning',label:t('checkinTimeNextMorning'),kind:'wide'});
+    slots.push(..._slotHours(ci,23));
+    slots.push(_slotLateNight());
+    slots.push(_slotNextMorning());
     return {slots,hide:false,mode:'past'};
   }
   // arrivalDate === today (Tbilisi)
   if(hour<ci){
-    for(let h=ci;h<=23;h++)slots.push({value:fmtHourLabel(h),label:fmtHourLabel(h),kind:'hour'});
-    slots.push({value:'00:00+',label:t('checkinTimeLateNight'),kind:'wide'});
-    slots.push({value:'next-morning',label:t('checkinTimeNextMorning'),kind:'wide'});
-    slots.push({value:'before-15',label:t('checkinTimeBefore15'),kind:'wide',warn:true});
+    slots.push(_slotBefore15());
+    slots.push(..._slotHours(ci,23));
+    slots.push(_slotLateNight());
+    slots.push(_slotNextMorning());
     return {slots,hide:false,mode:'today-before'};
   }
   // Today, at/after check-in hour — drop past hours; keep current hour if still in that hour
@@ -1641,6 +1688,7 @@ function applyTranslations(){
   const ppt=document.getElementById('t-passport-page-title');if(ppt)ppt.textContent=t('passportPageTitle');
   const pps=document.getElementById('t-passport-page-sub');if(pps)pps.textContent=t('passportPageSub');
   const ppr=document.getElementById('t-passport-required');if(ppr)ppr.textContent=t('passportRequired');
+  _renderHomeQuick();
   if(_wybCat)_renderWybCard(_wybCat);
 }
 
@@ -2632,6 +2680,95 @@ async function getFullCfg(){
   return guestFullCfg;
 }
 
+async function _ensureServicesConfigLoaded(){
+  if(_laundryLoaded)return;
+  try{
+    const cfgSnap=await getDoc(doc(db,'checkin_admin','config'));
+    const cfgData=cfgSnap.exists()?cfgSnap.data():{};
+    if(cfgData.laundryItems&&cfgData.laundryItems.length)laundryItems=cfgData.laundryItems;
+    if(cfgData.visibility&&!guestCfgVisibility)guestCfgVisibility=cfgData.visibility;
+    if(cfgData.services)guestSvcs=cfgData.services;
+    _laundryLoaded=true;
+  }catch(e){}
+}
+
+function _serviceIcons(){
+  const s=' fill="none" stroke="currentColor"';
+  return {
+    cleaning:`<svg viewBox="0 0 24 24"${s} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22v-4l9-9"/><path d="m15 3-3 3 5 5 3-3a2 2 0 0 0 0-2.83L17.83 3a2 2 0 0 0-2.83 0z"/><path d="M6 18H3"/></svg>`,
+    laundry:`<svg viewBox="0 0 24 24"${s} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><circle cx="12" cy="13" r="4"/><line x1="6" y1="7" x2="6.01" y2="7"/><line x1="10" y1="7" x2="16" y2="7"/></svg>`,
+    tour:`<svg viewBox="0 0 24 24"${s} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+    transfer:`<svg viewBox="0 0 24 24"${s} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v5h-3"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>`,
+    custom:`<svg viewBox="0 0 24 24"${s} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
+    all:`<svg viewBox="0 0 24 24"${s} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V10.5a6 6 0 0 1 12 0V16l1.5 2.5h-15L6 16z"/><path d="M10 21h4"/></svg>`,
+  };
+}
+
+function _getGuestServicesCatalog(){
+  const _I=_serviceIcons();
+  const _laundryTilePrice=laundryItems.length
+    ?'from '+Math.max(5,Math.min(...laundryItems.map(i=>i.price||0)))+' GEL'
+    :'25 GEL';
+  const _cfgSvc=id=>(guestSvcs||[]).find(s=>s.id===id)||{};
+  const _priceLabel=(id,fallback)=>{
+    const c=_cfgSvc(id);
+    if(c.price>0)return c.price+' GEL'+(c.note?(' '+c.note):'');
+    if(c.note)return c.note.charAt(0).toUpperCase()+c.note.slice(1);
+    return fallback;
+  };
+  const _visId={cleaning:'cleaning',laundry:'laundry',tour:'city_tour',transfer:'airport_transfer'};
+  const order=['tour','cleaning','laundry','transfer','custom'];
+  const defs={
+    cleaning:{icon:_I.cleaning,name:{en:'Room Cleaning',ka:'ოთახის დასუფთავება',ru:'Уборка номера',ar:'تنظيف الغرفة'},desc:{en:'Professional mid-stay cleaning',ka:'დასუფთავება ყოფნის დროს',ru:'Профессиональная уборка',ar:'تنظيف احترافي'},price:_priceLabel('cleaning','30 GEL'),hasTime:true},
+    laundry:{icon:_I.laundry,name:{en:'Laundry',ka:'სამრეცხაო',ru:'Стирка',ar:'غسيل'},desc:{en:'We collect, wash & return',ka:'ვაგროვებთ, ვრეცხავთ, ვაბრუნებთ',ru:'Собираем, стираем, возвращаем',ar:'نجمع ونغسل ونعيد'},price:_laundryTilePrice,hasTime:true},
+    tour:{icon:_I.tour,name:{en:'Tours',ka:'ტურები',ru:'Экскурсии',ar:'الجولات'},desc:{en:'Guided tours around Tbilisi',ka:'გიდური ტური თბილისში',ru:'Экскурсии по Тбилиси',ar:'جولات مرشدة في تبليسي'},price:_priceLabel('city_tour','50 GEL/person'),hasTime:false},
+    transfer:{icon:_I.transfer,name:{en:'Airport Transfer',ka:'ტრანსფერი',ru:'Трансфер',ar:'نقل المطار'},desc:{en:'Comfortable airport transfer',ka:'კომფორტული ტრანსფერი',ru:'Комфортный трансфер',ar:'نقل مريح'},price:_priceLabel('airport_transfer','On request'),hasTime:false},
+    custom:{icon:_I.custom,name:{en:'Other Request',ka:'სხვა მოთხოვნა',ru:'Другое',ar:'طلب آخر'},desc:{en:'Anything else we can help with?',ka:'სხვა რამე გჭირდებათ?',ru:'Чем ещё помочь?',ar:'أي شيء آخر؟'},price:'',hasTime:false},
+  };
+  return order.map(id=>{
+    const s={id,...defs[id]};
+    const c=_cfgSvc(_visId[id]||id);
+    if(c.name&&String(c.name).trim())s.name={...s.name,en:c.name};
+    if(c.desc&&String(c.desc).trim())s.desc={...s.desc,en:c.desc};
+    return s;
+  }).filter(s=>!_visId[s.id]||sectionVisible(_visId[s.id]));
+}
+
+function _renderHomeQuick(){
+  const locRow=document.getElementById('home-loc-row');
+  const svcArea=document.getElementById('home-svc-area');
+  if(!locRow||!svcArea)return;
+  const phase=_homePhase();
+  if(phase!=='staying'){
+    locRow.style.display='';
+    svcArea.style.display='none';
+    svcArea.innerHTML='';
+    return;
+  }
+  locRow.style.display='none';
+  const svcs=_getGuestServicesCatalog();
+  const _I=_serviceIcons();
+  const chips=svcs.map(s=>{
+    const nm=s.name[lang]||s.name.en;
+    return `<button type="button" class="home-svc-chip" onclick="window.openSvc('${s.id}',${JSON.stringify(nm)},${s.hasTime})">${s.icon}<span>${esc(nm)}</span></button>`;
+  }).join('');
+  const allChip=sectionVisible('services')
+    ?`<button type="button" class="home-svc-chip home-svc-chip--all" onclick="window.openPage('services')">${_I.all}<span>${esc(t('tsv'))}</span></button>`
+    :'';
+  if(!chips&&!allChip){
+    svcArea.style.display='none';
+    svcArea.innerHTML='';
+    return;
+  }
+  svcArea.style.display='block';
+  svcArea.innerHTML=`<div class="home-svc-scroll">${chips}${allChip}</div>`;
+}
+
+async function _renderHomeQuickAsync(){
+  if(_homePhase()==='staying')await _ensureServicesConfigLoaded();
+  _renderHomeQuick();
+}
+
 let _wybCat=null;
 
 function _renderWybCard(cat){
@@ -2736,55 +2873,11 @@ try{
   }
 
   if(type==='services'){
-    if(!_laundryLoaded){
-      try{
-        const cfgSnap=await getDoc(doc(db,'checkin_admin','config'));
-        const cfgData=cfgSnap.exists()?cfgSnap.data():{};
-        if(cfgData.laundryItems&&cfgData.laundryItems.length)laundryItems=cfgData.laundryItems;
-        if(cfgData.visibility&&!guestCfgVisibility)guestCfgVisibility=cfgData.visibility;
-        if(cfgData.services)guestSvcs=cfgData.services;
-        _laundryLoaded=true;
-      }catch(e){}
-    }
-    const _laundryTilePrice=laundryItems.length
-      ?'from '+Math.max(5,Math.min(...laundryItems.map(i=>i.price||0)))+' GEL'
-      :'25 GEL';
-    const _I={
-      cleaning:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22v-4l9-9"/><path d="m15 3-3 3 5 5 3-3a2 2 0 0 0 0-2.83L17.83 3a2 2 0 0 0-2.83 0z"/><path d="M6 18H3"/></svg>`,
-      laundry:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><circle cx="12" cy="13" r="4"/><line x1="6" y1="7" x2="6.01" y2="7"/><line x1="10" y1="7" x2="16" y2="7"/></svg>`,
-      tour:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
-      transfer:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v5h-3"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>`,
-      custom:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
-    };
-    // Config from checkin_admin/config services[]: name/desc/price/note overrides + per-service visibility
-    const _cfgSvc=id=>(guestSvcs||[]).find(s=>s.id===id)||{};
-    const _priceLabel=(id,fallback)=>{
-      const c=_cfgSvc(id);
-      if(c.price>0)return c.price+' GEL'+(c.note?(' '+c.note):'');
-      if(c.note)return c.note.charAt(0).toUpperCase()+c.note.slice(1); // e.g. "On request"
-      return fallback;
-    };
-    // Map guest ids → admin config/visibility ids
-    const _visId={cleaning:'cleaning',laundry:'laundry',tour:'city_tour',transfer:'airport_transfer'};
-    const SVCS=[
-      {id:'cleaning',icon:_I.cleaning,name:{en:'Room Cleaning',ka:'ოთახის დასუფთავება',ru:'Уборка номера',ar:'تنظيف الغرفة'},desc:{en:'Professional mid-stay cleaning',ka:'დასუფთავება ყოფნის დროს',ru:'Профессиональная уборка',ar:'تنظيف احترافي'},price:_priceLabel('cleaning','30 GEL'),hasTime:true},
-      {id:'laundry',icon:_I.laundry,name:{en:'Laundry',ka:'სამრეცხაო',ru:'Стирка',ar:'غسيل'},desc:{en:'We collect, wash & return. Note: we do not wash socks or underwear.',ka:'ვაგროვებთ, ვრეცხავთ, ვაბრუნებთ',ru:'Собираем, стираем, возвращаем',ar:'نجمع ونغسل ونعيد'},price:_laundryTilePrice,hasTime:true},
-      {id:'tour',icon:_I.tour,name:{en:'City Tour',ka:'ქალაქის ტური',ru:'Экскурсия',ar:'جولة المدينة'},desc:{en:'Guided tours around Tbilisi',ka:'გიდური ტური თბილისში',ru:'Экскурсии по Тбилиси',ar:'جولات مرشدة في تبليسي'},price:_priceLabel('city_tour','50 GEL/person'),hasTime:false},
-      {id:'transfer',icon:_I.transfer,name:{en:'Airport Transfer',ka:'ტრანსფერი',ru:'Трансфер',ar:'نقل المطار'},desc:{en:'Comfortable airport transfer',ka:'კომფორტული ტრანსფერი',ru:'Комфортный трансфер',ar:'نقل مريح'},price:_priceLabel('airport_transfer','On request'),hasTime:false},
-      {id:'custom',icon:_I.custom,name:{en:'Other Request',ka:'სხვა მოთხოვნა',ru:'Другое',ar:'طلب آخر'},desc:{en:'Anything else we can help with?',ka:'სხვა რამე გჭირდებათ?',ru:'Чем ещё помочь?',ar:'أي شيء آخر؟'},price:'',hasTime:false},
-    ]
-    // Hide services the admin toggled off for this property; 'custom' has no toggle → always shown
-    .filter(s=>!_visId[s.id]||sectionVisible(_visId[s.id]))
-    // Admin custom display name/description override the EN strings
-    .map(s=>{
-      const c=_cfgSvc(_visId[s.id]||s.id);
-      if(c.name&&String(c.name).trim())s.name={...s.name,en:c.name};
-      if(c.desc&&String(c.desc).trim())s.desc={...s.desc,en:c.desc};
-      return s;
-    });
+    await _ensureServicesConfigLoaded();
+    const SVCS=_getGuestServicesCatalog();
     body=`<div style="background:var(--gold-light);border:1px solid var(--gold-border);border-radius:var(--rs);padding:0.75rem 1rem;margin-bottom:1rem;font-size:13px;color:var(--text);line-height:1.5;">💵 Payment is directly to the cleaning staff in cash.</div>`;
     body+=SVCS.map(s=>`<div class="service-card" onclick="window.openSvc('${s.id}','${esc(s.name[lang]||s.name.en)}',${s.hasTime})">
-      <div class="sc-icon">${s.icon}</div>
+      <div class="sc-icon">${s.icon.replace('<svg','<svg width="22" height="22"')}</div>
       <div class="sc-info"><div class="sc-name">${esc(s.name[lang]||s.name.en)}</div><div class="sc-desc">${esc(s.desc[lang]||s.desc.en)}</div></div>
       ${s.price?`<div class="sc-price">${s.price}</div>`:''}
       <div class="sc-arrow">›</div>
@@ -2920,17 +3013,7 @@ window.copySth=function(text,btn){
 window.openSvc=async function(id,name,hasTime){
   currentSvcId=id;currentSvcName=name;
   laundryQtys={};
-  // Ensure services config (incl. whatsappNumber) is loaded before modal opens
-  if(!_laundryLoaded){
-    try{
-      const cfg=await getDoc(doc(db,'checkin_admin','config'));
-      const cfgData=cfg.exists()?cfg.data():{};
-      if(cfgData.laundryItems&&cfgData.laundryItems.length)laundryItems=cfgData.laundryItems;
-      if(cfgData.visibility&&!guestCfgVisibility)guestCfgVisibility=cfgData.visibility;
-      if(cfgData.services)guestSvcs=cfgData.services;
-      _laundryLoaded=true;
-    }catch(e){console.error('Config load error:',e);}
-  }
+  await _ensureServicesConfigLoaded();
   const modal=document.getElementById('svc-modal');
   document.getElementById('svc-modal-title').textContent=name;
   document.getElementById('svc-note-lbl').textContent=t('sn');
@@ -3760,6 +3843,13 @@ function _renderHeroContent(){
     const rn=String(activeReservation?.reservationNumber||'').trim();
     invite.style.display=rn?'':'none';
   }
+  _renderHomeQuickAsync().then(()=>{
+    const ph=_homePhase();
+    if(ph==='arriving'||ph==='staying'||ph==='leaving'){
+      _homeScrollPhase='';
+      setTimeout(_nudgeHomeScroll,80);
+    }
+  });
 }
 
 // Photo step cards from checkin_apartments.photos + photoCaptions (same shape as checkin-details.html)
@@ -3877,10 +3967,11 @@ function applyHomePhase(){
   home.classList.add('phase-'+phase);
   const wt=document.getElementById('hero-walkthrough');
   if(wt&&phase!=='staying')wt.classList.remove('wt-expanded');
+  _homeScrollPhase=''; // re-nudge scroll when phase changes (e.g. arriving → staying)
   _renderHeroContent();
   if(phase==='waiting')_startCountdownTick();
   applyTranslations();
-  _nudgeHomeScroll();
+  if(phase==='waiting')_nudgeHomeScroll();
 }
 
 window.guestCheckedIn=async function(){
