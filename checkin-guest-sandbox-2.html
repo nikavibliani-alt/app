@@ -391,6 +391,7 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 @media(max-width:480px){.tour-item__media{height:220px;}.lightbox{padding:24px 16px;}.lb-caption{font-size:15px;}}
 @media(max-width:360px){.tiles{grid-template-columns:1fr;}.tile.wide{grid-column:1;}}
 /* What You Booked card */
+.wyb-kicker{font-family:var(--sans);font-size:16px;font-weight:700;letter-spacing:-0.01em;text-transform:none;color:var(--ink);padding:16px 16px 4px;}
 .wyb-card{margin:0 16px 4px;background:var(--surface);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 1px 2px rgba(40,30,15,0.04);}
 .wyb-header{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent;gap:12px;overflow:visible;}
 .wyb-header-text{min-width:0;flex:1;}
@@ -726,7 +727,7 @@ body{padding-bottom:72px;}
 #page-home.phase-staying .guest-invite{display:block;}
 
 .home-tabs{padding:4px 16px 14px;}
-.home-tabs--top{margin-bottom:2px;}
+.home-tabs--top{margin-bottom:8px;}
 #page-home.phase-arriving .home-tabs--waiting,
 #page-home.phase-staying .home-tabs--waiting,
 #page-home.phase-leaving .home-tabs--waiting{display:none;}
@@ -1027,8 +1028,6 @@ body{padding-bottom:72px;}
         <p class="hero-waiting__sub" id="t-waiting-sub">Your door code and check-in instructions are not ready yet. When check-in opens, come back to this same page — they will appear here automatically.</p>
       </div>
 
-      <div id="what-you-booked"></div>
-
       <div class="home-tabs home-tabs--top home-tabs--waiting" id="home-tabs">
         <div class="tab-bar">
           <button class="tab-btn active" id="tab-location" onclick="window.switchHomeTab('location')"><span id="t-tab-location">Location</span></button>
@@ -1039,6 +1038,8 @@ body{padding-bottom:72px;}
         <div class="tab-panel" id="panel-shuttle"><span class="tab-empty" id="t-tab-shuttle-empty">Book an airport shuttle — coming soon</span></div>
         <div class="tab-panel" id="panel-tours"><span class="tab-empty" id="t-tab-tours-empty">Tours and city guide — coming soon</span></div>
       </div>
+
+      <div id="what-you-booked"></div>
 
       <!-- Phases B/C/D — checkout (leaving) first, then access codes -->
       <div class="hero-daily-key">
@@ -2790,7 +2791,7 @@ function _renderWybCard(cat){
   const pillsHtml=amenities.length?`<div class="wyb-amenities">${amenities.map(a=>`<span class="wyb-pill">${esc(a)}</span>`).join('')}</div>`:'';
   const chevron=`<svg class="wyb-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
   el.innerHTML=`<div class="wyb-card">
-    <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);padding:14px 16px 6px;">${t('wyb')}</div>
+    <div class="wyb-kicker">${t('wyb')}</div>
     <div class="wyb-header" onclick="window.wybToggle()">
       <div class="wyb-header-text">
         <div class="wyb-name">${esc(cat.name||'')}</div>
