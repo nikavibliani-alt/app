@@ -1106,6 +1106,61 @@ WHEN DONE:
 
 ---
 
+## 21. Coordination Protocol — Claude Code + Cursor (2026-08-25)
+
+> Both tools edit `checkin-guest-sandbox-2.html` in the same repo, often in the same
+> day, with no lock. This section is the traffic protocol. Follow it exactly — it
+> exists to prevent silently overwriting each other's work.
+
+### WHO OWNS WHAT IN `checkin-guest-sandbox-2.html`
+
+| Area | Owner | Notes |
+|------|-------|-------|
+| `#hero-walkthrough`, walkthrough JS | Claude Code | Phase 2 inline check-in |
+| `#panel-location`, `#panel-shuttle`, `#panel-tours` tab content | Claude Code | Phase 3 |
+| `.apt-pill`, `#multi-room-label` | Claude Code | Multi-room UI |
+| Registration form copy (`T={}` translations) | Claude Code | Copy fixes |
+| All CSS in `<style>` block | Cursor | Design tokens, typography, spacing |
+| Phase A/B/C/D hero layout | Cursor | Visual design of each phase |
+| Dev toolbar | Claude Code | Do not restyle unless broken |
+| `checkin_apartments` data rendering | Cursor | Photos, captions, amenities |
+
+Ownership is by area, not by exclusivity of edit rights — the other tool may still
+need to touch an area it doesn't own (e.g. Claude Code fixing a CSS-caused JS bug).
+When that happens, keep the edit minimal and say so in the commit message; don't
+redesign or restructure the owner's area.
+
+### BEFORE STARTING ANY SESSION
+
+1. `git pull origin main` — always, before touching anything.
+2. Check `git log --oneline -5 -- checkin-guest-sandbox-2.html` to see what changed
+   since your last session.
+3. If the file was touched in the last 2 hours by the other tool, read those commits
+   before editing: `git show <commit> -- checkin-guest-sandbox-2.html`.
+
+### BEFORE COMMITTING
+
+1. `git pull --rebase origin main`.
+2. Resolve any conflicts — never force push.
+3. Commit message format:
+   - Claude Code: `feat/fix/style(scope): description`
+   - Cursor: `style(design): description` (already following this)
+
+### IF THERE IS A CONFLICT
+
+- CSS conflicts: Cursor's version wins.
+- JS/logic conflicts: Claude Code's version wins.
+- HTML structure conflicts: stop and report to Nika before resolving.
+
+### NEVER touch in the same session
+
+- `checkin-guest-v2.html` (production)
+- `checkin-guest-sandbox-3.html` (parked)
+- `minihotel_reservation_sync.py`
+- `checkin-admin.html` (separate track)
+
+---
+
 ## Quick checklist before any major step
 
 - [ ] I re-read §1–§5 and §7  
