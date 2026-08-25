@@ -564,11 +564,6 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
   --shadow-card: 0 2px 12px rgba(0,0,0,0.06);
 }
 body{padding-bottom:72px;}
-.sb2-banner{
-  margin:8px 16px 0;padding:8px 12px;border:1px solid var(--line);border-radius:999px;
-  font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;
-  color:var(--muted);text-align:center;background:#fff;
-}
 #page-home .greeting{padding:10px 22px 14px !important;}
 #page-home .greeting__hello{font-size:10px !important;margin-bottom:4px !important;letter-spacing:0.14em !important;}
 #page-home .greeting__name{font-size:24px !important;font-weight:600;line-height:1.15 !important;}
@@ -635,19 +630,26 @@ body{padding-bottom:72px;}
 .dk-elev__qr{display:none;width:148px;height:148px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;align-items:center;justify-content:center;box-sizing:border-box;}
 .dk-elev__qr canvas{display:block;max-width:100%;height:auto;}
 .dk-qr-ph{display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;letter-spacing:0.12em;color:var(--muted);background:repeating-linear-gradient(135deg,#f5f2ee 0 8px,#fff 8px 16px);border-radius:8px;}
-.dk-elev__scan-hint{font-size:12px;color:var(--muted);line-height:1.4;max-width:260px;margin:0;}
+.dk-elev__scan-hint{font-size:12px;color:var(--muted);line-height:1.4;margin:10px 0 0;}
 .dk-elev__meta{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--line);}
 .dk-elev__meta-label{font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:0;color:var(--ink);}
 .dk-elev__meta .dk-code{font-size:28px;letter-spacing:0.16em;margin:0;word-break:break-all;}
-.dk-elev__fallback{font-size:11px;color:var(--muted);line-height:1.4;max-width:280px;margin:0;}
+.dk-elev__fallback{font-size:11px;color:var(--muted);line-height:1.4;margin:4px 0 0;}
+/* FIX 4 — compact row: QR left, code+label stacked right (saves ~60-80px vs the old
+   full-width centered QR-then-divider-then-big-code stack) */
+.dk-elev--compact{flex-direction:row;align-items:center;text-align:left;gap:14px;}
+.dk-elev__meta--compact{width:auto;flex:1;align-items:flex-start;text-align:left;padding-top:0;border-top:none;gap:2px;}
+.dk-elev__meta--compact .dk-elev__meta-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);}
+.dk-code--sm{font-size:14px;letter-spacing:0.1em;}
 
 /* Compact door row (WiFi moved up near greeting) */
 .dk-access{padding:2px 4px;}
 .dk-access__row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 12px;}
 .dk-access__left{min-width:0;flex:1;}
-.dk-access__lbl{font-family:var(--sans);font-size:14px;font-weight:700;letter-spacing:0;color:var(--ink);margin-bottom:4px;}
+.dk-access__lbl{font-family:var(--sans);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;}
 .dk-access__door{font-family:var(--mono);font-size:32px;font-weight:700;letter-spacing:0.14em;color:var(--ink);line-height:1.1;}
 .dk-access__hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4;}
+.dk-access__row .dk-copy{height:44px;padding:0 16px;}
 
 .dk-floor-text{font-size:15px;font-weight:600;color:var(--ink);}
 .hero-hidden-compat{display:none!important;}
@@ -680,8 +682,9 @@ body{padding-bottom:72px;}
 /* Unlocked quick row: Location | Parking (WiFi lives in hero, before checked-in CTA) */
 .home-quick{display:none;padding:0 16px 10px;flex-direction:column;gap:8px;}
 #page-home.phase-arriving .home-quick,
-#page-home.phase-staying .home-quick,
-#page-home.phase-leaving .home-quick{display:flex;}
+#page-home.phase-staying .home-quick{display:flex;}
+/* Leaving: guest is checking out — no Location/Parking nav, just door/elevator/WiFi/checkout */
+#page-home.phase-leaving .home-quick{display:none;}
 .hero-wifi-block{display:none;margin:4px 0 8px;}
 #page-home.phase-arriving .hero-wifi-block,
 #page-home.phase-staying .hero-wifi-block,
@@ -709,11 +712,11 @@ body{padding-bottom:72px;}
 #page-home.phase-staying .home-svc-area{display:block;}
 .home-svc-scroll{
   display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;
-  scroll-snap-type:x proximity;padding:2px 0 4px;scrollbar-width:none;
+  scroll-snap-type:none;padding:2px 0 4px;padding-bottom:4px;scrollbar-width:none;
 }
 .home-svc-scroll::-webkit-scrollbar{display:none;}
 .home-svc-chip{
-  flex:none;display:inline-flex;align-items:center;gap:7px;scroll-snap-align:start;
+  flex:none;display:inline-flex;align-items:center;gap:7px;
   min-height:44px;padding:0 14px;background:#fff;border:1.5px solid var(--line);
   border-radius:999px;font-family:var(--sans);font-size:13px;font-weight:600;
   color:var(--ink);cursor:pointer;white-space:nowrap;box-shadow:var(--shadow-card);
@@ -1008,7 +1011,6 @@ body{padding-bottom:72px;}
     </div>
     <input type="file" id="reupload-passport" accept="image/*" style="display:none;" onchange="window.reuploadPassport(this)">
 
-    <div class="sb2-banner">Sandbox 2 · Cursor design proposal · not live</div>
     <!-- GREETING -->
     <div class="greeting" style="padding:10px 22px 8px;">
       <p class="greeting__hello" id="t-greeting-label" style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Welcome</p>
@@ -1030,7 +1032,16 @@ body{padding-bottom:72px;}
     <!-- HERO — 4 phases, one shown at a time via #page-home.phase-* -->
     <div class="hero-section">
 
-      <!-- Phase A — Waiting -->
+      <!-- Phase A — Waiting: tabs open a real subpage (openPage) on tap, no inline
+           panel toggle. Order locked: tabs → countdown → What You Booked. -->
+      <div class="home-tabs home-tabs--top home-tabs--waiting" id="home-tabs">
+        <div class="tab-bar">
+          <button class="tab-btn" id="tab-location" onclick="window.openPage('location')"><span id="t-tab-location">Location</span></button>
+          <button class="tab-btn" id="tab-shuttle" onclick="window.openPage('shuttle')"><span id="t-tab-shuttle">Shuttle service</span></button>
+          <button class="tab-btn" id="tab-tours" onclick="window.openPage('tours')"><span id="t-tab-tours">Tours</span></button>
+        </div>
+      </div>
+
       <div class="hero-card hero-waiting" id="hero-waiting">
         <div class="hero-waiting__label" id="t-waiting-label">Available in</div>
         <div class="hero-waiting__countdown" id="countdown-display">00:00:00</div>
@@ -1039,17 +1050,6 @@ body{padding-bottom:72px;}
           <div class="hero-waiting__when-date" id="countdown-when-date">—</div>
         </div>
         <p class="hero-waiting__sub" id="t-waiting-sub">Your door code and check-in instructions are not ready yet. When check-in opens, come back to this same page — they will appear here automatically.</p>
-      </div>
-
-      <div class="home-tabs home-tabs--top home-tabs--waiting" id="home-tabs">
-        <div class="tab-bar">
-          <button class="tab-btn active" id="tab-location" onclick="window.switchHomeTab('location')"><span id="t-tab-location">Location</span></button>
-          <button class="tab-btn" id="tab-shuttle" onclick="window.switchHomeTab('shuttle')"><span id="t-tab-shuttle">Shuttle service</span></button>
-          <button class="tab-btn" id="tab-tours" onclick="window.switchHomeTab('tours')"><span id="t-tab-tours">Tours</span></button>
-        </div>
-        <div class="tab-panel active" id="panel-location"><span class="tab-empty" id="t-tab-loc-empty">Address, maps and parking — coming soon</span></div>
-        <div class="tab-panel" id="panel-shuttle"><span class="tab-empty" id="t-tab-shuttle-empty">Book an airport shuttle — coming soon</span></div>
-        <div class="tab-panel" id="panel-tours"><span class="tab-empty" id="t-tab-tours-empty">Tours and city guide — coming soon</span></div>
       </div>
 
       <div id="what-you-booked"></div>
@@ -1063,30 +1063,31 @@ body{padding-bottom:72px;}
           <button class="hero-cta__btn hero-cta__btn--checkout" id="btn-checked-out" onclick="window.guestCheckedOut()"><span id="t-btn-checked-out">I've checked out</span></button>
         </div>
 
+        <div class="dk-card dk-access">
+          <div class="dk-access__row">
+            <div class="dk-access__left">
+              <div class="dk-access__lbl" id="t-door-lbl">Smart lock code</div>
+              <div class="dk-access__door" id="hero-door-code">— — — —</div>
+              <p class="dk-access__hint" id="t-door-hint">Type on the lock keypad, then press #</p>
+            </div>
+            <button class="dk-copy" id="hero-door-copy" onclick="window.copySth(document.getElementById('hero-door-code').textContent,this)"><span id="t-door-copy">Copy</span></button>
+          </div>
+        </div>
+
         <div class="dk-card" id="hero-elevator" style="display:none;">
           <div class="dk-label" id="t-elev-lbl">Elevator &amp; entrance</div>
-          <div class="dk-elev">
-            <p class="dk-elev__scan-hint" id="t-elev-scan">Scan at the building entrance and elevator</p>
+          <div class="dk-elev dk-elev--compact">
             <div class="dk-elev__qr" id="hero-elevator-qr">
               <canvas id="hero-elevator-qr-canvas" width="152" height="152"></canvas>
               <div class="dk-qr-ph" id="hero-elevator-qr-ph">QR</div>
             </div>
-            <div class="dk-elev__meta">
-              <div class="dk-elev__meta-label" id="t-elev-type">Or type this 6-digit code</div>
-              <div class="dk-code" id="hero-elevator-code">— — — — — —</div>
-              <p class="dk-elev__fallback" id="t-elev-fallback">Type it on the pad, then press #. QR changes daily.</p>
+            <div class="dk-elev__meta dk-elev__meta--compact">
+              <div class="dk-elev__meta-label" id="t-elev-type">Elevator code</div>
+              <div class="dk-code dk-code--sm" id="hero-elevator-code">— — — — — —</div>
             </div>
           </div>
-        </div>
-
-        <div class="dk-card dk-access">
-          <div class="dk-access__row">
-            <div class="dk-access__left">
-              <div class="dk-access__lbl" id="t-door-lbl">Smart lock password</div>
-              <div class="dk-access__door" id="hero-door-code">— — — —</div>
-              <p class="dk-access__hint" id="t-door-hint">Type on the lock keypad, then press #</p>
-            </div>
-          </div>
+          <p class="dk-elev__scan-hint" id="t-elev-scan">Scan at the building entrance and elevator</p>
+          <p class="dk-elev__fallback" id="t-elev-fallback">Type it on the pad, then press #. QR changes daily.</p>
         </div>
 
         <div class="guest-invite" id="guest-invite-card">
@@ -1171,6 +1172,14 @@ body{padding-bottom:72px;}
   <div class="page" id="page-content-location">
     <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-location">Location &amp; Parking</div></div>
     <div class="subpage-body" id="pg-body-location"></div>
+  </div>
+  <div class="page" id="page-content-shuttle">
+    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-shuttle">Shuttle service</div></div>
+    <div class="subpage-body" id="pg-body-shuttle"></div>
+  </div>
+  <div class="page" id="page-content-tours">
+    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-tours">Tours</div></div>
+    <div class="subpage-body" id="pg-body-tours"></div>
   </div>
 
 </div>
@@ -1308,7 +1317,7 @@ function _nudgeHomeScrollOnce(){
   });
 }
 
-const _CONTENT_TYPES=['wifi','services','recs','rules','contact','location'];
+const _CONTENT_TYPES=['wifi','services','recs','rules','contact','location','shuttle','tours'];
 
 function _navToContent(type,title,body){
   const titleEl=document.getElementById('pg-title-'+type);
@@ -1341,13 +1350,13 @@ window.addEventListener('popstate',function(){
 
 const T={
   en:{ac:'Access Code',vf:'Valid from',vt:'to',ttp:'Tap to copy',cp2:'Code generation pending — please contact host',chc:'Please contact host for your access code',
-ws:'Welcome — please complete your check-in',yi:'Your information',fn:'Full name',gu:'Guests',na:'Nationality',ct:'Contact',cnu:'Your number / username',pt:'Passport / ID photo',ph:'Tap to take a photo or upload from gallery',sb:'Complete registration',gl:'Welcome back',tc:'Check-in Details',tcs:'Instructions, door code & photos',tw:'WiFi & Internet',tws:'Network name & password',tsv:'Services',tsvs:'Cleaning, laundry, tours & more',tr:'Recommendations',trs:'Best places nearby',tru:'House Rules',trus:'Please read before your stay',tco:'Contact Us',tcos:"We're here 24/7",lt:'Not available yet',ls:'Your room is being prepared. Instructions will unlock automatically at 3:00 PM.',cl:'Available in',dc:'Door code',wn:'WiFi name',wp:'Password',cp:'Copy',cpd:'Copied!',hi:'How to check in',hr:'House rules',rs:'Request sent!',rf:'Failed to send',sn:'Notes (optional)',snh:'Any special instructions...',sr:'Send request',ca:'Cancel',mr:'My requests',nr:'No requests yet',pe:'Pending',dn:'Done',cwa:'WhatsApp',cwas:'Chat with us directly on WhatsApp',rg:'Registered! Loading your stay...',elevatorTitle:'Elevator & Entrance Code',elevatorHint:'Same code for building entrance and elevator. Enter the code then press #.',elevatorToday:'Code for today,',elevatorUpdating:'Elevator code updating — please contact host if needed',checkinTitle:'Welcome to your stay',checkinSub:"Just a few details and you'll have everything you need for your stay.",checkinKicker:'GUEST CHECK-IN',searchInstructions:'Use the name on your booking — not your passport.',companionHint:'You\'re joining via a group link — enter your name and contact only.',companionJoin:'Join reservation',companionBanner:'Group member check-in — name and contact only. No passport. Access ends when the booking ends.',resNumber:'Booking.com / Expedia confirmation number',resPlaceholder:'Booking.com / Expedia confirmation number',fullName:'First and last name',namePlaceholder:'Same as on your booking',arrivalDate:'Check-in date',selectDate:'Tap to pick your check-in date',phoneLabel:'WhatsApp or Telegram',checkinTimeLabel:'Approximate arrival time',checkinTimeHint:'Tbilisi time — helps us prepare your apartment',checkinTimeLateNight:'After midnight',checkinTimeNextMorning:'Next morning',checkinTimeBefore15:'Before 15:00',checkinTimeWarn:'Check-in starts at 15:00. Your room may not be ready before then.',checkinTimeEarlyNote:'If early check-in is possible, instructions may unlock sooner — please still aim for 15:00.',passportRequired:'required',passportPageTitle:'Passport photo',passportPageSub:'Required for check-in verification',rulesTitle:'House rules',rulesIntro:'Please read and accept before your stay',rulesBtn:'I agree — Continue',ruleNoiseTitle:'No parties or excessive noise',ruleNoiseSub:'Quiet hours after 10 PM.',ruleSmokeTitle:'No smoking inside the apartment',ruleSmokeSub:'Strictly prohibited indoors. Fine applies.',ruleCareTitle:'Take care of the apartment',ruleCareSub:"Don't damage property or lose entrance cards (if provided). Replacement fees apply.",guestsLabel:'Guests',fields:'fields',tlo:'Location & Parking',tlos:'Address, maps & parking',wyb:'What you booked',waitingSub:'Your door code and check-in instructions are not ready yet. When check-in opens, come back to this same page — they will appear here automatically.',tabLocation:'Location',tabShuttle:'Shuttle service',tabTours:'Tours',tabLocEmpty:'Address, maps and parking — coming soon',tabRequestPickup:'Request pickup',tabAskTours:'Ask about tours',tabSvcUnavailable:'Not available right now',tabShuttleEmpty:'Book an airport shuttle — coming soon',tabToursEmpty:'Tours and city guide — coming soon',btnLocation:'Location',btnParking:'Parking',wifiLbl:'WiFi',wifiPageHint:'Connect your phone to this Wi‑Fi network',wifiPageEmpty:'WiFi details not added yet',doorLbl:'Smart lock password',elevLbl:'Elevator & entrance',elevScan:'Scan at the building entrance and elevator',elevType:'Or type this 6-digit code',elevFallback:'Type it on the pad, then press #. QR changes daily.',wtTitle:'How to arrive',wtDoorTitle:'Your apartment door',doorHint:'Type on the lock keypad, then press #',wtEmpty:'Arrival photos will appear here once set for this apartment.',inviteTitle:'Share access with your group',inviteSub:'Other people in your booking can open a short form — same QR and codes, no passport check.',inviteBtn:'Open link for group members',checkedInHint:"When you're inside the apartment, tap below so we know you've arrived.",btnCheckedIn:"I'm checked in",btnWalkthrough:'Show arrival instructions',btnHideWalkthrough:'Hide arrival instructions',checkoutHint:'Leaving today? Tap the button below once you\'re out of the apartment.',checkoutToday:'Checkout today',btnCheckedOut:"I've checked out",thankTitle:'Until next time.',thankBody:'Your access has ended. We hope your stay was comfortable. If you left anything behind or need assistance, contact us on WhatsApp.',thankContact:'Contact host',wybGuests:'Up to {n} guests'},
+ws:'Welcome — please complete your check-in',yi:'Your information',fn:'Full name',gu:'Guests',na:'Nationality',ct:'Contact',cnu:'Your number / username',pt:'Passport / ID photo',ph:'Tap to take a photo or upload from gallery',sb:'Complete registration',gl:'Welcome back',tc:'Check-in Details',tcs:'Instructions, door code & photos',tw:'WiFi & Internet',tws:'Network name & password',tsv:'Services',tsvs:'Cleaning, laundry, tours & more',tr:'Recommendations',trs:'Best places nearby',tru:'House Rules',trus:'Please read before your stay',tco:'Contact Us',tcos:"We're here 24/7",lt:'Not available yet',ls:'Your room is being prepared. Instructions will unlock automatically at 3:00 PM.',cl:'Available in',dc:'Door code',wn:'WiFi name',wp:'Password',cp:'Copy',cpd:'Copied!',hi:'How to check in',hr:'House rules',rs:'Request sent!',rf:'Failed to send',sn:'Notes (optional)',snh:'Any special instructions...',sr:'Send request',ca:'Cancel',mr:'My requests',nr:'No requests yet',pe:'Pending',dn:'Done',cwa:'WhatsApp',cwas:'Chat with us directly on WhatsApp',rg:'Registered! Loading your stay...',elevatorTitle:'Elevator & Entrance Code',elevatorHint:'Same code for building entrance and elevator. Enter the code then press #.',elevatorToday:'Code for today,',elevatorUpdating:'Elevator code updating — please contact host if needed',checkinTitle:'Welcome to your stay',checkinSub:"Just a few details and you'll have everything you need for your stay.",checkinKicker:'GUEST CHECK-IN',searchInstructions:'Use the name on your booking — not your passport.',companionHint:'You\'re joining via a group link — enter your name and contact only.',companionJoin:'Join reservation',companionBanner:'Group member check-in — name and contact only. No passport. Access ends when the booking ends.',resNumber:'Booking.com / Expedia confirmation number',resPlaceholder:'Booking.com / Expedia confirmation number',fullName:'First and last name',namePlaceholder:'Same as on your booking',arrivalDate:'Check-in date',selectDate:'Tap to pick your check-in date',phoneLabel:'WhatsApp or Telegram',checkinTimeLabel:'Approximate arrival time',checkinTimeHint:'Tbilisi time — helps us prepare your apartment',checkinTimeLateNight:'After midnight',checkinTimeNextMorning:'Next morning',checkinTimeBefore15:'Before 15:00',checkinTimeWarn:'Check-in starts at 15:00. Your room may not be ready before then.',checkinTimeEarlyNote:'If early check-in is possible, instructions may unlock sooner — please still aim for 15:00.',passportRequired:'required',passportPageTitle:'Passport photo',passportPageSub:'Required for check-in verification',rulesTitle:'House rules',rulesIntro:'Please read and accept before your stay',rulesBtn:'I agree — Continue',ruleNoiseTitle:'No parties or excessive noise',ruleNoiseSub:'Quiet hours after 10 PM.',ruleSmokeTitle:'No smoking inside the apartment',ruleSmokeSub:'Strictly prohibited indoors. Fine applies.',ruleCareTitle:'Take care of the apartment',ruleCareSub:"Don't damage property or lose entrance cards (if provided). Replacement fees apply.",guestsLabel:'Guests',fields:'fields',tlo:'Location & Parking',tlos:'Address, maps & parking',wyb:'What you booked',waitingSub:'Your door code and check-in instructions are not ready yet. When check-in opens, come back to this same page — they will appear here automatically.',tabLocation:'Location',tabShuttle:'Shuttle service',tabTours:'Tours',tabLocEmpty:'Address, maps and parking — coming soon',tabRequestPickup:'Request pickup',tabAskTours:'Ask about tours',tabSvcUnavailable:'Not available right now',tabShuttleEmpty:'Book an airport shuttle — coming soon',tabToursEmpty:'Tours and city guide — coming soon',btnLocation:'Location',btnParking:'Parking',wifiLbl:'WiFi',wifiPageHint:'Connect your phone to this Wi‑Fi network',wifiPageEmpty:'WiFi details not added yet',doorLbl:'Smart lock code',elevLbl:'Elevator & entrance',elevScan:'Scan at the building entrance and elevator',elevType:'Elevator code',elevFallback:'Type it on the pad, then press #. QR changes daily.',wtTitle:'How to arrive',wtDoorTitle:'Your apartment door',doorHint:'Type on the lock keypad, then press #',wtEmpty:'Arrival photos will appear here once set for this apartment.',inviteTitle:'Share access with your group',inviteSub:'Other people in your booking can open a short form — same QR and codes, no passport check.',inviteBtn:'Open link for group members',checkedInHint:"When you're inside the apartment, tap below so we know you've arrived.",btnCheckedIn:"I'm checked in",btnWalkthrough:'Show arrival instructions',btnHideWalkthrough:'Hide arrival instructions',checkoutHint:'Leaving today? Tap the button below once you\'re out of the apartment.',checkoutToday:'Checkout today',btnCheckedOut:"I've checked out",thankTitle:'Until next time.',thankBody:'Your access has ended. We hope your stay was comfortable. If you left anything behind or need assistance, contact us on WhatsApp.',thankContact:'Contact host',wybGuests:'Up to {n} guests'},
   ka:{ac:'კარის კოდი',vf:'მოქმედია',vt:'–',ttp:'შეეხეთ კოპირებისთვის',cp2:'კოდი მუშავდება — დაუკავშირდით ჰოსტს',chc:'კოდისთვის დაუკავშირდით ჰოსტს',
-ws:'კეთილი იყოს — გთხოვთ შეავსოთ ჩეკინი',yi:'თქვენი ინფორმაცია',fn:'სრული სახელი',gu:'სტუმრები',na:'ეროვნება',ct:'კონტაქტი',cnu:'ნომერი ან username',pt:'პასპორტის ფოტო',ph:'შეეხეთ გადასაღებად',sb:'რეგისტრაციის დასრულება',gl:'კეთილი იყოს თქვენი მობრძანება',tc:'ჩეკინის დეტალები',tcs:'ინსტრუქცია, კარის კოდი და ფოტოები',tw:'WiFi',tws:'ქსელის სახელი და პაროლი',tsv:'სერვისები',tsvs:'დასუფთავება, სამრეცხაო, ტური',tr:'რეკომენდაციები',trs:'საუკეთესო ადგილები',tru:'სახლის წესები',trus:'გთხოვთ წაიკითხოთ',tco:'დაგვიკავშირდით',tcos:'ჩვენ ყოველთვის აქ ვართ',lt:'ჯერ მიუწვდომელია',ls:'ოთახი მზადდება. ინსტრუქცია გამოჩნდება 15:00 საათზე.',cl:'კიდევ დარჩა',dc:'კარის კოდი',wn:'WiFi სახელი',wp:'პაროლი',cp:'კოპირება',cpd:'დაკოპირდა!',hi:'როგორ შეხვიდეთ',hr:'სახლის წესები',rs:'მოთხოვნა გაიგზავნა!',rf:'გაგზავნა ვერ მოხერხდა',sn:'შენიშვნები',snh:'სპეციალური მოთხოვნები...',sr:'გაგზავნა',ca:'გაუქმება',mr:'ჩემი მოთხოვნები',nr:'მოთხოვნები არ არის',pe:'განხილვაში',dn:'შესრულდა',cwa:'WhatsApp',cwas:'დაგვიკავშირდით WhatsApp-ით',rg:'დარეგისტრირდით! იტვირთება...',elevatorTitle:'ლიფტისა და შესასვლელის კოდი',elevatorHint:'ეს კოდი გამოიყენება შესასვლელისა და ლიფტისთვის. შეიყვანეთ კოდი და დააჭირეთ #.',elevatorToday:'დღევანდელი კოდი,',elevatorUpdating:'ლიფტის კოდი განახლდება — საჭიროების შემთხვევაში დაუკავშირდით ჰოსტს',checkinTitle:'კეთილი იყოს თქვენი ყოფნა',checkinSub:'სულ რამდენიმე დეტალი და თქვენ გექნებათ ყველაფერი, რაც გჭირდებათ თქვენი ყოფნისთვის.',checkinKicker:'სტუმრის რეგისტრაცია',searchInstructions:'გამოიყენეთ ბრონირებაში მითითებული სახელი — არა პასპორტის.',fullName:'სახელი და გვარი',namePlaceholder:'როგორც ბრონირებაშია',arrivalDate:'ჩასვლის თარიღი',selectDate:'შეეხეთ — აირჩიეთ ჩასვლის თარიღი',resNumber:'Booking.com / Expedia დადასტურების ნომერი',resPlaceholder:'Booking.com / Expedia დადასტურების ნომერი',phoneLabel:'WhatsApp ან Telegram',checkinTimeLabel:'სავარაუდო ჩასვლის დრო',checkinTimeHint:'თბილისის დრო — გვეხმარება ბინის მომზადებაში',checkinTimeLateNight:'შუაღამის შემდეგ',checkinTimeNextMorning:'შემდეგი დილა',checkinTimeBefore15:'15:00-მდე',checkinTimeWarn:'ჩეკ-ინი იწყება 15:00-ზე. ოთახი ადრე შეიძლება არ იყოს მზად.',checkinTimeEarlyNote:'ადრეული ჩეკ-ინი შესაძლოა ინსტრუქციას ადრე გახსნას — მაინც 15:00-ზე გეგმეთ.',passportRequired:'სავალდებულო',passportPageTitle:'პასპორტის ფოტო',passportPageSub:'საჭიროა ჩეკ-ინის დასადასტურებლად',rulesTitle:'სახლის წესები',rulesIntro:'გთხოვთ წაიკითხოთ და დაეთანხმოთ',rulesBtn:'ვეთანხმები — გაგრძელება',ruleNoiseTitle:'ყოველგვარი წვეულება და ხმაური აკრძალულია',ruleNoiseSub:'სიჩუმის საათები 22:00-ის შემდეგ.',ruleSmokeTitle:'ბინაში მოკარება აკრძალულია',ruleSmokeSub:'შენობის შიგნით სრულიად აკრძალულია. ჯარიმა გამოიწერება.',ruleCareTitle:'გთხოვთ, იზრუნოთ ბინაზე',ruleCareSub:'არ დააზიანოთ ქონება და არ დაკარგოთ შესასვლელის ბარათები (თუ გაცემული გაქვთ). შეცვლის ღირებულება გამოიწერება.',guestsLabel:'სტუმრები',fields:'ველი',tlo:'მდებარეობა',tlos:'მისამართი და პარკინგი',wyb:'რა დაჯავშნეთ',waitingSub:'კარის კოდი და ჩეკ-ინის ინსტრუქცია ჯერ არ არის მზად. ჩეკ-ინის დროს ისევ ამავე გვერდზე შემოდით — ყველაფერი აქ გამოჩნდება.',tabLocation:'მდებარეობა',tabShuttle:'შატლის სერვისი',tabTours:'ტურები',tabLocEmpty:'მისამართი, რუკა და პარკინგი — მალე',tabRequestPickup:'ტრანსფერის მოთხოვნა',tabAskTours:'ტურების შესახებ კითხვა',tabSvcUnavailable:'ამჟამად მიუწვდომელია',tabShuttleEmpty:'აეროპორტის შატლი — მალე',tabToursEmpty:'ტურები და ქალაქის გზამკვლევი — მალე',btnLocation:'მდებარეობა',btnParking:'პარკინგი',wifiLbl:'WiFi',doorLbl:'სმარტ-ჩაკრის პაროლი',doorHint:'შეიყვანეთ პანელზე და დააჭირეთ #',wtDoorTitle:'თქვენი ბინის კარი',btnHideWalkthrough:'ჩასვლის ინსტრუქციის დამალვა',checkoutHint:'გასვლა დღეს? როცა ბინიდან გახვალთ, დააჭირეთ ქვემოთ.',inviteTitle:'გაუზიარეთ ჯგუფის წევრებს',inviteSub:'ბრონირების სხვა სტუმრები შეძლებენ მოკლე ფორმის გახსნას — იგივე QR და კოდები, პასპორტის გარეშე.',inviteBtn:'ბმული ჯგუფის წევრებისთვის',companionHint:'ჯგუფის ბმულით ხართ — სახელი და კონტაქტი საკმარისია.',companionJoin:'შემოუერთდი ბრონირებას',companionBanner:'ჯგუფის წევრის რეგისტრაცია — მხოლოდ სახელი და კონტაქტი. პასპორტი არ სჭირდება. წვდომა მთავრდება ბრონირების ბოლოს.',wifiPageHint:'დააკავშირეთ ტელეფონი ამ Wi‑Fi ქსელთან',wifiPageEmpty:'WiFi ჯერ არ არის დამატებული',elevLbl:'ლიფტი და შესასვლელი',elevScan:'დაასკანერეთ შესასვლელსა და ლიფტთან',elevType:'ან შეიყვანეთ ეს 6-ნიშნა კოდი',elevFallback:'შეიყვანეთ პანელზე და დააჭირეთ #. QR ყოველდღე იცვლება.',wtTitle:'როგორ მოხვდეთ',wtEmpty:'ჩასვლის ფოტოები აქ გამოჩნდება, როცა ბინისთვის დაემატება.',inviteTitle:'სხვა სტუმრებსაც სჭირდებათ შენობის QR',inviteSub:'გაუზიარეთ ეს ბმული — ისინი პასპორტის ატვირთვას გამოტოვებენ.',inviteBtn:'ბმულის კოპირება სხვა სტუმრებისთვის',checkedInHint:'როცა ბინაში შეხვალთ, დააჭირეთ ქვემოთ — გვეცოდინება, რომ ჩამოხვედით.',btnCheckedIn:'ჩამოვედი',btnWalkthrough:'ჩასვლის ინსტრუქციის ჩვენება',checkoutToday:'გასვლა დღეს',btnCheckedOut:'გავედი',thankTitle:'კიდევ შევხვდებით.',thankBody:'წვდომა დასრულდა. იმედია, კომფორტულად გაგვივლეთ. რამე დაგავიწყდათ — დაგვიკავშირდით WhatsApp-ზე.',thankContact:'ჰოსტთან დაკავშირება',wybGuests:'მაქს. {n} სტუმარი'},
+ws:'კეთილი იყოს — გთხოვთ შეავსოთ ჩეკინი',yi:'თქვენი ინფორმაცია',fn:'სრული სახელი',gu:'სტუმრები',na:'ეროვნება',ct:'კონტაქტი',cnu:'ნომერი ან username',pt:'პასპორტის ფოტო',ph:'შეეხეთ გადასაღებად',sb:'რეგისტრაციის დასრულება',gl:'კეთილი იყოს თქვენი მობრძანება',tc:'ჩეკინის დეტალები',tcs:'ინსტრუქცია, კარის კოდი და ფოტოები',tw:'WiFi',tws:'ქსელის სახელი და პაროლი',tsv:'სერვისები',tsvs:'დასუფთავება, სამრეცხაო, ტური',tr:'რეკომენდაციები',trs:'საუკეთესო ადგილები',tru:'სახლის წესები',trus:'გთხოვთ წაიკითხოთ',tco:'დაგვიკავშირდით',tcos:'ჩვენ ყოველთვის აქ ვართ',lt:'ჯერ მიუწვდომელია',ls:'ოთახი მზადდება. ინსტრუქცია გამოჩნდება 15:00 საათზე.',cl:'კიდევ დარჩა',dc:'კარის კოდი',wn:'WiFi სახელი',wp:'პაროლი',cp:'კოპირება',cpd:'დაკოპირდა!',hi:'როგორ შეხვიდეთ',hr:'სახლის წესები',rs:'მოთხოვნა გაიგზავნა!',rf:'გაგზავნა ვერ მოხერხდა',sn:'შენიშვნები',snh:'სპეციალური მოთხოვნები...',sr:'გაგზავნა',ca:'გაუქმება',mr:'ჩემი მოთხოვნები',nr:'მოთხოვნები არ არის',pe:'განხილვაში',dn:'შესრულდა',cwa:'WhatsApp',cwas:'დაგვიკავშირდით WhatsApp-ით',rg:'დარეგისტრირდით! იტვირთება...',elevatorTitle:'ლიფტისა და შესასვლელის კოდი',elevatorHint:'ეს კოდი გამოიყენება შესასვლელისა და ლიფტისთვის. შეიყვანეთ კოდი და დააჭირეთ #.',elevatorToday:'დღევანდელი კოდი,',elevatorUpdating:'ლიფტის კოდი განახლდება — საჭიროების შემთხვევაში დაუკავშირდით ჰოსტს',checkinTitle:'კეთილი იყოს თქვენი ყოფნა',checkinSub:'სულ რამდენიმე დეტალი და თქვენ გექნებათ ყველაფერი, რაც გჭირდებათ თქვენი ყოფნისთვის.',checkinKicker:'სტუმრის რეგისტრაცია',searchInstructions:'გამოიყენეთ ბრონირებაში მითითებული სახელი — არა პასპორტის.',fullName:'სახელი და გვარი',namePlaceholder:'როგორც ბრონირებაშია',arrivalDate:'ჩასვლის თარიღი',selectDate:'შეეხეთ — აირჩიეთ ჩასვლის თარიღი',resNumber:'Booking.com / Expedia დადასტურების ნომერი',resPlaceholder:'Booking.com / Expedia დადასტურების ნომერი',phoneLabel:'WhatsApp ან Telegram',checkinTimeLabel:'სავარაუდო ჩასვლის დრო',checkinTimeHint:'თბილისის დრო — გვეხმარება ბინის მომზადებაში',checkinTimeLateNight:'შუაღამის შემდეგ',checkinTimeNextMorning:'შემდეგი დილა',checkinTimeBefore15:'15:00-მდე',checkinTimeWarn:'ჩეკ-ინი იწყება 15:00-ზე. ოთახი ადრე შეიძლება არ იყოს მზად.',checkinTimeEarlyNote:'ადრეული ჩეკ-ინი შესაძლოა ინსტრუქციას ადრე გახსნას — მაინც 15:00-ზე გეგმეთ.',passportRequired:'სავალდებულო',passportPageTitle:'პასპორტის ფოტო',passportPageSub:'საჭიროა ჩეკ-ინის დასადასტურებლად',rulesTitle:'სახლის წესები',rulesIntro:'გთხოვთ წაიკითხოთ და დაეთანხმოთ',rulesBtn:'ვეთანხმები — გაგრძელება',ruleNoiseTitle:'ყოველგვარი წვეულება და ხმაური აკრძალულია',ruleNoiseSub:'სიჩუმის საათები 22:00-ის შემდეგ.',ruleSmokeTitle:'ბინაში მოკარება აკრძალულია',ruleSmokeSub:'შენობის შიგნით სრულიად აკრძალულია. ჯარიმა გამოიწერება.',ruleCareTitle:'გთხოვთ, იზრუნოთ ბინაზე',ruleCareSub:'არ დააზიანოთ ქონება და არ დაკარგოთ შესასვლელის ბარათები (თუ გაცემული გაქვთ). შეცვლის ღირებულება გამოიწერება.',guestsLabel:'სტუმრები',fields:'ველი',tlo:'მდებარეობა',tlos:'მისამართი და პარკინგი',wyb:'რა დაჯავშნეთ',waitingSub:'კარის კოდი და ჩეკ-ინის ინსტრუქცია ჯერ არ არის მზად. ჩეკ-ინის დროს ისევ ამავე გვერდზე შემოდით — ყველაფერი აქ გამოჩნდება.',tabLocation:'მდებარეობა',tabShuttle:'შატლის სერვისი',tabTours:'ტურები',tabLocEmpty:'მისამართი, რუკა და პარკინგი — მალე',tabRequestPickup:'ტრანსფერის მოთხოვნა',tabAskTours:'ტურების შესახებ კითხვა',tabSvcUnavailable:'ამჟამად მიუწვდომელია',tabShuttleEmpty:'აეროპორტის შატლი — მალე',tabToursEmpty:'ტურები და ქალაქის გზამკვლევი — მალე',btnLocation:'მდებარეობა',btnParking:'პარკინგი',wifiLbl:'WiFi',doorLbl:'სმარტ-ჩაკრის კოდი',doorHint:'შეიყვანეთ პანელზე და დააჭირეთ #',wtDoorTitle:'თქვენი ბინის კარი',btnHideWalkthrough:'ჩასვლის ინსტრუქციის დამალვა',checkoutHint:'გასვლა დღეს? როცა ბინიდან გახვალთ, დააჭირეთ ქვემოთ.',inviteTitle:'გაუზიარეთ ჯგუფის წევრებს',inviteSub:'ბრონირების სხვა სტუმრები შეძლებენ მოკლე ფორმის გახსნას — იგივე QR და კოდები, პასპორტის გარეშე.',inviteBtn:'ბმული ჯგუფის წევრებისთვის',companionHint:'ჯგუფის ბმულით ხართ — სახელი და კონტაქტი საკმარისია.',companionJoin:'შემოუერთდი ბრონირებას',companionBanner:'ჯგუფის წევრის რეგისტრაცია — მხოლოდ სახელი და კონტაქტი. პასპორტი არ სჭირდება. წვდომა მთავრდება ბრონირების ბოლოს.',wifiPageHint:'დააკავშირეთ ტელეფონი ამ Wi‑Fi ქსელთან',wifiPageEmpty:'WiFi ჯერ არ არის დამატებული',elevLbl:'ლიფტი და შესასვლელი',elevScan:'დაასკანერეთ შესასვლელსა და ლიფტთან',elevType:'ლიფტის კოდი',elevFallback:'შეიყვანეთ პანელზე და დააჭირეთ #. QR ყოველდღე იცვლება.',wtTitle:'როგორ მოხვდეთ',wtEmpty:'ჩასვლის ფოტოები აქ გამოჩნდება, როცა ბინისთვის დაემატება.',inviteTitle:'სხვა სტუმრებსაც სჭირდებათ შენობის QR',inviteSub:'გაუზიარეთ ეს ბმული — ისინი პასპორტის ატვირთვას გამოტოვებენ.',inviteBtn:'ბმულის კოპირება სხვა სტუმრებისთვის',checkedInHint:'როცა ბინაში შეხვალთ, დააჭირეთ ქვემოთ — გვეცოდინება, რომ ჩამოხვედით.',btnCheckedIn:'ჩამოვედი',btnWalkthrough:'ჩასვლის ინსტრუქციის ჩვენება',checkoutToday:'გასვლა დღეს',btnCheckedOut:'გავედი',thankTitle:'კიდევ შევხვდებით.',thankBody:'წვდომა დასრულდა. იმედია, კომფორტულად გაგვივლეთ. რამე დაგავიწყდათ — დაგვიკავშირდით WhatsApp-ზე.',thankContact:'ჰოსტთან დაკავშირება',wybGuests:'მაქს. {n} სტუმარი'},
   ru:{ac:'Код доступа',vf:'Действует с',vt:'по',ttp:'Нажмите для копирования',cp2:'Код генерируется — свяжитесь с хозяином',chc:'Свяжитесь с хозяином для получения кода',
-ws:'Добро пожаловать — завершите регистрацию',yi:'Ваши данные',fn:'Полное имя',gu:'Гостей',na:'Гражданство',ct:'Контакт',cnu:'Ваш номер или username',pt:'Фото паспорта',ph:'Нажмите для фото или загрузки',sb:'Завершить регистрацию',gl:'С возвращением',tc:'Детали заезда',tcs:'Инструкции, код двери и фото',tw:'WiFi',tws:'Имя сети и пароль',tsv:'Услуги',tsvs:'Уборка, стирка, туры и другое',tr:'Рекомендации',trs:'Лучшие места рядом',tru:'Правила проживания',trus:'Пожалуйста прочитайте',tco:'Связаться с нами',tcos:'Мы здесь круглосуточно',lt:'Пока недоступно',ls:'Номер готовится. Инструкции откроются в 15:00.',cl:'Доступно через',dc:'Код двери',wn:'Имя сети',wp:'Пароль',cp:'Копировать',cpd:'Скопировано!',hi:'Как заселиться',hr:'Правила проживания',rs:'Запрос отправлен!',rf:'Ошибка',sn:'Примечания',snh:'Особые пожелания...',sr:'Отправить',ca:'Отмена',mr:'Мои запросы',nr:'Запросов нет',pe:'В обработке',dn:'Выполнено',cwa:'WhatsApp',cwas:'Напишите нам в WhatsApp',rg:'Зарегистрировано! Загрузка...',elevatorTitle:'Код лифта и входа',elevatorHint:'Этот код используется для входа в здание и лифта. Введите код и нажмите #.',elevatorToday:'Код на сегодня,',elevatorUpdating:'Код лифта обновляется — при необходимости свяжитесь с хозяином',checkinTitle:'Добро пожаловать на ваше пребывание',checkinSub:'Всего несколько деталей, и у вас будет всё необходимое для вашего проживания.',checkinKicker:'РЕГИСТРАЦИЯ ГОСТЯ',searchInstructions:'Имя из бронирования — не из паспорта.',fullName:'Имя и фамилия',namePlaceholder:'Как в подтверждении брони',arrivalDate:'Дата заезда',selectDate:'Нажмите — выберите дату заезда',resNumber:'Номер подтверждения Booking.com / Expedia',resPlaceholder:'Номер подтверждения Booking.com / Expedia',phoneLabel:'WhatsApp или Telegram',checkinTimeLabel:'Примерное время заезда',checkinTimeHint:'Время Тбилиси — помогает нам подготовить квартиру',checkinTimeLateNight:'После полуночи',checkinTimeNextMorning:'Следующее утро',checkinTimeBefore15:'До 15:00',checkinTimeWarn:'Заезд с 15:00. Номер может быть не готов раньше.',checkinTimeEarlyNote:'При раннем заезде инструкции могут открыться раньше — ориентируйтесь на 15:00.',passportRequired:'обязательно',passportPageTitle:'Фото паспорта',passportPageSub:'Нужно для подтверждения заезда',rulesTitle:'Правила проживания',rulesIntro:'Пожалуйста, прочитайте и примите перед заездом',rulesBtn:'Согласен — Продолжить',ruleNoiseTitle:'Без вечеринок и громкого шума',ruleNoiseSub:'Тихие часы после 22:00.',ruleSmokeTitle:'Курение в квартире запрещено',ruleSmokeSub:'Строго запрещено в помещении. Штраф.',ruleCareTitle:'Берегите квартиру',ruleCareSub:'Не повреждайте имущество и не теряйте карты доступа (если выданы). Замена за ваш счёт.',guestsLabel:'Гости',fields:'поля',tlo:'Расположение',tlos:'Адрес, карты и парковка',wyb:'Ваше бронирование',waitingSub:'Код двери и инструкции по заселению пока недоступны. Когда наступит время заезда, откройте эту же страницу снова — всё появится здесь автоматически.',tabLocation:'Расположение',tabShuttle:'Трансфер',tabTours:'Экскурсии',tabLocEmpty:'Адрес, карты и парковка — скоро',tabRequestPickup:'Запросить трансфер',tabAskTours:'Спросить об экскурсиях',tabSvcUnavailable:'Сейчас недоступно',tabShuttleEmpty:'Заказ трансфера из аэропорта — скоро',tabToursEmpty:'Экскурсии и путеводитель — скоро',btnLocation:'Расположение',btnParking:'Парковка',wifiLbl:'WiFi',doorLbl:'Пароль умного замка',doorHint:'Введите на панели замка, затем нажмите #',wtDoorTitle:'Дверь вашей квартиры',btnHideWalkthrough:'Скрыть инструкции',checkoutHint:'Выезжаете сегодня? Нажмите кнопку ниже, когда выйдете из квартиры.',inviteTitle:'Поделитесь доступом с группой',inviteSub:'Другие гости в бронировании откроют короткую форму — те же QR и коды, без паспорта.',inviteBtn:'Открыть ссылку для группы',companionHint:'Вы по групповой ссылке — нужны только имя и контакт.',companionJoin:'Присоединиться к брони',companionBanner:'Регистрация участника группы — только имя и контакт. Без паспорта. Доступ до конца бронирования.',wifiPageHint:'Подключите телефон к этой сети Wi‑Fi',wifiPageEmpty:'Данные WiFi ещё не добавлены',elevLbl:'Лифт и вход',elevScan:'Отсканируйте у входа в здание и у лифта',elevType:'Или введите этот 6-значный код',elevFallback:'Введите на панели и нажмите #. QR обновляется каждый день.',wtTitle:'Как добраться',wtEmpty:'Фото маршрута появятся здесь, когда будут добавлены для этой квартиры.',inviteTitle:'Другим гостям тоже нужен QR-код здания',inviteSub:'Отправьте эту ссылку — они пропустят загрузку паспорта и сразу попадут в бронирование.',inviteBtn:'Скопировать ссылку для других гостей',checkedInHint:'Когда окажетесь в квартире, нажмите ниже — мы будем знать, что вы заселились.',btnCheckedIn:'Я заселился',btnWalkthrough:'Показать инструкции по заезду',checkoutToday:'Выезд сегодня',btnCheckedOut:'Я выехал',thankTitle:'До новых встреч.',thankBody:'Доступ завершён. Надеемся, вам было комфортно. Если что-то забыли — напишите нам в WhatsApp.',thankContact:'Связаться с хозяином',wybGuests:'До {n} гостей'},
+ws:'Добро пожаловать — завершите регистрацию',yi:'Ваши данные',fn:'Полное имя',gu:'Гостей',na:'Гражданство',ct:'Контакт',cnu:'Ваш номер или username',pt:'Фото паспорта',ph:'Нажмите для фото или загрузки',sb:'Завершить регистрацию',gl:'С возвращением',tc:'Детали заезда',tcs:'Инструкции, код двери и фото',tw:'WiFi',tws:'Имя сети и пароль',tsv:'Услуги',tsvs:'Уборка, стирка, туры и другое',tr:'Рекомендации',trs:'Лучшие места рядом',tru:'Правила проживания',trus:'Пожалуйста прочитайте',tco:'Связаться с нами',tcos:'Мы здесь круглосуточно',lt:'Пока недоступно',ls:'Номер готовится. Инструкции откроются в 15:00.',cl:'Доступно через',dc:'Код двери',wn:'Имя сети',wp:'Пароль',cp:'Копировать',cpd:'Скопировано!',hi:'Как заселиться',hr:'Правила проживания',rs:'Запрос отправлен!',rf:'Ошибка',sn:'Примечания',snh:'Особые пожелания...',sr:'Отправить',ca:'Отмена',mr:'Мои запросы',nr:'Запросов нет',pe:'В обработке',dn:'Выполнено',cwa:'WhatsApp',cwas:'Напишите нам в WhatsApp',rg:'Зарегистрировано! Загрузка...',elevatorTitle:'Код лифта и входа',elevatorHint:'Этот код используется для входа в здание и лифта. Введите код и нажмите #.',elevatorToday:'Код на сегодня,',elevatorUpdating:'Код лифта обновляется — при необходимости свяжитесь с хозяином',checkinTitle:'Добро пожаловать на ваше пребывание',checkinSub:'Всего несколько деталей, и у вас будет всё необходимое для вашего проживания.',checkinKicker:'РЕГИСТРАЦИЯ ГОСТЯ',searchInstructions:'Имя из бронирования — не из паспорта.',fullName:'Имя и фамилия',namePlaceholder:'Как в подтверждении брони',arrivalDate:'Дата заезда',selectDate:'Нажмите — выберите дату заезда',resNumber:'Номер подтверждения Booking.com / Expedia',resPlaceholder:'Номер подтверждения Booking.com / Expedia',phoneLabel:'WhatsApp или Telegram',checkinTimeLabel:'Примерное время заезда',checkinTimeHint:'Время Тбилиси — помогает нам подготовить квартиру',checkinTimeLateNight:'После полуночи',checkinTimeNextMorning:'Следующее утро',checkinTimeBefore15:'До 15:00',checkinTimeWarn:'Заезд с 15:00. Номер может быть не готов раньше.',checkinTimeEarlyNote:'При раннем заезде инструкции могут открыться раньше — ориентируйтесь на 15:00.',passportRequired:'обязательно',passportPageTitle:'Фото паспорта',passportPageSub:'Нужно для подтверждения заезда',rulesTitle:'Правила проживания',rulesIntro:'Пожалуйста, прочитайте и примите перед заездом',rulesBtn:'Согласен — Продолжить',ruleNoiseTitle:'Без вечеринок и громкого шума',ruleNoiseSub:'Тихие часы после 22:00.',ruleSmokeTitle:'Курение в квартире запрещено',ruleSmokeSub:'Строго запрещено в помещении. Штраф.',ruleCareTitle:'Берегите квартиру',ruleCareSub:'Не повреждайте имущество и не теряйте карты доступа (если выданы). Замена за ваш счёт.',guestsLabel:'Гости',fields:'поля',tlo:'Расположение',tlos:'Адрес, карты и парковка',wyb:'Ваше бронирование',waitingSub:'Код двери и инструкции по заселению пока недоступны. Когда наступит время заезда, откройте эту же страницу снова — всё появится здесь автоматически.',tabLocation:'Расположение',tabShuttle:'Трансфер',tabTours:'Экскурсии',tabLocEmpty:'Адрес, карты и парковка — скоро',tabRequestPickup:'Запросить трансфер',tabAskTours:'Спросить об экскурсиях',tabSvcUnavailable:'Сейчас недоступно',tabShuttleEmpty:'Заказ трансфера из аэропорта — скоро',tabToursEmpty:'Экскурсии и путеводитель — скоро',btnLocation:'Расположение',btnParking:'Парковка',wifiLbl:'WiFi',doorLbl:'Код умного замка',doorHint:'Введите на панели замка, затем нажмите #',wtDoorTitle:'Дверь вашей квартиры',btnHideWalkthrough:'Скрыть инструкции',checkoutHint:'Выезжаете сегодня? Нажмите кнопку ниже, когда выйдете из квартиры.',inviteTitle:'Поделитесь доступом с группой',inviteSub:'Другие гости в бронировании откроют короткую форму — те же QR и коды, без паспорта.',inviteBtn:'Открыть ссылку для группы',companionHint:'Вы по групповой ссылке — нужны только имя и контакт.',companionJoin:'Присоединиться к брони',companionBanner:'Регистрация участника группы — только имя и контакт. Без паспорта. Доступ до конца бронирования.',wifiPageHint:'Подключите телефон к этой сети Wi‑Fi',wifiPageEmpty:'Данные WiFi ещё не добавлены',elevLbl:'Лифт и вход',elevScan:'Отсканируйте у входа в здание и у лифта',elevType:'Код лифта',elevFallback:'Введите на панели и нажмите #. QR обновляется каждый день.',wtTitle:'Как добраться',wtEmpty:'Фото маршрута появятся здесь, когда будут добавлены для этой квартиры.',inviteTitle:'Другим гостям тоже нужен QR-код здания',inviteSub:'Отправьте эту ссылку — они пропустят загрузку паспорта и сразу попадут в бронирование.',inviteBtn:'Скопировать ссылку для других гостей',checkedInHint:'Когда окажетесь в квартире, нажмите ниже — мы будем знать, что вы заселились.',btnCheckedIn:'Я заселился',btnWalkthrough:'Показать инструкции по заезду',checkoutToday:'Выезд сегодня',btnCheckedOut:'Я выехал',thankTitle:'До новых встреч.',thankBody:'Доступ завершён. Надеемся, вам было комфортно. Если что-то забыли — напишите нам в WhatsApp.',thankContact:'Связаться с хозяином',wybGuests:'До {n} гостей'},
   ar:{ac:'رمز الوصول',vf:'صالح من',vt:'إلى',ttp:'انقر للنسخ',cp2:'جارٍ إنشاء الرمز — تواصل مع المضيف',chc:'تواصل مع المضيف للحصول على رمز الوصول',
-ws:'مرحباً — يرجى إكمال تسجيل الوصول',yi:'معلوماتك',fn:'الاسم الكامل',gu:'الضيوف',na:'الجنسية',ct:'التواصل',cnu:'رقمك أو اسم المستخدم',pt:'صورة جواز السفر',ph:'انقر للتصوير أو الرفع',sb:'إتمام التسجيل',gl:'مرحباً بعودتك',tc:'تفاصيل الوصول',tcs:'التعليمات ورمز الباب والصور',tw:'واي فاي',tws:'اسم الشبكة وكلمة المرور',tsv:'الخدمات',tsvs:'تنظيف وغسيل وجولات',tr:'التوصيات',trs:'أفضل الأماكن القريبة',tru:'قواعد المنزل',trus:'يرجى القراءة قبل إقامتك',tco:'تواصل معنا',tcos:'نحن هنا على مدار الساعة',lt:'غير متاح بعد',ls:'غرفتك قيد التجهيز. ستظهر التعليمات في الساعة 3:00 مساءً.',cl:'متاح في',dc:'رمز الباب',wn:'اسم الشبكة',wp:'كلمة المرور',cp:'نسخ',cpd:'تم النسخ!',hi:'كيفية تسجيل الوصول',hr:'قواعد المنزل',rs:'تم إرسال الطلب!',rf:'فشل الإرسال',sn:'ملاحظات',snh:'تعليمات خاصة...',sr:'إرسال الطلب',ca:'إلغاء',mr:'طلباتي',nr:'لا توجد طلبات',pe:'قيد الانتظار',dn:'تم',cwa:'واتساب',cwas:'تواصل معنا على واتساب',rg:'تم التسجيل! جارٍ التحميل...',elevatorTitle:'رمز المصعد والمدخل',elevatorHint:'نفس الرمز لمدخل المبنى والمصعد. أدخل الرمز ثم اضغط #.',elevatorToday:'رمز اليوم،',elevatorUpdating:'رمز المصعد قيد التحديث — تواصل مع المضيف إذا لزم الأمر',checkinTitle:'مرحباً بكم في إقامتكم',checkinSub:'فقط بضع تفاصيل وستحصل على كل ما تحتاجه لإقامتك.',checkinKicker:'تسجيل وصول الضيف',searchInstructions:'الاسم في تأكيد الحجز — وليس جواز السفر.',fullName:'الاسم الأول والأخير',namePlaceholder:'كما في تأكيد الحجز',arrivalDate:'تاريخ تسجيل الدخول',selectDate:'اضغط لاختيار تاريخ الوصول',resNumber:'رقم تأكيد Booking.com / Expedia',resPlaceholder:'رقم تأكيد Booking.com / Expedia',phoneLabel:'واتساب أو تيليجرام',checkinTimeLabel:'وقت الوصول التقريبي',checkinTimeHint:'توقيت تبليسي — يساعدنا على تجهيز الشقة',checkinTimeLateNight:'بعد منتصف الليل',checkinTimeNextMorning:'صباح اليوم التالي',checkinTimeBefore15:'قبل 15:00',checkinTimeWarn:'يبدأ تسجيل الدخول الساعة 15:00. قد لا تكون الغرفة جاهزة قبل ذلك.',checkinTimeEarlyNote:'إن أمكن الوصول المبكر، قد تُفتح التعليمات أبكر — يُفضّل الوصول الساعة 15:00.',passportRequired:'مطلوب',passportPageTitle:'صورة جواز السفر',passportPageSub:'مطلوبة للتحقق من تسجيل الدخول',rulesTitle:'قواعد المنزل',rulesIntro:'يرجى القراءة والموافقة قبل إقامتك',rulesBtn:'أوافق — متابعة',ruleNoiseTitle:'ممنوع الحفلات والضوضاء الزائدة',ruleNoiseSub:'ساعات الهدوء بعد 22:00.',ruleSmokeTitle:'ممنوع التدخين داخل الشقة',ruleSmokeSub:'محظور تماماً في الداخل. غرامة.',ruleCareTitle:'اعتنِ بالشقة',ruleCareSub:'لا تُلحِق ضرراً بالممتلكات ولا تفقد بطاقات الدخول (إن وُجدت). رسوم الاستبدال.',guestsLabel:'الضيوف',fields:'حقول',tlo:'الموقع والمواقف',tlos:'العنوان والخرائط والمواقف',wyb:'ما حجزته',waitingSub:'رمز الباب وتعليمات تسجيل الوصول غير جاهزين بعد. عند موعد تسجيل الدخول، افتح هذه الصفحة نفسها مرة أخرى — ستظهر هنا تلقائياً.',tabLocation:'الموقع',tabShuttle:'خدمة النقل',tabTours:'الجولات',tabLocEmpty:'العنوان والخرائط والمواقف — قريباً',tabRequestPickup:'طلب النقل',tabAskTours:'استفسار عن الجولات',tabSvcUnavailable:'غير متاح حالياً',tabShuttleEmpty:'حجز نقل من المطار — قريباً',tabToursEmpty:'الجولات ودليل المدينة — قريباً',btnLocation:'الموقع',btnParking:'المواقف',wifiLbl:'واي فاي',doorLbl:'كلمة مرور القفل الذكي',doorHint:'أدخلها على لوحة القفل ثم اضغط #',wtDoorTitle:'باب شقتك',btnHideWalkthrough:'إخفاء تعليمات الوصول',checkoutHint:'المغادرة اليوم؟ اضغط الزر أدناه عند مغادرة الشقة.',inviteTitle:'شارك الوصول مع مجموعتك',inviteSub:'يمكن لأفراد حجزك فتح نموذج قصير — نفس رمز QR والأكواد، بدون جواز سفر.',inviteBtn:'فتح الرابط لأفراد المجموعة',companionHint:'انضممت عبر رابط المجموعة — الاسم والتواصل فقط.',companionJoin:'الانضمام للحجز',companionBanner:'تسجيل عضو المجموعة — الاسم والتواصل فقط. بدون جواز. ينتهي الوصول مع انتهاء الحجز.',wifiPageHint:'صل هاتفك بشبكة Wi‑Fi هذه',wifiPageEmpty:'تفاصيل WiFi غير متوفرة بعد',elevLbl:'المصعد والمدخل',elevScan:'امسح الرمز عند مدخل المبنى والمصعد',elevType:'أو أدخل هذا الرمز المكوّن من 6 أرقام',elevFallback:'أدخله على اللوحة ثم اضغط #. يتغيّر الرمز يومياً.',wtTitle:'كيف تصل',wtEmpty:'ستظهر صور الوصول هنا عند إضافتها لهذه الشقة.',inviteTitle:'الضيوف الآخرون يحتاجون رمز المبنى أيضاً',inviteSub:'شارك هذا الرابط — يتخطّون رفع جواز السفر ويصلون مباشرة إلى حجزك.',inviteBtn:'نسخ الرابط للضيوف الآخرين',checkedInHint:'عند دخولك الشقة، اضغط أدناه لنعرف أنك وصلت.',btnCheckedIn:'تم تسجيل وصولي',btnWalkthrough:'عرض تعليمات الوصول',checkoutToday:'المغادرة اليوم',btnCheckedOut:'غادرت',thankTitle:'نراك قريباً.',thankBody:'انتهى وصولك. نأمل أن كانت إقامتك مريحة. إن نسيت شيئاً أو احتجت مساعدة، تواصل معنا على واتساب.',thankContact:'تواصل مع المضيف',wybGuests:'حتى {n} ضيوف'}
+ws:'مرحباً — يرجى إكمال تسجيل الوصول',yi:'معلوماتك',fn:'الاسم الكامل',gu:'الضيوف',na:'الجنسية',ct:'التواصل',cnu:'رقمك أو اسم المستخدم',pt:'صورة جواز السفر',ph:'انقر للتصوير أو الرفع',sb:'إتمام التسجيل',gl:'مرحباً بعودتك',tc:'تفاصيل الوصول',tcs:'التعليمات ورمز الباب والصور',tw:'واي فاي',tws:'اسم الشبكة وكلمة المرور',tsv:'الخدمات',tsvs:'تنظيف وغسيل وجولات',tr:'التوصيات',trs:'أفضل الأماكن القريبة',tru:'قواعد المنزل',trus:'يرجى القراءة قبل إقامتك',tco:'تواصل معنا',tcos:'نحن هنا على مدار الساعة',lt:'غير متاح بعد',ls:'غرفتك قيد التجهيز. ستظهر التعليمات في الساعة 3:00 مساءً.',cl:'متاح في',dc:'رمز الباب',wn:'اسم الشبكة',wp:'كلمة المرور',cp:'نسخ',cpd:'تم النسخ!',hi:'كيفية تسجيل الوصول',hr:'قواعد المنزل',rs:'تم إرسال الطلب!',rf:'فشل الإرسال',sn:'ملاحظات',snh:'تعليمات خاصة...',sr:'إرسال الطلب',ca:'إلغاء',mr:'طلباتي',nr:'لا توجد طلبات',pe:'قيد الانتظار',dn:'تم',cwa:'واتساب',cwas:'تواصل معنا على واتساب',rg:'تم التسجيل! جارٍ التحميل...',elevatorTitle:'رمز المصعد والمدخل',elevatorHint:'نفس الرمز لمدخل المبنى والمصعد. أدخل الرمز ثم اضغط #.',elevatorToday:'رمز اليوم،',elevatorUpdating:'رمز المصعد قيد التحديث — تواصل مع المضيف إذا لزم الأمر',checkinTitle:'مرحباً بكم في إقامتكم',checkinSub:'فقط بضع تفاصيل وستحصل على كل ما تحتاجه لإقامتك.',checkinKicker:'تسجيل وصول الضيف',searchInstructions:'الاسم في تأكيد الحجز — وليس جواز السفر.',fullName:'الاسم الأول والأخير',namePlaceholder:'كما في تأكيد الحجز',arrivalDate:'تاريخ تسجيل الدخول',selectDate:'اضغط لاختيار تاريخ الوصول',resNumber:'رقم تأكيد Booking.com / Expedia',resPlaceholder:'رقم تأكيد Booking.com / Expedia',phoneLabel:'واتساب أو تيليجرام',checkinTimeLabel:'وقت الوصول التقريبي',checkinTimeHint:'توقيت تبليسي — يساعدنا على تجهيز الشقة',checkinTimeLateNight:'بعد منتصف الليل',checkinTimeNextMorning:'صباح اليوم التالي',checkinTimeBefore15:'قبل 15:00',checkinTimeWarn:'يبدأ تسجيل الدخول الساعة 15:00. قد لا تكون الغرفة جاهزة قبل ذلك.',checkinTimeEarlyNote:'إن أمكن الوصول المبكر، قد تُفتح التعليمات أبكر — يُفضّل الوصول الساعة 15:00.',passportRequired:'مطلوب',passportPageTitle:'صورة جواز السفر',passportPageSub:'مطلوبة للتحقق من تسجيل الدخول',rulesTitle:'قواعد المنزل',rulesIntro:'يرجى القراءة والموافقة قبل إقامتك',rulesBtn:'أوافق — متابعة',ruleNoiseTitle:'ممنوع الحفلات والضوضاء الزائدة',ruleNoiseSub:'ساعات الهدوء بعد 22:00.',ruleSmokeTitle:'ممنوع التدخين داخل الشقة',ruleSmokeSub:'محظور تماماً في الداخل. غرامة.',ruleCareTitle:'اعتنِ بالشقة',ruleCareSub:'لا تُلحِق ضرراً بالممتلكات ولا تفقد بطاقات الدخول (إن وُجدت). رسوم الاستبدال.',guestsLabel:'الضيوف',fields:'حقول',tlo:'الموقع والمواقف',tlos:'العنوان والخرائط والمواقف',wyb:'ما حجزته',waitingSub:'رمز الباب وتعليمات تسجيل الوصول غير جاهزين بعد. عند موعد تسجيل الدخول، افتح هذه الصفحة نفسها مرة أخرى — ستظهر هنا تلقائياً.',tabLocation:'الموقع',tabShuttle:'خدمة النقل',tabTours:'الجولات',tabLocEmpty:'العنوان والخرائط والمواقف — قريباً',tabRequestPickup:'طلب النقل',tabAskTours:'استفسار عن الجولات',tabSvcUnavailable:'غير متاح حالياً',tabShuttleEmpty:'حجز نقل من المطار — قريباً',tabToursEmpty:'الجولات ودليل المدينة — قريباً',btnLocation:'الموقع',btnParking:'المواقف',wifiLbl:'واي فاي',doorLbl:'رمز القفل الذكي',doorHint:'أدخلها على لوحة القفل ثم اضغط #',wtDoorTitle:'باب شقتك',btnHideWalkthrough:'إخفاء تعليمات الوصول',checkoutHint:'المغادرة اليوم؟ اضغط الزر أدناه عند مغادرة الشقة.',inviteTitle:'شارك الوصول مع مجموعتك',inviteSub:'يمكن لأفراد حجزك فتح نموذج قصير — نفس رمز QR والأكواد، بدون جواز سفر.',inviteBtn:'فتح الرابط لأفراد المجموعة',companionHint:'انضممت عبر رابط المجموعة — الاسم والتواصل فقط.',companionJoin:'الانضمام للحجز',companionBanner:'تسجيل عضو المجموعة — الاسم والتواصل فقط. بدون جواز. ينتهي الوصول مع انتهاء الحجز.',wifiPageHint:'صل هاتفك بشبكة Wi‑Fi هذه',wifiPageEmpty:'تفاصيل WiFi غير متوفرة بعد',elevLbl:'المصعد والمدخل',elevScan:'امسح الرمز عند مدخل المبنى والمصعد',elevType:'رمز المصعد',elevFallback:'أدخله على اللوحة ثم اضغط #. يتغيّر الرمز يومياً.',wtTitle:'كيف تصل',wtEmpty:'ستظهر صور الوصول هنا عند إضافتها لهذه الشقة.',inviteTitle:'الضيوف الآخرون يحتاجون رمز المبنى أيضاً',inviteSub:'شارك هذا الرابط — يتخطّون رفع جواز السفر ويصلون مباشرة إلى حجزك.',inviteBtn:'نسخ الرابط للضيوف الآخرين',checkedInHint:'عند دخولك الشقة، اضغط أدناه لنعرف أنك وصلت.',btnCheckedIn:'تم تسجيل وصولي',btnWalkthrough:'عرض تعليمات الوصول',checkoutToday:'المغادرة اليوم',btnCheckedOut:'غادرت',thankTitle:'نراك قريباً.',thankBody:'انتهى وصولك. نأمل أن كانت إقامتك مريحة. إن نسيت شيئاً أو احتجت مساعدة، تواصل معنا على واتساب.',thankContact:'تواصل مع المضيف',wybGuests:'حتى {n} ضيوف'}
 };
 
 function t(k){return T[lang]?.[k]||T.en?.[k]||k;}
@@ -1671,7 +1680,7 @@ function applyTranslations(){
     't-invite-title':'inviteTitle','t-invite-sub':'inviteSub','t-invite-btn':'inviteBtn',
     't-checked-in-hint':'checkedInHint','t-btn-checked-in':'btnCheckedIn','t-btn-walkthrough':'btnWalkthrough',
     't-checkout-hint':'checkoutHint','t-btn-checked-out':'btnCheckedOut','t-thank-title':'thankTitle','t-thank-body':'thankBody','t-thank-contact':'thankContact',
-    't-wifi-copy':'cp'
+    't-wifi-copy':'cp','t-door-copy':'cp'
   };
   Object.entries(map).forEach(([id,k])=>{const el=document.getElementById(id);if(el)el.textContent=t(k);});
   const walkBtn=document.querySelector('#btn-show-walkthrough span');
@@ -2782,51 +2791,23 @@ async function _renderHomeQuickAsync(){
   _renderHomeQuick();
 }
 
-// Waiting-phase tab panels (#panel-location/#panel-shuttle/#panel-tours) — real
-// pre-arrival info instead of "coming soon". Fetches admin config once (guarded by
-// _waitingTabsRendered) and reuses the same catalog/visibility the Staying-phase
-// service chips already use, so a service hidden by the host stays hidden here too.
-let _waitingTabsRendered=false;
-async function _renderWaitingTabsContent(){
-  if(_waitingTabsRendered)return;
-  _waitingTabsRendered=true;
-
-  try{
-    const locEl=document.getElementById('panel-location');
-    if(locEl){
-      const locData=await _getLocationData();
-      const mapsLink=locData.mapsUrl
-        ?`<a href="${esc(locData.mapsUrl)}" target="_blank" class="wtab-loc__maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>Open in Google Maps</a>`
-        :'';
-      const parking=locData.parkingEnabled
-        ?`<div class="wtab-loc__parking">${esc(locData.parkingDesc||'Paid parking available nearby')}</div>`
-        :'';
-      locEl.innerHTML=`<div class="wtab-loc"><div class="wtab-loc__address">${esc(locData.address||'')}</div>${mapsLink}${parking}</div>`;
-    }
-  }catch(e){console.error('[_renderWaitingTabsContent location]',e);}
-
-  try{
-    await _ensureServicesConfigLoaded();
-    const cat=_getGuestServicesCatalog();
-    const bySvc=id=>cat.find(s=>s.id===id);
-    const svcCard=(s,btnLabel)=>{
-      if(!s)return `<div class="tab-empty">${esc(t('tabSvcUnavailable'))}</div>`;
-      const nm=s.name[lang]||s.name.en;
-      const ds=s.desc[lang]||s.desc.en;
-      return `<div class="wtab-svc">${s.icon?`<div class="wtab-svc__icon">${s.icon}</div>`:''}`+
-        `<div class="wtab-svc__body">`+
-          `<div class="wtab-svc__name">${esc(nm)}</div>`+
-          `<div class="wtab-svc__desc">${esc(ds)}</div>`+
-          (s.price?`<div class="wtab-svc__price">${esc(s.price)}</div>`:'')+
-          `<button type="button" class="wtab-svc__btn" onclick="window.openSvc('${s.id}',${JSON.stringify(nm).replace(/"/g,'&quot;')},${s.hasTime})">${esc(btnLabel)}</button>`+
-        `</div>`+
-      `</div>`;
-    };
-    const shuttleEl=document.getElementById('panel-shuttle');
-    if(shuttleEl)shuttleEl.innerHTML=svcCard(bySvc('transfer'),t('tabRequestPickup'));
-    const toursEl=document.getElementById('panel-tours');
-    if(toursEl)toursEl.innerHTML=svcCard(bySvc('tour'),t('tabAskTours'));
-  }catch(e){console.error('[_renderWaitingTabsContent services]',e);}
+// FIX 1 — Shuttle/Tours tabs now open as a real subpage via openPage() (below),
+// same as Location, instead of an inline toggled panel. This card builder is
+// shared by both subpage branches; reuses the same catalog/visibility the
+// Staying-phase service chips already use, so a service hidden by the host
+// stays hidden here too.
+function _svcSubpageCard(s,btnLabel){
+  if(!s)return `<div class="tab-empty">${esc(t('tabSvcUnavailable'))}</div>`;
+  const nm=s.name[lang]||s.name.en;
+  const ds=s.desc[lang]||s.desc.en;
+  return `<div class="wtab-svc">${s.icon?`<div class="wtab-svc__icon">${s.icon}</div>`:''}`+
+    `<div class="wtab-svc__body">`+
+      `<div class="wtab-svc__name">${esc(nm)}</div>`+
+      `<div class="wtab-svc__desc">${esc(ds)}</div>`+
+      (s.price?`<div class="wtab-svc__price">${esc(s.price)}</div>`:'')+
+      `<button type="button" class="wtab-svc__btn" onclick="window.openSvc('${s.id}',${JSON.stringify(nm).replace(/"/g,'&quot;')},${s.hasTime})">${esc(btnLabel)}</button>`+
+    `</div>`+
+  `</div>`;
 }
 
 let _wybCat=null;
@@ -2896,7 +2877,7 @@ window.wybToggle=function(){
   if(chevron)chevron.classList.toggle('open',open);
 };
 
-// Shared by openPage('location') (full subpage) and _renderWaitingTabsContent()
+// Shared by openPage('location') (full subpage)
 // (inline waiting-tab panel) — same admin config + per-property fallback, one source of truth.
 async function _getLocationData(){
   const cfg=await getFullCfg();
@@ -2919,7 +2900,7 @@ try{
   })||activeReservation;
   if(type==='wifi'&&!isUnlocked()){openLocked(pageRes);return;}
   const d=aptData||{};
-  const titles={wifi:t('tw'),services:t('tsv'),recs:t('tr'),rules:t('tru'),contact:t('tco')};
+  const titles={wifi:t('tw'),services:t('tsv'),recs:t('tr'),rules:t('tru'),contact:t('tco'),shuttle:t('tabShuttle'),tours:t('tabTours')};
   let body='';
 
   if(type==='wifi'){
@@ -3017,6 +2998,17 @@ try{
       ${neighborhood}
       ${parkingSection}
     </div>`;
+  }
+
+  // FIX 1 — Shuttle/Tours tabs open as a real subpage now, same mechanism as
+  // Location, instead of toggling an inline panel. Reuses the same service
+  // catalog + admin visibility the Staying-phase chips already use.
+  if(type==='shuttle'||type==='tours'){
+    await _ensureServicesConfigLoaded();
+    const cat=_getGuestServicesCatalog();
+    const svc=cat.find(s=>s.id===(type==='shuttle'?'transfer':'tour'));
+    const btnLabel=type==='shuttle'?t('tabRequestPickup'):t('tabAskTours');
+    body=`<div style="padding:0 4px;">${_svcSubpageCard(svc,btnLabel)}</div>`;
   }
 
   _navToContent(type,titles[type]||t('tlo'),body);
@@ -4029,7 +4021,7 @@ function applyHomePhase(){
   const wt=document.getElementById('hero-walkthrough');
   if(wt&&phase!=='staying')wt.classList.remove('wt-expanded');
   _renderHeroContent();
-  if(phase==='waiting'){_startCountdownTick();_renderWaitingTabsContent();}
+  if(phase==='waiting')_startCountdownTick();
   applyTranslations();
 }
 
@@ -4177,7 +4169,7 @@ function _sbRenderHomeForPhase(phase){
   }else{
     home.classList.add('phase-'+phase);
     _renderHeroContent();
-    if(phase==='waiting'){_startCountdownTick();_renderWaitingTabsContent();}
+    if(phase==='waiting')_startCountdownTick();
     renderWhatYouBooked();
     applyTranslations();
     _nudgeHomeScrollOnce();
