@@ -4,8 +4,9 @@
 > Used by Cursor Cloud Agent and Claude / Claude Code.  
 > Do not start coding a section until it is claimed below and the system model in §2–§5 is still accurate.
 
-**Status:** Host decisions locked (§7) — sandbox build next; production URL unchanged until cutover  
-**Sandbox file (build here):** `checkin-guest-sandbox.html` *(create when Phase 1 opens — do not overwrite live guest page yet)*  
+**Status:** Host decisions locked (§7) — **Sandbox 2 is the canonical redesign**; production URL unchanged until cutover  
+**Sandbox file (build here):** `checkin-guest-sandbox-2.html` → https://app.maxelaapartments.com/checkin-guest-sandbox-2.html  
+**Other sandboxes:** `checkin-guest-sandbox.html` (Sandbox 1, Claude) · `checkin-guest-sandbox-3.html` (portal experiment, parked — §19)  
 **Production file / final URL:** `checkin-guest-v2.html` → https://app.maxelaapartments.com/checkin-guest-v2.html  
 **Admin file (separate track):** `checkin-admin.html`  
 **Do not touch without claim:** `minihotel_reservation_sync.py`  
@@ -407,8 +408,9 @@ That config work belongs in the admin track after guest sandbox IA is stable —
 |------------|--------|-------|-------|-------|
 | `docs-coord` | **active** | Cursor | `GUEST_CHECKIN_REDESIGN.md` | Decisions locked; sandbox plan |
 | `guest-sandbox-shell` | done (Phase 1) | Claude Code | `checkin-guest-sandbox.html` | Do not overwrite while comparing |
-| `guest-sandbox-2-design` | **active** | Cursor | `checkin-guest-sandbox-2.html` | 2026-08-24 — square multi-room tiles, Location/Parking split, companion link §17 |
-| `inline-checkin-access` | blocked on Phase 1 | — | sandbox | Door + elevator + tour |
+| `guest-sandbox-2-design` | **active — canonical** | Claude (continuing) | `checkin-guest-sandbox-2.html` | Host chose Sandbox 2 over Sandbox 3 — see §18 + §20 |
+| `guest-sandbox-3-portal` | parked | Cursor | `checkin-guest-sandbox-3.html` | Functional bottom-nav portal experiment — §19; do not overwrite Sandbox 2 |
+| `inline-checkin-access` | **next on Sandbox 2** | Claude | `checkin-guest-sandbox-2.html` | Real walkthrough / checkin-details content in `#hero-walkthrough` |
 | `secondary-location-services` | blocked on Phase 1 | — | sandbox | Parking/location + shuttle + tours |
 | `guest-visual-design` | blocked on shell | — | sandbox CSS | Phase 4 |
 | `guest-cutover` | blocked | — | `checkin-guest-v2.html`, `checkin-details.html` | Host approve |
@@ -460,6 +462,8 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-24 | Cursor | Sandbox 2 design proposal: `checkin-guest-sandbox-2.html` — compact greeting, date-or-countdown waiting, door-first stacked cards, large elevator QR, WiFi compact, door-photo empty state. Does not replace Claude sandbox 1. |
 | 2026-08-24 | Cursor | Sandbox 2 layout fixes: elevator QR stacked above 6-digit code; photo step walkthrough from `photos`/`photoCaptions`; multi-room full-width switcher + bottom sheet; tabs moved under greeting (above hero). |
 | 2026-08-24 | Cursor | Sandbox 2: square multi-room tiles; WiFi strip + Location/Parking split; removed photo peek & floor card; companion guest link §17; checked-in hint. |
+| 2026-08-25 | Cursor | Sandbox 2 polish merged to `main`: phone divider under contact; Tbilisi arrival-time chip picker; rules SVG icons + entrance-card copy; passport header fix; staying-phase horizontal service chips; group invite under door code; waiting tabs under countdown + stronger WYB heading; one-time QR scroll on first home open. |
+| 2026-08-25 | Cursor | Sandbox 3: first attempt = color reskin (rejected). Second attempt = functional guest portal with wizard + bottom nav (§19). Host prefers Sandbox 2 — parked for later. |
 
 ---
 
@@ -955,10 +959,147 @@ https://app.maxelaapartments.com/checkin-guest-sandbox-2.html?res=BOOKING_REF&co
 
 ---
 
+## 18. Sandbox 2 — current build state (2026-08-25, canonical)
+
+**File:** `checkin-guest-sandbox-2.html`  
+**URL:** https://app.maxelaapartments.com/checkin-guest-sandbox-2.html  
+**Decision:** Host confirmed Sandbox 2 is **much better** than Sandbox 3 and all ongoing redesign work continues here. **Do not modify Sandbox 2's IA unless the host asks.** Sandbox 3 is a separate experiment (§19).
+
+### 18.1 What Sandbox 2 is
+
+Same Firebase/JS module as production `checkin-guest-v2.html` (registration, unlock, multi-room, services, companion flow). Only `#page-home` + registration/rules/passport **CSS/HTML polish** differ from v2. Dev toolbar at bottom (`#sb-toolbar`, label "Sandbox 2 · Cursor design") — jump Loading / Register / Rules / Passport / Home + phases without Firebase.
+
+### 18.2 Built and live on Sandbox 2 (Cursor, Aug 2025)
+
+**Registration (`#page-register`)**
+- Divider line under phone / contact row
+- **Approximate arrival time** — chip grid `#checkin-time-grid`, hidden `#r-checkin-time`; Tbilisi-aware slots: `Before 15:00` first, then hourly 15:00–23:00, After midnight, Next morning; red warning if same-day before 15:00; saves `expectedCheckInTime` / `expectedCheckInWindow`
+- Copy: "Use the name on your booking — not your passport"
+
+**Rules (`#page-rules`)**
+- Emojis replaced with inline SVG icons (noise, smoking, care)
+- Entrance-card rule subcopy: "Don't damage property or lose entrance cards **(if provided)**"
+
+**Passport (`#page-passport`)**
+- Header: "Passport photo" + lowercase "required" (not cramped "Passport photoREQUIRED")
+
+**Home — Waiting phase**
+- Live countdown `#countdown-display` in hero
+- **Location | Shuttle | Tours** tabs **under countdown**, above "What you booked"
+- Stronger `.wyb-kicker` heading (not tiny pale mono)
+
+**Home — Unlocked (arriving / staying / leaving)**
+- Top row: **Location | Parking** buttons (not Airport/Tours after unlock)
+- Elevator QR + 6-digit code (QR stacked above code; no copy on elevator)
+- Door code + compact WiFi strip
+- **Share access with your group** (`#guest-invite-card`) **under apartment door code** (not after WiFi)
+- **Staying phase:** Location/Parking row hidden; horizontal scroll **service chips** (Tours first, then admin-visible services + "Services" pill) via `_renderHomeQuick()`
+- **QR scroll:** `_nudgeHomeScrollOnce()` — auto-scroll to elevator QR **once** on first home open only (fixed bug where `renderTiles()` re-scrolled every ~30s)
+
+**Design tokens:** §13 still applies (white cards, ink text, `#2C2C2A` primary CTA, no gold backgrounds on home).
+
+### 18.3 Not yet built on Sandbox 2 (good next tasks for Claude)
+
+| Priority | Task | Notes |
+|----------|------|-------|
+| P0 | **Real arrival walkthrough** in `#hero-walkthrough` | Port content/shape from `checkin-details.html` — photos + captions from `aptData.photos` / `photoCaptions` (mock toolbar already has 5 Unsplash steps) |
+| P1 | **Waiting tab panels** — real Location / Shuttle / Tours | Panels `#panel-location`, `#panel-shuttle`, `#panel-tours` still mostly placeholder; Location page via `openPage('location')` already works when unlocked |
+| P1 | **"Unlocks [date] at [time]"** when check-in is days away | Countdown shows `00:00:00` in toolbar Waiting phase — see §14.4 |
+| P2 | Phase 4 visual polish pass | Icons on daily-key rows, door-photo empty state |
+| Cutover | Promote Sandbox 2 → `checkin-guest-v2.html` | Host approval only |
+
+### 18.4 Do not regress
+
+- All element IDs listed in §13.5 + §14.4
+- `searchReservation()`, multi-room pinning, unlock math, elevator stale check
+- `#tiles-grid` hidden but must exist (`renderTiles()` writes to it)
+- Companion link: `?res=BOOKING_REF&companion=1` (§17)
+
+---
+
+## 19. Sandbox 3 — functional portal experiment (parked, 2026-08-25)
+
+**File:** `checkin-guest-sandbox-3.html`  
+**URL:** https://app.maxelaapartments.com/checkin-guest-sandbox-3.html  
+**Status:** Built and merged to `main`, but **not** the chosen direction. Host will revisit later.
+
+**What it is (different UX, not a reskin):**
+- **Check-in wizard** — 3-step progress (Booking → Rules → Verify ID)
+- **Bottom nav guest portal** — Access | Guide | Services | Help
+- **Access tab** — digital key card (door code), elevator QR, WiFi, group invite, "I'm checked in"
+- **Guide tab** — location/parking, waiting tabs, walkthrough, what you booked
+- **Phase defaults** — Waiting → Guide; Arriving/Staying → Access; Leaving → Help
+
+**Implementation:** Same `<script type="module">` as Sandbox 2 with thin adapters (`switchPortalTab`, `_portalDefaultTab`, service chip mirror). **Do not merge into Sandbox 2 without host approval.**
+
+**History:** First Sandbox 3 was a Harbor/teal color reskin (rejected). Second rebuild = functional portal inspired by Staykey / Guesty / ChargeAutomation one-link guest portals.
+
+---
+
+## 20. Prompt for Claude — continue Sandbox 2
+
+Copy everything inside the block below into Claude / Claude Code:
+
+```
+Read these files in this order before doing anything:
+1. GUEST_CHECKIN_REDESIGN.md — especially §0, §9, §13, §16, §17, §18, §20
+2. CHECKIN_GUEST_SPEC.md — technical audit (IDs, fragile areas)
+3. checkin-guest-sandbox-2.html — THE file to edit (canonical redesign)
+4. checkin-details.html — source for arrival walkthrough content to port
+
+DO NOT EDIT:
+- checkin-guest-v2.html (production — cutover only with host approval)
+- checkin-guest-sandbox-3.html (parked portal experiment — §19)
+- checkin-guest-sandbox-2.html registration/unlock/search JS logic unless fixing a bug
+
+CONTEXT FROM CURSOR (2026-08-25):
+The host chose Sandbox 2 over Sandbox 3. Sandbox 2 is live at:
+https://app.maxelaapartments.com/checkin-guest-sandbox-2.html
+
+Sandbox 2 already has (Cursor, merged to main):
+- Registration: arrival time chip picker (Tbilisi), phone divider, booking-name copy
+- Rules: SVG icons, entrance-card "(if provided)" copy
+- Passport: clean "Passport photo" + "required" header
+- Waiting: countdown + Location/Shuttle/Tours tabs under countdown + What You Booked
+- Unlocked: elevator QR first, door code, WiFi strip, Location|Parking, group invite under door code
+- Staying: horizontal service chips (admin visibility from checkin_admin/config)
+- One-time scroll to QR on first home open (not on every renderTiles refresh)
+- Dev toolbar at bottom for phase testing without Firebase
+
+YOUR TASK — claim workstream `inline-checkin-access` in §9:
+
+Focus on Sandbox 2 Phase 2: real check-in walkthrough in #hero-walkthrough.
+
+1. Open checkin-guest-sandbox-2.html, use dev toolbar → Home → Arriving (mock has 5 photos in aptData.photos + photoCaptions).
+
+2. Port the arrival instruction experience from checkin-details.html into #hero-walkthrough-list:
+   - Step cards with photo + caption (use existing .wt-card / .wt-list structure)
+   - Lightbox for photo tap (existing #lightbox)
+   - "Show arrival instructions" toggle on staying phase (#btn-show-walkthrough, .wt-expanded)
+
+3. Optionally improve waiting-phase tab panels (#panel-location, #panel-shuttle, #panel-tours) with real content stubs — Location already works via openPage('location') when unlocked; waiting guests need useful pre-arrival info.
+
+4. Keep §13 design tokens: white cards, ink text, #2C2C2A CTAs, no gold button backgrounds.
+
+5. Do not rename JS-referenced IDs (§13.5). Do not change unlock math, searchReservation(), or applyHomePhase() phase rules.
+
+VERIFY:
+- Dev toolbar: Waiting, Arriving, Staying, Leaving, Checkout Done — no console errors
+- Walkthrough renders with mock photos in Arriving
+- Register → rules → passport flow still works on real Firebase if tested
+
+WHEN DONE:
+- Update GUEST_CHECKIN_REDESIGN.md §9 (mark workstream progress) and §12 changelog
+- git commit on a descriptive branch, push, open PR or merge per team workflow
+- Report: sandbox URL + screenshots of walkthrough + what's still placeholder
+```
+
+---
+
 ## Quick checklist before any major step
 
 - [ ] I re-read §1–§5 and §7  
-- [ ] Guest work is in **sandbox**, not production, unless this is cutover  
+- [ ] Guest work is in **`checkin-guest-sandbox-2.html`**, not production, unless this is cutover  
 - [ ] My workstream is claimed in §9  
 - [ ] I am not editing a file another agent claimed  
 - [ ] I will update §9 and §12 when finished  
