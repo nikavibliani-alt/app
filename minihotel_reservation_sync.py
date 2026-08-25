@@ -765,7 +765,7 @@ def main():
     print(f"Date range: {from_date} → {to_date}")
 
     db = init_firestore()
-    print(f"[DEBUG] Firestore client: {db.project}")
+
     session = login_minihotel()
     reservations = fetch_reservations(session, from_date, to_date)
     synced = sync_to_firestore(db, reservations)
