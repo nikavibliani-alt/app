@@ -410,7 +410,7 @@ That config work belongs in the admin track after guest sandbox IA is stable —
 | `guest-sandbox-shell` | done (Phase 1) | Claude Code | `checkin-guest-sandbox.html` | Do not overwrite while comparing |
 | `guest-sandbox-2-design` | **active — canonical** | Claude (continuing) | `checkin-guest-sandbox-2.html` | Host chose Sandbox 2 over Sandbox 3 — see §18 + §20 |
 | `guest-sandbox-3-portal` | parked | Cursor | `checkin-guest-sandbox-3.html` | Functional bottom-nav portal experiment — §19; do not overwrite Sandbox 2 |
-| `inline-checkin-access` | **next on Sandbox 2** | Claude | `checkin-guest-sandbox-2.html` | Real walkthrough / checkin-details content in `#hero-walkthrough` |
+| `inline-checkin-access` | done (2026-08-25) | Claude | `checkin-guest-sandbox-2.html` | Walkthrough was already built + wired — verified working, fixed a real click bug (§18.3). Added real Waiting-tab content (Location/Shuttle/Tours). |
 | `secondary-location-services` | blocked on Phase 1 | — | sandbox | Parking/location + shuttle + tours |
 | `guest-visual-design` | blocked on shell | — | sandbox CSS | Phase 4 |
 | `guest-cutover` | blocked | — | `checkin-guest-v2.html`, `checkin-details.html` | Host approve |
@@ -464,6 +464,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-24 | Cursor | Sandbox 2: square multi-room tiles; WiFi strip + Location/Parking split; removed photo peek & floor card; companion guest link §17; checked-in hint. |
 | 2026-08-25 | Cursor | Sandbox 2 polish merged to `main`: phone divider under contact; Tbilisi arrival-time chip picker; rules SVG icons + entrance-card copy; passport header fix; staying-phase horizontal service chips; group invite under door code; waiting tabs under countdown + stronger WYB heading; one-time QR scroll on first home open. |
 | 2026-08-25 | Cursor | Sandbox 3: first attempt = color reskin (rejected). Second attempt = functional guest portal with wizard + bottom nav (§19). Host prefers Sandbox 2 — parked for later. |
+| 2026-08-25 | Claude Code | `inline-checkin-access` on Sandbox 2: verified the arrival walkthrough (already fully built — photos/captions render, lightbox works, Staying-phase collapse works, toggle works). Built real Waiting-tab content: `#panel-location` (address/maps/parking via new shared `_getLocationData()`), `#panel-shuttle`/`#panel-tours` (real service info + working "Request pickup"/"Ask about tours" buttons reusing `openSvc()`). Fixed a real bug: `JSON.stringify(name)` inside a double-quoted `onclick` attribute broke every service-chip button (Staying chips too, not just new code) — fixed by escaping `"`→`&quot;`. §18.3 updated to reflect actual build state (was stale). |
 
 ---
 
@@ -998,12 +999,20 @@ Same Firebase/JS module as production `checkin-guest-v2.html` (registration, unl
 
 **Design tokens:** §13 still applies (white cards, ink text, `#2C2C2A` primary CTA, no gold backgrounds on home).
 
-### 18.3 Not yet built on Sandbox 2 (good next tasks for Claude)
+### 18.3 Build status (updated 2026-08-25 — Claude, `inline-checkin-access`)
+
+**Done:**
+
+| Task | Notes |
+|------|-------|
+| **Real arrival walkthrough** in `#hero-walkthrough` | Was already fully built (HTML/CSS/`_renderWalkthrough()`/lightbox/toggle) as of this session's start — this table was stale. Verified live: 5 mock photo cards with captions render in Arriving, tap opens `#lightbox` with prev/next, Staying phase collapses to the single door-photo card, "Show arrival instructions" expands/collapses correctly (`.wt-expanded`), Leaving phase hides it. No changes needed beyond verification. |
+| **Waiting tab panels** — real Location / Shuttle / Tours | Built 2026-08-25. `#panel-location` shows real address + "Open in Google Maps" + parking blurb via a new shared `_getLocationData()` helper (extracted from `openPage('location')`'s inline logic — same data, one source of truth now). `#panel-shuttle`/`#panel-tours` show the same service catalog the Staying-phase chips use (`_getGuestServicesCatalog()` — respects admin `sectionVisible()` toggles) with a "Request pickup"/"Ask about tours" button that opens the real `openSvc()` request modal — works pre-arrival since it only needs `guestId` (set at registration), not unlock. |
+| **Bug fix:** service-chip buttons silently did nothing on click | `onclick="...openSvc('id',${JSON.stringify(nm)},...)"` embeds a JSON string's literal `"` characters inside a double-quoted HTML attribute, truncating it and corrupting the rest of the tag — every service chip with this pattern was unclickable (not just new code; this also affected the existing Staying-phase `_renderHomeQuick()` chips). Fixed by escaping `"` → `&quot;` before interpolating. **If you copy this `onclick`-with-`JSON.stringify` pattern anywhere else, escape it the same way or use `addEventListener` instead.** |
+
+**Still open:**
 
 | Priority | Task | Notes |
 |----------|------|-------|
-| P0 | **Real arrival walkthrough** in `#hero-walkthrough` | Port content/shape from `checkin-details.html` — photos + captions from `aptData.photos` / `photoCaptions` (mock toolbar already has 5 Unsplash steps) |
-| P1 | **Waiting tab panels** — real Location / Shuttle / Tours | Panels `#panel-location`, `#panel-shuttle`, `#panel-tours` still mostly placeholder; Location page via `openPage('location')` already works when unlocked |
 | P1 | **"Unlocks [date] at [time]"** when check-in is days away | Countdown shows `00:00:00` in toolbar Waiting phase — see §14.4 |
 | P2 | Phase 4 visual polish pass | Icons on daily-key rows, door-photo empty state |
 | Cutover | Promote Sandbox 2 → `checkin-guest-v2.html` | Host approval only |
@@ -1014,6 +1023,7 @@ Same Firebase/JS module as production `checkin-guest-v2.html` (registration, unl
 - `searchReservation()`, multi-room pinning, unlock math, elevator stale check
 - `#tiles-grid` hidden but must exist (`renderTiles()` writes to it)
 - Companion link: `?res=BOOKING_REF&companion=1` (§17)
+- New: `_getLocationData()` (shared by `openPage('location')` and `_renderWaitingTabsContent()`) and `_renderWaitingTabsContent()` (guarded by `_waitingTabsRendered` — fetches admin config once, not on every render)
 
 ---
 
