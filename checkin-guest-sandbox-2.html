@@ -1262,23 +1262,20 @@ let _pendingMatches=[];
 let allMatchedReservations=[];
 
 function _showPage(pageId){
-  if(pageId!=='page-home'){_homeScrollNudged=false;_homeScrollPhase='';}
+  if(pageId!=='page-home')_homeInitialScrollDone=false;
   document.querySelectorAll('#app .page').forEach(p=>p.classList.remove('active'));
   const pg=document.getElementById(pageId);
   if(pg){pg.classList.add('active');window.scrollTo(0,0);}
 }
 
-let _homeScrollNudged=false;
-let _homeScrollPhase='';
-function _nudgeHomeScroll(){
+let _homeInitialScrollDone=false;
+function _nudgeHomeScrollOnce(){
+  if(_homeInitialScrollDone)return;
   const home=document.getElementById('page-home');
   if(!home||!home.classList.contains('active'))return;
-  const phase=_homePhase();
-  if(_homeScrollPhase===phase)return;
-  _homeScrollPhase=phase;
-  _homeScrollNudged=true;
   requestAnimationFrame(()=>{
     requestAnimationFrame(()=>{
+      const phase=_homePhase();
       const elev=document.getElementById('hero-elevator');
       const elevVisible=elev&&elev.style.display!=='none'&&elev.offsetParent!==null;
       if((phase==='arriving'||phase==='staying'||phase==='leaving')&&elevVisible){
@@ -1287,10 +1284,12 @@ function _nudgeHomeScroll(){
         const peek=(quick&&quick.offsetHeight?quick.offsetHeight:0)+(greeting?greeting.offsetHeight:0)+12;
         const top=Math.max(0,elev.offsetTop-peek);
         window.scrollTo({top,behavior:'smooth'});
+        _homeInitialScrollDone=true;
         return;
       }
       if(phase==='waiting'){
         window.scrollTo({top:68,behavior:'smooth'});
+        _homeInitialScrollDone=true;
       }
     });
   });
@@ -2400,7 +2399,7 @@ function showHome(){
   renderWhatYouBooked();
   renderPassportBanner();
   applyTranslations();
-  _nudgeHomeScroll();
+  _nudgeHomeScrollOnce();
   if(guestId){
     _homeSnaps.push(onSnapshot(doc(db,'checkin_guests',guestId),snap=>{
       if(snap.exists()){
@@ -3808,6 +3807,7 @@ function _renderHeroContent(){
         }
         if(qrCanvas)qrCanvas.style.display=drawn?'block':'none';
         if(qrPh)qrPh.style.display=drawn?'none':'flex';
+        if(drawn&&!_homeInitialScrollDone)_nudgeHomeScrollOnce();
       }else if(qrWrap){
         qrWrap.style.display='none';
       }
@@ -3844,13 +3844,7 @@ function _renderHeroContent(){
     const rn=String(activeReservation?.reservationNumber||'').trim();
     invite.style.display=rn?'':'none';
   }
-  _renderHomeQuickAsync().then(()=>{
-    const ph=_homePhase();
-    if(ph==='arriving'||ph==='staying'||ph==='leaving'){
-      _homeScrollPhase='';
-      setTimeout(_nudgeHomeScroll,80);
-    }
-  });
+  _renderHomeQuickAsync();
 }
 
 // Photo step cards from checkin_apartments.photos + photoCaptions (same shape as checkin-details.html)
@@ -3968,11 +3962,9 @@ function applyHomePhase(){
   home.classList.add('phase-'+phase);
   const wt=document.getElementById('hero-walkthrough');
   if(wt&&phase!=='staying')wt.classList.remove('wt-expanded');
-  _homeScrollPhase=''; // re-nudge scroll when phase changes (e.g. arriving → staying)
   _renderHeroContent();
   if(phase==='waiting')_startCountdownTick();
   applyTranslations();
-  if(phase==='waiting')_nudgeHomeScroll();
 }
 
 window.guestCheckedIn=async function(){
@@ -4122,7 +4114,7 @@ function _sbRenderHomeForPhase(phase){
     if(phase==='waiting')_startCountdownTick();
     renderWhatYouBooked();
     applyTranslations();
-    _nudgeHomeScroll();
+    _nudgeHomeScrollOnce();
   }
   _sbCurrentPhase=phase;
   _sbSyncActiveButtons();
