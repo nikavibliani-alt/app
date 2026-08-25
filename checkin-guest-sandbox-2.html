@@ -594,15 +594,13 @@ body{padding-bottom:72px;}
 #page-home.phase-staying .hero-walkthrough.wt-expanded .wt-door-lbl{display:none;}
 #page-home.phase-arriving .wt-door-lbl{display:none!important;}
 #page-home.phase-leaving .hero-walkthrough,
-#page-home.phase-leaving .guest-invite,
-#page-home.phase-leaving .hero-wifi-block{display:none!important;}
+#page-home.phase-leaving .guest-invite{display:none!important;}
 .hero-cta--leaving{order:-20;margin:0 0 14px;}
 .hero-cta--leaving .hero-cta__checkout-label{font-family:var(--sans);font-size:15px;font-weight:700;letter-spacing:0;color:var(--ink);margin-bottom:12px;text-transform:none;}
 .hero-cta__btn--checkout{background:#2C2C2A;color:#fff;border:none;min-height:56px;font-size:17px;font-weight:700;box-shadow:0 8px 24px -8px rgba(44,44,42,0.55);animation:ctaPulse 2.5s ease-in-out infinite;}
 .hero-cta__btn--checkin{min-height:58px;font-size:18px;font-weight:700;box-shadow:0 10px 28px -10px rgba(44,44,42,0.5);border:2px solid var(--accent);}
 .hero-cta__hint{font-size:14px;color:var(--ink-2);font-weight:500;text-align:center;line-height:1.45;margin:0 0 12px;padding:0 8px;}
 .hero-cta__link{font-size:14px;font-weight:600;color:var(--ink);}
-.home-wifi-strip__lbl{font-size:13px;font-weight:700;letter-spacing:0;color:var(--ink);flex-shrink:0;}
 .hero-waiting__label{font-family:var(--sans);font-size:14px;font-weight:700;letter-spacing:0;color:var(--ink);margin-bottom:12px;}
 .ir-lbl{font-size:14px;color:var(--ink);font-weight:700;}
 .wifi-page{padding:8px 0 24px;}
@@ -635,12 +633,11 @@ body{padding-bottom:72px;}
 .dk-elev__meta-label{font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:0;color:var(--ink);}
 .dk-elev__meta .dk-code{font-size:28px;letter-spacing:0.16em;margin:0;word-break:break-all;}
 .dk-elev__fallback{font-size:11px;color:var(--muted);line-height:1.4;margin:4px 0 0;}
-/* FIX 4 — compact row: QR left, code+label stacked right (saves ~60-80px vs the old
-   full-width centered QR-then-divider-then-big-code stack) */
-.dk-elev--compact{flex-direction:row;align-items:center;text-align:left;gap:14px;}
-.dk-elev__meta--compact{width:auto;flex:1;align-items:flex-start;text-align:left;padding-top:0;border-top:none;gap:2px;}
+/* Elevator: QR on top, code stacked below — code is supplementary (max 16px), not primary */
+.dk-elev--compact{flex-direction:column;align-items:center;text-align:center;gap:8px;}
+.dk-elev__meta--compact{width:auto;flex:none;align-items:center;text-align:center;padding-top:0;border-top:none;gap:2px;}
 .dk-elev__meta--compact .dk-elev__meta-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);}
-.dk-code--sm{font-size:14px;letter-spacing:0.1em;}
+.dk-code--sm{font-size:16px;letter-spacing:0.1em;color:#2C2C2A;}
 
 /* Compact door row (WiFi moved up near greeting) */
 .dk-access{padding:2px 4px;}
@@ -649,7 +646,6 @@ body{padding-bottom:72px;}
 .dk-access__lbl{font-family:var(--sans);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;}
 .dk-access__door{font-family:var(--mono);font-size:32px;font-weight:700;letter-spacing:0.14em;color:var(--ink);line-height:1.1;}
 .dk-access__hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4;}
-.dk-access__row .dk-copy{height:44px;padding:0 16px;}
 
 .dk-floor-text{font-size:15px;font-weight:600;color:var(--ink);}
 .hero-hidden-compat{display:none!important;}
@@ -685,20 +681,20 @@ body{padding-bottom:72px;}
 #page-home.phase-staying .home-quick{display:flex;}
 /* Leaving: guest is checking out — no Location/Parking nav, just door/elevator/WiFi/checkout */
 #page-home.phase-leaving .home-quick{display:none;}
-.hero-wifi-block{display:none;margin:4px 0 8px;}
+.hero-wifi-block{display:none;margin:10px 0 0;width:100%;}
 #page-home.phase-arriving .hero-wifi-block,
 #page-home.phase-staying .hero-wifi-block,
 #page-home.phase-leaving .hero-wifi-block{display:block;}
 #what-you-booked{display:none;}
 #page-home.phase-waiting #what-you-booked{display:block;}
-.home-wifi-strip{
-  display:flex;align-items:center;gap:8px;padding:8px 12px;
-  background:var(--bg);border:1px solid var(--line);border-radius:12px;
-  font-family:var(--mono);font-size:12px;color:var(--ink);
-}
-.home-wifi-strip__val{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
-.home-wifi-strip__sep{color:var(--muted);margin:0 3px;}
-.home-wifi-strip .dk-copy{height:44px;padding:0 14px;font-size:10px;flex-shrink:0;}
+/* FIX 3 — WiFi card: two compact label/value/copy rows, not a single-line strip */
+.wifi-card{background:#fff;border:1.5px solid #E0D8D0;border-radius:12px;padding:16px;width:100%;box-sizing:border-box;}
+.wifi-card__label{font-family:var(--sans);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:8px;}
+.wifi-card__row{display:flex;align-items:center;gap:8px;padding:6px 0;}
+.wifi-card__key{font-family:var(--sans);font-size:13px;color:var(--muted);flex-shrink:0;}
+.wifi-card__val{font-family:var(--mono);font-size:13px;color:#2C2C2A;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
+.wifi-card__copy{background:none;border:none;font-family:var(--sans);font-size:12px;color:var(--muted);cursor:pointer;padding:4px 2px;flex-shrink:0;}
+.wifi-card__copy.copied{color:var(--green);}
 .home-loc-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .home-loc-btn{
   display:flex;align-items:center;justify-content:center;
@@ -712,7 +708,8 @@ body{padding-bottom:72px;}
 #page-home.phase-staying .home-svc-area{display:block;}
 .home-svc-scroll{
   display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;
-  scroll-snap-type:none;padding:2px 0 4px;padding-bottom:4px;scrollbar-width:none;
+  scroll-snap-type:none!important;scroll-behavior:auto;overscroll-behavior-x:contain;
+  padding:2px 0 4px;padding-bottom:4px;scrollbar-width:none;
 }
 .home-svc-scroll::-webkit-scrollbar{display:none;}
 .home-svc-chip{
@@ -1070,7 +1067,6 @@ body{padding-bottom:72px;}
               <div class="dk-access__door" id="hero-door-code">— — — —</div>
               <p class="dk-access__hint" id="t-door-hint">Type on the lock keypad, then press #</p>
             </div>
-            <button class="dk-copy" id="hero-door-copy" onclick="window.copySth(document.getElementById('hero-door-code').textContent,this)"><span id="t-door-copy">Copy</span></button>
           </div>
         </div>
 
@@ -1102,14 +1098,6 @@ body{padding-bottom:72px;}
           <div class="wt-list" id="hero-walkthrough-list"></div>
         </div>
 
-        <div class="hero-wifi-block" id="hero-wifi-block">
-          <div class="home-wifi-strip">
-            <span class="home-wifi-strip__lbl" id="t-wifi-lbl">WiFi</span>
-            <span class="home-wifi-strip__val"><span id="hero-wifi-name">—</span><span class="home-wifi-strip__sep">·</span><span id="hero-wifi-pass">—</span></span>
-            <button class="dk-copy" onclick="window.copySth(document.getElementById('hero-wifi-pass').textContent,this)"><span id="t-wifi-copy">Copy</span></button>
-          </div>
-        </div>
-
         <div class="hero-hidden-compat" aria-hidden="true">
           <span id="hero-floor-info">—</span>
           <img id="hero-door-photo" alt="">
@@ -1122,6 +1110,24 @@ body{padding-bottom:72px;}
         </div>
         <div class="hero-cta hero-cta--staying" style="text-align:center;">
           <button class="hero-cta__link" id="btn-show-walkthrough" onclick="window.toggleArrivalInstructions()"><span id="t-btn-walkthrough">Show arrival instructions</span></button>
+        </div>
+
+        <!-- FIX 3 — WiFi card moved below the checked-in/checkout CTAs (was above, and
+             too wide as a single-line strip). Two compact rows, own copy button each. -->
+        <div class="hero-wifi-block" id="hero-wifi-block">
+          <div class="wifi-card">
+            <div class="wifi-card__label" id="t-wifi-lbl">WiFi</div>
+            <div class="wifi-card__row">
+              <span class="wifi-card__key" id="t-wifi-name-lbl">WiFi name</span>
+              <span class="wifi-card__val" id="hero-wifi-name">—</span>
+              <button class="wifi-card__copy" onclick="window.copySth(document.getElementById('hero-wifi-name').textContent,this)"><span>Copy</span></button>
+            </div>
+            <div class="wifi-card__row">
+              <span class="wifi-card__key" id="t-wifi-pass-lbl">Password</span>
+              <span class="wifi-card__val" id="hero-wifi-pass">—</span>
+              <button class="wifi-card__copy" onclick="window.copySth(document.getElementById('hero-wifi-pass').textContent,this)"><span id="t-wifi-copy">Copy</span></button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1680,7 +1686,7 @@ function applyTranslations(){
     't-invite-title':'inviteTitle','t-invite-sub':'inviteSub','t-invite-btn':'inviteBtn',
     't-checked-in-hint':'checkedInHint','t-btn-checked-in':'btnCheckedIn','t-btn-walkthrough':'btnWalkthrough',
     't-checkout-hint':'checkoutHint','t-btn-checked-out':'btnCheckedOut','t-thank-title':'thankTitle','t-thank-body':'thankBody','t-thank-contact':'thankContact',
-    't-wifi-copy':'cp','t-door-copy':'cp'
+    't-wifi-copy':'cp','t-wifi-name-lbl':'wn','t-wifi-pass-lbl':'wp'
   };
   Object.entries(map).forEach(([id,k])=>{const el=document.getElementById(id);if(el)el.textContent=t(k);});
   const walkBtn=document.querySelector('#btn-show-walkthrough span');
