@@ -116,11 +116,18 @@ html.admin-authed #app{display:block;}
 .stat.active{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);}
 .stat__n{font-family:var(--mono);font-size:18px;font-weight:700;}
 .stat__l{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-top:2px;}
-.apt-pill__guest{font-size:11px;color:var(--green);font-weight:600;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.apt-pill__guest.empty{color:var(--muted);font-weight:500;}
 .section-hd{display:flex;align-items:baseline;justify-content:space-between;padding:8px 2px 10px;}
 .section-hd h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
 .section-hd .n{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink);}
+.day-row{display:none;gap:6px;overflow-x:auto;padding:0 0 12px;scrollbar-width:none;}
+.day-row.show{display:flex;}
+.day-row::-webkit-scrollbar{display:none;}
+.day-chip{flex:none;min-width:72px;padding:8px 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);cursor:pointer;font-family:var(--sans);text-align:center;}
+.day-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.day-chip.active .day-chip__date,.day-chip.active .day-chip__n{color:rgba(255,255,255,.75);}
+.day-chip__label{display:block;font-size:12px;font-weight:700;line-height:1.2;}
+.day-chip__date{display:block;font-size:10px;font-weight:600;color:var(--muted);margin-top:2px;}
+.day-chip__n{display:block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);margin-top:4px;}
 .apt-group{margin-bottom:16px;}
 .apt-group__title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:4px 2px 8px;}
 .apt-pill{display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;margin-bottom:6px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);cursor:pointer;font-family:var(--sans);text-align:left;}
@@ -179,6 +186,7 @@ html.admin-authed #app{display:block;}
       <button class="filter-chip" data-f="leaving" onclick="setStayFilter('leaving')">Leaving</button>
       <button class="filter-chip" data-f="need" onclick="setStayFilter('need')">Need unlock</button>
     </div>
+    <div class="day-row" id="upcoming-days"></div>
     <div id="stay-list"></div>
   </div>
 
@@ -301,7 +309,7 @@ const APARTMENTS=[
 ];
 
 let aptData={},guestData=[],hkStatusData={},_resCache=null,_resLoading=false;
-let elevData=null,currentTab='stay',stayFilter='overview',_currentAptId=null;
+let elevData=null,currentTab='stay',stayFilter='overview',upcomingDay=null,_currentAptId=null;
 let _formById=new Map();
 
 function toast(msg,ms=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),ms);}
@@ -403,9 +411,30 @@ function groupByBaseNum(list){
 }
 function nonCancelled(){return(_resCache||[]).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');}
 
+function addDaysISO(iso,n){
+  const d=new Date(iso+'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate()+n);
+  return d.toISOString().slice(0,10);
+}
+function upcomingDayMeta(iso,offset){
+  const d=new Date(iso+'T00:00:00Z');
+  const weekday=d.toLocaleDateString('en-GB',{weekday:'short'});
+  const dateOnly=d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  let label=weekday;
+  if(offset===1)label='Tomorrow';
+  else if(offset===2)label='Day after';
+  return{iso,offset,label,dateLabel:dateOnly};
+}
+function upcomingDaysList(){
+  const today=tbilisiToday();
+  return[1,2,3,4,5,6,7].map(i=>upcomingDayMeta(addDaysISO(today,i),i));
+}
+function groupsForCheckinDate(iso){
+  return groupByBaseNum(nonCancelled().filter(r=>r.checkin===iso).sort(byRoom));
+}
 function scheduleBuckets(){
   const today=tbilisiToday();
-  const in7=new Date(tbilisiNow().getTime()+7*864e5).toISOString().slice(0,10);
+  const in7=addDaysISO(today,7);
   const res=nonCancelled();
   return{
     arrivals:groupByBaseNum(res.filter(r=>r.checkin===today).sort(byRoom)),
@@ -450,9 +479,37 @@ function sectionBlock(title,groups,mode){
 
 window.setStayFilter=function(f){
   stayFilter=f;
+  if(f==='upcoming'){
+    const days=upcomingDaysList();
+    if(!upcomingDay||!days.some(d=>d.iso===upcomingDay))upcomingDay=days[0].iso;
+  }
   document.querySelectorAll('#stay-filters .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.f===f));
   renderStay();
 };
+window.setUpcomingDay=function(iso){
+  upcomingDay=iso;
+  stayFilter='upcoming';
+  document.querySelectorAll('#stay-filters .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.f==='upcoming'));
+  renderStay();
+};
+
+function renderUpcomingDayChips(){
+  const row=document.getElementById('upcoming-days');
+  if(!row)return;
+  if(stayFilter!=='upcoming'){row.classList.remove('show');row.innerHTML='';return;}
+  const days=upcomingDaysList();
+  if(!upcomingDay||!days.some(d=>d.iso===upcomingDay))upcomingDay=days[0].iso;
+  row.classList.add('show');
+  row.innerHTML=days.map(d=>{
+    const n=groupsForCheckinDate(d.iso).length;
+    const active=d.iso===upcomingDay?'active':'';
+    return`<button type="button" class="day-chip ${active}" onclick="setUpcomingDay('${d.iso}')">
+      <span class="day-chip__label">${esc(d.label)}</span>
+      <span class="day-chip__date">${esc(d.dateLabel)}</span>
+      <span class="day-chip__n">${n}</span>
+    </button>`;
+  }).join('');
+}
 
 window.renderStay=function(){
   const b=scheduleBuckets();
@@ -469,23 +526,42 @@ window.renderStay=function(){
     <button type="button" class="stat ${stayFilter==='upcoming'?'active':''}" onclick="setStayFilter('upcoming')"><div class="stat__n">${b.upcoming.length}</div><div class="stat__l">Next 7d</div></button>
     <button type="button" class="stat ${stayFilter==='leaving'?'active':''}" onclick="setStayFilter('leaving')"><div class="stat__n">${b.leaving.length}</div><div class="stat__l">Leave</div></button>`;
 
+  renderUpcomingDayChips();
+
   const el=document.getElementById('stay-list');
   if(!_resCache){el.innerHTML='<div class="empty">Loading reservations…</div>';return;}
 
   if(stayFilter==='overview'){
-    const arr=filterByQ(b.arrivals),leave=filterByQ(b.leaving),house=filterByQ(b.inhouse),up=filterByQ(b.upcoming);
-    el.innerHTML=
+    const arr=filterByQ(b.arrivals),leave=filterByQ(b.leaving),house=filterByQ(b.inhouse);
+    let html=
       sectionBlock('Arrivals today',arr,'arrival')+
       sectionBlock('Leaving today',leave,'leaving')+
-      sectionBlock('Currently in-house',house,'inhouse')+
-      sectionBlock('Upcoming (next 7 days)',up,'upcoming');
+      sectionBlock('Currently in-house',house,'inhouse');
+    const days=upcomingDaysList().filter(d=>groupsForCheckinDate(d.iso).length);
+    if(!days.length)html+=sectionBlock('Upcoming',[],'upcoming');
+    else for(const d of days){
+      const groups=filterByQ(groupsForCheckinDate(d.iso));
+      if(!groups.length&&q)continue;
+      html+=sectionBlock(d.label+' · '+d.dateLabel,groups,'upcoming');
+    }
+    el.innerHTML=html;
+    return;
+  }
+
+  if(stayFilter==='upcoming'){
+    const days=upcomingDaysList();
+    if(!upcomingDay||!days.some(d=>d.iso===upcomingDay))upcomingDay=days[0].iso;
+    const meta=days.find(d=>d.iso===upcomingDay)||days[0];
+    const groups=filterByQ(groupsForCheckinDate(upcomingDay));
+    const title=meta.label+' · '+meta.dateLabel;
+    if(!groups.length){el.innerHTML=`<div class="section-hd"><h2>${esc(title)}</h2><span class="n">0</span></div><div class="empty">No arrivals this day</div>`;return;}
+    el.innerHTML=sectionBlock(title,groups,'upcoming');
     return;
   }
 
   let groups=[],mode='inhouse',title='';
   if(stayFilter==='arrivals'){groups=b.arrivals;mode='arrival';title='Arrivals today';}
   else if(stayFilter==='inhouse'){groups=b.inhouse;mode='inhouse';title='Currently in-house';}
-  else if(stayFilter==='upcoming'){groups=b.upcoming;mode='upcoming';title='Upcoming (7 days)';}
   else if(stayFilter==='leaving'){groups=b.leaving;mode='leaving';title='Leaving today';}
   else if(stayFilter==='need'){
     groups=[...b.arrivals,...b.inhouse].filter(grp=>{
@@ -574,31 +650,6 @@ window.rejectPassport=async function(guestId){
 };
 
 /* ── Apartments ── */
-function occupancyForApt(aptId){
-  const today=tbilisiToday();
-  const id=(aptId||'').toLowerCase();
-  const matchRoom=r=>{
-    const code=(r.roomCode||'').toLowerCase();
-    const form=getForm(r);
-    return code===id||(form?.aptId||'').toLowerCase()===id;
-  };
-  const stay=nonCancelled().find(r=>matchRoom(r)&&r.checkin<=today&&r.checkout>today);
-  if(stay)return{name:_stripRoomNum(stay.guest||'')||'Guest',until:stay.checkout,arriving:stay.checkin===today,leaving:false};
-  const leave=nonCancelled().find(r=>matchRoom(r)&&r.checkout===today&&r.checkin<today);
-  if(leave)return{name:_stripRoomNum(leave.guest||'')||'Guest',until:leave.checkout,arriving:false,leaving:true};
-  return null;
-}
-function nextArrivalForApt(aptId){
-  const today=tbilisiToday();
-  const id=(aptId||'').toLowerCase();
-  const hits=nonCancelled().filter(r=>{
-    const code=(r.roomCode||'').toLowerCase();
-    const form=getForm(r);
-    return(code===id||(form?.aptId||'').toLowerCase()===id)&&r.checkin>today;
-  }).sort((a,b)=>a.checkin.localeCompare(b.checkin));
-  return hits[0]||null;
-}
-
 function renderAptsList(){
   const groups=[];
   const seen=new Map();
@@ -612,21 +663,12 @@ function renderAptsList(){
     for(const a of seen.get(g)){
       const d=aptData[a.id]||{};
       const ok=!!(d.tuyaDeviceId||d.doorCode);
-      const occ=occupancyForApt(a.id);
-      const next=occ?null:nextArrivalForApt(a.id);
-      let guestLabel='Vacant';
-      let guestCls='empty';
-      if(occ){
-        guestCls='';
-        if(occ.leaving)guestLabel='Out · '+occ.name;
-        else if(occ.arriving)guestLabel='In · '+occ.name;
-        else guestLabel=occ.name;
-      }else if(next){guestLabel='Next '+fmtDate(next.checkin);guestCls='empty';}
+      const photoN=(d.photos||[]).length;
+      const hint=photoN?photoN+' photo'+(photoN!==1?'s':''):(d.instructions?'Has instructions':'No instructions');
       html+=`<button type="button" class="apt-pill" onclick="window.openAptEditor('${a.id}')">
         <span class="apt-dot" style="background:${ok?'var(--green)':'var(--red)'}"></span>
         <span class="apt-pill__code">${esc(a.code)}</span>
-        <span class="apt-pill__name">${esc(a.name)}</span>
-        <span class="apt-pill__guest ${guestCls}">${esc(guestLabel)}</span>
+        <span class="apt-pill__name">${esc(a.name)} · ${esc(hint)}</span>
       </button>`;
     }
     html+='</div>';
