@@ -465,6 +465,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-25 | Claude Code | `inline-checkin-access` on Sandbox 2: verified the arrival walkthrough (already fully built — photos/captions render, lightbox works, Staying-phase collapse works, toggle works). Built real Waiting-tab content: `#panel-location` (address/maps/parking via new shared `_getLocationData()`), `#panel-shuttle`/`#panel-tours` (real service info + working "Request pickup"/"Ask about tours" buttons reusing `openSvc()`). Fixed a real bug: `JSON.stringify(name)` inside a double-quoted `onclick` attribute broke every service-chip button (Staying chips too, not just new code) — fixed by escaping `"`→`&quot;`. §18.3 updated to reflect actual build state (was stale). |
 | 2026-08-25 | Claude Code | **5 UX fixes on Sandbox 2:** (1) Waiting phase — moved Location/Shuttle/Tours tabs above the countdown; tabs now open a real subpage via `openPage()` (extended with new `shuttle`/`tours` content types + `#page-content-shuttle`/`#page-content-tours`) instead of toggling an inline panel — replaced the retired `_renderWaitingTabsContent()` with a shared `_svcSubpageCard()` builder. (2) Leaving phase — `#home-quick` (Location/Parking row) now hidden; only door code, elevator, WiFi, and "I've checked out" remain. (3) Fixed Staying-phase service-chip scroll snapping back to start — removed `scroll-snap-type`/`scroll-snap-align`. (4) Restructured daily-key layout: Smart lock code card now first (with a new copy button — it had none before), Elevator card compacted to one row (QR left, code+label stacked right, code now 14px not 28px) — saves ~60-80px. (5) Removed the "Sandbox 2 · Cursor design proposal · not live" banner and its CSS entirely. |
 | 2026-08-25 | Claude Code | **4 more fixes on Sandbox 2:** (1) Elevator code moved back below the QR (was beside it since the previous session's compact-row fix) — now QR on top, small muted "Elevator code" label, code capped at 16px, no copy button, matching "supplementary info" framing. (2) Removed the smart-lock/door-code copy button entirely (`#hero-door-copy` + its onclick) — guest types it manually; WiFi copy buttons untouched. (3) Rebuilt the WiFi section as a `.wifi-card` (white bg, `1.5px solid #E0D8D0`, `12px` radius) with two label/value/copy rows (Network + Password, each own copy button now — Network didn't have one before) and moved it below `#btn-checked-in` in Arriving and below the daily-key area in Staying/Leaving (was above the CTA; also un-hid it for Leaving, where it had been force-hidden). (4) Added `scroll-snap-type:none!important`, `scroll-behavior:auto`, `overscroll-behavior-x:contain` to `.home-svc-scroll` per exact spec (chip `scroll-snap-align` was already removed last session — confirmed still absent). **Could not fix:** "City Tours" → "Tours" rename — searched the full file, no such string exists in source; the label is pulled live from `checkin_admin/config.services[].name` (admin-configured Firestore data), and the code's own built-in default is already "Tours". Renaming requires an admin-panel/Firestore change, not a sandbox HTML edit. |
+| 2026-08-26 | Cursor + host | Admin redesign brief locked — §22 (bottom nav like Sandbox 3, Today's Arrivals, Check passport, checked-in status, elevator manual-sticky). |
 
 ---
 
@@ -1157,7 +1158,109 @@ redesign or restructure the owner's area.
 - `checkin-guest-v2.html` (production)
 - `checkin-guest-sandbox-3.html` (parked)
 - `minihotel_reservation_sync.py`
-- `checkin-admin.html` (separate track)
+- `checkin-admin.html` (separate track — rebuild goes in `checkin-admin-sandbox.html` per §22)
+
+---
+
+## 22. Admin mobile redesign — host decisions locked (2026-08-26)
+
+**File to build:** `checkin-admin-sandbox.html` (copy/adapt from `checkin-admin.html`)  
+**Spec audit:** `CHECKIN_ADMIN_SPEC.md`  
+**Do not edit live** `checkin-admin.html` until cutover.
+
+Host uses admin on phone daily for three jobs: **today's arrivals**, **grant access**, **elevator QR/code**. Desktop can stay dense later; **mobile is the product**.
+
+### 22.1 Shell — bottom nav (like Sandbox 3 guest portal)
+
+Host liked Sandbox 3's **bottom horizontal app menu**. Admin mobile uses the same pattern:
+
+| Tab | Purpose |
+|-----|---------|
+| **Today** | Today's arrivals list (default home on phone) |
+| **Elevator** | Elevator / entrance code + QR — first-class, not buried in Settings |
+| **Guests** | Search, current guests, upcoming, failed searches |
+| **More** | Apartments, Requests, HK Pins, Guest Page Settings, Sign out |
+
+Desktop may keep a sidebar; on ≤640px the sidebar is replaced by this bottom nav.
+
+### 22.2 Screen — Today's Arrivals
+
+Vertical **cards** (not a 5-column grid). Today's arrivals first.
+
+Each card:
+- Room (mono) + **status pill**
+- Guest name
+- Check-in → check-out dates
+- Actions: WhatsApp · Grant Access (always visible on card)
+
+**Status pills (locked):**
+
+| Status | Source |
+|--------|--------|
+| `NO FORM` | Reservation today, no matching `checkin_guests` form |
+| `AWAITING UNLOCK` | Form exists, not unlocked |
+| `UNLOCKED` | `manualUnlock` / unlock rules |
+| **`CHECKED IN`** | `guestData.guestConfirmedCheckin === true` (guest tapped "I'm checked in" on guest portal) |
+
+Filter chips optional: All · Need unlock · Checked in · Unlocked · No form.
+
+### 22.3 Screen — Guest detail (full-screen on mobile)
+
+- Full-screen overlay/page (not side drawer).
+- **Do not show passport photo by default.** Privacy + clutter.
+- Show a button: **“Check passport”** → expands or opens lightbox only when host taps.
+- Approve / Reject ID only after passport is opened (or adjacent to that section).
+- Room block(s): door code, unlock status, **Grant Access** primary CTA, WhatsApp.
+- Multi-room = stacked blocks.
+
+### 22.4 Screen — Elevator (dedicated bottom-nav tab)
+
+Host workflow:
+1. External app often uploads codes to Firestore/RTDB automatically.
+2. If that fails, host **pastes** the QR payload (decoded numbers) and/or **types/pastes** the display code, then taps Update.
+3. **Manual update must stick** — after a successful manual save, that value must remain what guests see until the next intentional update (auto or manual). Silent fail / dual-write half-success is not acceptable.
+
+**UI required:**
+- Large current **display code** + QR preview from `qr_code`
+- Relative timestamp: “Updated X min ago” + source badge: `Auto` vs `Manual`
+- Freshness: green &lt;2h · amber 2–8h · red &gt;8h
+- Two inputs: Display code · QR value (paste-friendly, `font-size:16px+`)
+- Update button with loading / success / **error on card** (never silent)
+- Live listener preferred so auto-app updates appear without refresh
+
+**Data rule (implement in sandbox):**
+- Write **both** RTDB and Firestore; if either fails → show error, do not claim success.
+- On manual save, set `source: 'manual'` (or equivalent) + `updatedAt`.
+- Auto-uploader may overwrite later with newer `updatedAt` (normal daily rotation). Manual save must not appear to “revert” or vanish immediately due to load race / one store lagging.
+- Show which store is displayed if they diverge.
+
+### 22.5 Design tokens (admin ≠ guest)
+
+Keep admin operational (not guest Sandbox 2 warm serif look). Single token set — no parallel `--gs-*` / `--apt-*` / raw `.go-*` hex forks.
+
+Suggested start (tunable): DM Sans + DM Mono; bg `#f7f6f4` or cooler `#F4F5F7`; surface white; ink `#1e1c1a`; green `#2d6a4f`; red `#922b21`; amber `#7a5a0a`; radius 10 / 6 / 20.
+
+Host does **not** want guest Sandbox 1/Claude decorative UI carried into admin.
+
+### 22.6 Out of scope for first admin sandbox slice
+
+- Full Apartments editor polish
+- Redesigning every Guest Page Settings card (elevator moves to its own tab; rest can stay under More)
+- Production cutover
+
+### 22.7 Prompt for Claude (admin sandbox)
+
+```
+Read: CHECKIN_ADMIN_SPEC.md, GUEST_CHECKIN_REDESIGN.md §8 + §22, CODEBASE.md.
+Do NOT edit checkin-admin.html. Create checkin-admin-sandbox.html.
+
+Build mobile-first shell with bottom nav: Today | Elevator | Guests | More.
+Implement §22.2–§22.4 exactly:
+- Today = arrival cards + statuses including CHECKED IN (guestConfirmedCheckin)
+- Detail = full screen; passport behind "Check passport" button
+- Elevator = first-class tab; dual-write reliable; manual sticky; freshness + Auto/Manual source
+Claim admin-redesign in §9. No visual guest-page cloning.
+```
 
 ---
 
@@ -1165,6 +1268,7 @@ redesign or restructure the owner's area.
 
 - [ ] I re-read §1–§5 and §7  
 - [ ] Guest work is in **`checkin-guest-sandbox-2.html`**, not production, unless this is cutover  
+- [ ] Admin work is in **`checkin-admin-sandbox.html`** per §22, not live admin, unless cutover  
 - [ ] My workstream is claimed in §9  
 - [ ] I am not editing a file another agent claimed  
 - [ ] I will update §9 and §12 when finished  
