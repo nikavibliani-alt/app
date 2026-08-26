@@ -23,7 +23,7 @@
 1. **Read this file first** at the start of every session and before every PR / major edit.
 2. **Claim a workstream** in §9 before editing. Put your name/tool, date, and file list.
 3. **One owner per file at a time.** Sandbox guest file and admin file can be claimed by different agents in parallel.
-4. **Sandbox first.** Until cutover is explicitly approved, all guest redesign code goes into `checkin-guest-sandbox.html` (or agreed sandbox name). Do **not** replace `checkin-guest-v2.html` mid-design.
+4. **Sandbox first.** Until cutover is explicitly approved, all guest redesign code goes into **`checkin-guest-sandbox-2.html`** (canonical). Do **not** replace `checkin-guest-v2.html` mid-design.
 5. **Do not redesign and rewrite unlock/search logic in the same pass** unless this doc says that phase is open.
 6. **Update this doc** when you finish a chunk: mark the workstream done, note what changed, link commit/PR.
 7. **Conflicts:** Prefer updating this doc and stopping over force-merging overlapping CSS/HTML.
@@ -378,9 +378,7 @@ Shared design language: DM Sans / DM Mono, green accent admin chrome (different 
 
 ### Admin redesign status
 
-**Wanted by host — problem statement not yet written.**
-
-Do **not** start admin visual redesign until host lists pain points (same process as guest). Suggested next step: short callout from host — what is slow, confusing, or missing in admin daily use.
+**Host problem brief locked 2026-08-26 — see §22.** Build in `checkin-admin-sandbox.html` only; do not replace live `checkin-admin.html` until cutover.
 
 ### Admin ↔ guest coupling (important)
 
@@ -414,8 +412,8 @@ That config work belongs in the admin track after guest sandbox IA is stable —
 | `secondary-location-services` | blocked on Phase 1 | — | sandbox | Parking/location + shuttle + tours |
 | `guest-visual-design` | blocked on shell | — | sandbox CSS | Phase 4 |
 | `guest-cutover` | blocked | — | `checkin-guest-v2.html`, `checkin-details.html` | Host approve |
-| `admin-problem-brief` | waiting on host | — | docs | List admin pains first |
-| `admin-redesign` | blocked on brief | — | `checkin-admin.html` or sandbox | Separate track |
+| `admin-problem-brief` | **done** | Cursor + host | docs §22 | Mobile ops: Today / Elevator / passport privacy / checked-in status / bottom nav |
+| `admin-redesign` | **ready — design locked** | Claude (sandbox) | `checkin-admin-sandbox.html` | §22 — no code until Claude confirms reading §22; Cursor owns token/layout review |
 
 **Claim example:**
 
@@ -910,11 +908,11 @@ THEN:
 
 ---
 
-## 16. Sandbox 2 — Cursor design proposal (2026-08-24)
+## 16. Sandbox 2 — Cursor design proposal (2026-08-24) — **canonical since 2026-08-25**
 
 **File:** `checkin-guest-sandbox-2.html`  
-**URL (after push to main):** https://app.maxelaapartments.com/checkin-guest-sandbox-2.html  
-**Does not replace** `checkin-guest-sandbox.html` (Claude / Sandbox 1). Same phases, IDs, and toolbar. Compare side by side.
+**URL:** https://app.maxelaapartments.com/checkin-guest-sandbox-2.html  
+**Status:** Host chose this over Sandbox 3. **Continue all redesign work here.** Does not replace production until cutover.
 
 | Difference vs Sandbox 1 | Why |
 |-------------------------|-----|
