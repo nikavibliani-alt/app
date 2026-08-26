@@ -84,10 +84,10 @@ html.admin-authed #app{display:block;}
 .elev-msg{font-size:13px;margin-top:10px;min-height:20px;}
 .elev-msg.ok{color:var(--green);}
 .elev-msg.err{color:var(--red);}
-#detail,#apt-editor-overlay,#req-detail{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;flex-direction:column;max-width:480px;margin:0 auto;overflow-y:auto;}
+#detail,#apt-editor-overlay,#req-detail,#gp-editor-overlay{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;flex-direction:column;max-width:480px;margin:0 auto;overflow-y:auto;}
 #apt-editor-overlay{z-index:210;}
 #req-detail{z-index:220;}
-#detail.open,#apt-editor-overlay.open,#req-detail.open{display:flex;}
+#detail.open,#apt-editor-overlay.open,#req-detail.open,#gp-editor-overlay.open{display:flex;}
 .detail-bar,.apt-ed-bar{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;}
 .detail-back{width:40px;height:40px;border:1px solid var(--line);border-radius:var(--rs);background:var(--surface);font-size:18px;cursor:pointer;flex-shrink:0;}
 .detail-title{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -166,6 +166,46 @@ html.admin-authed #app{display:block;}
 .apt-step-btn.del{color:var(--red);}
 .apt-add{width:100%;min-height:44px;border:1.5px dashed var(--line);border-radius:var(--r);background:transparent;font-weight:600;cursor:pointer;margin-top:8px;font-family:var(--sans);}
 .apt-ed-bar .btn{flex:none;min-height:40px;padding:0 14px;}
+/* More hub */
+.more-section{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:14px 4px 8px;}
+.more-item .more-badge{background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;margin-left:auto;}
+.more-item .more-hint{font-size:12px;color:var(--muted);font-weight:500;margin-left:auto;}
+/* Toggle switch */
+.switch{position:relative;display:inline-block;width:48px;height:28px;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;}
+.switch-track{position:absolute;inset:0;background:var(--line);border-radius:999px;transition:.2s;cursor:pointer;}
+.switch-track::after{content:'';position:absolute;width:22px;height:22px;left:3px;top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.15);transition:.2s;}
+.switch input:checked+.switch-track{background:var(--green);}
+.switch input:checked+.switch-track::after{transform:translateX(20px);}
+.gp-row{display:flex;align-items:center;gap:12px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:8px;}
+.gp-row__icon{width:40px;height:40px;border-radius:var(--rs);background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.gp-row__body{flex:1;min-width:0;}
+.gp-row__title{font-size:15px;font-weight:700;}
+.gp-row__sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.gp-row__chev{color:var(--muted);font-size:18px;padding:0 4px;border:none;background:none;cursor:pointer;}
+.gp-preview{display:flex;gap:8px;overflow-x:auto;padding:12px 0 16px;scrollbar-width:none;}
+.gp-preview::-webkit-scrollbar{display:none;}
+.gp-tile{flex:none;width:72px;padding:10px 6px;border-radius:var(--r);border:1.5px solid var(--line);background:var(--surface);text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);opacity:.45;}
+.gp-tile.on{opacity:1;border-color:var(--ink);color:var(--ink);}
+.gp-tile__emoji{font-size:20px;display:block;margin-bottom:4px;}
+.gp-prop-row{display:flex;gap:6px;overflow-x:auto;padding-bottom:12px;scrollbar-width:none;}
+.gp-prop-row::-webkit-scrollbar{display:none;}
+.gp-prop{flex:none;padding:8px 14px;border:1.5px solid var(--line);border-radius:999px;background:var(--surface);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+.gp-prop.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.hk-pin-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:10px;}
+.hk-pin-card h3{font-size:14px;font-weight:700;margin-bottom:4px;}
+.hk-pin-card p{font-size:12px;color:var(--muted);margin-bottom:12px;}
+.hk-pin-input{width:100%;height:52px;border:1.5px solid var(--line);border-radius:var(--r);font-family:var(--mono);font-size:24px;letter-spacing:8px;text-align:center;margin-bottom:10px;}
+.nav-slot{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);margin-bottom:8px;}
+.nav-slot__grip{color:var(--muted);font-size:16px;user-select:none;}
+.nav-slot__label{flex:1;font-weight:700;font-size:14px;}
+.nav-slot select{flex:1;min-height:40px;border:1.5px solid var(--line);border-radius:var(--rs);font-size:14px;font-family:var(--sans);padding:0 10px;background:var(--bg);}
+.save-bar{position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(100%,480px);padding:10px 14px;background:var(--ink);color:#fff;display:none;align-items:center;justify-content:space-between;gap:10px;z-index:90;box-shadow:0 -4px 20px rgba(0,0,0,.12);}
+.save-bar.show{display:flex;}
+.save-bar button{min-height:40px;padding:0 16px;border-radius:var(--rs);font-weight:700;font-size:13px;cursor:pointer;border:none;font-family:var(--sans);}
+.save-bar .save-bar-discard{background:transparent;color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.3);}
+.save-bar .save-bar-commit{background:var(--green);color:#fff;}
+#gp-editor-overlay{z-index:230;}
 </style>
 </head>
 <body>
@@ -223,30 +263,46 @@ html.admin-authed #app{display:block;}
     <div id="apts-list"></div>
   </div>
 
+  <div class="pane" id="pane-hkpins">
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">4-digit PINs for the HK app. Changes apply immediately.</p>
+    <div id="hkpins-list"></div>
+  </div>
+
+  <div class="pane" id="pane-guestsettings">
+    <div id="guestsettings-root"></div>
+  </div>
+
+  <div class="pane" id="pane-failures">
+    <div id="failures-list"></div>
+  </div>
+
+  <div class="pane" id="pane-navsettings">
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Pick 3 shortcuts for the bottom bar. <strong>More</strong> is always last.</p>
+    <div id="nav-slots"></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveNavConfig()">Apply tab bar</button>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="resetNavConfig()">Reset to default</button>
+  </div>
+
   <div class="pane" id="pane-more">
+    <div class="more-section">Operations</div>
     <div class="more-list">
-      <button class="more-item" type="button" onclick="switchTab('apts')">Apartments<span>Instructions…</span></button>
-      <a class="more-item" href="checkin-admin.html" target="_blank">Full desktop admin<span>Open</span></a>
-      <a class="more-item" href="checkin-admin.html" target="_blank">Guest page settings<span>Services…</span></a>
-      <a class="more-item" href="admin-search-test.html" target="_blank">Search debugger<span>Open</span></a>
+      <button class="more-item" type="button" onclick="switchTab('apts')">Apartments<span class="more-hint">Check-in instructions</span></button>
+      <button class="more-item" type="button" onclick="switchTab('hkpins')">HK Pins<span class="more-hint">Housekeeping app</span></button>
+      <button class="more-item" type="button" onclick="switchTab('failures')" id="more-failures-btn">Failed searches<span class="more-badge" id="sf-more-badge" style="display:none">0</span></button>
+    </div>
+    <div class="more-section">Guest experience</div>
+    <div class="more-list">
+      <button class="more-item" type="button" onclick="switchTab('guestsettings')">Guest page<span class="more-hint">Tiles, services, location</span></button>
+    </div>
+    <div class="more-section">App</div>
+    <div class="more-list">
+      <button class="more-item" type="button" onclick="switchTab('navsettings')">Tab bar layout<span class="more-hint">Reorder bottom nav</span></button>
+      <a class="more-item" href="admin-search-test.html" target="_blank" rel="noopener">Search debugger<span class="more-hint">Open</span></a>
       <button class="more-item" type="button" onclick="adminSignOut()">Sign out</button>
     </div>
   </div>
 
-  <nav class="nav">
-    <button class="nav__btn active" data-tab="stay" onclick="switchTab('stay')">
-      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Stay
-    </button>
-    <button class="nav__btn" data-tab="elevator" onclick="switchTab('elevator')" id="nav-elev">
-      <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 8v8M9 11l3-3 3 3"/></svg>Elevator<span class="dot"></span>
-    </button>
-    <button class="nav__btn" data-tab="requests" onclick="switchTab('requests')" id="nav-req">
-      <svg viewBox="0 0 24 24"><path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M8 8h8M8 12h5"/></svg>Requests<span class="badge" id="req-badge">0</span>
-    </button>
-    <button class="nav__btn" data-tab="more" onclick="switchTab('more')">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More
-    </button>
-  </nav>
+  <nav class="nav" id="main-nav"></nav>
 </div>
 
 <div id="detail">
@@ -272,6 +328,23 @@ html.admin-authed #app{display:block;}
     <div class="detail-title" id="req-detail-title">Request</div>
   </div>
   <div class="detail-body" id="req-detail-body"></div>
+</div>
+
+<div id="gp-editor-overlay">
+  <div class="apt-ed-bar">
+    <button class="detail-back" onclick="closeGpEditor()">←</button>
+    <div class="detail-title" id="gp-ed-title">Edit</div>
+    <button class="btn btn-primary" id="gp-ed-apply" onclick="applyGpEditor()">Apply</button>
+  </div>
+  <div class="apt-ed-body" id="gp-ed-body"></div>
+</div>
+
+<div class="save-bar" id="gs-save-bar">
+  <span style="font-size:13px;font-weight:600">Unsaved guest page changes</span>
+  <div style="display:flex;gap:8px">
+    <button type="button" class="save-bar-discard" onclick="gsDiscard()">Discard</button>
+    <button type="button" class="save-bar-commit" onclick="gsSaveAll()">Save</button>
+  </div>
 </div>
 
 <script type="module">
@@ -301,7 +374,7 @@ window.adminUnlock=function(){
 window.adminSignOut=function(){localStorage.removeItem(_ADMIN_KEY);location.reload();};
 
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDocs,query,where,orderBy,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -337,7 +410,408 @@ const APARTMENTS=[
 let aptData={},guestData=[],hkStatusData={},_resCache=null,_resLoading=false;
 let elevData=null,currentTab='stay',stayFilter='overview',upcomingDay=null,_currentAptId=null;
 let reqData=[],reqFilter='all',_reqLoading=false;
+let hkPinsData={shartava:'',centre:'',vgl:'',admin:''};
+let searchFailures=[];
 let _formById=new Map();
+
+const _NAV_KEY='maxela_admin_nav_v1';
+const NAV_POOL={
+  stay:{label:'Stay',pane:'stay',svg:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',extra:''},
+  elevator:{label:'Elevator',pane:'elevator',svg:'<svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 8v8M9 11l3-3 3 3"/></svg>',extra:'<span class="dot"></span>',navId:'nav-elev'},
+  requests:{label:'Requests',pane:'requests',svg:'<svg viewBox="0 0 24 24"><path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M8 8h8M8 12h5"/></svg>',extra:'<span class="badge" id="req-badge">0</span>',navId:'nav-req'},
+  apts:{label:'Apts',pane:'apts',svg:'<svg viewBox="0 0 24 24"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-8h6v8"/></svg>',extra:''},
+  hkpins:{label:'HK Pins',pane:'hkpins',svg:'<svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',extra:''},
+  guestsettings:{label:'Guest',pane:'guestsettings',svg:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>',extra:''},
+};
+const DEFAULT_NAV_SLOTS=['stay','elevator','requests'];
+
+function loadNavSlots(){
+  try{
+    const s=JSON.parse(localStorage.getItem(_NAV_KEY)||'null');
+    if(Array.isArray(s?.slots)&&s.slots.length===3&&s.slots.every(id=>NAV_POOL[id]))return s.slots;
+  }catch(e){}
+  return [...DEFAULT_NAV_SLOTS];
+}
+let navSlots=loadNavSlots();
+
+function renderNavBar(){
+  navSlots=loadNavSlots();
+  const nav=document.getElementById('main-nav');
+  if(!nav)return;
+  let html='';
+  for(const id of navSlots){
+    const d=NAV_POOL[id];
+    const active=currentTab===d.pane||(currentTab==='more'&&false);
+    html+=`<button class="nav__btn${currentTab===d.pane?' active':''}" data-tab="${d.pane}" onclick="switchTab('${d.pane}')" ${d.navId?`id="${d.navId}"`:''}>${d.svg}${d.label}${d.extra||''}</button>`;
+  }
+  html+=`<button class="nav__btn${currentTab==='more'||['apts','hkpins','guestsettings','navsettings','failures'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</button>`;
+  nav.innerHTML=html;
+  updateRequestsBadge();
+  if(elevData)document.getElementById('nav-elev')?.classList.toggle('has-alert',elevFreshness().cls==='old');
+}
+
+window.saveNavConfig=function(){
+  const slots=[];
+  for(let i=0;i<3;i++){
+    const sel=document.getElementById('nav-slot-'+i);
+    if(sel)slots.push(sel.value);
+  }
+  if(new Set(slots).size<3){toast('Each tab must be different');return;}
+  localStorage.setItem(_NAV_KEY,JSON.stringify({slots}));
+  navSlots=slots;
+  renderNavBar();
+  toast('Tab bar updated ✓');
+  switchTab('more');
+};
+window.resetNavConfig=function(){
+  localStorage.removeItem(_NAV_KEY);
+  navSlots=[...DEFAULT_NAV_SLOTS];
+  renderNavSettings();
+  renderNavBar();
+  toast('Reset to default');
+};
+function renderNavSettings(){
+  navSlots=loadNavSlots();
+  const el=document.getElementById('nav-slots');
+  if(!el)return;
+  el.innerHTML=navSlots.map((id,i)=>`
+    <div class="nav-slot">
+      <span class="nav-slot__grip">${i+1}</span>
+      <span class="nav-slot__label">Slot ${i+1}</span>
+      <select id="nav-slot-${i}" onchange="previewNavSlot(${i},this.value)">
+        ${Object.entries(NAV_POOL).map(([k,d])=>`<option value="${k}"${k===id?' selected':''}>${d.label}</option>`).join('')}
+      </select>
+    </div>`).join('');
+}
+window.previewNavSlot=function(){/* apply on save only */};
+
+/* ── Guest page settings ── */
+const SECTION_DEFAULTS={
+  ROOMS:{checkin:true,access_code:false,elevator_code:false,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  MAXELA:{checkin:true,access_code:true,elevator_code:true,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  BIG_APT:{checkin:true,access_code:true,elevator_code:true,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  FREEDOM:{checkin:true,access_code:true,elevator_code:false,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  ORBELIANI:{checkin:true,access_code:true,elevator_code:false,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+};
+const LAUNDRY_DEFAULTS=[
+  {name:'T-shirt / Polo',price:5},{name:'Pants / Jeans',price:8},{name:'Dress',price:10},
+  {name:'Jacket / Coat',price:15},{name:'Underwear / Socks',price:3},{name:'Bedsheet',price:12},{name:'Towel',price:5},
+];
+const SERVICE_DEFAULTS=[
+  {id:'laundry',name:'Laundry',price:0,note:'',desc:'We collect, wash & return.'},
+  {id:'cleaning',name:'Room Cleaning',price:30,note:'',desc:'Professional mid-stay cleaning'},
+  {id:'city_tour',name:'City Tour',price:50,note:'per person',desc:'Guided tours around Tbilisi'},
+  {id:'airport_transfer',name:'Airport Transfer',price:0,note:'on request',desc:'Door-to-door transfer'},
+  {id:'custom',name:'Other Request',price:0,note:'',desc:'Anything else we can help with?'},
+];
+const ROOM_CATEGORY_DEFAULTS={
+  ROOMS:{name:'Triple Room with Private Bathroom',maxGuests:4,amenities:['Private Bathroom','Free WiFi','Daily Housekeeping'],photos:[]},
+  MAXELA:{name:'Superior Apartment',maxGuests:6,amenities:['Full Kitchen','Living Room','Free WiFi','City View'],photos:[]},
+  BIG_APT:{name:'3-Bedroom Apartment',maxGuests:12,amenities:['3 Bedrooms','Full Kitchen','Living Room','Free WiFi'],photos:[]},
+  FREEDOM:{name:'Tabidze Studio',maxGuests:2,amenities:['Kitchenette','Free WiFi','City Center'],photos:[]},
+  ORBELIANI:{name:'Orbeliani Suite',maxGuests:3,amenities:['Free WiFi','City View','Historic District'],photos:[]},
+};
+const LOCATION_INFO_DEFAULTS={
+  ROOMS:{address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
+  MAXELA:{address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
+  BIG_APT:{address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
+  FREEDOM:{address:'Galaktion Tabidze St. 3/5, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
+  ORBELIANI:{address:'Atoneli St. 9, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:false,parkingDesc:'',parkingMapsUrl:'',parkingMediaUrl:''},
+};
+const GP_PROPS=[
+  {id:'ROOMS',label:'Rooms'},{id:'MAXELA',label:'Maxela'},{id:'BIG_APT',label:'Big Apt'},
+  {id:'FREEDOM',label:'Freedom'},{id:'ORBELIANI',label:'Orbeliani'},
+];
+const GP_TILES=[
+  {id:'checkin',emoji:'🔑',label:'Check-in',group:'essential',noEdit:true},
+  {id:'wifi',emoji:'📶',label:'WiFi',group:'essential',edit:'wifi'},
+  {id:'elevator_code',emoji:'🛗',label:'Elevator',group:'essential',noEdit:true},
+  {id:'services',emoji:'✨',label:'Services',group:'essential',noEdit:true},
+  {id:'laundry',emoji:'👕',label:'Laundry',group:'service',edit:'laundry'},
+  {id:'cleaning',emoji:'🧹',label:'Cleaning',group:'service',edit:'service'},
+  {id:'city_tour',emoji:'🗺',label:'Tours',group:'service',edit:'service'},
+  {id:'airport_transfer',emoji:'🚐',label:'Transfer',group:'service',edit:'service'},
+  {id:'recs',emoji:'⭐',label:'Recs',group:'content',edit:'text'},
+  {id:'rules',emoji:'📋',label:'Rules',group:'content',edit:'text'},
+  {id:'contact',emoji:'💬',label:'Contact',group:'content',edit:'text'},
+];
+let gsVisibility=JSON.parse(JSON.stringify(SECTION_DEFAULTS));
+let gsLaundry=[...LAUNDRY_DEFAULTS];
+let gsServices=SERVICE_DEFAULTS.map(s=>({...s}));
+let gsProp='ROOMS';
+let gsLoaded=false;
+let gsSectionLabels={};
+let gsRoomCategories={};
+let gsLocationInfo={};
+let gsDirty=false;
+let _gpEditCtx=null;
+
+async function loadGuestSettings(){
+  try{
+    const snap=await getDoc(doc(db,'checkin_admin','config'));
+    if(snap.exists()){
+      const d=snap.data();
+      if(d.visibility)gsVisibility={...JSON.parse(JSON.stringify(SECTION_DEFAULTS)),...d.visibility};
+      if(d.laundryItems)gsLaundry=d.laundryItems;
+      if(d.services){
+        const nameToId={'Cleaning':'cleaning','Room Cleaning':'cleaning','City Tour':'city_tour','Airport Transfer':'airport_transfer','Other Request':'custom','Laundry':'laundry'};
+        gsServices=d.services.map(s=>{const id=s.id||nameToId[s.name]||'';const def=SERVICE_DEFAULTS.find(x=>x.id===id)||{};return{...def,...s,id};});
+        for(const def of SERVICE_DEFAULTS){if(!gsServices.find(s=>s.id===def.id))gsServices.push({...def});}
+      }
+      if(d.sectionLabels)gsSectionLabels=d.sectionLabels;
+      if(d.roomCategories)gsRoomCategories=d.roomCategories;
+      if(d.locationInfo)gsLocationInfo=d.locationInfo;
+    }
+  }catch(e){console.warn(e);}
+  gsLoaded=true;
+}
+function gsMarkDirty(){gsDirty=true;document.getElementById('gs-save-bar')?.classList.add('show');}
+window.gsDiscard=async function(){gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');gsLoaded=false;await loadGuestSettings();renderGuestSettings();toast('Discarded');};
+window.gsSaveAll=async function(){
+  try{
+    await setDoc(doc(db,'checkin_admin','config'),{
+      visibility:gsVisibility,laundryItems:gsLaundry,services:gsServices,sectionLabels:gsSectionLabels,
+      roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,updatedAt:serverTimestamp()
+    });
+    gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');
+    toast('Guest page saved ✓');
+  }catch(e){toast('Save failed: '+e.message);}
+};
+window.gsToggle=function(id,val){
+  if(!gsVisibility[gsProp])gsVisibility[gsProp]={};
+  gsVisibility[gsProp][id]=val;
+  gsMarkDirty();renderGuestSettings();
+};
+window.gsSelectProp=function(prop){gsProp=prop;renderGuestSettings();};
+
+function renderGuestSettings(){
+  const root=document.getElementById('guestsettings-root');
+  if(!root)return;
+  const vis=gsVisibility[gsProp]||{};
+  const preview=GP_TILES.map(t=>`<div class="gp-tile${vis[t.id]!==false?' on':''}"><span class="gp-tile__emoji">${t.emoji}</span>${esc(t.label)}</div>`).join('');
+  const props=GP_PROPS.map(p=>`<button type="button" class="gp-prop${p.id===gsProp?' active':''}" onclick="gsSelectProp('${p.id}')">${esc(p.label)}</button>`).join('');
+  const row=(t)=>{
+    const on=vis[t.id]!==false;
+    const svc=gsServices.find(s=>s.id===t.id);
+    const sub=t.group==='service'&&svc?(svc.price?svc.price+' GEL':'')+(svc.note?' · '+svc.note:''):t.group==='content'?'Tap to edit copy':'Shown on guest home';
+    const chev=t.noEdit?'':`<button type="button" class="gp-row__chev" onclick="event.stopPropagation();openGpEditor('${t.id}')">›</button>`;
+    return`<div class="gp-row" ${!t.noEdit?`onclick="openGpEditor('${t.id}')" style="cursor:pointer"`:''}>
+      <div class="gp-row__icon">${t.emoji}</div>
+      <div class="gp-row__body"><div class="gp-row__title">${esc(t.label)}</div><div class="gp-row__sub">${esc(sub)}</div></div>
+      <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${on?'checked':''} onchange="gsToggle('${t.id}',this.checked)"><span class="switch-track"></span></label>
+      ${chev}
+    </div>`;
+  };
+  const cat=gsRoomCategories[gsProp]||{};
+  const def=ROOM_CATEGORY_DEFAULTS[gsProp]||{};
+  const loc=gsLocationInfo[gsProp]||LOCATION_INFO_DEFAULTS[gsProp]||{};
+  root.innerHTML=`
+    <div class="gp-prop-row">${props}</div>
+    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px">Guest preview</div>
+    <div class="gp-preview">${preview}</div>
+    <div class="section-hd"><h2>Home tiles</h2></div>
+    ${GP_TILES.filter(t=>t.group==='essential').map(row).join('')}
+    <div class="section-hd" style="margin-top:8px"><h2>Services</h2></div>
+    ${GP_TILES.filter(t=>t.group==='service').map(row).join('')}
+    <div class="section-hd" style="margin-top:8px"><h2>Content pages</h2></div>
+    ${GP_TILES.filter(t=>t.group==='content').map(row).join('')}
+    <div class="section-hd" style="margin-top:8px"><h2>What you booked</h2></div>
+    <button type="button" class="gp-row" style="width:100%;cursor:pointer;border:none;font-family:var(--sans)" onclick="openGpEditor('room_category')">
+      <div class="gp-row__icon">🏠</div>
+      <div class="gp-row__body"><div class="gp-row__title">${esc(cat.name||def.name||'Room category')}</div><div class="gp-row__sub">Photos, amenities, max guests</div></div>
+      <span class="gp-row__chev">›</span>
+    </button>
+    <div class="section-hd" style="margin-top:8px"><h2>Location</h2></div>
+    <button type="button" class="gp-row" style="width:100%;cursor:pointer;border:none;font-family:var(--sans)" onclick="openGpEditor('location')">
+      <div class="gp-row__icon">📍</div>
+      <div class="gp-row__body"><div class="gp-row__title">${esc(loc.address||def.address||'Address')}</div><div class="gp-row__sub">${loc.parkingEnabled?'Parking on':'No parking section'}</div></div>
+      <span class="gp-row__chev">›</span>
+    </button>
+    <button class="btn" style="width:100%;margin-top:12px" onclick="window.open('checkin-guest-sandbox-2.html?preview=true','_blank')">Preview guest sandbox</button>
+    <div style="height:72px"></div>`;
+}
+
+window.openGpEditor=function(ctx){
+  _gpEditCtx=ctx;
+  const body=document.getElementById('gp-ed-body');
+  const title=document.getElementById('gp-ed-title');
+  if(ctx==='laundry'){
+    title.textContent='Laundry prices';
+    body.innerHTML=`<p style="font-size:12px;color:var(--muted);margin-bottom:12px">2nd+ items auto-discount to 40% on guest form.</p>
+      ${gsLaundry.map((item,i)=>`<div class="apt-row" style="margin-bottom:8px;align-items:center">
+        <input class="apt-input" value="${esc(item.name)}" oninput="gsLaundry[${i}].name=this.value;gsMarkDirty()" style="margin:0">
+        <input class="apt-input" type="number" value="${item.price}" oninput="gsLaundry[${i}].price=parseFloat(this.value)||0;gsMarkDirty()" style="margin:0">
+      </div>`).join('')}
+      <div class="apt-row"><input class="apt-input" id="gp-new-laundry-name" placeholder="New item" style="margin:0"><input class="apt-input" id="gp-new-laundry-price" type="number" placeholder="GEL" style="margin:0"></div>
+      <button class="btn" style="width:100%;margin-top:8px" onclick="gpAddLaundry()">+ Add item</button>`;
+  }else if(ctx==='room_category'){
+    title.textContent='What you booked';
+    const cat=gsRoomCategories[gsProp]||{};
+    const def=ROOM_CATEGORY_DEFAULTS[gsProp]||{};
+    const data={...def,...cat};
+    const amenities=(data.amenities||[]);
+    body.innerHTML=`
+      <label class="apt-label">Display name</label><input class="apt-input" value="${esc(data.name||'')}" oninput="gpSetCat('name',this.value)">
+      <label class="apt-label">Description</label><textarea class="apt-textarea" oninput="gpSetCat('description',this.value)">${esc(data.description||'')}</textarea>
+      <label class="apt-label">Max guests</label><input class="apt-input" type="number" value="${data.maxGuests||''}" oninput="gpSetCat('maxGuests',parseInt(this.value)||0)">
+      <label class="apt-label">Amenities</label>
+      <div style="display:flex;flex-wrap:gap:6px;margin-bottom:10px">${amenities.map((a,i)=>`<span style="font-size:12px;padding:4px 10px;background:var(--bg);border-radius:999px">${esc(a)} <button type="button" style="border:none;background:none;cursor:pointer" onclick="gpRemoveAmenity(${i})">×</button></span>`).join('')}</div>
+      <div class="apt-row"><input class="apt-input" id="gp-new-amenity" placeholder="Add amenity" style="margin:0"><button class="btn" onclick="gpAddAmenity()">Add</button></div>`;
+  }else if(ctx==='location'){
+    title.textContent='Location & parking';
+    const loc=gsLocationInfo[gsProp]||{};
+    const def=LOCATION_INFO_DEFAULTS[gsProp]||{};
+    const data={...def,...loc};
+    body.innerHTML=`
+      <label class="apt-label">Address</label><input class="apt-input" value="${esc(data.address||'')}" oninput="gpSetLoc('address',this.value)">
+      <label class="apt-label">Google Maps URL</label><input class="apt-input" value="${esc(data.mapsUrl||'')}" oninput="gpSetLoc('mapsUrl',this.value)" placeholder="https://maps.google.com/…">
+      <label class="apt-label">Neighborhood blurb</label><textarea class="apt-textarea" oninput="gpSetLoc('neighborhood',this.value)">${esc(data.neighborhood||'')}</textarea>
+      <div class="gp-row" style="margin:12px 0"><div class="gp-row__body"><div class="gp-row__title">Parking section</div></div>
+        <label class="switch"><input type="checkbox" ${data.parkingEnabled?'checked':''} onchange="gpSetLoc('parkingEnabled',this.checked)"><span class="switch-track"></span></label></div>
+      <label class="apt-label">Parking description</label><textarea class="apt-textarea" oninput="gpSetLoc('parkingDesc',this.value)">${esc(data.parkingDesc||'')}</textarea>`;
+  }else if(ctx==='wifi'){
+    title.textContent='WiFi defaults';
+    body.innerHTML=`
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Fallback labels if apartment has no WiFi set. Per-room WiFi still comes from Apartments editor.</p>
+      <label class="apt-label">Network name hint</label><input class="apt-input" id="gp-wifi-name" value="${esc(gsSectionLabels.wifi_name||'')}" placeholder="Maxela_Guest">
+      <label class="apt-label">Password hint</label><input class="apt-input" id="gp-wifi-pass" value="${esc(gsSectionLabels.wifi_pass||'')}">`;
+  }else if(['recs','rules','contact'].includes(ctx)){
+    const labels={recs:'Recommendations',rules:'House rules',contact:'Contact'};
+    title.textContent=labels[ctx];
+    body.innerHTML=`<label class="apt-label">Page content</label><textarea class="apt-textarea" id="gp-text-content" style="min-height:220px">${esc(gsSectionLabels[ctx]||'')}</textarea>
+      <p style="font-size:12px;color:var(--muted);margin-top:8px">Line breaks are preserved for guests.</p>`;
+  }else{
+    const svc=gsServices.find(s=>s.id===ctx)||{};
+    title.textContent=svc.name||ctx;
+    const isTransfer=ctx==='airport_transfer';
+    body.innerHTML=`
+      <label class="apt-label">Display name</label><input class="apt-input" id="gp-svc-name" value="${esc(svc.name||'')}">
+      <label class="apt-label">Description</label><input class="apt-input" id="gp-svc-desc" value="${esc(svc.desc||'')}">
+      ${isTransfer?`
+        <label class="apt-label">Small car (1–3 guests) GEL</label><input class="apt-input" type="number" id="gp-svc-small" value="${svc.smallCarPrice||70}">
+        <label class="apt-label">Large car (4+) GEL</label><input class="apt-input" type="number" id="gp-svc-large" value="${svc.largeCarPrice||100}">
+        <label class="apt-label">WhatsApp</label><input class="apt-input" id="gp-svc-wa" value="${esc(svc.whatsappNumber||'')}">`
+      :`<label class="apt-label">Price (GEL)</label><input class="apt-input" type="number" id="gp-svc-price" value="${svc.price||0}">
+        <label class="apt-label">Price note</label><input class="apt-input" id="gp-svc-note" value="${esc(svc.note||'')}">`}`;
+  }
+  document.getElementById('gp-editor-overlay').classList.add('open');
+};
+window.closeGpEditor=function(){document.getElementById('gp-editor-overlay')?.classList.remove('open');_gpEditCtx=null;};
+window.applyGpEditor=function(){
+  const ctx=_gpEditCtx;if(!ctx)return;
+  if(ctx==='wifi'){
+    gsSectionLabels.wifi_name=document.getElementById('gp-wifi-name')?.value.trim()||'';
+    gsSectionLabels.wifi_pass=document.getElementById('gp-wifi-pass')?.value.trim()||'';
+  }else if(['recs','rules','contact'].includes(ctx)){
+    gsSectionLabels[ctx]=document.getElementById('gp-text-content')?.value||'';
+  }else if(ctx!=='laundry'&&ctx!=='room_category'&&ctx!=='location'){
+    const svc=gsServices.find(s=>s.id===ctx);
+    if(svc){
+      svc.name=document.getElementById('gp-svc-name')?.value.trim()||svc.name;
+      svc.desc=document.getElementById('gp-svc-desc')?.value.trim()||'';
+      if(ctx==='airport_transfer'){
+        svc.smallCarPrice=parseFloat(document.getElementById('gp-svc-small')?.value)||70;
+        svc.largeCarPrice=parseFloat(document.getElementById('gp-svc-large')?.value)||100;
+        svc.whatsappNumber=document.getElementById('gp-svc-wa')?.value.trim()||'';
+      }else{
+        svc.price=parseFloat(document.getElementById('gp-svc-price')?.value)||0;
+        svc.note=document.getElementById('gp-svc-note')?.value.trim()||'';
+      }
+    }
+  }
+  gsMarkDirty();closeGpEditor();renderGuestSettings();toast('Applied — tap Save when ready');
+};
+window.gpAddLaundry=function(){
+  const n=document.getElementById('gp-new-laundry-name')?.value.trim();
+  const p=parseFloat(document.getElementById('gp-new-laundry-price')?.value)||0;
+  if(!n){toast('Enter item name');return;}
+  gsLaundry.push({name:n,price:p});gsMarkDirty();openGpEditor('laundry');
+};
+window.gpSetCat=function(f,v){
+  if(!gsRoomCategories[gsProp])gsRoomCategories[gsProp]={...ROOM_CATEGORY_DEFAULTS[gsProp]};
+  gsRoomCategories[gsProp][f]=v;gsMarkDirty();
+};
+window.gpSetLoc=function(f,v){
+  if(!gsLocationInfo[gsProp])gsLocationInfo[gsProp]={...LOCATION_INFO_DEFAULTS[gsProp]};
+  gsLocationInfo[gsProp][f]=v;gsMarkDirty();
+};
+window.gpAddAmenity=function(){
+  const v=document.getElementById('gp-new-amenity')?.value.trim();if(!v)return;
+  if(!gsRoomCategories[gsProp])gsRoomCategories[gsProp]={...ROOM_CATEGORY_DEFAULTS[gsProp]};
+  if(!gsRoomCategories[gsProp].amenities)gsRoomCategories[gsProp].amenities=[...(ROOM_CATEGORY_DEFAULTS[gsProp]?.amenities||[])];
+  gsRoomCategories[gsProp].amenities.push(v);gsMarkDirty();openGpEditor('room_category');
+};
+window.gpRemoveAmenity=function(i){
+  if(!gsRoomCategories[gsProp]?.amenities)return;
+  gsRoomCategories[gsProp].amenities.splice(i,1);gsMarkDirty();openGpEditor('room_category');
+};
+
+async function loadAndRenderGuestSettings(){
+  const root=document.getElementById('guestsettings-root');
+  if(root)root.innerHTML='<div class="empty">Loading…</div>';
+  if(!gsLoaded)await loadGuestSettings();
+  renderGuestSettings();
+}
+
+/* ── HK Pins ── */
+const HK_ROLES=[
+  {id:'shartava',label:'Shartava Team',desc:'Shartava housekeeping'},
+  {id:'centre',label:'Centre Team',desc:'City centre housekeeping'},
+  {id:'vgl',label:'VGL Team',desc:'VGL studios & apartments'},
+  {id:'admin',label:'Admin PIN',desc:'All rooms across properties'},
+];
+function renderHkPins(){
+  const el=document.getElementById('hkpins-list');if(!el)return;
+  el.innerHTML=HK_ROLES.map(r=>`
+    <div class="hk-pin-card">
+      <h3>${esc(r.label)}</h3>
+      <p>${esc(r.desc)}</p>
+      <input class="hk-pin-input" type="text" inputmode="numeric" maxlength="4" placeholder="••••" value="${esc(hkPinsData[r.id]||'')}" id="pin-inp-${r.id}">
+      <button class="btn btn-primary" style="width:100%" onclick="saveHkPin('${r.id}')">Save PIN</button>
+    </div>`).join('');
+}
+window.saveHkPin=async function(roleId){
+  const pin=(document.getElementById('pin-inp-'+roleId)?.value||'').trim();
+  if(!/^\d{4}$/.test(pin)){toast('PIN must be 4 digits');return;}
+  try{
+    await setDoc(doc(db,'hk_pins',roleId),{pin,updatedAt:serverTimestamp()});
+    hkPinsData[roleId]=pin;toast('PIN saved ✓');
+  }catch(e){toast('Failed: '+e.message);}
+};
+
+/* ── Search failures ── */
+function updateSfBadge(){
+  const n=searchFailures.length;
+  const b=document.getElementById('sf-more-badge');
+  if(b){b.textContent=n;b.style.display=n?'inline-flex':'none';}
+}
+function renderFailures(){
+  const el=document.getElementById('failures-list');if(!el)return;
+  if(!searchFailures.length){el.innerHTML='<div class="empty">No unresolved failed searches</div>';return;}
+  el.innerHTML=searchFailures.map(f=>{
+    const ts=f.timestamp?.toDate?f.timestamp.toDate():null;
+    const timeStr=ts?ts.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
+    const info=[f.input_name,f.input_booking_ref,f.input_date].filter(Boolean).join(' · ')||'(no input)';
+    const raw=(f.input_contact||'').replace(/\D/g,'');
+    const wa=raw?`https://wa.me/${raw.length===9&&raw.startsWith('5')?'995'+raw:raw}`:null;
+    return`<div class="card">
+      <div class="card__name">${esc(info)}</div>
+      <div class="card__sub">${esc(timeStr)} · ${esc(f.input_contact||'—')}</div>
+      <div class="card__actions">
+        ${wa?`<a class="btn" href="${wa}" target="_blank" rel="noopener">WhatsApp</a>`:'<button class="btn" disabled>WhatsApp</button>'}
+        <button class="btn btn-primary" onclick="resolveSearchFailure('${f.id}')">Resolve</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+window.resolveSearchFailure=async function(id){
+  try{
+    await updateDoc(doc(db,'search_failures',id),{resolved:true,resolvedAt:serverTimestamp()});
+    searchFailures=searchFailures.filter(f=>f.id!==id);
+    updateSfBadge();renderFailures();toast('Resolved ✓');
+  }catch(e){toast('Failed: '+e.message);}
+};
+
 
 function toast(msg,ms=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),ms);}
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -607,24 +1081,33 @@ const TAB_META={
   elevator:{title:'Elevator',sub:'Entrance & elevator code'},
   requests:{title:'Requests',sub:'Guest service requests'},
   apts:{title:'Apartments',sub:'WiFi, instructions, photo steps'},
-  more:{title:'More',sub:'Apartments & settings'},
+  hkpins:{title:'HK Pins',sub:'Housekeeping app login codes'},
+  guestsettings:{title:'Guest page',sub:'Tiles, services & location'},
+  failures:{title:'Failed searches',sub:'Guests who could not find booking'},
+  navsettings:{title:'Tab bar',sub:'Customize bottom navigation'},
+  more:{title:'More',sub:'All admin tools'},
 };
+const MORE_TABS=new Set(['more','apts','hkpins','guestsettings','navsettings','failures']);
 window.switchTab=function(tab){
   currentTab=tab;
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='pane-'+tab));
+  renderNavBar();
   document.querySelectorAll('.nav__btn').forEach(b=>{
-    const active=b.dataset.tab===tab||(tab==='apts'&&b.dataset.tab==='more');
-    b.classList.toggle('active',active);
+    const t=b.dataset.tab;
+    b.classList.toggle('active',t===tab||(t==='more'&&MORE_TABS.has(tab)));
   });
-  const m=TAB_META[tab];
+  const m=TAB_META[tab]||TAB_META.more;
   document.getElementById('header-title').textContent=m.title;
   document.getElementById('header-sub').textContent=m.sub;
   if(tab==='stay')renderStay();
   if(tab==='elevator')renderElevator();
   if(tab==='requests')loadAndRenderRequests();
   if(tab==='apts')renderAptsList();
-  closeDetail();
-  closeReqDetail();
+  if(tab==='hkpins')renderHkPins();
+  if(tab==='guestsettings')loadAndRenderGuestSettings();
+  if(tab==='failures')renderFailures();
+  if(tab==='navsettings')renderNavSettings();
+  closeDetail();closeReqDetail();closeGpEditor();
 };
 
 window.unlockGuest=async function(guestId){
@@ -1132,6 +1615,9 @@ function render(){
   else if(currentTab==='apts')renderAptsList();
   else if(currentTab==='elevator')renderElevator();
   else if(currentTab==='requests')buildRequestsUI();
+  else if(currentTab==='hkpins')renderHkPins();
+  else if(currentTab==='guestsettings'&&gsLoaded)renderGuestSettings();
+  else if(currentTab==='failures')renderFailures();
 }
 
 async function _loadResCache(){
@@ -1146,7 +1632,18 @@ async function _loadResCache(){
 }
 
 let loaded=0;
-function checkLoaded(){loaded++;if(loaded>=2){document.getElementById('loading').style.display='none';_loadResCache();render();loadElevatorOnce();loadRequests(true);}}
+function checkLoaded(){
+  loaded++;
+  if(loaded>=2){
+    document.getElementById('loading').style.display='none';
+    renderNavBar();
+    _loadResCache();
+    render();
+    loadElevatorOnce();
+    loadRequests(true);
+    loadGuestSettings();
+  }
+}
 
 onSnapshot(collection(db,'checkin_apartments'),snap=>{
   aptData={};snap.docs.forEach(d=>{aptData[d.id]=d.data();});
@@ -1160,6 +1657,15 @@ onSnapshot(query(collection(db,'hk_status'),where('date','==',tbilisiToday())),s
   hkStatusData={};snap.docs.forEach(d=>{hkStatusData[d.id]=d.data();});
   if(loaded>=2)render();
 });
+onSnapshot(collection(db,'hk_pins'),snap=>{
+  snap.docs.forEach(d=>{hkPinsData[d.id]=d.data().pin||'';});
+  if(loaded>=2&&currentTab==='hkpins')renderHkPins();
+});
+onSnapshot(query(collection(db,'search_failures'),where('resolved','==',false)),snap=>{
+  searchFailures=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.timestamp?.seconds||0)-(a.timestamp?.seconds||0));
+  updateSfBadge();
+  if(loaded>=2&&currentTab==='failures')renderFailures();
+});
 onSnapshot(doc(db,'globals','elevator_code'),snap=>{
   if(snap.exists()){
     const d=snap.data();
@@ -1170,5 +1676,6 @@ onSnapshot(doc(db,'globals','elevator_code'),snap=>{
   loadElevatorOnce();
 });
 setInterval(()=>{if(currentTab==='elevator')renderElevator();loadElevatorOnce();},60000);
-setTimeout(()=>{document.getElementById('loading').style.display='none';if(!_resCache)_loadResCache();},5000);
+setTimeout(()=>{document.getElementById('loading').style.display='none';if(!_resCache)_loadResCache();renderNavBar();},5000);
+renderNavBar();
 </script></body></html>
