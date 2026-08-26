@@ -413,7 +413,7 @@ That config work belongs in the admin track after guest sandbox IA is stable —
 | `guest-visual-design` | blocked on shell | — | sandbox CSS | Phase 4 |
 | `guest-cutover` | blocked | — | `checkin-guest-v2.html`, `checkin-details.html` | Host approve |
 | `admin-problem-brief` | **done** | Cursor + host | docs §22 | Mobile ops: Today / Elevator / passport privacy / checked-in status / bottom nav |
-| `admin-redesign` | **ready — design locked** | Claude (sandbox) | `checkin-admin-sandbox.html` | §22 — no code until Claude confirms reading §22; Cursor owns token/layout review |
+| `admin-redesign` | **active** | Cursor | `checkin-admin-sandbox.html` | §22 mobile ops — Today / Elevator / Guests / More bottom nav |
 
 **Claim example:**
 

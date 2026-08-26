@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Maxela Admin — Sandbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#F4F5F7;--surface:#fff;--ink:#1e1c1a;--muted:#6e6b66;
+  --line:#e2dfd9;--green:#2d6a4f;--green-bg:#edf5f0;--red:#922b21;--red-bg:#fdf0ee;
+  --amber:#7a5a0a;--amber-bg:#faf3e0;--blue:#1a4a7a;--blue-bg:#eef3fa;
+  --sans:'DM Sans',system-ui,sans-serif;--mono:'DM Mono',ui-monospace,monospace;
+  --nav-h:64px;--r:10px;--rs:6px;
+}
+html,body{height:100%;}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45;
+  max-width:480px;margin:0 auto;min-height:100%;-webkit-font-smoothing:antialiased;}
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:999;}
+.spinner{width:22px;height:22px;border:2px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:calc(var(--nav-h) + 16px);left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
+  padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center;}
+.toast.show{opacity:1;}
+
+#lock-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:1000;padding:24px;}
+html.admin-authed #lock-screen{display:none;}
+.lock-brand{font-size:22px;font-weight:700;letter-spacing:-.02em;}
+.lock-brand span{color:var(--green);}
+.lock-sub{font-size:13px;color:var(--muted);margin-bottom:8px;}
+.lock-input{width:100%;max-width:280px;height:48px;padding:0 16px;border:1.5px solid var(--line);border-radius:var(--r);font-size:16px;background:var(--surface);}
+.lock-btn{width:100%;max-width:280px;height:48px;background:var(--ink);color:#fff;border:none;border-radius:var(--r);font-size:15px;font-weight:700;cursor:pointer;}
+.lock-err{color:var(--red);font-size:13px;min-height:18px;}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.lock-input.shake{animation:shake .3s;}
+
+#app{display:none;min-height:100vh;padding-bottom:calc(var(--nav-h) + 12px);}
+html.admin-authed #app{display:block;}
+.app-header{padding:14px 16px 10px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50;}
+.app-header__row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.app-title{font-size:17px;font-weight:700;letter-spacing:-.02em;}
+.app-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:4px 8px;border-radius:999px;background:var(--amber-bg);color:var(--amber);}
+.app-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+
+.pane{display:none;padding:12px 14px 20px;}
+.pane.active{display:block;}
+
+.filter-row{display:flex;gap:6px;overflow-x:auto;padding:4px 0 12px;scrollbar-width:none;}
+.filter-row::-webkit-scrollbar{display:none;}
+.filter-chip{flex:none;height:34px;padding:0 12px;border:1.5px solid var(--line);border-radius:999px;background:var(--surface);font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;}
+.filter-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:10px;}
+.card__top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
+.card__room{font-family:var(--mono);font-size:16px;font-weight:700;letter-spacing:.04em;}
+.card__name{font-size:16px;font-weight:700;margin-bottom:4px;}
+.card__dates{font-size:13px;color:var(--muted);}
+.card__actions{display:flex;gap:8px;margin-top:12px;}
+.btn{flex:1;min-height:48px;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-family:var(--sans);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;}
+.btn:disabled{opacity:.35;cursor:not-allowed;}
+.btn-primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+.btn-green{background:var(--green);color:#fff;border-color:var(--green);}
+.btn-ghost{background:transparent;}
+.empty{text-align:center;padding:40px 16px;color:var(--muted);font-size:14px;}
+
+.pill{display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;}
+.pill-pending{background:var(--amber-bg);color:var(--amber);}
+.pill-await{background:var(--blue-bg);color:var(--blue);}
+.pill-ok{background:var(--green-bg);color:var(--green);}
+.pill-in{background:#e8f0fe;color:#1a56a0;}
+.pill-multi{background:var(--bg);color:var(--muted);margin-left:6px;}
+
+/* Elevator */
+.elev-status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:16px;}
+.elev-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.elev-dot.fresh{background:var(--green);box-shadow:0 0 0 3px rgba(45,106,79,.2);}
+.elev-dot.stale{background:#d97706;box-shadow:0 0 0 3px rgba(217,119,6,.2);}
+.elev-dot.old{background:var(--red);box-shadow:0 0 0 3px rgba(146,43,33,.2);}
+.elev-code{font-family:var(--mono);font-size:40px;font-weight:700;letter-spacing:.14em;text-align:center;padding:12px 0 8px;}
+.elev-qr{width:140px;height:140px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:8px;}
+.elev-qr:empty{display:none;}
+.elev-meta{text-align:center;font-size:12px;color:var(--muted);margin-bottom:18px;}
+.elev-src{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;margin-left:6px;background:var(--bg);color:var(--muted);}
+.elev-src.manual{background:var(--amber-bg);color:var(--amber);}
+.elev-src.auto{background:var(--green-bg);color:var(--green);}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px;}
+.field input{width:100%;height:48px;padding:0 14px;border:1.5px solid var(--line);border-radius:var(--rs);font-size:16px;font-family:var(--mono);font-weight:600;letter-spacing:.06em;background:var(--surface);}
+.elev-msg{font-size:13px;margin-top:10px;min-height:20px;}
+.elev-msg.ok{color:var(--green);}
+.elev-msg.err{color:var(--red);}
+
+/* Detail overlay */
+#detail{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;flex-direction:column;max-width:480px;margin:0 auto;overflow-y:auto;}
+#detail.open{display:flex;}
+.detail-bar{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;}
+.detail-back{width:40px;height:40px;border:1px solid var(--line);border-radius:var(--rs);background:var(--surface);font-size:18px;cursor:pointer;}
+.detail-title{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.detail-body{padding:14px;padding-bottom:40px;}
+.passport-gate{padding:16px;border:1.5px dashed var(--line);border-radius:var(--r);text-align:center;margin-bottom:14px;background:var(--surface);}
+.passport-gate p{font-size:13px;color:var(--muted);margin-bottom:12px;}
+.passport-view{display:none;margin-bottom:14px;}
+.passport-view.show{display:block;}
+.passport-view img{width:100%;border-radius:var(--r);border:1px solid var(--line);max-height:320px;object-fit:contain;background:#111;}
+.room-block{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:10px;}
+.room-block h3{font-family:var(--mono);font-size:15px;margin-bottom:8px;}
+.room-block .door{font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:.1em;margin:8px 0;}
+
+.search-box{width:100%;height:44px;padding:0 14px;border:1.5px solid var(--line);border-radius:var(--r);font-size:16px;margin-bottom:12px;background:var(--surface);}
+.more-list{display:flex;flex-direction:column;gap:8px;}
+.more-item{display:flex;align-items:center;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);text-decoration:none;color:inherit;font-weight:600;font-size:15px;}
+.more-item span{font-size:12px;color:var(--muted);font-weight:500;margin-left:auto;}
+
+.nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,480px);height:calc(var(--nav-h) + env(safe-area-inset-bottom));
+  padding-bottom:env(safe-area-inset-bottom);background:var(--surface);border-top:1px solid var(--line);display:flex;z-index:100;
+  box-shadow:0 -4px 20px rgba(0,0,0,.06);}
+.nav__btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:transparent;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.nav__btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;}
+.nav__btn.active{color:var(--ink);}
+.nav__btn .dot{position:absolute;top:8px;right:calc(50% - 18px);width:7px;height:7px;border-radius:50%;background:var(--red);display:none;}
+.nav__btn.has-alert .dot{display:block;}
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div><div style="font-size:13px;color:var(--muted)">Loading admin…</div></div>
+<div class="toast" id="toast"></div>
+
+<div id="lock-screen">
+  <div class="lock-brand"><span>Maxela</span> Admin</div>
+  <div class="lock-sub">Sandbox · mobile ops</div>
+  <input class="lock-input" type="password" id="lock-input" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')adminUnlock()">
+  <button class="lock-btn" onclick="adminUnlock()">Enter</button>
+  <div class="lock-err" id="lock-error"></div>
+</div>
+
+<div id="app">
+  <div class="app-header">
+    <div class="app-header__row">
+      <div class="app-title" id="header-title">Today</div>
+      <span class="app-badge">Sandbox</span>
+    </div>
+    <div class="app-sub" id="header-sub">Today's arrivals</div>
+  </div>
+
+  <div class="pane active" id="pane-today">
+    <div class="filter-row" id="today-filters">
+      <button class="filter-chip active" data-f="all" onclick="setTodayFilter('all')">All</button>
+      <button class="filter-chip" data-f="need" onclick="setTodayFilter('need')">Need unlock</button>
+      <button class="filter-chip" data-f="checked" onclick="setTodayFilter('checked')">Checked in</button>
+      <button class="filter-chip" data-f="unlocked" onclick="setTodayFilter('unlocked')">Unlocked</button>
+      <button class="filter-chip" data-f="nof" onclick="setTodayFilter('nof')">No form</button>
+    </div>
+    <div id="today-list"></div>
+  </div>
+
+  <div class="pane" id="pane-elevator">
+    <div class="card" id="elev-card">
+      <div class="elev-status"><span class="elev-dot old" id="elev-dot"></span><span id="elev-age">Loading…</span><span class="elev-src" id="elev-src"></span></div>
+      <div class="elev-code" id="elev-code">— — — —</div>
+      <div class="elev-qr" id="elev-qr"></div>
+      <div class="elev-meta" id="elev-meta">Display code shown to guests on the pad</div>
+      <div class="field"><label>Display code</label><input id="elev-input" inputmode="numeric" placeholder="Paste or type" autocomplete="off"></div>
+      <div class="field"><label>QR value</label><input id="elev-qr-input" inputmode="numeric" placeholder="Paste decoded QR numbers" autocomplete="off"></div>
+      <button class="btn btn-primary" style="width:100%" id="elev-save" onclick="updateElevator()">Update code</button>
+      <div class="elev-msg" id="elev-msg"></div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);padding:0 4px;line-height:1.5;">Auto-app uploads update this live. Manual update writes both stores and marks source as Manual so you can see it stuck.</p>
+  </div>
+
+  <div class="pane" id="pane-guests">
+    <input class="search-box" id="guest-search" placeholder="Search name, room, booking…" oninput="renderGuestsPane()">
+    <div class="filter-row">
+      <button class="filter-chip active" data-g="current" onclick="setGuestsSub('current')">In-house</button>
+      <button class="filter-chip" data-g="upcoming" onclick="setGuestsSub('upcoming')">Upcoming</button>
+      <button class="filter-chip" data-g="departures" onclick="setGuestsSub('departures')">Departures</button>
+    </div>
+    <div id="guests-list"></div>
+  </div>
+
+  <div class="pane" id="pane-more">
+    <div class="more-list">
+      <a class="more-item" href="checkin-admin.html" target="_blank">Full admin (desktop)<span>Apartments, settings…</span></a>
+      <a class="more-item" href="checkin-admin.html#guestsettings" target="_blank">Guest page settings<span>Services, visibility</span></a>
+      <a class="more-item" href="admin-search-test.html" target="_blank">Search debugger<span>Open</span></a>
+      <button class="more-item" onclick="adminSignOut()" style="width:100%;cursor:pointer;border:1px solid var(--line);">Sign out</button>
+    </div>
+  </div>
+
+  <nav class="nav" id="nav">
+    <button class="nav__btn active" data-tab="today" onclick="switchTab('today')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+      Today
+    </button>
+    <button class="nav__btn" data-tab="elevator" onclick="switchTab('elevator')" id="nav-elev">
+      <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 8v8M9 11l3-3 3 3M9 15l3 3 3-3"/></svg>
+      Elevator
+      <span class="dot"></span>
+    </button>
+    <button class="nav__btn" data-tab="guests" onclick="switchTab('guests')">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Guests
+    </button>
+    <button class="nav__btn" data-tab="more" onclick="switchTab('more')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+      More
+    </button>
+  </nav>
+</div>
+
+<div id="detail">
+  <div class="detail-bar">
+    <button class="detail-back" onclick="closeDetail()">←</button>
+    <div class="detail-title" id="detail-title">Guest</div>
+  </div>
+  <div class="detail-body" id="detail-body"></div>
+</div>
+
+<script type="module">
+const _ADMIN_PWD='maxela2026';
+const _ADMIN_KEY='maxela_admin_authed';
+const CHECK_IN_HOUR=15;
+const RTDB_URL='https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json';
+
+(function authBoot(){
+  const t=localStorage.getItem(_ADMIN_KEY);
+  if(t&&t.startsWith('yes_')){
+    const ts=parseInt(t.slice(4),10);
+    if(Date.now()-ts<90*24*3600*1000)document.documentElement.classList.add('admin-authed');
+  }
+})();
+
+window.adminUnlock=function(){
+  const inp=document.getElementById('lock-input');
+  const err=document.getElementById('lock-error');
+  if(inp.value===_ADMIN_PWD){
+    localStorage.setItem(_ADMIN_KEY,'yes_'+Date.now());
+    document.documentElement.classList.add('admin-authed');
+    document.getElementById('lock-screen').style.display='none';
+  }else{
+    inp.classList.add('shake');setTimeout(()=>inp.classList.remove('shake'),300);
+    inp.value='';err.textContent='Incorrect password';
+    setTimeout(()=>err.textContent='',2500);
+  }
+};
+window.adminSignOut=function(){localStorage.removeItem(_ADMIN_KEY);location.reload();};
+
+import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import{getFirestore,collection,doc,setDoc,updateDoc,onSnapshot,serverTimestamp,getDocs,query,where,orderBy,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+const fb=initializeApp({
+  apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
+  authDomain:"sleepy-5c962.firebaseapp.com",
+  projectId:"sleepy-5c962",
+  storageBucket:"sleepy-5c962.firebasestorage.app",
+  messagingSenderId:"152940098906",
+  appId:"1:152940098906:web:bf245230d705c0a62c2f63"
+});
+const db=getFirestore(fb);
+
+let aptData={},guestData=[],hkStatusData={},_resCache=null,_resLoading=false;
+let elevData=null,currentTab='today',todayFilter='all',guestsSub='current';
+let _formById=new Map(),_byGuestCheckin=new Map();
+
+function toast(msg,ms=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),ms);}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function tbilisiNow(){return new Date(Date.now()+4*3600*1000);}
+function tbilisiToday(){return tbilisiNow().toISOString().slice(0,10);}
+function _stripRoomNum(s){return(s||'').replace(/\s+0\d+\s+/,' ').replace(/\s+/g,' ').trim();}
+
+function guestStatus(g){
+  const now=tbilisiNow(),today=now.toISOString().slice(0,10),hour=now.getUTCHours();
+  const arrival=g.arrivalDate||'';
+  if(arrival){if(today<arrival)return{label:'Arrives '+arrival,cls:'waiting'};if(today>arrival)return{label:'Checked in',cls:'unlocked'};}
+  if(g.manualUnlock)return{label:'Unlocked',cls:'unlocked'};
+  const aptCheckIn=aptData[g.aptId]?.checkInTime||'';
+  const checkInHour=aptCheckIn?parseInt(aptCheckIn.split(':')[0]):CHECK_IN_HOUR;
+  if(hour>=checkInHour)return{label:'Unlocked',cls:'unlocked'};
+  const hkKey=g.aptId+'_'+today;
+  if(hkStatusData[hkKey]?.done===true){
+    if(hour>=11)return{label:'Unlocked early',cls:'unlocked'};
+    return{label:'Ready 11am',cls:'waiting'};
+  }
+  const h=checkInHour;
+  return{label:'Waiting '+(h===12?'12pm':h<12?h+'am':(h-12)+'pm'),cls:'waiting'};
+}
+
+function rebuildFormMaps(){
+  const res=_resCache||[];
+  _formById=new Map();
+  for(const r of res){
+    if(_formById.has(r.id))continue;
+    const f=guestData.find(g=>g.matchedReservationId===r.id)||
+      guestData.find(g=>g.matchedReservationId===r.reservationNumber)||
+      guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||
+      guestData.find(g=>{const gn=_stripRoomNum((g.nameRoman||g.name||'').trim()).toLowerCase();const rn=_stripRoomNum(r.guest||'').toLowerCase();return gn&&rn&&gn===rn&&g.arrivalDate===r.checkin;})||null;
+    if(f)_formById.set(r.id,f);
+  }
+  _byGuestCheckin=new Map();
+  for(const r of res){
+    const key=_stripRoomNum(r.guest||'').toLowerCase()+'|'+(r.checkin||'');
+    if(!_byGuestCheckin.has(key))_byGuestCheckin.set(key,[]);
+    _byGuestCheckin.get(key).push(r);
+  }
+  for(const group of _byGuestCheckin.values()){
+    if(group.length<2)continue;
+    const shared=group.reduce((f,r)=>f||_formById.get(r.id),null);
+    if(shared)for(const r of group)if(!_formById.has(r.id))_formById.set(r.id,shared);
+  }
+}
+function getForm(r){return _formById.get(r.id)||null;}
+
+/** §22 status for ops cards */
+function cardStatus(r,form){
+  if(!form)return{label:'NO FORM',cls:'pill-pending',key:'nof'};
+  if(form.guestConfirmedCheckin===true)return{label:'CHECKED IN',cls:'pill-in',key:'checked'};
+  const gs=guestStatus(form);
+  if(gs.cls==='unlocked')return{label:'UNLOCKED',cls:'pill-ok',key:'unlocked'};
+  return{label:'AWAITING UNLOCK',cls:'pill-await',key:'need'};
+}
+
+function fmtDate(s){
+  if(!s)return'—';
+  return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+}
+function datesStr(r){return fmtDate(r.checkin)+' → '+fmtDate(r.checkout);}
+
+function normalizeWaPhone(raw){
+  if(!raw)return null;
+  const hasPlus=raw.startsWith('+');
+  let digits=(hasPlus?raw.slice(1):raw).replace(/\D/g,'');
+  if(!digits)return null;
+  if(digits.startsWith('00'))digits=digits.slice(2);
+  if(digits.length===9&&digits.startsWith('5'))return'995'+digits;
+  return digits;
+}
+function buildWaUrl(phone,guestName,hasForm,roomCode){
+  if(!phone)return null;
+  const base='https://wa.me/'+phone;
+  if(hasForm)return base;
+  const firstName=(guestName||'').split(/\s+/)[0]||'';
+  const msg='Hello '+firstName+',\n\nWelcome to Maxela Apartments!\n\nPlease complete online check-in:\nhttps://app.maxelaapartments.com/checkin-guest-v2.html\n\nMaxela Team';
+  return base+'?text='+encodeURIComponent(msg);
+}
+
+async function _loadResCache(){
+  if(_resCache||_resLoading)return;
+  _resLoading=true;
+  try{
+    const cutoff=new Date(Date.now()-365*864e5).toISOString().slice(0,10);
+    const snap=await getDocs(query(collection(db,'reservations'),where('checkin','>=',cutoff),orderBy('checkin','desc'),limit(1000)));
+    _resCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){console.error(e);_resCache=[];}
+  _resLoading=false;
+  rebuildFormMaps();
+  render();
+}
+
+const ROOM_ORDER=['0-1','0-2','0-3','0-4','0-5','6-1','6-2','6-3','6-4','7-1','7-2','7-4','tab-1','tab-2','tab-3','orb-1','orb-2','orb-3'];
+function roomSortKey(r){const i=ROOM_ORDER.indexOf((r.roomCode||'').toLowerCase());return i>=0?i:99;}
+function byRoom(a,b){return roomSortKey(a)-roomSortKey(b);}
+
+function groupByBaseNum(list){
+  const map=new Map(),order=[];
+  for(const r of list){
+    const base=(r.reservationNumber||r.id||'').replace(/_\d+$/,'');
+    if(!map.has(base)){map.set(base,[]);order.push(base);}
+    map.get(base).push(r);
+  }
+  return order.map(b=>map.get(b));
+}
+
+function arrivalGroups(){
+  const today=tbilisiToday();
+  const res=(_resCache||[]).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED'&&r.checkin===today).sort(byRoom);
+  return groupByBaseNum(res);
+}
+
+function renderCard(grp){
+  const sorted=[...grp].sort(byRoom);
+  const form=grp.reduce((f,r)=>f||getForm(r),null);
+  const st=cardStatus(sorted[0],form);
+  const roomStr=sorted.map(r=>{const f=getForm(r);return f?.aptId||r.roomCode||'—';}).join(' · ');
+  const name=_stripRoomNum(grp[0].guest||'')||'—';
+  const multi=grp.length>1?`<span class="pill pill-multi">MULTI</span>`:'';
+  const rawPhone=(form?.contact||grp.reduce((p,r)=>p||r.phone||r.guest_phone||r.guestPhone||'','')||'').trim();
+  const wa=buildWaUrl(normalizeWaPhone(rawPhone),name,!!form,grp[0].roomCode);
+  const waBtn=wa?`<a class="btn" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`
+    :`<button class="btn" disabled>WhatsApp</button>`;
+  let grant='';
+  if(st.key==='need'&&form){
+    grant=`<button class="btn btn-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Grant Access</button>`;
+  }else if(form){
+    grant=`<button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
+  }
+  const open=form?`onclick="window.openDetail('${form.id}')" style="cursor:pointer"`:'';
+  return`<div class="card" ${open}>
+    <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${st.cls}">${st.label}</span></div>
+    <div class="card__name">${esc(name)}${multi}</div>
+    <div class="card__dates">${esc(datesStr(grp[0]))}</div>
+    <div class="card__actions">${waBtn}${grant}</div>
+  </div>`;
+}
+
+window.setTodayFilter=function(f){
+  todayFilter=f;
+  document.querySelectorAll('#today-filters .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.f===f));
+  renderToday();
+};
+
+function renderToday(){
+  const groups=arrivalGroups();
+  const filtered=groups.filter(grp=>{
+    const form=grp.reduce((f,r)=>f||getForm(r),null);
+    const st=cardStatus(grp[0],form);
+    if(todayFilter==='all')return true;
+    return st.key===todayFilter||(todayFilter==='need'&&st.key==='need');
+  });
+  const el=document.getElementById('today-list');
+  if(!(_resCache)){el.innerHTML='<div class="empty">Loading reservations…</div>';return;}
+  if(!filtered.length){el.innerHTML='<div class="empty">No arrivals match</div>';return;}
+  el.innerHTML=filtered.map(renderCard).join('');
+  document.getElementById('header-sub').textContent=groups.length+' arrival'+(groups.length!==1?'s':'')+' today';
+}
+
+window.setGuestsSub=function(s){
+  guestsSub=s;
+  document.querySelectorAll('#pane-guests .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.g===s));
+  renderGuestsPane();
+};
+
+window.renderGuestsPane=function(){
+  const q=(document.getElementById('guest-search')?.value||'').trim().toLowerCase();
+  const today=tbilisiToday();
+  const in7=new Date(tbilisiNow().getTime()+7*864e5).toISOString().slice(0,10);
+  let list=(_resCache||[]).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
+  if(guestsSub==='current')list=list.filter(r=>r.checkin<today&&r.checkout>today);
+  else if(guestsSub==='upcoming')list=list.filter(r=>r.checkin>today&&r.checkin<=in7);
+  else if(guestsSub==='departures')list=list.filter(r=>r.checkout===today&&r.checkin!==today);
+  if(q)list=list.filter(r=>{
+    const hay=[r.guest,r.roomCode,r.reservationNumber,r.bookingId,getForm(r)?.name].join(' ').toLowerCase();
+    return hay.includes(q);
+  });
+  list.sort(byRoom);
+  const groups=groupByBaseNum(list);
+  const el=document.getElementById('guests-list');
+  if(!groups.length){el.innerHTML='<div class="empty">Nothing here</div>';return;}
+  el.innerHTML=groups.map(renderCard).join('');
+};
+
+const TAB_META={
+  today:{title:'Today',sub:"Today's arrivals"},
+  elevator:{title:'Elevator',sub:'Entrance & elevator code'},
+  guests:{title:'Guests',sub:'Search and manage stays'},
+  more:{title:'More',sub:'Settings & full admin'},
+};
+window.switchTab=function(tab){
+  currentTab=tab;
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='pane-'+tab));
+  document.querySelectorAll('.nav__btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  const m=TAB_META[tab];
+  document.getElementById('header-title').textContent=m.title;
+  document.getElementById('header-sub').textContent=m.sub;
+  if(tab==='today')renderToday();
+  if(tab==='elevator')renderElevator();
+  if(tab==='guests')renderGuestsPane();
+  closeDetail();
+};
+
+window.unlockGuest=async function(guestId){
+  if(!confirm('Grant access (unlock check-in) for this guest now?'))return;
+  try{
+    await updateDoc(doc(db,'checkin_guests',guestId),{manualUnlock:true,unlockedAt:serverTimestamp()});
+    toast('Access granted ✓');
+  }catch(e){toast('Failed: '+e.message);}
+};
+
+window.openDetail=function(guestId){
+  const g=guestData.find(x=>x.id===guestId);
+  if(!g){toast('Guest not found');return;}
+  const title=esc(_stripRoomNum(g.nameRoman||g.name||'Guest'));
+  document.getElementById('detail-title').textContent=_stripRoomNum(g.nameRoman||g.name||'Guest')+' · '+(g.aptId||'');
+  const st=g.guestConfirmedCheckin?{label:'CHECKED IN',cls:'pill-in'}:cardStatus({roomCode:g.aptId},g);
+  const passportUrl=g.passportUrl||g.passportPhotoUrl||g.passportImage||'';
+  const door=(_resCache||[]).find(r=>r.id===g.matchedReservationId||r.reservationNumber===g.matchedReservationId);
+  const doorCode=door?.tuyaPassword||aptData[g.aptId]?.doorCode||'—';
+  const waPhone=normalizeWaPhone(g.contact||'');
+  const wa=waPhone?'https://wa.me/'+waPhone:'';
+
+  document.getElementById('detail-body').innerHTML=`
+    <div style="margin-bottom:12px"><span class="pill ${st.cls}">${st.label}</span></div>
+    <div class="passport-gate" id="pp-gate">
+      <p>Passport / ID is hidden until you need it.</p>
+      <button class="btn btn-primary" style="width:100%" onclick="window.showPassport()">Check passport</button>
+    </div>
+    <div class="passport-view" id="pp-view">
+      ${passportUrl?`<img src="${esc(passportUrl)}" alt="Passport" onclick="window.open(this.src,'_blank')">`:'<p style="color:var(--muted);font-size:13px;margin-bottom:10px;">No passport uploaded.</p>'}
+      <div class="card__actions" style="margin-top:10px">
+        <button class="btn btn-green" onclick="window.approvePassport('${g.id}')">Approve ID</button>
+        <button class="btn" onclick="window.rejectPassport('${g.id}')">Reject</button>
+      </div>
+    </div>
+    <div class="room-block">
+      <h3>Room ${esc(g.aptId||'—')}</h3>
+      <div style="font-size:12px;color:var(--muted)">Smart lock</div>
+      <div class="door">${esc(doorCode)}</div>
+      <div class="card__actions">
+        ${g.manualUnlock||guestStatus(g).cls==='unlocked'?'':`<button class="btn btn-primary" onclick="window.unlockGuest('${g.id}')">Grant Access</button>`}
+        ${wa?`<a class="btn" href="${wa}" target="_blank">WhatsApp</a>`:''}
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px;">${esc(fmtDate(g.arrivalDate))} → ${esc(fmtDate(g.checkoutDate||door?.checkout||''))}</p>
+  `;
+  document.getElementById('detail').classList.add('open');
+};
+window.closeDetail=function(){document.getElementById('detail').classList.remove('open');};
+window.showPassport=function(){
+  document.getElementById('pp-gate').style.display='none';
+  document.getElementById('pp-view').classList.add('show');
+};
+window.approvePassport=async function(guestId){
+  if(!confirm('Approve this ID?'))return;
+  try{
+    await updateDoc(doc(db,'checkin_guests',guestId),{'passportScanResult.overrideByAdmin':true,'passportScanResult.valid':true});
+    toast('ID approved ✓');openDetail(guestId);
+  }catch(e){toast('Failed: '+e.message);}
+};
+window.rejectPassport=async function(guestId){
+  if(!confirm('Reject this ID?'))return;
+  try{
+    await updateDoc(doc(db,'checkin_guests',guestId),{'passportScanResult.overrideByAdmin':false,'passportScanResult.valid':false});
+    toast('ID rejected');openDetail(guestId);
+  }catch(e){toast('Failed: '+e.message);}
+};
+
+function elevAgeSec(){
+  if(!elevData?.updatedAt)return 1e12;
+  const sec=elevData.updatedAt.seconds||Math.floor(parseInt(elevData.updatedAt)/1000)||0;
+  return Math.floor(Date.now()/1000)-sec;
+}
+function elevFreshness(){
+  const a=elevAgeSec();
+  if(a<2*3600)return{cls:'fresh',label:'Fresh'};
+  if(a<8*3600)return{cls:'stale',label:'Getting stale'};
+  return{cls:'old',label:'Stale — update now'};
+}
+function relTime(){
+  const a=elevAgeSec();
+  if(a>1e10)return'Unknown';
+  if(a<60)return'Updated just now';
+  if(a<3600)return'Updated '+Math.floor(a/60)+' min ago';
+  if(a<86400)return'Updated '+Math.floor(a/3600)+'h ago';
+  return'Updated '+Math.floor(a/86400)+'d ago';
+}
+
+function renderElevator(){
+  const code=elevData?.code||elevData?.display_code||'— — — —';
+  const qr=elevData?.qrCode||elevData?.qr_code||'';
+  document.getElementById('elev-code').textContent=code||'— — — —';
+  const fr=elevFreshness();
+  document.getElementById('elev-dot').className='elev-dot '+fr.cls;
+  document.getElementById('elev-age').textContent=fr.label+' · '+relTime();
+  const src=elevData?.source||elevData?._source||'';
+  const srcEl=document.getElementById('elev-src');
+  if(src==='manual'){srcEl.textContent='Manual';srcEl.className='elev-src manual';}
+  else if(src){srcEl.textContent='Auto';srcEl.className='elev-src auto';}
+  else{srcEl.textContent='';srcEl.className='elev-src';}
+  const box=document.getElementById('elev-qr');
+  box.innerHTML='';
+  if(qr&&typeof QRCode!=='undefined'){
+    try{new QRCode(box,{text:String(qr),width:120,height:120});}catch(e){box.textContent='QR error';}
+  }
+  const inp=document.getElementById('elev-input');
+  const qinp=document.getElementById('elev-qr-input');
+  if(inp&&document.activeElement!==inp)inp.value=elevData?.code||elevData?.display_code||'';
+  if(qinp&&document.activeElement!==qinp)qinp.value=qr||'';
+  const nav=document.getElementById('nav-elev');
+  if(nav)nav.classList.toggle('has-alert',fr.cls==='old');
+}
+
+async function loadElevatorOnce(){
+  let rtdbData=null,fsData=null;
+  try{rtdbData=await fetch(RTDB_URL).then(r=>r.json());}catch(e){}
+  // fsData from elevData listener; also one-shot if needed
+  const rtdbTs=rtdbData?parseInt(rtdbData.updatedAt||0):0;
+  const fsTs=elevData?.updatedAt?.seconds?elevData.updatedAt.seconds*1000:0;
+  if(rtdbData&&rtdbTs>=fsTs){
+    elevData={
+      code:rtdbData.display_code||rtdbData.code||'',
+      qrCode:rtdbData.qr_code||'',
+      updatedAt:{seconds:Math.floor(rtdbTs/1000)},
+      source:rtdbData.source||'auto',
+      _source:'rtdb',
+    };
+  }else if(elevData){
+    elevData={...elevData,qrCode:elevData.qr_code||elevData.qrCode||rtdbData?.qr_code||'',_source:elevData._source||'firestore'};
+  }else if(rtdbData){
+    elevData={code:rtdbData.display_code||'',qrCode:rtdbData.qr_code||'',updatedAt:{seconds:Math.floor(rtdbTs/1000)},source:rtdbData.source||'auto',_source:'rtdb'};
+  }
+  if(currentTab==='elevator')renderElevator();
+  else{
+    const fr=elevFreshness();
+    document.getElementById('nav-elev')?.classList.toggle('has-alert',fr.cls==='old');
+  }
+}
+
+window.updateElevator=async function(){
+  const code=(document.getElementById('elev-input')?.value||'').trim();
+  const qrCode=(document.getElementById('elev-qr-input')?.value||'').trim();
+  const msg=document.getElementById('elev-msg');
+  const btn=document.getElementById('elev-save');
+  if(!code){msg.className='elev-msg err';msg.textContent='Enter a display code';return;}
+  btn.disabled=true;msg.className='elev-msg';msg.textContent='Saving…';
+  const nowMs=Date.now();
+  const updates={
+    display_code:code,
+    qr_code:qrCode,
+    expires_at:String(nowMs+24*3600*1000),
+    updatedAt:String(nowMs),
+    source:'manual',
+  };
+  let rtdbOk=false,fsOk=false,errMsg='';
+  try{
+    const res=await fetch(RTDB_URL,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});
+    rtdbOk=res.ok;
+    if(!rtdbOk)errMsg='RTDB HTTP '+res.status;
+  }catch(e){errMsg='RTDB: '+e.message;}
+  try{
+    await setDoc(doc(db,'globals','elevator_code'),{...updates,code,updatedAt:serverTimestamp(),source:'manual'},{merge:true});
+    fsOk=true;
+  }catch(e){errMsg=(errMsg?errMsg+'; ':'')+'Firestore: '+e.message;}
+  btn.disabled=false;
+  if(rtdbOk&&fsOk){
+    elevData={code,qrCode,updatedAt:{seconds:Math.floor(nowMs/1000)},source:'manual',_source:'manual'};
+    msg.className='elev-msg ok';
+    msg.textContent='Saved to both stores · Manual · will stay until next update';
+    renderElevator();
+    toast('Elevator code updated ✓');
+  }else{
+    msg.className='elev-msg err';
+    msg.textContent='Save failed — '+(errMsg||'unknown')+(rtdbOk?' (RTDB ok, Firestore failed)':fsOk?' (Firestore ok, RTDB failed)':'');
+  }
+};
+
+function render(){
+  rebuildFormMaps();
+  if(currentTab==='today')renderToday();
+  else if(currentTab==='guests')renderGuestsPane();
+  else if(currentTab==='elevator')renderElevator();
+}
+
+let loaded=0;
+function checkLoaded(){loaded++;if(loaded>=2){document.getElementById('loading').style.display='none';_loadResCache();render();loadElevatorOnce();}}
+
+onSnapshot(collection(db,'checkin_apartments'),snap=>{
+  aptData={};snap.docs.forEach(d=>{aptData[d.id]=d.data();});
+  if(loaded>=2)render();else checkLoaded();
+});
+onSnapshot(collection(db,'checkin_guests'),snap=>{
+  guestData=snap.docs.map(d=>({id:d.id,...d.data()}));
+  if(loaded>=2){rebuildFormMaps();render();}else checkLoaded();
+});
+const _hkToday=tbilisiToday();
+onSnapshot(query(collection(db,'hk_status'),where('date','==',_hkToday)),snap=>{
+  hkStatusData={};snap.docs.forEach(d=>{hkStatusData[d.id]=d.data();});
+  if(loaded>=2)render();
+});
+onSnapshot(doc(db,'globals','elevator_code'),snap=>{
+  if(snap.exists()){
+    const d=snap.data();
+    const fsTs=d.updatedAt?.seconds?d.updatedAt.seconds*1000:0;
+    const curTs=elevData?.updatedAt?.seconds?elevData.updatedAt.seconds*1000:0;
+    if(fsTs>=curTs){
+      elevData={code:d.display_code||d.code||'',qrCode:d.qr_code||'',updatedAt:d.updatedAt,source:d.source||'auto',_source:'firestore'};
+    }
+  }
+  loadElevatorOnce();
+});
+
+setInterval(()=>{if(currentTab==='elevator')renderElevator();loadElevatorOnce();},60000);
+setTimeout(()=>{document.getElementById('loading').style.display='none';if(!_resCache)_loadResCache();},5000);
+</script>
+</body>
+</html>
