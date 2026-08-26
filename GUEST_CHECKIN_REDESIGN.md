@@ -413,7 +413,7 @@ That config work belongs in the admin track after guest sandbox IA is stable —
 | `guest-visual-design` | blocked on shell | — | sandbox CSS | Phase 4 |
 | `guest-cutover` | blocked | — | `checkin-guest-v2.html`, `checkin-details.html` | Host approve |
 | `admin-problem-brief` | **done** | Cursor + host | docs §22 | Mobile ops: Today / Elevator / passport privacy / checked-in status / bottom nav |
-| `admin-redesign` | **active** | Cursor | `checkin-admin-sandbox.html` | §22 mobile ops — Today / Elevator / Guests / More bottom nav |
+| `admin-redesign` | **active** | Cursor | `checkin-admin-sandbox.html` | §22 mobile ops — Stay (overview/in-house/upcoming) · Elevator · Apts editor · More |
 
 **Claim example:**
 
@@ -467,6 +467,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-25 | Claude Code | **4 more fixes on Sandbox 2:** (1) Elevator code moved back below the QR (was beside it since the previous session's compact-row fix) — now QR on top, small muted "Elevator code" label, code capped at 16px, no copy button, matching "supplementary info" framing. (2) Removed the smart-lock/door-code copy button entirely (`#hero-door-copy` + its onclick) — guest types it manually; WiFi copy buttons untouched. (3) Rebuilt the WiFi section as a `.wifi-card` (white bg, `1.5px solid #E0D8D0`, `12px` radius) with two label/value/copy rows (Network + Password, each own copy button now — Network didn't have one before) and moved it below `#btn-checked-in` in Arriving and below the daily-key area in Staying/Leaving (was above the CTA; also un-hid it for Leaving, where it had been force-hidden). (4) Added `scroll-snap-type:none!important`, `scroll-behavior:auto`, `overscroll-behavior-x:contain` to `.home-svc-scroll` per exact spec (chip `scroll-snap-align` was already removed last session — confirmed still absent). **Could not fix:** "City Tours" → "Tours" rename — searched the full file, no such string exists in source; the label is pulled live from `checkin_admin/config.services[].name` (admin-configured Firestore data), and the code's own built-in default is already "Tours". Renaming requires an admin-panel/Firestore change, not a sandbox HTML edit. |
 | 2026-08-26 | Cursor + host | Admin redesign brief locked — §22 (bottom nav like Sandbox 3, Today's Arrivals, Check passport, checked-in status, elevator manual-sticky). |
 | 2026-08-26 | Cursor | Started `checkin-admin-sandbox.html` (§22.8) — mobile bottom-nav ops shell with Today / Elevator / Guests / More. |
+| 2026-08-26 | Cursor | Admin sandbox v2: **Stay** overview (arrivals + leaving + in-house + upcoming 7d), **Apts** full editor (lock/WiFi/instructions/photos → `checkin_apartments`), apt list shows who is staying / next arrival. |
 
 ---
 
@@ -1271,15 +1272,16 @@ Claim admin-redesign in §9. No visual guest-page cloning.
 **URL (after push):** https://app.maxelaapartments.com/checkin-admin-sandbox.html  
 **Owner:** Cursor (`admin-redesign` workstream)
 
-First slice shipped:
+Shipped:
 - Password gate (same as live admin)
-- Bottom nav: Today | Elevator | Guests | More
-- Today arrival cards + filters + statuses including **CHECKED IN** (`guestConfirmedCheckin`)
-- Guest detail full-screen; passport behind **Check passport**
-- Elevator tab: dual-write RTDB+Firestore, freshness dots, Auto/Manual source, error if either write fails
-- More → links to full `checkin-admin.html` for Apartments / settings
+- Bottom nav: **Stay | Elevator | Apts | More**
+- **Stay** — Overview stacks arrivals today, leaving today, in-house, upcoming (7 days). Filters + search + tappable stats. Statuses: NO FORM · AWAITING UNLOCK · UNLOCKED · CHECKED IN
+- Guest detail full-screen; passport behind **Check passport**; jump to apt instructions editor
+- **Elevator** — dual-write RTDB+Firestore, freshness dots, Auto/Manual source
+- **Apts** — room list with occupancy (who’s in / leaving / next arrival); full editor for Tuya/manual lock, check-in/out times, WiFi, written instructions, video URL, photo steps (Cloudinary upload/reorder/replace/delete). Saves to `checkin_apartments` (preserves `rules`)
+- More → full `checkin-admin.html` for guest page settings / debugger
 
-Not in this slice: full apartments editor, guest settings editor, requests, HK pins (use More → full admin).
+Still via full admin / later slices: Requests, HK Pins, Guest Page Settings editor, search-failure queue.
 
 ---
 

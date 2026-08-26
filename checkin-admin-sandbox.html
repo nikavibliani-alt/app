@@ -25,7 +25,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15p
 .toast{position:fixed;bottom:calc(var(--nav-h) + 16px);left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
   padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center;}
 .toast.show{opacity:1;}
-
 #lock-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:1000;padding:24px;}
 html.admin-authed #lock-screen{display:none;}
 .lock-brand{font-size:22px;font-weight:700;letter-spacing:-.02em;}
@@ -36,7 +35,6 @@ html.admin-authed #lock-screen{display:none;}
 .lock-err{color:var(--red);font-size:13px;min-height:18px;}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
 .lock-input.shake{animation:shake .3s;}
-
 #app{display:none;min-height:100vh;padding-bottom:calc(var(--nav-h) + 12px);}
 html.admin-authed #app{display:block;}
 .app-header{padding:14px 16px 10px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50;}
@@ -44,37 +42,31 @@ html.admin-authed #app{display:block;}
 .app-title{font-size:17px;font-weight:700;letter-spacing:-.02em;}
 .app-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:4px 8px;border-radius:999px;background:var(--amber-bg);color:var(--amber);}
 .app-sub{font-size:12px;color:var(--muted);margin-top:4px;}
-
 .pane{display:none;padding:12px 14px 20px;}
 .pane.active{display:block;}
-
 .filter-row{display:flex;gap:6px;overflow-x:auto;padding:4px 0 12px;scrollbar-width:none;}
 .filter-row::-webkit-scrollbar{display:none;}
 .filter-chip{flex:none;height:34px;padding:0 12px;border:1.5px solid var(--line);border-radius:999px;background:var(--surface);font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;}
 .filter-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
-
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:10px;}
 .card__top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
 .card__room{font-family:var(--mono);font-size:16px;font-weight:700;letter-spacing:.04em;}
 .card__name{font-size:16px;font-weight:700;margin-bottom:4px;}
 .card__dates{font-size:13px;color:var(--muted);}
+.card__sub{font-size:12px;color:var(--muted);margin-top:2px;}
 .card__actions{display:flex;gap:8px;margin-top:12px;}
 .btn{flex:1;min-height:48px;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-family:var(--sans);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;}
 .btn:disabled{opacity:.35;cursor:not-allowed;}
 .btn-primary{background:var(--ink);color:#fff;border-color:var(--ink);}
 .btn-green{background:var(--green);color:#fff;border-color:var(--green);}
-.btn-ghost{background:transparent;}
 .empty{text-align:center;padding:40px 16px;color:var(--muted);font-size:14px;}
-
 .pill{display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;}
 .pill-pending{background:var(--amber-bg);color:var(--amber);}
 .pill-await{background:var(--blue-bg);color:var(--blue);}
 .pill-ok{background:var(--green-bg);color:var(--green);}
 .pill-in{background:#e8f0fe;color:#1a56a0;}
 .pill-multi{background:var(--bg);color:var(--muted);margin-left:6px;}
-
-/* Elevator */
-.elev-status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:16px;}
+.elev-status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:16px;flex-wrap:wrap;}
 .elev-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .elev-dot.fresh{background:var(--green);box-shadow:0 0 0 3px rgba(45,106,79,.2);}
 .elev-dot.stale{background:#d97706;box-shadow:0 0 0 3px rgba(217,119,6,.2);}
@@ -82,24 +74,23 @@ html.admin-authed #app{display:block;}
 .elev-code{font-family:var(--mono);font-size:40px;font-weight:700;letter-spacing:.14em;text-align:center;padding:12px 0 8px;}
 .elev-qr{width:140px;height:140px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:8px;}
 .elev-qr:empty{display:none;}
-.elev-meta{text-align:center;font-size:12px;color:var(--muted);margin-bottom:18px;}
 .elev-src{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;margin-left:6px;background:var(--bg);color:var(--muted);}
 .elev-src.manual{background:var(--amber-bg);color:var(--amber);}
 .elev-src.auto{background:var(--green-bg);color:var(--green);}
 .field{margin-bottom:12px;}
 .field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px;}
 .field input{width:100%;height:48px;padding:0 14px;border:1.5px solid var(--line);border-radius:var(--rs);font-size:16px;font-family:var(--mono);font-weight:600;letter-spacing:.06em;background:var(--surface);}
+.field input.apt-plain{font-family:var(--sans);font-weight:500;letter-spacing:0;}
 .elev-msg{font-size:13px;margin-top:10px;min-height:20px;}
 .elev-msg.ok{color:var(--green);}
 .elev-msg.err{color:var(--red);}
-
-/* Detail overlay */
-#detail{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;flex-direction:column;max-width:480px;margin:0 auto;overflow-y:auto;}
-#detail.open{display:flex;}
-.detail-bar{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;}
-.detail-back{width:40px;height:40px;border:1px solid var(--line);border-radius:var(--rs);background:var(--surface);font-size:18px;cursor:pointer;}
+#detail,#apt-editor-overlay{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;flex-direction:column;max-width:480px;margin:0 auto;overflow-y:auto;}
+#apt-editor-overlay{z-index:210;}
+#detail.open,#apt-editor-overlay.open{display:flex;}
+.detail-bar,.apt-ed-bar{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;}
+.detail-back{width:40px;height:40px;border:1px solid var(--line);border-radius:var(--rs);background:var(--surface);font-size:18px;cursor:pointer;flex-shrink:0;}
 .detail-title{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.detail-body{padding:14px;padding-bottom:40px;}
+.detail-body,.apt-ed-body{padding:14px;padding-bottom:80px;}
 .passport-gate{padding:16px;border:1.5px dashed var(--line);border-radius:var(--r);text-align:center;margin-bottom:14px;background:var(--surface);}
 .passport-gate p{font-size:13px;color:var(--muted);margin-bottom:12px;}
 .passport-view{display:none;margin-bottom:14px;}
@@ -108,27 +99,59 @@ html.admin-authed #app{display:block;}
 .room-block{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:10px;}
 .room-block h3{font-family:var(--mono);font-size:15px;margin-bottom:8px;}
 .room-block .door{font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:.1em;margin:8px 0;}
-
 .search-box{width:100%;height:44px;padding:0 14px;border:1.5px solid var(--line);border-radius:var(--r);font-size:16px;margin-bottom:12px;background:var(--surface);}
 .more-list{display:flex;flex-direction:column;gap:8px;}
-.more-item{display:flex;align-items:center;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);text-decoration:none;color:inherit;font-weight:600;font-size:15px;}
+.more-item{display:flex;align-items:center;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);text-decoration:none;color:inherit;font-weight:600;font-size:15px;width:100%;cursor:pointer;font-family:var(--sans);}
 .more-item span{font-size:12px;color:var(--muted);font-weight:500;margin-left:auto;}
-
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,480px);height:calc(var(--nav-h) + env(safe-area-inset-bottom));
-  padding-bottom:env(safe-area-inset-bottom);background:var(--surface);border-top:1px solid var(--line);display:flex;z-index:100;
-  box-shadow:0 -4px 20px rgba(0,0,0,.06);}
+  padding-bottom:env(safe-area-inset-bottom);background:var(--surface);border-top:1px solid var(--line);display:flex;z-index:100;box-shadow:0 -4px 20px rgba(0,0,0,.06);}
 .nav__btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:transparent;
-  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);cursor:pointer;position:relative;-webkit-tap-highlight-color:transparent;}
 .nav__btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;}
 .nav__btn.active{color:var(--ink);}
 .nav__btn .dot{position:absolute;top:8px;right:calc(50% - 18px);width:7px;height:7px;border-radius:50%;background:var(--red);display:none;}
 .nav__btn.has-alert .dot{display:block;}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 6px;text-align:center;cursor:pointer;font-family:var(--sans);width:100%;}
+.stat.active{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);}
+.stat__n{font-family:var(--mono);font-size:18px;font-weight:700;}
+.stat__l{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-top:2px;}
+.apt-pill__guest{font-size:11px;color:var(--green);font-weight:600;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.apt-pill__guest.empty{color:var(--muted);font-weight:500;}
+.section-hd{display:flex;align-items:baseline;justify-content:space-between;padding:8px 2px 10px;}
+.section-hd h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+.section-hd .n{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink);}
+.apt-group{margin-bottom:16px;}
+.apt-group__title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:4px 2px 8px;}
+.apt-pill{display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;margin-bottom:6px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);cursor:pointer;font-family:var(--sans);text-align:left;}
+.apt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.apt-pill__code{font-family:var(--mono);font-weight:700;font-size:14px;}
+.apt-pill__name{font-size:12px;color:var(--muted);flex:1;}
+.apt-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:12px;overflow:hidden;}
+.apt-card-hd{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);font-size:13px;font-weight:700;}
+.apt-card-bd{padding:14px;}
+.apt-label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:6px;}
+.apt-input,.apt-textarea{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--rs);font-size:16px;font-family:var(--sans);background:var(--bg);margin-bottom:10px;}
+.apt-textarea{min-height:100px;resize:vertical;line-height:1.45;}
+.apt-mode-group{display:flex;gap:6px;margin-bottom:12px;}
+.apt-mode-btn{flex:1;min-height:40px;border:1.5px solid var(--line);border-radius:var(--rs);background:var(--bg);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);}
+.apt-mode-btn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.apt-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.apt-step{display:grid;grid-template-columns:72px 1fr auto;gap:8px;align-items:start;padding:10px 0;border-bottom:1px solid var(--line);}
+.apt-step:last-child{border-bottom:none;}
+.apt-step img{width:72px;height:72px;object-fit:cover;border-radius:var(--rs);border:1px solid var(--line);}
+.apt-step-textarea{width:100%;min-height:72px;padding:8px;border:1px solid var(--line);border-radius:var(--rs);font-size:13px;font-family:var(--sans);}
+.apt-step-actions{display:flex;flex-direction:column;gap:4px;}
+.apt-step-btn{width:32px;height:32px;border:1px solid var(--line);border-radius:6px;background:var(--surface);cursor:pointer;font-size:11px;}
+.apt-step-btn:disabled{opacity:.3;}
+.apt-step-btn.del{color:var(--red);}
+.apt-add{width:100%;min-height:44px;border:1.5px dashed var(--line);border-radius:var(--r);background:transparent;font-weight:600;cursor:pointer;margin-top:8px;font-family:var(--sans);}
+.apt-ed-bar .btn{flex:none;min-height:40px;padding:0 14px;}
 </style>
 </head>
 <body>
 <div id="loading"><div class="spinner"></div><div style="font-size:13px;color:var(--muted)">Loading admin…</div></div>
 <div class="toast" id="toast"></div>
-
 <div id="lock-screen">
   <div class="lock-brand"><span>Maxela</span> Admin</div>
   <div class="lock-sub">Sandbox · mobile ops</div>
@@ -136,25 +159,27 @@ html.admin-authed #app{display:block;}
   <button class="lock-btn" onclick="adminUnlock()">Enter</button>
   <div class="lock-err" id="lock-error"></div>
 </div>
-
 <div id="app">
   <div class="app-header">
     <div class="app-header__row">
-      <div class="app-title" id="header-title">Today</div>
+      <div class="app-title" id="header-title">Stay</div>
       <span class="app-badge">Sandbox</span>
     </div>
-    <div class="app-sub" id="header-sub">Today's arrivals</div>
+    <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
   </div>
 
-  <div class="pane active" id="pane-today">
-    <div class="filter-row" id="today-filters">
-      <button class="filter-chip active" data-f="all" onclick="setTodayFilter('all')">All</button>
-      <button class="filter-chip" data-f="need" onclick="setTodayFilter('need')">Need unlock</button>
-      <button class="filter-chip" data-f="checked" onclick="setTodayFilter('checked')">Checked in</button>
-      <button class="filter-chip" data-f="unlocked" onclick="setTodayFilter('unlocked')">Unlocked</button>
-      <button class="filter-chip" data-f="nof" onclick="setTodayFilter('nof')">No form</button>
+  <div class="pane active" id="pane-stay">
+    <div class="stat-row" id="stay-stats"></div>
+    <input class="search-box" id="stay-search" placeholder="Search name, room, booking…" oninput="renderStay()">
+    <div class="filter-row" id="stay-filters">
+      <button class="filter-chip active" data-f="overview" onclick="setStayFilter('overview')">Overview</button>
+      <button class="filter-chip" data-f="arrivals" onclick="setStayFilter('arrivals')">Arrivals</button>
+      <button class="filter-chip" data-f="inhouse" onclick="setStayFilter('inhouse')">In-house</button>
+      <button class="filter-chip" data-f="upcoming" onclick="setStayFilter('upcoming')">Upcoming</button>
+      <button class="filter-chip" data-f="leaving" onclick="setStayFilter('leaving')">Leaving</button>
+      <button class="filter-chip" data-f="need" onclick="setStayFilter('need')">Need unlock</button>
     </div>
-    <div id="today-list"></div>
+    <div id="stay-list"></div>
   </div>
 
   <div class="pane" id="pane-elevator">
@@ -162,51 +187,38 @@ html.admin-authed #app{display:block;}
       <div class="elev-status"><span class="elev-dot old" id="elev-dot"></span><span id="elev-age">Loading…</span><span class="elev-src" id="elev-src"></span></div>
       <div class="elev-code" id="elev-code">— — — —</div>
       <div class="elev-qr" id="elev-qr"></div>
-      <div class="elev-meta" id="elev-meta">Display code shown to guests on the pad</div>
       <div class="field"><label>Display code</label><input id="elev-input" inputmode="numeric" placeholder="Paste or type" autocomplete="off"></div>
       <div class="field"><label>QR value</label><input id="elev-qr-input" inputmode="numeric" placeholder="Paste decoded QR numbers" autocomplete="off"></div>
       <button class="btn btn-primary" style="width:100%" id="elev-save" onclick="updateElevator()">Update code</button>
       <div class="elev-msg" id="elev-msg"></div>
     </div>
-    <p style="font-size:12px;color:var(--muted);padding:0 4px;line-height:1.5;">Auto-app uploads update this live. Manual update writes both stores and marks source as Manual so you can see it stuck.</p>
   </div>
 
-  <div class="pane" id="pane-guests">
-    <input class="search-box" id="guest-search" placeholder="Search name, room, booking…" oninput="renderGuestsPane()">
-    <div class="filter-row">
-      <button class="filter-chip active" data-g="current" onclick="setGuestsSub('current')">In-house</button>
-      <button class="filter-chip" data-g="upcoming" onclick="setGuestsSub('upcoming')">Upcoming</button>
-      <button class="filter-chip" data-g="departures" onclick="setGuestsSub('departures')">Departures</button>
-    </div>
-    <div id="guests-list"></div>
+  <div class="pane" id="pane-apts">
+    <div id="apts-list"></div>
   </div>
 
   <div class="pane" id="pane-more">
     <div class="more-list">
-      <a class="more-item" href="checkin-admin.html" target="_blank">Full admin (desktop)<span>Apartments, settings…</span></a>
-      <a class="more-item" href="checkin-admin.html#guestsettings" target="_blank">Guest page settings<span>Services, visibility</span></a>
+      <a class="more-item" href="checkin-admin.html" target="_blank">Full desktop admin<span>Open</span></a>
+      <a class="more-item" href="checkin-admin.html" target="_blank">Guest page settings<span>Services…</span></a>
       <a class="more-item" href="admin-search-test.html" target="_blank">Search debugger<span>Open</span></a>
-      <button class="more-item" onclick="adminSignOut()" style="width:100%;cursor:pointer;border:1px solid var(--line);">Sign out</button>
+      <button class="more-item" type="button" onclick="adminSignOut()">Sign out</button>
     </div>
   </div>
 
-  <nav class="nav" id="nav">
-    <button class="nav__btn active" data-tab="today" onclick="switchTab('today')">
-      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
-      Today
+  <nav class="nav">
+    <button class="nav__btn active" data-tab="stay" onclick="switchTab('stay')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Stay
     </button>
     <button class="nav__btn" data-tab="elevator" onclick="switchTab('elevator')" id="nav-elev">
-      <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 8v8M9 11l3-3 3 3M9 15l3 3 3-3"/></svg>
-      Elevator
-      <span class="dot"></span>
+      <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 8v8M9 11l3-3 3 3"/></svg>Elevator<span class="dot"></span>
     </button>
-    <button class="nav__btn" data-tab="guests" onclick="switchTab('guests')">
-      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Guests
+    <button class="nav__btn" data-tab="apts" onclick="switchTab('apts')">
+      <svg viewBox="0 0 24 24"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-8h6v8"/></svg>Apts
     </button>
     <button class="nav__btn" data-tab="more" onclick="switchTab('more')">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
-      More
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More
     </button>
   </nav>
 </div>
@@ -219,31 +231,37 @@ html.admin-authed #app{display:block;}
   <div class="detail-body" id="detail-body"></div>
 </div>
 
+<div id="apt-editor-overlay">
+  <div class="apt-ed-bar">
+    <button class="detail-back" onclick="closeAptEditor()">←</button>
+    <div class="detail-title" id="apt-ed-title">Apartment</div>
+    <button class="btn btn-primary" id="apt-ed-save" onclick="saveAptData()">Save</button>
+  </div>
+  <div class="apt-ed-body" id="apt-ed-body"></div>
+</div>
+
 <script type="module">
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
 const CHECK_IN_HOUR=15;
 const RTDB_URL='https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json';
+const CLOUD='dlkjizhya';
+const PRESET='maxela_uploads';
 
-(function authBoot(){
+(function(){
   const t=localStorage.getItem(_ADMIN_KEY);
-  if(t&&t.startsWith('yes_')){
-    const ts=parseInt(t.slice(4),10);
-    if(Date.now()-ts<90*24*3600*1000)document.documentElement.classList.add('admin-authed');
-  }
+  if(t&&t.startsWith('yes_')&&Date.now()-parseInt(t.slice(4),10)<90*24*3600*1000)
+    document.documentElement.classList.add('admin-authed');
 })();
-
 window.adminUnlock=function(){
-  const inp=document.getElementById('lock-input');
-  const err=document.getElementById('lock-error');
+  const inp=document.getElementById('lock-input'),err=document.getElementById('lock-error');
   if(inp.value===_ADMIN_PWD){
     localStorage.setItem(_ADMIN_KEY,'yes_'+Date.now());
     document.documentElement.classList.add('admin-authed');
     document.getElementById('lock-screen').style.display='none';
   }else{
     inp.classList.add('shake');setTimeout(()=>inp.classList.remove('shake'),300);
-    inp.value='';err.textContent='Incorrect password';
-    setTimeout(()=>err.textContent='',2500);
+    inp.value='';err.textContent='Incorrect password';setTimeout(()=>err.textContent='',2500);
   }
 };
 window.adminSignOut=function(){localStorage.removeItem(_ADMIN_KEY);location.reload();};
@@ -261,15 +279,44 @@ const fb=initializeApp({
 });
 const db=getFirestore(fb);
 
+const APARTMENTS=[
+  {id:'0-1',code:'0-1',name:'Small Room 1',group:'Shartava — 0- Rooms'},
+  {id:'0-2',code:'0-2',name:'Small Room 2',group:'Shartava — 0- Rooms'},
+  {id:'0-3',code:'0-3',name:'Small Room 3',group:'Shartava — 0- Rooms'},
+  {id:'0-4',code:'0-4',name:'Small Room 4',group:'Shartava — 0- Rooms'},
+  {id:'0-5',code:'0-5',name:'Small Room 5',group:'Shartava — 0- Rooms'},
+  {id:'6-1',code:'6-1',name:'Apartment 6-1',group:'Shartava — 6- Apartments'},
+  {id:'6-2',code:'6-2',name:'Apartment 6-2',group:'Shartava — 6- Apartments'},
+  {id:'6-3',code:'6-3',name:'Apartment 6-3',group:'Shartava — 6- Apartments'},
+  {id:'6-4',code:'6-4',name:'Apartment 6-4',group:'Shartava — 6- Apartments'},
+  {id:'7-1',code:'7-1',name:'Apartment 7-1',group:'Shartava — 7- Apartments'},
+  {id:'7-2',code:'7-2',name:'Apartment 7-2',group:'Shartava — 7- Apartments'},
+  {id:'7-4',code:'7-4',name:'Apartment 7-4',group:'Shartava — 7- Apartments'},
+  {id:'orb-1',code:'Orb 1',name:'Orb Building, Unit 1',group:'City Centre — Orb'},
+  {id:'orb-2',code:'Orb 2',name:'Orb Building, Unit 2',group:'City Centre — Orb'},
+  {id:'orb-3',code:'Orb 3',name:'Orb Building, Unit 3',group:'City Centre — Orb'},
+  {id:'tab-1',code:'Tab 1',name:'Tab Building, Unit 1',group:'City Centre — Tab'},
+  {id:'tab-2',code:'Tab 2',name:'Tab Building, Unit 2',group:'City Centre — Tab'},
+  {id:'tab-3',code:'Tab 3',name:'Tab Building, Unit 3',group:'City Centre — Tab'},
+];
+
 let aptData={},guestData=[],hkStatusData={},_resCache=null,_resLoading=false;
-let elevData=null,currentTab='today',todayFilter='all',guestsSub='current';
-let _formById=new Map(),_byGuestCheckin=new Map();
+let elevData=null,currentTab='stay',stayFilter='overview',_currentAptId=null;
+let _formById=new Map();
 
 function toast(msg,ms=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),ms);}
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function tbilisiNow(){return new Date(Date.now()+4*3600*1000);}
 function tbilisiToday(){return tbilisiNow().toISOString().slice(0,10);}
 function _stripRoomNum(s){return(s||'').replace(/\s+0\d+\s+/,' ').replace(/\s+/g,' ').trim();}
+
+async function uploadToCloudinary(file,folder='maxela'){
+  const fd=new FormData();fd.append('file',file);fd.append('upload_preset',PRESET);fd.append('folder',folder);
+  const res=await fetch('https://api.cloudinary.com/v1_1/'+CLOUD+'/auto/upload',{method:'POST',body:fd});
+  const d=await res.json();
+  if(d.secure_url)return d.secure_url;
+  throw new Error(d.error?.message||'Upload failed');
+}
 
 function guestStatus(g){
   const now=tbilisiNow(),today=now.toISOString().slice(0,10),hour=now.getUTCHours();
@@ -284,8 +331,7 @@ function guestStatus(g){
     if(hour>=11)return{label:'Unlocked early',cls:'unlocked'};
     return{label:'Ready 11am',cls:'waiting'};
   }
-  const h=checkInHour;
-  return{label:'Waiting '+(h===12?'12pm':h<12?h+'am':(h-12)+'pm'),cls:'waiting'};
+  return{label:'Waiting',cls:'waiting'};
 }
 
 function rebuildFormMaps(){
@@ -299,13 +345,13 @@ function rebuildFormMaps(){
       guestData.find(g=>{const gn=_stripRoomNum((g.nameRoman||g.name||'').trim()).toLowerCase();const rn=_stripRoomNum(r.guest||'').toLowerCase();return gn&&rn&&gn===rn&&g.arrivalDate===r.checkin;})||null;
     if(f)_formById.set(r.id,f);
   }
-  _byGuestCheckin=new Map();
+  const byGC=new Map();
   for(const r of res){
     const key=_stripRoomNum(r.guest||'').toLowerCase()+'|'+(r.checkin||'');
-    if(!_byGuestCheckin.has(key))_byGuestCheckin.set(key,[]);
-    _byGuestCheckin.get(key).push(r);
+    if(!byGC.has(key))byGC.set(key,[]);
+    byGC.get(key).push(r);
   }
-  for(const group of _byGuestCheckin.values()){
+  for(const group of byGC.values()){
     if(group.length<2)continue;
     const shared=group.reduce((f,r)=>f||_formById.get(r.id),null);
     if(shared)for(const r of group)if(!_formById.has(r.id))_formById.set(r.id,shared);
@@ -313,56 +359,39 @@ function rebuildFormMaps(){
 }
 function getForm(r){return _formById.get(r.id)||null;}
 
-/** §22 status for ops cards */
 function cardStatus(r,form){
   if(!form)return{label:'NO FORM',cls:'pill-pending',key:'nof'};
   if(form.guestConfirmedCheckin===true)return{label:'CHECKED IN',cls:'pill-in',key:'checked'};
-  const gs=guestStatus(form);
-  if(gs.cls==='unlocked')return{label:'UNLOCKED',cls:'pill-ok',key:'unlocked'};
+  if(guestStatus(form).cls==='unlocked')return{label:'UNLOCKED',cls:'pill-ok',key:'unlocked'};
   return{label:'AWAITING UNLOCK',cls:'pill-await',key:'need'};
 }
-
-function fmtDate(s){
-  if(!s)return'—';
-  return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+function fmtDate(s){if(!s)return'—';return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
+function nights(r){return Math.max(0,Math.round((new Date(r.checkout+'T00:00:00Z')-new Date(r.checkin+'T00:00:00Z'))/864e5));}
+function datesStr(r,mode){
+  const n=nights(r);
+  const nl=n+' night'+(n!==1?'s':'');
+  if(mode==='arrival')return'Today → '+fmtDate(r.checkout)+' · '+nl;
+  if(mode==='leaving')return fmtDate(r.checkin)+' → Today · '+nl;
+  return fmtDate(r.checkin)+' → '+fmtDate(r.checkout)+' · '+nl;
 }
-function datesStr(r){return fmtDate(r.checkin)+' → '+fmtDate(r.checkout);}
-
 function normalizeWaPhone(raw){
   if(!raw)return null;
-  const hasPlus=raw.startsWith('+');
-  let digits=(hasPlus?raw.slice(1):raw).replace(/\D/g,'');
-  if(!digits)return null;
+  let digits=raw.replace(/\D/g,'');
   if(digits.startsWith('00'))digits=digits.slice(2);
   if(digits.length===9&&digits.startsWith('5'))return'995'+digits;
-  return digits;
+  return digits||null;
 }
-function buildWaUrl(phone,guestName,hasForm,roomCode){
+function buildWaUrl(phone,guestName,hasForm){
   if(!phone)return null;
-  const base='https://wa.me/'+phone;
-  if(hasForm)return base;
-  const firstName=(guestName||'').split(/\s+/)[0]||'';
-  const msg='Hello '+firstName+',\n\nWelcome to Maxela Apartments!\n\nPlease complete online check-in:\nhttps://app.maxelaapartments.com/checkin-guest-v2.html\n\nMaxela Team';
-  return base+'?text='+encodeURIComponent(msg);
-}
-
-async function _loadResCache(){
-  if(_resCache||_resLoading)return;
-  _resLoading=true;
-  try{
-    const cutoff=new Date(Date.now()-365*864e5).toISOString().slice(0,10);
-    const snap=await getDocs(query(collection(db,'reservations'),where('checkin','>=',cutoff),orderBy('checkin','desc'),limit(1000)));
-    _resCache=snap.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){console.error(e);_resCache=[];}
-  _resLoading=false;
-  rebuildFormMaps();
-  render();
+  if(hasForm)return'https://wa.me/'+phone;
+  const first=(guestName||'').split(/\s+/)[0]||'';
+  const msg='Hello '+first+',\n\nWelcome to Maxela Apartments!\n\nPlease complete online check-in:\nhttps://app.maxelaapartments.com/checkin-guest-v2.html\n\nMaxela Team';
+  return'https://wa.me/'+phone+'?text='+encodeURIComponent(msg);
 }
 
 const ROOM_ORDER=['0-1','0-2','0-3','0-4','0-5','6-1','6-2','6-3','6-4','7-1','7-2','7-4','tab-1','tab-2','tab-3','orb-1','orb-2','orb-3'];
 function roomSortKey(r){const i=ROOM_ORDER.indexOf((r.roomCode||'').toLowerCase());return i>=0?i:99;}
 function byRoom(a,b){return roomSortKey(a)-roomSortKey(b);}
-
 function groupByBaseNum(list){
   const map=new Map(),order=[];
   for(const r of list){
@@ -372,14 +401,21 @@ function groupByBaseNum(list){
   }
   return order.map(b=>map.get(b));
 }
+function nonCancelled(){return(_resCache||[]).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');}
 
-function arrivalGroups(){
+function scheduleBuckets(){
   const today=tbilisiToday();
-  const res=(_resCache||[]).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED'&&r.checkin===today).sort(byRoom);
-  return groupByBaseNum(res);
+  const in7=new Date(tbilisiNow().getTime()+7*864e5).toISOString().slice(0,10);
+  const res=nonCancelled();
+  return{
+    arrivals:groupByBaseNum(res.filter(r=>r.checkin===today).sort(byRoom)),
+    inhouse:groupByBaseNum(res.filter(r=>r.checkin<today&&r.checkout>today).sort(byRoom)),
+    upcoming:groupByBaseNum(res.filter(r=>r.checkin>today&&r.checkin<=in7).sort((a,b)=>(a.checkin||'').localeCompare(b.checkin||'')||byRoom(a,b))),
+    leaving:groupByBaseNum(res.filter(r=>r.checkout===today&&r.checkin!==today).sort(byRoom)),
+  };
 }
 
-function renderCard(grp){
+function renderCard(grp,mode){
   const sorted=[...grp].sort(byRoom);
   const form=grp.reduce((f,r)=>f||getForm(r),null);
   const st=cardStatus(sorted[0],form);
@@ -387,75 +423,87 @@ function renderCard(grp){
   const name=_stripRoomNum(grp[0].guest||'')||'—';
   const multi=grp.length>1?`<span class="pill pill-multi">MULTI</span>`:'';
   const rawPhone=(form?.contact||grp.reduce((p,r)=>p||r.phone||r.guest_phone||r.guestPhone||'','')||'').trim();
-  const wa=buildWaUrl(normalizeWaPhone(rawPhone),name,!!form,grp[0].roomCode);
-  const waBtn=wa?`<a class="btn" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`
-    :`<button class="btn" disabled>WhatsApp</button>`;
+  const wa=buildWaUrl(normalizeWaPhone(rawPhone),name,!!form);
+  const waBtn=wa?`<a class="btn" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`:`<button class="btn" disabled>WhatsApp</button>`;
   let grant='';
-  if(st.key==='need'&&form){
-    grant=`<button class="btn btn-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Grant Access</button>`;
-  }else if(form){
-    grant=`<button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
-  }
+  if(st.key==='need'&&form)grant=`<button class="btn btn-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Grant Access</button>`;
+  else if(form)grant=`<button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
+  else grant=`<button class="btn" disabled>No form yet</button>`;
+  const src=grp[0].source||grp[0].channel||'';
+  const ref=grp[0].reservationNumber||grp[0].bookingId||'';
+  const guests=grp.reduce((s,r)=>s+(r.guests||1),0);
+  const sub=[src,ref?'#'+ref:'',guests>1?guests+' guests':'',rawPhone||''].filter(Boolean).join(' · ');
   const open=form?`onclick="window.openDetail('${form.id}')" style="cursor:pointer"`:'';
   return`<div class="card" ${open}>
     <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${st.cls}">${st.label}</span></div>
     <div class="card__name">${esc(name)}${multi}</div>
-    <div class="card__dates">${esc(datesStr(grp[0]))}</div>
+    <div class="card__dates">${esc(datesStr(grp[0],mode))}</div>
+    ${sub?`<div class="card__sub">${esc(sub)}</div>`:''}
     <div class="card__actions">${waBtn}${grant}</div>
   </div>`;
 }
 
-window.setTodayFilter=function(f){
-  todayFilter=f;
-  document.querySelectorAll('#today-filters .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.f===f));
-  renderToday();
-};
-
-function renderToday(){
-  const groups=arrivalGroups();
-  const filtered=groups.filter(grp=>{
-    const form=grp.reduce((f,r)=>f||getForm(r),null);
-    const st=cardStatus(grp[0],form);
-    if(todayFilter==='all')return true;
-    return st.key===todayFilter||(todayFilter==='need'&&st.key==='need');
-  });
-  const el=document.getElementById('today-list');
-  if(!(_resCache)){el.innerHTML='<div class="empty">Loading reservations…</div>';return;}
-  if(!filtered.length){el.innerHTML='<div class="empty">No arrivals match</div>';return;}
-  el.innerHTML=filtered.map(renderCard).join('');
-  document.getElementById('header-sub').textContent=groups.length+' arrival'+(groups.length!==1?'s':'')+' today';
+function sectionBlock(title,groups,mode){
+  if(!groups.length)return`<div class="section-hd"><h2>${esc(title)}</h2><span class="n">0</span></div><div class="empty" style="padding:20px 16px">Nothing here</div>`;
+  return`<div class="section-hd"><h2>${esc(title)}</h2><span class="n">${groups.length}</span></div>`+groups.map(g=>renderCard(g,mode)).join('');
 }
 
-window.setGuestsSub=function(s){
-  guestsSub=s;
-  document.querySelectorAll('#pane-guests .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.g===s));
-  renderGuestsPane();
+window.setStayFilter=function(f){
+  stayFilter=f;
+  document.querySelectorAll('#stay-filters .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.f===f));
+  renderStay();
 };
 
-window.renderGuestsPane=function(){
-  const q=(document.getElementById('guest-search')?.value||'').trim().toLowerCase();
-  const today=tbilisiToday();
-  const in7=new Date(tbilisiNow().getTime()+7*864e5).toISOString().slice(0,10);
-  let list=(_resCache||[]).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
-  if(guestsSub==='current')list=list.filter(r=>r.checkin<today&&r.checkout>today);
-  else if(guestsSub==='upcoming')list=list.filter(r=>r.checkin>today&&r.checkin<=in7);
-  else if(guestsSub==='departures')list=list.filter(r=>r.checkout===today&&r.checkin!==today);
-  if(q)list=list.filter(r=>{
-    const hay=[r.guest,r.roomCode,r.reservationNumber,r.bookingId,getForm(r)?.name].join(' ').toLowerCase();
+window.renderStay=function(){
+  const b=scheduleBuckets();
+  const q=(document.getElementById('stay-search')?.value||'').trim().toLowerCase();
+  const filterByQ=(groups)=>!q?groups:groups.filter(grp=>{
+    const form=grp.reduce((f,r)=>f||getForm(r),null);
+    const hay=[grp[0].guest,grp.map(r=>r.roomCode).join(' '),grp[0].reservationNumber,grp[0].bookingId,form?.name,form?.aptId,form?.contact].join(' ').toLowerCase();
     return hay.includes(q);
   });
-  list.sort(byRoom);
-  const groups=groupByBaseNum(list);
-  const el=document.getElementById('guests-list');
-  if(!groups.length){el.innerHTML='<div class="empty">Nothing here</div>';return;}
-  el.innerHTML=groups.map(renderCard).join('');
+
+  document.getElementById('stay-stats').innerHTML=`
+    <button type="button" class="stat ${stayFilter==='arrivals'?'active':''}" onclick="setStayFilter('arrivals')"><div class="stat__n">${b.arrivals.length}</div><div class="stat__l">Arrive</div></button>
+    <button type="button" class="stat ${stayFilter==='inhouse'?'active':''}" onclick="setStayFilter('inhouse')"><div class="stat__n">${b.inhouse.length}</div><div class="stat__l">In-house</div></button>
+    <button type="button" class="stat ${stayFilter==='upcoming'?'active':''}" onclick="setStayFilter('upcoming')"><div class="stat__n">${b.upcoming.length}</div><div class="stat__l">Next 7d</div></button>
+    <button type="button" class="stat ${stayFilter==='leaving'?'active':''}" onclick="setStayFilter('leaving')"><div class="stat__n">${b.leaving.length}</div><div class="stat__l">Leave</div></button>`;
+
+  const el=document.getElementById('stay-list');
+  if(!_resCache){el.innerHTML='<div class="empty">Loading reservations…</div>';return;}
+
+  if(stayFilter==='overview'){
+    const arr=filterByQ(b.arrivals),leave=filterByQ(b.leaving),house=filterByQ(b.inhouse),up=filterByQ(b.upcoming);
+    el.innerHTML=
+      sectionBlock('Arrivals today',arr,'arrival')+
+      sectionBlock('Leaving today',leave,'leaving')+
+      sectionBlock('Currently in-house',house,'inhouse')+
+      sectionBlock('Upcoming (next 7 days)',up,'upcoming');
+    return;
+  }
+
+  let groups=[],mode='inhouse',title='';
+  if(stayFilter==='arrivals'){groups=b.arrivals;mode='arrival';title='Arrivals today';}
+  else if(stayFilter==='inhouse'){groups=b.inhouse;mode='inhouse';title='Currently in-house';}
+  else if(stayFilter==='upcoming'){groups=b.upcoming;mode='upcoming';title='Upcoming (7 days)';}
+  else if(stayFilter==='leaving'){groups=b.leaving;mode='leaving';title='Leaving today';}
+  else if(stayFilter==='need'){
+    groups=[...b.arrivals,...b.inhouse].filter(grp=>{
+      const form=grp.reduce((f,r)=>f||getForm(r),null);
+      return cardStatus(grp[0],form).key==='need';
+    });
+    mode='inhouse';title='Need unlock';
+  }
+  groups=filterByQ(groups);
+  if(!groups.length){el.innerHTML=`<div class="section-hd"><h2>${esc(title)}</h2><span class="n">0</span></div><div class="empty">Nothing here</div>`;return;}
+  el.innerHTML=sectionBlock(title,groups,mode);
 };
 
 const TAB_META={
-  today:{title:'Today',sub:"Today's arrivals"},
+  stay:{title:'Stay',sub:'Overview · arrivals · in-house · upcoming'},
   elevator:{title:'Elevator',sub:'Entrance & elevator code'},
-  guests:{title:'Guests',sub:'Search and manage stays'},
-  more:{title:'More',sub:'Settings & full admin'},
+  apts:{title:'Apartments',sub:'WiFi, instructions, photo steps'},
+  more:{title:'More',sub:'Settings & sign out'},
 };
 window.switchTab=function(tab){
   currentTab=tab;
@@ -464,32 +512,26 @@ window.switchTab=function(tab){
   const m=TAB_META[tab];
   document.getElementById('header-title').textContent=m.title;
   document.getElementById('header-sub').textContent=m.sub;
-  if(tab==='today')renderToday();
+  if(tab==='stay')renderStay();
   if(tab==='elevator')renderElevator();
-  if(tab==='guests')renderGuestsPane();
+  if(tab==='apts')renderAptsList();
   closeDetail();
 };
 
 window.unlockGuest=async function(guestId){
-  if(!confirm('Grant access (unlock check-in) for this guest now?'))return;
-  try{
-    await updateDoc(doc(db,'checkin_guests',guestId),{manualUnlock:true,unlockedAt:serverTimestamp()});
-    toast('Access granted ✓');
-  }catch(e){toast('Failed: '+e.message);}
+  if(!confirm('Grant access for this guest now?'))return;
+  try{await updateDoc(doc(db,'checkin_guests',guestId),{manualUnlock:true,unlockedAt:serverTimestamp()});toast('Access granted ✓');}
+  catch(e){toast('Failed: '+e.message);}
 };
 
 window.openDetail=function(guestId){
-  const g=guestData.find(x=>x.id===guestId);
-  if(!g){toast('Guest not found');return;}
-  const title=esc(_stripRoomNum(g.nameRoman||g.name||'Guest'));
+  const g=guestData.find(x=>x.id===guestId);if(!g){toast('Guest not found');return;}
   document.getElementById('detail-title').textContent=_stripRoomNum(g.nameRoman||g.name||'Guest')+' · '+(g.aptId||'');
   const st=g.guestConfirmedCheckin?{label:'CHECKED IN',cls:'pill-in'}:cardStatus({roomCode:g.aptId},g);
-  const passportUrl=g.passportUrl||g.passportPhotoUrl||g.passportImage||'';
+  const passportUrl=g.passportUrl||'';
   const door=(_resCache||[]).find(r=>r.id===g.matchedReservationId||r.reservationNumber===g.matchedReservationId);
   const doorCode=door?.tuyaPassword||aptData[g.aptId]?.doorCode||'—';
   const waPhone=normalizeWaPhone(g.contact||'');
-  const wa=waPhone?'https://wa.me/'+waPhone:'';
-
   document.getElementById('detail-body').innerHTML=`
     <div style="margin-bottom:12px"><span class="pill ${st.cls}">${st.label}</span></div>
     <div class="passport-gate" id="pp-gate">
@@ -497,7 +539,7 @@ window.openDetail=function(guestId){
       <button class="btn btn-primary" style="width:100%" onclick="window.showPassport()">Check passport</button>
     </div>
     <div class="passport-view" id="pp-view">
-      ${passportUrl?`<img src="${esc(passportUrl)}" alt="Passport" onclick="window.open(this.src,'_blank')">`:'<p style="color:var(--muted);font-size:13px;margin-bottom:10px;">No passport uploaded.</p>'}
+      ${passportUrl?`<img src="${esc(passportUrl)}" alt="Passport">`:'<p style="color:var(--muted);font-size:13px;margin-bottom:10px;">No passport uploaded.</p>'}
       <div class="card__actions" style="margin-top:10px">
         <button class="btn btn-green" onclick="window.approvePassport('${g.id}')">Approve ID</button>
         <button class="btn" onclick="window.rejectPassport('${g.id}')">Reject</button>
@@ -509,52 +551,259 @@ window.openDetail=function(guestId){
       <div class="door">${esc(doorCode)}</div>
       <div class="card__actions">
         ${g.manualUnlock||guestStatus(g).cls==='unlocked'?'':`<button class="btn btn-primary" onclick="window.unlockGuest('${g.id}')">Grant Access</button>`}
-        ${wa?`<a class="btn" href="${wa}" target="_blank">WhatsApp</a>`:''}
+        ${waPhone?`<a class="btn" href="https://wa.me/${waPhone}" target="_blank">WhatsApp</a>`:''}
       </div>
     </div>
-    <p style="font-size:12px;color:var(--muted);margin-top:8px;">${esc(fmtDate(g.arrivalDate))} → ${esc(fmtDate(g.checkoutDate||door?.checkout||''))}</p>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px;">${esc(fmtDate(g.arrivalDate))} → ${esc(fmtDate(g.checkoutDate||door?.checkout||''))} · ${esc(g.contact||'no contact')}</p>
+    ${g.matchedReservationId?`<p style="font-size:12px;color:var(--muted);">Booking ${esc(g.matchedReservationId)}</p>`:''}
+    <button class="btn" style="width:100%;margin-top:12px" onclick="window.openAptEditor('${g.aptId||''}')">Edit apartment instructions</button>
   `;
   document.getElementById('detail').classList.add('open');
 };
 window.closeDetail=function(){document.getElementById('detail').classList.remove('open');};
-window.showPassport=function(){
-  document.getElementById('pp-gate').style.display='none';
-  document.getElementById('pp-view').classList.add('show');
-};
+window.showPassport=function(){document.getElementById('pp-gate').style.display='none';document.getElementById('pp-view').classList.add('show');};
 window.approvePassport=async function(guestId){
   if(!confirm('Approve this ID?'))return;
-  try{
-    await updateDoc(doc(db,'checkin_guests',guestId),{'passportScanResult.overrideByAdmin':true,'passportScanResult.valid':true});
-    toast('ID approved ✓');openDetail(guestId);
-  }catch(e){toast('Failed: '+e.message);}
+  try{await updateDoc(doc(db,'checkin_guests',guestId),{'passportScanResult.overrideByAdmin':true,'passportScanResult.valid':true});toast('ID approved ✓');openDetail(guestId);}
+  catch(e){toast('Failed: '+e.message);}
 };
 window.rejectPassport=async function(guestId){
   if(!confirm('Reject this ID?'))return;
-  try{
-    await updateDoc(doc(db,'checkin_guests',guestId),{'passportScanResult.overrideByAdmin':false,'passportScanResult.valid':false});
-    toast('ID rejected');openDetail(guestId);
-  }catch(e){toast('Failed: '+e.message);}
+  try{await updateDoc(doc(db,'checkin_guests',guestId),{'passportScanResult.overrideByAdmin':false,'passportScanResult.valid':false});toast('ID rejected');openDetail(guestId);}
+  catch(e){toast('Failed: '+e.message);}
 };
 
+/* ── Apartments ── */
+function occupancyForApt(aptId){
+  const today=tbilisiToday();
+  const id=(aptId||'').toLowerCase();
+  const matchRoom=r=>{
+    const code=(r.roomCode||'').toLowerCase();
+    const form=getForm(r);
+    return code===id||(form?.aptId||'').toLowerCase()===id;
+  };
+  const stay=nonCancelled().find(r=>matchRoom(r)&&r.checkin<=today&&r.checkout>today);
+  if(stay)return{name:_stripRoomNum(stay.guest||'')||'Guest',until:stay.checkout,arriving:stay.checkin===today,leaving:false};
+  const leave=nonCancelled().find(r=>matchRoom(r)&&r.checkout===today&&r.checkin<today);
+  if(leave)return{name:_stripRoomNum(leave.guest||'')||'Guest',until:leave.checkout,arriving:false,leaving:true};
+  return null;
+}
+function nextArrivalForApt(aptId){
+  const today=tbilisiToday();
+  const id=(aptId||'').toLowerCase();
+  const hits=nonCancelled().filter(r=>{
+    const code=(r.roomCode||'').toLowerCase();
+    const form=getForm(r);
+    return(code===id||(form?.aptId||'').toLowerCase()===id)&&r.checkin>today;
+  }).sort((a,b)=>a.checkin.localeCompare(b.checkin));
+  return hits[0]||null;
+}
+
+function renderAptsList(){
+  const groups=[];
+  const seen=new Map();
+  for(const a of APARTMENTS){
+    if(!seen.has(a.group)){seen.set(a.group,[]);groups.push(a.group);}
+    seen.get(a.group).push(a);
+  }
+  let html='';
+  for(const g of groups){
+    html+=`<div class="apt-group"><div class="apt-group__title">${esc(g)}</div>`;
+    for(const a of seen.get(g)){
+      const d=aptData[a.id]||{};
+      const ok=!!(d.tuyaDeviceId||d.doorCode);
+      const occ=occupancyForApt(a.id);
+      const next=occ?null:nextArrivalForApt(a.id);
+      let guestLabel='Vacant';
+      let guestCls='empty';
+      if(occ){
+        guestCls='';
+        if(occ.leaving)guestLabel='Out · '+occ.name;
+        else if(occ.arriving)guestLabel='In · '+occ.name;
+        else guestLabel=occ.name;
+      }else if(next){guestLabel='Next '+fmtDate(next.checkin);guestCls='empty';}
+      html+=`<button type="button" class="apt-pill" onclick="window.openAptEditor('${a.id}')">
+        <span class="apt-dot" style="background:${ok?'var(--green)':'var(--red)'}"></span>
+        <span class="apt-pill__code">${esc(a.code)}</span>
+        <span class="apt-pill__name">${esc(a.name)}</span>
+        <span class="apt-pill__guest ${guestCls}">${esc(guestLabel)}</span>
+      </button>`;
+    }
+    html+='</div>';
+  }
+  document.getElementById('apts-list').innerHTML=html||'<div class="empty">No apartments</div>';
+}
+
+window.openAptEditor=function(aptId){
+  if(!aptId)return;
+  const apt=APARTMENTS.find(a=>a.id===aptId);if(!apt)return;
+  _currentAptId=aptId;
+  const d=aptData[aptId]||{};
+  const initMode=(!!d.doorCode&&!d.tuyaDeviceId)?'manual':'auto';
+  const photos=d.photos||[];
+  const caps=d.photoCaptions||[];
+  document.getElementById('apt-ed-title').textContent=apt.code+' · '+apt.name;
+  const steps=photos.map((url,i)=>`
+    <div class="apt-step">
+      <img src="${esc(url)}" alt="Step ${i+1}" onclick="document.getElementById('replace-${i}').click()">
+      <div>
+        <div class="apt-label">Step ${i+1}</div>
+        <textarea class="apt-step-textarea" id="photo-cap-${i}" placeholder="Caption…">${esc(caps[i]||'')}</textarea>
+        <input type="file" id="replace-${i}" accept="image/*" style="display:none" onchange="window.doReplacePhoto(${i},this)">
+      </div>
+      <div class="apt-step-actions">
+        <button type="button" class="apt-step-btn" onclick="window.movePhoto(${i},-1)" ${i===0?'disabled':''}>↑</button>
+        <button type="button" class="apt-step-btn" onclick="window.movePhoto(${i},1)" ${i===photos.length-1?'disabled':''}>↓</button>
+        <button type="button" class="apt-step-btn del" onclick="window.deletePhoto(${i})">×</button>
+      </div>
+    </div>`).join('')||'<div style="font-size:13px;color:var(--muted);padding:8px 0;">No photos yet.</div>';
+
+  document.getElementById('apt-ed-body').innerHTML=`
+    <div class="apt-card">
+      <div class="apt-card-hd">Smart lock · ${d.tuyaDeviceId?'Tuya':d.doorCode?'Manual':'Not set'}</div>
+      <div class="apt-card-bd">
+        <div class="apt-mode-group">
+          <button type="button" class="apt-mode-btn ${initMode==='auto'?'active':''}" id="mode-auto" onclick="setLockMode('auto')">Auto (Tuya)</button>
+          <button type="button" class="apt-mode-btn ${initMode==='manual'?'active':''}" id="mode-manual" onclick="setLockMode('manual')">Manual code</button>
+        </div>
+        <div id="lock-auto" style="display:${initMode==='auto'?'block':'none'}">
+          <label class="apt-label">Tuya device ID</label>
+          <input class="apt-input" id="apt-tuyaDeviceId" value="${esc(d.tuyaDeviceId||'')}" placeholder="bf…">
+        </div>
+        <div id="lock-manual" style="display:${initMode==='manual'?'block':'none'}">
+          <label class="apt-label">Door code</label>
+          <input class="apt-input" id="apt-doorCode" value="${esc(d.doorCode||'')}" placeholder="1234#">
+        </div>
+      </div>
+    </div>
+    <div class="apt-card">
+      <div class="apt-card-hd">Timing</div>
+      <div class="apt-card-bd"><div class="apt-row">
+        <div><label class="apt-label">Check-in</label><input class="apt-input" type="time" id="apt-checkInTime" value="${esc(d.checkInTime||'15:00')}"></div>
+        <div><label class="apt-label">Check-out</label><input class="apt-input" type="time" id="apt-checkOutTime" value="${esc(d.checkOutTime||'12:00')}"></div>
+      </div></div>
+    </div>
+    <div class="apt-card">
+      <div class="apt-card-hd">WiFi</div>
+      <div class="apt-card-bd">
+        <label class="apt-label">Network</label>
+        <input class="apt-input" id="apt-wifiName" value="${esc(d.wifiName||'')}">
+        <label class="apt-label">Password</label>
+        <input class="apt-input" id="apt-wifiPass" value="${esc(d.wifiPass||'')}">
+      </div>
+    </div>
+    <div class="apt-card">
+      <div class="apt-card-hd">Check-in instructions · ${photos.length} photos</div>
+      <div class="apt-card-bd">
+        <label class="apt-label">Written instructions</label>
+        <textarea class="apt-textarea" id="apt-instructions" placeholder="How to arrive…">${esc(d.instructions||'')}</textarea>
+        <label class="apt-label">Video URL</label>
+        <input class="apt-input" id="apt-videoUrl" value="${esc(d.videoUrl||'')}" placeholder="https://…">
+        <label class="apt-label">Photo steps</label>
+        <div id="aptPhotoSteps">${steps}</div>
+        <input type="file" id="apt-photo-input" accept="image/*" multiple style="display:none" onchange="window.uploadPhotos(this)">
+        <button type="button" class="apt-add" onclick="document.getElementById('apt-photo-input').click()">+ Add photo step</button>
+      </div>
+    </div>
+    <div class="apt-card">
+      <div class="apt-card-hd">Guest link</div>
+      <div class="apt-card-bd">
+        <button class="btn" style="width:100%" onclick="navigator.clipboard.writeText('https://app.maxelaapartments.com/checkin-guest-v2.html?apt=${encodeURIComponent(aptId)}').then(()=>toast('Link copied'))">Copy check-in URL</button>
+        <button class="btn" style="width:100%;margin-top:8px" onclick="window.open('checkin-guest-sandbox-2.html?preview=true&apt=${encodeURIComponent(aptId)}','_blank')">Preview guest view</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('apt-editor-overlay').classList.add('open');
+  closeDetail();
+};
+window.closeAptEditor=function(){document.getElementById('apt-editor-overlay').classList.remove('open');_currentAptId=null;};
+window.setLockMode=function(mode){
+  document.getElementById('lock-auto').style.display=mode==='auto'?'block':'none';
+  document.getElementById('lock-manual').style.display=mode==='manual'?'block':'none';
+  document.getElementById('mode-auto').classList.toggle('active',mode==='auto');
+  document.getElementById('mode-manual').classList.toggle('active',mode==='manual');
+};
+
+window.saveAptData=async function(){
+  const aptId=_currentAptId;if(!aptId)return;
+  const photoCaptions=(aptData[aptId]?.photos||[]).map((_,i)=>document.getElementById('photo-cap-'+i)?.value.trim()||'');
+  const inManual=document.getElementById('mode-manual')?.classList.contains('active');
+  const data={
+    tuyaDeviceId:document.getElementById('apt-tuyaDeviceId')?.value.trim()||'',
+    doorCode:inManual?(document.getElementById('apt-doorCode')?.value.trim()||''):(aptData[aptId]?.doorCode||''),
+    checkInTime:document.getElementById('apt-checkInTime')?.value||'15:00',
+    checkOutTime:document.getElementById('apt-checkOutTime')?.value||'12:00',
+    wifiName:document.getElementById('apt-wifiName')?.value.trim()||'',
+    wifiPass:document.getElementById('apt-wifiPass')?.value.trim()||'',
+    rules:aptData[aptId]?.rules||'',
+    instructions:document.getElementById('apt-instructions')?.value.trim()||'',
+    videoUrl:document.getElementById('apt-videoUrl')?.value.trim()||'',
+    photos:aptData[aptId]?.photos||[],
+    photoCaptions,
+    updatedAt:serverTimestamp()
+  };
+  try{
+    await setDoc(doc(db,'checkin_apartments',aptId),data);
+    aptData[aptId]={...aptData[aptId],...data};
+    toast('Saved ✓');
+    renderAptsList();
+  }catch(e){toast('Save failed: '+e.message);}
+};
+
+window.uploadPhotos=async function(input){
+  const aptId=_currentAptId;if(!aptId)return;
+  const files=Array.from(input.files||[]);if(!files.length)return;
+  try{
+    const urls=[];
+    for(let i=0;i<files.length;i++){toast('Uploading '+(i+1)+'/'+files.length+'…',15000);urls.push(await uploadToCloudinary(files[i],'maxela/'+aptId+'/photos'));}
+    const photos=[...(aptData[aptId]?.photos||[]),...urls];
+    const photoCaptions=[...(aptData[aptId]?.photoCaptions||[])];
+    while(photoCaptions.length<photos.length)photoCaptions.push('');
+    await setDoc(doc(db,'checkin_apartments',aptId),{photos,photoCaptions},{merge:true});
+    aptData[aptId]={...aptData[aptId],photos,photoCaptions};
+    toast('Uploaded ✓');openAptEditor(aptId);
+  }catch(e){toast('Upload failed: '+e.message);}
+};
+window.deletePhoto=async function(idx){
+  const aptId=_currentAptId;if(!aptId||!confirm('Delete this photo?'))return;
+  const photos=[...(aptData[aptId]?.photos||[])];
+  const photoCaptions=[...(aptData[aptId]?.photoCaptions||[])];
+  photos.splice(idx,1);photoCaptions.splice(idx,1);
+  await setDoc(doc(db,'checkin_apartments',aptId),{photos,photoCaptions},{merge:true});
+  aptData[aptId]={...aptData[aptId],photos,photoCaptions};
+  openAptEditor(aptId);
+};
+window.movePhoto=async function(idx,dir){
+  const aptId=_currentAptId;if(!aptId)return;
+  const j=idx+dir;const photos=[...(aptData[aptId]?.photos||[])];
+  const caps=[...(aptData[aptId]?.photoCaptions||[])];
+  if(j<0||j>=photos.length)return;
+  [photos[idx],photos[j]]=[photos[j],photos[idx]];
+  [caps[idx],caps[j]]=[caps[j]||'',caps[idx]||''];
+  await setDoc(doc(db,'checkin_apartments',aptId),{photos,photoCaptions:caps},{merge:true});
+  aptData[aptId]={...aptData[aptId],photos,photoCaptions:caps};
+  openAptEditor(aptId);
+};
+window.doReplacePhoto=async function(idx,input){
+  const aptId=_currentAptId;const file=input.files?.[0];if(!aptId||!file)return;
+  try{
+    toast('Replacing…',15000);
+    const url=await uploadToCloudinary(file,'maxela/'+aptId+'/photos');
+    const photos=[...(aptData[aptId]?.photos||[])];photos[idx]=url;
+    await setDoc(doc(db,'checkin_apartments',aptId),{photos},{merge:true});
+    aptData[aptId]={...aptData[aptId],photos};
+    toast('Replaced ✓');openAptEditor(aptId);
+  }catch(e){toast('Replace failed: '+e.message);}
+};
+
+/* ── Elevator ── */
 function elevAgeSec(){
   if(!elevData?.updatedAt)return 1e12;
   const sec=elevData.updatedAt.seconds||Math.floor(parseInt(elevData.updatedAt)/1000)||0;
   return Math.floor(Date.now()/1000)-sec;
 }
-function elevFreshness(){
-  const a=elevAgeSec();
-  if(a<2*3600)return{cls:'fresh',label:'Fresh'};
-  if(a<8*3600)return{cls:'stale',label:'Getting stale'};
-  return{cls:'old',label:'Stale — update now'};
-}
-function relTime(){
-  const a=elevAgeSec();
-  if(a>1e10)return'Unknown';
-  if(a<60)return'Updated just now';
-  if(a<3600)return'Updated '+Math.floor(a/60)+' min ago';
-  if(a<86400)return'Updated '+Math.floor(a/3600)+'h ago';
-  return'Updated '+Math.floor(a/86400)+'d ago';
-}
+function elevFreshness(){const a=elevAgeSec();if(a<7200)return{cls:'fresh',label:'Fresh'};if(a<28800)return{cls:'stale',label:'Getting stale'};return{cls:'old',label:'Stale — update now'};}
+function relTime(){const a=elevAgeSec();if(a>1e10)return'Unknown';if(a<60)return'just now';if(a<3600)return Math.floor(a/60)+' min ago';if(a<86400)return Math.floor(a/3600)+'h ago';return Math.floor(a/86400)+'d ago';}
 
 function renderElevator(){
   const code=elevData?.code||elevData?.display_code||'— — — —';
@@ -568,88 +817,67 @@ function renderElevator(){
   if(src==='manual'){srcEl.textContent='Manual';srcEl.className='elev-src manual';}
   else if(src){srcEl.textContent='Auto';srcEl.className='elev-src auto';}
   else{srcEl.textContent='';srcEl.className='elev-src';}
-  const box=document.getElementById('elev-qr');
-  box.innerHTML='';
-  if(qr&&typeof QRCode!=='undefined'){
-    try{new QRCode(box,{text:String(qr),width:120,height:120});}catch(e){box.textContent='QR error';}
-  }
-  const inp=document.getElementById('elev-input');
-  const qinp=document.getElementById('elev-qr-input');
+  const box=document.getElementById('elev-qr');box.innerHTML='';
+  if(qr&&typeof QRCode!=='undefined'){try{new QRCode(box,{text:String(qr),width:120,height:120});}catch(e){}}
+  const inp=document.getElementById('elev-input'),qinp=document.getElementById('elev-qr-input');
   if(inp&&document.activeElement!==inp)inp.value=elevData?.code||elevData?.display_code||'';
   if(qinp&&document.activeElement!==qinp)qinp.value=qr||'';
-  const nav=document.getElementById('nav-elev');
-  if(nav)nav.classList.toggle('has-alert',fr.cls==='old');
+  document.getElementById('nav-elev')?.classList.toggle('has-alert',fr.cls==='old');
 }
 
 async function loadElevatorOnce(){
-  let rtdbData=null,fsData=null;
+  let rtdbData=null;
   try{rtdbData=await fetch(RTDB_URL).then(r=>r.json());}catch(e){}
-  // fsData from elevData listener; also one-shot if needed
   const rtdbTs=rtdbData?parseInt(rtdbData.updatedAt||0):0;
   const fsTs=elevData?.updatedAt?.seconds?elevData.updatedAt.seconds*1000:0;
   if(rtdbData&&rtdbTs>=fsTs){
-    elevData={
-      code:rtdbData.display_code||rtdbData.code||'',
-      qrCode:rtdbData.qr_code||'',
-      updatedAt:{seconds:Math.floor(rtdbTs/1000)},
-      source:rtdbData.source||'auto',
-      _source:'rtdb',
-    };
+    elevData={code:rtdbData.display_code||rtdbData.code||'',qrCode:rtdbData.qr_code||'',updatedAt:{seconds:Math.floor(rtdbTs/1000)},source:rtdbData.source||'auto',_source:'rtdb'};
   }else if(elevData){
-    elevData={...elevData,qrCode:elevData.qr_code||elevData.qrCode||rtdbData?.qr_code||'',_source:elevData._source||'firestore'};
+    elevData={...elevData,qrCode:elevData.qr_code||elevData.qrCode||rtdbData?.qr_code||''};
   }else if(rtdbData){
     elevData={code:rtdbData.display_code||'',qrCode:rtdbData.qr_code||'',updatedAt:{seconds:Math.floor(rtdbTs/1000)},source:rtdbData.source||'auto',_source:'rtdb'};
   }
   if(currentTab==='elevator')renderElevator();
-  else{
-    const fr=elevFreshness();
-    document.getElementById('nav-elev')?.classList.toggle('has-alert',fr.cls==='old');
-  }
+  else document.getElementById('nav-elev')?.classList.toggle('has-alert',elevFreshness().cls==='old');
 }
 
 window.updateElevator=async function(){
   const code=(document.getElementById('elev-input')?.value||'').trim();
   const qrCode=(document.getElementById('elev-qr-input')?.value||'').trim();
-  const msg=document.getElementById('elev-msg');
-  const btn=document.getElementById('elev-save');
+  const msg=document.getElementById('elev-msg'),btn=document.getElementById('elev-save');
   if(!code){msg.className='elev-msg err';msg.textContent='Enter a display code';return;}
   btn.disabled=true;msg.className='elev-msg';msg.textContent='Saving…';
   const nowMs=Date.now();
-  const updates={
-    display_code:code,
-    qr_code:qrCode,
-    expires_at:String(nowMs+24*3600*1000),
-    updatedAt:String(nowMs),
-    source:'manual',
-  };
+  const updates={display_code:code,qr_code:qrCode,expires_at:String(nowMs+24*3600*1000),updatedAt:String(nowMs),source:'manual'};
   let rtdbOk=false,fsOk=false,errMsg='';
-  try{
-    const res=await fetch(RTDB_URL,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});
-    rtdbOk=res.ok;
-    if(!rtdbOk)errMsg='RTDB HTTP '+res.status;
-  }catch(e){errMsg='RTDB: '+e.message;}
-  try{
-    await setDoc(doc(db,'globals','elevator_code'),{...updates,code,updatedAt:serverTimestamp(),source:'manual'},{merge:true});
-    fsOk=true;
-  }catch(e){errMsg=(errMsg?errMsg+'; ':'')+'Firestore: '+e.message;}
+  try{const res=await fetch(RTDB_URL,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});rtdbOk=res.ok;if(!rtdbOk)errMsg='RTDB HTTP '+res.status;}
+  catch(e){errMsg='RTDB: '+e.message;}
+  try{await setDoc(doc(db,'globals','elevator_code'),{...updates,code,updatedAt:serverTimestamp(),source:'manual'},{merge:true});fsOk=true;}
+  catch(e){errMsg=(errMsg?errMsg+'; ':'')+'Firestore: '+e.message;}
   btn.disabled=false;
   if(rtdbOk&&fsOk){
     elevData={code,qrCode,updatedAt:{seconds:Math.floor(nowMs/1000)},source:'manual',_source:'manual'};
-    msg.className='elev-msg ok';
-    msg.textContent='Saved to both stores · Manual · will stay until next update';
-    renderElevator();
-    toast('Elevator code updated ✓');
-  }else{
-    msg.className='elev-msg err';
-    msg.textContent='Save failed — '+(errMsg||'unknown')+(rtdbOk?' (RTDB ok, Firestore failed)':fsOk?' (Firestore ok, RTDB failed)':'');
-  }
+    msg.className='elev-msg ok';msg.textContent='Saved · Manual · both stores OK';
+    renderElevator();toast('Elevator updated ✓');
+  }else{msg.className='elev-msg err';msg.textContent='Failed — '+(errMsg||'unknown');}
 };
 
 function render(){
   rebuildFormMaps();
-  if(currentTab==='today')renderToday();
-  else if(currentTab==='guests')renderGuestsPane();
+  if(currentTab==='stay')renderStay();
+  else if(currentTab==='apts')renderAptsList();
   else if(currentTab==='elevator')renderElevator();
+}
+
+async function _loadResCache(){
+  if(_resCache||_resLoading)return;
+  _resLoading=true;
+  try{
+    const cutoff=new Date(Date.now()-365*864e5).toISOString().slice(0,10);
+    const snap=await getDocs(query(collection(db,'reservations'),where('checkin','>=',cutoff),orderBy('checkin','desc'),limit(1000)));
+    _resCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){console.error(e);_resCache=[];}
+  _resLoading=false;rebuildFormMaps();render();
 }
 
 let loaded=0;
@@ -663,8 +891,7 @@ onSnapshot(collection(db,'checkin_guests'),snap=>{
   guestData=snap.docs.map(d=>({id:d.id,...d.data()}));
   if(loaded>=2){rebuildFormMaps();render();}else checkLoaded();
 });
-const _hkToday=tbilisiToday();
-onSnapshot(query(collection(db,'hk_status'),where('date','==',_hkToday)),snap=>{
+onSnapshot(query(collection(db,'hk_status'),where('date','==',tbilisiToday())),snap=>{
   hkStatusData={};snap.docs.forEach(d=>{hkStatusData[d.id]=d.data();});
   if(loaded>=2)render();
 });
@@ -673,15 +900,10 @@ onSnapshot(doc(db,'globals','elevator_code'),snap=>{
     const d=snap.data();
     const fsTs=d.updatedAt?.seconds?d.updatedAt.seconds*1000:0;
     const curTs=elevData?.updatedAt?.seconds?elevData.updatedAt.seconds*1000:0;
-    if(fsTs>=curTs){
-      elevData={code:d.display_code||d.code||'',qrCode:d.qr_code||'',updatedAt:d.updatedAt,source:d.source||'auto',_source:'firestore'};
-    }
+    if(fsTs>=curTs)elevData={code:d.display_code||d.code||'',qrCode:d.qr_code||'',updatedAt:d.updatedAt,source:d.source||'auto',_source:'firestore'};
   }
   loadElevatorOnce();
 });
-
 setInterval(()=>{if(currentTab==='elevator')renderElevator();loadElevatorOnce();},60000);
 setTimeout(()=>{document.getElementById('loading').style.display='none';if(!_resCache)_loadResCache();},5000);
-</script>
-</body>
-</html>
+</script></body></html>
