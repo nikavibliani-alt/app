@@ -469,6 +469,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-26 | Cursor | Started `checkin-admin-sandbox.html` (§22.8) — mobile bottom-nav ops shell with Today / Elevator / Guests / More. |
 | 2026-08-26 | Cursor | Admin sandbox v2: **Stay** overview (arrivals + leaving + in-house + upcoming 7d), **Apts** full editor (lock/WiFi/instructions/photos → `checkin_apartments`), apt list shows who is staying / next arrival. |
 | 2026-08-26 | Cursor | Admin sandbox v3: **More** hub (Apts, HK Pins, failed searches, guest page, tab bar layout). Mobile **Guest page** editor with property preview tiles. Configurable bottom nav (3 slots + More). |
+| 2026-08-26 | Cursor | Admin sandbox: unified **back navigation** (`goBack()` + header ← on More sub-pages); §22.9 maintainability rules for sandbox-only edits. |
 
 ---
 
@@ -1275,14 +1276,35 @@ Claim admin-redesign in §9. No visual guest-page cloning.
 
 Shipped:
 - Password gate (same as live admin)
-- Bottom nav: **Stay | Elevator | Apts | More**
-- **Stay** — Overview stacks arrivals today, leaving today, in-house, upcoming (7 days). Filters + search + tappable stats. Statuses: NO FORM · AWAITING UNLOCK · UNLOCKED · CHECKED IN
+- Bottom nav: **Stay · Elevator · Requests · More** (3 slots configurable in More → Tab bar layout)
+- **Stay** — Overview, arrivals, in-house, upcoming (per-day chips), leaving, need-unlock filters + search + stats
 - Guest detail full-screen; passport behind **Check passport**; jump to apt instructions editor
 - **Elevator** — dual-write RTDB+Firestore, freshness dots, Auto/Manual source
-- **Apts** — room list with occupancy (who’s in / leaving / next arrival); full editor for Tuya/manual lock, check-in/out times, WiFi, written instructions, video URL, photo steps (Cloudinary upload/reorder/replace/delete). Saves to `checkin_apartments` (preserves `rules`)
-- More → full `checkin-admin.html` for guest page settings / debugger
+- **Requests** — service requests from Firestore with detail overlay and actions
+- **More** hub — Apartments, HK Pins, Failed searches, Guest page (mobile editor), Tab bar layout, Search debugger, Sign out
+- **Apartments** — full editor (Tuya/manual lock, check-in/out times, WiFi, instructions, photo steps). Saves to `checkin_apartments`. List shows hints only (no guest names)
+- Tab persistence via `localStorage` `maxela_admin_tab`
+- Stroke SVG icons (no emoji)
+- **Back navigation** — header ← on More sub-pages; overlay ← on guest detail, apt editor, request detail, guest-page tile editor — all via single `goBack()` (see §22.9)
 
-Still via full admin / later slices: Requests queue polish, room-category photo uploads in mobile guest editor.
+Still via full admin / later slices: room-category photo uploads in mobile guest editor.
+
+### 22.9 Maintainability (admin sandbox)
+
+The old monolithic admin (`checkin-admin.html`, ~3400 lines) is hard to debug because UI, Firestore, and navigation are tangled. **Sandbox rules** until cutover:
+
+| Rule | Why |
+|------|-----|
+| **Edit only `checkin-admin-sandbox.html`** for mobile admin work | Live admin stays stable; sandbox is the experiment surface. |
+| **One navigation API** | `switchTab(id)` for tabs/sub-pages; `goBack()` for overlays and More sub-pages. Do not add ad-hoc `classList.remove('open')` in random handlers — extend `goBack()` or `switchTab()`. |
+| **Overlay stack order** (top → bottom) | `#gp-editor-overlay` → `#apt-editor-overlay` → `#req-detail` → `#detail`. `goBack()` closes the topmost open layer. |
+| **More sub-pages** | Tabs: `apts`, `hkpins`, `guestsettings`, `failures`, `navsettings`. Header `#header-back` returns to `more`. |
+| **Named render functions** | `renderStay`, `renderRequests`, `renderMore`, `renderApts`, etc. — one screen, one function; avoid giant anonymous blocks. |
+| **Firestore listeners** | Document new `onSnapshot` in this section when added; unsubscribe on tab leave if heavy (future). |
+| **Parity reference** | `CHECKIN_ADMIN_SPEC.md` + desktop `checkin-admin.html` for field names and collections — copy behavior, not the whole file. |
+| **Small diffs** | Prefer extending existing helpers over duplicating desktop logic. |
+
+When something breaks, check in order: (1) which tab/pane is `active`, (2) which overlay has `open`, (3) `localStorage` `maxela_admin_tab`, (4) console errors from Firebase rules.
 
 ---
 
