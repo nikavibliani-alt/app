@@ -468,6 +468,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-26 | Cursor + host | Admin redesign brief locked — §22 (bottom nav like Sandbox 3, Today's Arrivals, Check passport, checked-in status, elevator manual-sticky). |
 | 2026-08-26 | Cursor | Started `checkin-admin-sandbox.html` (§22.8) — mobile bottom-nav ops shell with Today / Elevator / Guests / More. |
 | 2026-08-26 | Cursor | Admin sandbox v2: **Stay** overview (arrivals + leaving + in-house + upcoming 7d), **Apts** full editor (lock/WiFi/instructions/photos → `checkin_apartments`), apt list shows who is staying / next arrival. |
+| 2026-08-26 | Cursor | Admin sandbox v3: **More** hub (Apts, HK Pins, failed searches, guest page, tab bar layout). Mobile **Guest page** editor with property preview tiles. Configurable bottom nav (3 slots + More). |
 
 ---
 
@@ -1281,7 +1282,7 @@ Shipped:
 - **Apts** — room list with occupancy (who’s in / leaving / next arrival); full editor for Tuya/manual lock, check-in/out times, WiFi, written instructions, video URL, photo steps (Cloudinary upload/reorder/replace/delete). Saves to `checkin_apartments` (preserves `rules`)
 - More → full `checkin-admin.html` for guest page settings / debugger
 
-Still via full admin / later slices: Requests, HK Pins, Guest Page Settings editor, search-failure queue.
+Still via full admin / later slices: Requests queue polish, room-category photo uploads in mobile guest editor.
 
 ---
 
