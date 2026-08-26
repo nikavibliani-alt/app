@@ -39,6 +39,10 @@ html.admin-authed #lock-screen{display:none;}
 html.admin-authed #app{display:block;}
 .app-header{padding:14px 16px 10px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50;}
 .app-header__row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.app-header__main{display:flex;align-items:flex-start;gap:10px;flex:1;min-width:0;}
+.app-header__titles{flex:1;min-width:0;}
+.header-back{display:none;flex-shrink:0;}
+.header-back.show{display:flex;}
 .app-title{font-size:17px;font-weight:700;letter-spacing:-.02em;}
 .app-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:4px 8px;border-radius:999px;background:var(--amber-bg);color:var(--amber);}
 .app-sub{font-size:12px;color:var(--muted);margin-top:4px;}
@@ -223,10 +227,17 @@ html.admin-authed #app{display:block;}
 <div id="app">
   <div class="app-header">
     <div class="app-header__row">
-      <div class="app-title" id="header-title">Stay</div>
-      <span class="app-badge">Sandbox</span>
+      <div class="app-header__main">
+        <button type="button" class="detail-back header-back" id="header-back" onclick="goBack()" aria-label="Back">←</button>
+        <div class="app-header__titles">
+          <div class="app-header__row" style="margin:0;padding:0;border:none">
+            <div class="app-title" id="header-title">Stay</div>
+            <span class="app-badge">Sandbox</span>
+          </div>
+          <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
+        </div>
+      </div>
     </div>
-    <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
   </div>
 
   <div class="pane active" id="pane-stay">
@@ -309,7 +320,7 @@ html.admin-authed #app{display:block;}
 
 <div id="detail">
   <div class="detail-bar">
-    <button class="detail-back" onclick="closeDetail()">←</button>
+    <button class="detail-back" onclick="goBack()" aria-label="Back">←</button>
     <div class="detail-title" id="detail-title">Guest</div>
   </div>
   <div class="detail-body" id="detail-body"></div>
@@ -317,7 +328,7 @@ html.admin-authed #app{display:block;}
 
 <div id="apt-editor-overlay">
   <div class="apt-ed-bar">
-    <button class="detail-back" onclick="closeAptEditor()">←</button>
+    <button class="detail-back" onclick="goBack()" aria-label="Back">←</button>
     <div class="detail-title" id="apt-ed-title">Apartment</div>
     <button class="btn btn-primary" id="apt-ed-save" onclick="saveAptData()">Save</button>
   </div>
@@ -326,7 +337,7 @@ html.admin-authed #app{display:block;}
 
 <div id="req-detail">
   <div class="detail-bar">
-    <button class="detail-back" onclick="closeReqDetail()">←</button>
+    <button class="detail-back" onclick="goBack()" aria-label="Back">←</button>
     <div class="detail-title" id="req-detail-title">Request</div>
   </div>
   <div class="detail-body" id="req-detail-body"></div>
@@ -334,7 +345,7 @@ html.admin-authed #app{display:block;}
 
 <div id="gp-editor-overlay">
   <div class="apt-ed-bar">
-    <button class="detail-back" onclick="closeGpEditor()">←</button>
+    <button class="detail-back" onclick="goBack()" aria-label="Back">←</button>
     <div class="detail-title" id="gp-ed-title">Edit</div>
     <button class="btn btn-primary" id="gp-ed-apply" onclick="applyGpEditor()">Apply</button>
   </div>
@@ -350,6 +361,12 @@ html.admin-authed #app{display:block;}
 </div>
 
 <script type="module">
+/* ADMIN SANDBOX — see GUEST_CHECKIN_REDESIGN.md §22.9
+ * Tabs: stay | elevator | requests | more (+ sub: apts, hkpins, guestsettings, failures, navsettings)
+ * Overlays (full-screen, z-index stack): #detail → #apt-editor → #req-detail → #gp-editor
+ * Nav: switchTab() + localStorage tab; goBack() / header ← for More sub-pages & overlays
+ * Data: one onSnapshot per collection → render*() for active tab only
+ */
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
 const CHECK_IN_HOUR=15;
@@ -1120,6 +1137,21 @@ const TAB_META={
   more:{title:'More',sub:'All admin tools'},
 };
 const MORE_TABS=new Set(['more','apts','hkpins','guestsettings','navsettings','failures']);
+const MORE_SUB_PAGES=new Set(['apts','hkpins','guestsettings','navsettings','failures']);
+
+function updateHeaderBack(){
+  const btn=document.getElementById('header-back');
+  if(btn)btn.classList.toggle('show',MORE_SUB_PAGES.has(currentTab));
+}
+
+window.goBack=function(){
+  if(document.getElementById('gp-editor-overlay')?.classList.contains('open')){closeGpEditor();return;}
+  if(document.getElementById('apt-editor-overlay')?.classList.contains('open')){closeAptEditor();return;}
+  if(document.getElementById('req-detail')?.classList.contains('open')){closeReqDetail();return;}
+  if(document.getElementById('detail')?.classList.contains('open')){closeDetail();return;}
+  if(MORE_SUB_PAGES.has(currentTab))switchTab('more');
+};
+
 window.switchTab=function(tab){
   if(!VALID_TABS.has(tab))tab='stay';
   currentTab=tab;
@@ -1133,6 +1165,7 @@ window.switchTab=function(tab){
   const m=TAB_META[tab]||TAB_META.more;
   document.getElementById('header-title').textContent=m.title;
   document.getElementById('header-sub').textContent=m.sub;
+  updateHeaderBack();
   if(tab==='stay')renderStay();
   if(tab==='elevator')renderElevator();
   if(tab==='requests')loadAndRenderRequests();
@@ -1142,6 +1175,7 @@ window.switchTab=function(tab){
   if(tab==='failures')renderFailures();
   if(tab==='navsettings')renderNavSettings();
   closeDetail();closeReqDetail();closeGpEditor();
+  if(tab!=='apts')closeAptEditor();
 };
 
 window.unlockGuest=async function(guestId){
@@ -1495,9 +1529,11 @@ window.openAptEditor=function(aptId){
     </div>
   `;
   document.getElementById('apt-editor-overlay').classList.add('open');
-  closeDetail();
 };
-window.closeAptEditor=function(){document.getElementById('apt-editor-overlay').classList.remove('open');_currentAptId=null;};
+window.closeAptEditor=function(){
+  document.getElementById('apt-editor-overlay').classList.remove('open');
+  _currentAptId=null;
+};
 window.setLockMode=function(mode){
   document.getElementById('lock-auto').style.display=mode==='auto'?'block':'none';
   document.getElementById('lock-manual').style.display=mode==='manual'?'block':'none';
