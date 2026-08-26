@@ -84,9 +84,10 @@ html.admin-authed #app{display:block;}
 .elev-msg{font-size:13px;margin-top:10px;min-height:20px;}
 .elev-msg.ok{color:var(--green);}
 .elev-msg.err{color:var(--red);}
-#detail,#apt-editor-overlay{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;flex-direction:column;max-width:480px;margin:0 auto;overflow-y:auto;}
+#detail,#apt-editor-overlay,#req-detail{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;flex-direction:column;max-width:480px;margin:0 auto;overflow-y:auto;}
 #apt-editor-overlay{z-index:210;}
-#detail.open,#apt-editor-overlay.open{display:flex;}
+#req-detail{z-index:220;}
+#detail.open,#apt-editor-overlay.open,#req-detail.open{display:flex;}
 .detail-bar,.apt-ed-bar{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;}
 .detail-back{width:40px;height:40px;border:1px solid var(--line);border-radius:var(--rs);background:var(--surface);font-size:18px;cursor:pointer;flex-shrink:0;}
 .detail-title{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -111,6 +112,17 @@ html.admin-authed #app{display:block;}
 .nav__btn.active{color:var(--ink);}
 .nav__btn .dot{position:absolute;top:8px;right:calc(50% - 18px);width:7px;height:7px;border-radius:50%;background:var(--red);display:none;}
 .nav__btn.has-alert .dot{display:block;}
+.nav__btn .badge{position:absolute;top:6px;right:calc(50% - 22px);min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1;}
+.nav__btn.has-badge .badge{display:inline-flex;}
+.req-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:8px;cursor:pointer;text-align:left;width:100%;font-family:var(--sans);}
+.req-card__top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;}
+.req-card__name{font-size:15px;font-weight:700;}
+.req-card__apt{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--muted);margin-left:6px;}
+.req-card__sub{font-size:12px;color:var(--muted);line-height:1.4;}
+.req-actions{display:flex;gap:8px;margin-top:14px;}
+.pill-pending-req{background:var(--amber-bg);color:var(--amber);}
+.pill-confirmed{background:var(--green-bg);color:var(--green);}
+.pill-cancelled{background:var(--bg);color:var(--muted);}
 .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 6px;text-align:center;cursor:pointer;font-family:var(--sans);width:100%;}
 .stat.active{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);}
@@ -202,12 +214,18 @@ html.admin-authed #app{display:block;}
     </div>
   </div>
 
+  <div class="pane" id="pane-requests">
+    <div class="filter-row" id="req-filters"></div>
+    <div id="req-list"></div>
+  </div>
+
   <div class="pane" id="pane-apts">
     <div id="apts-list"></div>
   </div>
 
   <div class="pane" id="pane-more">
     <div class="more-list">
+      <button class="more-item" type="button" onclick="switchTab('apts')">Apartments<span>Instructions…</span></button>
       <a class="more-item" href="checkin-admin.html" target="_blank">Full desktop admin<span>Open</span></a>
       <a class="more-item" href="checkin-admin.html" target="_blank">Guest page settings<span>Services…</span></a>
       <a class="more-item" href="admin-search-test.html" target="_blank">Search debugger<span>Open</span></a>
@@ -222,8 +240,8 @@ html.admin-authed #app{display:block;}
     <button class="nav__btn" data-tab="elevator" onclick="switchTab('elevator')" id="nav-elev">
       <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 8v8M9 11l3-3 3 3"/></svg>Elevator<span class="dot"></span>
     </button>
-    <button class="nav__btn" data-tab="apts" onclick="switchTab('apts')">
-      <svg viewBox="0 0 24 24"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-8h6v8"/></svg>Apts
+    <button class="nav__btn" data-tab="requests" onclick="switchTab('requests')" id="nav-req">
+      <svg viewBox="0 0 24 24"><path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M8 8h8M8 12h5"/></svg>Requests<span class="badge" id="req-badge">0</span>
     </button>
     <button class="nav__btn" data-tab="more" onclick="switchTab('more')">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More
@@ -246,6 +264,14 @@ html.admin-authed #app{display:block;}
     <button class="btn btn-primary" id="apt-ed-save" onclick="saveAptData()">Save</button>
   </div>
   <div class="apt-ed-body" id="apt-ed-body"></div>
+</div>
+
+<div id="req-detail">
+  <div class="detail-bar">
+    <button class="detail-back" onclick="closeReqDetail()">←</button>
+    <div class="detail-title" id="req-detail-title">Request</div>
+  </div>
+  <div class="detail-body" id="req-detail-body"></div>
 </div>
 
 <script type="module">
@@ -275,7 +301,7 @@ window.adminUnlock=function(){
 window.adminSignOut=function(){localStorage.removeItem(_ADMIN_KEY);location.reload();};
 
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,collection,doc,setDoc,updateDoc,onSnapshot,serverTimestamp,getDocs,query,where,orderBy,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDocs,query,where,orderBy,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -310,6 +336,7 @@ const APARTMENTS=[
 
 let aptData={},guestData=[],hkStatusData={},_resCache=null,_resLoading=false;
 let elevData=null,currentTab='stay',stayFilter='overview',upcomingDay=null,_currentAptId=null;
+let reqData=[],reqFilter='all',_reqLoading=false;
 let _formById=new Map();
 
 function toast(msg,ms=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),ms);}
@@ -578,20 +605,26 @@ window.renderStay=function(){
 const TAB_META={
   stay:{title:'Stay',sub:'Overview · arrivals · in-house · upcoming'},
   elevator:{title:'Elevator',sub:'Entrance & elevator code'},
+  requests:{title:'Requests',sub:'Guest service requests'},
   apts:{title:'Apartments',sub:'WiFi, instructions, photo steps'},
-  more:{title:'More',sub:'Settings & sign out'},
+  more:{title:'More',sub:'Apartments & settings'},
 };
 window.switchTab=function(tab){
   currentTab=tab;
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='pane-'+tab));
-  document.querySelectorAll('.nav__btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  document.querySelectorAll('.nav__btn').forEach(b=>{
+    const active=b.dataset.tab===tab||(tab==='apts'&&b.dataset.tab==='more');
+    b.classList.toggle('active',active);
+  });
   const m=TAB_META[tab];
   document.getElementById('header-title').textContent=m.title;
   document.getElementById('header-sub').textContent=m.sub;
   if(tab==='stay')renderStay();
   if(tab==='elevator')renderElevator();
+  if(tab==='requests')loadAndRenderRequests();
   if(tab==='apts')renderAptsList();
   closeDetail();
+  closeReqDetail();
 };
 
 window.unlockGuest=async function(guestId){
@@ -647,6 +680,195 @@ window.rejectPassport=async function(guestId){
   if(!confirm('Reject this ID?'))return;
   try{await updateDoc(doc(db,'checkin_guests',guestId),{'passportScanResult.overrideByAdmin':false,'passportScanResult.valid':false});toast('ID rejected');openDetail(guestId);}
   catch(e){toast('Failed: '+e.message);}
+};
+
+/* ── Requests ── */
+const REQ_FILTERS=[
+  {id:'all',label:'All'},
+  {id:'airport_transfer',label:'Airport'},
+  {id:'transfer',label:'Transfer'},
+  {id:'city_tour',label:'Tour'},
+  {id:'cleaning',label:'Cleaning'},
+  {id:'laundry',label:'Laundry'},
+  {id:'custom',label:'Other'},
+];
+function reqTs(r){
+  if(r.timestamp?.toDate)return r.timestamp.toDate();
+  if(r.timestamp?.seconds)return new Date(r.timestamp.seconds*1000);
+  return new Date(0);
+}
+function reqStatusPill(status){
+  const s=status||'PENDING';
+  if(s==='CONFIRMED')return{label:'CONFIRMED',cls:'pill-confirmed'};
+  if(s==='CANCELLED')return{label:'CANCELLED',cls:'pill-cancelled'};
+  return{label:'PENDING',cls:'pill-pending-req'};
+}
+function reqSubline(r){
+  const ts=reqTs(r);
+  const timeStr=ts.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+', '+ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const d=r.details||{};
+  const svc=r.service||r.serviceId||'Service';
+  let sub=svc+' · '+timeStr;
+  const sid=r.serviceId||'';
+  if(sid==='airport_transfer'||sid==='transfer'){
+    const parts=[];
+    if(d.pickupDate)parts.push(d.pickupDate);
+    if(d.arrivalTime)parts.push(d.arrivalTime);
+    if(d.guests)parts.push(d.guests+' guest'+(d.guests!=1?'s':''));
+    if(d.carConfig)parts.push(d.carConfig);
+    if(d.price)parts.push(d.price+' GEL');
+    if(parts.length)sub+=' · '+parts.join(' · ');
+  }else if(sid==='laundry'){
+    if(d.items&&d.items.length)sub+=' · '+d.items.map(i=>i.name+'×'+i.qty).join(', ');
+    if(d.total)sub+=' · '+d.total+' GEL';
+  }else if(d.preferredTime){
+    sub+=' · '+d.preferredTime;
+  }
+  if(d.note)sub+=' · "'+d.note+'"';
+  return sub;
+}
+function updateRequestsBadge(){
+  const pending=reqData.filter(r=>(r.status||'PENDING')==='PENDING').length;
+  const btn=document.getElementById('nav-req');
+  const badge=document.getElementById('req-badge');
+  if(!btn||!badge)return;
+  btn.classList.toggle('has-badge',pending>0);
+  badge.textContent=pending>99?'99+':String(pending);
+}
+async function loadRequests(force){
+  if(_reqLoading)return;
+  if(reqData.length&&!force){updateRequestsBadge();return;}
+  _reqLoading=true;
+  try{
+    const snap=await getDocs(query(collection(db,'service_requests'),orderBy('timestamp','desc'),limit(100)));
+    reqData=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){console.error(e);if(!reqData.length)reqData=[];}
+  _reqLoading=false;
+  updateRequestsBadge();
+}
+async function loadAndRenderRequests(){
+  const el=document.getElementById('req-list');
+  if(el)el.innerHTML='<div class="empty">Loading requests…</div>';
+  await loadRequests(true);
+  buildRequestsUI();
+}
+function buildRequestsUI(){
+  const used=new Set(reqData.map(r=>r.serviceId));
+  const filters=REQ_FILTERS.filter(f=>f.id==='all'||used.has(f.id));
+  if(!filters.some(f=>f.id===reqFilter))reqFilter='all';
+  document.getElementById('req-filters').innerHTML=filters.map(f=>
+    `<button class="filter-chip ${reqFilter===f.id?'active':''}" onclick="setReqFilter('${f.id}')">${esc(f.label)}</button>`
+  ).join('')+`<button class="filter-chip" onclick="deleteCompleted()">Clear done</button>`;
+
+  const filtered=reqFilter==='all'?reqData:reqData.filter(r=>r.serviceId===reqFilter);
+  const now=new Date();
+  const todayStr=now.toDateString();
+  const yd=new Date(now);yd.setDate(yd.getDate()-1);const ydStr=yd.toDateString();
+  const groupOrder=[];const groups={};
+  filtered.forEach(r=>{
+    const ts=reqTs(r);
+    const ds=ts.toDateString();
+    const label=ds===todayStr?'Today':ds===ydStr?'Yesterday':ts.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    if(!groups[label]){groups[label]=[];groupOrder.push(label);}
+    groups[label].push(r);
+  });
+
+  const el=document.getElementById('req-list');
+  if(!groupOrder.length){el.innerHTML='<div class="empty">No requests yet</div>';return;}
+  let html='';
+  for(const label of groupOrder){
+    const rows=groups[label];
+    html+=`<div class="section-hd"><h2>${esc(label)}</h2><span class="n">${rows.length}</span></div>`;
+    html+=rows.map(r=>{
+      const st=reqStatusPill(r.status);
+      return`<button type="button" class="req-card" onclick="openReqDetail('${r.id}')">
+        <div class="req-card__top">
+          <div class="req-card__name">${esc(r.guestName||'—')}<span class="req-card__apt">${esc(r.aptId||r.roomCode||'')}</span></div>
+          <span class="pill ${st.cls}">${st.label}</span>
+        </div>
+        <div class="req-card__sub">${esc(reqSubline(r))}</div>
+      </button>`;
+    }).join('');
+  }
+  el.innerHTML=html;
+}
+window.setReqFilter=function(f){reqFilter=f;buildRequestsUI();};
+window.openReqDetail=function(id){
+  const r=reqData.find(x=>x.id===id);if(!r)return;
+  const st=reqStatusPill(r.status);
+  const ts=reqTs(r);
+  const timeStr=ts.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})+' · '+ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const d=r.details||{};
+  const sid=r.serviceId||'';
+  const row=(label,val)=>!val&&val!==0?'':`<div class="field" style="margin-bottom:14px"><label>${esc(label)}</label><div class="card" style="margin:0;padding:12px 14px;font-size:14px;white-space:pre-wrap">${esc(String(val))}</div></div>`;
+  let body=`
+    <div style="margin-bottom:12px"><span class="pill ${st.cls}">${st.label}</span></div>
+    ${row('Guest',r.guestName||'—')}
+    ${row('Apartment',r.aptId||r.roomCode||'—')}
+    ${row('Service',r.service||sid||'—')}
+    ${row('Submitted',timeStr)}`;
+  if(sid==='airport_transfer'||sid==='transfer'){
+    body+=row('Pickup date',d.pickupDate);
+    body+=row('Arrival time',d.arrivalTime);
+    body+=row('Guests',d.guests);
+    body+=row('Pickup',d.pickupLocation);
+    body+=row('Drop-off',d.dropoffLocation);
+    body+=row('Car',d.carConfig);
+    if(d.price)body+=row('Price',d.price+' GEL');
+    body+=row('Flight',d.flightNumber);
+  }else if(sid==='laundry'){
+    if(d.items&&d.items.length)body+=row('Items',d.items.map(i=>`${i.name} ×${i.qty}${i.subtotal!=null?' = '+i.subtotal+' GEL':''}`).join('\n'));
+    if(d.total)body+=row('Total',d.total+' GEL');
+  }else if(sid==='cleaning'){
+    body+=row('Preferred time',d.preferredTime);
+  }
+  if(d.note)body+=row('Guest notes',d.note);
+  if(d.preferredTime&&sid!=='cleaning')body+=row('Preferred time',d.preferredTime);
+  if(r.whatsappNumber)body+=row('WhatsApp',r.whatsappNumber);
+  const wa=normalizeWaPhone(r.whatsappNumber||'');
+  body+=`<div class="req-actions">
+    ${wa?`<a class="btn" href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>`:''}
+    ${(r.status||'PENDING')!=='CONFIRMED'?`<button class="btn btn-green" onclick="setReqStatus('${id}','CONFIRMED')">Confirm</button>`:''}
+    ${(r.status||'PENDING')!=='CANCELLED'?`<button class="btn" onclick="setReqStatus('${id}','CANCELLED')">Cancel</button>`:''}
+  </div>
+  <button class="btn" style="width:100%;margin-top:10px;color:var(--red)" onclick="deleteReq('${id}')">Delete request</button>`;
+  document.getElementById('req-detail-title').textContent=(r.guestName||'Request')+' · '+(r.aptId||r.roomCode||'');
+  document.getElementById('req-detail-body').innerHTML=body;
+  document.getElementById('req-detail').classList.add('open');
+};
+window.closeReqDetail=function(){document.getElementById('req-detail')?.classList.remove('open');};
+window.setReqStatus=async function(id,status){
+  try{
+    await updateDoc(doc(db,'service_requests',id),{status});
+    const r=reqData.find(x=>x.id===id);if(r)r.status=status;
+    updateRequestsBadge();
+    buildRequestsUI();
+    closeReqDetail();
+    toast(status==='CONFIRMED'?'Confirmed ✓':'Cancelled');
+  }catch(e){toast('Update failed: '+e.message);}
+};
+window.deleteReq=async function(id){
+  if(!confirm('Delete this request?'))return;
+  try{
+    await deleteDoc(doc(db,'service_requests',id));
+    reqData=reqData.filter(x=>x.id!==id);
+    updateRequestsBadge();
+    buildRequestsUI();
+    closeReqDetail();
+    toast('Deleted');
+  }catch(e){toast('Delete failed: '+e.message);}
+};
+window.deleteCompleted=async function(){
+  const toDelete=reqData.filter(r=>r.status==='CONFIRMED'||r.status==='CANCELLED');
+  if(!toDelete.length){toast('No completed requests');return;}
+  if(!confirm('Delete '+toDelete.length+' completed request'+(toDelete.length!==1?'s':'')+'?'))return;
+  try{
+    await Promise.all(toDelete.map(r=>deleteDoc(doc(db,'service_requests',r.id))));
+    reqData=reqData.filter(r=>r.status!=='CONFIRMED'&&r.status!=='CANCELLED');
+    updateRequestsBadge();
+    buildRequestsUI();
+    toast('Cleared ✓');
+  }catch(e){toast('Delete failed: '+e.message);}
 };
 
 /* ── Apartments ── */
@@ -909,6 +1131,7 @@ function render(){
   if(currentTab==='stay')renderStay();
   else if(currentTab==='apts')renderAptsList();
   else if(currentTab==='elevator')renderElevator();
+  else if(currentTab==='requests')buildRequestsUI();
 }
 
 async function _loadResCache(){
@@ -923,7 +1146,7 @@ async function _loadResCache(){
 }
 
 let loaded=0;
-function checkLoaded(){loaded++;if(loaded>=2){document.getElementById('loading').style.display='none';_loadResCache();render();loadElevatorOnce();}}
+function checkLoaded(){loaded++;if(loaded>=2){document.getElementById('loading').style.display='none';_loadResCache();render();loadElevatorOnce();loadRequests(true);}}
 
 onSnapshot(collection(db,'checkin_apartments'),snap=>{
   aptData={};snap.docs.forEach(d=>{aptData[d.id]=d.data();});
