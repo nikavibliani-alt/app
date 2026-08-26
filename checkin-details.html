@@ -118,7 +118,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15p
 
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,doc,getDoc,collection,query,where,getDocs}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,doc,getDoc,onSnapshot,collection,query,where,getDocs}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -424,28 +424,17 @@ async function render(){
   body.innerHTML=elevBlock+doorBlock+instrHtml+photosHtml+videoHtml
     ||(body.innerHTML=`<div style="text-align:center;padding:3rem;color:#B8B6B2;font-size:14px;">Check-in details not set up yet</div>`);
 
-  if(needsElevatorCode()){fetchElevatorCode();}
+  if(needsElevatorCode()){subscribeElevatorCode();}
 }
 
-async function fetchElevatorCode(){
-  let rtdbData=null;
-  let fsData=null;
-
-  // Fetch both sources independently
-  try{rtdbData=await fetch(RTDB_URL).then(r=>r.json());}
-  catch(e){console.log('[elevator] RTDB fetch failed:',e.message);}
-  try{const fsSnap=await getDoc(doc(db,'globals','elevator_code'));if(fsSnap.exists())fsData=fsSnap.data();}
-  catch(e){console.log('[elevator] Firestore fetch failed:',e.message);}
-
+function _applyElevatorData(fsData,rtdbData){
   const canvas=document.getElementById('elevator-qr');
   const ph=document.getElementById('elevator-qr-placeholder');
 
-  // Use best available value from either source — no winner/loser, just take what's present
   const qrCode=fsData?.qr_code||rtdbData?.qr_code||'';
   const displayCode=fsData?.display_code||fsData?.code||rtdbData?.display_code||rtdbData?.code||'';
   const expiresAt=fsData?.expires_at||rtdbData?.expires_at||'';
 
-  // Render QR if available (from either source)
   if(qrCode&&canvas){
     canvas.style.display='none';
     if(ph)ph.style.display='none';
@@ -469,18 +458,27 @@ async function fetchElevatorCode(){
     if(ph)ph.style.display='flex';
   }
 
-  // Show numeric code
   if(displayCode){
     _elevatorCode=displayCode;
     const el=document.getElementById('elevator-code-num');
     if(el)el.textContent=displayCode+'#';
   }
 
-  // Show expiry
   if(expiresAt){
     const el=document.getElementById('elevator-expires');
     if(el){const exp=new Date(parseInt(expiresAt));el.textContent='QR code and entrance code change daily · Next update at '+exp.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:true});}
   }
+}
+
+let _elevatorUnsub=null;
+function subscribeElevatorCode(){
+  if(_elevatorUnsub)return; // already subscribed
+  // Seed with RTDB value first (fast), then keep Firestore live
+  let rtdbData=null;
+  fetch(RTDB_URL).then(r=>r.json()).then(d=>{rtdbData=d;_applyElevatorData(null,rtdbData);}).catch(()=>{});
+  _elevatorUnsub=onSnapshot(doc(db,'globals','elevator_code'),snap=>{
+    _applyElevatorData(snap.exists()?snap.data():null,rtdbData);
+  });
 }
 
 // ── Session restore & init ────────────────────────────────────────────────
@@ -614,8 +612,6 @@ async function init(){
 }
 
 init();
-// Refresh elevator code every 5 minutes in case guest leaves page open
-setInterval(()=>{if(needsElevatorCode())fetchElevatorCode();},5*60*1000);
 </script>
 </body>
 </html>
