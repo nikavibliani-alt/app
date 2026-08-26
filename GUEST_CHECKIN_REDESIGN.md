@@ -466,6 +466,7 @@ Retest: single room, multi-room switch, locked→unlocked flip, logout, preview,
 | 2026-08-25 | Claude Code | **5 UX fixes on Sandbox 2:** (1) Waiting phase — moved Location/Shuttle/Tours tabs above the countdown; tabs now open a real subpage via `openPage()` (extended with new `shuttle`/`tours` content types + `#page-content-shuttle`/`#page-content-tours`) instead of toggling an inline panel — replaced the retired `_renderWaitingTabsContent()` with a shared `_svcSubpageCard()` builder. (2) Leaving phase — `#home-quick` (Location/Parking row) now hidden; only door code, elevator, WiFi, and "I've checked out" remain. (3) Fixed Staying-phase service-chip scroll snapping back to start — removed `scroll-snap-type`/`scroll-snap-align`. (4) Restructured daily-key layout: Smart lock code card now first (with a new copy button — it had none before), Elevator card compacted to one row (QR left, code+label stacked right, code now 14px not 28px) — saves ~60-80px. (5) Removed the "Sandbox 2 · Cursor design proposal · not live" banner and its CSS entirely. |
 | 2026-08-25 | Claude Code | **4 more fixes on Sandbox 2:** (1) Elevator code moved back below the QR (was beside it since the previous session's compact-row fix) — now QR on top, small muted "Elevator code" label, code capped at 16px, no copy button, matching "supplementary info" framing. (2) Removed the smart-lock/door-code copy button entirely (`#hero-door-copy` + its onclick) — guest types it manually; WiFi copy buttons untouched. (3) Rebuilt the WiFi section as a `.wifi-card` (white bg, `1.5px solid #E0D8D0`, `12px` radius) with two label/value/copy rows (Network + Password, each own copy button now — Network didn't have one before) and moved it below `#btn-checked-in` in Arriving and below the daily-key area in Staying/Leaving (was above the CTA; also un-hid it for Leaving, where it had been force-hidden). (4) Added `scroll-snap-type:none!important`, `scroll-behavior:auto`, `overscroll-behavior-x:contain` to `.home-svc-scroll` per exact spec (chip `scroll-snap-align` was already removed last session — confirmed still absent). **Could not fix:** "City Tours" → "Tours" rename — searched the full file, no such string exists in source; the label is pulled live from `checkin_admin/config.services[].name` (admin-configured Firestore data), and the code's own built-in default is already "Tours". Renaming requires an admin-panel/Firestore change, not a sandbox HTML edit. |
 | 2026-08-26 | Cursor + host | Admin redesign brief locked — §22 (bottom nav like Sandbox 3, Today's Arrivals, Check passport, checked-in status, elevator manual-sticky). |
+| 2026-08-26 | Cursor | Started `checkin-admin-sandbox.html` (§22.8) — mobile bottom-nav ops shell with Today / Elevator / Guests / More. |
 
 ---
 
@@ -1261,6 +1262,24 @@ Implement §22.2–§22.4 exactly:
 - Elevator = first-class tab; dual-write reliable; manual sticky; freshness + Auto/Manual source
 Claim admin-redesign in §9. No visual guest-page cloning.
 ```
+
+---
+
+### 22.8 Build started (Cursor — 2026-08-26)
+
+**File:** `checkin-admin-sandbox.html`  
+**URL (after push):** https://app.maxelaapartments.com/checkin-admin-sandbox.html  
+**Owner:** Cursor (`admin-redesign` workstream)
+
+First slice shipped:
+- Password gate (same as live admin)
+- Bottom nav: Today | Elevator | Guests | More
+- Today arrival cards + filters + statuses including **CHECKED IN** (`guestConfirmedCheckin`)
+- Guest detail full-screen; passport behind **Check passport**
+- Elevator tab: dual-write RTDB+Firestore, freshness dots, Auto/Manual source, error if either write fails
+- More → links to full `checkin-admin.html` for Apartments / settings
+
+Not in this slice: full apartments editor, guest settings editor, requests, HK pins (use More → full admin).
 
 ---
 
