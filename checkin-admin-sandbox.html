@@ -111,13 +111,13 @@ html.admin-authed #app{display:block;}
   width:40px;height:40px;min-width:40px;min-height:40px;
   border:1px solid var(--line);border-radius:var(--rs);background:var(--surface);
   cursor:pointer;flex-shrink:0;
-  display:inline-flex;align-items:center;justify-content:center;
-  padding:0;margin:0;font-family:var(--sans);color:var(--ink);
+  display:flex;align-items:center;justify-content:center;
+  padding:0;margin:0;line-height:0;font-size:0;color:var(--ink);
   -webkit-tap-highlight-color:transparent;
   appearance:none;-webkit-appearance:none;
   overflow:hidden;
 }
-.detail-back .back-icon{width:22px;height:22px;display:block;pointer-events:none;}
+.detail-back .back-icon{width:20px;height:20px;display:block;flex-shrink:0;pointer-events:none;}
 .detail-back:active{background:var(--bg);}
 .detail-title{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .detail-body,.apt-ed-body{padding:14px;padding-bottom:80px;}
@@ -244,6 +244,23 @@ html.admin-authed #app{display:block;}
 .save-bar .save-bar-commit{background:var(--green);color:#fff;}
 #gp-editor-overlay{z-index:230;}
 </style>
+<script>
+(function(){
+  var BUILD='20260827c';
+  if(!/[?&]build=20260827c(?:&|$)/.test(location.search)){
+    var q=location.search?location.search+'&':'?';
+    location.replace(location.pathname+q+'build='+BUILD+location.hash);
+    return;
+  }
+  try{
+    localStorage.removeItem('maxela_admin_nav_v1');
+    localStorage.removeItem('maxela_admin_nav_v2');
+    var nav=JSON.parse(localStorage.getItem('maxela_admin_nav_v3')||'null');
+    if(!nav||!Array.isArray(nav.slots)||!nav.slots.includes('hk'))
+      localStorage.removeItem('maxela_admin_nav_v3');
+  }catch(e){}
+})();
+</script>
 </head>
 <body>
 <div id="loading"><div class="spinner"></div><div style="font-size:13px;color:var(--muted)">Loading admin…</div></div>
@@ -259,11 +276,11 @@ html.admin-authed #app{display:block;}
   <div class="app-header">
     <div class="app-header__row">
       <div class="app-header__main">
-        <button type="button" class="detail-back header-back" id="header-back" onclick="goBack()" aria-label="Back">←</button>
+        <button type="button" class="detail-back header-back" id="header-back" onclick="goBack()" aria-label="Back"><svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6L9 12l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 27 Aug · HK</span>
+            <span class="app-badge" id="app-version-badge">Build 27c · HK</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -359,7 +376,7 @@ html.admin-authed #app{display:block;}
 
 <div id="detail">
   <div class="detail-bar">
-    <button class="detail-back" onclick="goBack()" aria-label="Back">←</button>
+    <button class="detail-back" onclick="goBack()" aria-label="Back"><svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6L9 12l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <div class="detail-title" id="detail-title">Guest</div>
   </div>
   <div class="detail-body" id="detail-body"></div>
@@ -367,7 +384,7 @@ html.admin-authed #app{display:block;}
 
 <div id="apt-editor-overlay">
   <div class="apt-ed-bar">
-    <button class="detail-back" onclick="goBack()" aria-label="Back">←</button>
+    <button class="detail-back" onclick="goBack()" aria-label="Back"><svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6L9 12l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <div class="detail-title" id="apt-ed-title">Apartment</div>
     <button class="btn btn-primary" id="apt-ed-save" onclick="saveAptData()">Save</button>
   </div>
@@ -376,7 +393,7 @@ html.admin-authed #app{display:block;}
 
 <div id="req-detail">
   <div class="detail-bar">
-    <button class="detail-back" onclick="goBack()" aria-label="Back">←</button>
+    <button class="detail-back" onclick="goBack()" aria-label="Back"><svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6L9 12l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <div class="detail-title" id="req-detail-title">Request</div>
   </div>
   <div class="detail-body" id="req-detail-body"></div>
@@ -384,7 +401,7 @@ html.admin-authed #app{display:block;}
 
 <div id="gp-editor-overlay">
   <div class="apt-ed-bar">
-    <button class="detail-back" onclick="goBack()" aria-label="Back">←</button>
+    <button class="detail-back" onclick="goBack()" aria-label="Back"><svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6L9 12l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <div class="detail-title" id="gp-ed-title">Edit</div>
     <button class="btn btn-primary" id="gp-ed-apply" onclick="applyGpEditor()">Apply</button>
   </div>
@@ -407,10 +424,9 @@ html.admin-authed #app{display:block;}
  * Nav: switchTab() + localStorage tab; goBack() / header ← for More sub-pages & overlays
  * Data: one onSnapshot per collection → render*() for active tab only
  */
-const BACK_ICON='<svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
-const SANDBOX_BUILD='20260827b';
+const SANDBOX_BUILD='20260827c';
 (function migrateSandboxBuild(){
   try{
     if(localStorage.getItem('maxela_sandbox_build')!==SANDBOX_BUILD){
@@ -421,9 +437,6 @@ const SANDBOX_BUILD='20260827b';
     }
   }catch(e){}
 })();
-document.querySelectorAll('.detail-back').forEach(btn=>{
-  if(!btn.querySelector('.back-icon'))btn.innerHTML=BACK_ICON;
-});
 const CHECK_IN_HOUR=15;
 const RTDB_URL='https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json';
 const CLOUD='dlkjizhya';
@@ -510,7 +523,6 @@ const NAV_POOL={
 const DEFAULT_NAV_SLOTS=['stay','hk','requests'];
 
 function loadNavSlots(){
-  // HK must always be on the bottom bar unless user saves a custom layout that includes HK
   try{
     const s=JSON.parse(localStorage.getItem(_NAV_KEY)||'null');
     if(Array.isArray(s?.slots)&&s.slots.length===3&&s.slots.includes('hk')&&s.slots.every(id=>NAV_POOL[id]))
@@ -522,6 +534,7 @@ let navSlots=loadNavSlots();
 
 function renderNavBar(){
   navSlots=loadNavSlots();
+  if(!navSlots.includes('hk'))navSlots=[...DEFAULT_NAV_SLOTS];
   const nav=document.getElementById('main-nav');
   if(!nav)return;
   let html='';
