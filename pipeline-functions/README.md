@@ -51,7 +51,7 @@ notifications" below.
 │  tuya-functions/  (existing codebase — deploy id "default")               │
 │  Tuya smart lock ONLY now. See tuya-functions/README.md.                  │
 │    whatsappWebhook        — active, to migrate later (kept, out of scope) │
-│    roomReadyNotification  — disabled, to migrate later (kept, out of scope)│
+│    roomReadyNotification  — active, to migrate later (kept, out of scope) │
 │    elevatorCodeGuard      — REMOVED. Moved to pipeline-functions/. ────────┼─ see diff below
 │  Reserved for future: regenerate/generate/delete Tuya offline door        │
 │  passwords (package.json already references these — not implemented yet).│
