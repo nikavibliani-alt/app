@@ -79,6 +79,13 @@ html.admin-authed #app{display:block;}
 .hk-card__when{font-size:11px;font-weight:700;color:var(--ink);margin-top:2px}
 .hk-card__time.tb-urgent{border-color:#fca5a5;background:#fef2f2}
 .hk-bedding-alert{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--amber-bg);color:var(--amber);font-size:12px;font-weight:700}
+.hk-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);}
+.hk-cleaner-link{font-size:13px;font-weight:700;color:var(--blue);text-decoration:none;white-space:nowrap;}
+.hk-cleaner-link:active{opacity:.7}
+.hk-role-badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--blue-bg);color:var(--blue);white-space:nowrap;}
+.hk-logout-btn{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;font-family:var(--sans);-webkit-tap-highlight-color:transparent;margin-left:auto;flex-shrink:0;}
+.hk-logout-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;pointer-events:none;}
+.hk-logout-btn:active{background:var(--bg);}
 .hk-card__foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .hk-done{height:34px;padding:0 14px;border:none;border-radius:8px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;background:var(--green);color:#fff}
 .hk-done.undo{background:var(--line);color:var(--muted)}
@@ -244,8 +251,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260827d';
-  if(!/[?&]build=20260827d(?:&|$)/.test(location.search)){
+  var BUILD='20260827e';
+  if(!/[?&]build=20260827e(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -278,7 +285,7 @@ html.admin-authed #app{display:block;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 27d · HK</span>
+            <span class="app-badge" id="app-version-badge">Build 27e · HK</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -323,6 +330,14 @@ html.admin-authed #app{display:block;}
   </div>
 
   <div class="pane" id="pane-hk">
+    <div class="hk-toolbar">
+      <a class="hk-cleaner-link" href="HK.html" target="_blank" rel="noopener">Cleaner app ↗</a>
+      <span class="hk-role-badge" id="hk-role-badge" hidden></span>
+      <button type="button" class="hk-logout-btn" onclick="hkCleanerLogout()" aria-label="Log out of HK cleaner app">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        Log out
+      </button>
+    </div>
     <div class="filter-row" id="hk-day-tabs"></div>
     <div id="hk-list"></div>
   </div>
@@ -350,9 +365,6 @@ html.admin-authed #app{display:block;}
   <div class="pane" id="pane-more">
     <div class="more-section">Operations</div>
     <div class="more-list">
-      <button class="more-item" type="button" onclick="switchTab('hk')" style="border-color:#86efac;background:#f0fdf4">
-        <span><strong>Housekeeping (HK)</strong></span><span class="more-hint">Mark rooms done</span>
-      </button>
       <button class="more-item" type="button" onclick="switchTab('apts')">Apartments<span class="more-hint">Check-in instructions</span></button>
       <button class="more-item" type="button" onclick="switchTab('failures')" id="more-failures-btn">Failed searches<span class="more-badge" id="sf-more-badge" style="display:none">0</span></button>
     </div>
@@ -429,7 +441,7 @@ html.admin-authed #app{display:block;}
  */
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
-const SANDBOX_BUILD='20260827d';
+const SANDBOX_BUILD='20260827e';
 (function migrateSandboxBuild(){
   try{
     if(localStorage.getItem('maxela_sandbox_build')!==SANDBOX_BUILD){
@@ -1705,6 +1717,20 @@ const HK_ROOMS=[
 ];
 let hkActiveDay=0;
 
+const HK_ROLE_LABELS={shartava:'Shartava',centre:'Centre',vgl:'VGL',admin:'All properties'};
+function updateHkCleanerBadge(){
+  const el=document.getElementById('hk-role-badge');
+  if(!el)return;
+  const role=localStorage.getItem('hk_role')||'';
+  if(role&&HK_ROLE_LABELS[role]){el.textContent='Logged in: '+HK_ROLE_LABELS[role];el.hidden=false;}
+  else el.hidden=true;
+}
+window.hkCleanerLogout=function(){
+  localStorage.removeItem('hk_role');
+  updateHkCleanerBadge();
+  toast('HK app logged out — open Cleaner app to see PIN screen');
+};
+
 function hkFmtDate(d){
   if(typeof d==='string')return d.slice(0,10);
   const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dy=String(d.getDate()).padStart(2,'0');
@@ -1762,6 +1788,7 @@ function hkTaskRooms(dateStr){
   return HK_ROOMS.filter(r=>hkGetCheckout(r.code,dateStr));
 }
 async function renderHk(){
+  updateHkCleanerBadge();
   const tabsEl=document.getElementById('hk-day-tabs');
   const listEl=document.getElementById('hk-list');
   if(!tabsEl||!listEl)return;
