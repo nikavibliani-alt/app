@@ -1092,6 +1092,12 @@ body{padding-bottom:72px;}
           <button type="button" class="guest-invite__btn" id="t-invite-btn" onclick="window.openCompanionForm()">Open link for group members</button>
         </div>
 
+        <div class="guest-invite" id="guest-save-link" style="display:none">
+          <div class="guest-invite__title">Your personal link</div>
+          <div class="guest-invite__sub">Save this link — open on any phone or browser without uploading your passport again.</div>
+          <button type="button" class="guest-invite__btn" id="guest-copy-link-btn" onclick="window.copyGuestLink(this)">Copy my link</button>
+        </div>
+
         <div class="hero-walkthrough" id="hero-walkthrough">
           <div class="wt-door-lbl" id="t-wt-door-lbl">Your apartment door</div>
           <div class="wt-title" id="t-wt-title">How to arrive</div>
@@ -1208,7 +1214,7 @@ body{padding-bottom:72px;}
 
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,doc,setDoc,getDoc,collection,addDoc,onSnapshot,serverTimestamp,query,where}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,doc,setDoc,getDoc,getDocs,collection,addDoc,onSnapshot,serverTimestamp,query,where,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getStorage,ref,uploadBytes,getDownloadURL}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
 // Storage rules (set in Firebase Console):
 //   match /passport_uploads/{allPaths=**} {
@@ -1890,7 +1896,46 @@ function renderGreetingApt(){
 
 let _companionGuest=params.get('companion')==='1';
 const _resParam=(params.get('res')||'').trim();
+const _urlGuestToken=(params.get('g')||'').trim();
 let _companionResGroup=null;
+
+function generateGuestToken(){
+  if(typeof crypto!=='undefined'&&crypto.randomUUID)return crypto.randomUUID().replace(/-/g,'');
+  return 'g'+Date.now().toString(36)+Math.random().toString(36).slice(2,14);
+}
+function buildGuestLink(token){
+  const base=window.location.origin+window.location.pathname;
+  return base+'?g='+encodeURIComponent(token);
+}
+async function findExistingPrimaryGuest(resId,resNum){
+  const ids=[resId,resNum].filter(Boolean);
+  for(const id of ids){
+    try{
+      const snap=await getDocs(query(collection(db,'checkin_guests'),where('matchedReservationId','==',id),limit(10)));
+      for(const d of snap.docs){
+        const data=d.data();
+        if(data.companionGuest)continue;
+        if(data.passportUrl)return{id:d.id,...data};
+      }
+    }catch(e){console.warn('[findExistingPrimaryGuest]',e);}
+  }
+  return null;
+}
+function updateGuestLinkCard(){
+  const card=document.getElementById('guest-save-link');
+  if(!card)return;
+  const show=!_companionGuest&&guestId&&guestData?.passportUrl&&!guestData?.companionGuest;
+  card.style.display=show?'block':'none';
+}
+window.buildGuestLink=function(){return guestId?buildGuestLink(guestId):window.location.href;};
+window.copyGuestLink=async function(btn){
+  const url=window.buildGuestLink();
+  try{
+    await navigator.clipboard.writeText(url);
+    if(btn){const o=btn.textContent;btn.textContent='Link copied!';setTimeout(()=>{btn.textContent=o;},2000);}
+    else toast('Link copied!');
+  }catch(e){toast(url);}
+};
 
 async function _getHomeLocData(){
   const cfg=await getFullCfg();
@@ -2049,10 +2094,17 @@ async function finishRegistration_(bestRes,formData){
   // For number-based bookings arrival is '' — fall back to reservation checkin date
   const arrivalDate=arrival||bestRes?.checkin||bestRes?.checkIn||'';
   const checkoutDate=bestRes?.checkout||bestRes?.checkOut||'';
-  const docId=`${aptId}_${arrivalDate||Date.now()}`;
+  let docId;
+  if(_companionGuest){
+    docId=`${aptId}_${arrivalDate||Date.now()}`;
+  }else{
+    const existing=await findExistingPrimaryGuest(bestRes?.id,bestRes?.reservationNumber);
+    docId=existing?.id||generateGuestToken();
+  }
+  const guestLink=buildGuestLink(docId);
   const data={aptId,name,nameRoman:bestRes?.guest||'',guests,nationality,contact,contactType:ct,passportUrl,
     passportScanResult:{},arrivalDate,checkoutDate,expectedCheckInWindow:expectedCheckInWindow||'',expectedCheckInTime:expectedCheckInWindow||'',
-    matchedReservationId:bestRes?.id||null,manualUnlock:false,companionGuest:!!_companionGuest,
+    matchedReservationId:bestRes?.id||null,manualUnlock:false,companionGuest:!!_companionGuest,isPrimaryGuest:!_companionGuest,guestLink,
     linkedReservationNumber:_companionGuest?(String(_resParam||bestRes?.reservationNumber||'').trim()||null):null};
   const existing=await getDoc(doc(db,'checkin_guests',docId));
   if(existing.exists()){
@@ -2090,6 +2142,7 @@ async function finishRegistration_(bestRes,formData){
   }
   _pendingReg=null;_pendingMatches=[];
   toast(t('rg'),3000);
+  updateGuestLinkCard();
   showHome();
   _saveSession();
   clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
@@ -2254,6 +2307,23 @@ window.searchReservation=async function(){
     allMatchedReservations=group;
     _pendingReg={name:name||(_bestMatch.guest||''),guests,nationality,contact,contactType,arrival,expectedCheckInWindow:getExpectedCheckInWindow()};
     _pendingMatches=[{res:_bestMatch,score:_bestScore}];
+    const existing=await findExistingPrimaryGuest(_bestMatch.id,_bestMatch.reservationNumber);
+    if(existing?.passportUrl&&!_companionGuest){
+      guestId=existing.id;
+      guestData={...existing,id:existing.id};
+      aptId=existing.aptId||_bestMatch.roomCode||'';
+      activeReservation=_bestMatch;
+      localStorage.setItem('maxela_guest_id',guestId);
+      localStorage.setItem('maxela_apt_id',aptId);
+      localStorage.setItem('maxela_g_'+aptId,guestId);
+      btn.disabled=false;
+      document.getElementById('t-search-btn').textContent='Find my booking';
+      toast(t('gl')||'Welcome back');
+      updateGuestLinkCard();
+      showHome();
+      _saveSession();
+      return;
+    }
     btn.disabled=false;
     document.getElementById('t-search-btn').textContent='Find my booking';
     _showPage('page-rules');
@@ -2416,6 +2486,7 @@ function showHome(){
   document.getElementById('t-greeting-label').textContent=t('gl');
   applyHomePhase(); // sandbox: sets #page-home phase-* class + fills hero daily key — before first renderTiles()
   renderTiles();
+  updateGuestLinkCard();
   // Load admin guest-page config (visibility, services, prices) and re-render
   // tiles once it arrives so sectionVisibility from checkin_admin/config applies.
   getFullCfg().then(cfg=>{
@@ -3598,6 +3669,41 @@ async function init(){
     _showCompanionBanner();
     await _initCompanionFromRes();
   }
+
+  // Personal link ?g= — open on any device without passport re-upload
+  if(_urlGuestToken&&!_companionGuest){
+    const {data:guestDocData,found}=await loadGuestDataWithRetry(_urlGuestToken);
+    if(found===true){
+      guestId=_urlGuestToken;
+      guestData={...guestDocData,id:_urlGuestToken};
+      aptId=guestDocData.aptId||'';
+      localStorage.setItem('maxela_guest_id',guestId);
+      localStorage.setItem('maxela_apt_id',aptId);
+      if(aptId)localStorage.setItem('maxela_g_'+aptId,guestId);
+      try{
+        const _resId=guestData.matchedReservationId;
+        if(_resId){
+          const _resSnap=await getDoc(doc(db,'reservations',_resId));
+          if(_resSnap.exists()){
+            const _newRoom=_resSnap.data().roomCode;
+            if(_newRoom&&_newRoom!==aptId){
+              aptId=_newRoom;guestData={...guestData,aptId:_newRoom};
+              localStorage.setItem('maxela_apt_id',_newRoom);
+              setDoc(doc(db,'checkin_guests',guestId),{aptId:_newRoom},{merge:true}).catch(()=>{});
+            }
+          }
+        }
+      }catch(e){}
+      try{const as=await getDoc(doc(db,'checkin_apartments',aptId));if(as.exists())aptData=as.data();}catch(e){}
+      document.getElementById('loading').style.display='none';
+      document.getElementById('app').style.display='block';
+      updateGuestLinkCard();
+      showHome();
+      _saveSession();
+      return;
+    }
+  }
+
   // ── Admin preview mode ────────────────────────────────────────────────
   if(params.get('preview')==='true'){
     const previewApt=params.get('apt')||'';
@@ -3686,16 +3792,6 @@ async function init(){
                   localStorage.setItem('maxela_apt_id',_newRoom);
                   try{const _as=await getDoc(doc(db,'checkin_apartments',_newRoom));if(_as.exists())aptData=_as.data();}catch(e){}
                   setDoc(doc(db,'checkin_guests',savedGuest),{aptId:_newRoom},{merge:true}).catch(()=>{});
-                  try{
-                    const _arrDate=guestData.arrivalDate||'';
-                    const _newDocId=`${_newRoom}_${_arrDate||Date.now()}`;
-                    const _existing=await getDoc(doc(db,'checkin_guests',_newDocId));
-                    if(!_existing.exists()){
-                      const {id:_,..._baseData}=guestData;
-                      await setDoc(doc(db,'checkin_guests',_newDocId),{..._baseData,aptId:_newRoom,movedFrom:_storedRoom||_guestDocRoom,submittedAt:serverTimestamp()});
-                      console.log('[RoomFix] Created new doc',_newDocId);
-                    }
-                  }catch(_e){console.error('[RoomFix] new doc error',_e);}
                 }
               }
             }

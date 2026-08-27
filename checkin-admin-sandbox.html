@@ -64,6 +64,17 @@ html.admin-authed #app{display:block;}
 .btn-primary{background:var(--ink);color:#fff;border-color:var(--ink);}
 .btn-green{background:var(--green);color:#fff;border-color:var(--green);}
 .empty{text-align:center;padding:40px 16px;color:var(--muted);font-size:14px;}
+.hk-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;}
+.hk-card.done{opacity:.65}
+.hk-card__top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.hk-card__room{font-size:18px;font-weight:800;font-family:var(--mono)}
+.hk-card__name{font-size:12px;color:var(--muted)}
+.hk-card__times{display:flex;gap:8px;font-size:12px;margin-bottom:8px}
+.hk-card__time{flex:1;background:#f7f8fa;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.hk-card__time b{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:2px}
+.hk-card__foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hk-done{height:34px;padding:0 14px;border:none;border-radius:8px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;background:var(--green);color:#fff}
+.hk-done.undo{background:var(--line);color:var(--muted)}
 .pill{display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;}
 .pill-pending{background:var(--amber-bg);color:var(--amber);}
 .pill-await{background:var(--blue-bg);color:var(--blue);}
@@ -276,6 +287,11 @@ html.admin-authed #app{display:block;}
     <div id="apts-list"></div>
   </div>
 
+  <div class="pane" id="pane-hk">
+    <div class="filter-row" id="hk-day-tabs"></div>
+    <div id="hk-list"></div>
+  </div>
+
   <div class="pane" id="pane-hkpins">
     <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">4-digit PINs for the HK app. Changes apply immediately.</p>
     <div id="hkpins-list"></div>
@@ -300,7 +316,8 @@ html.admin-authed #app{display:block;}
     <div class="more-section">Operations</div>
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('apts')">Apartments<span class="more-hint">Check-in instructions</span></button>
-      <button class="more-item" type="button" onclick="switchTab('hkpins')">HK Pins<span class="more-hint">Housekeeping app</span></button>
+      <button class="more-item" type="button" onclick="switchTab('hk')">Housekeeping<span class="more-hint">Mark rooms done</span></button>
+      <button class="more-item" type="button" onclick="switchTab('hkpins')">HK Pins<span class="more-hint">Legacy HK login</span></button>
       <button class="more-item" type="button" onclick="switchTab('failures')" id="more-failures-btn">Failed searches<span class="more-badge" id="sf-more-badge" style="display:none">0</span></button>
     </div>
     <div class="more-section">Guest experience</div>
@@ -360,6 +377,7 @@ html.admin-authed #app{display:block;}
   </div>
 </div>
 
+<script src="shared/elevator-sync.js"></script>
 <script type="module">
 /* ADMIN SANDBOX — see GUEST_CHECKIN_REDESIGN.md §22.9
  * Tabs: stay | elevator | requests | more (+ sub: apts, hkpins, guestsettings, failures, navsettings)
@@ -429,7 +447,7 @@ const APARTMENTS=[
 let aptData={},guestData=[],hkStatusData={},_resCache=null,_resLoading=false;
 let elevData=null,stayFilter='overview',upcomingDay=null,_currentAptId=null;
 const _TAB_KEY='maxela_admin_tab';
-const VALID_TABS=new Set(['stay','elevator','requests','apts','hkpins','guestsettings','failures','navsettings','more']);
+const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','hkpins','guestsettings','failures','navsettings','more']);
 function loadSavedTab(){
   try{
     const t=localStorage.getItem(_TAB_KEY);
@@ -1130,14 +1148,15 @@ const TAB_META={
   elevator:{title:'Elevator',sub:'Entrance & elevator code'},
   requests:{title:'Requests',sub:'Guest service requests'},
   apts:{title:'Apartments',sub:'WiFi, instructions, photo steps'},
-  hkpins:{title:'HK Pins',sub:'Housekeeping app login codes'},
+  hk:{title:'Housekeeping',sub:'Mark rooms done · guest arrival times'},
+  hkpins:{title:'HK Pins',sub:'Legacy HK login codes'},
   guestsettings:{title:'Guest page',sub:'Tiles, services & location'},
   failures:{title:'Failed searches',sub:'Guests who could not find booking'},
   navsettings:{title:'Tab bar',sub:'Customize bottom navigation'},
   more:{title:'More',sub:'All admin tools'},
 };
-const MORE_TABS=new Set(['more','apts','hkpins','guestsettings','navsettings','failures']);
-const MORE_SUB_PAGES=new Set(['apts','hkpins','guestsettings','navsettings','failures']);
+const MORE_TABS=new Set(['more','apts','hk','hkpins','guestsettings','navsettings','failures']);
+const MORE_SUB_PAGES=new Set(['apts','hk','hkpins','guestsettings','navsettings','failures']);
 
 function updateHeaderBack(){
   const btn=document.getElementById('header-back');
@@ -1170,6 +1189,7 @@ window.switchTab=function(tab){
   if(tab==='elevator')renderElevator();
   if(tab==='requests')loadAndRenderRequests();
   if(tab==='apts')renderAptsList();
+  if(tab==='hk')renderHk();
   if(tab==='hkpins')renderHkPins();
   if(tab==='guestsettings')loadAndRenderGuestSettings();
   if(tab==='failures')renderFailures();
@@ -1613,6 +1633,113 @@ window.doReplacePhoto=async function(idx,input){
   }catch(e){toast('Replace failed: '+e.message);}
 };
 
+/* ── Housekeeping (built into admin) ── */
+const HK_ROOMS=[
+  {code:'0-1',name:'Small room 1',group:'0- Rooms'},{code:'0-2',name:'Small room 2',group:'0- Rooms'},{code:'0-3',name:'Small room 3',group:'0- Rooms'},{code:'0-4',name:'Small room 4',group:'0- Rooms'},{code:'0-5',name:'Small room 5',group:'0- Rooms'},
+  {code:'6-1',name:'Apartment 6-1',group:'6- Apartments'},{code:'6-2',name:'Apartment 6-2',group:'6- Apartments'},{code:'6-3',name:'Apartment 6-3',group:'6- Apartments'},{code:'6-4',name:'Apartment 6-4',group:'6- Apartments'},
+  {code:'7-1',name:'Apartment 7-1',group:'7- Apartments'},{code:'7-2',name:'Apartment 7-2',group:'7- Apartments'},{code:'7-4',name:'Apartment 7-4',group:'7- Apartments'},
+  {code:'orb-1',name:'Orb 1',group:'Centre'},{code:'orb-2',name:'Orb 2',group:'Centre'},{code:'orb-3',name:'Orb 3',group:'Centre'},
+  {code:'tab-1',name:'Tab 1',group:'Centre'},{code:'tab-2',name:'Tab 2',group:'Centre'},{code:'tab-3',name:'Tab 3',group:'Centre'},
+  {code:'abashidze',name:'Abashidze',group:'Abashidze'},
+];
+let hkActiveDay=0;
+
+function hkFmtDate(d){
+  if(typeof d==='string')return d.slice(0,10);
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dy=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dy}`;
+}
+function hkAddDays(n){
+  const d=new Date(tbilisiToday()+'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate()+n);
+  return d.toISOString().slice(0,10);
+}
+function hkNotCancelled(r){return(r.status||'').toUpperCase()!=='CANCELLED';}
+function hkGetCheckout(roomCode,dateStr){
+  const co=(_resCache||[]).find(r=>hkNotCancelled(r)&&r.roomCode===roomCode&&r.checkout===dateStr);
+  return co||null;
+}
+function hkGetNextCheckin(roomCode,dateStr){
+  return (_resCache||[]).filter(r=>hkNotCancelled(r)&&r.roomCode===roomCode&&r.checkin>=dateStr).sort((a,b)=>a.checkin.localeCompare(b.checkin))[0]||null;
+}
+function formatGuestArrival(form,res){
+  const w=form?.expectedCheckInWindow||form?.expectedCheckInTime||'';
+  if(w==='before-15')return'Before 15:00';
+  if(w==='00:00+')return'After midnight';
+  if(w==='next-morning')return'Next morning';
+  if(w==='asap')return'ASAP';
+  if(/^\d{2}:\d{2}$/.test(w))return w;
+  return res?.checkinTime||'14:00';
+}
+function hkGuestFormForRoom(roomCode,dateStr,nextRes){
+  const forms=guestData.filter(g=>!g.companionGuest&&g.aptId===roomCode&&g.arrivalDate===dateStr);
+  if(forms.length)return forms[0];
+  if(nextRes){
+    return guestData.find(g=>!g.companionGuest&&(g.matchedReservationId===nextRes.id||g.matchedReservationId===nextRes.reservationNumber))||null;
+  }
+  return null;
+}
+function hkTaskRooms(dateStr){
+  return HK_ROOMS.filter(r=>hkGetCheckout(r.code,dateStr));
+}
+async function renderHk(){
+  const tabsEl=document.getElementById('hk-day-tabs');
+  const listEl=document.getElementById('hk-list');
+  if(!tabsEl||!listEl)return;
+  let tabs='';
+  for(let i=0;i<7;i++){
+    const ds=hkAddDays(i);
+    const n=hkTaskRooms(ds).length;
+    tabs+=`<button type="button" class="filter-chip${i===hkActiveDay?' active':''}" onclick="hkPickDay(${i})">${i===0?'Today':i===1?'Tomorrow':new Date(ds+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric'})}${n?` (${n})`:''}</button>`;
+  }
+  tabsEl.innerHTML=tabs;
+  const dateStr=hkAddDays(hkActiveDay);
+  try{
+    const snap=await getDocs(query(collection(db,'hk_status'),where('date','==',dateStr)));
+    snap.docs.forEach(d=>{hkStatusData[d.id]=d.data();});
+  }catch(e){console.warn('[HK] status load',e);}
+  const rooms=hkTaskRooms(dateStr);
+  if(!rooms.length){listEl.innerHTML='<div class="empty">No checkout rooms this day</div>';return;}
+  let html='';
+  rooms.forEach(room=>{
+    const key=room.code+'_'+dateStr;
+    const st=hkStatusData[key]||{};
+    const done=!!st.done;
+    const co=hkGetCheckout(room.code,dateStr);
+    const nextRes=hkGetNextCheckin(room.code,dateStr);
+    const form=hkGuestFormForRoom(room.code,dateStr,nextRes);
+    const coTime=st.checkOutTime||co?.checkoutTime||'12:00';
+    const ciTime=st.checkInTime||formatGuestArrival(form,nextRes);
+    html+=`<div class="hk-card${done?' done':''}">
+      <div class="hk-card__top"><div><div class="hk-card__room">${esc(room.code)}</div><div class="hk-card__name">${esc(room.name)}</div></div>
+      <span class="pill ${done?'pill-ok':'pill-await'}">${done?'Done':'Pending'}</span></div>
+      <div class="hk-card__times">
+        <div class="hk-card__time"><b>Checkout</b>${esc(coTime)}</div>
+        <div class="hk-card__time"><b>Check-in</b>${esc(ciTime)}${form?.expectedCheckInWindow?'<span style="display:block;font-size:10px;color:var(--green);margin-top:2px">Guest time</span>':''}</div>
+      </div>
+      <div class="hk-card__foot"><span style="font-size:12px;color:var(--muted)">${co?.guest?esc(_stripRoomNum(co.guest)):'—'}</span>
+      <button type="button" class="hk-done${done?' undo':''}" onclick="toggleHkDone('${esc(room.code)}','${dateStr}')">${done?'Undo':'✓ Done'}</button></div>
+    </div>`;
+  });
+  listEl.innerHTML=html;
+}
+window.hkPickDay=function(i){hkActiveDay=i;renderHk();};
+window.toggleHkDone=async function(roomCode,dateStr){
+  const key=roomCode+'_'+dateStr;
+  const cur=!!(hkStatusData[key]?.done);
+  const next=!cur;
+  try{
+    await setDoc(doc(db,'hk_status',key),{done:next,roomCode,date:dateStr,updatedAt:serverTimestamp()},{merge:true});
+    hkStatusData[key]={...(hkStatusData[key]||{}),done:next,roomCode,date:dateStr};
+    if(next){
+      const snap=await getDocs(query(collection(db,'checkin_guests'),where('aptId','==',roomCode),where('arrivalDate','==',dateStr)));
+      for(const d of snap.docs){await updateDoc(d.ref,{manualUnlock:true,unlockedAt:serverTimestamp()});}
+    }
+    toast(next?'Room marked done ✓':'Undone');
+    renderHk();rebuildFormMaps();if(currentTab==='stay')renderStay();
+  }catch(e){toast('HK save failed: '+e.message);}
+};
+
 /* ── Elevator ── */
 function elevAgeSec(){
   if(!elevData?.updatedAt)return 1e12;
@@ -1665,15 +1792,17 @@ window.updateElevator=async function(){
   if(!code){msg.className='elev-msg err';msg.textContent='Enter a display code';return;}
   btn.disabled=true;msg.className='elev-msg';msg.textContent='Saving…';
   const nowMs=Date.now();
-  const updates={display_code:code,qr_code:qrCode,expires_at:String(nowMs+24*3600*1000),updatedAt:String(nowMs),source:'manual'};
+  const updates=window.ElevatorSync?ElevatorSync.buildManualUpdate(code,qrCode,nowMs):{
+    display_code:code,qr_code:qrCode,code,lastCode:code,expires_at:String(nowMs+24*3600*1000),updatedAt:String(nowMs),source:'manual'
+  };
   let rtdbOk=false,fsOk=false,errMsg='';
   try{const res=await fetch(RTDB_URL,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});rtdbOk=res.ok;if(!rtdbOk)errMsg='RTDB HTTP '+res.status;}
   catch(e){errMsg='RTDB: '+e.message;}
-  try{await setDoc(doc(db,'globals','elevator_code'),{...updates,code,updatedAt:serverTimestamp(),source:'manual'},{merge:true});fsOk=true;}
+  try{await setDoc(doc(db,'globals','elevator_code'),{...updates,code,updatedAt:serverTimestamp(),source:'manual',lastCode:code},{merge:true});fsOk=true;}
   catch(e){errMsg=(errMsg?errMsg+'; ':'')+'Firestore: '+e.message;}
   btn.disabled=false;
   if(rtdbOk&&fsOk){
-    elevData={code,qrCode,updatedAt:{seconds:Math.floor(nowMs/1000)},source:'manual',_source:'manual'};
+    elevData={code,qrCode,updatedAt:{seconds:Math.floor(nowMs/1000)},source:'manual',lastCode:code,_source:'manual'};
     msg.className='elev-msg ok';msg.textContent='Saved · Manual · both stores OK';
     renderElevator();toast('Elevator updated ✓');
   }else{msg.className='elev-msg err';msg.textContent='Failed — '+(errMsg||'unknown');}
@@ -1683,6 +1812,7 @@ function render(){
   rebuildFormMaps();
   if(currentTab==='stay')renderStay();
   else if(currentTab==='apts')renderAptsList();
+  else if(currentTab==='hk')renderHk();
   else if(currentTab==='elevator')renderElevator();
   else if(currentTab==='requests')buildRequestsUI();
   else if(currentTab==='hkpins')renderHkPins();
@@ -1724,7 +1854,7 @@ onSnapshot(collection(db,'checkin_guests'),snap=>{
 });
 onSnapshot(query(collection(db,'hk_status'),where('date','==',tbilisiToday())),snap=>{
   hkStatusData={};snap.docs.forEach(d=>{hkStatusData[d.id]=d.data();});
-  if(loaded>=2)render();
+  if(loaded>=2){render();if(currentTab==='hk')renderHk();}
 });
 onSnapshot(collection(db,'hk_pins'),snap=>{
   snap.docs.forEach(d=>{hkPinsData[d.id]=d.data().pin||'';});
