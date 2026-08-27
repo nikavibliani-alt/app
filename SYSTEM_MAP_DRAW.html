@@ -3,335 +3,260 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Maxela — Draw your system map</title>
+<title>Maxela — Your system map (blank board)</title>
 <style>
   :root{
-    --bg:#f4f5f7; --panel:#fff; --ink:#1a1d23; --muted:#5f6772;
-    --line:#dfe3e8; --blue:#1a73e8; --blue-bg:#e8f0fe;
-    --green:#137333; --orange:#b06000; --purple:#7b1fa2;
-    --starter:#94a3b8; --user:#1a73e8;
+    --bg:#eceef1; --panel:#fff; --ink:#1a1d23; --muted:#6b7280;
+    --line:#e2e5ea; --accent:#2563eb; --accent-soft:#eff6ff;
+    --ok:#15803d; --miss:#9ca3af;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column;overflow:hidden}
-  header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap}
-  header h1{font-size:17px;font-weight:750}
-  header p{font-size:12px;color:var(--muted);margin-top:2px}
-  .hdr-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-  .hdr-actions button,.hdr-actions label.btn{
-    font:inherit;font-size:12px;font-weight:650;padding:7px 11px;border-radius:8px;
+  html,body{height:100%;overflow:hidden}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);display:flex;flex-direction:column}
+
+  header{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-shrink:0;
+  }
+  header h1{font-size:16px;font-weight:700}
+  header p{font-size:11px;color:var(--muted);margin-top:2px}
+  .hdr-btns{display:flex;flex-wrap:wrap;gap:6px}
+  .hdr-btns button{
+    font:inherit;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;
     border:1px solid var(--line);background:#fff;cursor:pointer;
   }
-  .hdr-actions button:hover,.hdr-actions label.btn:hover{background:#f1f3f5}
-  .hdr-actions button.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
-  .hdr-actions button.danger{color:#c62828;border-color:#ffcdd2}
-  .main{flex:1;display:flex;min-height:0}
-  .toolbar{width:52px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:4px;flex-shrink:0}
-  .tool{
-    width:40px;height:40px;border-radius:10px;border:1px solid transparent;background:transparent;
-    font-size:18px;cursor:pointer;display:grid;place-items:center;color:var(--ink);
+  .hdr-btns button:hover{background:#f8f9fa}
+  .hdr-btns button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  .body{flex:1;display:flex;min-height:0}
+
+  /* toolbar */
+  .tools{
+    width:48px;background:var(--panel);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;flex-shrink:0;
   }
-  .tool:hover{background:#f1f3f5}
-  .tool.active{background:var(--blue-bg);border-color:#c5d8f8;color:var(--blue)}
-  .tool-sep{width:28px;height:1px;background:var(--line);margin:6px 0}
-  .hint-bar{font-size:11px;color:var(--muted);padding:6px 14px;background:#fafbfc;border-bottom:1px solid var(--line);flex-shrink:0}
-  #viewport{flex:1;position:relative;overflow:hidden;cursor:grab;background:#fff}
-  #viewport.grabbing{cursor:grabbing}
-  #viewport.pen{cursor:crosshair}
-  svg{width:100%;height:100%;display:block;touch-action:none}
-  .starter-box{fill:#f8fafc;stroke:var(--starter);stroke-width:2}
-  .starter-text{fill:var(--ink);font-size:13px;font-weight:650;text-anchor:middle;pointer-events:none}
-  .starter-sub{fill:var(--muted);font-size:10px;text-anchor:middle;pointer-events:none}
-  .starter-link{fill:none;stroke:var(--starter);stroke-width:2;marker-end:url(#arrow-starter)}
-  .starter-label{font-size:10px;fill:var(--muted);text-anchor:middle;pointer-events:none}
-  .user-box{fill:#fff;stroke:var(--user);stroke-width:2;cursor:move}
-  .user-text{fill:var(--ink);font-size:13px;font-weight:600;text-anchor:middle;pointer-events:none;user-select:none}
-  .user-link{fill:none;stroke:var(--user);stroke-width:2;marker-end:url(#arrow-user);cursor:pointer}
-  .user-path{fill:none;stroke:var(--user);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
-  .selected{stroke:#c62828!important;stroke-width:3!important}
-  .layer-title{font-size:11px;font-weight:800;fill:var(--muted);letter-spacing:.06em;text-transform:uppercase}
-  .toast{
-    position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(20px);
-    background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;
-    opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:99;
+  .tools button{
+    width:38px;height:38px;border:none;border-radius:9px;background:transparent;
+    font-size:17px;cursor:pointer;color:var(--ink);
   }
-  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  @media(max-width:640px){.toolbar{width:44px}.tool{width:36px;height:36px;font-size:16px}}
+  .tools button:hover{background:#f3f4f6}
+  .tools button.active{background:var(--accent-soft);color:var(--accent);outline:2px solid #bfdbfe}
+  .tools .sep{height:1px;width:28px;background:var(--line);margin:6px 0}
+
+  /* canvas */
+  .canvas-wrap{flex:1;position:relative;overflow:hidden;background:#fafafa}
+  .canvas-wrap.hand{cursor:grab}
+  .canvas-wrap.hand.grabbing{cursor:grabbing}
+  .canvas-wrap.pen{cursor:crosshair}
+  .canvas-wrap.box{cursor:crosshair}
+  svg{display:block;width:100%;height:100%;touch-action:none}
+  .grid line{stroke:#e8eaed;stroke-width:1}
+  .stroke{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  .shape{fill:#fff;stroke:var(--ink);stroke-width:2;cursor:move}
+  .shape-text{fill:var(--ink);font-size:14px;font-weight:600;text-anchor:middle;dominant-baseline:middle;pointer-events:none;user-select:none}
+  .arrow{fill:none;stroke:var(--ink);stroke-width:2;marker-end:url(#arr)}
+  .label{fill:var(--ink);font-size:15px;font-weight:500;cursor:move;user-select:none}
+  .sel{stroke:var(--accent)!important;stroke-width:3!important}
+  .ghost{fill:rgba(37,99,235,.06);stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4;pointer-events:none}
+
+  /* checklist panel */
+  .panel{
+    width:280px;background:var(--panel);border-left:1px solid var(--line);
+    display:flex;flex-direction:column;flex-shrink:0;transition:width .2s,margin .2s;
+  }
+  .panel.hidden{width:0;border:none;overflow:hidden}
+  .panel-head{padding:12px 14px;border-bottom:1px solid var(--line)}
+  .panel-head h2{font-size:13px;font-weight:700}
+  .panel-head p{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .panel-body{flex:1;overflow-y:auto;padding:10px 12px}
+  .group{margin-bottom:14px}
+  .group-title{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  .check{
+    display:flex;align-items:flex-start;gap:8px;padding:7px 8px;border-radius:8px;
+    font-size:12.5px;line-height:1.35;cursor:pointer;margin-bottom:2px;
+  }
+  .check:hover{background:#f8f9fa}
+  .check input{margin-top:2px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+  .check.done{color:var(--ok)}
+  .check.done span{text-decoration:line-through;opacity:.75}
+  .progress{font-size:11px;color:var(--muted);padding:8px 14px;border-top:1px solid var(--line)}
+
+  .hint{
+    position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+    background:rgba(26,29,35,.88);color:#fff;font-size:12px;padding:8px 14px;border-radius:999px;
+    pointer-events:none;white-space:nowrap;z-index:5;
+  }
+
+  @media(max-width:800px){
+    .panel{position:absolute;right:0;top:0;bottom:0;z-index:10;box-shadow:-4px 0 20px rgba(0,0,0,.08)}
+    .panel.hidden{width:0}
+  }
 </style>
 </head>
 <body>
 <header>
   <div>
-    <h1>Draw your Maxela system</h1>
-    <p>Gray = Cursor’s starter map · Blue = your drawing · Saved in this browser only</p>
+    <h1>Your system map</h1>
+    <p>Blank board · drag to pan · draw only what you need · checklist on the right</p>
   </div>
-  <div class="hdr-actions">
-    <button type="button" id="btn-toggle-starter">Hide starter</button>
-    <button type="button" id="btn-copy-starter">Copy starter → mine</button>
-    <button type="button" class="primary" id="btn-save">Save my map</button>
-    <button type="button" id="btn-load">Load saved</button>
-    <button type="button" id="btn-export">Export PNG</button>
-    <button type="button" class="danger" id="btn-clear-user">Clear my layer</button>
+  <div class="hdr-btns">
+    <button type="button" id="btn-checklist" class="on">Checklist</button>
+    <button type="button" id="btn-save">Save</button>
+    <button type="button" id="btn-clear">Clear board</button>
   </div>
 </header>
-<div class="hint-bar" id="hint">Select tool: click items to move · Box: click canvas · Arrow: click start then end · Pen: drag · Double-click text to edit</div>
-<div class="main">
-  <aside class="toolbar" id="toolbar">
-    <button type="button" class="tool active" data-tool="select" title="Select / move">↖</button>
-    <button type="button" class="tool" data-tool="box" title="Add box">▢</button>
-    <button type="button" class="tool" data-tool="arrow" title="Add arrow">→</button>
-    <button type="button" class="tool" data-tool="text" title="Add text">T</button>
-    <button type="button" class="tool" data-tool="pen" title="Freehand pen">✎</button>
-    <div class="tool-sep"></div>
-    <button type="button" class="tool" data-tool="delete" title="Delete selected">⌫</button>
-    <div class="tool-sep"></div>
-    <button type="button" class="tool" data-tool="pan" title="Pan canvas">✋</button>
+
+<div class="body">
+  <aside class="tools" aria-label="Tools">
+    <button type="button" class="active" data-t="hand" title="Move / pan">✋</button>
+    <button type="button" data-t="select" title="Select item">↖</button>
+    <div class="sep"></div>
+    <button type="button" data-t="pen" title="Pen">✎</button>
+    <button type="button" data-t="box" title="Box — drag to draw">▢</button>
+    <button type="button" data-t="arrow" title="Arrow — 2 clicks">→</button>
+    <button type="button" data-t="text" title="Text — click then type">T</button>
+    <div class="sep"></div>
+    <button type="button" data-t="erase" title="Delete — click item">⌫</button>
   </aside>
-  <div id="viewport">
-    <svg id="svg" viewBox="0 0 2400 1400" preserveAspectRatio="xMidYMid meet">
+
+  <div class="canvas-wrap hand" id="wrap">
+    <svg id="svg" viewBox="0 0 4000 3000">
       <defs>
-        <marker id="arrow-starter" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#1a1d23"/>
         </marker>
-        <marker id="arrow-user" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M0 0 L10 5 L0 10 z" fill="#1a73e8"/>
-        </marker>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#eceef1" stroke-width="1"/>
+        </pattern>
       </defs>
-      <g id="pan-root">
-        <!-- STARTER MAP (Cursor) -->
-        <g id="layer-starter">
-          <text x="80" y="36" class="layer-title">CURSOR STARTER — how the system works today</text>
-
-          <!-- Row labels -->
-          <text x="200" y="70" class="starter-label">Outside</text>
-          <text x="520" y="70" class="starter-label">Automation</text>
-          <text x="900" y="70" class="starter-label">Data</text>
-          <text x="1280" y="70" class="starter-label">Screens</text>
-
-          <!-- External -->
-          <g class="starter-node" transform="translate(120,100)"><rect class="starter-box" width="160" height="44" rx="10"/><text class="starter-text" x="80" y="27">MiniHotel</text></g>
-          <g class="starter-node" transform="translate(120,170)"><rect class="starter-box" width="160" height="44" rx="10"/><text class="starter-text" x="80" y="27">Guest</text></g>
-          <g class="starter-node" transform="translate(120,240)"><rect class="starter-box" width="160" height="44" rx="10"/><text class="starter-text" x="80" y="27">Admin</text></g>
-          <g class="starter-node" transform="translate(120,310)"><rect class="starter-box" width="160" height="44" rx="10"/><text class="starter-text" x="80" y="27">HK staff</text></g>
-
-          <!-- Automation -->
-          <g class="starter-node" transform="translate(420,100)"><rect class="starter-box" width="200" height="52" rx="10"/><text class="starter-text" x="100" y="22">Booking sync</text><text class="starter-sub" x="100" y="38">every ~10 min</text></g>
-          <g class="starter-node" transform="translate(420,180)"><rect class="starter-box" width="200" height="52" rx="10"/><text class="starter-text" x="100" y="22">Room ready WA</text><text class="starter-sub" x="100" y="38">daily job</text></g>
-          <g class="starter-node" transform="translate(420,270)"><rect class="starter-box" width="200" height="52" rx="10"/><text class="starter-text" x="100" y="22">Elevator monitor</text><text class="starter-sub" x="100" y="38">hourly</text></g>
-
-          <!-- Data -->
-          <g class="starter-node" transform="translate(800,90)"><rect class="starter-box" width="180" height="44" rx="10"/><text class="starter-text" x="90" y="27">reservations</text></g>
-          <g class="starter-node" transform="translate(800,150)"><rect class="starter-box" width="180" height="44" rx="10"/><text class="starter-text" x="90" y="27">checkin_guests</text></g>
-          <g class="starter-node" transform="translate(800,210)"><rect class="starter-box" width="180" height="52" rx="10"/><text class="starter-text" x="90" y="22">v2_assignments</text><text class="starter-sub" x="90" y="38">NEW — one room truth</text></g>
-          <g class="starter-node" transform="translate(800,280)"><rect class="starter-box" width="180" height="44" rx="10"/><text class="starter-text" x="90" y="27">checkin_apartments</text></g>
-          <g class="starter-node" transform="translate(800,340)"><rect class="starter-box" width="180" height="44" rx="10"/><text class="starter-text" x="90" y="27">hk_status</text></g>
-
-          <!-- Screens -->
-          <g class="starter-node" transform="translate(1180,90)"><rect class="starter-box" width="200" height="52" rx="10"/><text class="starter-text" x="100" y="22">Guest page LIVE</text><text class="starter-sub" x="100" y="38">checkin-guest-v2</text></g>
-          <g class="starter-node" transform="translate(1180,170)"><rect class="starter-box" width="200" height="52" rx="10"/><text class="starter-text" x="100" y="22">Admin LIVE</text><text class="starter-sub" x="100" y="38">checkin-admin</text></g>
-          <g class="starter-node" transform="translate(1180,250)"><rect class="starter-box" width="200" height="52" rx="10"/><text class="starter-text" x="100" y="22">Admin sandbox</text><text class="starter-sub" x="100" y="38">mobile redesign</text></g>
-          <g class="starter-node" transform="translate(1180,330)"><rect class="starter-box" width="200" height="44" rx="10"/><text class="starter-text" x="100" y="27">HK app</text></g>
-
-          <!-- Main flow arrows -->
-          <path class="starter-link" d="M280,122 C350,122 350,122 420,126"/>
-          <path class="starter-link" d="M620,126 C700,126 700,112 800,112"/>
-          <path class="starter-link" d="M980,112 C1100,112 1100,116 1180,116"/>
-          <path class="starter-link" d="M200,192 C200,260 200,260 1180,116"/>
-          <path class="starter-link" d="M200,262 C400,262 700,232 800,172"/>
-          <path class="starter-link" d="M200,332 C500,332 700,360 800,362"/>
-          <path class="starter-link" d="M890,362 C1000,362 1100,352 1180,352"/>
-
-          <!-- Pipeline rebuild box -->
-          <g transform="translate(80,420)">
-            <rect class="starter-box" width="560" height="120" rx="14" fill="#fef7e0" stroke="#b06000"/>
-            <text class="starter-text" x="280" y="28" style="font-size:14px">NEW PIPELINE (sandbox only — not live yet)</text>
-            <text class="starter-sub" x="280" y="50" style="font-size:11px">RoomAssignment · AdminAction · logs · fake reservation tester</text>
-            <text class="starter-sub" x="280" y="68" style="font-size:11px">One room truth → block conflict → swap → audit every move</text>
-            <text class="starter-sub" x="280" y="86" style="font-size:11px">Run: sandbox_rebuild → python3 -m pipeline.scenario_tester</text>
-          </g>
-
-          <!-- Fragile -->
-          <g transform="translate(720,420)">
-            <rect class="starter-box" width="480" height="120" rx="14" fill="#fce8e6" stroke="#c62828" stroke-dasharray="6 4"/>
-            <text class="starter-text" x="240" y="28" style="font-size:14px;fill:#c62828">Known fragile spots</text>
-            <text class="starter-sub" x="240" y="52" style="font-size:11px">⚠ tuyaPassword writer unknown · ⚠ dual room truth today</text>
-            <text class="starter-sub" x="240" y="70" style="font-size:11px">⚠ config overwrite · ⚠ 4 room lists · ⚠ duplicate WA notify</text>
-            <text class="starter-sub" x="240" y="88" style="font-size:11px">Pipeline rebuild fixes #5 (lost guest on move) first</text>
-          </g>
-
-          <!-- Guest journey strip -->
-          <text x="80" y="580" class="layer-title">GUEST JOURNEY (simple)</text>
-          <g class="starter-node" transform="translate(80,600)"><rect class="starter-box" width="130" height="40" rx="8"/><text class="starter-text" x="65" y="25" style="font-size:12px">Booking</text></g>
-          <g class="starter-node" transform="translate(240,600)"><rect class="starter-box" width="130" height="40" rx="8"/><text class="starter-text" x="65" y="25" style="font-size:12px">Saved</text></g>
-          <g class="starter-node" transform="translate(400,600)"><rect class="starter-box" width="130" height="40" rx="8"/><text class="starter-text" x="65" y="25" style="font-size:12px">Find page</text></g>
-          <g class="starter-node" transform="translate(560,600)"><rect class="starter-box" width="130" height="40" rx="8"/><text class="starter-text" x="65" y="25" style="font-size:12px">Register</text></g>
-          <g class="starter-node" transform="translate(720,600)"><rect class="starter-box" width="130" height="40" rx="8"/><text class="starter-text" x="65" y="25" style="font-size:12px">Unlock</text></g>
-          <g class="starter-node" transform="translate(880,600)"><rect class="starter-box" width="130" height="40" rx="8"/><text class="starter-text" x="65" y="25" style="font-size:12px">Door + WiFi</text></g>
-          <path class="starter-link" d="M210,620 L240,620"/><path class="starter-link" d="M370,620 L400,620"/>
-          <path class="starter-link" d="M530,620 L560,620"/><path class="starter-link" d="M690,620 L720,620"/>
-          <path class="starter-link" d="M850,620 L880,620"/>
-
-          <!-- Your space label -->
-          <text x="80" y="720" class="layer-title" fill="#1a73e8">YOUR MAP — draw below (blue)</text>
-          <rect x="60" y="740" width="2280" height="600" rx="16" fill="#f8fbff" stroke="#c5d8f8" stroke-width="2" stroke-dasharray="8 6" pointer-events="none"/>
-          <text x="1200" y="780" class="starter-sub" style="font-size:13px;fill:#1a73e8">Use toolbar: add boxes, arrows, pen · double-click to edit text · Save when done</text>
-        </g>
-
-        <!-- USER LAYER -->
-        <g id="layer-user"></g>
-        <g id="layer-temp"></g>
+      <g id="cam">
+        <rect width="4000" height="3000" fill="url(#grid)"/>
+        <g id="draw"></g>
+        <g id="ghost"></g>
       </g>
     </svg>
+    <div class="hint" id="hint">✋ Drag empty space to move around the board</div>
   </div>
+
+  <aside class="panel" id="panel">
+    <div class="panel-head">
+      <h2>What am I missing?</h2>
+      <p>Tick items as you add them to your map. This is a guide — nothing is drawn for you.</p>
+    </div>
+    <div class="panel-body" id="checks"></div>
+    <div class="progress" id="prog">0 / 0 checked</div>
+  </aside>
 </div>
-<div class="toast" id="toast"></div>
 
 <script>
 (() => {
-  const STORAGE_KEY = 'maxela_system_map_draw_v1';
+  const KEY = 'maxela_blank_map_v2';
+  const wrap = document.getElementById('wrap');
   const svg = document.getElementById('svg');
-  const panRoot = document.getElementById('pan-root');
-  const layerUser = document.getElementById('layer-user');
-  const layerTemp = document.getElementById('layer-temp');
-  const layerStarter = document.getElementById('layer-starter');
-  const viewport = document.getElementById('viewport');
+  const cam = document.getElementById('cam');
+  const draw = document.getElementById('draw');
+  const ghost = document.getElementById('ghost');
   const hint = document.getElementById('hint');
-  const toast = document.getElementById('toast');
+  const checksEl = document.getElementById('checks');
+  const prog = document.getElementById('prog');
 
-  let tool = 'select';
+  const CHECKLIST = [
+    { group:'Guest journey', items:[
+      'Booking arrives (MiniHotel)',
+      'Booking saved in system',
+      'Guest opens check-in page',
+      'Guest registers (passport / contact)',
+      'Guest gets unlock (door / WiFi / elevator)',
+    ]},
+    { group:'Admin', items:[
+      'See today’s guests',
+      'Check passport / grant access',
+      'Edit apartment (WiFi, photos)',
+      'Update elevator code',
+    ]},
+    { group:'Housekeeping', items:[
+      'HK marks room clean',
+      'Early unlock rule',
+      'WhatsApp “room ready” (optional)',
+    ]},
+    { group:'Data (Firebase)', items:[
+      'reservations',
+      'checkin_guests (guest forms)',
+      'checkin_apartments (room info)',
+      'hk_status',
+      'elevator code',
+    ]},
+    { group:'Automation', items:[
+      'Booking sync (~10 min)',
+      'Elevator monitor',
+    ]},
+    { group:'New pipeline (future)', items:[
+      'One room truth (assignments)',
+      'Move = block conflict + swap',
+      'Logs when something fails',
+    ]},
+  ];
+
+  let tool = 'hand';
+  let camX = 200, camY = 150, camS = 1;
   let selected = null;
-  let arrowStart = null;
+  let dragItem = null;
+  let panning = null;
+  let boxDrag = null;
   let penPath = null;
-  let penPoints = '';
-  let drag = null;
-  let pan = null;
-  let view = {x:0,y:0,scale:1};
-  let uid = 0;
+  let penD = '';
+  let arrowA = null;
+  let idN = 0;
 
   const hints = {
-    select:'Select: click to pick · drag to move · double-click text to edit',
-    box:'Box: click empty space to add a box',
-    arrow:'Arrow: click start point, then end point',
-    text:'Text: click to place a label',
-    pen:'Pen: drag to draw freehand',
-    delete:'Delete: click an item to remove it',
-    pan:'Pan: drag the canvas',
+    hand:'✋ Drag empty space to pan · scroll to zoom',
+    select:'↖ Click an item to select · drag to move',
+    pen:'✎ Drag to draw',
+    box:'▢ Click and drag to draw a box · double-click box text to edit',
+    arrow:'→ Click start point, then end point',
+    text:'T Click where you want text',
+    erase:'⌫ Click an item to delete it',
   };
 
-  function showToast(msg){
-    toast.textContent = msg;
-    toast.classList.add('show');
-    setTimeout(()=>toast.classList.remove('show'), 2200);
+  function applyCam(){
+    cam.setAttribute('transform', `translate(${camX},${camY}) scale(${camS})`);
   }
 
-  function applyView(){
-    panRoot.setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.scale})`);
-  }
-
-  function clientToSvg(ex, ey){
-    const pt = svg.createSVGPoint();
-    pt.x = ex; pt.y = ey;
-    const m = panRoot.getScreenCTM().inverse();
-    return pt.matrixTransform(m);
-  }
-
-  function nextId(){ return 'u'+(++uid); }
-
-  function selectEl(el){
-    if(selected) selected.classList.remove('selected');
-    selected = el;
-    if(el) el.classList.add('selected');
+  function pt(ex, ey){
+    const p = svg.createSVGPoint();
+    p.x = ex; p.y = ey;
+    return p.matrixTransform(cam.getScreenCTM().inverse());
   }
 
   function setTool(t){
     tool = t;
-    document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('active', b.dataset.tool===t));
+    document.querySelectorAll('.tools button[data-t]').forEach(b=>{
+      b.classList.toggle('active', b.dataset.t===t);
+    });
+    wrap.className = 'canvas-wrap ' + (t==='hand'||t==='select'? 'hand' : t);
     hint.textContent = hints[t]||'';
-    viewport.classList.toggle('pen', t==='pen');
-    arrowStart = null;
-    layerTemp.innerHTML = '';
+    arrowA = null;
+    ghost.innerHTML = '';
+    if(t!=='select') deselect();
   }
 
-  document.getElementById('toolbar').addEventListener('click', e=>{
-    const btn = e.target.closest('.tool');
-    if(btn) setTool(btn.dataset.tool);
-  });
+  function nid(){ return 'n'+(++idN); }
 
-  function addBox(x,y,text='Your step'){
-    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
-    g.dataset.type = 'box';
-    g.dataset.id = nextId();
-    g.setAttribute('transform', `translate(${x-70},${y-22})`);
-    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
-    rect.setAttribute('class','user-box');
-    rect.setAttribute('width','140');
-    rect.setAttribute('height','44');
-    rect.setAttribute('rx','10');
-    const tx = document.createElementNS('http://www.w3.org/2000/svg','text');
-    tx.setAttribute('class','user-text');
-    tx.setAttribute('x','70');
-    tx.setAttribute('y','27');
-    tx.textContent = text;
-    g.appendChild(rect); g.appendChild(tx);
-    wireUserEl(g);
-    layerUser.appendChild(g);
-    selectEl(g);
-    return g;
+  function deselect(){
+    if(selected){ selected.classList.remove('sel'); selected = null; }
   }
 
-  function addText(x,y,text='Your note'){
-    const tx = document.createElementNS('http://www.w3.org/2000/svg','text');
-    tx.dataset.type = 'text';
-    tx.dataset.id = nextId();
-    tx.setAttribute('class','user-text');
-    tx.setAttribute('x', x);
-    tx.setAttribute('y', y);
-    tx.setAttribute('text-anchor','start');
-    tx.textContent = text;
-    tx.style.cursor = 'move';
-    wireUserEl(tx);
-    layerUser.appendChild(tx);
-    selectEl(tx);
-    return tx;
+  function select(el){
+    deselect();
+    selected = el;
+    if(el) el.classList.add('sel');
   }
 
-  function addArrow(x1,y1,x2,y2){
-    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-    p.dataset.type = 'arrow';
-    p.dataset.id = nextId();
-    p.setAttribute('class','user-link');
-    p.setAttribute('d', curvePath(x1,y1,x2,y2));
-    wireUserEl(p);
-    layerUser.appendChild(p);
-    selectEl(p);
-    return p;
-  }
+  function isDrawn(el){ return draw.contains(el); }
 
-  function addPenPath(d){
-    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-    p.dataset.type = 'pen';
-    p.dataset.id = nextId();
-    p.setAttribute('class','user-path');
-    p.setAttribute('d', d);
-    layerUser.appendChild(p);
-    return p;
-  }
-
-  function curvePath(x1,y1,x2,y2){
-    const mx = (x1+x2)/2;
-    return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
-  }
-
-  function editText(el){
-    const cur = el.tagName==='text' ? el.textContent : el.querySelector('text')?.textContent || '';
-    const nv = prompt('Edit text:', cur);
-    if(nv===null) return;
-    if(el.tagName==='text') el.textContent = nv;
-    else el.querySelector('text').textContent = nv;
-  }
-
-  function wireUserEl(el){
+  function wire(el){
     el.addEventListener('pointerdown', e=>{
-      if(tool==='delete'){
+      if(tool==='erase' && isDrawn(el)){
         el.remove();
         if(selected===el) selected=null;
         e.stopPropagation();
@@ -339,210 +264,325 @@
       }
       if(tool!=='select') return;
       e.stopPropagation();
-      selectEl(el);
-      const p = clientToSvg(e.clientX, e.clientY);
-      let ox=0, oy=0;
+      select(el);
+      const p = pt(e.clientX, e.clientY);
+      let ox, oy;
       if(el.tagName==='g'){
         const tr = el.getAttribute('transform')||'translate(0,0)';
         const m = tr.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
-        ox = m?+m[1]:0; oy = m?+m[2]:0;
+        ox=+(m?.[1]||0); oy=+(m?.[2]||0);
+        dragItem = {el, sx:p.x, sy:p.y, ox, oy, kind:'g'};
       } else {
-        ox = +el.getAttribute('x')||0; oy = +el.getAttribute('y')||0;
+        ox=+el.getAttribute('x')||0; oy=+el.getAttribute('y')||0;
+        dragItem = {el, sx:p.x, sy:p.y, ox, oy, kind:'t'};
       }
-      drag = {el, startX:p.x, startY:p.y, ox, oy, isG: el.tagName==='g'};
       el.setPointerCapture(e.pointerId);
     });
     el.addEventListener('dblclick', e=>{
       e.stopPropagation();
-      if(el.dataset.type==='box' || el.dataset.type==='text') editText(el);
+      if(el.dataset.kind==='box'){
+        const tx = el.querySelector('text');
+        const v = prompt('Label:', tx.textContent);
+        if(v!==null) tx.textContent = v || ' ';
+      } else if(el.dataset.kind==='text'){
+        const v = prompt('Text:', el.textContent);
+        if(v!==null) el.textContent = v;
+      }
     });
   }
 
-  function serializeUser(){
-    const items = [];
-    layerUser.querySelectorAll('[data-type]').forEach(el=>{
-      const t = el.dataset.type;
-      if(t==='box'){
-        const tr = el.getAttribute('transform');
-        const m = tr.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
-        items.push({type:'box', x:+m[1], y:+m[2], text: el.querySelector('text').textContent});
-      } else if(t==='text'){
-        items.push({type:'text', x:+el.getAttribute('x'), y:+el.getAttribute('y'), text: el.textContent});
-      } else if(t==='arrow'){
-        items.push({type:'arrow', d: el.getAttribute('d')});
-      } else if(t==='pen'){
-        items.push({type:'pen', d: el.getAttribute('d')});
-      }
-    });
-    return items;
+  function addBox(x,y,w,h,text=''){
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.dataset.kind = 'box';
+    g.dataset.id = nid();
+    g.setAttribute('transform', `translate(${x},${y})`);
+    const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    r.setAttribute('class','shape');
+    r.setAttribute('width', Math.max(40,w));
+    r.setAttribute('height', Math.max(28,h));
+    r.setAttribute('rx','8');
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('class','shape-text');
+    t.setAttribute('x', Math.max(40,w)/2);
+    t.setAttribute('y', Math.max(28,h)/2);
+    t.textContent = text || 'label';
+    g.append(r,t);
+    wire(g);
+    draw.appendChild(g);
+    return g;
   }
 
-  function loadUser(items){
-    layerUser.innerHTML = '';
-    uid = 0;
-    (items||[]).forEach(it=>{
-      if(it.type==='box') addBox(it.x+70, it.y+22, it.text);
-      else if(it.type==='text') addText(it.x, it.y, it.text);
-      else if(it.type==='arrow'){
-        const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-        p.dataset.type='arrow'; p.dataset.id=nextId();
-        p.setAttribute('class','user-link'); p.setAttribute('d', it.d);
-        wireUserEl(p); layerUser.appendChild(p);
-      } else if(it.type==='pen'){
-        const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-        p.dataset.type='pen'; p.dataset.id=nextId();
-        p.setAttribute('class','user-path'); p.setAttribute('d', it.d);
-        layerUser.appendChild(p);
-      }
+  function addText(x,y, text='text'){
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.dataset.kind = 'text';
+    t.dataset.id = nid();
+    t.setAttribute('class','label');
+    t.setAttribute('x', x);
+    t.setAttribute('y', y);
+    t.textContent = text;
+    wire(t);
+    draw.appendChild(t);
+    return t;
+  }
+
+  function addArrow(x1,y1,x2,y2){
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.dataset.kind = 'arrow';
+    p.dataset.id = nid();
+    p.setAttribute('class','arrow');
+    const mx = (x1+x2)/2;
+    p.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+    wire(p);
+    draw.appendChild(p);
+    return p;
+  }
+
+  function addPen(d){
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.dataset.kind = 'pen';
+    p.dataset.id = nid();
+    p.setAttribute('class','stroke');
+    p.setAttribute('d', d);
+    wire(p);
+    draw.appendChild(p);
+    return p;
+  }
+
+  function buildChecklist(){
+    checksEl.innerHTML = '';
+    CHECKLIST.forEach(gr=>{
+      const div = document.createElement('div');
+      div.className = 'group';
+      div.innerHTML = `<div class="group-title">${gr.group}</div>`;
+      gr.items.forEach((label,i)=>{
+        const id = gr.group+'_'+i;
+        const row = document.createElement('label');
+        row.className = 'check';
+        row.innerHTML = `<input type="checkbox" data-id="${id}"><span>${label}</span>`;
+        row.querySelector('input').addEventListener('change', updateProg);
+        div.appendChild(row);
+      });
+      checksEl.appendChild(div);
     });
-    selectEl(null);
+    updateProg();
+  }
+
+  function updateProg(){
+    const all = checksEl.querySelectorAll('input[type=checkbox]');
+    const done = checksEl.querySelectorAll('input:checked');
+    all.forEach(inp=>{
+      inp.closest('.check').classList.toggle('done', inp.checked);
+    });
+    prog.textContent = `${done.length} / ${all.length} checked`;
   }
 
   function save(){
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({items: serializeUser(), view, savedAt: Date.now()}));
-    showToast('Saved in this browser');
-  }
-
-  function loadSaved(){
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw){ showToast('Nothing saved yet'); return; }
-    try{
-      const data = JSON.parse(raw);
-      loadUser(data.items);
-      if(data.view) { view = data.view; applyView(); }
-      showToast('Loaded your saved map');
-    }catch(e){ showToast('Load failed'); }
-  }
-
-  viewport.addEventListener('pointerdown', e=>{
-    if(e.target.closest('.user-box,.user-text,.user-link,.user-path,[data-type]') && tool!=='box' && tool!=='arrow' && tool!=='text' && tool!=='pen') return;
-    const p = clientToSvg(e.clientX, e.clientY);
-    if(tool==='pan' || (tool==='select' && e.target===svg || e.target===viewport || e.target.id==='pan-root')){
-      pan = {sx:e.clientX, sy:e.clientY, vx:view.x, vy:view.y};
-      viewport.classList.add('grabbing');
-      return;
-    }
-    if(tool==='box'){ addBox(p.x,p.y); return; }
-    if(tool==='text'){ addText(p.x,p.y); return; }
-    if(tool==='arrow'){
-      if(!arrowStart){ arrowStart = p; const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
-        c.setAttribute('cx',p.x); c.setAttribute('cy',p.y); c.setAttribute('r',5); c.setAttribute('fill','#1a73e8');
-        layerTemp.innerHTML=''; layerTemp.appendChild(c);
-      } else {
-        addArrow(arrowStart.x, arrowStart.y, p.x, p.y);
-        arrowStart=null; layerTemp.innerHTML='';
+    const items = [];
+    draw.querySelectorAll('[data-kind]').forEach(el=>{
+      const k = el.dataset.kind;
+      if(k==='box'){
+        const tr = el.getAttribute('transform').match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+        const r = el.querySelector('rect');
+        items.push({k,x:+tr[1],y:+tr[2],w:+r.getAttribute('width'),h:+r.getAttribute('height'),text:el.querySelector('text').textContent});
+      } else if(k==='text'){
+        items.push({k,x:+el.getAttribute('x'),y:+el.getAttribute('y'),text:el.textContent});
+      } else if(k==='arrow'||k==='pen'){
+        items.push({k,d:el.getAttribute('d')});
       }
-      return;
-    }
-    if(tool==='pen'){
-      penPoints = `M${p.x},${p.y}`;
-      penPath = document.createElementNS('http://www.w3.org/2000/svg','path');
-      penPath.setAttribute('class','user-path');
-      penPath.setAttribute('d', penPoints);
-      layerTemp.appendChild(penPath);
-      viewport.setPointerCapture(e.pointerId);
-      return;
-    }
-    if(tool==='select') selectEl(null);
+    });
+    const checked = [...checksEl.querySelectorAll('input:checked')].map(i=>i.dataset.id);
+    localStorage.setItem(KEY, JSON.stringify({items, checked, cam:{camX,camY,camS}}));
+    hint.textContent = 'Saved ✓';
+    setTimeout(()=> hint.textContent = hints[tool], 1200);
+  }
+
+  function load(){
+    const raw = localStorage.getItem(KEY);
+    if(!raw) return;
+    try{
+      const d = JSON.parse(raw);
+      draw.innerHTML = '';
+      idN = 0;
+      (d.items||[]).forEach(it=>{
+        if(it.k==='box') addBox(it.x,it.y,it.w,it.h,it.text);
+        else if(it.k==='text') addText(it.x,it.y,it.text);
+        else if(it.k==='arrow'){
+          const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+          p.dataset.kind='arrow'; p.dataset.id=nid();
+          p.setAttribute('class','arrow'); p.setAttribute('d',it.d);
+          wire(p); draw.appendChild(p);
+        } else if(it.k==='pen'){
+          const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+          p.dataset.kind='pen'; p.dataset.id=nid();
+          p.setAttribute('class','stroke'); p.setAttribute('d',it.d);
+          wire(p); draw.appendChild(p);
+        }
+      });
+      checksEl.querySelectorAll('input').forEach(inp=>{
+        inp.checked = (d.checked||[]).includes(inp.dataset.id);
+      });
+      updateProg();
+      if(d.cam){ camX=d.cam.camX??camX; camY=d.cam.camY??camY; camS=d.cam.camS??camS; applyCam(); }
+    }catch(e){}
+  }
+
+  // tools
+  document.querySelector('.tools').addEventListener('click', e=>{
+    const b = e.target.closest('button[data-t]');
+    if(b) setTool(b.dataset.t);
   });
 
-  viewport.addEventListener('pointermove', e=>{
-    const p = clientToSvg(e.clientX, e.clientY);
-    if(drag){
-      const dx = p.x - drag.startX, dy = p.y - drag.startY;
-      if(drag.isG) drag.el.setAttribute('transform', `translate(${drag.ox+dx},${drag.oy+dy})`);
-      else { drag.el.setAttribute('x', drag.ox+dx); drag.el.setAttribute('y', drag.oy+dy); }
-      return;
-    }
-    if(pan){
-      view.x = pan.vx + (e.clientX - pan.sx);
-      view.y = pan.vy + (e.clientY - pan.sy);
-      applyView();
-      return;
-    }
-    if(tool==='pen' && penPath){
-      penPoints += ` L${p.x},${p.y}`;
-      penPath.setAttribute('d', penPoints);
-    }
-    if(tool==='arrow' && arrowStart){
-      layerTemp.innerHTML = '';
-      const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
-      c.setAttribute('cx',arrowStart.x); c.setAttribute('cy',arrowStart.y); c.setAttribute('r',5); c.setAttribute('fill','#1a73e8');
-      layerTemp.appendChild(c);
-      const preview=document.createElementNS('http://www.w3.org/2000/svg','path');
-      preview.setAttribute('class','user-link'); preview.setAttribute('opacity','0.5');
-      preview.setAttribute('d', curvePath(arrowStart.x,arrowStart.y,p.x,p.y));
-      layerTemp.appendChild(preview);
-    }
-  });
-
-  viewport.addEventListener('pointerup', e=>{
-    if(drag){ drag=null; return; }
-    if(pan){ pan=null; viewport.classList.remove('grabbing'); return; }
-    if(tool==='pen' && penPath){
-      penPath.dataset.type='pen'; penPath.dataset.id=nextId();
-      layerUser.appendChild(penPath);
-      penPath=null; penPoints='';
-    }
-  });
-
-  viewport.addEventListener('wheel', e=>{
-    e.preventDefault();
-    const rect = viewport.getBoundingClientRect();
-    const mx = e.clientX-rect.left, my = e.clientY-rect.top;
-    const prev = view.scale;
-    view.scale = Math.min(2.5, Math.max(0.35, view.scale * (e.deltaY<0?1.08:0.92)));
-    view.x = mx - (mx-view.x)*(view.scale/prev);
-    view.y = my - (my-view.y)*(view.scale/prev);
-    applyView();
-  }, {passive:false});
-
-  document.getElementById('btn-toggle-starter').addEventListener('click', function(){
-    const hide = layerStarter.style.display !== 'none';
-    layerStarter.style.display = hide ? 'none' : '';
-    this.textContent = hide ? 'Show starter' : 'Hide starter';
-  });
-
-  document.getElementById('btn-copy-starter').addEventListener('click', ()=>{
-    addText(120, 820, 'My idea starts here…');
-    addBox(120, 860, 'Step 1');
-    addBox(320, 860, 'Step 2');
-    addBox(520, 860, 'Controller?');
-    addArrow(190,860,320,860);
-    addArrow(390,860,520,860);
-    showToast('Starter sketch copied — edit freely');
+  document.getElementById('btn-checklist').addEventListener('click', function(){
+    document.getElementById('panel').classList.toggle('hidden');
+    this.classList.toggle('on');
   });
 
   document.getElementById('btn-save').addEventListener('click', save);
-  document.getElementById('btn-load').addEventListener('click', loadSaved);
-  document.getElementById('btn-clear-user').addEventListener('click', ()=>{
-    if(confirm('Clear everything you drew?')){ loadUser([]); showToast('Your layer cleared'); }
+
+  document.getElementById('btn-clear').addEventListener('click', ()=>{
+    if(confirm('Clear the whole board?')){
+      draw.innerHTML = '';
+      deselect();
+    }
   });
 
-  document.getElementById('btn-export').addEventListener('click', ()=>{
-    const xml = new XMLSerializer().serializeToString(svg);
-    const img = new Image();
-    const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
-    img.onload = ()=>{
-      const c = document.createElement('canvas');
-      c.width = 2400; c.height = 1400;
-      c.getContext('2d').fillStyle='#fff';
-      c.getContext('2d').fillRect(0,0,c.width,c.height);
-      c.getContext('2d').drawImage(img,0,0);
-      const a = document.createElement('a');
-      a.download = 'maxela-my-system-map.png';
-      a.href = c.toDataURL('image/png');
-      a.click();
-      showToast('PNG downloaded');
-    };
-    img.src = url;
+  wrap.addEventListener('pointerdown', e=>{
+    if(e.target.closest('[data-kind]') && tool!=='hand') return;
+
+    const p = pt(e.clientX, e.clientY);
+
+    if(tool==='hand' || (tool==='select' && !e.target.closest('[data-kind]'))){
+      panning = {sx:e.clientX, sy:e.clientY, cx:camX, cy:camY};
+      wrap.classList.add('grabbing');
+      return;
+    }
+
+    if(tool==='box'){
+      boxDrag = {x0:p.x, y0:p.y};
+      const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      r.setAttribute('class','ghost');
+      r.setAttribute('x', p.x); r.setAttribute('y', p.y);
+      r.setAttribute('width',0); r.setAttribute('height',0);
+      r.setAttribute('rx','8');
+      ghost.innerHTML=''; ghost.appendChild(r);
+      boxDrag.rect = r;
+      wrap.setPointerCapture(e.pointerId);
+      return;
+    }
+
+    if(tool==='pen'){
+      penD = `M${p.x},${p.y}`;
+      penPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+      penPath.setAttribute('class','stroke');
+      penPath.setAttribute('d', penD);
+      ghost.innerHTML=''; ghost.appendChild(penPath);
+      wrap.setPointerCapture(e.pointerId);
+      return;
+    }
+
+    if(tool==='arrow'){
+      if(!arrowA){
+        arrowA = p;
+        ghost.innerHTML = `<circle cx="${p.x}" cy="${p.y}" r="5" fill="#2563eb"/>`;
+      } else {
+        addArrow(arrowA.x, arrowA.y, p.x, p.y);
+        arrowA = null;
+        ghost.innerHTML = '';
+      }
+      return;
+    }
+
+    if(tool==='text'){
+      const t = prompt('Text:');
+      if(t) addText(p.x, p.y, t);
+      return;
+    }
+
+    if(tool==='select') deselect();
   });
 
-  // Auto-load if saved
-  if(localStorage.getItem(STORAGE_KEY)) loadSaved();
-  else setTool('box');
+  wrap.addEventListener('pointermove', e=>{
+    const p = pt(e.clientX, e.clientY);
 
-  applyView();
+    if(dragItem){
+      const dx = p.x-dragItem.sx, dy = p.y-dragItem.sy;
+      if(dragItem.kind==='g')
+        dragItem.el.setAttribute('transform', `translate(${dragItem.ox+dx},${dragItem.oy+dy})`);
+      else {
+        dragItem.el.setAttribute('x', dragItem.ox+dx);
+        dragItem.el.setAttribute('y', dragItem.oy+dy);
+      }
+      return;
+    }
+
+    if(panning){
+      camX = panning.cx + (e.clientX - panning.sx);
+      camY = panning.cy + (e.clientY - panning.sy);
+      applyCam();
+      return;
+    }
+
+    if(boxDrag && boxDrag.rect){
+      const x = Math.min(boxDrag.x0, p.x), y = Math.min(boxDrag.y0, p.y);
+      const w = Math.abs(p.x - boxDrag.x0), h = Math.abs(p.y - boxDrag.y0);
+      boxDrag.rect.setAttribute('x', x);
+      boxDrag.rect.setAttribute('y', y);
+      boxDrag.rect.setAttribute('width', w);
+      boxDrag.rect.setAttribute('height', h);
+      return;
+    }
+
+    if(penPath){
+      penD += ` L${p.x},${p.y}`;
+      penPath.setAttribute('d', penD);
+      return;
+    }
+
+    if(arrowA){
+      const mx = (arrowA.x+p.x)/2;
+      ghost.innerHTML = `<circle cx="${arrowA.x}" cy="${arrowA.y}" r="5" fill="#2563eb"/>
+        <path class="arrow" opacity=".4" d="M${arrowA.x},${arrowA.y} C${mx},${arrowA.y} ${mx},${p.y} ${p.x},${p.y}"/>`;
+    }
+  });
+
+  wrap.addEventListener('pointerup', e=>{
+    if(dragItem){ dragItem=null; return; }
+    if(panning){ panning=null; wrap.classList.remove('grabbing'); return; }
+
+    if(boxDrag && boxDrag.rect){
+      const x = +boxDrag.rect.getAttribute('x');
+      const y = +boxDrag.rect.getAttribute('y');
+      const w = +boxDrag.rect.getAttribute('width');
+      const h = +boxDrag.rect.getAttribute('height');
+      ghost.innerHTML = '';
+      if(w > 12 && h > 12) addBox(x,y,w,h);
+      boxDrag = null;
+      return;
+    }
+
+    if(penPath){
+      if(penD.split('L').length > 2) addPen(penD);
+      ghost.innerHTML = '';
+      penPath = null;
+      penD = '';
+    }
+  });
+
+  wrap.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const r = wrap.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const prev = camS;
+    camS = Math.min(2.5, Math.max(0.25, camS * (e.deltaY < 0 ? 1.07 : 0.93)));
+    camX = mx - (mx - camX) * (camS / prev);
+    camY = my - (my - camY) * (camS / prev);
+    applyCam();
+  }, {passive:false});
+
+  buildChecklist();
+  load();
+  applyCam();
+  setTool('hand');
 })();
 </script>
 </body>
