@@ -1,0 +1,108 @@
+{
+  "meta": {
+    "title": "Fake Maxela reservations for pipeline testing",
+    "note": "Invented data only. Never written to live Firebase by default.",
+    "timezone": "Asia/Tbilisi"
+  },
+  "reservations": [
+    {
+      "id": "res_anna",
+      "reservationNumber": "9001",
+      "guest": "Anna Rossi",
+      "roomCode": "6-1",
+      "checkin": "2026-09-10",
+      "checkout": "2026-09-14",
+      "status": "CONFIRMED",
+      "guestId": "guest_anna"
+    },
+    {
+      "id": "res_ben",
+      "reservationNumber": "9002",
+      "guest": "Ben Okoro",
+      "roomCode": "6-2",
+      "checkin": "2026-09-10",
+      "checkout": "2026-09-13",
+      "status": "CONFIRMED",
+      "guestId": "guest_ben"
+    },
+    {
+      "id": "res_cara",
+      "reservationNumber": "9003",
+      "guest": "Cara Nguyen",
+      "roomCode": "6-3",
+      "checkin": "2026-09-14",
+      "checkout": "2026-09-18",
+      "status": "CONFIRMED",
+      "guestId": "guest_cara",
+      "note": "Same-day turnover after Anna leaves 6-1 conceptually; currently in 6-3"
+    },
+    {
+      "id": "res_dani_a",
+      "reservationNumber": "9004",
+      "guest": "Dani Family",
+      "roomCode": "7-1",
+      "checkin": "2026-09-11",
+      "checkout": "2026-09-16",
+      "status": "CONFIRMED",
+      "guestId": "guest_dani_a",
+      "slot": 1,
+      "note": "Multi-room booking slot A"
+    },
+    {
+      "id": "res_dani_b",
+      "reservationNumber": "9004",
+      "guest": "Dani Family",
+      "roomCode": "7-2",
+      "checkin": "2026-09-11",
+      "checkout": "2026-09-16",
+      "status": "CONFIRMED",
+      "guestId": "guest_dani_b",
+      "slot": 2,
+      "note": "Multi-room booking slot B"
+    },
+    {
+      "id": "res_eli",
+      "reservationNumber": "9005",
+      "guest": "Eli Cohen",
+      "roomCode": "tab-1",
+      "checkin": "2026-09-12",
+      "checkout": "2026-09-15",
+      "status": "CONFIRMED",
+      "guestId": "guest_eli"
+    },
+    {
+      "id": "res_faye",
+      "reservationNumber": "9006",
+      "guest": "Faye Park",
+      "roomCode": "orb-1",
+      "checkin": "2026-09-10",
+      "checkout": "2026-09-20",
+      "status": "CONFIRMED",
+      "guestId": "guest_faye",
+      "note": "Long stay — used for contained-overlap conflict tests"
+    },
+    {
+      "id": "res_cancelled",
+      "reservationNumber": "9007",
+      "guest": "Gone Guest",
+      "roomCode": "0-1",
+      "checkin": "2026-09-10",
+      "checkout": "2026-09-12",
+      "status": "CANCELLED",
+      "guestId": "guest_gone",
+      "assignmentStatus": "cancelled"
+    },
+    {
+      "id": "res_empty_target",
+      "reservationNumber": "9008",
+      "guest": "Later Guest",
+      "roomCode": "0-4",
+      "checkin": "2026-10-01",
+      "checkout": "2026-10-05",
+      "status": "CONFIRMED",
+      "guestId": "guest_later",
+      "note": "Far future — leaves 7-3 / 6-4 free in September for empty moves"
+    }
+  ],
+  "free_rooms_in_september": ["6-4", "7-3", "7-4", "tab-2", "orb-2", "0-2", "0-3"]
+}

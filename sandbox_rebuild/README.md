@@ -12,7 +12,8 @@ Design source: `PIPELINE_DESIGN_CURSOR.md` (repo root)
 | MemoryStore + logging (`v2_system_logs` / `v2_system_alerts`) | done |
 | **RoomAssignment** controller (move / swap / conflict / audit) | done |
 | **AdminAction** façade (move_guest, swap_guests, release_to_minihotel) | done |
-| Unit tests (8) | done |
+| **Fake reservations + scenario tester** (17 scenarios) | done |
+| Unit tests | done |
 | ReservationSync / GuestUnlock / Elevator / WhatsApp | not yet |
 
 ## Run demo (safe)
@@ -22,11 +23,24 @@ cd /workspace/sandbox_rebuild
 PYTHONPATH=. python3 -m pipeline.run_demo
 ```
 
+## Run scenario tester (fake reservations — every case)
+
+```bash
+cd /workspace/sandbox_rebuild
+PYTHONPATH=. python3 -m pipeline.scenario_tester
+```
+
+Covers: empty move, conflict block, partial/contained overlap, same-day turnover,
+swap, NOOP, NOT_FOUND, cancelled, version conflict, release to MiniHotel,
+create conflict, multi-room family, audit trail, AdminAction, atomic rollback.
+
+Fake data: `data/fake_reservations.json`
+
 ## Run tests
 
 ```bash
 cd /workspace/sandbox_rebuild
-PYTHONPATH=. python3 -m unittest tests.test_room_assignment -v
+PYTHONPATH=. python3 -m unittest tests.test_room_assignment tests.test_scenarios -v
 ```
 
 ## Rules encoded
