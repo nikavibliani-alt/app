@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maxela — System Map (Cursor)</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:#fff;color:#1a1a1a;min-height:100vh;
+  }
+  header{
+    display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+    padding:18px 22px 12px;border-bottom:1px solid #e8eaed;background:#fafbfc;
+  }
+  header h1{font-size:20px;font-weight:700;letter-spacing:-.02em}
+  header p{font-size:13px;color:#5f6368;margin-top:4px;max-width:720px;line-height:1.45}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-shrink:0}
+  .toolbar button{
+    font:inherit;font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;
+    border:1px solid #dadce0;background:#fff;color:#202124;cursor:pointer;
+  }
+  .toolbar button:hover{background:#f1f3f4}
+  .toolbar button.active{background:#fce8e6;border-color:#f44336;color:#b71c1c}
+  .hint{font-size:12px;color:#80868b;padding:8px 22px;background:#fff}
+  #stage{
+    position:relative;width:100%;height:calc(100vh - 110px);min-height:800px;
+    overflow:hidden;background:#fff;cursor:grab;touch-action:none;
+  }
+  #stage.grabbing{cursor:grabbing}
+  #stage svg{display:block;width:100%;height:100%}
+  .col-bg{fill:#fafbfc;stroke:#e8eaed;stroke-width:1;rx:14}
+  .col-title{
+    font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+    fill:#5f6368;
+  }
+  .group-bg{fill:#fff;stroke:#e6e8eb;stroke-width:1;rx:10}
+  .group-title{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;fill:#80868b}
+  .node{cursor:pointer}
+  .node rect,.node path.nshape{
+    stroke-width:1.75;transition:opacity .15s,filter .15s;
+  }
+  .node text{pointer-events:none;user-select:none}
+  .node .label{font-size:12.5px;font-weight:700;fill:#202124}
+  .node .sub{font-size:10px;font-weight:500;fill:#5f6368}
+  .badge{font-size:8.5px;font-weight:800;letter-spacing:.04em}
+  .link{fill:none;stroke:#90A4AE;stroke-width:1.5;transition:opacity .15s}
+  .link.fragile{stroke:#f44336;stroke-width:2;stroke-dasharray:6 4}
+  .link-label{font-size:10px;font-weight:600;fill:#546e7a;pointer-events:none}
+  .link-label.fragile{fill:#c62828}
+  .link-label-bg{fill:#fff;opacity:.92;pointer-events:none}
+  .dim{opacity:.12 !important}
+  .focus{opacity:1 !important}
+  .tooltip{
+    position:fixed;z-index:50;max-width:300px;padding:10px 12px;border-radius:10px;
+    background:#fff;border:1px solid #dadce0;box-shadow:0 8px 28px rgba(0,0,0,.12);
+    font-size:12.5px;line-height:1.45;color:#3c4043;pointer-events:none;
+    opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s;
+  }
+  .tooltip.show{opacity:1;transform:none}
+  .tooltip b{display:block;color:#202124;font-size:13px;margin-bottom:4px}
+  .legend{
+    display:flex;flex-wrap:wrap;gap:14px;padding:10px 22px 16px;font-size:12px;color:#5f6368;
+    border-top:1px solid #e8eaed;background:#fafbfc;
+  }
+  .legend i{
+    display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;
+    vertical-align:-2px;border:1.5px solid;
+  }
+  .fragile-panel{
+    margin:0 22px 14px;padding:12px 14px;border:1px solid #ffcdd2;border-radius:10px;
+    background:#fff8f7;color:#5f6368;font-size:12.5px;line-height:1.45;
+  }
+  .fragile-panel strong{color:#b71c1c}
+  .fragile-panel ol{margin:8px 0 0 18px}
+  .fragile-panel li{margin:4px 0}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Maxela system map</h1>
+    <p>Left → right = how bookings and people move through the system. Click a box to see only its connections. Drag to pan · scroll to zoom.</p>
+  </div>
+  <div class="toolbar">
+    <button type="button" id="btn-fragile">Show fragile only</button>
+    <button type="button" id="btn-reset">Reset view</button>
+  </div>
+</header>
+<div class="hint" id="status">Showing all important flows</div>
+<div id="stage"></div>
+<div class="fragile-panel">
+  <strong>Fragile connections (red dashed on the map)</strong>
+  <ol>
+    <li><b>⚠1</b> Tuya → <code>reservations.tuyaPassword</code> — unknown writer; nothing in this repo writes it</li>
+    <li><b>⚠2</b> <code>checkin_admin/config</code> full <code>setDoc</code> — last-write-wins; two tabs can clobber each other</li>
+    <li><b>⚠3</b> <code>roomReadyNotification</code> Cloud Function — duplicate of <code>whatsapp_checkin_ready.py</code> (currently disabled)</li>
+    <li><b>⚠4</b> Room list defined in 4 places — drift risk if one is updated</li>
+    <li><b>⚠5</b> <code>checkin_guests.aptId</code> vs <code>reservations.roomCode</code> — two sources of truth for guest room</li>
+  </ol>
+</div>
+<div class="legend">
+  <span><i style="background:#e8f4fd;border-color:#2196F3"></i>Outside Maxela</span>
+  <span><i style="background:#fff3e0;border-color:#FF9800"></i>Automation</span>
+  <span><i style="background:#f5f5f5;border-color:#9E9E9E;border-style:dashed"></i>Disabled jobs</span>
+  <span><i style="background:#e8f5e9;border-color:#4CAF50"></i>Firestore data</span>
+  <span><i style="background:#fce4ec;border-color:#E91E63"></i>Realtime DB</span>
+  <span><i style="background:#f3e5f5;border-color:#9C27B0"></i>Screens / apps</span>
+  <span style="color:#c62828;font-weight:600">Red dashed = fragile / unclear</span>
+</div>
+<div class="tooltip" id="tip"></div>
+
+<script>
+(() => {
+  // ── Data (drawn from SYSTEM_CONNECTION_MAP + specs; layout per brief) ──
+  const W = 1680, H = 980;
+
+  const nodes = [
+    // Col 1 — External
+    {id:'minihotel', col:1, x:70, y:120, w:200, h:56, kind:'ext',
+      label:'MiniHotel', tip:'Booking source system. Reservations are pulled from here into Firebase.'},
+    {id:'guest', col:1, x:70, y:210, w:200, h:56, kind:'ext',
+      label:'Guest', tip:'Person staying in an apartment. Uses the check-in page and receives WhatsApp.'},
+    {id:'admin', col:1, x:70, y:300, w:200, h:56, kind:'ext',
+      label:'Nika / Admin', tip:'Operator. Uses live admin, sandbox admin, and Sleepy PMS.'},
+    {id:'cron', col:1, x:70, y:390, w:200, h:56, kind:'ext',
+      label:'cron-job.org', tip:'External scheduler. Triggers GitHub Actions (reservation sync every ~10 min, pricing runs).'},
+    {id:'whatsapp', col:1, x:70, y:480, w:200, h:56, kind:'ext',
+      label:'WhatsApp / Meta', tip:'Sends check-in ready messages. Also receives inbound guest chats via webhook.'},
+    {id:'tuya', col:1, x:70, y:570, w:200, h:56, kind:'ext',
+      label:'Tuya', tip:'Smart lock platform. Guest pages read tuyaPassword — writer in this repo is unknown.'},
+    {id:'cloudinary', col:1, x:70, y:660, w:200, h:56, kind:'ext',
+      label:'Cloudinary', tip:'Photo hosting for apartment check-in steps and guest-page media uploads from admin.'},
+    {id:'resend', col:1, x:70, y:750, w:200, h:56, kind:'ext',
+      label:'Resend (email)', tip:'Sends elevator-stale alert emails from elevator-monitor.js (not SendGrid).'},
+
+    // Col 2 — Automation
+    {id:'sync', col:2, x:340, y:90, w:260, h:70, kind:'auto',
+      label:'minihotel_reservation_sync.py',
+      sub:'Every ~10 min — pulls bookings',
+      tip:'Core pipeline: MiniHotel → Firestore reservations. Also enriches guest details and can trigger urgent pricing.'},
+    {id:'pricing', col:2, x:340, y:180, w:260, h:70, kind:'auto',
+      label:'pricing_engine.py',
+      sub:'~5× daily — updates prices',
+      tip:'Pricing orchestrator. Triggered by cron-job.org / cancellations / manual dispatch.'},
+    {id:'elevmon', col:2, x:340, y:270, w:260, h:70, kind:'auto',
+      label:'elevator-monitor.js',
+      sub:'Hourly — code freshness check',
+      tip:'Reads RTDB /elevator_code. Emails via Resend if stale >26h.'},
+    {id:'waready', col:2, x:340, y:360, w:260, h:70, kind:'auto',
+      label:'whatsapp_checkin_ready.py',
+      sub:'Daily — room ready WhatsApp',
+      tip:'If HK marked room done and guest has a form, sends “room ready” WhatsApp.'},
+    {id:'waremind', col:2, x:340, y:450, w:260, h:58, kind:'disabled', badge:'DISABLED',
+      label:'whatsapp check-in reminder',
+      tip:'Intentionally disabled. Part of whatsapp_automation.py — no schedule fires it.'},
+    {id:'wacheckout', col:2, x:340, y:525, w:260, h:58, kind:'disabled', badge:'DISABLED',
+      label:'whatsapp checkout',
+      tip:'Intentionally disabled checkout reminder job.'},
+    {id:'wamidstay', col:2, x:340, y:600, w:260, h:58, kind:'disabled', badge:'DISABLED',
+      label:'whatsapp midstay',
+      tip:'Intentionally disabled midstay message job.'},
+    {id:'hksync', col:2, x:340, y:675, w:260, h:58, kind:'disabled', badge:'DISABLED',
+      label:'housekeeper_sync.py',
+      tip:'Dormant MiniHotel HK scrape. Would write roomCode + manualRoom:true if re-enabled.'},
+    {id:'roomready_cf', col:2, x:340, y:760, w:260, h:70, kind:'disabled', badge:'DISABLED',
+      label:'roomReadyNotification CF',
+      sub:'Same job as checkin_ready',
+      tip:'Cloud Function on hk_status writes. Deployed but hardcoded return — duplicate of whatsapp_checkin_ready.py.'},
+
+    // Col 3 — Data
+    {id:'reservations', col:3, x:700, y:100, w:220, h:52, kind:'fs', group:'guest',
+      label:'reservations', tip:'Bookings from MiniHotel. Source of room, dates, and (sometimes) tuyaPassword.'},
+    {id:'checkin_guests', col:3, x:700, y:170, w:220, h:52, kind:'fs', group:'guest',
+      label:'checkin_guests', tip:'Guest registration forms: passport, contact, unlock flags, aptId.'},
+    {id:'search_failures', col:3, x:700, y:240, w:220, h:52, kind:'fs', group:'guest',
+      label:'search_failures', tip:'When a guest cannot find their booking on the check-in page.'},
+
+    {id:'checkin_apartments', col:3, x:700, y:360, w:220, h:52, kind:'fs', group:'property',
+      label:'checkin_apartments', tip:'Per-room WiFi, door code, photos, instructions, Tuya device id.'},
+    {id:'admin_config', col:3, x:700, y:430, w:220, h:52, kind:'fs', group:'property',
+      label:'checkin_admin/config', tip:'Guest page tiles, services, location text. Full setDoc overwrite — last write wins.'},
+    {id:'hk_status', col:3, x:700, y:500, w:220, h:52, kind:'fs', group:'property',
+      label:'hk_status', tip:'Housekeeping “room clean / done” flags by room + date.'},
+    {id:'hk_pins', col:3, x:700, y:570, w:220, h:52, kind:'fs', group:'property',
+      label:'hk_pins', tip:'4-digit PINs for housekeeping apps.'},
+
+    {id:'elev_fs', col:3, x:700, y:690, w:220, h:52, kind:'fs', group:'system',
+      label:'globals/elevator_code', tip:'Firestore copy of elevator display code + QR.'},
+    {id:'elev_rtdb', col:3, x:700, y:760, w:220, h:52, kind:'rtdb', group:'system',
+      label:'RTDB /elevator_code', tip:'Realtime Database path used for fast elevator QR/code reads and monitor.'},
+    {id:'service_requests', col:3, x:700, y:830, w:220, h:52, kind:'fs', group:'system',
+      label:'service_requests', tip:'Airport shuttle, tours, laundry, cleaning requests from guests.'},
+
+    // Col 4 — Interfaces
+    {id:'guest_live', col:4, x:1040, y:90, w:260, h:58, kind:'ui', badge:'LIVE',
+      label:'checkin-guest-v2.html', tip:'Production guest check-in page.'},
+    {id:'guest_sb', col:4, x:1040, y:165, w:260, h:58, kind:'ui', badge:'REDESIGN',
+      label:'checkin-guest-sandbox-2.html', tip:'Approved guest redesign sandbox — not production yet.'},
+    {id:'guest_details', col:4, x:1040, y:240, w:260, h:58, kind:'ui',
+      label:'checkin-details.html', tip:'Check-in instructions sub-page (door, photos, elevator).'},
+
+    {id:'admin_live', col:4, x:1040, y:370, w:260, h:58, kind:'ui', badge:'LIVE',
+      label:'checkin-admin.html', tip:'Production desktop admin panel.'},
+    {id:'admin_sb', col:4, x:1040, y:445, w:260, h:58, kind:'ui', badge:'REDESIGN',
+      label:'checkin-admin-sandbox.html', tip:'Mobile admin sandbox: Stay, Elevator, Requests, More.'},
+
+    {id:'hk_centre', col:4, x:1040, y:575, w:260, h:58, kind:'ui',
+      label:'HK-Centre.html', tip:'Housekeeping app (Centre). Marks rooms clean → hk_status.'},
+    {id:'sleepy', col:4, x:1040, y:650, w:260, h:58, kind:'ui',
+      label:'SleepyPMS.html', tip:'PMS / Sleepy dashboard. Own properties list + reservations path.'},
+  ];
+
+  const links = [
+    {from:'minihotel', to:'sync', label:'booking data ~10 min'},
+    {from:'cron', to:'sync', label:'triggers'},
+    {from:'cron', to:'pricing', label:'triggers'},
+    {from:'sync', to:'reservations', label:'writes bookings'},
+    {from:'pricing', to:'minihotel', label:'price write-back', soft:true},
+
+    {from:'reservations', to:'guest_live', label:'room · dates · door?'},
+    {from:'checkin_guests', to:'guest_live', label:'form / unlock state'},
+    {from:'checkin_apartments', to:'guest_live', label:'WiFi · photos · door'},
+    {from:'elev_fs', to:'guest_live', label:'elevator code'},
+    {from:'elev_rtdb', to:'guest_live', label:'elevator QR'},
+    {from:'guest_live', to:'checkin_guests', label:'passport · name · contact'},
+    {from:'guest_live', to:'search_failures', label:'failed booking search', soft:true},
+    {from:'guest_live', to:'service_requests', label:'shuttle · tours · etc.'},
+
+    {from:'admin', to:'admin_live', label:'operates', soft:true},
+    {from:'admin_live', to:'checkin_guests', label:'unlock · approve · move'},
+    {from:'admin_live', to:'checkin_apartments', label:'WiFi · door · photos'},
+    {from:'admin_live', to:'elev_fs', label:'update elevator'},
+    {from:'admin_live', to:'elev_rtdb', label:'update elevator'},
+    {from:'service_requests', to:'admin_live', label:'service queue'},
+
+    {from:'guest', to:'guest_live', label:'uses check-in page', soft:true},
+    {from:'hk_centre', to:'hk_status', label:'mark room clean'},
+    {from:'hk_status', to:'guest_live', label:'early unlock if cleaned'},
+    {from:'hk_status', to:'waready', label:'room ready signal'},
+    {from:'waready', to:'whatsapp', label:'send message'},
+    {from:'whatsapp', to:'guest', label:'check-in ready ping'},
+
+    {from:'cloudinary', to:'checkin_apartments', label:'apt step photos'},
+    {from:'elevmon', to:'elev_rtdb', label:'reads freshness'},
+    {from:'elevmon', to:'resend', label:'stale alert email'},
+
+    // Fragile (short labels — full text in panel below)
+    {from:'tuya', to:'reservations', label:'⚠1 unknown writer', fragile:true},
+    {from:'admin_live', to:'admin_config', label:'⚠2 last-write-wins', fragile:true},
+    {from:'roomready_cf', to:'whatsapp', label:'⚠3 duplicate notify', fragile:true},
+    {from:'sleepy', to:'reservations', label:'⚠4 room-list drift', fragile:true},
+    {from:'checkin_guests', to:'reservations', label:'⚠5 dual room truth', fragile:true},
+  ];
+
+  // Avoid duplicate admin_config normal+fragile stacking visually: keep normal write + fragile as annotation via separate fragile edge from admin_sb too conceptually — user asked for setDoc fragile on config. We'll keep one normal and one fragile to same target with offset.
+
+  const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const kindStyle = {
+    ext:      {fill:'#e8f4fd', stroke:'#2196F3'},
+    auto:     {fill:'#fff3e0', stroke:'#FF9800'},
+    disabled: {fill:'#f5f5f5', stroke:'#9E9E9E', dash:'4 3'},
+    fs:       {fill:'#e8f5e9', stroke:'#4CAF50'},
+    rtdb:     {fill:'#fce4ec', stroke:'#E91E63'},
+    ui:       {fill:'#f3e5f5', stroke:'#9C27B0'},
+  };
+
+  // ── SVG setup ──
+  const stage = document.getElementById('stage');
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  stage.appendChild(svg);
+
+  const root = document.createElementNS('http://www.w3.org/2000/svg','g');
+  root.setAttribute('id','viewport');
+  svg.appendChild(root);
+
+  // Column backgrounds
+  const cols = [
+    {x:40,  y:40, w:260, h:900, title:'1 · External world'},
+    {x:320, y:40, w:300, h:900, title:'2 · Automation'},
+    {x:640, y:40, w:340, h:900, title:'3 · Data (Firebase)'},
+    {x:1000,y:40, w:340, h:900, title:'4 · Interfaces'},
+  ];
+  cols.forEach(c => {
+    const r = el('rect', {x:c.x, y:c.y, width:c.w, height:c.h, class:'col-bg'});
+    root.appendChild(r);
+    const t = el('text', {x:c.x+16, y:c.y+28, class:'col-title'});
+    t.textContent = c.title;
+    root.appendChild(t);
+  });
+
+  // Data subgroups
+  const groups = [
+    {x:680, y:78,  w:260, h:230, title:'Guest data'},
+    {x:680, y:330, w:260, h:310, title:'Property data'},
+    {x:680, y:660, w:260, h:240, title:'System data'},
+  ];
+  // Interface subgroups
+  groups.push(
+    {x:1020, y:70,  w:300, h:250, title:'Guest faces'},
+    {x:1020, y:340, w:300, h:185, title:'Admin faces'},
+    {x:1020, y:545, w:300, h:185, title:'Staff faces'},
+  );
+  groups.forEach(g => {
+    root.appendChild(el('rect', {x:g.x, y:g.y, width:g.w, height:g.h, class:'group-bg'}));
+    const t = el('text', {x:g.x+14, y:g.y+22, class:'group-title'});
+    t.textContent = g.title;
+    root.appendChild(t);
+  });
+
+  const linkLayer = el('g', {id:'links'});
+  const nodeLayer = el('g', {id:'nodes'});
+  const labelLayer = el('g', {id:'llabels'});
+  root.appendChild(linkLayer);
+  root.appendChild(labelLayer);
+  root.appendChild(nodeLayer);
+
+  function el(name, attrs={}) {
+    const n = document.createElementNS('http://www.w3.org/2000/svg', name);
+    for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v);
+    return n;
+  }
+
+  function center(n) {
+    return {x: n.x + n.w/2, y: n.y + n.h/2};
+  }
+  function edgePoint(n, toward) {
+    const c = center(n);
+    const dx = toward.x - c.x, dy = toward.y - c.y;
+    const hw = n.w/2, hh = n.h/2;
+    if (Math.abs(dx)/hw > Math.abs(dy)/hh) {
+      const sx = dx >= 0 ? 1 : -1;
+      return {x: c.x + sx*hw, y: c.y + dy * (hw/Math.abs(dx||1))};
+    }
+    const sy = dy >= 0 ? 1 : -1;
+    return {x: c.x + dx * (hh/Math.abs(dy||1)), y: c.y + sy*hh};
+  }
+
+  // Draw links
+  const linkEls = [];
+  const laneOffset = {}; // reduce label pile-ups on similar midpoints
+  links.forEach((L, i) => {
+    const a = byId[L.from], b = byId[L.to];
+    if (!a || !b) return;
+    const ac = center(a), bc = center(b);
+    const p1 = edgePoint(a, bc), p2 = edgePoint(b, ac);
+    let mx = (p1.x + p2.x)/2;
+    // slight horizontal stagger for fragile labels so they don't stack
+    if (L.fragile) mx += ((i % 3) - 1) * 36;
+    const path = `M${p1.x},${p1.y} C${mx},${p1.y} ${mx},${p2.y} ${p2.x},${p2.y}`;
+    const pathEl = el('path', {
+      d: path,
+      class: 'link' + (L.fragile ? ' fragile' : ''),
+      'data-i': i,
+      'data-from': L.from,
+      'data-to': L.to,
+      'marker-end': L.fragile ? 'url(#arrow-red)' : 'url(#arrow)',
+    });
+    if (L.soft) pathEl.setAttribute('stroke-opacity', '0.55');
+    linkLayer.appendChild(pathEl);
+
+    const laneKey = Math.round(mx/40)+':'+Math.round(((p1.y+p2.y)/2)/30);
+    laneOffset[laneKey] = (laneOffset[laneKey]||0) + 1;
+    const midY = (p1.y + p2.y)/2 - 10 - (laneOffset[laneKey]-1)*14;
+    const bg = el('rect', {class:'link-label-bg', rx:3, 'data-i':i});
+    const tx = el('text', {
+      x: mx, y: midY,
+      class: 'link-label' + (L.fragile ? ' fragile' : ''),
+      'text-anchor': 'middle',
+      'data-i': i,
+    });
+    // wrap long fragile labels — unused now (short labels)
+    tx.textContent = L.label;
+    labelLayer.appendChild(bg);
+    labelLayer.appendChild(tx);
+    requestAnimationFrame(() => {
+      try {
+        const bb = tx.getBBox();
+        bg.setAttribute('x', bb.x - 4);
+        bg.setAttribute('y', bb.y - 2);
+        bg.setAttribute('width', bb.width + 8);
+        bg.setAttribute('height', bb.height + 4);
+      } catch (_) {}
+    });
+
+    linkEls.push({L, pathEl, tx, bg, i});
+  });
+
+  // Markers
+  const defs = el('defs');
+  defs.innerHTML = `
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#90A4AE"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#f44336"/>
+    </marker>`;
+  svg.insertBefore(defs, root);
+
+  // Draw nodes
+  const nodeEls = {};
+  nodes.forEach(n => {
+    const g = el('g', {class:'node', 'data-id':n.id, transform:`translate(${n.x},${n.y})`});
+    const st = kindStyle[n.kind];
+    const rect = el('rect', {
+      width:n.w, height:n.h, rx:10, ry:10,
+      fill:st.fill, stroke:st.stroke,
+    });
+    if (st.dash) rect.setAttribute('stroke-dasharray', st.dash);
+    g.appendChild(rect);
+
+    if (n.badge) {
+      const isLive = n.badge === 'LIVE';
+      const isRed = n.badge === 'REDESIGN';
+      const bx = n.w - 78, by = 8;
+      const br = el('rect', {
+        x:bx, y:by, width:70, height:16, rx:8,
+        fill: isLive ? '#e6f4ea' : isRed ? '#e8f0fe' : '#eeeeee',
+        stroke: isLive ? '#1e8e3e' : isRed ? '#1a73e8' : '#9e9e9e',
+      });
+      const bt = el('text', {
+        x:bx+35, y:by+12, class:'badge', 'text-anchor':'middle',
+        fill: isLive ? '#137333' : isRed ? '#174ea6' : '#616161',
+      });
+      bt.textContent = n.badge;
+      g.appendChild(br); g.appendChild(bt);
+    }
+
+    const label = el('text', {x:14, y: n.sub ? 24 : n.h/2+5, class:'label'});
+    label.textContent = n.label.length > 28 ? n.label.slice(0,26)+'…' : n.label;
+    g.appendChild(label);
+    if (n.sub) {
+      const sub = el('text', {x:14, y:44, class:'sub'});
+      sub.textContent = n.sub;
+      g.appendChild(sub);
+    }
+
+    g.addEventListener('mouseenter', e => showTip(n, e));
+    g.addEventListener('mousemove', e => moveTip(e));
+    g.addEventListener('mouseleave', hideTip);
+    g.addEventListener('click', e => {
+      e.stopPropagation();
+      focusNode(n.id);
+    });
+
+    nodeLayer.appendChild(g);
+    nodeEls[n.id] = g;
+  });
+
+  // ── Interaction ──
+  let focusId = null;
+  let fragileOnly = false;
+  const tip = document.getElementById('tip');
+  const status = document.getElementById('status');
+
+  function showTip(n, e) {
+    tip.innerHTML = `<b>${n.label}</b>${n.tip||''}`;
+    tip.classList.add('show');
+    moveTip(e);
+  }
+  function moveTip(e) {
+    tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 320) + 'px';
+    tip.style.top = Math.min(e.clientY + 14, window.innerHeight - 120) + 'px';
+  }
+  function hideTip(){ tip.classList.remove('show'); }
+
+  function applyVisibility() {
+    const related = new Set();
+    if (focusId) {
+      related.add(focusId);
+      links.forEach(L => {
+        if (L.from === focusId || L.to === focusId) {
+          related.add(L.from); related.add(L.to);
+        }
+      });
+    }
+    nodes.forEach(n => {
+      const eln = nodeEls[n.id];
+      eln.classList.remove('dim','focus');
+      if (focusId) {
+        if (related.has(n.id)) eln.classList.add('focus');
+        else eln.classList.add('dim');
+      }
+    });
+    linkEls.forEach(({L, pathEl, tx, bg}) => {
+      const showFragileGate = !fragileOnly || L.fragile;
+      const showFocusGate = !focusId || L.from === focusId || L.to === focusId;
+      const show = showFragileGate && showFocusGate;
+      pathEl.classList.toggle('dim', !show);
+      tx.classList.toggle('dim', !show);
+      bg.classList.toggle('dim', !show);
+      if (fragileOnly && !L.fragile) {
+        pathEl.style.display = 'none';
+        tx.style.display = 'none';
+        bg.style.display = 'none';
+      } else {
+        pathEl.style.display = '';
+        tx.style.display = '';
+        bg.style.display = '';
+      }
+    });
+    // When fragile-only, also dim nodes not on a fragile edge
+    if (fragileOnly && !focusId) {
+      const fragileNodes = new Set();
+      links.filter(l => l.fragile).forEach(l => { fragileNodes.add(l.from); fragileNodes.add(l.to); });
+      nodes.forEach(n => {
+        const eln = nodeEls[n.id];
+        if (!fragileNodes.has(n.id)) eln.classList.add('dim');
+        else eln.classList.remove('dim');
+      });
+    }
+  }
+
+  function focusNode(id) {
+    if (focusId === id) focusId = null;
+    else focusId = id;
+    status.textContent = focusId
+      ? `Focused: ${byId[focusId].label} — click again or background to reset`
+      : (fragileOnly ? 'Showing fragile connections only' : 'Showing all important flows');
+    applyVisibility();
+  }
+
+  stage.addEventListener('click', () => {
+    if (focusId) { focusId = null; status.textContent = fragileOnly ? 'Showing fragile connections only' : 'Showing all important flows'; applyVisibility(); }
+  });
+
+  function toggleFragile(e) {
+    if (e) e.stopPropagation();
+    fragileOnly = !fragileOnly;
+    const b = document.getElementById('btn-fragile');
+    b.classList.toggle('active', fragileOnly);
+    b.textContent = fragileOnly ? 'Show all connections' : 'Show fragile only';
+    status.textContent = fragileOnly ? 'Showing fragile connections only' : 'Showing all important flows';
+    applyVisibility();
+  }
+  document.getElementById('btn-fragile').addEventListener('click', toggleFragile);
+  window.__toggleFragile = toggleFragile;
+
+  // Pan / zoom
+  let scale = 1, tx = 0, ty = 0;
+  function applyTransform() {
+    root.setAttribute('transform', `translate(${tx},${ty}) scale(${scale})`);
+  }
+  function resetMap() {
+    scale = 1; tx = 0; ty = 0; applyTransform();
+    focusId = null; fragileOnly = false;
+    const b = document.getElementById('btn-fragile');
+    b.classList.remove('active'); b.textContent = 'Show fragile only';
+    status.textContent = 'Showing all important flows';
+    applyVisibility();
+  }
+  document.getElementById('btn-reset').addEventListener('click', (e) => { e.stopPropagation(); resetMap(); });
+  window.__resetMap = resetMap;
+
+  stage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = stage.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const prev = scale;
+    scale = Math.min(2.4, Math.max(0.45, scale * (e.deltaY < 0 ? 1.08 : 0.92)));
+    tx = mx - (mx - tx) * (scale/prev);
+    ty = my - (my - ty) * (scale/prev);
+    applyTransform();
+  }, {passive:false});
+
+  let dragging = false, lx=0, ly=0;
+  stage.addEventListener('pointerdown', e => {
+    if (e.target.closest('.node')) return;
+    dragging = true; lx = e.clientX; ly = e.clientY;
+    stage.classList.add('grabbing');
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    tx += e.clientX - lx; ty += e.clientY - ly;
+    lx = e.clientX; ly = e.clientY;
+    applyTransform();
+  });
+  stage.addEventListener('pointerup', () => { dragging = false; stage.classList.remove('grabbing'); });
+
+  applyVisibility();
+})();
+</script>
+</body>
+</html>
