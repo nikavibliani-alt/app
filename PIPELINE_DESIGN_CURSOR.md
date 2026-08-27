@@ -1,11 +1,11 @@
 # PIPELINE_DESIGN_CURSOR.md — Maxela Backend Rebuild (Cursor proposal)
 
-**Status:** Design only. No implementation. No live files touched.  
+**Status:** Phase 1 implementation started in `sandbox_rebuild/` (dry-run MemoryStore). Live HTML untouched.  
 **Author:** Cursor (parallel to Claude Code’s design track)  
 **Date:** 2026-08-27  
 **Sources read:** `SYSTEM_CONNECTION_MAP.md`, `CHECKIN_ADMIN_SPEC.md`, `CHECKIN_GUEST_SPEC.md`, `CODEBASE.md`
 
-> This document is Cursor’s independent design. Compare with Claude’s `PIPELINE_DESIGN.md` when both exist; pick the stronger rules, then implement once.
+> Implementation lives in `sandbox_rebuild/pipeline/`. Default = in-memory only. No writes to live Firebase collections.
 
 ---
 
