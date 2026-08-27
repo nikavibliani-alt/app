@@ -457,10 +457,12 @@ hk_status           ──bridge──►   v2_hk_status
 
 1. **`v2_assignments` is new SoT** rather than anointing `reservations.roomCode` alone — because guest doc IDs encode room today.
 2. **Unlock state is written by GuestUnlock** rather than computed independently in every UI.
-3. **Displace** is optional; default safe mode is block+swap.
+3. **Displace is disabled in v1**; only block + swap.
 4. **Tuya password writer** remains unknown; phase 1 reads `tuyaPassword` if present else apartment `doorCode`, and logs when missing — no fake generator.
 5. **Pricing / Sleepy room master lists** not unified in phase 1.
 6. **Sandbox prefix `v2_`** for all new writes until cutover.
+7. **Shadow period = 2 weeks** before live move cutover.
+8. **“Follow MiniHotel again”** is included to clear `manualRoom`.
 
 ---
 
