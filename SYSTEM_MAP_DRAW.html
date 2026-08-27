@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maxela — Draw your system map</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --panel:#fff; --ink:#1a1d23; --muted:#5f6772;
+    --line:#dfe3e8; --blue:#1a73e8; --blue-bg:#e8f0fe;
+    --green:#137333; --orange:#b06000; --purple:#7b1fa2;
+    --starter:#94a3b8; --user:#1a73e8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-shrink:0;flex-wrap:wrap}
+  header h1{font-size:17px;font-weight:750}
+  header p{font-size:12px;color:var(--muted);margin-top:2px}
+  .hdr-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .hdr-actions button,.hdr-actions label.btn{
+    font:inherit;font-size:12px;font-weight:650;padding:7px 11px;border-radius:8px;
+    border:1px solid var(--line);background:#fff;cursor:pointer;
+  }
+  .hdr-actions button:hover,.hdr-actions label.btn:hover{background:#f1f3f5}
+  .hdr-actions button.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .hdr-actions button.danger{color:#c62828;border-color:#ffcdd2}
+  .main{flex:1;display:flex;min-height:0}
+  .toolbar{width:52px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:4px;flex-shrink:0}
+  .tool{
+    width:40px;height:40px;border-radius:10px;border:1px solid transparent;background:transparent;
+    font-size:18px;cursor:pointer;display:grid;place-items:center;color:var(--ink);
+  }
+  .tool:hover{background:#f1f3f5}
+  .tool.active{background:var(--blue-bg);border-color:#c5d8f8;color:var(--blue)}
+  .tool-sep{width:28px;height:1px;background:var(--line);margin:6px 0}
+  .hint-bar{font-size:11px;color:var(--muted);padding:6px 14px;background:#fafbfc;border-bottom:1px solid var(--line);flex-shrink:0}
+  #viewport{flex:1;position:relative;overflow:hidden;cursor:grab;background:#fff}
+  #viewport.grabbing{cursor:grabbing}
+  #viewport.pen{cursor:crosshair}
+  svg{width:100%;height:100%;display:block;touch-action:none}
+  .starter-box{fill:#f8fafc;stroke:var(--starter);stroke-width:2}
+  .starter-text{fill:var(--ink);font-size:13px;font-weight:650;text-anchor:middle;pointer-events:none}
+  .starter-sub{fill:var(--muted);font-size:10px;text-anchor:middle;pointer-events:none}
+  .starter-link{fill:none;stroke:var(--starter);stroke-width:2;marker-end:url(#arrow-starter)}
+  .starter-label{font-size:10px;fill:var(--muted);text-anchor:middle;pointer-events:none}
+  .user-box{fill:#fff;stroke:var(--user);stroke-width:2;cursor:move}
+  .user-text{fill:var(--ink);font-size:13px;font-weight:600;text-anchor:middle;pointer-events:none;user-select:none}
+  .user-link{fill:none;stroke:var(--user);stroke-width:2;marker-end:url(#arrow-user);cursor:pointer}
+  .user-path{fill:none;stroke:var(--user);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+  .selected{stroke:#c62828!important;stroke-width:3!important}
+  .layer-title{font-size:11px;font-weight:800;fill:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+  .toast{
+    position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;
+    opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:99;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  @media(max-width:640px){.toolbar{width:44px}.tool{width:36px;height:36px;font-size:16px}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Draw your Maxela system</h1>
+    <p>Gray = Cursor’s starter map · Blue = your drawing · Saved in this browser only</p>
+  </div>
+  <div class="hdr-actions">
+    <button type="button" id="btn-toggle-starter">Hide starter</button>
+    <button type="button" id="btn-copy-starter">Copy starter → mine</button>
+    <button type="button" class="primary" id="btn-save">Save my map</button>
+    <button type="button" id="btn-load">Load saved</button>
+    <button type="button" id="btn-export">Export PNG</button>
+    <button type="button" class="danger" id="btn-clear-user">Clear my layer</button>
+  </div>
+</header>
+<div class="hint-bar" id="hint">Select tool: click items to move · Box: click canvas · Arrow: click start then end · Pen: drag · Double-click text to edit</div>
+<div class="main">
+  <aside class="toolbar" id="toolbar">
+    <button type="button" class="tool active" data-tool="select" title="Select / move">↖</button>
+    <button type="button" class="tool" data-tool="box" title="Add box">▢</button>
+    <button type="button" class="tool" data-tool="arrow" title="Add arrow">→</button>
+    <button type="button" class="tool" data-tool="text" title="Add text">T</button>
+    <button type="button" class="tool" data-tool="pen" title="Freehand pen">✎</button>
+    <div class="tool-sep"></div>
+    <button type="button" class="tool" data-tool="delete" title="Delete selected">⌫</button>
+    <div class="tool-sep"></div>
+    <button type="button" class="tool" data-tool="pan" title="Pan canvas">✋</button>
+  </aside>
+  <div id="viewport">
+    <svg id="svg" viewBox="0 0 2400 1400" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="arrow-starter" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/>
+        </marker>
+        <marker id="arrow-user" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#1a73e8"/>
+        </marker>
+      </defs>
+      <g id="pan-root">
+        <!-- STARTER MAP (Cursor) -->
+        <g id="layer-starter">
+          <text x="80" y="36" class="layer-title">CURSOR STARTER — how the system works today</text>
+
+          <!-- Row labels -->
+          <text x="200" y="70" class="starter-label">Outside</text>
+          <text x="520" y="70" class="starter-label">Automation</text>
+          <text x="900" y="70" class="starter-label">Data</text>
+          <text x="1280" y="70" class="starter-label">Screens</text>
+
+          <!-- External -->
+          <g class="starter-node" transform="translate(120,100)"><rect class="starter-box" width="160" height="44" rx="10"/><text class="starter-text" x="80" y="27">MiniHotel</text></g>
+          <g class="starter-node" transform="translate(120,170)"><rect class="starter-box" width="160" height="44" rx="10"/><text class="starter-text" x="80" y="27">Guest</text></g>
+          <g class="starter-node" transform="translate(120,240)"><rect class="starter-box" width="160" height="44" rx="10"/><text class="starter-text" x="80" y="27">Admin</text></g>
+          <g class="starter-node" transform="translate(120,310)"><rect class="starter-box" width="160" height="44" rx="10"/><text class="starter-text" x="80" y="27">HK staff</text></g>
+
+          <!-- Automation -->
+          <g class="starter-node" transform="translate(420,100)"><rect class="starter-box" width="200" height="52" rx="10"/><text class="starter-text" x="100" y="22">Booking sync</text><text class="starter-sub" x="100" y="38">every ~10 min</text></g>
+          <g class="starter-node" transform="translate(420,180)"><rect class="starter-box" width="200" height="52" rx="10"/><text class="starter-text" x="100" y="22">Room ready WA</text><text class="starter-sub" x="100" y="38">daily job</text></g>
+          <g class="starter-node" transform="translate(420,270)"><rect class="starter-box" width="200" height="52" rx="10"/><text class="starter-text" x="100" y="22">Elevator monitor</text><text class="starter-sub" x="100" y="38">hourly</text></g>
+
+          <!-- Data -->
+          <g class="starter-node" transform="translate(800,90)"><rect class="starter-box" width="180" height="44" rx="10"/><text class="starter-text" x="90" y="27">reservations</text></g>
+          <g class="starter-node" transform="translate(800,150)"><rect class="starter-box" width="180" height="44" rx="10"/><text class="starter-text" x="90" y="27">checkin_guests</text></g>
+          <g class="starter-node" transform="translate(800,210)"><rect class="starter-box" width="180" height="52" rx="10"/><text class="starter-text" x="90" y="22">v2_assignments</text><text class="starter-sub" x="90" y="38">NEW — one room truth</text></g>
+          <g class="starter-node" transform="translate(800,280)"><rect class="starter-box" width="180" height="44" rx="10"/><text class="starter-text" x="90" y="27">checkin_apartments</text></g>
+          <g class="starter-node" transform="translate(800,340)"><rect class="starter-box" width="180" height="44" rx="10"/><text class="starter-text" x="90" y="27">hk_status</text></g>
+
+          <!-- Screens -->
+          <g class="starter-node" transform="translate(1180,90)"><rect class="starter-box" width="200" height="52" rx="10"/><text class="starter-text" x="100" y="22">Guest page LIVE</text><text class="starter-sub" x="100" y="38">checkin-guest-v2</text></g>
+          <g class="starter-node" transform="translate(1180,170)"><rect class="starter-box" width="200" height="52" rx="10"/><text class="starter-text" x="100" y="22">Admin LIVE</text><text class="starter-sub" x="100" y="38">checkin-admin</text></g>
+          <g class="starter-node" transform="translate(1180,250)"><rect class="starter-box" width="200" height="52" rx="10"/><text class="starter-text" x="100" y="22">Admin sandbox</text><text class="starter-sub" x="100" y="38">mobile redesign</text></g>
+          <g class="starter-node" transform="translate(1180,330)"><rect class="starter-box" width="200" height="44" rx="10"/><text class="starter-text" x="100" y="27">HK app</text></g>
+
+          <!-- Main flow arrows -->
+          <path class="starter-link" d="M280,122 C350,122 350,122 420,126"/>
+          <path class="starter-link" d="M620,126 C700,126 700,112 800,112"/>
+          <path class="starter-link" d="M980,112 C1100,112 1100,116 1180,116"/>
+          <path class="starter-link" d="M200,192 C200,260 200,260 1180,116"/>
+          <path class="starter-link" d="M200,262 C400,262 700,232 800,172"/>
+          <path class="starter-link" d="M200,332 C500,332 700,360 800,362"/>
+          <path class="starter-link" d="M890,362 C1000,362 1100,352 1180,352"/>
+
+          <!-- Pipeline rebuild box -->
+          <g transform="translate(80,420)">
+            <rect class="starter-box" width="560" height="120" rx="14" fill="#fef7e0" stroke="#b06000"/>
+            <text class="starter-text" x="280" y="28" style="font-size:14px">NEW PIPELINE (sandbox only — not live yet)</text>
+            <text class="starter-sub" x="280" y="50" style="font-size:11px">RoomAssignment · AdminAction · logs · fake reservation tester</text>
+            <text class="starter-sub" x="280" y="68" style="font-size:11px">One room truth → block conflict → swap → audit every move</text>
+            <text class="starter-sub" x="280" y="86" style="font-size:11px">Run: sandbox_rebuild → python3 -m pipeline.scenario_tester</text>
+          </g>
+
+          <!-- Fragile -->
+          <g transform="translate(720,420)">
+            <rect class="starter-box" width="480" height="120" rx="14" fill="#fce8e6" stroke="#c62828" stroke-dasharray="6 4"/>
+            <text class="starter-text" x="240" y="28" style="font-size:14px;fill:#c62828">Known fragile spots</text>
+            <text class="starter-sub" x="240" y="52" style="font-size:11px">⚠ tuyaPassword writer unknown · ⚠ dual room truth today</text>
+            <text class="starter-sub" x="240" y="70" style="font-size:11px">⚠ config overwrite · ⚠ 4 room lists · ⚠ duplicate WA notify</text>
+            <text class="starter-sub" x="240" y="88" style="font-size:11px">Pipeline rebuild fixes #5 (lost guest on move) first</text>
+          </g>
+
+          <!-- Guest journey strip -->
+          <text x="80" y="580" class="layer-title">GUEST JOURNEY (simple)</text>
+          <g class="starter-node" transform="translate(80,600)"><rect class="starter-box" width="130" height="40" rx="8"/><text class="starter-text" x="65" y="25" style="font-size:12px">Booking</text></g>
+          <g class="starter-node" transform="translate(240,600)"><rect class="starter-box" width="130" height="40" rx="8"/><text class="starter-text" x="65" y="25" style="font-size:12px">Saved</text></g>
+          <g class="starter-node" transform="translate(400,600)"><rect class="starter-box" width="130" height="40" rx="8"/><text class="starter-text" x="65" y="25" style="font-size:12px">Find page</text></g>
+          <g class="starter-node" transform="translate(560,600)"><rect class="starter-box" width="130" height="40" rx="8"/><text class="starter-text" x="65" y="25" style="font-size:12px">Register</text></g>
+          <g class="starter-node" transform="translate(720,600)"><rect class="starter-box" width="130" height="40" rx="8"/><text class="starter-text" x="65" y="25" style="font-size:12px">Unlock</text></g>
+          <g class="starter-node" transform="translate(880,600)"><rect class="starter-box" width="130" height="40" rx="8"/><text class="starter-text" x="65" y="25" style="font-size:12px">Door + WiFi</text></g>
+          <path class="starter-link" d="M210,620 L240,620"/><path class="starter-link" d="M370,620 L400,620"/>
+          <path class="starter-link" d="M530,620 L560,620"/><path class="starter-link" d="M690,620 L720,620"/>
+          <path class="starter-link" d="M850,620 L880,620"/>
+
+          <!-- Your space label -->
+          <text x="80" y="720" class="layer-title" fill="#1a73e8">YOUR MAP — draw below (blue)</text>
+          <rect x="60" y="740" width="2280" height="600" rx="16" fill="#f8fbff" stroke="#c5d8f8" stroke-width="2" stroke-dasharray="8 6" pointer-events="none"/>
+          <text x="1200" y="780" class="starter-sub" style="font-size:13px;fill:#1a73e8">Use toolbar: add boxes, arrows, pen · double-click to edit text · Save when done</text>
+        </g>
+
+        <!-- USER LAYER -->
+        <g id="layer-user"></g>
+        <g id="layer-temp"></g>
+      </g>
+    </svg>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const STORAGE_KEY = 'maxela_system_map_draw_v1';
+  const svg = document.getElementById('svg');
+  const panRoot = document.getElementById('pan-root');
+  const layerUser = document.getElementById('layer-user');
+  const layerTemp = document.getElementById('layer-temp');
+  const layerStarter = document.getElementById('layer-starter');
+  const viewport = document.getElementById('viewport');
+  const hint = document.getElementById('hint');
+  const toast = document.getElementById('toast');
+
+  let tool = 'select';
+  let selected = null;
+  let arrowStart = null;
+  let penPath = null;
+  let penPoints = '';
+  let drag = null;
+  let pan = null;
+  let view = {x:0,y:0,scale:1};
+  let uid = 0;
+
+  const hints = {
+    select:'Select: click to pick · drag to move · double-click text to edit',
+    box:'Box: click empty space to add a box',
+    arrow:'Arrow: click start point, then end point',
+    text:'Text: click to place a label',
+    pen:'Pen: drag to draw freehand',
+    delete:'Delete: click an item to remove it',
+    pan:'Pan: drag the canvas',
+  };
+
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(()=>toast.classList.remove('show'), 2200);
+  }
+
+  function applyView(){
+    panRoot.setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.scale})`);
+  }
+
+  function clientToSvg(ex, ey){
+    const pt = svg.createSVGPoint();
+    pt.x = ex; pt.y = ey;
+    const m = panRoot.getScreenCTM().inverse();
+    return pt.matrixTransform(m);
+  }
+
+  function nextId(){ return 'u'+(++uid); }
+
+  function selectEl(el){
+    if(selected) selected.classList.remove('selected');
+    selected = el;
+    if(el) el.classList.add('selected');
+  }
+
+  function setTool(t){
+    tool = t;
+    document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('active', b.dataset.tool===t));
+    hint.textContent = hints[t]||'';
+    viewport.classList.toggle('pen', t==='pen');
+    arrowStart = null;
+    layerTemp.innerHTML = '';
+  }
+
+  document.getElementById('toolbar').addEventListener('click', e=>{
+    const btn = e.target.closest('.tool');
+    if(btn) setTool(btn.dataset.tool);
+  });
+
+  function addBox(x,y,text='Your step'){
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.dataset.type = 'box';
+    g.dataset.id = nextId();
+    g.setAttribute('transform', `translate(${x-70},${y-22})`);
+    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('class','user-box');
+    rect.setAttribute('width','140');
+    rect.setAttribute('height','44');
+    rect.setAttribute('rx','10');
+    const tx = document.createElementNS('http://www.w3.org/2000/svg','text');
+    tx.setAttribute('class','user-text');
+    tx.setAttribute('x','70');
+    tx.setAttribute('y','27');
+    tx.textContent = text;
+    g.appendChild(rect); g.appendChild(tx);
+    wireUserEl(g);
+    layerUser.appendChild(g);
+    selectEl(g);
+    return g;
+  }
+
+  function addText(x,y,text='Your note'){
+    const tx = document.createElementNS('http://www.w3.org/2000/svg','text');
+    tx.dataset.type = 'text';
+    tx.dataset.id = nextId();
+    tx.setAttribute('class','user-text');
+    tx.setAttribute('x', x);
+    tx.setAttribute('y', y);
+    tx.setAttribute('text-anchor','start');
+    tx.textContent = text;
+    tx.style.cursor = 'move';
+    wireUserEl(tx);
+    layerUser.appendChild(tx);
+    selectEl(tx);
+    return tx;
+  }
+
+  function addArrow(x1,y1,x2,y2){
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.dataset.type = 'arrow';
+    p.dataset.id = nextId();
+    p.setAttribute('class','user-link');
+    p.setAttribute('d', curvePath(x1,y1,x2,y2));
+    wireUserEl(p);
+    layerUser.appendChild(p);
+    selectEl(p);
+    return p;
+  }
+
+  function addPenPath(d){
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.dataset.type = 'pen';
+    p.dataset.id = nextId();
+    p.setAttribute('class','user-path');
+    p.setAttribute('d', d);
+    layerUser.appendChild(p);
+    return p;
+  }
+
+  function curvePath(x1,y1,x2,y2){
+    const mx = (x1+x2)/2;
+    return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+  }
+
+  function editText(el){
+    const cur = el.tagName==='text' ? el.textContent : el.querySelector('text')?.textContent || '';
+    const nv = prompt('Edit text:', cur);
+    if(nv===null) return;
+    if(el.tagName==='text') el.textContent = nv;
+    else el.querySelector('text').textContent = nv;
+  }
+
+  function wireUserEl(el){
+    el.addEventListener('pointerdown', e=>{
+      if(tool==='delete'){
+        el.remove();
+        if(selected===el) selected=null;
+        e.stopPropagation();
+        return;
+      }
+      if(tool!=='select') return;
+      e.stopPropagation();
+      selectEl(el);
+      const p = clientToSvg(e.clientX, e.clientY);
+      let ox=0, oy=0;
+      if(el.tagName==='g'){
+        const tr = el.getAttribute('transform')||'translate(0,0)';
+        const m = tr.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+        ox = m?+m[1]:0; oy = m?+m[2]:0;
+      } else {
+        ox = +el.getAttribute('x')||0; oy = +el.getAttribute('y')||0;
+      }
+      drag = {el, startX:p.x, startY:p.y, ox, oy, isG: el.tagName==='g'};
+      el.setPointerCapture(e.pointerId);
+    });
+    el.addEventListener('dblclick', e=>{
+      e.stopPropagation();
+      if(el.dataset.type==='box' || el.dataset.type==='text') editText(el);
+    });
+  }
+
+  function serializeUser(){
+    const items = [];
+    layerUser.querySelectorAll('[data-type]').forEach(el=>{
+      const t = el.dataset.type;
+      if(t==='box'){
+        const tr = el.getAttribute('transform');
+        const m = tr.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+        items.push({type:'box', x:+m[1], y:+m[2], text: el.querySelector('text').textContent});
+      } else if(t==='text'){
+        items.push({type:'text', x:+el.getAttribute('x'), y:+el.getAttribute('y'), text: el.textContent});
+      } else if(t==='arrow'){
+        items.push({type:'arrow', d: el.getAttribute('d')});
+      } else if(t==='pen'){
+        items.push({type:'pen', d: el.getAttribute('d')});
+      }
+    });
+    return items;
+  }
+
+  function loadUser(items){
+    layerUser.innerHTML = '';
+    uid = 0;
+    (items||[]).forEach(it=>{
+      if(it.type==='box') addBox(it.x+70, it.y+22, it.text);
+      else if(it.type==='text') addText(it.x, it.y, it.text);
+      else if(it.type==='arrow'){
+        const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+        p.dataset.type='arrow'; p.dataset.id=nextId();
+        p.setAttribute('class','user-link'); p.setAttribute('d', it.d);
+        wireUserEl(p); layerUser.appendChild(p);
+      } else if(it.type==='pen'){
+        const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+        p.dataset.type='pen'; p.dataset.id=nextId();
+        p.setAttribute('class','user-path'); p.setAttribute('d', it.d);
+        layerUser.appendChild(p);
+      }
+    });
+    selectEl(null);
+  }
+
+  function save(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({items: serializeUser(), view, savedAt: Date.now()}));
+    showToast('Saved in this browser');
+  }
+
+  function loadSaved(){
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw){ showToast('Nothing saved yet'); return; }
+    try{
+      const data = JSON.parse(raw);
+      loadUser(data.items);
+      if(data.view) { view = data.view; applyView(); }
+      showToast('Loaded your saved map');
+    }catch(e){ showToast('Load failed'); }
+  }
+
+  viewport.addEventListener('pointerdown', e=>{
+    if(e.target.closest('.user-box,.user-text,.user-link,.user-path,[data-type]') && tool!=='box' && tool!=='arrow' && tool!=='text' && tool!=='pen') return;
+    const p = clientToSvg(e.clientX, e.clientY);
+    if(tool==='pan' || (tool==='select' && e.target===svg || e.target===viewport || e.target.id==='pan-root')){
+      pan = {sx:e.clientX, sy:e.clientY, vx:view.x, vy:view.y};
+      viewport.classList.add('grabbing');
+      return;
+    }
+    if(tool==='box'){ addBox(p.x,p.y); return; }
+    if(tool==='text'){ addText(p.x,p.y); return; }
+    if(tool==='arrow'){
+      if(!arrowStart){ arrowStart = p; const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+        c.setAttribute('cx',p.x); c.setAttribute('cy',p.y); c.setAttribute('r',5); c.setAttribute('fill','#1a73e8');
+        layerTemp.innerHTML=''; layerTemp.appendChild(c);
+      } else {
+        addArrow(arrowStart.x, arrowStart.y, p.x, p.y);
+        arrowStart=null; layerTemp.innerHTML='';
+      }
+      return;
+    }
+    if(tool==='pen'){
+      penPoints = `M${p.x},${p.y}`;
+      penPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+      penPath.setAttribute('class','user-path');
+      penPath.setAttribute('d', penPoints);
+      layerTemp.appendChild(penPath);
+      viewport.setPointerCapture(e.pointerId);
+      return;
+    }
+    if(tool==='select') selectEl(null);
+  });
+
+  viewport.addEventListener('pointermove', e=>{
+    const p = clientToSvg(e.clientX, e.clientY);
+    if(drag){
+      const dx = p.x - drag.startX, dy = p.y - drag.startY;
+      if(drag.isG) drag.el.setAttribute('transform', `translate(${drag.ox+dx},${drag.oy+dy})`);
+      else { drag.el.setAttribute('x', drag.ox+dx); drag.el.setAttribute('y', drag.oy+dy); }
+      return;
+    }
+    if(pan){
+      view.x = pan.vx + (e.clientX - pan.sx);
+      view.y = pan.vy + (e.clientY - pan.sy);
+      applyView();
+      return;
+    }
+    if(tool==='pen' && penPath){
+      penPoints += ` L${p.x},${p.y}`;
+      penPath.setAttribute('d', penPoints);
+    }
+    if(tool==='arrow' && arrowStart){
+      layerTemp.innerHTML = '';
+      const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx',arrowStart.x); c.setAttribute('cy',arrowStart.y); c.setAttribute('r',5); c.setAttribute('fill','#1a73e8');
+      layerTemp.appendChild(c);
+      const preview=document.createElementNS('http://www.w3.org/2000/svg','path');
+      preview.setAttribute('class','user-link'); preview.setAttribute('opacity','0.5');
+      preview.setAttribute('d', curvePath(arrowStart.x,arrowStart.y,p.x,p.y));
+      layerTemp.appendChild(preview);
+    }
+  });
+
+  viewport.addEventListener('pointerup', e=>{
+    if(drag){ drag=null; return; }
+    if(pan){ pan=null; viewport.classList.remove('grabbing'); return; }
+    if(tool==='pen' && penPath){
+      penPath.dataset.type='pen'; penPath.dataset.id=nextId();
+      layerUser.appendChild(penPath);
+      penPath=null; penPoints='';
+    }
+  });
+
+  viewport.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const rect = viewport.getBoundingClientRect();
+    const mx = e.clientX-rect.left, my = e.clientY-rect.top;
+    const prev = view.scale;
+    view.scale = Math.min(2.5, Math.max(0.35, view.scale * (e.deltaY<0?1.08:0.92)));
+    view.x = mx - (mx-view.x)*(view.scale/prev);
+    view.y = my - (my-view.y)*(view.scale/prev);
+    applyView();
+  }, {passive:false});
+
+  document.getElementById('btn-toggle-starter').addEventListener('click', function(){
+    const hide = layerStarter.style.display !== 'none';
+    layerStarter.style.display = hide ? 'none' : '';
+    this.textContent = hide ? 'Show starter' : 'Hide starter';
+  });
+
+  document.getElementById('btn-copy-starter').addEventListener('click', ()=>{
+    addText(120, 820, 'My idea starts here…');
+    addBox(120, 860, 'Step 1');
+    addBox(320, 860, 'Step 2');
+    addBox(520, 860, 'Controller?');
+    addArrow(190,860,320,860);
+    addArrow(390,860,520,860);
+    showToast('Starter sketch copied — edit freely');
+  });
+
+  document.getElementById('btn-save').addEventListener('click', save);
+  document.getElementById('btn-load').addEventListener('click', loadSaved);
+  document.getElementById('btn-clear-user').addEventListener('click', ()=>{
+    if(confirm('Clear everything you drew?')){ loadUser([]); showToast('Your layer cleared'); }
+  });
+
+  document.getElementById('btn-export').addEventListener('click', ()=>{
+    const xml = new XMLSerializer().serializeToString(svg);
+    const img = new Image();
+    const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+    img.onload = ()=>{
+      const c = document.createElement('canvas');
+      c.width = 2400; c.height = 1400;
+      c.getContext('2d').fillStyle='#fff';
+      c.getContext('2d').fillRect(0,0,c.width,c.height);
+      c.getContext('2d').drawImage(img,0,0);
+      const a = document.createElement('a');
+      a.download = 'maxela-my-system-map.png';
+      a.href = c.toDataURL('image/png');
+      a.click();
+      showToast('PNG downloaded');
+    };
+    img.src = url;
+  });
+
+  // Auto-load if saved
+  if(localStorage.getItem(STORAGE_KEY)) loadSaved();
+  else setTool('box');
+
+  applyView();
+})();
+</script>
+</body>
+</html>
