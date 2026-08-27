@@ -258,44 +258,5 @@ exports.roomReadyNotification = onDocumentWritten(
   }
 );
 
-/** Reject stale auto elevator writes (same code as before); accept new daily code from Samsung app. */
-function _normElevatorCode(v) {
-  return String(v == null ? '' : v).replace(/[#\s]/g, '').trim();
-}
-function _pickElevatorCode(data) {
-  if (!data) return '';
-  return data.display_code || data.code || data.lastCode || '';
-}
-
-exports.elevatorCodeGuard = onDocumentWritten(
-  { document: 'globals/elevator_code', region: 'europe-west1' },
-  async (event) => {
-    const after = event.data.after;
-    const before = event.data.before;
-    if (!after?.exists) return;
-    const next = after.data();
-    const prev = before?.exists ? before.data() : null;
-    const source = next.source || 'auto';
-    if (source !== 'auto') {
-      const code = _pickElevatorCode(next);
-      if (code && next.lastCode !== code) {
-        await after.ref.update({ lastCode: code });
-      }
-      return;
-    }
-    const inc = _normElevatorCode(_pickElevatorCode(next));
-    const cur = _normElevatorCode(_pickElevatorCode(prev));
-    if (!inc) return;
-    if (cur && inc === cur) {
-      console.log('[elevatorCodeGuard] Rejected stale auto write:', inc);
-      if (prev) {
-        await after.ref.set(prev, { merge: false });
-      } else {
-        await after.ref.delete();
-      }
-      return;
-    }
-    await after.ref.update({ lastCode: _pickElevatorCode(next) });
-    console.log('[elevatorCodeGuard] Accepted new auto code:', inc);
-  }
-);
+// elevatorCodeGuard moved to pipeline-functions/controllers/elevatorCodeGuard.js
+// — see tuya-functions/README.md. Do not re-add elevator code here.

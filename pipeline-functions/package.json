@@ -1,0 +1,17 @@
+{
+  "name": "pipeline-functions",
+  "version": "1.0.0",
+  "description": "Maxela pipeline controllers — small, single-purpose Cloud Functions. Separate codebase from tuya-functions/ (Tuya smart lock, reserved).",
+  "engines": { "node": "22" },
+  "main": "index.js",
+  "scripts": {
+    "deploy": "firebase deploy --only functions:pipeline",
+    "deploy:elevator": "firebase deploy --only functions:pipeline:elevatorCodeSync",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^5.0.0"
+  },
+  "private": true
+}

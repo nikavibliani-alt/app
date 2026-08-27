@@ -10,6 +10,18 @@
         "firebase-debug.*.log",
         "*.local"
       ]
+    },
+    {
+      "source": "pipeline-functions",
+      "codebase": "pipeline",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local",
+        "tests"
+      ]
     }
   ]
 }
