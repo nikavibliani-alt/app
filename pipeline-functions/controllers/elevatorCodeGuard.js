@@ -32,7 +32,7 @@
  *     was no previous doc to revert to).
  */
 
-const ElevatorSync = require('../../shared/elevator-sync.js');
+const ElevatorSync = require('../lib/elevator-sync.js');
 
 /**
  * Pure decision function — no Firestore imports, directly unit-testable.

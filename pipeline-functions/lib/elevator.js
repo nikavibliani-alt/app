@@ -4,7 +4,7 @@
  * same normalize/pick rules elevatorCodeGuard.js and the Samsung app contract in
  * docs/ELEVATOR_APP.md already use — one implementation, not three).
  */
-const ElevatorSync = require('../../shared/elevator-sync.js');
+const ElevatorSync = require('./elevator-sync.js');
 const { toMillis, ageHours } = require('./timestamps');
 
 // elevatorCodeSync's own reconcile-staleness threshold. Deliberately NOT the same
