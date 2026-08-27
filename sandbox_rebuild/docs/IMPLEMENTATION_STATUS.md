@@ -3,6 +3,7 @@
 | Date | What |
 |------|------|
 | 2026-08-27 | Phase 1: RoomAssignment + AdminAction + MemoryStore + logs + tests + demo |
+| 2026-08-27 | Fake reservations + 17-scenario tester (`pipeline.scenario_tester`) |
 
 Next (when approved):
 1. ReservationSync → creates/updates `v2_assignments` from MiniHotel (dry-run first)
