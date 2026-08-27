@@ -39,10 +39,10 @@ html.admin-authed #lock-screen{display:none;}
 html.admin-authed #app{display:block;}
 .app-header{padding:14px 16px 10px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50;}
 .app-header__row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.app-header__main{display:flex;align-items:flex-start;gap:10px;flex:1;min-width:0;}
+.app-header__main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
 .app-header__titles{flex:1;min-width:0;}
-.header-back{display:none;flex-shrink:0;}
-.header-back.show{display:flex;}
+.header-back{display:none!important;flex-shrink:0;}
+.header-back.show{display:inline-flex!important;}
 .app-title{font-size:17px;font-weight:700;letter-spacing:-.02em;}
 .app-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:4px 8px;border-radius:999px;background:var(--amber-bg);color:var(--amber);}
 .app-sub{font-size:12px;color:var(--muted);margin-top:4px;}
@@ -104,7 +104,15 @@ html.admin-authed #app{display:block;}
 #req-detail{z-index:220;}
 #detail.open,#apt-editor-overlay.open,#req-detail.open,#gp-editor-overlay.open{display:flex;}
 .detail-bar,.apt-ed-bar{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;}
-.detail-back{width:40px;height:40px;border:1px solid var(--line);border-radius:var(--rs);background:var(--surface);font-size:18px;cursor:pointer;flex-shrink:0;}
+.detail-back{
+  width:40px;height:40px;min-width:40px;min-height:40px;
+  border:1px solid var(--line);border-radius:var(--rs);background:var(--surface);
+  font-size:20px;line-height:1;cursor:pointer;flex-shrink:0;
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:0;margin:0;font-family:var(--sans);color:var(--ink);
+  -webkit-tap-highlight-color:transparent;
+}
+.detail-back:active{background:var(--bg);}
 .detail-title{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .detail-body,.apt-ed-body{padding:14px;padding-bottom:80px;}
 .passport-gate{padding:16px;border:1.5px dashed var(--line);border-radius:var(--r);text-align:center;margin-bottom:14px;background:var(--surface);}
@@ -461,16 +469,17 @@ let hkPinsData={shartava:'',centre:'',vgl:'',admin:''};
 let searchFailures=[];
 let _formById=new Map();
 
-const _NAV_KEY='maxela_admin_nav_v1';
+const _NAV_KEY='maxela_admin_nav_v2';
 const NAV_POOL={
   stay:{label:'Stay',pane:'stay',svg:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',extra:''},
+  hk:{label:'HK',pane:'hk',svg:'<svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>',extra:''},
   elevator:{label:'Elevator',pane:'elevator',svg:'<svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 8v8M9 11l3-3 3 3"/></svg>',extra:'<span class="dot"></span>',navId:'nav-elev'},
   requests:{label:'Requests',pane:'requests',svg:'<svg viewBox="0 0 24 24"><path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M8 8h8M8 12h5"/></svg>',extra:'<span class="badge" id="req-badge">0</span>',navId:'nav-req'},
   apts:{label:'Apts',pane:'apts',svg:'<svg viewBox="0 0 24 24"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-8h6v8"/></svg>',extra:''},
   hkpins:{label:'HK Pins',pane:'hkpins',svg:'<svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',extra:''},
   guestsettings:{label:'Guest',pane:'guestsettings',svg:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>',extra:''},
 };
-const DEFAULT_NAV_SLOTS=['stay','elevator','requests'];
+const DEFAULT_NAV_SLOTS=['stay','hk','elevator'];
 
 function loadNavSlots(){
   try{
@@ -491,7 +500,7 @@ function renderNavBar(){
     const active=currentTab===d.pane||(currentTab==='more'&&false);
     html+=`<button class="nav__btn${currentTab===d.pane?' active':''}" data-tab="${d.pane}" onclick="switchTab('${d.pane}')" ${d.navId?`id="${d.navId}"`:''}>${d.svg}${d.label}${d.extra||''}</button>`;
   }
-  html+=`<button class="nav__btn${currentTab==='more'||['apts','hkpins','guestsettings','navsettings','failures'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</button>`;
+  html+=`<button class="nav__btn${currentTab==='more'||['apts','hk','hkpins','guestsettings','navsettings','failures'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</button>`;
   nav.innerHTML=html;
   updateRequestsBadge();
   if(elevData)document.getElementById('nav-elev')?.classList.toggle('has-alert',elevFreshness().cls==='old');
@@ -1156,7 +1165,7 @@ const TAB_META={
   more:{title:'More',sub:'All admin tools'},
 };
 const MORE_TABS=new Set(['more','apts','hk','hkpins','guestsettings','navsettings','failures']);
-const MORE_SUB_PAGES=new Set(['apts','hk','hkpins','guestsettings','navsettings','failures']);
+const MORE_SUB_PAGES=new Set(['apts','hkpins','guestsettings','navsettings','failures']);
 
 function updateHeaderBack(){
   const btn=document.getElementById('header-back');
