@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Maxela Admin — Sandbox</title>
+<title>Maxela Admin — Sandbox (HK)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -107,11 +110,14 @@ html.admin-authed #app{display:block;}
 .detail-back{
   width:40px;height:40px;min-width:40px;min-height:40px;
   border:1px solid var(--line);border-radius:var(--rs);background:var(--surface);
-  font-size:20px;line-height:1;cursor:pointer;flex-shrink:0;
+  cursor:pointer;flex-shrink:0;
   display:inline-flex;align-items:center;justify-content:center;
   padding:0;margin:0;font-family:var(--sans);color:var(--ink);
   -webkit-tap-highlight-color:transparent;
+  appearance:none;-webkit-appearance:none;
+  overflow:hidden;
 }
+.detail-back .back-icon{width:22px;height:22px;display:block;pointer-events:none;}
 .detail-back:active{background:var(--bg);}
 .detail-title{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .detail-body,.apt-ed-body{padding:14px;padding-bottom:80px;}
@@ -257,7 +263,7 @@ html.admin-authed #app{display:block;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Sandbox · HK</span>
+            <span class="app-badge" id="app-version-badge">Build 27 Aug · HK</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -325,6 +331,9 @@ html.admin-authed #app{display:block;}
   <div class="pane" id="pane-more">
     <div class="more-section">Operations</div>
     <div class="more-list">
+      <button class="more-item" type="button" onclick="switchTab('hk')" style="border-color:#86efac;background:#f0fdf4">
+        <span><strong>Housekeeping (HK)</strong></span><span class="more-hint">Mark rooms done</span>
+      </button>
       <button class="more-item" type="button" onclick="switchTab('apts')">Apartments<span class="more-hint">Check-in instructions</span></button>
       <button class="more-item" type="button" onclick="switchTab('failures')" id="more-failures-btn">Failed searches<span class="more-badge" id="sf-more-badge" style="display:none">0</span></button>
     </div>
@@ -340,7 +349,12 @@ html.admin-authed #app{display:block;}
     </div>
   </div>
 
-  <nav class="nav" id="main-nav"></nav>
+  <nav class="nav" id="main-nav">
+    <button class="nav__btn" data-tab="stay" onclick="switchTab('stay')"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Stay</button>
+    <button class="nav__btn" data-tab="hk" onclick="switchTab('hk')"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>HK</button>
+    <button class="nav__btn" data-tab="requests" onclick="switchTab('requests')"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M8 8h8M8 12h5"/></svg>Requests</button>
+    <button class="nav__btn" data-tab="more" onclick="switchTab('more')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</button>
+  </nav>
 </div>
 
 <div id="detail">
@@ -393,8 +407,23 @@ html.admin-authed #app{display:block;}
  * Nav: switchTab() + localStorage tab; goBack() / header ← for More sub-pages & overlays
  * Data: one onSnapshot per collection → render*() for active tab only
  */
+const BACK_ICON='<svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
+const SANDBOX_BUILD='20260827b';
+(function migrateSandboxBuild(){
+  try{
+    if(localStorage.getItem('maxela_sandbox_build')!==SANDBOX_BUILD){
+      localStorage.removeItem('maxela_admin_nav_v1');
+      localStorage.removeItem('maxela_admin_nav_v2');
+      localStorage.removeItem('maxela_admin_nav_v3');
+      localStorage.setItem('maxela_sandbox_build',SANDBOX_BUILD);
+    }
+  }catch(e){}
+})();
+document.querySelectorAll('.detail-back').forEach(btn=>{
+  if(!btn.querySelector('.back-icon'))btn.innerHTML=BACK_ICON;
+});
 const CHECK_IN_HOUR=15;
 const RTDB_URL='https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json';
 const CLOUD='dlkjizhya';
@@ -481,16 +510,11 @@ const NAV_POOL={
 const DEFAULT_NAV_SLOTS=['stay','hk','requests'];
 
 function loadNavSlots(){
+  // HK must always be on the bottom bar unless user saves a custom layout that includes HK
   try{
     const s=JSON.parse(localStorage.getItem(_NAV_KEY)||'null');
-    if(Array.isArray(s?.slots)&&s.slots.length===3&&s.slots.every(id=>NAV_POOL[id])){
-      let slots=[...s.slots];
-      if(!slots.includes('hk')){
-        slots[1]='hk';
-        localStorage.setItem(_NAV_KEY,JSON.stringify({slots}));
-      }
-      return slots;
-    }
+    if(Array.isArray(s?.slots)&&s.slots.length===3&&s.slots.includes('hk')&&s.slots.every(id=>NAV_POOL[id]))
+      return [...s.slots];
   }catch(e){}
   return [...DEFAULT_NAV_SLOTS];
 }
