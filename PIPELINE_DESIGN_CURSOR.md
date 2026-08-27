@@ -1,6 +1,7 @@
 # PIPELINE_DESIGN_CURSOR.md — Maxela Backend Rebuild (Cursor proposal)
 
 **Status:** Phase 1 implementation started in `sandbox_rebuild/` (dry-run MemoryStore). Live HTML untouched.  
+**Master architecture:** See **`MASTER_ARCHITECTURE_CURSOR.md`** for Nika's full requirements (elevator, HK, guest persistence, Firestore, SleepyPMS).  
 **Author:** Cursor (parallel to Claude Code’s design track)  
 **Date:** 2026-08-27  
 **Sources read:** `SYSTEM_CONNECTION_MAP.md`, `CHECKIN_ADMIN_SPEC.md`, `CHECKIN_GUEST_SPEC.md`, `CODEBASE.md`
