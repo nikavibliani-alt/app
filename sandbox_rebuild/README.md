@@ -3,7 +3,7 @@
 > **Safe zone.** Nothing here touches live `checkin-admin.html` or `checkin-guest-v2.html`.  
 > Default mode is **in-memory dry-run** (no Firebase writes).
 
-Design source: `/workspace/PIPELINE_DESIGN_CURSOR.md`
+Design source: `PIPELINE_DESIGN_CURSOR.md` (repo root)
 
 ## What is built (phase 1)
 
@@ -12,21 +12,21 @@ Design source: `/workspace/PIPELINE_DESIGN_CURSOR.md`
 | MemoryStore + logging (`v2_system_logs` / `v2_system_alerts`) | done |
 | **RoomAssignment** controller (move / swap / conflict / audit) | done |
 | **AdminAction** façade (move_guest, swap_guests, release_to_minihotel) | done |
-| Unit tests | done |
+| Unit tests (8) | done |
 | ReservationSync / GuestUnlock / Elevator / WhatsApp | not yet |
 
 ## Run demo (safe)
 
 ```bash
-cd /workspace
-python3 -m sandbox-rebuild.pipeline.run_demo
+cd /workspace/sandbox_rebuild
+PYTHONPATH=. python3 -m pipeline.run_demo
 ```
 
 ## Run tests
 
 ```bash
-cd /workspace/sandbox-rebuild
-python3 -m unittest tests.test_room_assignment -v
+cd /workspace/sandbox_rebuild
+PYTHONPATH=. python3 -m unittest tests.test_room_assignment -v
 ```
 
 ## Rules encoded
