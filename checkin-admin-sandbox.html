@@ -75,6 +75,10 @@ html.admin-authed #app{display:block;}
 .hk-card__times{display:flex;gap:8px;font-size:12px;margin-bottom:8px}
 .hk-card__time{flex:1;background:#f7f8fa;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
 .hk-card__time b{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:2px}
+.hk-card__count{font-size:11px;color:var(--muted);margin-top:4px}
+.hk-card__when{font-size:11px;font-weight:700;color:var(--ink);margin-top:2px}
+.hk-card__time.tb-urgent{border-color:#fca5a5;background:#fef2f2}
+.hk-bedding-alert{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--amber-bg);color:var(--amber);font-size:12px;font-weight:700}
 .hk-card__foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .hk-done{height:34px;padding:0 14px;border:none;border-radius:8px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;background:var(--green);color:#fff}
 .hk-done.undo{background:var(--line);color:var(--muted)}
@@ -246,8 +250,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260827c';
-  if(!/[?&]build=20260827c(?:&|$)/.test(location.search)){
+  var BUILD='20260827d';
+  if(!/[?&]build=20260827d(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -280,7 +284,7 @@ html.admin-authed #app{display:block;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 27c · HK</span>
+            <span class="app-badge" id="app-version-badge">Build 27d · HK</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -327,7 +331,11 @@ html.admin-authed #app{display:block;}
   <div class="pane" id="pane-hk">
     <div class="filter-row" id="hk-day-tabs"></div>
     <div id="hk-list"></div>
-    <div id="hk-pins-section" class="hk-pins-section"></div>
+  </div>
+
+  <div class="pane" id="pane-hkpinsettings">
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">PINs for the legacy HK apps (HK.html). Cleaning staff use those apps — they never see these codes here.</p>
+    <div id="hkpinsettings-root"></div>
   </div>
 
   <div class="pane" id="pane-guestsettings">
@@ -361,6 +369,7 @@ html.admin-authed #app{display:block;}
     <div class="more-section">App</div>
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('navsettings')">Tab bar layout<span class="more-hint">Reorder bottom nav</span></button>
+      <button class="more-item" type="button" onclick="switchTab('hkpinsettings')">HK staff PINs<span class="more-hint">Admin only · legacy HK apps</span></button>
       <a class="more-item" href="admin-search-test.html" target="_blank" rel="noopener">Search debugger<span class="more-hint">Open</span></a>
       <button class="more-item" type="button" onclick="adminSignOut()">Sign out</button>
     </div>
@@ -426,7 +435,7 @@ html.admin-authed #app{display:block;}
  */
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
-const SANDBOX_BUILD='20260827c';
+const SANDBOX_BUILD='20260827d';
 (function migrateSandboxBuild(){
   try{
     if(localStorage.getItem('maxela_sandbox_build')!==SANDBOX_BUILD){
@@ -497,7 +506,7 @@ const APARTMENTS=[
 let aptData={},guestData=[],hkStatusData={},_resCache=null,_resLoading=false;
 let elevData=null,stayFilter='overview',upcomingDay=null,_currentAptId=null;
 const _TAB_KEY='maxela_admin_tab';
-const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','guestsettings','failures','navsettings','more']);
+const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','guestsettings','failures','navsettings','hkpinsettings','more']);
 function loadSavedTab(){
   try{
     const t=localStorage.getItem(_TAB_KEY);
@@ -543,7 +552,7 @@ function renderNavBar(){
     const active=currentTab===d.pane||(currentTab==='more'&&false);
     html+=`<button class="nav__btn${currentTab===d.pane?' active':''}" data-tab="${d.pane}" onclick="switchTab('${d.pane}')" ${d.navId?`id="${d.navId}"`:''}>${d.svg}${d.label}${d.extra||''}</button>`;
   }
-  html+=`<button class="nav__btn${currentTab==='more'||['apts','guestsettings','navsettings','failures','elevator'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</button>`;
+  html+=`<button class="nav__btn${currentTab==='more'||['apts','guestsettings','navsettings','failures','elevator','hkpinsettings'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</button>`;
   nav.innerHTML=html;
   updateRequestsBadge();
   if(elevData)document.getElementById('nav-elev')?.classList.toggle('has-alert',elevFreshness().cls==='old');
@@ -872,40 +881,19 @@ async function loadAndRenderGuestSettings(){
   renderGuestSettings();
 }
 
-/* ── HK Pins (inside HK tab, admin PIN 0000) ── */
-const _HK_ADMIN_PIN='0000';
+/* ── HK staff PINs (More → admin only; not on HK tab) ── */
 const HK_ROLES=[
   {id:'shartava',label:'Shartava Team',desc:'Shartava housekeeping'},
   {id:'centre',label:'Centre Team',desc:'City centre housekeeping'},
   {id:'vgl',label:'VGL Team',desc:'VGL studios & apartments'},
   {id:'admin',label:'Admin PIN',desc:'All rooms across properties'},
 ];
-function hkPinsAdminUnlocked(){
-  try{return sessionStorage.getItem('hk_pins_admin')==='1';}catch(e){return false;}
-}
-function renderHkPinsSection(){
-  const wrap=document.getElementById('hk-pins-section');
+function renderHkPinSettings(){
+  const wrap=document.getElementById('hkpinsettings-root');
   if(!wrap)return;
-  if(!hkPinsAdminUnlocked()){
-    wrap.innerHTML=`<div class="hk-admin-gate">
-      <p><strong>HK login PINs</strong> — admin only. Enter admin PIN to change team codes for the legacy HK HTML apps.</p>
-      <div class="hk-admin-pin-row">
-        <input type="password" inputmode="numeric" maxlength="4" placeholder="••••" id="hk-admin-pin-inp" autocomplete="off" onkeydown="if(event.key==='Enter')unlockHkPinsAdmin()">
-        <button type="button" onclick="unlockHkPinsAdmin()">Unlock</button>
-      </div>
-    </div>`;
-    return;
-  }
   wrap.innerHTML=`<div class="more-section" style="margin-top:0">HK login PINs</div><div id="hkpins-list"></div>`;
   renderHkPins();
 }
-window.unlockHkPinsAdmin=function(){
-  const v=(document.getElementById('hk-admin-pin-inp')?.value||'').trim();
-  if(v!==_HK_ADMIN_PIN){toast('Wrong admin PIN');return;}
-  try{sessionStorage.setItem('hk_pins_admin','1');}catch(e){}
-  toast('Unlocked ✓');
-  renderHkPinsSection();
-};
 function renderHkPins(){
   const el=document.getElementById('hkpins-list');if(!el)return;
   el.innerHTML=HK_ROLES.map(r=>`
@@ -1227,14 +1215,15 @@ const TAB_META={
   elevator:{title:'Elevator',sub:'Entrance & elevator code'},
   requests:{title:'Requests',sub:'Guest service requests'},
   apts:{title:'Apartments',sub:'WiFi, instructions, photo steps'},
-  hk:{title:'Housekeeping',sub:'Mark rooms done · guest arrival times'},
+  hk:{title:'Housekeeping',sub:'Checkouts · guest counts · extra sheets'},
+  hkpinsettings:{title:'HK staff PINs',sub:'Legacy HK app login codes · admin only'},
   guestsettings:{title:'Guest page',sub:'Tiles, services & location'},
   failures:{title:'Failed searches',sub:'Guests who could not find booking'},
   navsettings:{title:'Tab bar',sub:'Customize bottom navigation'},
   more:{title:'More',sub:'All admin tools'},
 };
-const MORE_TABS=new Set(['more','apts','guestsettings','navsettings','failures','elevator']);
-const MORE_SUB_PAGES=new Set(['apts','guestsettings','navsettings','failures','elevator']);
+const MORE_TABS=new Set(['more','apts','guestsettings','navsettings','failures','elevator','hkpinsettings']);
+const MORE_SUB_PAGES=new Set(['apts','guestsettings','navsettings','failures','elevator','hkpinsettings']);
 
 function updateHeaderBack(){
   const btn=document.getElementById('header-back');
@@ -1268,6 +1257,7 @@ window.switchTab=function(tab){
   if(tab==='requests')loadAndRenderRequests();
   if(tab==='apts')renderAptsList();
   if(tab==='hk')renderHk();
+  if(tab==='hkpinsettings')renderHkPinSettings();
   if(tab==='guestsettings')loadAndRenderGuestSettings();
   if(tab==='failures')renderFailures();
   if(tab==='navsettings')renderNavSettings();
@@ -1756,6 +1746,24 @@ function hkGuestFormForRoom(roomCode,dateStr,nextRes){
   }
   return null;
 }
+function hkGuestCount(res){
+  if(!res)return 0;
+  if(typeof res.guests==='number')return res.guests;
+  if(typeof res.guests==='string'&&res.guests!=='')return parseInt(res.guests,10)||0;
+  if(res.adults)return parseInt(String(res.adults),10)||0;
+  return 0;
+}
+function hkBeddingAlert(roomCode,guests){
+  if(guests<1)return null;
+  const c=roomCode.toLowerCase();
+  if(/^0-/.test(c))return guests>=4?'⚠️ Extra sofa bed sheets needed':null;
+  if(['6-1','6-2','6-4','7-1','7-2','7-4'].includes(c))return guests>=5?'⚠️ Extra sheets needed':null;
+  if(c==='6-3')return guests>=9?'⚠️ Extra sheets needed':null;
+  if(['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3'].includes(c))return guests>=3?'⚠️ Extra sheets needed':null;
+  if(['vgl-st1','vgl-st2'].includes(c))return guests>=3?'⚠️ Extra sheets needed':null;
+  if(['vgl-ap3','vgl-ap4'].includes(c))return guests>=5?'⚠️ Extra sheets needed':null;
+  return null;
+}
 function hkTaskRooms(dateStr){
   return HK_ROOMS.filter(r=>hkGetCheckout(r.code,dateStr));
 }
@@ -1776,7 +1784,8 @@ async function renderHk(){
     snap.docs.forEach(d=>{hkStatusData[d.id]=d.data();});
   }catch(e){console.warn('[HK] status load',e);}
   const rooms=hkTaskRooms(dateStr);
-  if(!rooms.length){listEl.innerHTML='<div class="empty">No checkout rooms this day</div>';renderHkPinsSection();return;}
+  if(!rooms.length){listEl.innerHTML='<div class="empty">No checkout rooms this day</div>';return;}
+  const tomorrowStr=hkAddDays(hkActiveDay+1);
   let html='';
   rooms.forEach(room=>{
     const key=room.code+'_'+dateStr;
@@ -1785,21 +1794,27 @@ async function renderHk(){
     const co=hkGetCheckout(room.code,dateStr);
     const nextRes=hkGetNextCheckin(room.code,dateStr);
     const form=hkGuestFormForRoom(room.code,dateStr,nextRes);
+    const outGuests=hkGuestCount(co);
+    const inGuests=hkGuestCount(nextRes);
+    const beddingAlert=nextRes?hkBeddingAlert(room.code,inGuests):null;
     const coTime=st.checkOutTime||co?.checkoutTime||'12:00';
     const ciTime=st.checkInTime||formatGuestArrival(form,nextRes);
+    const nextSameDay=nextRes&&nextRes.checkin===dateStr;
+    const nextTomorrow=nextRes&&nextRes.checkin===tomorrowStr;
+    const whenLabel=nextRes?(nextSameDay?'Today':nextTomorrow?'Tomorrow':nextRes.checkin):'';
     html+=`<div class="hk-card${done?' done':''}">
       <div class="hk-card__top"><div><div class="hk-card__room">${esc(room.code)}</div><div class="hk-card__name">${esc(room.name)}</div></div>
       <span class="pill ${done?'pill-ok':'pill-await'}">${done?'Done':'Pending'}</span></div>
       <div class="hk-card__times">
-        <div class="hk-card__time"><b>Checkout</b>${esc(coTime)}</div>
-        <div class="hk-card__time"><b>Check-in</b>${esc(ciTime)}${form?.expectedCheckInWindow?'<span style="display:block;font-size:10px;color:var(--green);margin-top:2px">Guest time</span>':''}</div>
+        <div class="hk-card__time"><b>Checkout</b>${esc(coTime)}<div class="hk-card__count">${outGuests>0?`👥 ${outGuests} leaving`:'👥 —'}</div></div>
+        <div class="hk-card__time${nextSameDay?' tb-urgent':''}"><b>Check-in</b>${nextRes?`<div class="hk-card__when">${esc(whenLabel)}</div>${esc(ciTime)}${form?.expectedCheckInWindow?'<span style="display:block;font-size:10px;color:var(--green);margin-top:2px">Guest time</span>':''}<div class="hk-card__count">${inGuests>0?`👥 ${inGuests} arriving`:'No booking'}</div>`:'<div class="hk-card__count">No booking</div>'}</div>
       </div>
+      ${beddingAlert?`<div class="hk-bedding-alert">${esc(beddingAlert)}</div>`:''}
       <div class="hk-card__foot"><span style="font-size:12px;color:var(--muted)">${co?.guest?esc(_stripRoomNum(co.guest)):'—'}</span>
       <button type="button" class="hk-done${done?' undo':''}" onclick="toggleHkDone('${esc(room.code)}','${dateStr}')">${done?'Undo':'✓ Done'}</button></div>
     </div>`;
   });
   listEl.innerHTML=html;
-  renderHkPinsSection();
 }
 window.hkPickDay=function(i){hkActiveDay=i;renderHk();};
 window.toggleHkDone=async function(roomCode,dateStr){
@@ -1935,7 +1950,7 @@ onSnapshot(query(collection(db,'hk_status'),where('date','==',tbilisiToday())),s
 });
 onSnapshot(collection(db,'hk_pins'),snap=>{
   snap.docs.forEach(d=>{hkPinsData[d.id]=d.data().pin||'';});
-  if(loaded>=2&&currentTab==='hk')renderHkPinsSection();
+  if(loaded>=2&&currentTab==='hkpinsettings')renderHkPinSettings();
 });
 onSnapshot(query(collection(db,'search_failures'),where('resolved','==',false)),snap=>{
   searchFailures=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.timestamp?.seconds||0)-(a.timestamp?.seconds||0));
