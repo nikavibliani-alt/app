@@ -137,7 +137,7 @@ body{
 .tile{background:var(--surface);border:1px solid var(--line-2);border-radius:20px;padding:18px 16px 16px;display:flex;flex-direction:column;gap:10px;position:relative;cursor:pointer;transition:transform .15s,box-shadow .15s;}
 .tile:hover{transform:translateY(-1px);box-shadow:0 8px 20px -12px rgba(40,30,15,0.12);}
 .tile.wide{grid-column:1/-1;}
-.tile.locked{opacity:.6;cursor:default;}
+.tile.locked{opacity:.6;}
 .tile.locked:hover{transform:none;box-shadow:none;}
 .tile__icon{width:36px;height:36px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;color:var(--ink);flex-shrink:0;}
 .tile__icon svg{width:18px;height:18px;}
@@ -1800,7 +1800,7 @@ function _renderTilesNow(){
   const _detailsUrl='checkin-details.html?apt='+encodeURIComponent(aptId)+(isPreview?'&preview=true':'');
   const _tiles=[];
   if(sectionVisible('checkin'))_tiles.push(`
-    <div class="tile checkin-tile${u?'':' locked'}" onclick="window.location.href='${_detailsUrl}'">
+    <div class="tile checkin-tile${u?'':' locked'}" onclick="${u?`window.location.href='${_detailsUrl}'`:`window.openCheckinLocked()`}">
       <div class="tile__icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L21 2"/><path d="M15.5 7.5l3 3"/><path d="M18 5l2.5 2.5"/></svg></div>
       <div><div class="tile__title">${t('tc')}</div><div class="tile__sub">${t('tcs')}</div></div>
       <div class="tile__arrow">${_ARR}</div>
@@ -2220,6 +2220,20 @@ function openLocked(res){
     <div style="margin-top:14px;font-size:17px;font-weight:500;color:var(--ink);">${availMsg}</div>
   </div>`);
 }
+window.openLocked=openLocked;
+window.openCheckinLocked=function(){
+  const r=activeReservation;
+  const dateStr=fmtCheckinAvailable(r);
+  const availMsg=dateStr
+    ?`Available from ${esc(dateStr)}`
+    :`Check-in instructions will be available on your check-in day from ${String(getCheckInHour()).padStart(2,'0')}:00`;
+  _navToContent('wifi',t('tc'),`<div class="locked-card">
+    <div class="lc-icon">🔒</div>
+    <div class="lc-title">${t('lt')}</div>
+    <div class="lc-sub" style="margin-bottom:0">${t('ls')}</div>
+    <div style="margin-top:14px;font-size:17px;font-weight:500;color:var(--ink);">${availMsg}</div>
+  </div>`);
+};
 
 function openSubpage(title,body){
   document.getElementById('cur-sp')?.remove();
