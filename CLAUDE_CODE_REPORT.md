@@ -102,17 +102,26 @@ SANDBOX_BACKEND_HANDOFF.md  step-by-step review checklist
 
 **Policy:** Test everything in sandbox first. Use the Functions emulator; do not deploy callables until manual tests pass.
 
-```bash
-cd pipeline-functions && npm install && npm test   # expect 49 pass
-npm run emulator:setup && npm run emulator         # 127.0.0.1:5001
+**On your Mac** — clone or `cd` into the repo first (`pipeline-functions` is not in `~`):
 
-# separate terminal — serve sandbox HTML
-npx serve -p 8080 .
-# Admin:  http://127.0.0.1:8080/checkin-admin-sandbox.html?emulator=1
-# Guest:  http://127.0.0.1:8080/checkin-guest-sandbox-2.html?emulator=1&apt=6-1
+```bash
+cd ~/app/pipeline-functions
+npm install
+npm test
+npm run emulator:setup
+npm run emulator
 ```
 
-See **`SANDBOX_BACKEND_HANDOFF.md`** for full checklist.
+Second terminal:
+
+```bash
+cd ~/app
+npx serve -p 8080 .
+```
+
+Open `http://127.0.0.1:8080/checkin-admin-sandbox.html?emulator=1`
+
+See **`SANDBOX_BACKEND_HANDOFF.md`** for clone instructions and full checklist.
 
 ## Deploy commands (only after sandbox sign-off)
 

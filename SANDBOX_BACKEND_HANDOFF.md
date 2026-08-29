@@ -61,27 +61,58 @@ cd pipeline-functions && npm install && npm test
 
 Callables run locally; Firestore reads/writes still hit **production** `sleepy-5c962` (same data as today). Only the Cloud Function code runs on your machine.
 
-### One-time setup
+### Get the repo on your Mac first
+
+`pipeline-functions` lives **inside the git repo**, not in your home folder. If you see `cd: no such file or directory: pipeline-functions`, you are in the wrong directory.
+
+**First time — clone:**
 
 ```bash
-cd pipeline-functions
-npm install
-npm run emulator:setup    # copies .secret.local.example → .secret.local (ADMIN_ACTION_PASSWORD)
+cd ~
+git clone https://github.com/nikavibliani-alt/app.git
+cd app
+git checkout cursor/pipeline-room-assignment-7e07
 ```
 
-Ensure `.secret.local` contains the same password as admin sandbox `_ADMIN_PWD` (`maxela2026`).
+**Already cloned — update:**
+
+```bash
+cd ~/app
+git fetch origin
+git checkout cursor/pipeline-room-assignment-7e07
+git pull origin cursor/pipeline-room-assignment-7e07
+```
+
+Replace `~/app` with wherever you keep the project (e.g. `~/Projects/app`).
+
+**Prerequisites:** [Node.js](https://nodejs.org/) (v18+) and [Firebase CLI](https://firebase.google.com/docs/cli) (`npm install -g firebase-tools`), then `firebase login`.
+
+### One-time setup
+
+Run **one command per line** (do not paste inline `# comments` — zsh can mis-parse them):
+
+```bash
+cd ~/app/pipeline-functions
+npm install
+npm test
+npm run emulator:setup
+```
+
+Expected: `npm test` reports **49 pass**. `emulator:setup` creates `.secret.local` with `ADMIN_ACTION_PASSWORD=maxela2026` (same as admin sandbox password).
 
 ### Start emulator
 
-From repo root (requires [Firebase CLI](https://firebase.google.com/docs/cli)):
+**Terminal 1** — keep this running:
 
 ```bash
-cd pipeline-functions && npm run emulator
+cd ~/app/pipeline-functions
+npm run emulator
 ```
 
-Or:
+Or from repo root:
 
 ```bash
+cd ~/app
 firebase emulators:start --only functions:pipeline --project sleepy-5c962
 ```
 
@@ -95,12 +126,14 @@ firebase login
 
 ### Serve sandbox HTML locally
 
-ES modules require HTTP (not `file://`). From repo root:
+**Terminal 2** — ES modules require HTTP (not `file://`):
 
 ```bash
+cd ~/app
 npx serve -p 8080 .
-# or: python3 -m http.server 8080
 ```
+
+Or: `python3 -m http.server 8080` (same `cd ~/app` first).
 
 Open:
 
