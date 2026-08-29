@@ -586,6 +586,20 @@ body{padding-bottom:72px;}
 #page-home.phase-arriving .hero-daily-key,
 #page-home.phase-staying .hero-daily-key,
 #page-home.phase-leaving .hero-daily-key{display:flex;}
+/* Arriving — WiFi above "I'm checked in", share-access below (staying keeps invite before door section) */
+#page-home.phase-arriving #hero-wifi-block{order:25;margin-bottom:10px;}
+#page-home.phase-arriving .hero-cta--arriving{order:30;}
+#page-home.phase-arriving #guest-invite-card,
+#page-home.phase-arriving #guest-save-link{order:40;}
+/* Staying — WiFi above "Your apartment door" walkthrough */
+#page-home.phase-staying #guest-invite-card,
+#page-home.phase-staying #guest-save-link{order:10;}
+#page-home.phase-staying #hero-wifi-block{order:15;margin-bottom:10px;}
+#page-home.phase-staying #hero-walkthrough{order:20;}
+#page-home.phase-staying .hero-cta--staying{order:25;}
+/* Checkout done — no Location / Shuttle / Tours */
+#page-home.phase-ended .home-quick,
+#page-home.phase-ended .home-tabs--waiting{display:none!important;}
 .hero-walkthrough.wt-expanded .wt-title{display:block;}
 #page-home.phase-staying .hero-walkthrough:not(.wt-expanded) .wt-title{display:none;}
 .wt-title{font-family:var(--sans);font-size:17px;font-weight:700;margin:4px 4px 12px;color:var(--ink);}
@@ -4162,10 +4176,11 @@ function _startCountdownTick(){
 function applyHomePhase(){
   const home=document.getElementById('page-home');
   if(!home)return;
-  home.classList.remove('phase-waiting','phase-arriving','phase-staying','phase-leaving');
+  home.classList.remove('phase-waiting','phase-arriving','phase-staying','phase-leaving','phase-ended');
   document.getElementById('hero-thankyou')?.classList.remove('show');
 
   if(window.isStayEnded()){
+    home.classList.add('phase-ended');
     document.getElementById('hero-thankyou')?.classList.add('show');
     document.getElementById('hero-thankyou-whatsapp')?.setAttribute('href','https://wa.me/'+WA);
     return; // no phase-* class — hero-card (daily key) stays hidden, thank-you card shows instead
@@ -4324,10 +4339,11 @@ function _sbRenderHomeForPhase(phase){
   renderGreetingApt();
 
   const home=document.getElementById('page-home');
-  home.classList.remove('phase-waiting','phase-arriving','phase-staying','phase-leaving');
+  home.classList.remove('phase-waiting','phase-arriving','phase-staying','phase-leaving','phase-ended');
   document.getElementById('hero-thankyou')?.classList.remove('show');
 
   if(phase==='checkoutdone'){
+    home.classList.add('phase-ended');
     document.getElementById('hero-thankyou')?.classList.add('show');
     document.getElementById('hero-thankyou-whatsapp')?.setAttribute('href','https://wa.me/'+WA);
   }else{
