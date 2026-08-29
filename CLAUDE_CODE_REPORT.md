@@ -84,7 +84,7 @@ pipeline-functions/
     guest-unlock.js         (sync with shared/guest-unlock.js)
     guest-token.js
     dates.js, logging.js, elevator.js
-  tests/                    46 tests, all passing
+  tests/                    49 tests, all passing
 
 shared/
   guest-unlock.js           browser + docs canonical unlock rules
@@ -98,11 +98,25 @@ SANDBOX_BACKEND_HANDOFF.md  step-by-step review checklist
 
 ---
 
-## Deploy commands (required for sandbox E2E)
+## Sandbox E2E (emulator — no deploy until sign-off)
+
+**Policy:** Test everything in sandbox first. Use the Functions emulator; do not deploy callables until manual tests pass.
 
 ```bash
-cd pipeline-functions && npm install && npm test   # expect 46 pass
+cd pipeline-functions && npm install && npm test   # expect 49 pass
+npm run emulator:setup && npm run emulator         # 127.0.0.1:5001
 
+# separate terminal — serve sandbox HTML
+npx serve -p 8080 .
+# Admin:  http://127.0.0.1:8080/checkin-admin-sandbox.html?emulator=1
+# Guest:  http://127.0.0.1:8080/checkin-guest-sandbox-2.html?emulator=1&apt=6-1
+```
+
+See **`SANDBOX_BACKEND_HANDOFF.md`** for full checklist.
+
+## Deploy commands (only after sandbox sign-off)
+
+```bash
 firebase functions:secrets:set ADMIN_ACTION_PASSWORD --project sleepy-5c962
 # Use same value as admin sandbox gate (maxela2026) for testing, or rotate for prod
 
@@ -123,7 +137,9 @@ Callable names (region `europe-west1`):
 - [ ] No `v2_*` collection writes in `pipeline-functions/`
 - [ ] Live HTML files unchanged (`checkin-admin.html`, `checkin-guest-v2.html`)
 
-### Manual (after deploy)
+### Manual (emulator or after deploy)
+
+- [ ] Start emulator + serve sandbox HTML (see SANDBOX_BACKEND_HANDOFF.md) **or** deploy callables after sign-off
 
 - [ ] Admin sandbox: move guest → `room_moves` + both `reservations` and `checkin_guests` updated; guest `?g=` link unchanged
 - [ ] Admin sandbox: conflict move blocked with message
@@ -169,7 +185,7 @@ Review branch cursor/pipeline-room-assignment-7e07 / PR #16.
 Read CLAUDE_CODE_REPORT.md and SANDBOX_BACKEND_HANDOFF.md first.
 
 Verify:
-1. npm test in pipeline-functions (46 tests)
+1. npm test in pipeline-functions (49 tests)
 2. RoomAssignment conflict policy and atomic writes
 3. Sandbox wiring does not touch live HTML
 4. Guest token stability across room moves

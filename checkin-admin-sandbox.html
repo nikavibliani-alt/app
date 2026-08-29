@@ -477,9 +477,10 @@ window.adminSignOut=function(){localStorage.removeItem(_ADMIN_KEY);location.relo
 
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-import{getFunctions,httpsCallable}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
+import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour}from"./shared/guest-unlock.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
+import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -491,7 +492,14 @@ const fb=initializeApp({
 });
 const db=getFirestore(fb);
 const fns=getFunctions(fb,'europe-west1');
+const _usingPipelineEmulator=connectPipelineFunctionsEmulator(fns,connectFunctionsEmulator);
+if(_usingPipelineEmulator){mountEmulatorBanner();console.info('[sandbox] pipeline functions → emulator 127.0.0.1:5001');}
 const pipelineAdmin=createPipelineAdminClient(fns,httpsCallable);
+function _pipelineCallableHint(){
+  if(_usingPipelineEmulator||shouldUseFunctionsEmulator())
+    return 'Functions emulator not running — see SANDBOX_BACKEND_HANDOFF.md (npm run emulator in pipeline-functions)';
+  return 'Add ?emulator=1 and start emulator, or deploy pipeline-adminAction (see SANDBOX_BACKEND_HANDOFF.md)';
+}
 
 const APARTMENTS=[
   {id:'0-1',code:'0-1',name:'Small Room 1',group:'Shartava — 0- Rooms'},
@@ -1283,7 +1291,7 @@ window.unlockGuest=async function(guestId){
     toast('Access granted ✓');
   }catch(e){
     console.error('[unlockGuest]',e);
-    toast(/functions|internal|not-found/i.test(e.message||'')?'Deploy pipeline-adminAction first (see SANDBOX_BACKEND_HANDOFF.md)':'Failed: '+e.message);
+    toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Failed: '+e.message);
   }
 };
 
@@ -1313,7 +1321,7 @@ window.moveGuestPipeline=async function(guestId){
     openDetail(guestId);
   }catch(e){
     console.error('[moveGuestPipeline]',e);
-    toast(/functions|internal|not-found/i.test(e.message||'')?'Deploy pipeline-adminAction first':'Error: '+e.message);
+    toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Error: '+e.message);
   }
 };
 

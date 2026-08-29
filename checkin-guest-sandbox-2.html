@@ -1216,10 +1216,11 @@ body{padding-bottom:72px;}
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,doc,setDoc,getDoc,getDocs,collection,addDoc,onSnapshot,serverTimestamp,query,where,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getStorage,ref,uploadBytes,getDownloadURL}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
-import{getFunctions,httpsCallable}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
+import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
 import{isGuestUnlocked,tbilisiHour as sharedTbilisiHour}from"./shared/guest-unlock.js";
 import{createPipelineGuestClient}from"./shared/pipeline-guest.js";
 import{buildRegisterPrimaryPayload,buildRegisterCompanionPayload,buildUpdateProfilePayload}from"./shared/guest-register.js";
+import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 // Storage rules (set in Firebase Console):
 //   match /passport_uploads/{allPaths=**} {
 //     allow write: if true;
@@ -1248,6 +1249,8 @@ const fb=initializeApp({
 });
 const db=getFirestore(fb);
 const guestFns=getFunctions(fb,'europe-west1');
+const _usingPipelineEmulator=connectPipelineFunctionsEmulator(guestFns,connectFunctionsEmulator);
+if(_usingPipelineEmulator){mountEmulatorBanner();console.info('[sandbox] pipeline functions → emulator 127.0.0.1:5001');}
 const pipelineGuest=createPipelineGuestClient(guestFns,httpsCallable);
 
 // Load Gemini key from Firestore globals/config (set via Firebase console: geminiKey field)
@@ -2138,6 +2141,13 @@ async function finishRegistration_(bestRes,formData){
       usedPipeline=true;
     }
   }catch(pipeErr){
+    if(_usingPipelineEmulator||shouldUseFunctionsEmulator()){
+      console.error('[finishRegistration_] pipeline (emulator, no fallback):',pipeErr);
+      toast('Pipeline registration failed: '+(pipeErr.message||pipeErr));
+      const _sb=document.getElementById('passport-continue-btn');const _st=document.getElementById('t-passport-submit-btn');
+      if(_sb)_sb.disabled=false;if(_st)_st.textContent='Continue to your stay';
+      return;
+    }
     console.warn('[finishRegistration_] pipeline fallback:',pipeErr);
     if(_companionGuest){
       docId=`${aptId}_${arrivalDate||Date.now()}`;

@@ -2,6 +2,8 @@
 
 **Status:** Work in progress. All changes stay in **sandbox HTML** + `pipeline-functions/` — **no live cutover** (`checkin-admin.html`, `checkin-guest-v2.html` untouched).
 
+**Deploy policy:** Do **not** deploy `pipeline-adminAction` or `pipeline-guestRegister` until sandbox E2E passes and you explicitly approve. Use the **Functions emulator** for callable testing against production Firestore.
+
 **Purpose:** When this pipeline is complete, Claude Code (or any reviewer) should run this checklist before approving production wiring.
 
 ---
@@ -26,52 +28,115 @@ Shared unlock rules (browser + server): `shared/guest-unlock.js` ↔ `pipeline-f
 | File | What uses pipeline |
 |------|-------------------|
 | `checkin-admin-sandbox.html` | `force_unlock`, `move_guest` via `shared/pipeline-admin.js` |
-| `checkin-guest-sandbox-2.html` | `shared/guest-unlock.js`; registration via `pipeline-guestRegister` (Firestore fallback) |
+| `checkin-guest-sandbox-2.html` | `shared/guest-unlock.js`; registration via `pipeline-guestRegister` (Firestore fallback when **not** in emulator mode) |
 | `shared/pipeline-admin.js` | Callable client → `pipeline-adminAction` |
-| `shared/elevator-sync.js` | Elevator dual-write (existing) |
+| `shared/pipeline-guest.js` | Callable client → `pipeline-guestRegister` |
+| `shared/pipeline-emulator.js` | Auto-connects to Functions emulator on localhost or `?emulator=1` |
 
 **Not wired:** `checkin-admin.html`, `checkin-guest-v2.html`, `minihotel_reservation_sync.py`
 
 ---
 
-## Review checklist (Claude Code)
+## Testing layers (sandbox-first)
 
-### 1. Unit tests
+| Layer | Command / action | Needs deploy? |
+|-------|------------------|---------------|
+| Unit tests | `cd pipeline-functions && npm test` | No |
+| Callable E2E (recommended) | Functions emulator + sandbox HTML | **No** |
+| Callable E2E (optional) | Deploy callables to Firebase | Yes — only after sandbox sign-off |
+
+Expected unit tests: **49/49 pass** (elevator + room assignment + admin action + guest unlock + guest register).
+
+---
+
+## 1. Unit tests
 
 ```bash
 cd pipeline-functions && npm install && npm test
 ```
 
-Expected: **all pass** (elevator + room assignment + admin action + guest unlock).
+---
 
-### 2. Deploy pipeline (sandbox E2E requires this)
+## 2. Sandbox E2E — Functions emulator (no deploy)
+
+Callables run locally; Firestore reads/writes still hit **production** `sleepy-5c962` (same data as today). Only the Cloud Function code runs on your machine.
+
+### One-time setup
 
 ```bash
-firebase functions:secrets:set ADMIN_ACTION_PASSWORD --project sleepy-5c962
-# Use same value as admin sandbox _ADMIN_PWD (maxela2026) for testing, or rotate for prod
-
-firebase deploy --only functions:pipeline:adminAction --project sleepy-5c962
+cd pipeline-functions
+npm install
+npm run emulator:setup    # copies .secret.local.example → .secret.local (ADMIN_ACTION_PASSWORD)
 ```
 
-Callable name: **`pipeline-adminAction`** (region `europe-west1`).
+Ensure `.secret.local` contains the same password as admin sandbox `_ADMIN_PWD` (`maxela2026`).
 
-### 3. Admin sandbox manual tests
+### Start emulator
 
-Open `checkin-admin-sandbox.html`:
+From repo root (requires [Firebase CLI](https://firebase.google.com/docs/cli)):
 
-- [ ] **Grant Access** on a guest with arrival today → calls `force_unlock`; `checkin_guests.manualUnlock` + `unlockState` updated; log in `system_logs` (`AdminAction`, `GuestUnlock`)
+```bash
+cd pipeline-functions && npm run emulator
+```
+
+Or:
+
+```bash
+firebase emulators:start --only functions:pipeline --project sleepy-5c962
+```
+
+Emulator listens on **`127.0.0.1:5001`**. Emulator UI (optional): **`http://127.0.0.1:4000`**.
+
+You must be logged in to Firebase CLI with access to `sleepy-5c962` so Admin SDK in the emulator can reach Firestore:
+
+```bash
+firebase login
+```
+
+### Serve sandbox HTML locally
+
+ES modules require HTTP (not `file://`). From repo root:
+
+```bash
+npx serve -p 8080 .
+# or: python3 -m http.server 8080
+```
+
+Open:
+
+- Admin: `http://127.0.0.1:8080/checkin-admin-sandbox.html?emulator=1`
+- Guest: `http://127.0.0.1:8080/checkin-guest-sandbox-2.html?emulator=1&apt=6-1` (adjust `apt` / `g` as needed)
+
+On **localhost**, `?emulator=1` is optional — emulator mode auto-enables. Use `?emulator=1` when serving from another host (e.g. LAN IP).
+
+A blue banner at the top confirms emulator mode. Callable errors point here instead of asking for deploy.
+
+### Guest registration in emulator mode
+
+When emulator mode is active, registration **does not** fall back to direct Firestore writes — failures surface immediately so you know the pipeline path is what ran.
+
+---
+
+## 3. Admin sandbox manual tests
+
+With emulator running, open admin sandbox (see URLs above):
+
+- [ ] **Grant Access** on a guest with arrival today → `force_unlock`; `checkin_guests.manualUnlock` + `unlockState` updated; log in `system_logs` (`AdminAction`, `GuestUnlock`)
 - [ ] **Move room** on guest with `matchedReservationId` → `reservations.roomCode` + `checkin_guests.aptId` updated atomically; `room_moves` audit doc; guest doc **ID unchanged**
 - [ ] **Conflict block** — move into occupied overlapping room → UI shows conflict message, no partial writes
 - [ ] **HK tab** still works (direct `hk_status` write — not migrated yet)
 
-### 4. Guest sandbox manual tests
+---
 
-Open `checkin-guest-sandbox-2.html`:
+## 4. Guest sandbox manual tests
 
 - [ ] Unlock gate matches admin status for same guest (before arrival / HK early / after 3pm / mid-stay)
+- [ ] Registration via `pipeline-guestRegister` creates stable `guestToken` doc ID and `?g=` link
 - [ ] Room move from admin sandbox → guest page still loads same `?g=` link; WiFi/photos follow new room
 
-### 5. system_logs queries
+---
+
+## 5. system_logs queries
 
 Firestore → `system_logs`:
 
@@ -79,25 +144,54 @@ Firestore → `system_logs`:
 controller == "RoomAssignment"
 controller == "AdminAction"
 controller == "GuestUnlock"
+controller == "GuestRegister"
 ```
 
 Each action should have `ok` | `warn` | `error` with sanitized input/output.
 
-### 6. Still TODO (backend phases)
+---
 
-- [ ] `GuestRegister` — **done in code**; deploy `pipeline-guestRegister` + test sandbox registration
+## 6. Deploy (only after sandbox sign-off)
+
+**Do not run this until manual sandbox tests pass and you approve.**
+
+```bash
+firebase functions:secrets:set ADMIN_ACTION_PASSWORD --project sleepy-5c962
+# Use same value as admin sandbox _ADMIN_PWD for testing, or rotate for prod
+
+firebase deploy --only functions:pipeline:adminAction,functions:pipeline:guestRegister --project sleepy-5c962
+```
+
+Callable names (region `europe-west1`): **`pipeline-adminAction`**, **`pipeline-guestRegister`**.
+
+After deploy, sandbox pages work **without** emulator (remove `?emulator=1` or use production hosting URL).
+
+---
+
+## Review checklist (Claude Code)
+
+- [ ] `npm test` — all pass
+- [ ] Emulator E2E — admin move + unlock + guest register
+- [ ] `system_logs` + `room_moves` audit rows present
+- [ ] No changes to live HTML or Python sync
+
+---
+
+## Still TODO (backend phases)
+
 - [ ] `HKStatusSync` — route HK done through pipeline (optional; HK app still writes `hk_status` today)
 - [ ] `ReservationSync` — replace Python sync (later)
-- [ ] Wire **live** admin/guest pages only after sandbox sign-off
+- [ ] Wire **live** admin/guest pages only after sandbox sign-off on phone
 - [ ] Recover missing Tuya function sources in git before `functions:default` deploy
 
 ---
 
 ## Known limitations
 
-1. **Admin sandbox room move / unlock require deployed `pipeline-adminAction`.** Without deploy, UI shows a clear toast pointing here.
-2. **Password in callable body** is v1 auth (same as HTML gate). Stronger auth is a later phase.
-3. **`guest-unlock.js` duplicated** in `shared/` and `pipeline-functions/lib/` — changes must be mirrored manually until a single build step exists.
+1. **Admin sandbox move/unlock need callable** — emulator locally, or deploy after sign-off. No direct Firestore fallback for admin mutations.
+2. **Guest sandbox** falls back to direct Firestore only when **not** in emulator mode (for pages hosted without emulator during transition).
+3. **Password in callable body** is v1 auth (same as HTML gate). Stronger auth is a later phase.
+4. **`guest-unlock.js` duplicated** in `shared/` and `pipeline-functions/lib/` — changes must be mirrored manually until a single build step exists.
 
 ---
 
