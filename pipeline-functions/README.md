@@ -107,7 +107,7 @@ pipeline-functions/
     adminAction.test.js           # 5 unit tests
 ```
 
-**31/31 tests passing** (`npm test` from inside `pipeline-functions/`).
+**39/39 tests passing** (`npm test` from inside `pipeline-functions/`).
 
 ---
 

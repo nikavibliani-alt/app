@@ -10,6 +10,7 @@
  *
  * Phase 1 (live): elevatorCodeGuard, elevatorCodeSync.
  * Phase 2 (this branch): adminAction callable → RoomAssignment (move/swap/release).
+ * Phase 3: guestRegister callable, GuestUnlock via AdminAction, sandbox wiring.
  */
 
 const { initializeApp, getApps } = require('firebase-admin/app');
@@ -18,6 +19,7 @@ if (!getApps().length) initializeApp();
 const { registerCloudFunction: registerElevatorCodeGuard } = require('./controllers/elevatorCodeGuard');
 const { registerCloudFunctions: registerElevatorCodeSync } = require('./controllers/elevatorCodeSync');
 const { registerCloudFunction: registerAdminAction } = require('./controllers/adminAction');
+const { registerCloudFunction: registerGuestRegister } = require('./controllers/guestRegister');
 
 exports.elevatorCodeGuard = registerElevatorCodeGuard();
 
@@ -26,3 +28,4 @@ exports.elevatorCodeSync = elevatorCodeSync;
 exports.elevatorCodeSyncManual = elevatorCodeSyncManual;
 
 exports.adminAction = registerAdminAction();
+exports.guestRegister = registerGuestRegister();

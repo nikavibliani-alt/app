@@ -1216,7 +1216,10 @@ body{padding-bottom:72px;}
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,doc,setDoc,getDoc,getDocs,collection,addDoc,onSnapshot,serverTimestamp,query,where,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getStorage,ref,uploadBytes,getDownloadURL}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
+import{getFunctions,httpsCallable}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
 import{isGuestUnlocked,tbilisiHour as sharedTbilisiHour}from"./shared/guest-unlock.js";
+import{createPipelineGuestClient}from"./shared/pipeline-guest.js";
+import{buildRegisterPrimaryPayload,buildRegisterCompanionPayload,buildUpdateProfilePayload}from"./shared/guest-register.js";
 // Storage rules (set in Firebase Console):
 //   match /passport_uploads/{allPaths=**} {
 //     allow write: if true;
@@ -1244,6 +1247,8 @@ const fb=initializeApp({
   appId:"1:152940098906:web:bf245230d705c0a62c2f63"
 });
 const db=getFirestore(fb);
+const guestFns=getFunctions(fb,'europe-west1');
+const pipelineGuest=createPipelineGuestClient(guestFns,httpsCallable);
 
 // Load Gemini key from Firestore globals/config (set via Firebase console: geminiKey field)
 (async function(){try{const cfg=await getDoc(doc(db,'globals','config'));if(cfg.exists())_geminiKey=cfg.data().geminiKey||'';}catch(e){}})();
@@ -2071,7 +2076,6 @@ async function finishRegistration_(bestRes,formData){
     try{const s=await getDoc(doc(db,'checkin_apartments',aptId));if(s.exists())aptData=s.data();}catch(e){}
     document.getElementById('home-apt-name').textContent=APT_NAMES[aptId]||aptId;
   }
-  // Fire scan async — don't block page transition
   const scanPromise=(passportFile&&!passportScanResult&&!_companionGuest)?scanPassport(passportFile):Promise.resolve();
   let passportUrl='';
   if(_companionGuest){
@@ -2086,28 +2090,76 @@ async function finishRegistration_(bestRes,formData){
   }else{
     throw new Error('Passport required');
   }
-  // Save to Firestore immediately with empty scan result placeholder; transition to home
-  // For number-based bookings arrival is '' — fall back to reservation checkin date
   const arrivalDate=arrival||bestRes?.checkin||bestRes?.checkIn||'';
   const checkoutDate=bestRes?.checkout||bestRes?.checkOut||'';
-  let docId;
-  if(_companionGuest){
-    docId=`${aptId}_${arrivalDate||Date.now()}`;
-  }else{
-    const existing=await findExistingPrimaryGuest(bestRes?.id,bestRes?.reservationNumber);
-    docId=existing?.id||generateGuestToken();
+  const profile={
+    name,guests,nationality,contact,contactType:ct,passportUrl,
+    passportScanResult:{},arrivalDate,checkoutDate,
+    expectedCheckInWindow:expectedCheckInWindow||'',expectedCheckInTime:expectedCheckInWindow||'',
+    nameRoman:bestRes?.guest||'',
+  };
+  let docId,guestLink,data;
+  let usedPipeline=false;
+  try{
+    if(_companionGuest){
+      const r=await pipelineGuest(buildRegisterCompanionPayload({
+        reservationId:bestRes?.id,
+        reservationNumber:String(_resParam||bestRes?.reservationNumber||'').trim(),
+        profile,
+        primaryGuestId:guestId||null,
+      }));
+      if(!r.ok)throw new Error(r.message||'Companion registration failed');
+      docId=r.data.guestToken;
+      guestLink=null;
+      data={
+        ...profile,aptId:r.data.aptId||aptId,
+        matchedReservationId:bestRes?.id||null,manualUnlock:false,companionGuest:true,isPrimaryGuest:false,guestLink:null,
+        linkedReservationNumber:String(_resParam||bestRes?.reservationNumber||'').trim()||null,
+        primaryGuestId:guestId||null,
+      };
+      usedPipeline=true;
+    }else{
+      const existing=await findExistingPrimaryGuest(bestRes?.id,bestRes?.reservationNumber);
+      const r=await pipelineGuest(buildRegisterPrimaryPayload({
+        reservationId:bestRes?.id,
+        guestToken:existing?.id||null,
+        profile,
+        guestLinkBase:window.location.origin+window.location.pathname,
+      }));
+      if(!r.ok)throw new Error(r.message||'Registration failed');
+      docId=r.data.guestToken;
+      guestLink=r.data.guestLink||buildGuestLink(docId);
+      aptId=r.data.aptId||aptId;
+      data={
+        ...profile,aptId,
+        matchedReservationId:bestRes?.id||null,manualUnlock:false,companionGuest:false,isPrimaryGuest:true,guestLink,
+        linkedReservationNumber:null,
+      };
+      usedPipeline=true;
+    }
+  }catch(pipeErr){
+    console.warn('[finishRegistration_] pipeline fallback:',pipeErr);
+    if(_companionGuest){
+      docId=`${aptId}_${arrivalDate||Date.now()}`;
+    }else{
+      const existing=await findExistingPrimaryGuest(bestRes?.id,bestRes?.reservationNumber);
+      docId=existing?.id||generateGuestToken();
+    }
+    guestLink=buildGuestLink(docId);
+    data={...profile,aptId,nameRoman:bestRes?.guest||'',guests,nationality,contact,contactType:ct,passportUrl,
+      passportScanResult:{},arrivalDate,checkoutDate,expectedCheckInWindow:expectedCheckInWindow||'',expectedCheckInTime:expectedCheckInWindow||'',
+      matchedReservationId:bestRes?.id||null,manualUnlock:false,companionGuest:!!_companionGuest,isPrimaryGuest:!_companionGuest,guestLink,
+      linkedReservationNumber:_companionGuest?(String(_resParam||bestRes?.reservationNumber||'').trim()||null):null};
+    const existing=await getDoc(doc(db,'checkin_guests',docId));
+    if(existing.exists()){
+      await setDoc(doc(db,'checkin_guests',docId),{...data,updatedAt:serverTimestamp()},{merge:true});
+      guestData={...existing.data(),...data,id:docId};
+    }else{
+      await setDoc(doc(db,'checkin_guests',docId),{...data,submittedAt:serverTimestamp()});
+      guestData={...data,id:docId};
+    }
   }
-  const guestLink=buildGuestLink(docId);
-  const data={aptId,name,nameRoman:bestRes?.guest||'',guests,nationality,contact,contactType:ct,passportUrl,
-    passportScanResult:{},arrivalDate,checkoutDate,expectedCheckInWindow:expectedCheckInWindow||'',expectedCheckInTime:expectedCheckInWindow||'',
-    matchedReservationId:bestRes?.id||null,manualUnlock:false,companionGuest:!!_companionGuest,isPrimaryGuest:!_companionGuest,guestLink,
-    linkedReservationNumber:_companionGuest?(String(_resParam||bestRes?.reservationNumber||'').trim()||null):null};
-  const existing=await getDoc(doc(db,'checkin_guests',docId));
-  if(existing.exists()){
-    await setDoc(doc(db,'checkin_guests',docId),{...data,updatedAt:serverTimestamp()},{merge:true});
-    guestData={...existing.data(),...data,id:docId};
-  }else{
-    await setDoc(doc(db,'checkin_guests',docId),{...data,submittedAt:serverTimestamp()});
+  if(usedPipeline){
     guestData={...data,id:docId};
   }
   guestId=docId;
@@ -2148,7 +2200,11 @@ async function finishRegistration_(bestRes,formData){
   scanPromise.then(async()=>{
     if(!passportScanResult)return;
     try{
-      await setDoc(doc(db,'checkin_guests',docId),{passportScanResult},{merge:true});
+      if(usedPipeline){
+        await pipelineGuest(buildUpdateProfilePayload({guestToken:docId,profile:{},passportScanResult}));
+      }else{
+        await setDoc(doc(db,'checkin_guests',docId),{passportScanResult},{merge:true});
+      }
       if(passportScanResult.valid===false){
         await setDoc(doc(db,'passport_alerts',`${aptId}_${Date.now()}`),{aptId,guestName:name,passportUrl,scanResult:passportScanResult,reason:passportScanResult.reason||'',createdAt:serverTimestamp()});
       }

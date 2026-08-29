@@ -25,7 +25,7 @@ Shared unlock rules (browser + server): `shared/guest-unlock.js` ↔ `pipeline-f
 | File | What uses pipeline |
 |------|-------------------|
 | `checkin-admin-sandbox.html` | `force_unlock`, `move_guest` via `shared/pipeline-admin.js` |
-| `checkin-guest-sandbox-2.html` | `shared/guest-unlock.js` for `isUnlocked()` |
+| `checkin-guest-sandbox-2.html` | `shared/guest-unlock.js`; registration via `pipeline-guestRegister` (Firestore fallback) |
 | `shared/pipeline-admin.js` | Callable client → `pipeline-adminAction` |
 | `shared/elevator-sync.js` | Elevator dual-write (existing) |
 
@@ -84,7 +84,7 @@ Each action should have `ok` | `warn` | `error` with sanitized input/output.
 
 ### 6. Still TODO (backend phases)
 
-- [ ] `GuestRegister` — stable guest token, passport link
+- [ ] `GuestRegister` — **done in code**; deploy `pipeline-guestRegister` + test sandbox registration
 - [ ] `HKStatusSync` — route HK done through pipeline (optional; HK app still writes `hk_status` today)
 - [ ] `ReservationSync` — replace Python sync (later)
 - [ ] Wire **live** admin/guest pages only after sandbox sign-off
@@ -120,4 +120,4 @@ All calls include `password` and optional `actor`.
 
 ---
 
-*Update this file when a phase completes or sandbox wiring changes.*
+**Full report for Claude Code:** see **`CLAUDE_CODE_REPORT.md`**
