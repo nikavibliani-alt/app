@@ -7,7 +7,18 @@
 
 ---
 
-## Executive summary
+## Review fixes applied (2026-08-29, after Claude Code review)
+
+| Finding | Fix |
+|---------|-----|
+| 🔴 `room_moves` audit written outside transaction | Audit + success `system_logs` now written **inside** the same Firestore transaction as reservation/guest updates |
+| 🟡 `manualUnlock` ignored when `arrivalDate` missing | `computeGuestUnlock` checks `manualUnlock` before `no_arrival` early return (shared + pipeline lib) |
+| 🟡 `correlationId` never populated | AdminAction generates `adm_{hex}` and passes through to RoomAssignment / GuestUnlock logs |
+| 🟡 `isLikelyGuestToken` regex too narrow | Uses `isLegacyCompanionDocId()` — matches `tab-1_2026-09-01`, `orb-2_…`, etc. |
+
+**Tests:** 49/49 passing (added audit rollback + manualUnlock edge case tests).
+
+---
 
 We rebuilt Maxela’s check-in backend as **small pipeline controllers** (one job each, full `system_logs` logging) using **one Firestore** — no `v2_*` collections. Phase 1 elevator pipes are **already deployed**. Phases 2–4 are **implemented in code**, wired to **sandboxes only**, and **await deploy + your review** before any live cutover.
 
@@ -108,7 +119,7 @@ Callable names (region `europe-west1`):
 
 ### Automated
 
-- [ ] `cd pipeline-functions && npm test` → **46/46 pass**
+- [ ] `cd pipeline-functions && npm test` → **49/49 pass**
 - [ ] No `v2_*` collection writes in `pipeline-functions/`
 - [ ] Live HTML files unchanged (`checkin-admin.html`, `checkin-guest-v2.html`)
 
