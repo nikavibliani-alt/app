@@ -441,7 +441,7 @@ html.admin-authed #app{display:block;}
  */
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
-const SANDBOX_BUILD='20260827e';
+const SANDBOX_BUILD='20260829a';
 (function migrateSandboxBuild(){
   try{
     if(localStorage.getItem('maxela_sandbox_build')!==SANDBOX_BUILD){
@@ -477,6 +477,9 @@ window.adminSignOut=function(){localStorage.removeItem(_ADMIN_KEY);location.relo
 
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFunctions,httpsCallable}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
+import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour}from"./shared/guest-unlock.js";
+import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -487,6 +490,8 @@ const fb=initializeApp({
   appId:"1:152940098906:web:bf245230d705c0a62c2f63"
 });
 const db=getFirestore(fb);
+const fns=getFunctions(fb,'europe-west1');
+const pipelineAdmin=createPipelineAdminClient(fns,httpsCallable);
 
 const APARTMENTS=[
   {id:'0-1',code:'0-1',name:'Small Room 1',group:'Shartava — 0- Rooms'},
@@ -968,19 +973,18 @@ async function uploadToCloudinary(file,folder='maxela'){
 }
 
 function guestStatus(g){
-  const now=tbilisiNow(),today=now.toISOString().slice(0,10),hour=now.getUTCHours();
-  const arrival=g.arrivalDate||'';
-  if(arrival){if(today<arrival)return{label:'Arrives '+arrival,cls:'waiting'};if(today>arrival)return{label:'Checked in',cls:'unlocked'};}
-  if(g.manualUnlock)return{label:'Unlocked',cls:'unlocked'};
+  const today=unlockToday();
+  const hkKey=(g.aptId||'')+'_'+today;
   const aptCheckIn=aptData[g.aptId]?.checkInTime||'';
-  const checkInHour=aptCheckIn?parseInt(aptCheckIn.split(':')[0]):CHECK_IN_HOUR;
-  if(hour>=checkInHour)return{label:'Unlocked',cls:'unlocked'};
-  const hkKey=g.aptId+'_'+today;
-  if(hkStatusData[hkKey]?.done===true){
-    if(hour>=11)return{label:'Unlocked early',cls:'unlocked'};
-    return{label:'Ready 11am',cls:'waiting'};
-  }
-  return{label:'Waiting',cls:'waiting'};
+  const checkInHour=aptCheckIn?parseInt(String(aptCheckIn).split(':')[0],10):CHECK_IN_HOUR;
+  const r=computeGuestUnlock({
+    guest:g,
+    checkInHour:Number.isFinite(checkInHour)?checkInHour:CHECK_IN_HOUR,
+    hkDone:hkStatusData[hkKey]?.done===true,
+    today,
+    hour:tbilisiHour(),
+  });
+  return{label:r.label,cls:r.cls};
 }
 
 function rebuildFormMaps(){
@@ -1273,8 +1277,44 @@ window.switchTab=function(tab){
 
 window.unlockGuest=async function(guestId){
   if(!confirm('Grant access for this guest now?'))return;
-  try{await updateDoc(doc(db,'checkin_guests',guestId),{manualUnlock:true,unlockedAt:serverTimestamp()});toast('Access granted ✓');}
-  catch(e){toast('Failed: '+e.message);}
+  try{
+    const r=await pipelineAdmin({password:_ADMIN_PWD,actionType:'force_unlock',payload:{guestId},actor:'admin-sandbox'});
+    if(!r.ok){toast(r.message||'Failed');return;}
+    toast('Access granted ✓');
+  }catch(e){
+    console.error('[unlockGuest]',e);
+    toast(/functions|internal|not-found/i.test(e.message||'')?'Deploy pipeline-adminAction first (see SANDBOX_BACKEND_HANDOFF.md)':'Failed: '+e.message);
+  }
+};
+
+function roomOptionsHtml(selected){
+  return ROOM_ORDER.map(r=>`<option value="${esc(r)}"${r===(selected||'')?' selected':''}>${esc(r)}</option>`).join('');
+}
+
+window.moveGuestPipeline=async function(guestId){
+  const newRoom=document.getElementById('detail-room-select')?.value;
+  const g=guestData.find(x=>x.id===guestId);
+  if(!g||!newRoom)return;
+  if(newRoom===g.aptId){toast('Already in '+newRoom);return;}
+  const resId=g.matchedReservationId;
+  if(!resId){toast('No linked reservation — cannot move via pipeline');return;}
+  try{
+    const r=await pipelineAdmin({
+      password:_ADMIN_PWD,
+      actionType:'move_guest',
+      payload:{reservationId:resId,toRoom:newRoom},
+      actor:'admin-sandbox',
+    });
+    if(!r.ok){
+      toast(r.errorCode==='CONFLICT'?'Room conflict — pick another room or swap':(r.message||'Move failed'));
+      return;
+    }
+    toast('Moved to '+newRoom+' ✓');
+    openDetail(guestId);
+  }catch(e){
+    console.error('[moveGuestPipeline]',e);
+    toast(/functions|internal|not-found/i.test(e.message||'')?'Deploy pipeline-adminAction first':'Error: '+e.message);
+  }
 };
 
 window.openDetail=function(guestId){
@@ -1307,6 +1347,14 @@ window.openDetail=function(guestId){
         ${waPhone?`<a class="btn" href="https://wa.me/${waPhone}" target="_blank">WhatsApp</a>`:''}
       </div>
     </div>
+    ${g.matchedReservationId?`<div style="margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs)">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px">Move room (pipeline)</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="detail-room-select" class="lock-input" style="flex:1;height:44px;margin:0">${roomOptionsHtml(g.aptId)}</select>
+        <button class="btn btn-primary" style="flex:none;min-height:44px;padding:0 14px" onclick="window.moveGuestPipeline('${g.id}')">Move</button>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px">AdminAction → RoomAssignment · guest link unchanged</p>
+    </div>`:''}
     <p style="font-size:12px;color:var(--muted);margin-top:8px;">${esc(fmtDate(g.arrivalDate))} → ${esc(fmtDate(g.checkoutDate||door?.checkout||''))} · ${esc(g.contact||'no contact')}</p>
     ${g.matchedReservationId?`<p style="font-size:12px;color:var(--muted);">Booking ${esc(g.matchedReservationId)}</p>`:''}
     <button class="btn" style="width:100%;margin-top:12px" onclick="window.openAptEditor('${g.aptId||''}')">Edit apartment instructions</button>

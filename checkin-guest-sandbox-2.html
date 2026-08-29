@@ -1216,6 +1216,7 @@ body{padding-bottom:72px;}
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,doc,setDoc,getDoc,getDocs,collection,addDoc,onSnapshot,serverTimestamp,query,where,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getStorage,ref,uploadBytes,getDownloadURL}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
+import{isGuestUnlocked,tbilisiHour as sharedTbilisiHour}from"./shared/guest-unlock.js";
 // Storage rules (set in Firebase Console):
 //   match /passport_uploads/{allPaths=**} {
 //     allow write: if true;
@@ -1614,23 +1615,18 @@ document.addEventListener('visibilitychange',()=>{
   }
 });
 
-// ── UNLOCK GATE (single shared decision — guest page is source of truth) ──────
+// ── UNLOCK GATE (shared/guest-unlock.js — same rules as admin sandbox + pipeline GuestUnlock) ──
 function isUnlocked(){
   if(!guestData)return false;
-  const today=tbilisiToday();
-  // Fall back to reservation checkin date if arrivalDate was not saved (number-based registration)
   const arrival=guestData.arrivalDate||activeReservation?.checkin||activeReservation?.checkIn||'';
-  if(!arrival)return false;
-  // Mid-stay (today after check-in day) → always unlocked
-  if(today>arrival)return true;
-  // Before check-in day → locked
-  if(today<arrival)return false;
-  // today === arrival: time-based rules
-  if(guestData.manualUnlock)return true;
-  const hour=tbilisiHour();
-  if(hour>=getCheckInHour())return true;
-  if(hour>=11&&_hkTodayData?.done===true)return true;
-  return false;
+  return isGuestUnlocked({
+    guest:guestData,
+    arrivalDate:arrival,
+    checkInHour:getCheckInHour(),
+    hkDone:_hkTodayData?.done===true,
+    today:tbilisiToday(),
+    hour:sharedTbilisiHour(),
+  });
 }
 
 function timeUntilCheckin(){

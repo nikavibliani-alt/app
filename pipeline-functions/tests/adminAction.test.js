@@ -59,7 +59,7 @@ test('routes swap to RoomAssignment.swap', async () => {
 test('unknown action returns UNKNOWN_ACTION', async () => {
   const ctx = makeCtx({ ok: true, message: 'unused' });
   const result = await runAdminAction(ctx, {
-    actionType: 'force_unlock',
+    actionType: 'save_apartment',
     payload: {},
     actor: 'admin',
   });
@@ -79,4 +79,21 @@ test('missing move fields returns BAD_REQUEST', async () => {
 
   assert.equal(result.ok, false);
   assert.equal(result.errorCode, 'BAD_REQUEST');
+});
+
+test('routes force_unlock to GuestUnlock', async () => {
+  const ctx = makeCtx({ ok: true, errorCode: 'UNLOCKED', message: 'Unlocked' });
+  ctx.runGuestUnlock = async (params) => {
+    ctx.unlockCalls = ctx.unlockCalls || [];
+    ctx.unlockCalls.push(params);
+    return { ok: true, errorCode: 'UNLOCKED', message: 'Unlocked' };
+  };
+  const result = await runAdminAction(ctx, {
+    actionType: 'force_unlock',
+    payload: { guestId: 'g1' },
+    actor: 'nika',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(ctx.unlockCalls[0].guestId, 'g1');
+  assert.equal(ctx.unlockCalls[0].forceManual, true);
 });

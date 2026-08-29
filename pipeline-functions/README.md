@@ -285,13 +285,56 @@ already reads/writes.
    ]
 ```
 
-## Deploy commands (documented — NOT run; waiting for approval)
+---
+
+## Phase 2 — RoomAssignment + AdminAction
+
+**One Firestore** — uses existing `reservations`, `checkin_guests`, and new audit docs in `room_moves`. No `v2_*` collections.
+
+| Action | `actionType` | Required `payload` fields |
+|--------|--------------|---------------------------|
+| Move guest to another room | `move` or `move_guest` | `reservationId` (or `assignmentId`), `toRoom` (or `toRoomCode`); optional `expectedVersion` |
+| Swap two guests' rooms | `swap` or `swap_guests` | `reservationId`, `otherReservationId` |
+| Let MiniHotel sync room again | `release_to_minihotel` | `reservationId` |
+
+**Conflict policy (locked):** block if target room has an overlapping active stay; admin must explicitly swap or cancel. Same-day turnover (`checkout == checkin`) is not a conflict.
+
+**What each move writes (atomic transaction):**
+- `reservations/{id}` — `roomCode`, `allRooms`, `manualRoom: true`, `roomVersion` (+1), `updatedAt`, `updatedBy`
+- `checkin_guests/*` where `matchedReservationId == id` — `aptId` only (guest doc ID unchanged)
+- `room_moves/{autoId}` — audit row with from/to room, actor, mode
+
+**Callable request shape** (from admin sandbox once wired):
+
+```javascript
+const fn = httpsCallable(functions, 'adminAction');
+await fn({
+  password: '…',           // same as admin HTML gate; checked against ADMIN_ACTION_PASSWORD secret
+  actionType: 'move_guest',
+  payload: { reservationId: '12345_6-1', toRoom: '6-3' },
+  actor: 'nika',
+});
+```
+
+**Response:** `{ ok, errorCode, message, data }` — never a bare throw to the UI for expected cases (CONFLICT, NOOP, NOT_FOUND).
+
+Admin HTML is **not wired yet** — backend first, then sandbox cutover.
+
+---
+
+## Deploy commands (documented — coordinate before deploy)
 
 ```bash
 cd pipeline-functions && npm install   # once
-firebase deploy --only functions:pipeline:elevatorCodeGuard,functions:pipeline:elevatorCodeSync --project sleepy-5c962
-# elevatorCodeSyncManual deploys automatically with elevatorCodeSync's group; to target it alone:
-firebase deploy --only functions:pipeline:elevatorCodeSyncManual --project sleepy-5c962
+firebase deploy --only functions:pipeline:adminAction --project sleepy-5c962
+# or full pipeline codebase:
+firebase deploy --only functions:pipeline --project sleepy-5c962
+```
+
+Set secret before first `adminAction` deploy:
+
+```bash
+firebase functions:secrets:set ADMIN_ACTION_PASSWORD --project sleepy-5c962
 ```
 
 ### ⚠️ Cutover step required after first deploy: delete the OLD `elevatorCodeGuard`
@@ -326,12 +369,13 @@ as before.
 
 ---
 
-## Confirmed for this delivery
+## Confirmed for Phase 2 delivery
 
-- ✅ `elevatorCodeGuard` is **NOT** in `tuya-functions/index.js` anymore (moved here).
-- ✅ Zero WhatsApp, zero email, zero `system_alerts` anywhere in `pipeline-functions/` — log-only.
-- ✅ `scripts/elevator-monitor.js` and `.github/workflows/elevator-monitor.yml` — untouched.
-- ✅ No `v2_*` collections anywhere.
-- ✅ No HTML file touched (live or sandbox).
-- ✅ No Python script touched.
-- ✅ Nothing deployed. `firebase deploy` has not been run.
+- ✅ `RoomAssignment` — move, swap, release_to_minihotel with conflict block + audit
+- ✅ `AdminAction` — HTTPS callable, password-gated, logs every admin intent
+- ✅ 31 unit tests passing (`npm test`)
+- ✅ Zero WhatsApp, zero email, zero `system_alerts`
+- ✅ No `v2_*` collections
+- ✅ No HTML file touched (admin sandbox wiring is next phase)
+- ✅ No Python script touched
+- ⏸ Not deployed — waiting for your approval (same as Phase 1 elevator deploy)

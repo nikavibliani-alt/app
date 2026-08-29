@@ -10,8 +10,11 @@
  */
 
 const { runRoomAssignment, buildLiveCtx: buildRoomCtx } = require('./roomAssignment');
+const { runGuestUnlock, buildLiveCtx: buildGuestUnlockCtx } = require('./guestUnlock');
 
 const ROOM_ACTIONS = new Set(['move', 'move_guest', 'swap', 'swap_guests', 'release_to_minihotel']);
+const UNLOCK_ACTIONS = new Set(['force_unlock', 'force_lock', 'recompute_unlock']);
+const KNOWN_ACTIONS = new Set([...ROOM_ACTIONS, ...UNLOCK_ACTIONS]);
 
 function normalizeActionType(actionType) {
   return String(actionType || '')
@@ -30,6 +33,7 @@ function pick(payload, ...keys) {
 /**
  * @param {object} ctx
  * @param {(params:object) => Promise<object>} ctx.runRoomAssignment
+ * @param {(params:object) => Promise<object>} ctx.runGuestUnlock
  * @param {(entry:object) => Promise<void>} ctx.logRun
  * @param {{actionType:string, payload:object, actor:string}} params
  */
@@ -51,7 +55,7 @@ async function runAdminAction(ctx, params) {
     return { ok: false, errorCode: 'BAD_REQUEST', message: 'actionType is required' };
   }
 
-  if (!ROOM_ACTIONS.has(actionType)) {
+  if (!KNOWN_ACTIONS.has(actionType)) {
     await ctx.logRun({
       controller: 'AdminAction',
       action: actionType,
@@ -69,6 +73,37 @@ async function runAdminAction(ctx, params) {
     message: `Admin intent received: ${actionType}`,
     input,
   });
+
+  if (UNLOCK_ACTIONS.has(actionType)) {
+    const guestId = pick(payload, 'guestId');
+    if (!guestId) {
+      await ctx.logRun({
+        controller: 'AdminAction',
+        action: actionType,
+        status: 'error',
+        message: 'guestId is required',
+        input,
+      });
+      return { ok: false, errorCode: 'BAD_REQUEST', message: 'guestId is required' };
+    }
+    const forceManual =
+      actionType === 'force_unlock' ? true : actionType === 'force_lock' ? false : null;
+    const result = await ctx.runGuestUnlock({ guestId, actor, forceManual });
+    await ctx.logRun({
+      controller: 'AdminAction',
+      action: actionType,
+      status: result.ok ? 'ok' : 'error',
+      message: result.message,
+      input,
+      output: { ok: result.ok, errorCode: result.errorCode, data: result.data || null },
+    });
+    return {
+      ok: result.ok,
+      errorCode: result.errorCode || (result.ok ? 'OK' : 'FAILED'),
+      message: result.message,
+      data: result.data || null,
+    };
+  }
 
   let roomParams;
   if (actionType === 'move' || actionType === 'move_guest') {
@@ -157,9 +192,12 @@ async function runAdminAction(ctx, params) {
 
 function buildLiveCtx() {
   const roomCtx = buildRoomCtx();
+  const guestCtx = buildGuestUnlockCtx();
+  const logRun = roomCtx.logRun;
   return {
     runRoomAssignment: (params) => runRoomAssignment(roomCtx, params),
-    logRun: roomCtx.logRun,
+    runGuestUnlock: (params) => runGuestUnlock({ ...guestCtx, logRun }, params),
+    logRun,
   };
 }
 
