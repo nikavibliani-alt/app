@@ -13,7 +13,7 @@ notifications" below.
 
 ---
 
-## Pipe map (Phase 1 status)
+## Pipe map (Phase 1 + Phase 2 status)
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
@@ -39,12 +39,20 @@ notifications" below.
 │   alert channel, firing at 26h stale on RTDB. Not duplicated here.)        │
 │                                                                             │
 │  ┌────────────────────────┐   ┌────────────────────────┐                  │
-│  │ roomAssignment.js  🔲  │   │ adminAction.js     🔲  │                  │
-│  │ Phase 2 — scaffold      │   │ Phase 2 — scaffold      │                  │
-│  │ only, throws if called,│   │ only, throws if called, │                  │
-│  │ NOT exported as a       │   │ NOT exported as a       │                  │
-│  │ Cloud Function          │   │ Cloud Function          │                  │
-│  └────────────────────────┘   └────────────────────────┘                  │
+│  │ roomAssignment.js  ✅  │   │ adminAction.js     ✅  │                  │
+│  │ move / swap / release   │◄──│ HTTPS callable         │                  │
+│  │ (internal — called by   │   │ routes room actions    │                  │
+│  │  AdminAction only)      │   │ + logs admin intent    │                  │
+│  └───────────┬─────────────┘   └────────────────────────┘                  │
+│              │ writes (atomic transaction)                                   │
+│              ▼                                                               │
+│   reservations.roomCode + manualRoom + roomVersion                           │
+│   checkin_guests.aptId (mirror via matchedReservationId)                     │
+│   room_moves/{id} (audit)                                                    │
+│              │                                                               │
+│              └──────────────────┬────────────────────────────────────────────│
+│                                  ▼ every run, all controllers                │
+│                    system_logs/{autoId}  (ok | warn | error)                │
 └───────────────────────────────────────────────────────────────────────────┘
 
 ┌───────────────────────────────────────────────────────────────────────────┐
@@ -81,22 +89,25 @@ notifications" below.
 ```
 pipeline-functions/
   package.json
-  index.js                        # exports live Cloud Functions: elevatorCodeGuard, elevatorCodeSync, elevatorCodeSyncManual
+  index.js                        # exports: elevator*, adminAction
   lib/
-    logging.js                    # writeSystemLog() — the ONLY output every controller shares
+    logging.js                    # writeSystemLog() — shared by all controllers
+    dates.js                      # datesOverlap() for stay conflict checks
     timestamps.js                 # normalizes Firestore Timestamp vs RTDB ms-string
     elevator.js                   # drift-detection logic; reuses shared/elevator-sync.js
   controllers/
-    elevatorCodeGuard.js          # MOVED from tuya-functions/index.js — full implementation
-    elevatorCodeSync.js           # NEW — full implementation
-    roomAssignment.js             # Phase 2 — scaffold, throws if called, not exported
-    adminAction.js                # Phase 2 — scaffold, throws if called, not exported
+    elevatorCodeGuard.js          # Firestore trigger — stale auto retry guard
+    elevatorCodeSync.js           # hourly FS↔RTDB reconcile
+    roomAssignment.js             # move / swap / release_to_minihotel (Phase 2)
+    adminAction.js                # HTTPS callable → RoomAssignment (Phase 2)
   tests/
     elevatorCodeGuard.test.js     # 10 unit tests
     elevatorCodeSync.test.js      # 9 unit tests
+    roomAssignment.test.js        # 7 unit tests
+    adminAction.test.js           # 5 unit tests
 ```
 
-**19/19 tests passing** as of this delivery (`npm test` from inside `pipeline-functions/`).
+**31/31 tests passing** (`npm test` from inside `pipeline-functions/`).
 
 ---
 
@@ -250,10 +261,10 @@ filter `controller == "ElevatorCodeGuard"` or `"ElevatorCodeSync"`.
 
 | Secret | Used by | Already exists? |
 |---|---|---|
-| `ELEVATOR_SYNC_MANUAL_SECRET` | `elevatorCodeSyncManual` (Authorization-header gate) | **New — needs to be set**, any random string |
+| `ELEVATOR_SYNC_MANUAL_SECRET` | `elevatorCodeSyncManual` (Authorization-header gate) | Set at deploy |
+| `ADMIN_ACTION_PASSWORD` | `adminAction` callable (`password` field in request body) | **New — set before deploy** (same value as admin HTML password gate) |
 
-No other secrets. `elevatorCodeGuard` and the scheduled `elevatorCodeSync` need
-none at all (log-only, no outbound calls).
+No other secrets. `elevatorCodeGuard`, scheduled `elevatorCodeSync`, and `adminAction` room logic need no outbound API keys.
 
 ## IAM
 
