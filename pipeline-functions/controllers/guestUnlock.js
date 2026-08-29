@@ -24,7 +24,8 @@ const { computeGuestUnlock, parseCheckInHour, tbilisiToday } = require('../lib/g
 async function runGuestUnlock(ctx, params) {
   const guestId = params.guestId;
   const actor = params.actor || 'system';
-  const input = { guestId, actor, forceManual: params.forceManual ?? null };
+  const correlationId = params.correlationId || null;
+  const input = { guestId, actor, forceManual: params.forceManual ?? null, correlationId };
 
   if (!guestId) {
     await ctx.logRun({
@@ -96,6 +97,7 @@ async function runGuestUnlock(ctx, params) {
       message: `${action} ${guestId} → ${computed.state} (${computed.reason})`,
       input,
       output: { guestId, ...computed, aptId, hkDone: hk?.done === true },
+      correlationId,
     });
 
     return {

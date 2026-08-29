@@ -16,11 +16,17 @@ function buildGuestLink(baseUrl, guestToken) {
   return `${trimmed}${sep}g=${encodeURIComponent(guestToken)}`;
 }
 
-function isLikelyGuestToken(id) {
-  if (!id || typeof id !== 'string') return false;
-  if (/^\d+-\d+_\d{4}-\d{2}-\d{2}$/.test(id)) return false;
-  if (id.startsWith('g') && id.length > 8) return true;
-  return /^[a-f0-9]{32}$/i.test(id);
+function isLegacyCompanionDocId(id) {
+  // Legacy/companion shape: {roomCode}_{YYYY-MM-DD} e.g. 6-1_2026-09-01, tab-1_2026-09-01
+  return /^.+\_\d{4}-\d{2}-\d{2}$/.test(id);
 }
 
-module.exports = { generateGuestToken, buildGuestLink, isLikelyGuestToken };
+function isLikelyGuestToken(id) {
+  if (!id || typeof id !== 'string') return false;
+  if (isLegacyCompanionDocId(id)) return false;
+  if (/^[a-f0-9]{32}$/i.test(id)) return true;
+  if (id.startsWith('g') && id.length > 8) return true;
+  return false;
+}
+
+module.exports = { generateGuestToken, buildGuestLink, isLikelyGuestToken, isLegacyCompanionDocId };

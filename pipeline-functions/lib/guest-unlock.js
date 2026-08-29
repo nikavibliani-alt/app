@@ -33,6 +33,9 @@ function computeGuestUnlock(opts = {}) {
   const arrival = opts.arrivalDate || guest.arrivalDate || '';
 
   if (!arrival) {
+    if (guest.manualUnlock === true) {
+      return { state: 'unlocked', unlocked: true, label: 'Unlocked', cls: 'unlocked', reason: 'manual_unlock' };
+    }
     return { state: 'locked', unlocked: false, label: 'Waiting', cls: 'waiting', reason: 'no_arrival' };
   }
   if (today > arrival) {

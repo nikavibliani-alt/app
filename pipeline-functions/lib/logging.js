@@ -46,9 +46,9 @@ function sanitize(value) {
  * @param {{controller:string, action:string, status:'ok'|'warn'|'error',
  *          message?:string, input?:object, output?:object, correlationId?:string}} entry
  */
-async function writeSystemLog(db, entry) {
+function buildSystemLogDoc(entry) {
   const { FieldValue } = require('firebase-admin/firestore');
-  const doc = {
+  return {
     controller: entry.controller,
     action: entry.action,
     status: entry.status,
@@ -58,8 +58,12 @@ async function writeSystemLog(db, entry) {
     correlationId: entry.correlationId || null,
     timestamp: FieldValue.serverTimestamp(),
   };
+}
+
+async function writeSystemLog(db, entry) {
+  const doc = buildSystemLogDoc(entry);
   await db.collection('system_logs').add(doc);
   return doc;
 }
 
-module.exports = { writeSystemLog, sanitize };
+module.exports = { writeSystemLog, buildSystemLogDoc, sanitize };

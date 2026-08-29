@@ -11,6 +11,11 @@
 
 const { runRoomAssignment, buildLiveCtx: buildRoomCtx } = require('./roomAssignment');
 const { runGuestUnlock, buildLiveCtx: buildGuestUnlockCtx } = require('./guestUnlock');
+const crypto = require('crypto');
+
+function newCorrelationId() {
+  return `adm_${crypto.randomBytes(8).toString('hex')}`;
+}
 
 const ROOM_ACTIONS = new Set(['move', 'move_guest', 'swap', 'swap_guests', 'release_to_minihotel']);
 const UNLOCK_ACTIONS = new Set(['force_unlock', 'force_lock', 'recompute_unlock']);
@@ -66,12 +71,16 @@ async function runAdminAction(ctx, params) {
     return { ok: false, errorCode: 'UNKNOWN_ACTION', message: `Unknown action: ${actionType}` };
   }
 
+  const correlationId = params.correlationId || newCorrelationId();
+  input.correlationId = correlationId;
+
   await ctx.logRun({
     controller: 'AdminAction',
     action: actionType,
     status: 'ok',
     message: `Admin intent received: ${actionType}`,
     input,
+    correlationId,
   });
 
   if (UNLOCK_ACTIONS.has(actionType)) {
@@ -88,7 +97,7 @@ async function runAdminAction(ctx, params) {
     }
     const forceManual =
       actionType === 'force_unlock' ? true : actionType === 'force_lock' ? false : null;
-    const result = await ctx.runGuestUnlock({ guestId, actor, forceManual });
+    const result = await ctx.runGuestUnlock({ guestId, actor, forceManual, correlationId });
     await ctx.logRun({
       controller: 'AdminAction',
       action: actionType,
@@ -96,6 +105,7 @@ async function runAdminAction(ctx, params) {
       message: result.message,
       input,
       output: { ok: result.ok, errorCode: result.errorCode, data: result.data || null },
+      correlationId,
     });
     return {
       ok: result.ok,
@@ -129,6 +139,7 @@ async function runAdminAction(ctx, params) {
       toRoomCode,
       actor,
       expectedVersion: payload.expectedVersion ?? payload.expectedRoomVersion ?? null,
+      correlationId,
     };
   } else if (actionType === 'swap' || actionType === 'swap_guests') {
     const assignmentId = pick(payload, 'assignmentId', 'reservationId');
@@ -147,7 +158,7 @@ async function runAdminAction(ctx, params) {
         message: 'swap requires assignmentId and otherAssignmentId',
       };
     }
-    roomParams = { mode: 'swap', assignmentId, otherAssignmentId, actor };
+    roomParams = { mode: 'swap', assignmentId, otherAssignmentId, actor, correlationId };
   } else {
     const assignmentId = pick(payload, 'assignmentId', 'reservationId');
     if (!assignmentId) {
@@ -164,7 +175,7 @@ async function runAdminAction(ctx, params) {
         message: 'release_to_minihotel requires assignmentId/reservationId',
       };
     }
-    roomParams = { mode: 'release_to_minihotel', assignmentId, actor };
+    roomParams = { mode: 'release_to_minihotel', assignmentId, actor, correlationId };
   }
 
   const result = await ctx.runRoomAssignment(roomParams);
@@ -180,6 +191,7 @@ async function runAdminAction(ctx, params) {
       errorCode: result.errorCode || null,
       data: result.data || null,
     },
+    correlationId,
   });
 
   return {

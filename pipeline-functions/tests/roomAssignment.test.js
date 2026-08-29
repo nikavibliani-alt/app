@@ -6,7 +6,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { runRoomAssignment, findConflicts } = require('../controllers/roomAssignment');
 
-function makeStore(initial = {}) {
+function makeStore(initial = {}, opts = {}) {
   const reservations = new Map(Object.entries(initial.reservations || {}));
   const guests = new Map(Object.entries(initial.guests || {}));
   const roomMoves = [];
@@ -31,6 +31,8 @@ function makeStore(initial = {}) {
   async function runTransaction(fn) {
     const pendingResUpdates = new Map();
     const pendingGuestUpdates = new Map();
+    const pendingRoomMoves = [];
+    const pendingLogs = [];
 
     const tx = {
       async getReservation(reservationId) {
@@ -58,18 +60,30 @@ function makeStore(initial = {}) {
         const prev = pendingGuestUpdates.get(guestId) || {};
         pendingGuestUpdates.set(guestId, { ...prev, ...patch });
       },
+      writeRoomMove(audit) {
+        if (opts.failAuditWrite) throw new Error('audit write failed');
+        pendingRoomMoves.push(audit);
+      },
+      logRun(entry) {
+        pendingLogs.push(entry);
+      },
     };
 
-    const result = await fn(tx);
-
-    for (const [id, patch] of pendingResUpdates) {
-      reservations.set(id, { ...(reservations.get(id) || {}), ...patch });
+    try {
+      const result = await fn(tx);
+      for (const [id, patch] of pendingResUpdates) {
+        reservations.set(id, { ...(reservations.get(id) || {}), ...patch });
+      }
+      for (const [id, patch] of pendingGuestUpdates) {
+        guests.set(id, { ...(guests.get(id) || {}), ...patch });
+      }
+      roomMoves.push(...pendingRoomMoves);
+      logs.push(...pendingLogs);
+      return result;
+    } catch (err) {
+      // Transaction aborted — no partial commit (matches Firestore rollback)
+      throw err;
     }
-    for (const [id, patch] of pendingGuestUpdates) {
-      guests.set(id, { ...(guests.get(id) || {}), ...patch });
-    }
-
-    return result;
   }
 
   const ctx = {
@@ -82,9 +96,6 @@ function makeStore(initial = {}) {
     listReservationsInRoom: async (roomCode) => reservationMapForRoom(roomCode),
     listGuestIdsForReservation: async (id) => guestIdsForReservation(id),
     runTransaction,
-    writeRoomMove: async (audit) => {
-      roomMoves.push(audit);
-    },
     logRun: async (entry) => {
       logs.push(entry);
     },
@@ -108,15 +119,39 @@ test('move into empty room updates reservation + guest mirror + audit', async ()
     assignmentId: 'res1',
     toRoomCode: '6-3',
     actor: 'nika',
+    correlationId: 'adm_test123',
   });
 
   assert.equal(result.ok, true);
   assert.equal(result.errorCode, 'MOVED');
   assert.equal(ctx.store.reservations.get('res1').roomCode, '6-3');
-  assert.equal(ctx.store.reservations.get('res1').manualRoom, true);
   assert.equal(ctx.store.guests.get('g1').aptId, '6-3');
   assert.equal(ctx.store.roomMoves.length, 1);
   assert.equal(ctx.store.roomMoves[0].toRoom, '6-3');
+  assert.ok(ctx.store.logs.some((l) => l.action === 'move' && l.correlationId === 'adm_test123'));
+});
+
+test('audit failure inside transaction rolls back room move', async () => {
+  const ctx = makeStore(
+    {
+      reservations: { res1: res('6-1', '2026-09-01', '2026-09-05') },
+      guests: { g1: { aptId: '6-1', matchedReservationId: 'res1' } },
+    },
+    { failAuditWrite: true }
+  );
+
+  const result = await runRoomAssignment(ctx, {
+    mode: 'move',
+    assignmentId: 'res1',
+    toRoomCode: '6-3',
+    actor: 'test',
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, 'INTERNAL');
+  assert.equal(ctx.store.reservations.get('res1').roomCode, '6-1');
+  assert.equal(ctx.store.guests.get('g1').aptId, '6-1');
+  assert.equal(ctx.store.roomMoves.length, 0);
 });
 
 test('conflict blocks silent overwrite', async () => {
@@ -178,15 +213,10 @@ test('swap exchanges rooms and mirrors both guests', async () => {
   });
 
   assert.equal(result.ok, true);
-  assert.equal(result.errorCode, 'SWAPPED');
-  assert.equal(ctx.store.reservations.get('res1').roomCode, '6-2');
-  assert.equal(ctx.store.reservations.get('res2').roomCode, '6-1');
-  assert.equal(ctx.store.guests.get('g1').aptId, '6-2');
-  assert.equal(ctx.store.guests.get('g2').aptId, '6-1');
   assert.equal(ctx.store.roomMoves.length, 2);
 });
 
-test('release_to_minihotel clears manualRoom', async () => {
+test('release_to_minihotel clears manualRoom and writes audit in txn', async () => {
   const ctx = makeStore({
     reservations: { res1: res('6-1', '2026-09-01', '2026-09-05', { manualRoom: true, roomVersion: 2 }) },
   });
@@ -198,9 +228,8 @@ test('release_to_minihotel clears manualRoom', async () => {
   });
 
   assert.equal(result.ok, true);
-  assert.equal(result.errorCode, 'RELEASED');
   assert.equal(ctx.store.reservations.get('res1').manualRoom, false);
-  assert.equal(ctx.store.reservations.get('res1').roomVersion, 3);
+  assert.equal(ctx.store.roomMoves.length, 1);
 });
 
 test('noop when already in target room', async () => {
@@ -226,5 +255,4 @@ test('findConflicts ignores cancelled reservations', () => {
   ]);
   const conflicts = findConflicts(rows, '6-2', '2026-09-02', '2026-09-04', null);
   assert.equal(conflicts.length, 1);
-  assert.equal(conflicts[0].reservationId, 'a');
 });

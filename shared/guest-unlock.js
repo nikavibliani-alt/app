@@ -45,7 +45,11 @@ function computeGuestUnlock(opts = {}) {
   const hkDone = opts.hkDone === true;
   const arrival = opts.arrivalDate || guest.arrivalDate || '';
 
+  // Admin manual unlock must work even when arrivalDate is missing on the doc.
   if (!arrival) {
+    if (guest.manualUnlock === true) {
+      return { state: 'unlocked', unlocked: true, label: 'Unlocked', cls: 'unlocked', reason: 'manual_unlock' };
+    }
     return { state: 'locked', unlocked: false, label: 'Waiting', cls: 'waiting', reason: 'no_arrival' };
   }
   if (today > arrival) {

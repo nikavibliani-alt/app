@@ -96,4 +96,17 @@ test('routes force_unlock to GuestUnlock', async () => {
   assert.equal(result.ok, true);
   assert.equal(ctx.unlockCalls[0].guestId, 'g1');
   assert.equal(ctx.unlockCalls[0].forceManual, true);
+  assert.ok(ctx.unlockCalls[0].correlationId);
+  assert.ok(ctx.logs.every((l) => l.correlationId === ctx.logs[0].correlationId));
+});
+
+test('routes move_guest with correlationId propagated', async () => {
+  const ctx = makeCtx({ ok: true, errorCode: 'MOVED', message: 'ok' });
+  await runAdminAction(ctx, {
+    actionType: 'move_guest',
+    payload: { assignmentId: 'res1', toRoom: '6-3' },
+    actor: 'nika',
+    correlationId: 'adm_corr_1',
+  });
+  assert.equal(ctx.calls[0].correlationId, 'adm_corr_1');
 });

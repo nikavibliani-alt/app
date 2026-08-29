@@ -65,6 +65,12 @@ test('manualUnlock on arrival day → unlocked', () => {
   assert.equal(r.unlocked, true);
 });
 
+test('manualUnlock without arrivalDate still unlocks', () => {
+  const r = computeGuestUnlock({ guest: { manualUnlock: true }, today: '2026-09-01', hour: 8 });
+  assert.equal(r.unlocked, true);
+  assert.equal(r.reason, 'manual_unlock');
+});
+
 test('runGuestUnlock force_unlock writes derived fields', async () => {
   const { tbilisiToday } = require('../lib/guest-unlock');
   const today = tbilisiToday();

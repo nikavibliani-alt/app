@@ -88,6 +88,7 @@ async function runRoomAssignment(ctx, params) {
   const mode = params.mode;
   const assignmentId = params.assignmentId;
   const actor = params.actor || 'unknown';
+  const correlationId = params.correlationId || null;
   const input = {
     mode,
     assignmentId,
@@ -95,17 +96,18 @@ async function runRoomAssignment(ctx, params) {
     otherAssignmentId: params.otherAssignmentId || null,
     actor,
     expectedVersion: params.expectedVersion ?? null,
+    correlationId,
   };
 
   try {
     if (mode === 'release_to_minihotel') {
-      return await releaseToMinihotel(ctx, assignmentId, actor, input);
+      return await releaseToMinihotel(ctx, assignmentId, actor, input, correlationId);
     }
     if (mode === 'swap') {
-      return await swapRooms(ctx, assignmentId, params.otherAssignmentId, actor, input);
+      return await swapRooms(ctx, assignmentId, params.otherAssignmentId, actor, input, correlationId);
     }
     if (mode === 'move') {
-      return await moveRoom(ctx, assignmentId, params.toRoomCode, actor, params.expectedVersion, input);
+      return await moveRoom(ctx, assignmentId, params.toRoomCode, actor, params.expectedVersion, input, correlationId);
     }
     const message = `Unknown mode: ${mode}`;
     await ctx.logRun({
@@ -129,15 +131,15 @@ async function runRoomAssignment(ctx, params) {
   }
 }
 
-async function releaseToMinihotel(ctx, reservationId, actor, input) {
+async function releaseToMinihotel(ctx, reservationId, actor, input, correlationId) {
   const nowIso = ctx.nowIso();
   const current = await ctx.getReservation(reservationId);
   if (!current.data) {
-    await logRoomError(ctx, 'release_to_minihotel', input, 'NOT_FOUND', 'Reservation not found');
+    await logRoomError(ctx, 'release_to_minihotel', input, 'NOT_FOUND', 'Reservation not found', null, correlationId);
     return { ok: false, errorCode: 'NOT_FOUND', message: 'Reservation not found' };
   }
   if (!isActiveReservation(current.data)) {
-    await logRoomError(ctx, 'release_to_minihotel', input, 'INACTIVE', 'Reservation is cancelled');
+    await logRoomError(ctx, 'release_to_minihotel', input, 'INACTIVE', 'Reservation is cancelled', null, correlationId);
     return { ok: false, errorCode: 'INACTIVE', message: 'Reservation is cancelled' };
   }
 
@@ -147,36 +149,35 @@ async function releaseToMinihotel(ctx, reservationId, actor, input) {
   await ctx.runTransaction(async (tx) => {
     const snap = await tx.getReservation(reservationId);
     if (!snap.data) throw new RoomAbort('NOT_FOUND', 'Reservation not found');
+    const guestIds = await tx.listGuestIdsForReservation(reservationId);
     tx.updateReservation(reservationId, {
       manualRoom: false,
       roomVersion: versionMeta.roomVersion,
       updatedAt: versionMeta.updatedAt,
       updatedBy: versionMeta.updatedBy,
     });
-  });
-
-  const guestIds = await ctx.listGuestIdsForReservation(reservationId);
-  await ctx.writeRoomMove({
-    reservationId,
-    reservationNumber: current.data.reservationNumber || null,
-    guestIds,
-    fromRoom,
-    toRoom: fromRoom,
-    mode: 'release_to_minihotel',
-    actor,
-    at: nowIso,
-    beforeRoomVersion: versionMeta._beforeRoomVersion,
-    afterRoomVersion: versionMeta.roomVersion,
-    otherReservationId: null,
-  });
-
-  await ctx.logRun({
-    controller: 'RoomAssignment',
-    action: 'release_to_minihotel',
-    status: 'ok',
-    message: `Cleared manualRoom on ${reservationId}`,
-    input,
-    output: { reservationId, manualRoom: false, roomVersion: versionMeta.roomVersion },
+    tx.writeRoomMove({
+      reservationId,
+      reservationNumber: snap.data.reservationNumber || null,
+      guestIds,
+      fromRoom,
+      toRoom: fromRoom,
+      mode: 'release_to_minihotel',
+      actor,
+      at: nowIso,
+      beforeRoomVersion: versionMeta._beforeRoomVersion,
+      afterRoomVersion: versionMeta.roomVersion,
+      otherReservationId: null,
+    });
+    tx.logRun({
+      controller: 'RoomAssignment',
+      action: 'release_to_minihotel',
+      status: 'ok',
+      message: `Cleared manualRoom on ${reservationId}`,
+      input,
+      output: { reservationId, manualRoom: false, roomVersion: versionMeta.roomVersion },
+      correlationId,
+    });
   });
 
   return {
@@ -187,7 +188,7 @@ async function releaseToMinihotel(ctx, reservationId, actor, input) {
   };
 }
 
-async function moveRoom(ctx, reservationId, toRoomCode, actor, expectedVersion, input) {
+async function moveRoom(ctx, reservationId, toRoomCode, actor, expectedVersion, input, correlationId) {
   if (!toRoomCode) {
     await logRoomError(ctx, 'move', input, 'BAD_REQUEST', 'toRoomCode is required');
     return { ok: false, errorCode: 'BAD_REQUEST', message: 'toRoomCode is required' };
@@ -273,6 +274,29 @@ async function moveRoom(ctx, reservationId, toRoomCode, actor, expectedVersion, 
       for (const guestId of guestIds) {
         tx.updateGuest(guestId, { aptId: toRoomCode, updatedAt: versionMeta.updatedAt });
       }
+
+      tx.writeRoomMove({
+        reservationId,
+        reservationNumber: snap.data.reservationNumber || null,
+        guestIds,
+        fromRoom: liveFrom,
+        toRoom: toRoomCode,
+        mode: 'move',
+        actor,
+        at: nowIso,
+        beforeRoomVersion: versionMeta._beforeRoomVersion,
+        afterRoomVersion: versionMeta.roomVersion,
+        otherReservationId: null,
+      });
+      tx.logRun({
+        controller: 'RoomAssignment',
+        action: 'move',
+        status: 'ok',
+        message: `move ${reservationId}: ${liveFrom} → ${toRoomCode}`,
+        input,
+        output: { reservationId, fromRoom: liveFrom, toRoom: toRoomCode, roomVersion: versionMeta.roomVersion },
+        correlationId,
+      });
     });
   } catch (err) {
     if (err instanceof RoomAbort) {
@@ -284,35 +308,12 @@ async function moveRoom(ctx, reservationId, toRoomCode, actor, expectedVersion, 
         message: err.message,
         input,
         output: err.data || { errorCode: err.code },
+        correlationId,
       });
       return { ok: false, errorCode: err.code, message: err.message, data: err.data || undefined };
     }
     throw err;
   }
-
-  const guestIds = await ctx.listGuestIdsForReservation(reservationId);
-  await ctx.writeRoomMove({
-    reservationId,
-    reservationNumber: current.data.reservationNumber || null,
-    guestIds,
-    fromRoom,
-    toRoom: toRoomCode,
-    mode: 'move',
-    actor,
-    at: nowIso,
-    beforeRoomVersion: versionMeta._beforeRoomVersion,
-    afterRoomVersion: versionMeta.roomVersion,
-    otherReservationId: null,
-  });
-
-  await ctx.logRun({
-    controller: 'RoomAssignment',
-    action: 'move',
-    status: 'ok',
-    message: `move ${reservationId}: ${fromRoom} → ${toRoomCode}`,
-    input,
-    output: { reservationId, fromRoom, toRoom: toRoomCode, roomVersion: versionMeta.roomVersion },
-  });
 
   return {
     ok: true,
@@ -322,7 +323,7 @@ async function moveRoom(ctx, reservationId, toRoomCode, actor, expectedVersion, 
   };
 }
 
-async function swapRooms(ctx, reservationId, otherReservationId, actor, input) {
+async function swapRooms(ctx, reservationId, otherReservationId, actor, input, correlationId) {
   if (!otherReservationId) {
     await logRoomError(ctx, 'swap', input, 'BAD_REQUEST', 'otherAssignmentId is required');
     return { ok: false, errorCode: 'BAD_REQUEST', message: 'otherAssignmentId is required' };
@@ -398,6 +399,49 @@ async function swapRooms(ctx, reservationId, otherReservationId, actor, input) {
       for (const guestId of guestIdsB) {
         tx.updateGuest(guestId, { aptId: liveA, updatedAt: versionB.updatedAt });
       }
+
+      tx.writeRoomMove({
+        reservationId,
+        reservationNumber: snapA.data.reservationNumber || null,
+        guestIds: guestIdsA,
+        fromRoom: liveA,
+        toRoom: liveB,
+        mode: 'swap',
+        actor,
+        at: nowIso,
+        beforeRoomVersion: versionA._beforeRoomVersion,
+        afterRoomVersion: versionA.roomVersion,
+        otherReservationId,
+      });
+      tx.writeRoomMove({
+        reservationId: otherReservationId,
+        reservationNumber: snapB.data.reservationNumber || null,
+        guestIds: guestIdsB,
+        fromRoom: liveB,
+        toRoom: liveA,
+        mode: 'swap',
+        actor,
+        at: nowIso,
+        beforeRoomVersion: versionB._beforeRoomVersion,
+        afterRoomVersion: versionB.roomVersion,
+        otherReservationId: reservationId,
+      });
+      tx.logRun({
+        controller: 'RoomAssignment',
+        action: 'swap',
+        status: 'ok',
+        message: `swap ${reservationId} ↔ ${otherReservationId}: ${liveA} ↔ ${liveB}`,
+        input,
+        output: {
+          reservationId,
+          otherReservationId,
+          fromRoom: liveA,
+          toRoom: liveB,
+          roomVersionA: versionA.roomVersion,
+          roomVersionB: versionB.roomVersion,
+        },
+        correlationId,
+      });
     });
   } catch (err) {
     if (err instanceof RoomAbort) {
@@ -409,59 +453,12 @@ async function swapRooms(ctx, reservationId, otherReservationId, actor, input) {
         message: err.message,
         input,
         output: err.data || { errorCode: err.code },
+        correlationId,
       });
       return { ok: false, errorCode: err.code, message: err.message, data: err.data || undefined };
     }
     throw err;
   }
-
-  const [guestIdsA, guestIdsB] = await Promise.all([
-    ctx.listGuestIdsForReservation(reservationId),
-    ctx.listGuestIdsForReservation(otherReservationId),
-  ]);
-
-  await ctx.writeRoomMove({
-    reservationId,
-    reservationNumber: a.data.reservationNumber || null,
-    guestIds: guestIdsA,
-    fromRoom: roomA,
-    toRoom: roomB,
-    mode: 'swap',
-    actor,
-    at: nowIso,
-    beforeRoomVersion: versionA._beforeRoomVersion,
-    afterRoomVersion: versionA.roomVersion,
-    otherReservationId,
-  });
-  await ctx.writeRoomMove({
-    reservationId: otherReservationId,
-    reservationNumber: b.data.reservationNumber || null,
-    guestIds: guestIdsB,
-    fromRoom: roomB,
-    toRoom: roomA,
-    mode: 'swap',
-    actor,
-    at: nowIso,
-    beforeRoomVersion: versionB._beforeRoomVersion,
-    afterRoomVersion: versionB.roomVersion,
-    otherReservationId: reservationId,
-  });
-
-  await ctx.logRun({
-    controller: 'RoomAssignment',
-    action: 'swap',
-    status: 'ok',
-    message: `swap ${reservationId} ↔ ${otherReservationId}: ${roomA} ↔ ${roomB}`,
-    input,
-    output: {
-      reservationId,
-      otherReservationId,
-      fromRoom: roomA,
-      toRoom: roomB,
-      roomVersionA: versionA.roomVersion,
-      roomVersionB: versionB.roomVersion,
-    },
-  });
 
   return {
     ok: true,
@@ -478,7 +475,7 @@ async function swapRooms(ctx, reservationId, otherReservationId, actor, input) {
   };
 }
 
-async function logRoomError(ctx, action, input, code, message, output = null) {
+async function logRoomError(ctx, action, input, code, message, output = null, correlationId = null) {
   await ctx.logRun({
     controller: 'RoomAssignment',
     action,
@@ -486,10 +483,11 @@ async function logRoomError(ctx, action, input, code, message, output = null) {
     message,
     input,
     output: output || { errorCode: code },
+    correlationId: correlationId || input.correlationId || null,
   });
 }
 
-async function logRoomWarn(ctx, action, input, code, message, output = null) {
+async function logRoomWarn(ctx, action, input, code, message, output = null, correlationId = null) {
   await ctx.logRun({
     controller: 'RoomAssignment',
     action,
@@ -497,12 +495,13 @@ async function logRoomWarn(ctx, action, input, code, message, output = null) {
     message,
     input,
     output: output || { errorCode: code },
+    correlationId: correlationId || input.correlationId || null,
   });
 }
 
 function buildLiveCtx() {
   const { getFirestore, FieldValue } = require('firebase-admin/firestore');
-  const { writeSystemLog } = require('../lib/logging');
+  const { writeSystemLog, buildSystemLogDoc } = require('../lib/logging');
 
   const db = getFirestore();
 
@@ -524,13 +523,6 @@ function buildLiveCtx() {
       .where('matchedReservationId', '==', reservationId)
       .get();
     return snap.docs.map((d) => d.id);
-  }
-
-  async function writeRoomMove(audit) {
-    await db.collection('room_moves').add({
-      ...audit,
-      timestamp: FieldValue.serverTimestamp(),
-    });
   }
 
   async function runTransaction(fn) {
@@ -561,6 +553,14 @@ function buildLiveCtx() {
           const ref = db.collection('checkin_guests').doc(guestId);
           txn.set(ref, patch, { merge: true });
         },
+        writeRoomMove(audit) {
+          const ref = db.collection('room_moves').doc();
+          txn.set(ref, { ...audit, timestamp: FieldValue.serverTimestamp() });
+        },
+        logRun(entry) {
+          const ref = db.collection('system_logs').doc();
+          txn.set(ref, buildSystemLogDoc(entry));
+        },
       };
 
       try {
@@ -578,7 +578,6 @@ function buildLiveCtx() {
     listReservationsInRoom,
     listGuestIdsForReservation,
     runTransaction,
-    writeRoomMove,
     logRun: (entry) => writeSystemLog(db, entry),
   };
 }

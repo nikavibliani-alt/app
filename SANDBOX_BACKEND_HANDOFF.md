@@ -14,6 +14,7 @@
 | `elevatorCodeSync` | FS ↔ RTDB elevator reconcile | Hourly schedule ✅ deployed |
 | `RoomAssignment` | `reservations.roomCode`, `checkin_guests.aptId`, `room_moves` | AdminAction only |
 | `GuestUnlock` | `checkin_guests.unlockState*`, `manualUnlock` (via force_*) | AdminAction |
+| `GuestRegister` | `checkin_guests/{guestToken}` create/update | HTTPS callable `pipeline-guestRegister` |
 | `AdminAction` | Orchestration + `system_logs` | HTTPS callable `pipeline-adminAction` |
 
 Shared unlock rules (browser + server): `shared/guest-unlock.js` ↔ `pipeline-functions/lib/guest-unlock.js` (keep in sync).
