@@ -251,8 +251,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260827e';
-  if(!/[?&]build=20260827e(?:&|$)/.test(location.search)){
+  var BUILD='20260830a';
+  if(!/[?&]build=20260830a(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -260,9 +260,13 @@ html.admin-authed #app{display:block;}
   try{
     localStorage.removeItem('maxela_admin_nav_v1');
     localStorage.removeItem('maxela_admin_nav_v2');
-    var nav=JSON.parse(localStorage.getItem('maxela_admin_nav_v3')||'null');
-    if(!nav||!Array.isArray(nav.slots)||!nav.slots.includes('hk'))
-      localStorage.removeItem('maxela_admin_nav_v3');
+    localStorage.removeItem('maxela_admin_nav_v3');
+    var nav=JSON.parse(localStorage.getItem('maxela_admin_nav_v4')||'null');
+    if(nav&&Array.isArray(nav.slots)&&nav.slots.includes('hk')){
+      var slots=nav.slots.map(function(s){return s==='hk'?'elevator':s;});
+      if(new Set(slots).size<3)slots=['stay','requests','elevator'];
+      localStorage.setItem('maxela_admin_nav_v4',JSON.stringify({slots:slots}));
+    }
   }catch(e){}
 })();
 </script>
@@ -285,7 +289,7 @@ html.admin-authed #app{display:block;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 27e · HK</span>
+            <span class="app-badge" id="app-version-badge">Build 30a · Sandbox</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -342,9 +346,8 @@ html.admin-authed #app{display:block;}
     <div id="hk-list"></div>
   </div>
 
-  <div class="pane" id="pane-hkpinsettings">
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">PINs for the legacy HK apps (HK.html). Cleaning staff use those apps — they never see these codes here.</p>
-    <div id="hkpinsettings-root"></div>
+  <div class="pane" id="pane-hksettings">
+    <div id="hksettings-root"></div>
   </div>
 
   <div class="pane" id="pane-guestsettings">
@@ -365,26 +368,30 @@ html.admin-authed #app{display:block;}
   <div class="pane" id="pane-more">
     <div class="more-section">Operations</div>
     <div class="more-list">
+      <button class="more-item" type="button" onclick="switchTab('hk')">Housekeeping<span class="more-hint">Daily task board · checkouts &amp; done</span></button>
       <button class="more-item" type="button" onclick="switchTab('apts')">Apartments<span class="more-hint">Check-in instructions</span></button>
       <button class="more-item" type="button" onclick="switchTab('failures')" id="more-failures-btn">Failed searches<span class="more-badge" id="sf-more-badge" style="display:none">0</span></button>
     </div>
     <div class="more-section">Guest experience</div>
     <div class="more-list">
-      <button class="more-item" type="button" onclick="switchTab('guestsettings')">Guest page<span class="more-hint">Tiles, services, location</span></button>
+      <button class="more-item" type="button" onclick="switchTab('guestsettings')">Guest page<span class="more-hint">Tiles, services, waiting tabs</span></button>
+    </div>
+    <div class="more-section">Housekeeping setup</div>
+    <div class="more-list">
+      <button class="more-item" type="button" onclick="switchTab('hksettings')">HK settings<span class="more-hint">Staff PINs · cleaner apps · defaults</span></button>
     </div>
     <div class="more-section">App</div>
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('navsettings')">Tab bar layout<span class="more-hint">Reorder bottom nav</span></button>
-      <button class="more-item" type="button" onclick="switchTab('hkpinsettings')">HK staff PINs<span class="more-hint">Admin only · legacy HK apps</span></button>
       <a class="more-item" href="admin-search-test.html" target="_blank" rel="noopener">Search debugger<span class="more-hint">Open</span></a>
       <button class="more-item" type="button" onclick="adminSignOut()">Sign out</button>
     </div>
   </div>
 
   <nav class="nav" id="main-nav">
-    <button class="nav__btn" data-tab="stay" onclick="switchTab('stay')"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Stay</button>
-    <button class="nav__btn" data-tab="hk" onclick="switchTab('hk')"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>HK</button>
+    <button class="nav__btn active" data-tab="stay" onclick="switchTab('stay')"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Stay</button>
     <button class="nav__btn" data-tab="requests" onclick="switchTab('requests')"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M8 8h8M8 12h5"/></svg>Requests</button>
+    <button class="nav__btn" id="nav-elev" data-tab="elevator" onclick="switchTab('elevator')"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 8v8M9 11l3-3 3 3"/></svg>Elevator</button>
     <button class="nav__btn" data-tab="more" onclick="switchTab('more')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</button>
   </nav>
 </div>
@@ -525,7 +532,7 @@ const APARTMENTS=[
 let aptData={},guestData=[],hkStatusData={},_resCache=null,_resLoading=false;
 let elevData=null,stayFilter='overview',upcomingDay=null,_currentAptId=null;
 const _TAB_KEY='maxela_admin_tab';
-const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','guestsettings','failures','navsettings','hkpinsettings','more']);
+const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','guestsettings','failures','navsettings','hksettings','more']);
 function loadSavedTab(){
   try{
     const t=localStorage.getItem(_TAB_KEY);
@@ -539,21 +546,20 @@ let hkPinsData={shartava:'',centre:'',vgl:'',admin:''};
 let searchFailures=[];
 let _formById=new Map();
 
-const _NAV_KEY='maxela_admin_nav_v3';
+const _NAV_KEY='maxela_admin_nav_v4';
 const NAV_POOL={
   stay:{label:'Stay',pane:'stay',svg:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',extra:''},
-  hk:{label:'HK',pane:'hk',svg:'<svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>',extra:''},
   elevator:{label:'Elevator',pane:'elevator',svg:'<svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 8v8M9 11l3-3 3 3"/></svg>',extra:'<span class="dot"></span>',navId:'nav-elev'},
   requests:{label:'Requests',pane:'requests',svg:'<svg viewBox="0 0 24 24"><path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M8 8h8M8 12h5"/></svg>',extra:'<span class="badge" id="req-badge">0</span>',navId:'nav-req'},
   apts:{label:'Apts',pane:'apts',svg:'<svg viewBox="0 0 24 24"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-8h6v8"/></svg>',extra:''},
   guestsettings:{label:'Guest',pane:'guestsettings',svg:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>',extra:''},
 };
-const DEFAULT_NAV_SLOTS=['stay','hk','requests'];
+const DEFAULT_NAV_SLOTS=['stay','requests','elevator'];
 
 function loadNavSlots(){
   try{
     const s=JSON.parse(localStorage.getItem(_NAV_KEY)||'null');
-    if(Array.isArray(s?.slots)&&s.slots.length===3&&s.slots.includes('hk')&&s.slots.every(id=>NAV_POOL[id]))
+    if(Array.isArray(s?.slots)&&s.slots.length===3&&s.slots.every(id=>NAV_POOL[id])&&!s.slots.includes('hk'))
       return [...s.slots];
   }catch(e){}
   return [...DEFAULT_NAV_SLOTS];
@@ -562,16 +568,15 @@ let navSlots=loadNavSlots();
 
 function renderNavBar(){
   navSlots=loadNavSlots();
-  if(!navSlots.includes('hk'))navSlots=[...DEFAULT_NAV_SLOTS];
   const nav=document.getElementById('main-nav');
   if(!nav)return;
   let html='';
   for(const id of navSlots){
     const d=NAV_POOL[id];
-    const active=currentTab===d.pane||(currentTab==='more'&&false);
+    if(!d)continue;
     html+=`<button class="nav__btn${currentTab===d.pane?' active':''}" data-tab="${d.pane}" onclick="switchTab('${d.pane}')" ${d.navId?`id="${d.navId}"`:''}>${d.svg}${d.label}${d.extra||''}</button>`;
   }
-  html+=`<button class="nav__btn${currentTab==='more'||['apts','guestsettings','navsettings','failures','elevator','hkpinsettings'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</button>`;
+  html+=`<button class="nav__btn${currentTab==='more'||['apts','guestsettings','navsettings','failures','elevator','hksettings','hk'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</button>`;
   nav.innerHTML=html;
   updateRequestsBadge();
   if(elevData)document.getElementById('nav-elev')?.classList.toggle('has-alert',elevFreshness().cls==='old');
@@ -682,6 +687,9 @@ const GP_TILES=[
   {id:'rules',icon:'rules',label:'Rules',group:'content',edit:'text'},
   {id:'contact',icon:'contact',label:'Contact',group:'content',edit:'text'},
 ];
+const WAITING_TABS_DEFAULTS={location:true,shuttle:false,tours:false};
+let gsWaitingTabs={...WAITING_TABS_DEFAULTS};
+let hkSettings={defaultCheckIn:'14:00'};
 let gsVisibility=JSON.parse(JSON.stringify(SECTION_DEFAULTS));
 let gsLaundry=[...LAUNDRY_DEFAULTS];
 let gsServices=SERVICE_DEFAULTS.map(s=>({...s}));
@@ -708,6 +716,8 @@ async function loadGuestSettings(){
       if(d.sectionLabels)gsSectionLabels=d.sectionLabels;
       if(d.roomCategories)gsRoomCategories=d.roomCategories;
       if(d.locationInfo)gsLocationInfo=d.locationInfo;
+      if(d.waitingTabs)gsWaitingTabs={...WAITING_TABS_DEFAULTS,...d.waitingTabs};
+      if(d.hkSettings)hkSettings={...hkSettings,...d.hkSettings};
     }
   }catch(e){console.warn(e);}
   gsLoaded=true;
@@ -718,7 +728,8 @@ window.gsSaveAll=async function(){
   try{
     await setDoc(doc(db,'checkin_admin','config'),{
       visibility:gsVisibility,laundryItems:gsLaundry,services:gsServices,sectionLabels:gsSectionLabels,
-      roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,updatedAt:serverTimestamp()
+      roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,waitingTabs:gsWaitingTabs,hkSettings,
+      updatedAt:serverTimestamp()
     });
     gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');
     toast('Guest page saved ✓');
@@ -729,6 +740,7 @@ window.gsToggle=function(id,val){
   gsVisibility[gsProp][id]=val;
   gsMarkDirty();renderGuestSettings();
 };
+window.gsToggleWaitingTab=function(id,val){gsWaitingTabs[id]=val;gsMarkDirty();renderGuestSettings();};
 window.gsSelectProp=function(prop){gsProp=prop;renderGuestSettings();};
 
 function renderGuestSettings(){
@@ -756,7 +768,16 @@ function renderGuestSettings(){
     <div class="gp-prop-row">${props}</div>
     <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px">Guest preview</div>
     <div class="gp-preview">${preview}</div>
-    <div class="section-hd"><h2>Home tiles</h2></div>
+    <div class="section-hd" style="margin-top:8px"><h2>Waiting phase tabs</h2></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Before check-in unlocks. Location on by default; Shuttle &amp; Tours off.</p>
+    ${[{id:'location',label:'Location'},{id:'shuttle',label:'Shuttle service'},{id:'tours',label:'Tours'}].map(t=>{
+      const checked=t.id==='location'?gsWaitingTabs.location!==false:gsWaitingTabs[t.id]===true;
+      return`<div class="gp-row">
+      <div class="gp-row__icon">${gpIcon(t.id==='location'?'location':'tour')}</div>
+      <div class="gp-row__body"><div class="gp-row__title">${esc(t.label)}</div><div class="gp-row__sub">Waiting screen tab</div></div>
+      <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${checked?'checked':''} onchange="gsToggleWaitingTab('${t.id}',this.checked)"><span class="switch-track"></span></label>
+    </div>`;}).join('')}
+    <div class="section-hd" style="margin-top:8px"><h2>Home tiles</h2></div>
     ${GP_TILES.filter(t=>t.group==='essential').map(row).join('')}
     <div class="section-hd" style="margin-top:8px"><h2>Services</h2></div>
     ${GP_TILES.filter(t=>t.group==='service').map(row).join('')}
@@ -900,19 +921,44 @@ async function loadAndRenderGuestSettings(){
   renderGuestSettings();
 }
 
-/* ── HK staff PINs (More → admin only; not on HK tab) ── */
+/* ── HK settings (More → PINs, cleaner apps, defaults) ── */
 const HK_ROLES=[
   {id:'shartava',label:'Shartava Team',desc:'Shartava housekeeping'},
   {id:'centre',label:'Centre Team',desc:'City centre housekeeping'},
   {id:'vgl',label:'VGL Team',desc:'VGL studios & apartments'},
   {id:'admin',label:'Admin PIN',desc:'All rooms across properties'},
 ];
-function renderHkPinSettings(){
-  const wrap=document.getElementById('hkpinsettings-root');
+function renderHkSettings(){
+  const wrap=document.getElementById('hksettings-root');
   if(!wrap)return;
-  wrap.innerHTML=`<div class="more-section" style="margin-top:0">HK login PINs</div><div id="hkpins-list"></div>`;
+  wrap.innerHTML=`
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Task board: <strong>More → Housekeeping</strong>. Staff use cleaner apps — not this admin login.</p>
+    <div class="more-section" style="margin-top:0">Cleaner apps (staff)</div>
+    <div class="more-list" style="margin-bottom:16px">
+      <a class="more-item" href="HK-Shartava.html" target="_blank" rel="noopener">Shartava HK<span class="more-hint">6-, 7-, 0- rooms</span></a>
+      <a class="more-item" href="HK-Centre.html" target="_blank" rel="noopener">Centre HK<span class="more-hint">Orb &amp; Tab</span></a>
+      <a class="more-item" href="HK.html" target="_blank" rel="noopener">All properties<span class="more-hint">Legacy unified app</span></a>
+    </div>
+    <div class="section-hd"><h2>Defaults</h2></div>
+    <div class="card">
+      <div class="field"><label>Fallback check-in time (HK cards)</label>
+        <input id="hk-default-checkin" type="time" value="${esc(hkSettings.defaultCheckIn||'14:00')}" style="width:100%;height:44px;padding:0 12px;border:1.5px solid var(--line);border-radius:var(--r);font-size:16px;background:var(--surface);">
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveHkSettings()">Save defaults</button>
+    </div>
+    <div class="more-section" style="margin-top:16px">Staff login PINs</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">4-digit codes for legacy HK apps. Staff never see these here.</p>
+    <div id="hkpins-list"></div>`;
   renderHkPins();
 }
+window.saveHkSettings=async function(){
+  const t=document.getElementById('hk-default-checkin')?.value||'14:00';
+  hkSettings.defaultCheckIn=t;
+  try{
+    await setDoc(doc(db,'checkin_admin','config'),{hkSettings,updatedAt:serverTimestamp()},{merge:true});
+    toast('HK settings saved ✓');
+  }catch(e){toast('Failed: '+e.message);}
+};
 function renderHkPins(){
   const el=document.getElementById('hkpins-list');if(!el)return;
   el.innerHTML=HK_ROLES.map(r=>`
@@ -1233,15 +1279,15 @@ const TAB_META={
   elevator:{title:'Elevator',sub:'Entrance & elevator code'},
   requests:{title:'Requests',sub:'Guest service requests'},
   apts:{title:'Apartments',sub:'WiFi, instructions, photo steps'},
-  hk:{title:'Housekeeping',sub:'Checkouts · guest counts · extra sheets'},
-  hkpinsettings:{title:'HK staff PINs',sub:'Legacy HK app login codes · admin only'},
-  guestsettings:{title:'Guest page',sub:'Tiles, services & location'},
+  hk:{title:'Housekeeping',sub:'Daily task board · checkouts & done'},
+  hksettings:{title:'HK settings',sub:'Staff PINs · cleaner apps · defaults'},
+  guestsettings:{title:'Guest page',sub:'Tiles, services, waiting tabs & location'},
   failures:{title:'Failed searches',sub:'Guests who could not find booking'},
   navsettings:{title:'Tab bar',sub:'Customize bottom navigation'},
   more:{title:'More',sub:'All admin tools'},
 };
-const MORE_TABS=new Set(['more','apts','guestsettings','navsettings','failures','elevator','hkpinsettings']);
-const MORE_SUB_PAGES=new Set(['apts','guestsettings','navsettings','failures','elevator','hkpinsettings']);
+const MORE_TABS=new Set(['more','apts','guestsettings','navsettings','failures','elevator','hksettings','hk']);
+const MORE_SUB_PAGES=new Set(['apts','guestsettings','navsettings','failures','elevator','hksettings','hk']);
 
 function updateHeaderBack(){
   const btn=document.getElementById('header-back');
@@ -1275,7 +1321,7 @@ window.switchTab=function(tab){
   if(tab==='requests')loadAndRenderRequests();
   if(tab==='apts')renderAptsList();
   if(tab==='hk')renderHk();
-  if(tab==='hkpinsettings')renderHkPinSettings();
+  if(tab==='hksettings')renderHkSettings();
   if(tab==='guestsettings')loadAndRenderGuestSettings();
   if(tab==='failures')renderFailures();
   if(tab==='navsettings')renderNavSettings();
@@ -2027,7 +2073,7 @@ onSnapshot(query(collection(db,'hk_status'),where('date','==',tbilisiToday())),s
 });
 onSnapshot(collection(db,'hk_pins'),snap=>{
   snap.docs.forEach(d=>{hkPinsData[d.id]=d.data().pin||'';});
-  if(loaded>=2&&currentTab==='hkpinsettings')renderHkPinSettings();
+  if(loaded>=2&&currentTab==='hksettings')renderHkSettings();
 });
 onSnapshot(query(collection(db,'search_failures'),where('resolved','==',false)),snap=>{
   searchFailures=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.timestamp?.seconds||0)-(a.timestamp?.seconds||0));
