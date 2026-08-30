@@ -97,6 +97,12 @@ html.admin-authed #app{display:block;}
 .hk-clean-row__code{font-family:var(--mono);font-size:13px;font-weight:700;}
 .hk-clean-row__name{font-size:11px;color:var(--muted);}
 .hk-clean-row input{width:64px;height:40px;text-align:center;border:1.5px solid var(--line);border-radius:8px;font-family:var(--mono);font-size:15px;font-weight:700;background:var(--surface);}
+.hk-clean-type-row{display:flex;align-items:center;gap:10px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);}
+.hk-clean-type-row__meta{flex:1;min-width:0;}
+.hk-clean-type-row__label{font-size:14px;font-weight:700;}
+.hk-clean-type-row__hint{font-size:11px;color:var(--muted);margin-top:2px;}
+.hk-clean-detail{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);}
+.hk-clean-expand{width:100%;margin-top:8px;font-size:13px;}
 .hk-bedding-alert{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--amber-bg);color:var(--amber);font-size:12px;font-weight:700}
 .hk-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);}
 .hk-cleaner-link{font-size:13px;font-weight:700;color:var(--blue);text-decoration:none;white-space:nowrap;}
@@ -311,8 +317,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830e';
-  if(!/[?&]build=20260830e(?:&|$)/.test(location.search)){
+  var BUILD='20260830g';
+  if(!/[?&]build=20260830g(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -1115,8 +1121,18 @@ const GP_TILES=[
   {id:'contact',icon:'contact',label:'Contact',group:'content',edit:'text'},
 ];
 const WAITING_TABS_DEFAULTS={location:true,shuttle:false,tours:false};
+const HK_CLEAN_TYPE_DEFAULTS={'0-':45,'6-7':90,'6-3':120,'orb-tab':50,'vgl':90,'abashidze':90,default:75};
+const HK_CLEAN_TYPES=[
+  {id:'0-',label:'0- rooms',hint:'Small rooms · 0-1, 0-2, …',match:c=>/^0-/.test(c)},
+  {id:'6-7',label:'6- & 7- apartments',hint:'6-1, 6-2, 7-1, … (not 6-3)',match:c=>/^6-|^7-/.test(c)&&c!=='6-3'},
+  {id:'6-3',label:'6-3 apartment',hint:'Large 3-bedroom unit',match:c=>c==='6-3'},
+  {id:'orb-tab',label:'Orb & Tab',hint:'City centre units',match:c=>/^orb-|^tab-/.test(c)},
+  {id:'vgl',label:'VGL',hint:'VGL studios & apartments',match:c=>/^vgl-/.test(c)},
+  {id:'abashidze',label:'Abashidze',hint:'Abashidze property',match:c=>c==='abashidze'},
+];
 let gsWaitingTabs={...WAITING_TABS_DEFAULTS};
-let hkSettings={defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByRoom:{}};
+let _hkCleanDetailOpen=false;
+let hkSettings={defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS},cleanMinutesByRoom:{}};
 let gsVisibility=JSON.parse(JSON.stringify(SECTION_DEFAULTS));
 let gsLaundry=[...LAUNDRY_DEFAULTS];
 let gsServices=SERVICE_DEFAULTS.map(s=>({...s}));
@@ -1144,7 +1160,12 @@ async function loadGuestSettings(){
       if(d.roomCategories)gsRoomCategories=d.roomCategories;
       if(d.locationInfo)gsLocationInfo=d.locationInfo;
       if(d.waitingTabs)gsWaitingTabs={...WAITING_TABS_DEFAULTS,...d.waitingTabs};
-      if(d.hkSettings)hkSettings={defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByRoom:{},...hkSettings,...d.hkSettings,cleanMinutesByRoom:{...(hkSettings.cleanMinutesByRoom||{}),...(d.hkSettings.cleanMinutesByRoom||{})}};
+      if(d.hkSettings)hkSettings={
+        defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS},cleanMinutesByRoom:{},
+        ...hkSettings,...d.hkSettings,
+        cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS,...(hkSettings.cleanMinutesByType||{}),...(d.hkSettings.cleanMinutesByType||{})},
+        cleanMinutesByRoom:{...(hkSettings.cleanMinutesByRoom||{}),...(d.hkSettings.cleanMinutesByRoom||{})},
+      };
     }
   }catch(e){console.warn(e);}
   gsLoaded=true;
@@ -1355,16 +1376,45 @@ const HK_ROLES=[
   {id:'vgl',label:'VGL Team',desc:'VGL studios & apartments'},
   {id:'admin',label:'Admin PIN',desc:'All rooms across properties'},
 ];
+function hkCleanTypeId(roomCode){
+  const c=String(roomCode||'').toLowerCase();
+  for(const t of HK_CLEAN_TYPES){if(t.match(c))return t.id;}
+  return 'default';
+}
+function hkTypeCleanMinutes(typeId){
+  const raw=hkSettings.cleanMinutesByType?.[typeId];
+  if(raw!=null&&raw!=='')return parseInt(raw,10)||HK_CLEAN_TYPE_DEFAULTS[typeId]||75;
+  return HK_CLEAN_TYPE_DEFAULTS[typeId]??75;
+}
+function hkVisibleCleanTypes(){
+  const codes=getHkRooms().map(r=>String(r.code||'').toLowerCase());
+  return HK_CLEAN_TYPES.filter(t=>codes.some(c=>t.match(c)));
+}
 function renderHkSettings(){
   const wrap=document.getElementById('hksettings-root');
   if(!wrap)return;
+  if(!hkSettings.cleanMinutesByType)hkSettings.cleanMinutesByType={...HK_CLEAN_TYPE_DEFAULTS};
   if(!hkSettings.cleanMinutesByRoom)hkSettings.cleanMinutesByRoom={};
+  const typeRows=hkVisibleCleanTypes().map(t=>{
+    const val=hkTypeCleanMinutes(t.id);
+    return`<div class="hk-clean-type-row">
+      <div class="hk-clean-type-row__meta">
+        <div class="hk-clean-type-row__label">${esc(t.label)}</div>
+        <div class="hk-clean-type-row__hint">${esc(t.hint)}</div>
+      </div>
+      <input type="number" min="20" max="240" step="5" id="hk-clean-type-${t.id}" value="${val}" aria-label="Minutes for ${esc(t.label)}">
+      <span style="font-size:11px;color:var(--muted);width:28px">min</span>
+    </div>`;
+  }).join('');
   const siteBlock=(title,rooms)=>`
     <div class="section-hd" style="margin-top:12px"><h2>${esc(title)}</h2></div>
     <div class="hk-clean-grid">${rooms.map(r=>{
-      const val=hkSettings.cleanMinutesByRoom[r.code]??hkDefaultCleanMinutes(r.code);
+      const typeId=hkCleanTypeId(r.code);
+      const typeDef=hkTypeCleanMinutes(typeId);
+      const val=hkSettings.cleanMinutesByRoom[r.code]??typeDef;
+      const override=hkSettings.cleanMinutesByRoom[r.code]!=null;
       return`<div class="hk-clean-row">
-        <div class="hk-clean-row__meta"><div class="hk-clean-row__code">${esc(r.code)}</div><div class="hk-clean-row__name">${esc(r.name)}</div></div>
+        <div class="hk-clean-row__meta"><div class="hk-clean-row__code">${esc(r.code)}${override?' · override':''}</div><div class="hk-clean-row__name">${esc(r.name)} · default ${typeDef} min</div></div>
         <input type="number" min="20" max="240" step="5" id="hk-clean-${esc(r.code)}" value="${val}" aria-label="Minutes for ${esc(r.code)}">
         <span style="font-size:11px;color:var(--muted);width:28px">min</span>
       </div>`;
@@ -1373,6 +1423,14 @@ function renderHkSettings(){
   const centre=getHkRooms().filter(r=>hkSiteId(r.code)==='centre');
   const vgl=getHkRooms().filter(r=>hkSiteId(r.code)==='vgl');
   const abash=getHkRooms().filter(r=>hkSiteId(r.code)==='abashidze');
+  const detailBlock=_hkCleanDetailOpen?`
+    <div class="hk-clean-detail">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.45">Override a single room only when it differs from the type default above. Matching the type default clears the override.</p>
+      ${siteBlock('Shartava · per room',shartava)}
+      ${siteBlock('City Centre · per room',centre)}
+      ${vgl.length?siteBlock('VGL · per room',vgl):''}
+      ${abash.length?siteBlock('Abashidze · per room',abash):''}
+    </div>`:'';
   wrap.innerHTML=`
     <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Task board: <strong>More → Housekeeping</strong>. List order is calculated automatically — staff only see the sorted list.</p>
     <div class="more-section" style="margin-top:0">Cleaner apps (staff)</div>
@@ -1390,10 +1448,11 @@ function renderHkSettings(){
       </div>
       <p style="font-size:12px;color:var(--muted);line-height:1.45;margin-top:8px">Used when guest did not pick an arrival time. Guest check-in unlocks from 15:00 unless they chose earlier in the form.</p>
     </div>
-    ${siteBlock('Shartava · cleaning minutes',shartava)}
-    ${siteBlock('City Centre · Orb &amp; Tab',centre)}
-    ${vgl.length?siteBlock('VGL · cleaning minutes',vgl):''}
-    ${abash.length?siteBlock('Abashidze · cleaning minutes',abash):''}
+    <div class="section-hd" style="margin-top:12px"><h2>Cleaning duration</h2></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.45">One setting per apartment type. All matching rooms use the same minutes unless you add a per-room override below.</p>
+    <div class="hk-clean-grid">${typeRows}</div>
+    <button type="button" class="btn hk-clean-expand" onclick="_hkCleanDetailOpen=!_hkCleanDetailOpen;renderHkSettings()">${_hkCleanDetailOpen?'Hide per-room overrides':'Per-room overrides…'}</button>
+    ${detailBlock}
     <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveHkSettings()">Save HK settings</button>
     <div class="more-section" style="margin-top:16px">Staff login PINs</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px">4-digit codes for legacy HK apps.</p>
@@ -1401,11 +1460,20 @@ function renderHkSettings(){
   renderHkPins();
 }
 window.saveHkSettings=async function(){
+  if(!hkSettings.cleanMinutesByType)hkSettings.cleanMinutesByType={...HK_CLEAN_TYPE_DEFAULTS};
   if(!hkSettings.cleanMinutesByRoom)hkSettings.cleanMinutesByRoom={};
-  getHkRooms().forEach(r=>{
-    const v=parseInt(document.getElementById('hk-clean-'+r.code)?.value,10);
-    if(Number.isFinite(v)&&v>=20)hkSettings.cleanMinutesByRoom[r.code]=v;
+  hkVisibleCleanTypes().forEach(t=>{
+    const v=parseInt(document.getElementById('hk-clean-type-'+t.id)?.value,10);
+    if(Number.isFinite(v)&&v>=20)hkSettings.cleanMinutesByType[t.id]=v;
   });
+  if(_hkCleanDetailOpen){
+    getHkRooms().forEach(r=>{
+      const v=parseInt(document.getElementById('hk-clean-'+r.code)?.value,10);
+      const typeDef=hkTypeCleanMinutes(hkCleanTypeId(r.code));
+      if(Number.isFinite(v)&&v>=20&&v!==typeDef)hkSettings.cleanMinutesByRoom[r.code]=v;
+      else delete hkSettings.cleanMinutesByRoom[r.code];
+    });
+  }
   hkSettings.defaultCheckOut=document.getElementById('hk-default-checkout')?.value||'12:00';
   hkSettings.defaultCheckIn=document.getElementById('hk-default-checkin')?.value||'15:00';
   try{
@@ -2504,14 +2572,7 @@ function hkActiveSites(){
   return HK_SITES_ALL.filter(s=>ids.has(s.id));
 }
 function hkDefaultCleanMinutes(roomCode){
-  const c=String(roomCode||'').toLowerCase();
-  if(/^0-/.test(c))return 45;
-  if(c==='6-3')return 120;
-  if(/^6-|^7-/.test(c))return 90;
-  if(/^orb-|^tab-/.test(c))return 50;
-  if(c.startsWith('vgl'))return 90;
-  if(c==='abashidze')return 90;
-  return 75;
+  return hkTypeCleanMinutes(hkCleanTypeId(roomCode));
 }
 function hkCleanMinutes(roomCode){
   const custom=hkSettings.cleanMinutesByRoom?.[roomCode];
