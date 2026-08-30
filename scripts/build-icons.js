@@ -9,7 +9,7 @@ const ICON_DIR = join(ROOT, 'node_modules/@tabler/icons/icons/outline');
 
 const ICON_NAMES = [
   'key', 'wifi', 'elevator', 'layout-grid', 'wash-machine', 'sparkles',
-  'building-monument', 'plane-arrival', 'star', 'file-text', 'message-circle',
+  'map-route', 'plane-arrival', 'star', 'file-text', 'message-circle',
   'home', 'map-pin', 'calendar', 'message-2', 'chevrons-up', 'dots', 'square-check',
   'bell', 'map-2', 'lock', 'alert-triangle', 'slash', 'currency-dollar', 'loader',
   'check', 'copy', 'pencil', 'clock', 'users', 'trash', 'x', 'menu',
@@ -23,8 +23,8 @@ const ALIASES = {
   services: 'layout-grid',
   laundry: 'wash-machine',
   cleaning: 'sparkles',
-  tour: 'building-monument',
-  landmark: 'building-monument',
+  tour: 'map-route',
+  landmark: 'map-route',
   transfer: 'plane-arrival',
   recs: 'star',
   rules: 'file-text',

@@ -322,7 +322,7 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830w';
+  var BUILD='20260830x';
   if(!/[?&]build=20260830h(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
@@ -1089,7 +1089,7 @@ const GP_TILES=[
   {id:'services',icon:'services',label:'Services',group:'essential',noEdit:true},
   {id:'laundry',icon:'laundry',label:'Laundry',group:'service',edit:'laundry'},
   {id:'cleaning',icon:'cleaning',label:'Cleaning',group:'service',edit:'service'},
-  {id:'city_tour',icon:'landmark',label:'Tours',group:'service',edit:'service'},
+  {id:'city_tour',icon:'tour',label:'Tours',group:'service',edit:'service'},
   {id:'airport_transfer',icon:'transfer',label:'Airport transfer',group:'service',edit:'service'},
   {id:'recs',icon:'recs',label:'Recs',group:'content',edit:'text'},
   {id:'rules',icon:'rules',label:'Rules',group:'content',edit:'text'},
@@ -1098,7 +1098,7 @@ const GP_TILES=[
 const WAITING_TABS_DEFAULTS={location:true,tours:false};
 const GP_WAITING_TABS=[
   {id:'location',label:'Location',icon:'location'},
-  {id:'tours',label:'Tours',icon:'landmark'},
+  {id:'tours',label:'Tours',icon:'tour'},
 ];
 const HK_CLEAN_TYPE_DEFAULTS={'0-':45,'6-7':90,'6-3':120,'orb-tab':50,'vgl':90,'abashidze':90,default:75};
 const HK_CLEAN_TYPES=[
