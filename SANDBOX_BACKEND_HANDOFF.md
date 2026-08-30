@@ -54,11 +54,15 @@ Expected unit tests: **49/49 pass** (elevator + room assignment + admin action +
 ## 1. Unit tests
 
 ```bash
-cd pipeline-functions && npm install && npm test
-npm run check:unlock   # shared/guest-unlock.js ↔ server mirror
+cd ~/app/pipeline-functions
+npm install
+npm test
+npm run check:unlock
 ```
 
 If unlock sync fails: `node scripts/sync-guest-unlock.js` from repo root.
+
+**Note:** `check:unlock` exists on branch `cursor/pipeline-stability-7e07` (or after that PR merges to main).
 
 ---
 
@@ -84,9 +88,11 @@ git checkout cursor/pipeline-room-assignment-7e07
 ```bash
 cd ~/app
 git fetch origin
-git checkout cursor/pipeline-room-assignment-7e07
-git pull origin cursor/pipeline-room-assignment-7e07
+git checkout cursor/pipeline-stability-7e07
+git pull origin cursor/pipeline-stability-7e07
 ```
+
+Run **one command per line**. Do not paste `# comment` text on the same line as `git checkout` — the shell will treat it as extra branch names and fail.
 
 Replace `~/app` with wherever you keep the project (e.g. `~/Projects/app`).
 
@@ -136,6 +142,8 @@ Or skip the UI entirely (callables still work on 5001):
 ```bash
 npm run emulator:lite
 ```
+
+Uses `firebase.emulator-lite.json` at repo root (UI disabled — no port 4000 needed).
 
 You must be logged in to Firebase CLI with access to `sleepy-5c962` so Admin SDK in the emulator can reach Firestore:
 

@@ -8,7 +8,7 @@
     "deploy": "firebase deploy --only functions:pipeline",
     "deploy:elevator": "firebase deploy --only functions:pipeline:elevatorCodeSync",
     "emulator": "firebase emulators:start --only functions:pipeline --project sleepy-5c962",
-    "emulator:lite": "firebase emulators:start --only functions:pipeline --project sleepy-5c962 --ui=false",
+    "emulator:lite": "firebase emulators:start --only functions:pipeline --project sleepy-5c962 --config ../firebase.emulator-lite.json",
     "emulator:setup": "test -f .secret.local || cp .secret.local.example .secret.local",
     "test": "node --test tests/*.test.js",
     "check:unlock": "node ../scripts/check-guest-unlock-sync.js"
