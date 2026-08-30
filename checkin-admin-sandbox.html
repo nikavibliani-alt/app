@@ -338,11 +338,16 @@ html.admin-authed #app{display:block;}
 .save-bar .save-bar-discard{background:transparent;color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.3);}
 .save-bar .save-bar-commit{background:var(--ink);color:#fff;}
 #gp-editor-overlay{z-index:230;}
+.wa-template-block{margin-bottom:16px;}
+.wa-template-label{font-size:13px;font-weight:600;margin-bottom:4px;color:var(--ink);}
+.wa-template-hint{font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.45;}
+.wa-template-input{width:100%;min-height:132px;padding:12px;border:1.5px solid var(--line);border-radius:var(--rs);font-family:var(--sans);font-size:13px;line-height:1.5;resize:vertical;background:var(--surface);}
+.wa-url-input{width:100%;height:44px;padding:0 12px;border:1.5px solid var(--line);border-radius:var(--rs);font-size:14px;background:var(--surface);}
 </style>
 <script>
 (function(){
-  var BUILD='20260830o';
-  if(!/[?&]build=20260830o(?:&|$)/.test(location.search)){
+  var BUILD='20260830p';
+  if(!/[?&]build=20260830p(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -466,6 +471,10 @@ html.admin-authed #app{display:block;}
     <div id="guestsettings-root"></div>
   </div>
 
+  <div class="pane" id="pane-wasettings">
+    <div id="wasettings-root"></div>
+  </div>
+
   <div class="pane" id="pane-failures">
     <div id="failures-list"></div>
   </div>
@@ -489,6 +498,7 @@ html.admin-authed #app{display:block;}
     <div class="more-section">Guest experience</div>
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('guestsettings')">Guest page</button>
+      <button class="more-item" type="button" onclick="switchTab('wasettings')">WhatsApp messages</button>
     </div>
     <div class="more-section">Housekeeping setup</div>
     <div class="more-list">
@@ -712,7 +722,7 @@ async function ensureRoomsSeeded(){
 let aptData={},guestData=[],hkStatusData={},_resCache=null,_resLoading=false;
 let elevData=null,stayFilter='overview',upcomingDay=null,_currentAptId=null;
 const _TAB_KEY='maxela_admin_tab';
-const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','guestsettings','failures','navsettings','hksettings','more']);
+const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','guestsettings','wasettings','failures','navsettings','hksettings','more']);
 
 const _NAV_KEY='maxela_admin_nav_v5';
 const NAV_MIN=2;
@@ -794,7 +804,7 @@ function renderNavBar(){
     if(!d)continue;
     html+=`<button class="nav__btn${currentTab===d.pane?' active':''}" data-tab="${d.pane}" onclick="switchTab('${d.pane}')" ${d.navId?`id="${d.navId}"`:''}>${navTabSvg(id)}${d.label}${d.extra||''}</button>`;
   }
-  html+=`<button class="nav__btn${currentTab==='more'||['apts','guestsettings','navsettings','failures','elevator','hksettings','hk'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')">${featherIcon('more-horizontal',22,1.8)}More</button>`;
+  html+=`<button class="nav__btn${currentTab==='more'||['apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','hk'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')">${featherIcon('more-horizontal',22,1.8)}More</button>`;
   nav.innerHTML=html;
   updateRequestsBadge();
   if(elevData)document.getElementById('nav-elev')?.classList.toggle('has-alert',elevFreshness().cls==='old');
@@ -1173,9 +1183,11 @@ async function loadGuestSettings(){
         cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS,...(hkSettings.cleanMinutesByType||{}),...(d.hkSettings.cleanMinutesByType||{})},
         cleanMinutesByRoom:{...(hkSettings.cleanMinutesByRoom||{}),...(d.hkSettings.cleanMinutesByRoom||{})},
       };
+      if(d.whatsappMessages)waSettings=mergeWaSettings(d.whatsappMessages);
     }
   }catch(e){console.warn(e);}
   gsLoaded=true;
+  waLoaded=true;
 }
 function gsMarkDirty(){gsDirty=true;document.getElementById('gs-save-bar')?.classList.add('show');}
 window.gsDiscard=async function(){gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');gsLoaded=false;await loadGuestSettings();renderGuestSettings();toast('Discarded');};
@@ -1481,6 +1493,92 @@ window.saveHkSettings=async function(){
     if(currentTab==='hk')renderHk();
   }catch(e){toast('Failed: '+e.message);}
 };
+
+/* ── WhatsApp message templates ── */
+const WA_MSG_DEFAULTS={
+  checkinUrl:'https://app.maxelaapartments.com/checkin-guest-v2.html',
+  checkinInvite:{
+    maxela:'Hello {{firstName}},\n\nWelcome to Maxela Apartments!\n\nTo access your check-in instructions, door code, WiFi details, and our services, please complete your online check-in:\n\n{{checkinUrl}}\n\nIt only takes 2 minutes. Once completed, everything you need for your stay will be available instantly.\n\nLooking forward to welcoming you!\nMaxela Apartments Team',
+    freedom:'Hello {{firstName}},\n\nWelcome to Freedom Square Studios!\n\nTo access your check-in instructions, door code and WiFi details, please complete your online check-in:\n\n{{checkinUrl}}\n\nIt only takes 2 minutes. Once completed, everything you need for your stay will be available instantly.\n\nLooking forward to welcoming you!\nFreedom Square Studios Team',
+    orbeliani:'Hello {{firstName}},\n\nWelcome to Midamo Orbeliani!\n\nTo access your check-in instructions and WiFi details, please complete your online check-in:\n\n{{checkinUrl}}\n\nIt only takes 2 minutes.\n\nLooking forward to welcoming you!\nMidamo Orbeliani Team',
+  },
+  searchFailure:"Hi, I tried to check in online but couldn't find my booking. Name: {{inputName}}, arrival: {{inputDate}}{{inputRef}}.",
+};
+const WA_INVITE_KEYS=[
+  {id:'maxela',label:'Maxela / Shartava',hint:'Rooms 6-*, 7-*, 0-*, Big Apt — default template'},
+  {id:'freedom',label:'Freedom Square',hint:'tab-* rooms'},
+  {id:'orbeliani',label:'Orbeliani',hint:'orb-* rooms'},
+];
+let waSettings=mergeWaSettings(null);
+let waLoaded=false;
+function mergeWaSettings(saved){
+  const out=JSON.parse(JSON.stringify(WA_MSG_DEFAULTS));
+  if(!saved||typeof saved!=='object')return out;
+  if(saved.checkinUrl)out.checkinUrl=String(saved.checkinUrl);
+  if(saved.checkinInvite&&typeof saved.checkinInvite==='object'){
+    for(const k of Object.keys(out.checkinInvite)){
+      if(saved.checkinInvite[k]!=null&&String(saved.checkinInvite[k]).trim())out.checkinInvite[k]=String(saved.checkinInvite[k]);
+    }
+  }
+  if(saved.searchFailure!=null&&String(saved.searchFailure).trim())out.searchFailure=String(saved.searchFailure);
+  return out;
+}
+function applyWaTemplate(template,vars){
+  return String(template||'').replace(/\{\{(\w+)\}\}/g,(_,k)=>vars[k]??'');
+}
+function pickCheckinInviteKey(roomCode){
+  const rc=String(roomCode||'').toLowerCase();
+  if(rc.startsWith('tab-'))return'freedom';
+  if(rc.startsWith('orb-'))return'orbeliani';
+  return'maxela';
+}
+function renderWaSettings(){
+  const root=document.getElementById('wasettings-root');
+  if(!root)return;
+  const inviteBlocks=WA_INVITE_KEYS.map(k=>`
+    <div class="wa-template-block">
+      <div class="wa-template-label">${esc(k.label)}</div>
+      <div class="wa-template-hint">${esc(k.hint)} · placeholders: {{firstName}}, {{checkinUrl}}</div>
+      <textarea class="wa-template-input" id="wa-invite-${k.id}" rows="8">${esc(waSettings.checkinInvite[k.id]||'')}</textarea>
+    </div>`).join('');
+  root.innerHTML=`
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin:0 0 14px">Pre-filled texts when you tap <strong>WhatsApp</strong> on a guest card. If the guest already submitted a form, WhatsApp opens with no pre-fill.</p>
+    <div class="wa-template-block">
+      <div class="wa-template-label">Check-in page URL</div>
+      <div class="wa-template-hint">Used as {{checkinUrl}} in invite messages</div>
+      <input class="wa-url-input" id="wa-checkin-url" value="${esc(waSettings.checkinUrl||WA_MSG_DEFAULTS.checkinUrl)}">
+    </div>
+    <div class="section-hd" style="margin-top:4px"><h2>Check-in invite (no form yet)</h2></div>
+    ${inviteBlocks}
+    <div class="section-hd" style="margin-top:4px"><h2>Failed search reply</h2></div>
+    <div class="wa-template-block">
+      <div class="wa-template-hint">Failed searches tab · placeholders: {{inputName}}, {{inputDate}}, {{inputRef}} (booking ref suffix, may be empty)</div>
+      <textarea class="wa-template-input" id="wa-search-failure" rows="4">${esc(waSettings.searchFailure||'')}</textarea>
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="saveWaSettings()">Save WhatsApp messages</button>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="resetWaSettings()">Reset to defaults</button>`;
+}
+window.saveWaSettings=async function(){
+  const url=document.getElementById('wa-checkin-url')?.value.trim()||WA_MSG_DEFAULTS.checkinUrl;
+  const checkinInvite={};
+  for(const k of WA_INVITE_KEYS){
+    checkinInvite[k.id]=document.getElementById('wa-invite-'+k.id)?.value??waSettings.checkinInvite[k.id];
+  }
+  const searchFailure=document.getElementById('wa-search-failure')?.value??waSettings.searchFailure;
+  waSettings={checkinUrl:url,checkinInvite,searchFailure};
+  try{
+    await setDoc(doc(db,'checkin_admin','config'),{whatsappMessages:waSettings,updatedAt:serverTimestamp()},{merge:true});
+    toast('WhatsApp messages saved ✓');
+    if(currentTab==='stay')renderStay();
+    if(currentTab==='failures')renderFailures();
+  }catch(e){toast('Save failed: '+e.message);}
+};
+window.resetWaSettings=function(){
+  if(!confirm('Reset all WhatsApp message templates to defaults?'))return;
+  waSettings=mergeWaSettings(null);
+  renderWaSettings();
+};
+
 function renderHkPins(){
   const el=document.getElementById('hkpins-list');if(!el)return;
   el.innerHTML=HK_ROLES.map(r=>`
@@ -1514,7 +1612,14 @@ function renderFailures(){
     const timeStr=ts?ts.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'—';
     const info=[f.input_name,f.input_booking_ref,f.input_date].filter(Boolean).join(' · ')||'(no input)';
     const raw=(f.input_contact||'').replace(/\D/g,'');
-    const wa=raw?`https://wa.me/${raw.length===9&&raw.startsWith('5')?'995'+raw:raw}`:null;
+    const norm=normalizeWaPhone(f.input_contact||'');
+    const inputRef=f.input_booking_ref?', ref: '+f.input_booking_ref:'';
+    const failMsg=applyWaTemplate(waSettings.searchFailure||WA_MSG_DEFAULTS.searchFailure,{
+      inputName:f.input_name||'—',
+      inputDate:f.input_date||'—',
+      inputRef,
+    });
+    const wa=norm?`https://wa.me/${norm}?text=${encodeURIComponent(failMsg)}`:null;
     return`<div class="card">
       <div class="card__name">${esc(info)}</div>
       <div class="card__sub">${esc(timeStr)} · ${esc(f.input_contact||'—')}</div>
@@ -1610,12 +1715,16 @@ function normalizeWaPhone(raw){
   if(digits.length===9&&digits.startsWith('5'))return'995'+digits;
   return digits||null;
 }
-function buildWaUrl(phone,guestName,hasForm){
+function buildWaUrl(phone,guestName,hasForm,roomCode){
   if(!phone)return null;
-  if(hasForm)return'https://wa.me/'+phone;
+  const base='https://wa.me/'+phone;
+  if(hasForm)return base;
   const first=(guestName||'').split(/\s+/)[0]||'';
-  const msg='Hello '+first+',\n\nWelcome to Maxela Apartments!\n\nPlease complete online check-in:\nhttps://app.maxelaapartments.com/checkin-guest-v2.html\n\nMaxela Team';
-  return'https://wa.me/'+phone+'?text='+encodeURIComponent(msg);
+  const key=pickCheckinInviteKey(roomCode);
+  const template=waSettings.checkinInvite?.[key]||WA_MSG_DEFAULTS.checkinInvite[key];
+  const checkinUrl=waSettings.checkinUrl||WA_MSG_DEFAULTS.checkinUrl;
+  const msg=applyWaTemplate(template,{firstName:first,checkinUrl});
+  return base+'?text='+encodeURIComponent(msg);
 }
 
 function roomSortKey(r){const i=getRoomOrder().indexOf((r.roomCode||'').toLowerCase());return i>=0?i:999;}
@@ -1672,7 +1781,7 @@ function renderCard(grp,mode){
   const name=_stripRoomNum(grp[0].guest||'')||'—';
   const multi=grp.length>1?`<span class="pill pill-multi">MULTI</span>`:'';
   const rawPhone=(form?.contact||grp.reduce((p,r)=>p||r.phone||r.guest_phone||r.guestPhone||'','')||'').trim();
-  const wa=buildWaUrl(normalizeWaPhone(rawPhone),name,!!form);
+  const wa=buildWaUrl(normalizeWaPhone(rawPhone),name,!!form,sorted[0].roomCode);
   const waBtn=wa?`<a class="btn" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`:`<button class="btn" disabled>WhatsApp</button>`;
   let grant='';
   if(st.key==='need'&&form)grant=`<button class="btn btn-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Grant Access</button>`;
@@ -1803,12 +1912,13 @@ const TAB_META={
   hk:{title:'Housekeeping',sub:'Daily task board · checkouts & done'},
   hksettings:{title:'HK settings',sub:'Staff PINs · cleaner apps · defaults'},
   guestsettings:{title:'Guest page',sub:'Tiles, services, waiting tabs & location'},
+  wasettings:{title:'WhatsApp messages',sub:'Pre-filled texts for guest outreach'},
   failures:{title:'Failed searches',sub:'Guests who could not find booking'},
   navsettings:{title:'Tab bar',sub:'Add tabs · reorder · landing page'},
   more:{title:'More',sub:'All admin tools'},
 };
-const MORE_TABS=new Set(['more','apts','guestsettings','navsettings','failures','elevator','hksettings','hk']);
-const MORE_SUB_PAGES=new Set(['apts','guestsettings','navsettings','failures','elevator','hksettings','hk']);
+const MORE_TABS=new Set(['more','apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','hk']);
+const MORE_SUB_PAGES=new Set(['apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','hk']);
 
 function updateHeaderBack(){
   const btn=document.getElementById('header-back');
@@ -1844,6 +1954,7 @@ window.switchTab=function(tab){
   if(tab==='hk')renderHk();
   if(tab==='hksettings')renderHkSettings();
   if(tab==='guestsettings')loadAndRenderGuestSettings();
+  if(tab==='wasettings'){if(!waLoaded)loadGuestSettings().then(()=>renderWaSettings());else renderWaSettings();}
   if(tab==='failures')renderFailures();
   if(tab==='navsettings')renderNavSettings();
   closeDetail();closeReqDetail();closeGpEditor();
