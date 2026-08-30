@@ -299,6 +299,11 @@ html.admin-authed #app{display:block;}
 .nav-cfg-star svg{width:36px;height:36px;stroke:var(--line);fill:none;stroke-width:1.5;transition:stroke .2s,fill .2s,transform .2s;}
 .nav-cfg-star.on svg{stroke:#d97706;fill:#fbbf24;filter:drop-shadow(0 2px 4px rgba(217,119,6,.3));}
 .nav-cfg-star:active{transform:scale(1.14);}
+.nav-cfg-landing{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;height:34px;padding:0 10px;border:1.5px solid var(--line);border-radius:999px;background:var(--bg);color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;cursor:pointer;font-family:var(--sans);-webkit-tap-highlight-color:transparent;transition:border-color .15s,background .15s,color .15s;}
+.nav-cfg-landing__dot{width:7px;height:7px;border-radius:50%;border:1.5px solid currentColor;background:transparent;flex-shrink:0;}
+.nav-cfg-landing.on{border-color:var(--green);background:var(--green-bg);color:var(--green);}
+.nav-cfg-landing.on .nav-cfg-landing__dot{background:currentColor;border-color:currentColor;}
+.nav-cfg-landing:active{opacity:.85;}
 .nav-cfg-arrows{flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding-left:4px;}
 .nav-cfg-arrow{width:48px;height:44px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;-webkit-tap-highlight-color:transparent;transition:color .18s,transform .18s;}
 .nav-cfg-arrow svg{width:28px;height:28px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;}
@@ -317,8 +322,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830g';
-  if(!/[?&]build=20260830g(?:&|$)/.test(location.search)){
+  var BUILD='20260830h';
+  if(!/[?&]build=20260830h(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -437,7 +442,7 @@ html.admin-authed #app{display:block;}
   </div>
 
   <div class="pane" id="pane-navsettings">
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.45">Drag to reorder · arrows to nudge · star = landing tab when you open the app. <strong>More</strong> is always last.</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.45">Drag to reorder · arrows to nudge · tap <strong>Landing</strong> for the tab that opens first. <strong>More</strong> is always last.</p>
     <div id="nav-preview" class="nav-cfg-preview"></div>
     <div id="nav-slots" class="nav-cfg-list"></div>
     <button type="button" class="btn" style="width:100%;margin-top:12px" id="nav-add-btn" onclick="addNavSlot()">+ Add tab</button>
@@ -800,7 +805,6 @@ window.resetNavConfig=async function(){
 const NAV_ARROW_UP='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
 const NAV_ARROW_DN='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>';
 const NAV_DRAG_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="17" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="17" r="1.2" fill="currentColor" stroke="none"/></svg>';
-const NAV_STAR_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
 let _navDrag=null;
 
 function renderNavPreview(){
@@ -827,7 +831,7 @@ function navCfgRowHtml(id,i){
         ${Object.entries(NAV_POOL).map(([k,nd])=>`<option value="${k}"${k===id?' selected':''}>${esc(nd.label)}</option>`).join('')}
       </select>
     </div>
-    <button type="button" class="nav-cfg-star${isLand?' on':''}" aria-label="Set as landing tab" onclick="navSetLanding(${i})">${NAV_STAR_SVG}</button>
+    <button type="button" class="nav-cfg-landing${isLand?' on':''}" aria-label="Set as landing tab" aria-pressed="${isLand}" onclick="navSetLanding(${i})"><span class="nav-cfg-landing__dot"></span><span>Landing</span></button>
     <div class="nav-cfg-arrows">
       <button type="button" class="nav-cfg-arrow" aria-label="Move up" onclick="navMoveSlot(${i},-1)" ${i===0?'disabled':''}>${NAV_ARROW_UP}</button>
       <button type="button" class="nav-cfg-arrow" aria-label="Move down" onclick="navMoveSlot(${i},1)" ${i>=n-1?'disabled':''}>${NAV_ARROW_DN}</button>
@@ -919,9 +923,13 @@ function navSyncDraftFromDom(){
   if(!list||!navConfigDraft)return;
   const order=[];
   [...list.children].forEach(el=>{
-    if(el.classList.contains('nav-cfg-item'))order.push(el.dataset.tabId);
+    if(el.classList.contains('nav-cfg-placeholder')){
+      if(_navDrag?.row?.dataset?.tabId)order.push(_navDrag.row.dataset.tabId);
+    }else if(el.classList.contains('nav-cfg-item')){
+      order.push(el.dataset.tabId);
+    }
   });
-  if(order.length)navConfigDraft.slots=order;
+  if(order.length&&order.length===navConfigDraft.slots.length)navConfigDraft.slots=order;
 }
 let _navDragRaf=0;
 function navFlipListSiblings(list,mutate){
@@ -962,6 +970,7 @@ window.navDragPointerDown=function(e,idx){
   row.style.top=rect.top+'px';
   row.style.width=rect.width+'px';
   row.style.margin='0';
+  row.style.zIndex='10000';
   document.body.appendChild(row);
   _navDrag={active:true,idx,row,list,placeholder,offsetY:e.clientY-rect.top,pointerId:e.pointerId,pendingY:e.clientY};
   handle.setPointerCapture(e.pointerId);
@@ -1016,38 +1025,22 @@ function navDragPointerEnd(e){
   if(e?.pointerId&&e.pointerId!==d.pointerId)return;
   if(_navDragRaf){cancelAnimationFrame(_navDragRaf);_navDragRaf=0;}
   navDragCleanupListeners();
-  const phRect=d.placeholder.getBoundingClientRect();
-  d.row.style.transition='top 340ms cubic-bezier(.22,1,.36,1), left 340ms cubic-bezier(.22,1,.36,1), width 340ms cubic-bezier(.22,1,.36,1), box-shadow 340ms ease';
-  d.row.style.top=phRect.top+'px';
-  d.row.style.left=phRect.left+'px';
-  d.row.style.width=phRect.width+'px';
-  d.row.style.boxShadow='0 6px 20px rgba(0,0,0,.1)';
-  let finished=false;
-  const finish=()=>{
-    if(finished)return;
-    finished=true;
-    d.row.removeEventListener('transitionend',finish);
-    navSyncDraftFromDom();
-    d.row.classList.remove('is-dragging');
-    d.row.style.position='';
-    d.row.style.left='';
-    d.row.style.top='';
-    d.row.style.width='';
-    d.row.style.margin='';
-    d.row.style.transform='';
-    d.row.style.transition='';
-    d.row.style.boxShadow='';
-    d.list.insertBefore(d.row,d.placeholder);
-    d.placeholder.remove();
-    const handle=d.row.querySelector('.nav-cfg-drag');
-    if(handle){
-      try{handle.releasePointerCapture(d.pointerId);}catch(err){}
-    }
-    _navDrag=null;
-    navFlipReorder(()=>renderNavSettings());
-  };
-  d.row.addEventListener('transitionend',finish);
-  setTimeout(finish,360);
+  const handle=d.row.querySelector('.nav-cfg-drag');
+  if(handle){try{handle.releasePointerCapture(d.pointerId);}catch(err){}}
+  d.row.classList.remove('is-dragging');
+  d.row.style.position='';
+  d.row.style.left='';
+  d.row.style.top='';
+  d.row.style.width='';
+  d.row.style.margin='';
+  d.row.style.transform='';
+  d.row.style.transition='';
+  d.row.style.boxShadow='';
+  d.row.style.zIndex='';
+  d.list.insertBefore(d.row,d.placeholder);
+  d.placeholder.remove();
+  _navDrag=null;
+  navFlipReorder(()=>renderNavSettings());
 }
 
 /* ── Guest page settings ── */
