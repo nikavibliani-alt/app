@@ -1,0 +1,12 @@
+{
+  "name": "maxela-app",
+  "private": true,
+  "type": "module",
+  "description": "Static guest check-in portal hosted at https://app.maxelaapartments.com/",
+  "scripts": {
+    "build:icons": "node scripts/build-icons.js"
+  },
+  "devDependencies": {
+    "@tabler/icons": "^3.46.0"
+  }
+}
