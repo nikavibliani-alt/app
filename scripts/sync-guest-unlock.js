@@ -44,7 +44,7 @@ const DEFAULT_CHECK_IN_HOUR = 15;
 const HK_EARLY_HOUR = 11;
 
 function tbilisiNow() {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: TBILISI_TZ }));
+  return new Date(Date.now() + 4 * 3600 * 1000);
 }
 
 function tbilisiToday() {
@@ -52,7 +52,22 @@ function tbilisiToday() {
 }
 
 function tbilisiHour() {
-  return tbilisiNow().getHours();
+  return tbilisiNow().getUTCHours();
+}
+
+function normalizeStayDate(v) {
+  if (v == null || v === '') return '';
+  if (typeof v === 'string') {
+    const m = v.match(/^(\\d{4}-\\d{2}-\\d{2})/);
+    return m ? m[1] : '';
+  }
+  if (typeof v.toDate === 'function') {
+    return v.toDate().toISOString().slice(0, 10);
+  }
+  if (v.seconds != null) {
+    return new Date(v.seconds * 1000).toISOString().slice(0, 10);
+  }
+  return '';
 }
 
 ${computeBlock}
@@ -64,6 +79,7 @@ module.exports = {
   tbilisiNow,
   tbilisiToday,
   tbilisiHour,
+  normalizeStayDate,
   computeGuestUnlock,
   isGuestUnlocked,
   parseCheckInHour,

@@ -10,7 +10,7 @@
  * Never writes roomCode, reservations, elevator, or hk_status.
  */
 
-const { computeGuestUnlock, parseCheckInHour, tbilisiToday } = require('../lib/guest-unlock');
+const { computeGuestUnlock, parseCheckInHour, tbilisiToday, normalizeStayDate } = require('../lib/guest-unlock');
 
 /**
  * @param {object} ctx
@@ -58,6 +58,12 @@ async function runGuestUnlock(ctx, params) {
     const aptId = workingGuest.aptId || '';
     const today = tbilisiToday();
 
+    const reservationId = workingGuest.matchedReservationId || null;
+    const reservation = reservationId && ctx.getReservation ? await ctx.getReservation(reservationId) : null;
+    const resCheckin = normalizeStayDate(reservation?.checkin || reservation?.checkIn);
+    const arrivalDate =
+      reservationId && resCheckin ? resCheckin : normalizeStayDate(workingGuest.arrivalDate) || resCheckin || '';
+
     const [apt, hk] = await Promise.all([
       aptId ? ctx.getApartment(aptId) : Promise.resolve(null),
       aptId ? ctx.getHkStatus(aptId, today) : Promise.resolve(null),
@@ -66,6 +72,7 @@ async function runGuestUnlock(ctx, params) {
     const checkInHour = parseCheckInHour(apt?.checkInTime);
     const computed = computeGuestUnlock({
       guest: workingGuest,
+      arrivalDate,
       checkInHour,
       hkDone: hk?.done === true,
     });
@@ -131,6 +138,16 @@ function buildLiveCtx() {
     getApartment: async (aptId) => {
       const snap = await db.collection('checkin_apartments').doc(aptId).get();
       return snap.exists ? snap.data() : null;
+    },
+    getReservation: async (reservationRef) => {
+      let snap = await db.collection('reservations').doc(reservationRef).get();
+      if (snap.exists) return { id: snap.id, ...snap.data() };
+      const q = await db.collection('reservations').where('reservationNumber', '==', reservationRef).limit(1).get();
+      if (!q.empty) {
+        const doc = q.docs[0];
+        return { id: doc.id, ...doc.data() };
+      }
+      return null;
     },
     getHkStatus: async (roomCode, dateStr) => {
       const snap = await db.collection('hk_status').doc(roomCode + '_' + dateStr).get();

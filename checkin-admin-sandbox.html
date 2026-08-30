@@ -570,7 +570,7 @@ window.adminSignOut=function(){localStorage.removeItem(_ADMIN_KEY);location.relo
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
-import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour}from"./shared/guest-unlock.js";
+import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour,normalizeStayDate}from"./shared/guest-unlock.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 
@@ -1532,6 +1532,7 @@ function toast(msg,ms=2500){const el=document.getElementById('toast');el.textCon
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function tbilisiNow(){return new Date(Date.now()+4*3600*1000);}
 function tbilisiToday(){return tbilisiNow().toISOString().slice(0,10);}
+function tbilisiHourLocal(){return tbilisiNow().getUTCHours();}
 function _stripRoomNum(s){return(s||'').replace(/\s+0\d+\s+/,' ').replace(/\s+/g,' ').trim();}
 
 async function uploadToCloudinary(file,folder='maxela'){
@@ -1542,13 +1543,19 @@ async function uploadToCloudinary(file,folder='maxela'){
   throw new Error(d.error?.message||'Upload failed');
 }
 
-function guestStatus(g){
+function guestArrivalDate(g,res){
+  const door=res||(_resCache||[]).find(r=>isSameReservation(r,g.matchedReservationId));
+  const fromRes=normalizeStayDate(door?.checkin||door?.checkIn);
+  if(g.matchedReservationId&&fromRes)return fromRes;
+  return normalizeStayDate(g.arrivalDate)||fromRes||'';
+}
+
+function guestStatus(g,res){
   const today=unlockToday();
   const hkKey=(g.aptId||'')+'_'+today;
   const aptCheckIn=aptData[g.aptId]?.checkInTime||'';
   const checkInHour=aptCheckIn?parseInt(String(aptCheckIn).split(':')[0],10):CHECK_IN_HOUR;
-  const door=(_resCache||[]).find(r=>isSameReservation(r,g.matchedReservationId));
-  const arrivalDate=g.arrivalDate||door?.checkin||door?.checkIn||'';
+  const arrivalDate=guestArrivalDate(g,res);
   const r=computeGuestUnlock({
     guest:g,
     arrivalDate,
@@ -1560,15 +1567,40 @@ function guestStatus(g){
   return{label:r.label,cls:r.cls};
 }
 
+function findFormForReservation(r){
+  if(!r)return null;
+  const linked=guestData.filter(g=>!g.companionGuest&&isSameReservation(r,g.matchedReservationId));
+  if(linked.length===1)return linked[0];
+  if(linked.length>1){
+    const rc=r.roomCode||r.room||'';
+    return linked.find(g=>g.aptId===rc)||linked[0];
+  }
+  const ci=normalizeStayDate(r.checkin||r.checkIn);
+  const rc=r.roomCode||r.room||'';
+  const rn=_stripRoomNum(r.guest||'').toLowerCase();
+  if(rn&&ci){
+    const byName=guestData.find(g=>{
+      if(g.companionGuest||g.matchedReservationId)return false;
+      const gn=_stripRoomNum((g.nameRoman||g.name||'').trim()).toLowerCase();
+      return gn===rn&&normalizeStayDate(g.arrivalDate)===ci;
+    });
+    if(byName)return byName;
+  }
+  if(rc&&ci){
+    return guestData.find(g=>{
+      if(g.companionGuest||g.matchedReservationId)return false;
+      return g.aptId===rc&&normalizeStayDate(g.arrivalDate)===ci;
+    })||null;
+  }
+  return null;
+}
+
 function rebuildFormMaps(){
   const res=_resCache||[];
   _formById=new Map();
   for(const r of res){
     if(_formById.has(r.id))continue;
-    const f=guestData.find(g=>g.matchedReservationId===r.id)||
-      guestData.find(g=>g.matchedReservationId===r.reservationNumber)||
-      guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||
-      guestData.find(g=>{const gn=_stripRoomNum((g.nameRoman||g.name||'').trim()).toLowerCase();const rn=_stripRoomNum(r.guest||'').toLowerCase();return gn&&rn&&gn===rn&&g.arrivalDate===r.checkin;})||null;
+    const f=findFormForReservation(r);
     if(f)_formById.set(r.id,f);
   }
   const byGC=new Map();
@@ -1588,7 +1620,7 @@ function getForm(r){return _formById.get(r.id)||null;}
 function cardStatus(r,form){
   if(!form)return{label:'NO FORM',cls:'pill-pending',key:'nof'};
   if(form.guestConfirmedCheckin===true)return{label:'CHECKED IN',cls:'pill-in',key:'checked'};
-  if(guestStatus(form).cls==='unlocked')return{label:'UNLOCKED',cls:'pill-ok',key:'unlocked'};
+  if(guestStatus(form,r).cls==='unlocked')return{label:'UNLOCKED',cls:'pill-ok',key:'unlocked'};
   return{label:'AWAITING UNLOCK',cls:'pill-await',key:'need'};
 }
 function fmtDate(s){if(!s)return'—';return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
@@ -1917,6 +1949,7 @@ window.moveGuestPipeline=async function(guestId){
       return;
     }
     toast('Moved to '+newRoom+' ✓');
+    await refreshReservationsNow();
     openDetail(guestId);
   }catch(e){
     console.error('[moveGuestPipeline]',e);
@@ -1946,6 +1979,7 @@ window.swapGuestPipeline=async function(guestId){
     });
     if(!r.ok){toast(r.message||'Swap failed');return;}
     toast(`Swapped with ${otherName} ✓`);
+    await refreshReservationsNow();
     openDetail(guestId);
   }catch(e){
     console.error('[swapGuestPipeline]',e);
@@ -2011,7 +2045,7 @@ window.openDetail=function(guestId){
       <div style="font-size:12px;color:var(--muted)">Smart lock</div>
       <div class="door">${esc(doorCode)}</div>
       <div class="card__actions">
-        ${g.manualUnlock||guestStatus(g).cls==='unlocked'?'':`<button class="btn btn-primary" onclick="window.unlockGuest('${g.id}')">Grant Access</button>`}
+        ${g.manualUnlock||guestStatus(g,door).cls==='unlocked'?'':`<button class="btn btn-primary" onclick="window.unlockGuest('${g.id}')">Grant Access</button>`}
         ${waPhone?`<a class="btn" href="https://wa.me/${waPhone}" target="_blank">WhatsApp</a>`:''}
       </div>
     </div>
@@ -2949,13 +2983,45 @@ async function _loadResCache(){
   _resLoading=false;rebuildFormMaps();render();
 }
 
+async function refreshReservationsNow(){
+  try{
+    const cutoff=new Date(Date.now()-365*864e5).toISOString().slice(0,10);
+    const snap=await getDocs(query(collection(db,'reservations'),where('checkin','>=',cutoff),orderBy('checkin','desc'),limit(1000)));
+    _resCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+    rebuildFormMaps();
+    if(currentTab==='stay')renderStay();
+    else render();
+  }catch(e){console.error('[refreshReservationsNow]',e);}
+}
+
+let _resSubscribed=false;
+function _subscribeResCache(){
+  if(_resSubscribed)return;
+  _resSubscribed=true;
+  const cutoff=new Date(Date.now()-365*864e5).toISOString().slice(0,10);
+  onSnapshot(
+    query(collection(db,'reservations'),where('checkin','>=',cutoff),orderBy('checkin','desc'),limit(1000)),
+    snap=>{
+      _resCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+      _resLoading=false;
+      rebuildFormMaps();
+      if(loaded>=2)render();
+    },
+    err=>{
+      console.error('[reservations snapshot]',err);
+      if(_resCache===null)_resCache=[];
+      _resLoading=false;
+    }
+  );
+}
+
 let loaded=0;
 function checkLoaded(){
   loaded++;
   if(loaded>=2){
     document.getElementById('loading').style.display='none';
     switchTab(currentTab);
-    _loadResCache();
+    _subscribeResCache();
     loadElevatorOnce();
     loadRequests(true);
     loadGuestSettings();
@@ -3003,6 +3069,6 @@ onSnapshot(doc(db,'globals','elevator_code'),snap=>{
   loadElevatorOnce();
 });
 setInterval(()=>{if(currentTab==='elevator')renderElevator();loadElevatorOnce();},60000);
-setTimeout(()=>{document.getElementById('loading').style.display='none';if(!_resCache)_loadResCache();if(loaded<2)switchTab(currentTab);},5000);
+setTimeout(()=>{document.getElementById('loading').style.display='none';if(!_resCache&&!_resSubscribed)_loadResCache();if(loaded<2)switchTab(currentTab);},5000);
 switchTab(currentTab);
 </script></body></html>
