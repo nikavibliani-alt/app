@@ -322,7 +322,7 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830h';
+  var BUILD='20260830y';
   if(!/[?&]build=20260830h(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
@@ -573,6 +573,7 @@ import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gsta
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour}from"./shared/guest-unlock.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
+import{appIcon}from"./shared/icons.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -1080,26 +1081,7 @@ const GP_PROPS=[
   {id:'ROOMS',label:'Rooms'},{id:'MAXELA',label:'Maxela'},{id:'BIG_APT',label:'Big Apt'},
   {id:'FREEDOM',label:'Freedom'},{id:'ORBELIANI',label:'Orbeliani'},
 ];
-function gpIcon(name,size=18){
-  const s=size;
-  const icons={
-    key:'<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
-    wifi:'<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>',
-    elevator:'<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 8v8M9 11l3-3 3 3"/>',
-    services:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
-    laundry:'<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/>',
-    cleaning:'<path d="M9 3h6l-1 9H10L9 3z"/><path d="M3 21c0-4 2-7 9-7s9 3 9 7"/><path d="M12 14v7"/>',
-    tour:'<polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>',
-    transfer:'<path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
-    recs:'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
-    rules:'<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
-    contact:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
-    home:'<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
-    location:'<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>',
-  };
-  const inner=icons[name]||icons.recs;
-  return`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
-}
+function gpIcon(name,size=18){return appIcon(name,size,1.75);}
 const GP_TILES=[
   {id:'checkin',icon:'key',label:'Check-in',group:'essential',noEdit:true},
   {id:'wifi',icon:'wifi',label:'WiFi',group:'essential',edit:'wifi'},
@@ -1108,12 +1090,16 @@ const GP_TILES=[
   {id:'laundry',icon:'laundry',label:'Laundry',group:'service',edit:'laundry'},
   {id:'cleaning',icon:'cleaning',label:'Cleaning',group:'service',edit:'service'},
   {id:'city_tour',icon:'tour',label:'Tours',group:'service',edit:'service'},
-  {id:'airport_transfer',icon:'transfer',label:'Transfer',group:'service',edit:'service'},
+  {id:'airport_transfer',icon:'transfer',label:'Airport transfer',group:'service',edit:'service'},
   {id:'recs',icon:'recs',label:'Recs',group:'content',edit:'text'},
   {id:'rules',icon:'rules',label:'Rules',group:'content',edit:'text'},
   {id:'contact',icon:'contact',label:'Contact',group:'content',edit:'text'},
 ];
-const WAITING_TABS_DEFAULTS={location:true,shuttle:false,tours:false};
+const WAITING_TABS_DEFAULTS={location:true,tours:false};
+const GP_WAITING_TABS=[
+  {id:'location',label:'Location',icon:'location'},
+  {id:'tours',label:'Tours',icon:'tour'},
+];
 const HK_CLEAN_TYPE_DEFAULTS={'0-':45,'6-7':90,'6-3':120,'orb-tab':50,'vgl':90,'abashidze':90,default:75};
 const HK_CLEAN_TYPES=[
   {id:'0-',label:'0- rooms',hint:'Small rooms · 0-1, 0-2, …',match:c=>/^0-/.test(c)},
@@ -1152,7 +1138,11 @@ async function loadGuestSettings(){
       if(d.sectionLabels)gsSectionLabels=d.sectionLabels;
       if(d.roomCategories)gsRoomCategories=d.roomCategories;
       if(d.locationInfo)gsLocationInfo=d.locationInfo;
-      if(d.waitingTabs)gsWaitingTabs={...WAITING_TABS_DEFAULTS,...d.waitingTabs};
+      if(d.waitingTabs){
+        const wt={...WAITING_TABS_DEFAULTS,...d.waitingTabs};
+        delete wt.shuttle;
+        gsWaitingTabs=wt;
+      }
       if(d.hkSettings)hkSettings={
         defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS},cleanMinutesByRoom:{},
         ...hkSettings,...d.hkSettings,
@@ -1167,9 +1157,11 @@ function gsMarkDirty(){gsDirty=true;document.getElementById('gs-save-bar')?.clas
 window.gsDiscard=async function(){gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');gsLoaded=false;await loadGuestSettings();renderGuestSettings();toast('Discarded');};
 window.gsSaveAll=async function(){
   try{
+    const waitingTabs={...gsWaitingTabs};
+    delete waitingTabs.shuttle;
     await setDoc(doc(db,'checkin_admin','config'),{
       visibility:gsVisibility,laundryItems:gsLaundry,services:gsServices,sectionLabels:gsSectionLabels,
-      roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,waitingTabs:gsWaitingTabs,hkSettings,
+      roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,waitingTabs,hkSettings,
       updatedAt:serverTimestamp()
     });
     gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');
@@ -1210,14 +1202,18 @@ function renderGuestSettings(){
     <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px">Guest preview</div>
     <div class="gp-preview">${preview}</div>
     <div class="section-hd" style="margin-top:8px"><h2>Waiting phase tabs</h2></div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Before check-in unlocks. Location on by default; Shuttle &amp; Tours off.</p>
-    ${[{id:'location',label:'Location'},{id:'shuttle',label:'Shuttle service'},{id:'tours',label:'Tours'}].map(t=>{
+    <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Before check-in unlocks. Location on by default; Tours off. Airport transfer uses the same toggle as the Transfer service below — no duplicate setting.</p>
+    ${GP_WAITING_TABS.map(t=>{
       const checked=t.id==='location'?gsWaitingTabs.location!==false:gsWaitingTabs[t.id]===true;
       return`<div class="gp-row">
-      <div class="gp-row__icon">${gpIcon(t.id==='location'?'location':'tour')}</div>
+      <div class="gp-row__icon">${gpIcon(t.icon)}</div>
       <div class="gp-row__body"><div class="gp-row__title">${esc(t.label)}</div><div class="gp-row__sub">Waiting screen tab</div></div>
       <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${checked?'checked':''} onchange="gsToggleWaitingTab('${t.id}',this.checked)"><span class="switch-track"></span></label>
     </div>`;}).join('')}
+    <div class="gp-row gp-row--muted" style="opacity:.85">
+      <div class="gp-row__icon">${gpIcon('transfer')}</div>
+      <div class="gp-row__body"><div class="gp-row__title">Airport transfer</div><div class="gp-row__sub">Same as Transfer under Services — shown while waiting when that service is on</div></div>
+    </div>
     <div class="section-hd" style="margin-top:8px"><h2>Home tiles</h2></div>
     ${GP_TILES.filter(t=>t.group==='essential').map(row).join('')}
     <div class="section-hd" style="margin-top:8px"><h2>Services</h2></div>
