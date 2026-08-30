@@ -341,8 +341,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830m';
-  if(!/[?&]build=20260830m(?:&|$)/.test(location.search)){
+  var BUILD='20260830o';
+  if(!/[?&]build=20260830o(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -3050,15 +3050,21 @@ window.updateElevator=async function(){
     display_code:code,qr_code:qrCode,code,lastCode:code,expires_at:String(nowMs+24*3600*1000),updatedAt:String(nowMs),source:'manual'
   };
   let rtdbOk=false,fsOk=false,errMsg='';
-  try{const res=await fetch(RTDB_URL,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});rtdbOk=res.ok;if(!rtdbOk)errMsg='RTDB HTTP '+res.status;}
-  catch(e){errMsg='RTDB: '+e.message;}
   try{await setDoc(doc(db,'globals','elevator_code'),{...updates,code,updatedAt:serverTimestamp(),source:'manual',lastCode:code},{merge:true});fsOk=true;}
-  catch(e){errMsg=(errMsg?errMsg+'; ':'')+'Firestore: '+e.message;}
+  catch(e){errMsg='Firestore: '+e.message;}
+  if(fsOk){
+    try{const res=await fetch(RTDB_URL,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});rtdbOk=res.ok;if(!rtdbOk)errMsg='RTDB HTTP '+res.status;}
+    catch(e){errMsg='RTDB: '+e.message;}
+  }
   btn.disabled=false;
-  if(rtdbOk&&fsOk){
+  if(fsOk&&rtdbOk){
     elevData={code,qrCode,updatedAt:{seconds:Math.floor(nowMs/1000)},source:'manual',lastCode:code,_source:'manual'};
     msg.className='elev-msg ok';msg.textContent='Saved · Manual · both stores OK';
     renderElevator();toast('Elevator updated ✓');
+  }else if(fsOk){
+    elevData={code,qrCode,updatedAt:{seconds:Math.floor(nowMs/1000)},source:'manual',lastCode:code,_source:'manual'};
+    msg.className='elev-msg err';msg.textContent='Saved to Firestore · RTDB sync failed — '+errMsg;
+    renderElevator();toast('Elevator saved (RTDB sync failed)');
   }else{msg.className='elev-msg err';msg.textContent='Failed — '+(errMsg||'unknown');}
 };
 
