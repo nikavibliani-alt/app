@@ -88,9 +88,15 @@ html.admin-authed #app{display:block;}
 .hk-legend__dot--red{background:#dc2626}
 .hk-legend__dot--yellow{background:#d97706}
 .hk-legend__dot--green{background:#16a34a}
-.hk-schedule{font-size:11px;color:var(--ink);margin:8px 0 0;padding:8px 10px;background:#f7f8fa;border:1px solid var(--line);border-radius:8px;line-height:1.45;}
-.hk-schedule.tight{background:#fef2f2;border-color:#fca5a5;color:#991b1b;font-weight:600;}
 .hk-guest-out{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--green);background:var(--green-bg);border:1px solid #86efac;border-radius:999px;padding:4px 10px;margin-top:8px;}
+.hk-site-hd{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:14px 2px 8px;margin-top:4px;border-top:1px solid var(--line);}
+.hk-site-hd:first-child{border-top:none;margin-top:0;padding-top:4px;}
+.hk-clean-grid{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.hk-clean-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);}
+.hk-clean-row__meta{flex:1;min-width:0;}
+.hk-clean-row__code{font-family:var(--mono);font-size:13px;font-weight:700;}
+.hk-clean-row__name{font-size:11px;color:var(--muted);}
+.hk-clean-row input{width:64px;height:40px;text-align:center;border:1.5px solid var(--line);border-radius:8px;font-family:var(--mono);font-size:15px;font-weight:700;background:var(--surface);}
 .hk-bedding-alert{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--amber-bg);color:var(--amber);font-size:12px;font-weight:700}
 .hk-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);}
 .hk-cleaner-link{font-size:13px;font-weight:700;color:var(--blue);text-decoration:none;white-space:nowrap;}
@@ -707,7 +713,7 @@ const GP_TILES=[
 ];
 const WAITING_TABS_DEFAULTS={location:true,shuttle:false,tours:false};
 let gsWaitingTabs={...WAITING_TABS_DEFAULTS};
-let hkSettings={defaultCheckIn:'14:00'};
+let hkSettings={defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByRoom:{}};
 let gsVisibility=JSON.parse(JSON.stringify(SECTION_DEFAULTS));
 let gsLaundry=[...LAUNDRY_DEFAULTS];
 let gsServices=SERVICE_DEFAULTS.map(s=>({...s}));
@@ -949,37 +955,56 @@ const HK_ROLES=[
 function renderHkSettings(){
   const wrap=document.getElementById('hksettings-root');
   if(!wrap)return;
+  if(!hkSettings.cleanMinutesByRoom)hkSettings.cleanMinutesByRoom={};
+  const siteBlock=(title,rooms)=>`
+    <div class="section-hd" style="margin-top:12px"><h2>${esc(title)}</h2></div>
+    <div class="hk-clean-grid">${rooms.map(r=>{
+      const val=hkSettings.cleanMinutesByRoom[r.code]??hkDefaultCleanMinutes(r.code);
+      return`<div class="hk-clean-row">
+        <div class="hk-clean-row__meta"><div class="hk-clean-row__code">${esc(r.code)}</div><div class="hk-clean-row__name">${esc(r.name)}</div></div>
+        <input type="number" min="20" max="240" step="5" id="hk-clean-${esc(r.code)}" value="${val}" aria-label="Minutes for ${esc(r.code)}">
+        <span style="font-size:11px;color:var(--muted);width:28px">min</span>
+      </div>`;
+    }).join('')}</div>`;
+  const shartava=HK_ROOMS.filter(r=>hkSiteId(r)==='shartava');
+  const centre=HK_ROOMS.filter(r=>hkSiteId(r)==='centre');
   wrap.innerHTML=`
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Task board: <strong>More → Housekeeping</strong>. Staff use cleaner apps — not this admin login.</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Task board: <strong>More → Housekeeping</strong>. List order is calculated automatically — staff only see the sorted list.</p>
     <div class="more-section" style="margin-top:0">Cleaner apps (staff)</div>
     <div class="more-list" style="margin-bottom:16px">
       <a class="more-item" href="HK-Shartava.html" target="_blank" rel="noopener">Shartava HK<span class="more-hint">6-, 7-, 0- rooms</span></a>
       <a class="more-item" href="HK-Centre.html" target="_blank" rel="noopener">Centre HK<span class="more-hint">Orb &amp; Tab</span></a>
-      <a class="more-item" href="HK.html" target="_blank" rel="noopener">All properties<span class="more-hint">Legacy unified app</span></a>
     </div>
-    <div class="section-hd"><h2>Cleaning time estimates</h2></div>
-    <div class="card" style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:16px">
-      Used on the HK board to calculate <strong>ready by</strong> vs guest arrival.<br>
-      0- rooms · 45 min · Standard apartments · 90 min · 6-3 (3-bed) · 120 min · Orb/Tab · 75 min
-    </div>
-    <div class="section-hd"><h2>Defaults</h2></div>
+    <div class="section-hd"><h2>Standard times</h2></div>
     <div class="card">
-      <div class="field"><label>Fallback check-in time (HK cards)</label>
-        <input id="hk-default-checkin" type="time" value="${esc(hkSettings.defaultCheckIn||'14:00')}" style="width:100%;height:44px;padding:0 12px;border:1.5px solid var(--line);border-radius:var(--r);font-size:16px;background:var(--surface);">
+      <div class="field"><label>Checkout time</label>
+        <input id="hk-default-checkout" type="time" value="${esc(hkSettings.defaultCheckOut||'12:00')}" style="width:100%;height:44px;padding:0 12px;border:1.5px solid var(--line);border-radius:var(--r);font-size:16px;background:var(--surface);">
       </div>
-      <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveHkSettings()">Save defaults</button>
+      <div class="field"><label>Check-in from (guest access)</label>
+        <input id="hk-default-checkin" type="time" value="${esc(hkSettings.defaultCheckIn||'15:00')}" style="width:100%;height:44px;padding:0 12px;border:1.5px solid var(--line);border-radius:var(--r);font-size:16px;background:var(--surface);">
+      </div>
+      <p style="font-size:12px;color:var(--muted);line-height:1.45;margin-top:8px">Used when guest did not pick an arrival time. Guest check-in unlocks from 15:00 unless they chose earlier in the form.</p>
     </div>
+    ${siteBlock('Shartava · cleaning minutes',shartava)}
+    ${siteBlock('City Centre · Orb &amp; Tab',centre)}
+    <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveHkSettings()">Save HK settings</button>
     <div class="more-section" style="margin-top:16px">Staff login PINs</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">4-digit codes for legacy HK apps. Staff never see these here.</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">4-digit codes for legacy HK apps.</p>
     <div id="hkpins-list"></div>`;
   renderHkPins();
 }
 window.saveHkSettings=async function(){
-  const t=document.getElementById('hk-default-checkin')?.value||'14:00';
-  hkSettings.defaultCheckIn=t;
+  if(!hkSettings.cleanMinutesByRoom)hkSettings.cleanMinutesByRoom={};
+  HK_ROOMS.forEach(r=>{
+    const v=parseInt(document.getElementById('hk-clean-'+r.code)?.value,10);
+    if(Number.isFinite(v)&&v>=20)hkSettings.cleanMinutesByRoom[r.code]=v;
+  });
+  hkSettings.defaultCheckOut=document.getElementById('hk-default-checkout')?.value||'12:00';
+  hkSettings.defaultCheckIn=document.getElementById('hk-default-checkin')?.value||'15:00';
   try{
     await setDoc(doc(db,'checkin_admin','config'),{hkSettings,updatedAt:serverTimestamp()},{merge:true});
     toast('HK settings saved ✓');
+    if(currentTab==='hk')renderHk();
   }catch(e){toast('Failed: '+e.message);}
 };
 function renderHkPins(){
@@ -1881,17 +1906,29 @@ function formatGuestArrival(form,res){
   if(w==='next-morning')return'Next morning';
   if(w==='asap')return'ASAP';
   if(/^\d{2}:\d{2}$/.test(w))return w;
-  return res?.checkinTime||hkSettings.defaultCheckIn||'14:00';
+  return res?.checkinTime||hkSettings.defaultCheckIn||'15:00';
 }
-/** Estimated cleaning minutes by room type (0- quick · standard apt · 6-3 large). */
-function hkCleanMinutes(roomCode){
+const HK_SITES=[
+  {id:'shartava',title:'Shartava'},
+  {id:'centre',title:'City Centre · Orb & Tab'},
+];
+function hkSiteId(roomCode){
+  return/^orb-|^tab-/i.test(roomCode)?'centre':'shartava';
+}
+function hkDefaultCleanMinutes(roomCode){
   const c=String(roomCode||'').toLowerCase();
   if(/^0-/.test(c))return 45;
   if(c==='6-3')return 120;
   if(/^6-|^7-/.test(c))return 90;
-  if(/^orb-|^tab-/.test(c))return 75;
+  if(/^orb-|^tab-/.test(c))return 50;
   if(c.startsWith('vgl'))return 90;
+  if(c==='abashidze')return 90;
   return 75;
+}
+function hkCleanMinutes(roomCode){
+  const custom=hkSettings.cleanMinutesByRoom?.[roomCode];
+  if(custom!=null&&custom!=='')return parseInt(custom,10)||hkDefaultCleanMinutes(roomCode);
+  return hkDefaultCleanMinutes(roomCode);
 }
 function hkTomorrowStr(dateStr){
   const d=new Date(dateStr+'T12:00:00Z');
@@ -1909,35 +1946,36 @@ function hkTimeToMinutes(t){
   if(!t)return null;
   if(/^\d{2}:\d{2}$/.test(t)){const [h,m]=t.split(':').map(Number);return h*60+m;}
   if(t==='before-15')return 15*60;
-  if(t==='asap')return 14*60;
+  if(t==='asap')return hkTimeToMinutes(hkSettings.defaultCheckIn||'15:00')||15*60;
   if(t==='00:00+')return 18*60;
   if(t==='next-morning')return 11*60;
   if(t==='Before 15:00')return 15*60;
   if(t==='After midnight')return 18*60;
   if(t==='Next morning')return 11*60;
-  if(t==='ASAP')return 14*60;
+  if(t==='ASAP')return hkTimeToMinutes(hkSettings.defaultCheckIn||'15:00')||15*60;
   const m=t.match(/^(\d{1,2}):(\d{2})/);
   if(m)return parseInt(m[1],10)*60+parseInt(m[2],10);
   return null;
 }
-function hkMinutesToLabel(mins){
-  const h=Math.floor(mins/60),m=mins%60;
-  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
-}
-function hkScheduleHint(roomCode,coTimeStr,ciDisplay,form){
-  const cleanM=hkCleanMinutes(roomCode);
-  const coM=hkTimeToMinutes(coTimeStr)||12*60;
-  const readyM=coM+cleanM;
-  const readyLabel=hkMinutesToLabel(readyM);
+function hkGuestArrivalMinutes(form,nextRes){
+  if(!nextRes)return 24*60;
   const raw=form?.expectedCheckInWindow||form?.expectedCheckInTime||'';
-  const guestM=hkTimeToMinutes(raw)||hkTimeToMinutes(ciDisplay);
-  const guestLabel=raw&&/^\d{2}:\d{2}$/.test(raw)?raw:ciDisplay;
-  if(guestM==null)return {text:`Clean ~${cleanM} min · ready ~${readyLabel}`,tight:false};
-  const tight=guestM<readyM+15;
-  const text=tight
-    ?`Tight · need ready ~${readyLabel} · guest ${guestLabel}`
-    :`Clean ~${cleanM} min · ready ~${readyLabel} · guest ${guestLabel}`;
-  return {text,tight};
+  const display=formatGuestArrival(form,nextRes);
+  return hkTimeToMinutes(raw)||hkTimeToMinutes(display)||hkTimeToMinutes(hkSettings.defaultCheckIn||'15:00')||15*60;
+}
+/** Lower score = clean first (urgency + guest arrival + clean duration). */
+function hkSortScore(room,dateStr){
+  const key=room.code+'_'+dateStr;
+  if(hkStatusData[key]?.done)return 1e9;
+  const priority=hkGetPriority(room.code,dateStr);
+  const pBase={red:0,yellow:1000,green:2000}[priority];
+  const nextRes=hkGetNextCheckin(room.code,dateStr);
+  const form=hkGuestFormForRoom(room.code,dateStr,nextRes);
+  const coM=hkTimeToMinutes(hkSettings.defaultCheckOut||'12:00')||12*60;
+  const cleanM=hkCleanMinutes(room.code);
+  const guestM=hkGuestArrivalMinutes(form,nextRes);
+  const slack=guestM-(coM+cleanM);
+  return pBase+slack;
 }
 function hkDepartingGuestForm(roomCode,dateStr,coRes){
   const byDate=guestData.find(g=>!g.companionGuest&&g.aptId===roomCode&&g.checkoutDate===dateStr);
@@ -1994,14 +2032,8 @@ async function renderHk(){
   const rooms=hkTaskRooms(dateStr);
   if(!rooms.length){listEl.innerHTML='<div class="empty">No checkout rooms this day</div>';return;}
   const tomorrowStr=hkTomorrowStr(dateStr);
-  const priorityOrder={red:0,yellow:1,green:2};
-  rooms.sort((a,b)=>{
-    const pa=hkGetPriority(a.code,dateStr),pb=hkGetPriority(b.code,dateStr);
-    if(priorityOrder[pa]!==priorityOrder[pb])return priorityOrder[pa]-priorityOrder[pb];
-    return a.code.localeCompare(b.code);
-  });
-  let html='';
-  rooms.forEach(room=>{
+  rooms.sort((a,b)=>hkSortScore(a,dateStr)-hkSortScore(b,dateStr));
+  function hkBuildCard(room){
     const key=room.code+'_'+dateStr;
     const st=hkStatusData[key]||{};
     const done=!!st.done;
@@ -2013,29 +2045,33 @@ async function renderHk(){
     const outGuests=hkGuestCount(co);
     const inGuests=hkGuestCount(nextRes);
     const beddingAlert=nextRes?hkBeddingAlert(room.code,inGuests):null;
-    const coTime=st.checkOutTime||co?.checkoutTime||'12:00';
+    const coTime=st.checkOutTime||co?.checkoutTime||hkSettings.defaultCheckOut||'12:00';
     const ciTime=st.checkInTime||formatGuestArrival(form,nextRes);
-    const guestSetTime=!!(form?.expectedCheckInWindow||form?.expectedCheckInTime);
     const nextSameDay=nextRes&&nextRes.checkin===dateStr;
     const nextTomorrow=nextRes&&nextRes.checkin===tomorrowStr;
     const priority=hkGetPriority(room.code,dateStr);
     const priorityCls={red:'hk-priority-red',yellow:'hk-priority-yellow',green:'hk-priority-green'}[priority];
     const inBoxCls=nextSameDay?' tb-urgent':nextTomorrow?' tb-yellow':'';
     const whenLabel=nextRes?(nextSameDay?'Today':nextTomorrow?'Tomorrow':nextRes.checkin):'';
-    const schedule=nextRes?hkScheduleHint(room.code,coTime,ciTime,form):null;
-    html+=`<div class="hk-card ${priorityCls}${done?' done':''}">
+    return`<div class="hk-card ${priorityCls}${done?' done':''}">
       <div class="hk-card__top"><div><div class="hk-card__room">${esc(room.code)}</div><div class="hk-card__name">${esc(room.name)}</div></div>
       <span class="pill ${done?'pill-ok':'pill-await'}">${done?'Done':'Pending'}</span></div>
       <div class="hk-card__times">
         <div class="hk-card__time"><b>Checkout</b>${esc(coTime)}<div class="hk-card__count">${outGuests>0?`👥 ${outGuests} leaving`:'👥 —'}</div></div>
-        <div class="hk-card__time${inBoxCls}"><b>Check-in</b>${nextRes?`<div class="hk-card__when">${esc(whenLabel)}</div>${esc(ciTime)}${guestSetTime?'<span style="display:block;font-size:10px;color:var(--green);margin-top:2px;font-weight:700">Guest arrival time</span>':''}<div class="hk-card__count">${inGuests>0?`👥 ${inGuests} arriving`:'No booking'}</div>`:'<div class="hk-card__count">No booking</div>'}</div>
+        <div class="hk-card__time${inBoxCls}"><b>Check-in</b>${nextRes?`<div class="hk-card__when">${esc(whenLabel)}</div>${esc(ciTime)}<div class="hk-card__count">${inGuests>0?`👥 ${inGuests} arriving`:'No booking'}</div>`:'<div class="hk-card__count">No booking</div>'}</div>
       </div>
-      ${schedule?`<div class="hk-schedule${schedule.tight?' tight':''}">${esc(schedule.text)}</div>`:''}
       ${guestCheckedOut?'<div class="hk-guest-out">✓ Guest checked out</div>':''}
       ${beddingAlert?`<div class="hk-bedding-alert">${esc(beddingAlert)}</div>`:''}
       <div class="hk-card__foot"><span style="font-size:12px;color:var(--muted)">${co?.guest?esc(_stripRoomNum(co.guest)):'—'}</span>
       <button type="button" class="hk-done${done?' undo':''}" onclick="toggleHkDone('${esc(room.code)}','${dateStr}')">${done?'Undo':'✓ Done'}</button></div>
     </div>`;
+  }
+  let html='';
+  HK_SITES.forEach(site=>{
+    const siteRooms=rooms.filter(r=>hkSiteId(r.code)===site.id);
+    if(!siteRooms.length)return;
+    html+=`<div class="hk-site-hd">${esc(site.title)}</div>`;
+    siteRooms.forEach(room=>{html+=hkBuildCard(room);});
   });
   listEl.innerHTML=html;
 }
