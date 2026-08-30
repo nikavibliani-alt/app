@@ -1,0 +1,42 @@
+'use strict';
+/**
+ * HK bedding / extra sheets rules — canonical copy for admin sandbox + HK apps.
+ *
+ * Thresholds (guest count that triggers alert):
+ *   0-*           — 4th guest  (sofa bed sheets)
+ *   6-1,6-2,6-4,7-1,7-2,7-4 — after 4th (= 5+ guests)
+ *   6-3           — after 8th (= 9+ guests)
+ *   orb-*, tab-*  — 3rd guest (Orbeliani / Tabidze studios)
+ */
+
+export const HK_GUEST_ICON =
+  '<svg class="hk-icon hk-icon--guest" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="3"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>';
+
+export const HK_SHEET_ICON =
+  '<svg class="hk-icon hk-icon--sheet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7v11a2 2 0 002 2h14a2 2 0 002-2V7"/><path d="M3 7h18V5a2 2 0 00-2-2H5a2 2 0 00-2 2v2z"/><path d="M7 11h10"/></svg>';
+
+/** @returns {{text:string, kind:'sofa'|'sheets'}|null} */
+export function hkBeddingAlert(roomCode, guests) {
+  const n = Number(guests) || 0;
+  if (n < 1) return null;
+  const c = String(roomCode || '').toLowerCase();
+
+  if (/^0-/.test(c)) {
+    return n >= 4 ? { kind: 'sofa', text: 'Extra sofa bed sheets needed' } : null;
+  }
+  if (['6-1', '6-2', '6-4', '7-1', '7-2', '7-4'].includes(c)) {
+    return n >= 5 ? { kind: 'sheets', text: 'Extra sheets needed' } : null;
+  }
+  if (c === '6-3') {
+    return n >= 9 ? { kind: 'sheets', text: 'Extra sheets needed' } : null;
+  }
+  if (/^(orb|tab)-/.test(c)) {
+    return n >= 3 ? { kind: 'sheets', text: 'Extra sheets needed' } : null;
+  }
+  return null;
+}
+
+export function hkGuestCountLabel(count, verb) {
+  if (count > 0) return `${count} ${verb}`;
+  return '';
+}
