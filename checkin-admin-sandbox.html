@@ -211,8 +211,26 @@ html.admin-authed #app{display:block;}
 .day-chip__label{display:block;font-size:12px;font-weight:700;line-height:1.2;}
 .day-chip__date{display:block;font-size:10px;font-weight:600;color:var(--muted);margin-top:2px;}
 .day-chip__n{display:block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);margin-top:4px;}
-.apt-group{margin-bottom:16px;}
-.apt-group__title{font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--ink-2);padding:4px 2px 8px;}
+.apt-group{margin-bottom:12px;}
+.apt-group__hd{display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;margin-bottom:6px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);cursor:pointer;font-family:var(--sans);text-align:left;-webkit-tap-highlight-color:transparent;}
+.apt-group__hd:active{background:var(--bg);}
+.apt-group__toggle{width:28px;height:28px;border:1px solid var(--line);border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--ink-2);}
+.apt-group__toggle svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.2;}
+.apt-group__title{flex:1;font-size:13px;font-weight:600;letter-spacing:.01em;color:var(--ink);min-width:0;}
+.apt-group__count{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--muted);flex-shrink:0;}
+.apt-group.collapsed .apt-group__rooms{display:none;}
+.apt-group.collapsed .apt-group__toggle svg{transform:rotate(-90deg);}
+.apt-fold{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:12px;overflow:hidden;}
+.apt-fold__hd{display:flex;align-items:center;gap:8px;width:100%;padding:12px 14px;border:none;background:transparent;cursor:pointer;font-family:var(--sans);text-align:left;-webkit-tap-highlight-color:transparent;}
+.apt-fold__hd:active{background:var(--bg);}
+.apt-fold__title{flex:1;font-size:13px;font-weight:700;color:var(--ink);}
+.apt-fold__hint{font-size:11px;color:var(--muted);font-weight:500;}
+.apt-fold__chev{width:20px;height:20px;flex-shrink:0;color:var(--muted);transition:transform .15s ease;}
+.apt-fold__chev svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2.2;}
+.apt-fold.collapsed .apt-fold__bd{display:none;}
+.apt-fold.collapsed .apt-fold__chev{transform:rotate(-90deg);}
+.apt-fold__bd{padding:0 14px 14px;border-top:1px solid var(--line);}
+.apt-hint{font-size:11px;color:var(--muted);margin:-4px 0 8px;line-height:1.4;}
 .apt-sync-note{font-size:12px;color:var(--muted);background:var(--blue-bg);border:1px solid #c7d9ef;border-radius:var(--r);padding:10px 12px;margin-bottom:12px;line-height:1.45;}
 .apt-toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .apt-toolbar .btn{flex:none;min-height:40px;padding:0 14px;font-size:13px;}
@@ -373,8 +391,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830r';
-  if(!/[?&]build=20260830r(?:&|$)/.test(location.search)){
+  var BUILD='20260830s';
+  if(!/[?&]build=20260830s(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -697,6 +715,19 @@ let roomsData={};
 let roomsSeeding=false;
 let _showAddRoomForm=false;
 let _showHiddenRooms=false;
+const _APT_COLLAPSED_KEY='maxela_apt_collapsed';
+function getCollapsedAptGroups(){
+  try{return new Set(JSON.parse(localStorage.getItem(_APT_COLLAPSED_KEY)||'[]'));}catch(e){return new Set();}
+}
+window.toggleAptGroup=function(groupName){
+  const collapsed=getCollapsedAptGroups();
+  if(collapsed.has(groupName))collapsed.delete(groupName);else collapsed.add(groupName);
+  try{localStorage.setItem(_APT_COLLAPSED_KEY,JSON.stringify([...collapsed]));}catch(e){}
+  renderAptsList();
+};
+window.toggleAptFold=function(foldId){
+  document.getElementById(foldId)?.classList.toggle('collapsed');
+};
 
 function roomsSorted(activeOnly=true){
   return Object.values(roomsData)
@@ -2481,10 +2512,17 @@ window.deleteCompleted=async function(){
 };
 
 /* ── Apartments (room registry + content editor) ── */
-function roomGroupOptions(selected){
-  const groups=[...new Set(roomsSorted(true).map(r=>r.group).filter(Boolean))];
-  DEFAULT_ROOMS_SEED.forEach(r=>{if(r.group&&!groups.includes(r.group))groups.push(r.group);});
-  return groups.map(g=>`<option value="${esc(g)}"${g===(selected||'')?' selected':''}>${esc(g)}</option>`).join('');
+function roomGroupList(selected){
+  const groups=[...new Set([
+    ...DEFAULT_ROOMS_SEED.map(r=>r.group),
+    ...roomsSorted(true).map(r=>r.group),
+  ].filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const sel=selected||'';
+  if(sel&&!groups.includes(sel))groups.unshift(sel);
+  return groups;
+}
+function roomGroupSelectHtml(selectId,selected){
+  return `<select class="apt-input" id="${selectId}">${roomGroupList(selected).map(g=>`<option value="${esc(g)}"${g===(selected||'')?' selected':''}>${esc(g)}</option>`).join('')}</select>`;
 }
 window.toggleAddRoomForm=function(){
   _showAddRoomForm=!_showAddRoomForm;
@@ -2505,14 +2543,16 @@ function renderAddRoomForm(){
     <input class="apt-input" id="new-room-code" placeholder="6-1" autocapitalize="off" autocomplete="off">
     <label class="apt-label">Display name</label>
     <input class="apt-input" id="new-room-name" placeholder="Apartment 6-1">
-    <label class="apt-label">Short code</label>
+    <label class="apt-label">Short label</label>
+    <p class="apt-hint">Compact code on the apartments list (usually same as room code).</p>
     <input class="apt-input" id="new-room-display" placeholder="6-1">
-    <label class="apt-label">Group</label>
-    <input class="apt-input" id="new-room-group" list="room-group-list" placeholder="Shartava — 6- Apartments">
-    <datalist id="room-group-list">${roomGroupOptions()}</datalist>
+    <label class="apt-label">List section</label>
+    <p class="apt-hint">Which group heading this room appears under on the Apartments page.</p>
+    ${roomGroupSelectHtml('new-room-group','Shartava — 6- Apartments')}
     <label class="apt-label">Site</label>
     <select class="apt-input" id="new-room-site">${ROOM_SITES.map(s=>`<option value="${s.id}">${esc(s.label)}</option>`).join('')}</select>
     <label class="apt-label">MiniHotel names</label>
+    <p class="apt-hint">How this room is named in MiniHotel for reservation sync (comma-separated). Leave blank if unsure.</p>
     <input class="apt-input" id="new-room-mh" placeholder="M-6-1">
     <label class="apt-label" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="new-room-hk" checked> Show on HK board</label>
     <div style="display:flex;gap:8px;margin-top:12px">
@@ -2609,10 +2649,19 @@ function renderAptsList(){
     seen.get(a.group).push(a);
   }
   const globalList=roomsSorted(true);
+  const collapsed=getCollapsedAptGroups();
   let html='';
   for(const g of groups){
-    html+=`<div class="apt-group"><div class="apt-group__title">${esc(g)}</div>`;
-    for(const a of seen.get(g)){
+    const rooms=seen.get(g);
+    const isCollapsed=collapsed.has(g);
+    html+=`<div class="apt-group${isCollapsed?' collapsed':''}">
+      <button type="button" class="apt-group__hd" data-group="${esc(g)}" onclick="toggleAptGroup(this.dataset.group)">
+        <span class="apt-group__toggle" aria-hidden="true">${isCollapsed?featherIcon('plus',16,2.2):featherIcon('minus',16,2.2)}</span>
+        <span class="apt-group__title">${esc(g)}</span>
+        <span class="apt-group__count">${rooms.length}</span>
+      </button>
+      <div class="apt-group__rooms">`;
+    for(const a of rooms){
       const idx=globalList.findIndex(r=>r.roomCode===a.id);
       const d=aptData[a.id]||{};
       const ok=!!(d.tuyaDeviceId||d.doorCode);
@@ -2631,7 +2680,7 @@ function renderAptsList(){
         <button type="button" class="apt-pill-hide" onclick="hideRoom('${esc(a.id)}')" title="Hide room">Hide</button>
       </div>`;
     }
-    html+='</div>';
+    html+='</div></div>';
   }
   listEl.innerHTML=html||'<div class="empty">No active rooms — add one above</div>';
   if(inactiveEl){
@@ -2687,25 +2736,6 @@ window.openAptEditor=function(aptId){
 
   document.getElementById('apt-ed-body').innerHTML=`
     <div class="apt-card">
-      <div class="apt-card-hd">Room settings · <span style="font-family:var(--mono);font-size:12px">${esc(aptId)}</span></div>
-      <div class="apt-card-bd">
-        <p style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.45">Room code cannot change — reservations link to it. Hide a room from the list instead of deleting.</p>
-        <label class="apt-label">Display name</label>
-        <input class="apt-input" id="room-meta-name" value="${esc(meta.displayName||apt.name)}">
-        <label class="apt-label">Short code (pill label)</label>
-        <input class="apt-input" id="room-meta-code" value="${esc(meta.displayCode||apt.code)}">
-        <label class="apt-label">Group</label>
-        <input class="apt-input" id="room-meta-group" list="room-group-list-ed" value="${esc(meta.group||apt.group||'')}">
-        <datalist id="room-group-list-ed">${roomGroupOptions(meta.group)}</datalist>
-        <label class="apt-label">Site</label>
-        <select class="apt-input" id="room-meta-site">${ROOM_SITES.map(s=>`<option value="${s.id}"${(meta.site||'shartava')===s.id?' selected':''}>${esc(s.label)}</option>`).join('')}</select>
-        <label class="apt-label">MiniHotel room names</label>
-        <input class="apt-input" id="room-meta-mh" value="${esc(mhNames)}" placeholder="M-6-1, …">
-        <label class="apt-label" style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="room-meta-hk" ${meta.showInHk!==false?'checked':''}> Show on HK board</label>
-        <button type="button" class="btn" style="width:100%;margin-top:10px" onclick="saveRoomMeta('${esc(aptId)}')">Save room settings</button>
-      </div>
-    </div>
-    <div class="apt-card">
       <div class="apt-card-hd">Smart lock · ${d.tuyaDeviceId?'Tuya':d.doorCode?'Manual':'Not set'}</div>
       <div class="apt-card-bd">
         <div class="apt-mode-group">
@@ -2723,13 +2753,6 @@ window.openAptEditor=function(aptId){
       </div>
     </div>
     <div class="apt-card">
-      <div class="apt-card-hd">Timing</div>
-      <div class="apt-card-bd"><div class="apt-row">
-        <div><label class="apt-label">Check-in</label><input class="apt-input" type="time" id="apt-checkInTime" value="${esc(d.checkInTime||'15:00')}"></div>
-        <div><label class="apt-label">Check-out</label><input class="apt-input" type="time" id="apt-checkOutTime" value="${esc(d.checkOutTime||'12:00')}"></div>
-      </div></div>
-    </div>
-    <div class="apt-card">
       <div class="apt-card-hd">WiFi</div>
       <div class="apt-card-bd">
         <label class="apt-label">Network</label>
@@ -2737,6 +2760,13 @@ window.openAptEditor=function(aptId){
         <label class="apt-label">Password</label>
         <input class="apt-input" id="apt-wifiPass" value="${esc(d.wifiPass||'')}">
       </div>
+    </div>
+    <div class="apt-card">
+      <div class="apt-card-hd">Timing</div>
+      <div class="apt-card-bd"><div class="apt-row">
+        <div><label class="apt-label">Check-in</label><input class="apt-input" type="time" id="apt-checkInTime" value="${esc(d.checkInTime||'15:00')}"></div>
+        <div><label class="apt-label">Check-out</label><input class="apt-input" type="time" id="apt-checkOutTime" value="${esc(d.checkOutTime||'12:00')}"></div>
+      </div></div>
     </div>
     <div class="apt-card">
       <div class="apt-card-hd">Check-in instructions · ${photos.length} photos</div>
@@ -2756,6 +2786,32 @@ window.openAptEditor=function(aptId){
       <div class="apt-card-bd">
         <button class="btn" style="width:100%" onclick="navigator.clipboard.writeText('https://app.maxelaapartments.com/checkin-guest-v2.html?apt=${encodeURIComponent(aptId)}').then(()=>toast('Link copied'))">Copy check-in URL</button>
         <button class="btn" style="width:100%;margin-top:8px" onclick="window.open('checkin-guest-sandbox-2.html?preview=true&apt=${encodeURIComponent(aptId)}','_blank')">Preview guest view</button>
+      </div>
+    </div>
+    <div class="apt-fold collapsed" id="apt-fold-registry">
+      <button type="button" class="apt-fold__hd" onclick="toggleAptFold('apt-fold-registry')">
+        <span class="apt-fold__title">Room registry</span>
+        <span class="apt-fold__hint">Rarely changed</span>
+        <span class="apt-fold__chev">${featherIcon('chevron-down',20,2.2)}</span>
+      </button>
+      <div class="apt-fold__bd">
+        <p class="apt-hint" style="margin-top:12px">Room code <strong style="font-family:var(--mono)">${esc(aptId)}</strong> is fixed — reservations link to it. Use Hide on the list instead of deleting.</p>
+        <label class="apt-label">Guest-facing name</label>
+        <p class="apt-hint">Full name on lists and HK, e.g. Small Room 1 or Apartment 6-1.</p>
+        <input class="apt-input" id="room-meta-name" value="${esc(meta.displayName||apt.name)}">
+        <label class="apt-label">Short label</label>
+        <p class="apt-hint">Compact code on the apartments pill (0-1, 6-2, Orb 1).</p>
+        <input class="apt-input" id="room-meta-code" value="${esc(meta.displayCode||apt.code)}">
+        <label class="apt-label">List section</label>
+        <p class="apt-hint">Which collapsible group this room sits under on the Apartments page.</p>
+        ${roomGroupSelectHtml('room-meta-group',meta.group||apt.group||'Other')}
+        <label class="apt-label">Site</label>
+        <select class="apt-input" id="room-meta-site">${ROOM_SITES.map(s=>`<option value="${s.id}"${(meta.site||'shartava')===s.id?' selected':''}>${esc(s.label)}</option>`).join('')}</select>
+        <label class="apt-label">MiniHotel room names</label>
+        <p class="apt-hint">Names in MiniHotel PMS for reservation matching. Comma-separated — only edit if sync is wrong.</p>
+        <input class="apt-input" id="room-meta-mh" value="${esc(mhNames)}" placeholder="M-6-1, …">
+        <label class="apt-label" style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="room-meta-hk" ${meta.showInHk!==false?'checked':''}> Show on HK board</label>
+        <button type="button" class="btn" style="width:100%;margin-top:10px" onclick="saveRoomMeta('${esc(aptId)}')">Save room registry</button>
       </div>
     </div>
   `;
