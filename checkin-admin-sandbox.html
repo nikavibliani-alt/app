@@ -2532,7 +2532,7 @@ function hkStoredRole(){
   return localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role')||'';
 }
 function isHkAdmin(){
-  return hkStoredRole()==='admin'||!!document.getElementById('app')?.offsetParent;
+  return true;
 }
 function updateHkCleanerBadge(){
   const el=document.getElementById('hk-role-badge');
