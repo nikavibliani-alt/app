@@ -65,7 +65,7 @@ html.admin-authed #app{display:block;}
 .btn{flex:1;min-height:48px;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-family:var(--sans);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;}
 .btn:disabled{opacity:.35;cursor:not-allowed;}
 .btn-primary{background:var(--ink);color:#fff;border-color:var(--ink);}
-.btn-green{background:var(--green);color:#fff;border-color:var(--green);}
+.btn-green{background:var(--ink);color:#fff;border-color:var(--ink);}
 .empty{text-align:center;padding:40px 16px;color:var(--muted);font-size:14px;}
 .hk-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;}
 .hk-card.done{opacity:.65}
@@ -112,7 +112,7 @@ html.admin-authed #app{display:block;}
 .hk-logout-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;pointer-events:none;}
 .hk-logout-btn:active{background:var(--bg);}
 .hk-card__foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.hk-done{height:34px;padding:0 14px;border:none;border-radius:8px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;background:var(--green);color:#fff}
+.hk-done{height:34px;padding:0 14px;border:none;border-radius:8px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;background:var(--ink);color:#fff}
 .hk-done.undo{background:var(--line);color:var(--muted)}
 .pill{display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;}
 .pill-pending{background:var(--amber-bg);color:var(--amber);}
@@ -325,18 +325,18 @@ html.admin-authed #app{display:block;}
 .hk-admin-modal__actions .btn{flex:1;}
 .hk-move-days{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
 .hk-move-day{padding:8px 12px;border:1.5px solid var(--line);border-radius:999px;background:var(--bg);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);}
-.hk-move-day:active{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.hk-move-day:active{background:var(--bg);border-color:var(--ink);color:var(--ink);}
 .save-bar{position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(100%,480px);padding:10px 14px;background:var(--ink);color:#fff;display:none;align-items:center;justify-content:space-between;gap:10px;z-index:90;box-shadow:0 -4px 20px rgba(0,0,0,.12);}
 .save-bar.show{display:flex;}
 .save-bar button{min-height:40px;padding:0 16px;border-radius:var(--rs);font-weight:700;font-size:13px;cursor:pointer;border:none;font-family:var(--sans);}
 .save-bar .save-bar-discard{background:transparent;color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.3);}
-.save-bar .save-bar-commit{background:var(--green);color:#fff;}
+.save-bar .save-bar-commit{background:var(--ink);color:#fff;}
 #gp-editor-overlay{z-index:230;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830i';
-  if(!/[?&]build=20260830i(?:&|$)/.test(location.search)){
+  var BUILD='20260830j';
+  if(!/[?&]build=20260830j(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -414,7 +414,7 @@ html.admin-authed #app{display:block;}
   </div>
 
   <div class="pane" id="pane-apts">
-    <div class="apt-sync-note">MiniHotel sync updates <strong>reservations only</strong> (dates, guest names, room moves). Your room list, order, WiFi, and instructions stay exactly as you set them here.</div>
+    <div class="apt-sync-note">MiniHotel sync updates reservations only — your room list and apartment content stay as you set them here.</div>
     <div class="apt-toolbar">
       <button type="button" class="btn btn-primary" onclick="toggleAddRoomForm()">+ Add room</button>
       <button type="button" class="btn" onclick="toggleHiddenRooms()">Hidden rooms</button>
@@ -440,13 +440,13 @@ html.admin-authed #app{display:block;}
       <span class="hk-legend__item"><span class="hk-legend__dot hk-legend__dot--green"></span>Free 2+ days</span>
     </div>
     <div id="hk-list"></div>
-    <div id="hk-admin-modal" class="hk-admin-modal" hidden>
-      <div class="hk-admin-modal__sheet">
+    <div id="hk-admin-modal" class="hk-admin-modal" hidden onclick="if(event.target===this)window.hkCloseAdminModal()">
+      <div class="hk-admin-modal__sheet" onclick="event.stopPropagation()">
         <div class="hk-admin-modal__title" id="hk-admin-modal-title">HK schedule</div>
         <div id="hk-admin-modal-body"></div>
         <div class="hk-admin-modal__actions">
-          <button type="button" class="btn" onclick="hkCloseAdminModal()">Cancel</button>
-          <button type="button" class="btn btn-primary" id="hk-admin-modal-save" onclick="hkSaveAdminModal()">Save</button>
+          <button type="button" class="btn" onclick="window.hkCloseAdminModal()">Cancel</button>
+          <button type="button" class="btn btn-primary" id="hk-admin-modal-save" onclick="window.hkSaveAdminModal()">Save</button>
         </div>
       </div>
     </div>
@@ -465,7 +465,7 @@ html.admin-authed #app{display:block;}
   </div>
 
   <div class="pane" id="pane-navsettings">
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.45">Drag to reorder · arrows to nudge · tap <strong>Landing</strong> for the tab that opens first. <strong>More</strong> is always last.</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Drag to reorder · ↑↓ to nudge · tap <strong>Landing</strong> for first tab opened.</p>
     <div id="nav-preview" class="nav-cfg-preview"></div>
     <div id="nav-slots" class="nav-cfg-list"></div>
     <button type="button" class="btn" style="width:100%;margin-top:12px" id="nav-add-btn" onclick="addNavSlot()">+ Add tab</button>
@@ -476,22 +476,22 @@ html.admin-authed #app{display:block;}
   <div class="pane" id="pane-more">
     <div class="more-section">Operations</div>
     <div class="more-list">
-      <button class="more-item" type="button" onclick="switchTab('hk')">Housekeeping<span class="more-hint">Daily task board · checkouts &amp; done</span></button>
-      <button class="more-item" type="button" onclick="switchTab('apts')">Apartments<span class="more-hint">Add · reorder · WiFi · instructions</span></button>
+      <button class="more-item" type="button" onclick="switchTab('hk')">Housekeeping</button>
+      <button class="more-item" type="button" onclick="switchTab('apts')">Apartments</button>
       <button class="more-item" type="button" onclick="switchTab('failures')" id="more-failures-btn">Failed searches<span class="more-badge" id="sf-more-badge" style="display:none">0</span></button>
     </div>
     <div class="more-section">Guest experience</div>
     <div class="more-list">
-      <button class="more-item" type="button" onclick="switchTab('guestsettings')">Guest page<span class="more-hint">Tiles, services, waiting tabs</span></button>
+      <button class="more-item" type="button" onclick="switchTab('guestsettings')">Guest page</button>
     </div>
     <div class="more-section">Housekeeping setup</div>
     <div class="more-list">
-      <button class="more-item" type="button" onclick="switchTab('hksettings')">HK settings<span class="more-hint">Staff PINs · cleaner apps · defaults</span></button>
+      <button class="more-item" type="button" onclick="switchTab('hksettings')">HK settings</button>
     </div>
     <div class="more-section">App</div>
     <div class="more-list">
-      <button class="more-item" type="button" onclick="switchTab('navsettings')">Tab bar layout<span class="more-hint">Add tabs · reorder · landing page</span></button>
-      <a class="more-item" href="admin-search-test.html" target="_blank" rel="noopener">Search debugger<span class="more-hint">Open</span></a>
+      <button class="more-item" type="button" onclick="switchTab('navsettings')">Tab bar layout</button>
+      <a class="more-item" href="admin-search-test.html" target="_blank" rel="noopener">Search debugger</a>
       <button class="more-item" type="button" onclick="adminSignOut()">Sign out</button>
     </div>
   </div>
@@ -591,7 +591,7 @@ window.adminUnlock=function(){
 window.adminSignOut=function(){localStorage.removeItem(_ADMIN_KEY);location.reload();};
 
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit,runTransaction}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour}from"./shared/guest-unlock.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
@@ -1233,12 +1233,11 @@ function renderGuestSettings(){
     <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px">Guest preview</div>
     <div class="gp-preview">${preview}</div>
     <div class="section-hd" style="margin-top:8px"><h2>Waiting phase tabs</h2></div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Before check-in unlocks. Location on by default; Shuttle &amp; Tours off.</p>
     ${[{id:'location',label:'Location'},{id:'shuttle',label:'Shuttle service'},{id:'tours',label:'Tours'}].map(t=>{
       const checked=t.id==='location'?gsWaitingTabs.location!==false:gsWaitingTabs[t.id]===true;
       return`<div class="gp-row">
       <div class="gp-row__icon">${gpIcon(t.id==='location'?'location':'tour')}</div>
-      <div class="gp-row__body"><div class="gp-row__title">${esc(t.label)}</div><div class="gp-row__sub">Waiting screen tab</div></div>
+      <div class="gp-row__body"><div class="gp-row__title">${esc(t.label)}</div></div>
       <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${checked?'checked':''} onchange="gsToggleWaitingTab('${t.id}',this.checked)"><span class="switch-track"></span></label>
     </div>`;}).join('')}
     <div class="section-hd" style="margin-top:8px"><h2>Home tiles</h2></div>
@@ -1269,7 +1268,7 @@ window.openGpEditor=function(ctx){
   const title=document.getElementById('gp-ed-title');
   if(ctx==='laundry'){
     title.textContent='Laundry prices';
-    body.innerHTML=`<p style="font-size:12px;color:var(--muted);margin-bottom:12px">2nd+ items auto-discount to 40% on guest form.</p>
+    body.innerHTML=`
       ${gsLaundry.map((item,i)=>`<div class="apt-row" style="margin-bottom:8px;align-items:center">
         <input class="apt-input" value="${esc(item.name)}" oninput="gsLaundry[${i}].name=this.value;gsMarkDirty()" style="margin:0">
         <input class="apt-input" type="number" value="${item.price}" oninput="gsLaundry[${i}].price=parseFloat(this.value)||0;gsMarkDirty()" style="margin:0">
@@ -1304,14 +1303,12 @@ window.openGpEditor=function(ctx){
   }else if(ctx==='wifi'){
     title.textContent='WiFi defaults';
     body.innerHTML=`
-      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Fallback labels if apartment has no WiFi set. Per-room WiFi still comes from Apartments editor.</p>
-      <label class="apt-label">Network name hint</label><input class="apt-input" id="gp-wifi-name" value="${esc(gsSectionLabels.wifi_name||'')}" placeholder="Maxela_Guest">
-      <label class="apt-label">Password hint</label><input class="apt-input" id="gp-wifi-pass" value="${esc(gsSectionLabels.wifi_pass||'')}">`;
+      <label class="apt-label">Network name</label><input class="apt-input" id="gp-wifi-name" value="${esc(gsSectionLabels.wifi_name||'')}" placeholder="Maxela_Guest">
+      <label class="apt-label">Password</label><input class="apt-input" id="gp-wifi-pass" value="${esc(gsSectionLabels.wifi_pass||'')}">`;
   }else if(['recs','rules','contact'].includes(ctx)){
     const labels={recs:'Recommendations',rules:'House rules',contact:'Contact'};
     title.textContent=labels[ctx];
-    body.innerHTML=`<label class="apt-label">Page content</label><textarea class="apt-textarea" id="gp-text-content" style="min-height:220px">${esc(gsSectionLabels[ctx]||'')}</textarea>
-      <p style="font-size:12px;color:var(--muted);margin-top:8px">Line breaks are preserved for guests.</p>`;
+    body.innerHTML=`<label class="apt-label">Page content</label><textarea class="apt-textarea" id="gp-text-content" style="min-height:220px">${esc(gsSectionLabels[ctx]||'')}</textarea>`;
   }else{
     const svc=gsServices.find(s=>s.id===ctx)||{};
     title.textContent=svc.name||ctx;
@@ -1441,37 +1438,32 @@ function renderHkSettings(){
   const abash=getHkRooms().filter(r=>hkSiteId(r.code)==='abashidze');
   const detailBlock=_hkCleanDetailOpen?`
     <div class="hk-clean-detail">
-      <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.45">Override a single room only when it differs from the type default above. Matching the type default clears the override.</p>
       ${siteBlock('Shartava · per room',shartava)}
       ${siteBlock('City Centre · per room',centre)}
       ${vgl.length?siteBlock('VGL · per room',vgl):''}
       ${abash.length?siteBlock('Abashidze · per room',abash):''}
     </div>`:'';
   wrap.innerHTML=`
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Task board: <strong>More → Housekeeping</strong>. List order is calculated automatically — staff only see the sorted list.</p>
-    <div class="more-section" style="margin-top:0">Cleaner apps (staff)</div>
+    <div class="more-section" style="margin-top:0">Cleaner apps</div>
     <div class="more-list" style="margin-bottom:16px">
-      <a class="more-item" href="HK-Shartava.html" target="_blank" rel="noopener">Shartava HK<span class="more-hint">6-, 7-, 0- rooms</span></a>
-      <a class="more-item" href="HK-Centre.html" target="_blank" rel="noopener">Centre HK<span class="more-hint">Orb &amp; Tab</span></a>
+      <a class="more-item" href="HK-Shartava.html" target="_blank" rel="noopener">Shartava HK</a>
+      <a class="more-item" href="HK-Centre.html" target="_blank" rel="noopener">Centre HK</a>
     </div>
     <div class="section-hd"><h2>Standard times</h2></div>
     <div class="card">
       <div class="field"><label>Checkout time</label>
         <input id="hk-default-checkout" type="time" value="${esc(hkSettings.defaultCheckOut||'12:00')}" style="width:100%;height:44px;padding:0 12px;border:1.5px solid var(--line);border-radius:var(--r);font-size:16px;background:var(--surface);">
       </div>
-      <div class="field"><label>Check-in from (guest access)</label>
+      <div class="field"><label>Check-in from</label>
         <input id="hk-default-checkin" type="time" value="${esc(hkSettings.defaultCheckIn||'15:00')}" style="width:100%;height:44px;padding:0 12px;border:1.5px solid var(--line);border-radius:var(--r);font-size:16px;background:var(--surface);">
       </div>
-      <p style="font-size:12px;color:var(--muted);line-height:1.45;margin-top:8px">Used when guest did not pick an arrival time. Guest check-in unlocks from 15:00 unless they chose earlier in the form.</p>
     </div>
     <div class="section-hd" style="margin-top:12px"><h2>Cleaning duration</h2></div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.45">One setting per apartment type. All matching rooms use the same minutes unless you add a per-room override below.</p>
     <div class="hk-clean-grid">${typeRows}</div>
     <button type="button" class="btn hk-clean-expand" onclick="_hkCleanDetailOpen=!_hkCleanDetailOpen;renderHkSettings()">${_hkCleanDetailOpen?'Hide per-room overrides':'Per-room overrides…'}</button>
     ${detailBlock}
     <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveHkSettings()">Save HK settings</button>
-    <div class="more-section" style="margin-top:16px">Staff login PINs</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">4-digit codes for legacy HK apps.</p>
+    <div class="more-section" style="margin-top:16px">Staff PINs</div>
     <div id="hkpins-list"></div>`;
   renderHkPins();
 }
@@ -1882,30 +1874,143 @@ window.unlockGuest=async function(guestId){
 function roomOptionsHtml(selected){
   return getRoomOrder().map(r=>`<option value="${esc(r)}"${r===(selected||'')?' selected':''}>${esc(r)}</option>`).join('');
 }
+function datesOverlap(aIn,aOut,bIn,bOut){
+  if(!aIn||!aOut||!bIn||!bOut)return false;
+  return aIn<bOut&&bIn<aOut;
+}
+function resolveReservation(matchedId){
+  if(!matchedId)return null;
+  return(_resCache||[]).find(r=>r.id===matchedId||r.reservationNumber===matchedId)||null;
+}
+function resDocId(res){return res?.id||null;}(fromResId,toRoom,checkin,checkout){
+  for(const r of (_resCache||[])){
+    if((r.status||'').toUpperCase()==='CANCELLED')continue;
+    if(r.roomCode!==toRoom)continue;
+    if(r.id===fromResId||r.reservationNumber===fromResId)continue;
+    const ci=r.checkin||r.checkIn||'';
+    const co=r.checkout||r.checkOut||'';
+    if(datesOverlap(checkin,checkout,ci,co))return r;
+  }
+  return null;
+}
+function guestsForReservation(res){
+  if(!res)return[];
+  const id=res.id,num=res.reservationNumber;
+  return guestData.filter(g=>!g.companionGuest&&(g.matchedReservationId===id||g.matchedReservationId===num));
+}
+async function swapGuestsLocal(resA,resB){
+  const idA=resA.id,idB=resB.id;
+  const roomA=resA.roomCode||'',roomB=resB.roomCode||'';
+  const guestsA=guestsForReservation(resA);
+  const guestsB=guestsForReservation(resB);
+  await runTransaction(db,async tx=>{
+    tx.update(doc(db,'reservations',idA),{roomCode:roomB,allRooms:roomB,manualRoom:true,updatedAt:serverTimestamp()});
+    tx.update(doc(db,'reservations',idB),{roomCode:roomA,allRooms:roomA,manualRoom:true,updatedAt:serverTimestamp()});
+    for(const g of guestsA)tx.update(doc(db,'checkin_guests',g.id),{aptId:roomB,updatedAt:serverTimestamp()});
+    for(const g of guestsB)tx.update(doc(db,'checkin_guests',g.id),{aptId:roomA,updatedAt:serverTimestamp()});
+  });
+  const idxA=_resCache.findIndex(r=>r.id===idA);
+  const idxB=_resCache.findIndex(r=>r.id===idB);
+  if(idxA>=0)_resCache[idxA]={..._resCache[idxA],roomCode:roomB,allRooms:roomB,manualRoom:true};
+  if(idxB>=0)_resCache[idxB]={..._resCache[idxB],roomCode:roomA,allRooms:roomA,manualRoom:true};
+  for(const g of guestsA){g.aptId=roomB;}
+  for(const g of guestsB){g.aptId=roomA;}
+}
+async function swapGuestsPipeline(resIdA,resIdB){
+  return pipelineAdmin({
+    password:_ADMIN_PWD,
+    actionType:'swap_guests',
+    payload:{reservationId:resIdA,otherReservationId:resIdB},
+    actor:'admin-sandbox',
+  });
+}
+async function moveGuestLocal(g,res,newRoom){
+  await setDoc(doc(db,'checkin_guests',g.id),{aptId:newRoom,updatedAt:serverTimestamp()},{merge:true});
+  if(res?.id){
+    await updateDoc(doc(db,'reservations',res.id),{roomCode:newRoom,allRooms:newRoom,manualRoom:true,updatedAt:serverTimestamp()});
+    const idx=_resCache.findIndex(r=>r.id===res.id);
+    if(idx>=0)_resCache[idx]={..._resCache[idx],roomCode:newRoom,allRooms:newRoom,manualRoom:true};
+  }
+  g.aptId=newRoom;
+}
 
 window.moveGuestPipeline=async function(guestId){
   const newRoom=document.getElementById('detail-room-select')?.value;
   const g=guestData.find(x=>x.id===guestId);
   if(!g||!newRoom)return;
   if(newRoom===g.aptId){toast('Already in '+newRoom);return;}
-  const resId=g.matchedReservationId;
-  if(!resId){toast('No linked reservation — cannot move via pipeline');return;}
+  const res=resolveReservation(g.matchedReservationId);
+  if(!res?.id){toast('No linked reservation');return;}
+  const checkin=g.arrivalDate||res.checkin||'';
+  const checkout=g.checkoutDate||res.checkout||'';
+  const conflict=findRoomConflict(res.id,newRoom,checkin,checkout);
+  if(conflict){
+    const sameType=hkCleanTypeId(g.aptId)===hkCleanTypeId(newRoom);
+    if(!sameType){
+      toast('Room occupied — pick a free room or another '+hkCleanTypeId(g.aptId)+' room to swap');
+      return;
+    }
+    const conflictRes=resolveReservation(conflict.id||conflict.reservationNumber);
+    if(!conflictRes?.id){toast('Could not resolve other booking');return;}
+    try{
+      const r=await swapGuestsPipeline(res.id,conflictRes.id);
+      if(r.ok){
+        toast(`Swapped ${g.aptId} ↔ ${newRoom} ✓`);
+        openDetail(guestId);
+        return;
+      }
+    }catch(e){}
+    await swapGuestsLocal(res,conflictRes);
+    toast(`Swapped ${g.aptId} ↔ ${newRoom} ✓`);
+    openDetail(guestId);
+    return;
+  }
   try{
     const r=await pipelineAdmin({
       password:_ADMIN_PWD,
       actionType:'move_guest',
-      payload:{reservationId:resId,toRoom:newRoom},
+      payload:{reservationId:res.id,toRoom:newRoom},
       actor:'admin-sandbox',
     });
     if(!r.ok){
-      toast(r.errorCode==='CONFLICT'?'Room conflict — pick another room or swap':(r.message||'Move failed'));
+      if(r.errorCode==='CONFLICT'){
+        const c=r.data?.conflict;
+        const conflictRes=c?resolveReservation(c.reservationId||c.id):resolveReservation(findRoomConflict(res.id,newRoom,checkin,checkout)?.id);
+        if(conflictRes&&hkCleanTypeId(g.aptId)===hkCleanTypeId(newRoom)){
+          try{
+            let sr=await swapGuestsPipeline(res.id,conflictRes.id);
+            if(!sr.ok)await swapGuestsLocal(res,conflictRes);
+            toast(`Swapped ${g.aptId} ↔ ${newRoom} ✓`);
+            openDetail(guestId);
+            return;
+          }catch(swapErr){
+            await swapGuestsLocal(res,conflictRes);
+            toast(`Swapped ${g.aptId} ↔ ${newRoom} ✓`);
+            openDetail(guestId);
+            return;
+          }
+        }
+      }
+      if(/functions|internal|not-found/i.test(r.message||'')){
+        await moveGuestLocal(g,res,newRoom);
+        toast('Moved to '+newRoom+' ✓');
+        openDetail(guestId);
+        return;
+      }
+      toast(r.message||'Move failed');
       return;
     }
     toast('Moved to '+newRoom+' ✓');
     openDetail(guestId);
   }catch(e){
-    console.error('[moveGuestPipeline]',e);
-    toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Error: '+e.message);
+    try{
+      await moveGuestLocal(g,res,newRoom);
+      toast('Moved to '+newRoom+' ✓');
+      openDetail(guestId);
+    }catch(err){
+      console.error('[moveGuestPipeline]',err);
+      toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():('Error: '+(err.message||e.message)));
+    }
   }
 };
 
@@ -1926,7 +2031,7 @@ window.openDetail=function(guestId){
     <div class="passport-view" id="pp-view">
       ${passportUrl?`<img src="${esc(passportUrl)}" alt="Passport">`:'<p style="color:var(--muted);font-size:13px;margin-bottom:10px;">No passport uploaded.</p>'}
       <div class="card__actions" style="margin-top:10px">
-        <button class="btn btn-green" onclick="window.approvePassport('${g.id}')">Approve ID</button>
+        <button class="btn btn-primary" onclick="window.approvePassport('${g.id}')">Approve ID</button>
         <button class="btn" onclick="window.rejectPassport('${g.id}')">Reject</button>
       </div>
     </div>
@@ -1940,12 +2045,11 @@ window.openDetail=function(guestId){
       </div>
     </div>
     ${g.matchedReservationId?`<div style="margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs)">
-      <div style="font-size:12px;font-weight:700;margin-bottom:8px">Move room (pipeline)</div>
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px">Move room</div>
       <div style="display:flex;gap:8px;align-items:center">
         <select id="detail-room-select" class="lock-input" style="flex:1;height:44px;margin:0">${roomOptionsHtml(g.aptId)}</select>
         <button class="btn btn-primary" style="flex:none;min-height:44px;padding:0 14px" onclick="window.moveGuestPipeline('${g.id}')">Move</button>
       </div>
-      <p style="font-size:11px;color:var(--muted);margin-top:8px">AdminAction → RoomAssignment · guest link unchanged</p>
     </div>`:''}
     <p style="font-size:12px;color:var(--muted);margin-top:8px;">${esc(fmtDate(g.arrivalDate))} → ${esc(fmtDate(g.checkoutDate||door?.checkout||''))} · ${esc(g.contact||'no contact')}</p>
     ${g.matchedReservationId?`<p style="font-size:12px;color:var(--muted);">Booking ${esc(g.matchedReservationId)}</p>`:''}
@@ -2112,7 +2216,7 @@ window.openReqDetail=function(id){
   const wa=normalizeWaPhone(r.whatsappNumber||'');
   body+=`<div class="req-actions">
     ${wa?`<a class="btn" href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>`:''}
-    ${(r.status||'PENDING')!=='CONFIRMED'?`<button class="btn btn-green" onclick="setReqStatus('${id}','CONFIRMED')">Confirm</button>`:''}
+    ${(r.status||'PENDING')!=='CONFIRMED'?`<button class="btn btn-primary" onclick="setReqStatus('${id}','CONFIRMED')">Confirm</button>`:''}
     ${(r.status||'PENDING')!=='CANCELLED'?`<button class="btn" onclick="setReqStatus('${id}','CANCELLED')">Cancel</button>`:''}
   </div>
   <button class="btn" style="width:100%;margin-top:10px;color:var(--red)" onclick="deleteReq('${id}')">Delete request</button>`;
@@ -2176,21 +2280,19 @@ function renderAddRoomForm(){
   el.hidden=false;
   el.innerHTML=`
     <h3>Add room</h3>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.45">Room code is permanent — it links reservations from MiniHotel. Use lowercase with dashes (e.g. <code>6-1</code>, <code>orb-2</code>).</p>
     <label class="apt-label">Room code</label>
     <input class="apt-input" id="new-room-code" placeholder="6-1" autocapitalize="off" autocomplete="off">
     <label class="apt-label">Display name</label>
     <input class="apt-input" id="new-room-name" placeholder="Apartment 6-1">
-    <label class="apt-label">Short code (shown on pills)</label>
+    <label class="apt-label">Short code</label>
     <input class="apt-input" id="new-room-display" placeholder="6-1">
     <label class="apt-label">Group</label>
     <input class="apt-input" id="new-room-group" list="room-group-list" placeholder="Shartava — 6- Apartments">
     <datalist id="room-group-list">${roomGroupOptions()}</datalist>
     <label class="apt-label">Site</label>
     <select class="apt-input" id="new-room-site">${ROOM_SITES.map(s=>`<option value="${s.id}">${esc(s.label)}</option>`).join('')}</select>
-    <label class="apt-label">MiniHotel room names (comma-separated)</label>
+    <label class="apt-label">MiniHotel names</label>
     <input class="apt-input" id="new-room-mh" placeholder="M-6-1">
-    <p style="font-size:11px;color:var(--muted);margin:6px 0 10px">Sync uses these to match reservations. Built-in defaults still apply if left empty.</p>
     <label class="apt-label" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="new-room-hk" checked> Show on HK board</label>
     <div style="display:flex;gap:8px;margin-top:12px">
       <button type="button" class="btn btn-primary" style="flex:1" onclick="saveNewRoom()">Create room</button>
@@ -2795,6 +2897,7 @@ function hkCloseAdminModal(){
   const el=document.getElementById('hk-admin-modal');
   if(el)el.hidden=true;
 }
+window.hkCloseAdminModal=hkCloseAdminModal;
 window.hkOpenAddRoom=function(dateStr){
   const onDay=new Set(hkTaskRooms(dateStr).map(r=>r.code));
   const options=getHkRooms().filter(r=>!onDay.has(r.code));
@@ -2830,7 +2933,7 @@ window.hkOpenMoveRoom=function(roomCode,dateStr){
     if(ds===dateStr)continue;
     chips.push(`<button type="button" class="hk-move-day" onclick="hkMoveRoom('${esc(roomCode)}','${dateStr}','${ds}')">${esc(hkDayTabLabel(i,ds))}</button>`);
   }
-  document.getElementById('hk-admin-modal-body').innerHTML=`<p style="font-size:12px;color:var(--muted);margin-bottom:4px">Pick a day:</p><div class="hk-move-days">${chips.join('')}</div>`;
+  document.getElementById('hk-admin-modal-body').innerHTML=`<div class="hk-move-days">${chips.join('')}</div>`;
   document.getElementById('hk-admin-modal-save').style.display='none';
   document.getElementById('hk-admin-modal').hidden=false;
 };
