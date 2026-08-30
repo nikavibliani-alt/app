@@ -48,3 +48,9 @@ export function mountEmulatorBanner() {
 }
 
 export { DEFAULT_HOST, DEFAULT_PORT };
+
+/** Emulator uses export names; deployed uses `{codebase}-{exportName}`. */
+export function pipelineCallableName(exportName, codebaseId = 'pipeline') {
+  if (shouldUseFunctionsEmulator()) return exportName;
+  return `${codebaseId}-${exportName}`;
+}

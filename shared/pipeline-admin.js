@@ -1,18 +1,18 @@
 /**
  * Sandbox client for pipeline AdminAction callable.
- * Deployed function id: pipeline-adminAction (codebase "pipeline", region europe-west1).
- *
- * Used by checkin-admin-sandbox.html only — live admin not wired yet.
+ * Deployed: pipeline-adminAction · Emulator: adminAction (no codebase prefix).
  */
 
-const PIPELINE_CALLABLE = 'pipeline-adminAction';
+import { pipelineCallableName } from './pipeline-emulator.js';
+
+const PIPELINE_EXPORT = 'adminAction';
 
 /**
  * @param {import('firebase/functions').Functions} functions — from getFunctions(app, 'europe-west1')
  * @param {typeof import('firebase/functions').httpsCallable} httpsCallable
  */
 export function createPipelineAdminClient(functions, httpsCallable) {
-  const fn = httpsCallable(functions, PIPELINE_CALLABLE);
+  const fn = httpsCallable(functions, pipelineCallableName(PIPELINE_EXPORT));
 
   /**
    * @param {{password:string, actionType:string, payload:object, actor?:string}} req
@@ -29,4 +29,4 @@ export function createPipelineAdminClient(functions, httpsCallable) {
   };
 }
 
-export { PIPELINE_CALLABLE };
+export { PIPELINE_EXPORT as PIPELINE_CALLABLE };
