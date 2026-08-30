@@ -1,4 +1,7 @@
 
+# Root dev dependencies (lucide icon build)
+node_modules/
+
 # Firebase Cloud Functions — ignore all files except index.js (Tuya credentials in other files)
 tuya-functions/*
 !tuya-functions/index.js
