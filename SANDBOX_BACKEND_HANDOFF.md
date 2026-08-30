@@ -47,13 +47,18 @@ Shared unlock rules (browser + server): `shared/guest-unlock.js` ↔ `pipeline-f
 
 Expected unit tests: **49/49 pass** (elevator + room assignment + admin action + guest unlock + guest register).
 
+**CI:** GitHub Actions runs `npm test` + guest-unlock sync check on every PR that touches `pipeline-functions/` or `shared/guest-unlock.js`.
+
 ---
 
 ## 1. Unit tests
 
 ```bash
 cd pipeline-functions && npm install && npm test
+npm run check:unlock   # shared/guest-unlock.js ↔ server mirror
 ```
+
+If unlock sync fails: `node scripts/sync-guest-unlock.js` from repo root.
 
 ---
 
