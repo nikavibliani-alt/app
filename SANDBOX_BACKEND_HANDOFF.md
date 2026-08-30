@@ -123,6 +123,20 @@ firebase emulators:start --only functions:pipeline --project sleepy-5c962
 
 Emulator listens on **`127.0.0.1:5001`**. Emulator UI (optional): **`http://127.0.0.1:4000`**.
 
+**Port already in use?** An old emulator or dev server is still running. Free the ports, then retry:
+
+```bash
+lsof -i :4000 -i :5001 -i :8080
+kill $(lsof -t -i :4000) 2>/dev/null
+kill $(lsof -t -i :5001) 2>/dev/null
+```
+
+Or skip the UI entirely (callables still work on 5001):
+
+```bash
+npm run emulator:lite
+```
+
 You must be logged in to Firebase CLI with access to `sleepy-5c962` so Admin SDK in the emulator can reach Firestore:
 
 ```bash
