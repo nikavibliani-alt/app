@@ -10,9 +10,11 @@
 const TBILISI_TZ = 'Asia/Tbilisi';
 const DEFAULT_CHECK_IN_HOUR = 15;
 const HK_EARLY_HOUR = 11;
+const TBILISI_OFFSET_MS = 4 * 3600 * 1000;
 
+/** Tbilisi clock via fixed UTC+4 offset (no DST). Same approach as live admin HTML. */
 function tbilisiNow() {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: TBILISI_TZ }));
+  return new Date(Date.now() + TBILISI_OFFSET_MS);
 }
 
 function tbilisiToday() {
@@ -20,7 +22,23 @@ function tbilisiToday() {
 }
 
 function tbilisiHour() {
-  return tbilisiNow().getHours();
+  return tbilisiNow().getUTCHours();
+}
+
+/** Normalize Firestore Timestamp / ISO / YYYY-MM-DD to calendar date string. */
+function normalizeStayDate(v) {
+  if (v == null || v === '') return '';
+  if (typeof v === 'string') {
+    const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : '';
+  }
+  if (typeof v.toDate === 'function') {
+    return v.toDate().toISOString().slice(0, 10);
+  }
+  if (v.seconds != null) {
+    return new Date(v.seconds * 1000).toISOString().slice(0, 10);
+  }
+  return '';
 }
 
 /**
@@ -43,23 +61,18 @@ function computeGuestUnlock(opts = {}) {
   const hour = opts.hour != null ? opts.hour : tbilisiHour();
   const checkInHour = opts.checkInHour != null ? opts.checkInHour : DEFAULT_CHECK_IN_HOUR;
   const hkDone = opts.hkDone === true;
-  const arrival = opts.arrivalDate || guest.arrivalDate || '';
+  const arrival = normalizeStayDate(opts.arrivalDate || guest.arrivalDate || '');
 
-  // Admin manual unlock must work even when arrivalDate is missing on the doc.
-  if (!arrival) {
-    if (guest.manualUnlock === true) {
-      return { state: 'unlocked', unlocked: true, label: 'Unlocked', cls: 'unlocked', reason: 'manual_unlock' };
+  if (arrival) {
+    if (today > arrival) {
+      return { state: 'unlocked', unlocked: true, label: 'Checked in', cls: 'unlocked', reason: 'mid_stay' };
     }
-    return { state: 'locked', unlocked: false, label: 'Waiting', cls: 'waiting', reason: 'no_arrival' };
-  }
-  if (today > arrival) {
-    return { state: 'unlocked', unlocked: true, label: 'Checked in', cls: 'unlocked', reason: 'mid_stay' };
-  }
-  if (today < arrival) {
-    return { state: 'locked', unlocked: false, label: 'Arrives ' + arrival, cls: 'waiting', reason: 'before_arrival' };
+    if (today < arrival) {
+      return { state: 'locked', unlocked: false, label: 'Arrives ' + arrival, cls: 'waiting', reason: 'before_arrival' };
+    }
   }
 
-  // today === arrival
+  // Arrival day, or no arrivalDate — time / HK / manual rules (matches live admin HTML)
   if (guest.manualUnlock === true) {
     return { state: 'unlocked', unlocked: true, label: 'Unlocked', cls: 'unlocked', reason: 'manual_unlock' };
   }
@@ -71,6 +84,9 @@ function computeGuestUnlock(opts = {}) {
   }
   if (hkDone) {
     return { state: 'locked', unlocked: false, label: 'Ready 11am', cls: 'waiting', reason: 'hk_ready_wait_11' };
+  }
+  if (!arrival) {
+    return { state: 'locked', unlocked: false, label: 'Waiting', cls: 'waiting', reason: 'no_arrival' };
   }
   return { state: 'locked', unlocked: false, label: 'Waiting', cls: 'waiting', reason: 'awaiting_hk_or_hour' };
 }
@@ -88,6 +104,7 @@ if (typeof module !== 'undefined' && module.exports) {
     tbilisiNow,
     tbilisiToday,
     tbilisiHour,
+    normalizeStayDate,
     computeGuestUnlock,
     isGuestUnlocked,
   };
@@ -100,6 +117,7 @@ export {
   tbilisiNow,
   tbilisiToday,
   tbilisiHour,
+  normalizeStayDate,
   computeGuestUnlock,
   isGuestUnlocked,
 };

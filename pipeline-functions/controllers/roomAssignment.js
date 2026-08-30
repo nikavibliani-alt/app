@@ -237,6 +237,7 @@ async function moveRoom(ctx, reservationId, toRoomCode, actor, expectedVersion, 
 
   const nowIso = ctx.nowIso();
   const versionMeta = bumpRoomVersion(current.data, actor, nowIso);
+  const guestIds = await ctx.listGuestIdsForReservation(reservationId);
 
   try {
     await ctx.runTransaction(async (tx) => {
@@ -319,7 +320,7 @@ async function moveRoom(ctx, reservationId, toRoomCode, actor, expectedVersion, 
     ok: true,
     errorCode: 'MOVED',
     message: 'Room move succeeded',
-    data: { reservationId, fromRoom, toRoom: toRoomCode, roomVersion: versionMeta.roomVersion },
+    data: { reservationId, fromRoom, toRoom: toRoomCode, roomVersion: versionMeta.roomVersion, affectedGuestIds: guestIds },
   };
 }
 
@@ -360,6 +361,10 @@ async function swapRooms(ctx, reservationId, otherReservationId, actor, input, c
   const nowIso = ctx.nowIso();
   const versionA = bumpRoomVersion(a.data, actor, nowIso);
   const versionB = bumpRoomVersion(b.data, actor, nowIso);
+  const [guestIdsA, guestIdsB] = await Promise.all([
+    ctx.listGuestIdsForReservation(reservationId),
+    ctx.listGuestIdsForReservation(otherReservationId),
+  ]);
 
   try {
     await ctx.runTransaction(async (tx) => {
@@ -471,6 +476,7 @@ async function swapRooms(ctx, reservationId, otherReservationId, actor, input, c
       toRoom: roomB,
       roomVersionA: versionA.roomVersion,
       roomVersionB: versionB.roomVersion,
+      affectedGuestIds: [...guestIdsA, ...guestIdsB],
     },
   };
 }

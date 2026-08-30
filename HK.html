@@ -334,19 +334,20 @@ function getPriority(roomCode,date){
 function getGuestCount(res){
   if(!res)return 0;
   if(typeof res.guests==='number')return res.guests;
-  if(typeof res.guests==='string'&&res.guests!=='')return parseInt(res.guests)||0;
-  if(res.adults)return parseInt(String(res.adults))||0;
+  if(typeof res.guests==='string'&&res.guests!=='')return parseInt(res.guests,10)||0;
+  const adults=parseInt(String(res.adults||0),10)||0;
+  const children=parseInt(String(res.children||res.child||res.kids||0),10)||0;
+  if(adults>0||children>0)return adults+children;
+  if(res.guestCount!=null&&res.guestCount!=='')return parseInt(String(res.guestCount),10)||0;
   return 0;
 }
 function getBeddingAlert(roomCode,guests){
   if(guests<1)return null;
-  const c=roomCode.toLowerCase();
-  if(/^0-/.test(c))return guests>=4?'⚠️ Extra sofa bed sheets needed':null;
-  if(['6-1','6-2','6-4','7-1','7-2','7-4'].includes(c))return guests>=5?'⚠️ Extra sheets needed':null;
-  if(c==='6-3')return guests>=9?'⚠️ Extra sheets needed':null;
-  if(['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3'].includes(c))return guests>=3?'⚠️ Extra sheets needed':null;
-  if(['vgl-st1','vgl-st2'].includes(c))return guests>=3?'⚠️ Extra sheets needed':null;
-  if(['vgl-ap3','vgl-ap4'].includes(c))return guests>=5?'⚠️ Extra sheets needed':null;
+  const c=String(roomCode||'').toLowerCase();
+  if(/^0-/.test(c))return guests>=4?'Extra sofa bed sheets needed':null;
+  if(['6-1','6-2','6-4','7-1','7-2','7-4'].includes(c))return guests>=5?'Extra sheets needed':null;
+  if(c==='6-3')return guests>=9?'Extra sheets needed':null;
+  if(/^(orb|tab)-/.test(c))return guests>=3?'Extra sheets needed':null;
   return null;
 }
 function getTaskRooms(date){

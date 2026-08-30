@@ -1,16 +1,18 @@
 /**
  * Sandbox client for pipeline GuestRegister callable.
- * Deployed function id: pipeline-guestRegister (codebase "pipeline", region europe-west1).
+ * Deployed: pipeline-guestRegister · Emulator: guestRegister
  */
 
-const PIPELINE_GUEST_CALLABLE = 'pipeline-guestRegister';
+import { pipelineCallableName } from './pipeline-emulator.js';
+
+const PIPELINE_GUEST_EXPORT = 'guestRegister';
 
 export function createPipelineGuestClient(functions, httpsCallable) {
-  const fn = httpsCallable(functions, PIPELINE_GUEST_CALLABLE);
+  const fn = httpsCallable(functions, pipelineCallableName(PIPELINE_GUEST_EXPORT));
   return async function callGuestRegister(payload) {
     const { data } = await fn(payload);
     return data;
   };
 }
 
-export { PIPELINE_GUEST_CALLABLE };
+export { PIPELINE_GUEST_EXPORT as PIPELINE_GUEST_CALLABLE };

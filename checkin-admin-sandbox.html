@@ -75,12 +75,23 @@ html.admin-authed #app{display:block;}
 .hk-card__times{display:flex;gap:8px;font-size:12px;margin-bottom:8px}
 .hk-card__time{flex:1;background:#f7f8fa;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
 .hk-card__time b{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:2px}
-.hk-card__count{font-size:11px;color:var(--muted);margin-top:4px}
+.hk-card__count{font-size:12px;color:var(--ink);font-weight:600;margin-top:4px;line-height:1.3}
+.hk-card__count-line{display:inline-flex;align-items:center;gap:5px;color:var(--ink);}
+.hk-card__count-line span{color:var(--ink);}
+.hk-icon{width:14px;height:14px;flex-shrink:0;color:var(--ink);opacity:.85;}
+.hk-bedding-alert{margin-top:8px;padding:8px 10px;border-radius:8px;background:#fff;border:1.5px solid #d97706;color:#1e1c1a;font-size:12px;font-weight:700;display:flex;align-items:flex-start;gap:6px;box-shadow:0 1px 2px rgba(30,28,26,.06);}
+.hk-bedding-alert .hk-icon--sheet{width:15px;height:15px;color:#c2410c;margin-top:1px;opacity:1;}
 .hk-card__when{font-size:11px;font-weight:700;color:var(--ink);margin-top:2px}
 .hk-card__time.tb-urgent{border-color:#fca5a5;background:#fef2f2}
-.hk-card__time.tb-yellow{border-color:#fcd34d;background:#fffbeb}
+.hk-card__time.tb-yellow{border-color:#f59e0b;background:#fff7ed}
+.hk-card__time.tb-urgent .hk-card__count,
+.hk-card__time.tb-urgent .hk-card__count-line,
+.hk-card__time.tb-yellow .hk-card__count,
+.hk-card__time.tb-yellow .hk-card__count-line{color:#1e1c1a}
+.hk-card__time.tb-urgent .hk-icon,
+.hk-card__time.tb-yellow .hk-icon{color:#1e1c1a;opacity:.9}
 .hk-card.hk-priority-red{border-color:#fca5a5;background:#fef2f2}
-.hk-card.hk-priority-yellow{border-color:#fcd34d;background:#fffbeb}
+.hk-card.hk-priority-yellow{border-color:#f59e0b;background:#fffbf5}
 .hk-card.hk-priority-green{border-color:#86efac;background:#f0fdf4}
 .hk-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);}
 .hk-legend__item{display:inline-flex;align-items:center;gap:5px;}
@@ -103,7 +114,6 @@ html.admin-authed #app{display:block;}
 .hk-clean-type-row__hint{font-size:11px;color:var(--muted);margin-top:2px;}
 .hk-clean-detail{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);}
 .hk-clean-expand{width:100%;margin-top:8px;font-size:13px;}
-.hk-bedding-alert{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--amber-bg);color:var(--amber);font-size:12px;font-weight:700}
 .hk-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);}
 .hk-cleaner-link{font-size:13px;font-weight:700;color:var(--blue);text-decoration:none;white-space:nowrap;}
 .hk-cleaner-link:active{opacity:.7}
@@ -570,7 +580,8 @@ window.adminSignOut=function(){localStorage.removeItem(_ADMIN_KEY);location.relo
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
-import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour}from"./shared/guest-unlock.js";
+import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour,normalizeStayDate}from"./shared/guest-unlock.js";
+import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON}from"./shared/hk-bedding.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 
@@ -1532,6 +1543,7 @@ function toast(msg,ms=2500){const el=document.getElementById('toast');el.textCon
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function tbilisiNow(){return new Date(Date.now()+4*3600*1000);}
 function tbilisiToday(){return tbilisiNow().toISOString().slice(0,10);}
+function tbilisiHourLocal(){return tbilisiNow().getUTCHours();}
 function _stripRoomNum(s){return(s||'').replace(/\s+0\d+\s+/,' ').replace(/\s+/g,' ').trim();}
 
 async function uploadToCloudinary(file,folder='maxela'){
@@ -1542,13 +1554,22 @@ async function uploadToCloudinary(file,folder='maxela'){
   throw new Error(d.error?.message||'Upload failed');
 }
 
-function guestStatus(g){
+function guestArrivalDate(g,res){
+  const door=res||(_resCache||[]).find(r=>isSameReservation(r,g.matchedReservationId));
+  const fromRes=normalizeStayDate(door?.checkin||door?.checkIn);
+  if(g.matchedReservationId&&fromRes)return fromRes;
+  return normalizeStayDate(g.arrivalDate)||fromRes||'';
+}
+
+function guestStatus(g,res){
   const today=unlockToday();
   const hkKey=(g.aptId||'')+'_'+today;
   const aptCheckIn=aptData[g.aptId]?.checkInTime||'';
   const checkInHour=aptCheckIn?parseInt(String(aptCheckIn).split(':')[0],10):CHECK_IN_HOUR;
+  const arrivalDate=guestArrivalDate(g,res);
   const r=computeGuestUnlock({
     guest:g,
+    arrivalDate,
     checkInHour:Number.isFinite(checkInHour)?checkInHour:CHECK_IN_HOUR,
     hkDone:hkStatusData[hkKey]?.done===true,
     today,
@@ -1557,15 +1578,40 @@ function guestStatus(g){
   return{label:r.label,cls:r.cls};
 }
 
+function findFormForReservation(r){
+  if(!r)return null;
+  const linked=guestData.filter(g=>!g.companionGuest&&isSameReservation(r,g.matchedReservationId));
+  if(linked.length===1)return linked[0];
+  if(linked.length>1){
+    const rc=r.roomCode||r.room||'';
+    return linked.find(g=>g.aptId===rc)||linked[0];
+  }
+  const ci=normalizeStayDate(r.checkin||r.checkIn);
+  const rc=r.roomCode||r.room||'';
+  const rn=_stripRoomNum(r.guest||'').toLowerCase();
+  if(rn&&ci){
+    const byName=guestData.find(g=>{
+      if(g.companionGuest||g.matchedReservationId)return false;
+      const gn=_stripRoomNum((g.nameRoman||g.name||'').trim()).toLowerCase();
+      return gn===rn&&normalizeStayDate(g.arrivalDate)===ci;
+    });
+    if(byName)return byName;
+  }
+  if(rc&&ci){
+    return guestData.find(g=>{
+      if(g.companionGuest||g.matchedReservationId)return false;
+      return g.aptId===rc&&normalizeStayDate(g.arrivalDate)===ci;
+    })||null;
+  }
+  return null;
+}
+
 function rebuildFormMaps(){
   const res=_resCache||[];
   _formById=new Map();
   for(const r of res){
     if(_formById.has(r.id))continue;
-    const f=guestData.find(g=>g.matchedReservationId===r.id)||
-      guestData.find(g=>g.matchedReservationId===r.reservationNumber)||
-      guestData.find(g=>g.aptId===(r.roomCode||'')&&g.arrivalDate===r.checkin)||
-      guestData.find(g=>{const gn=_stripRoomNum((g.nameRoman||g.name||'').trim()).toLowerCase();const rn=_stripRoomNum(r.guest||'').toLowerCase();return gn&&rn&&gn===rn&&g.arrivalDate===r.checkin;})||null;
+    const f=findFormForReservation(r);
     if(f)_formById.set(r.id,f);
   }
   const byGC=new Map();
@@ -1585,10 +1631,43 @@ function getForm(r){return _formById.get(r.id)||null;}
 function cardStatus(r,form){
   if(!form)return{label:'NO FORM',cls:'pill-pending',key:'nof'};
   if(form.guestConfirmedCheckin===true)return{label:'CHECKED IN',cls:'pill-in',key:'checked'};
-  if(guestStatus(form).cls==='unlocked')return{label:'UNLOCKED',cls:'pill-ok',key:'unlocked'};
+  if(guestStatus(form,r).cls==='unlocked')return{label:'UNLOCKED',cls:'pill-ok',key:'unlocked'};
   return{label:'AWAITING UNLOCK',cls:'pill-await',key:'need'};
 }
 function fmtDate(s){if(!s)return'—';return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
+function datesOverlap(aIn,aOut,bIn,bOut){if(!aIn||!aOut||!bIn||!bOut)return false;return aIn<bOut&&bIn<aOut;}
+function resolveReservationId(ref){
+  if(!ref)return null;
+  const r=(_resCache||[]).find(x=>x.id===ref||x.reservationNumber===ref);
+  return r?r.id:ref;
+}
+function isSameReservation(r,ref){
+  if(!ref)return false;
+  return r.id===ref||r.reservationNumber===ref;
+}
+function guestStayDates(g){
+  const door=(_resCache||[]).find(r=>isSameReservation(r,g.matchedReservationId));
+  return{checkin:g.arrivalDate||door?.checkin||'',checkout:g.checkoutDate||door?.checkout||''};
+}
+function guestDisplayNameForRes(r){
+  const form=getForm(r)||guestData.find(g=>isSameReservation(r,g.matchedReservationId));
+  if(form)return _stripRoomNum(form.nameRoman||form.name||'Guest');
+  return _stripRoomNum(r.guest||'Guest');
+}
+function findRoomConflictForGuest(g,targetRoom){
+  if(!g||!targetRoom)return null;
+  const dates=guestStayDates(g);
+  if(!dates.checkin||!dates.checkout)return null;
+  const room=targetRoom.toLowerCase();
+  for(const r of(_resCache||[])){
+    if(isSameReservation(r,g.matchedReservationId))continue;
+    if((r.status||'').toUpperCase()==='CANCELLED')continue;
+    if((r.roomCode||r.room||'').toLowerCase()!==room)continue;
+    const rd={checkin:r.checkin||r.checkIn||'',checkout:r.checkout||r.checkOut||''};
+    if(datesOverlap(dates.checkin,dates.checkout,rd.checkin,rd.checkout))return r;
+  }
+  return null;
+}
 function nights(r){return Math.max(0,Math.round((new Date(r.checkout+'T00:00:00Z')-new Date(r.checkin+'T00:00:00Z'))/864e5));}
 function datesStr(r,mode){
   const n=nights(r);
@@ -1865,7 +1944,8 @@ window.moveGuestPipeline=async function(guestId){
   const g=guestData.find(x=>x.id===guestId);
   if(!g||!newRoom)return;
   if(newRoom===g.aptId){toast('Already in '+newRoom);return;}
-  const resId=g.matchedReservationId;
+  if(findRoomConflictForGuest(g,newRoom)){updateDetailRoomAction(guestId);toast('Room occupied — use Swap');return;}
+  const resId=resolveReservationId(g.matchedReservationId);
   if(!resId){toast('No linked reservation — cannot move via pipeline');return;}
   try{
     const r=await pipelineAdmin({
@@ -1876,15 +1956,79 @@ window.moveGuestPipeline=async function(guestId){
     });
     if(!r.ok){
       toast(r.errorCode==='CONFLICT'?'Room conflict — pick another room or swap':(r.message||'Move failed'));
+      updateDetailRoomAction(guestId);
       return;
     }
     toast('Moved to '+newRoom+' ✓');
+    await refreshReservationsNow();
     openDetail(guestId);
   }catch(e){
     console.error('[moveGuestPipeline]',e);
     toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Error: '+e.message);
   }
 };
+
+window.swapGuestPipeline=async function(guestId){
+  const newRoom=document.getElementById('detail-room-select')?.value;
+  const g=guestData.find(x=>x.id===guestId);
+  if(!g||!newRoom)return;
+  const conflict=findRoomConflictForGuest(g,newRoom);
+  if(!conflict){toast('Room is free — use Move');updateDetailRoomAction(guestId);return;}
+  const resId=resolveReservationId(g.matchedReservationId);
+  const otherResId=conflict.id;
+  if(!resId||!otherResId){toast('Missing reservation link — cannot swap');return;}
+  const selfName=_stripRoomNum(g.nameRoman||g.name||'Guest');
+  const otherName=guestDisplayNameForRes(conflict);
+  const fromRoom=g.aptId||'—';
+  if(!confirm(`Swap rooms with ${otherName}?\n\n${selfName} → ${newRoom}\n${otherName} → ${fromRoom}`))return;
+  try{
+    const r=await pipelineAdmin({
+      password:_ADMIN_PWD,
+      actionType:'swap_guests',
+      payload:{reservationId:resId,otherReservationId:otherResId},
+      actor:'admin-sandbox',
+    });
+    if(!r.ok){toast(r.message||'Swap failed');return;}
+    toast(`Swapped with ${otherName} ✓`);
+    await refreshReservationsNow();
+    openDetail(guestId);
+  }catch(e){
+    console.error('[swapGuestPipeline]',e);
+    toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Error: '+e.message);
+  }
+};
+
+function updateDetailRoomAction(guestId){
+  const g=guestData.find(x=>x.id===guestId);
+  const select=document.getElementById('detail-room-select');
+  const btn=document.getElementById('detail-room-action-btn');
+  const info=document.getElementById('detail-room-swap-info');
+  if(!g||!select||!btn||!info)return;
+  const newRoom=select.value;
+  const currentRoom=g.aptId||'';
+  if(newRoom===currentRoom){
+    btn.textContent='Move';
+    btn.disabled=true;
+    btn.onclick=null;
+    info.style.display='none';
+    info.innerHTML='';
+    return;
+  }
+  btn.disabled=false;
+  const conflict=findRoomConflictForGuest(g,newRoom);
+  if(conflict){
+    const otherName=guestDisplayNameForRes(conflict);
+    btn.textContent='Swap';
+    btn.onclick=()=>window.swapGuestPipeline(guestId);
+    info.style.display='block';
+    info.innerHTML=`<span style="font-size:12px;color:var(--muted);line-height:1.4">Swap with <strong style="color:var(--text)">${esc(otherName)}</strong> — they move to <strong style="color:var(--text)">${esc(currentRoom)}</strong></span>`;
+  }else{
+    btn.textContent='Move';
+    btn.onclick=()=>window.moveGuestPipeline(guestId);
+    info.style.display='none';
+    info.innerHTML='';
+  }
+}
 
 window.openDetail=function(guestId){
   const g=guestData.find(x=>x.id===guestId);if(!g){toast('Guest not found');return;}
@@ -1912,16 +2056,17 @@ window.openDetail=function(guestId){
       <div style="font-size:12px;color:var(--muted)">Smart lock</div>
       <div class="door">${esc(doorCode)}</div>
       <div class="card__actions">
-        ${g.manualUnlock||guestStatus(g).cls==='unlocked'?'':`<button class="btn btn-primary" onclick="window.unlockGuest('${g.id}')">Grant Access</button>`}
+        ${g.manualUnlock||guestStatus(g,door).cls==='unlocked'?'':`<button class="btn btn-primary" onclick="window.unlockGuest('${g.id}')">Grant Access</button>`}
         ${waPhone?`<a class="btn" href="https://wa.me/${waPhone}" target="_blank">WhatsApp</a>`:''}
       </div>
     </div>
     ${g.matchedReservationId?`<div style="margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs)">
       <div style="font-size:12px;font-weight:700;margin-bottom:8px">Move room (pipeline)</div>
       <div style="display:flex;gap:8px;align-items:center">
-        <select id="detail-room-select" class="lock-input" style="flex:1;height:44px;margin:0">${roomOptionsHtml(g.aptId)}</select>
-        <button class="btn btn-primary" style="flex:none;min-height:44px;padding:0 14px" onclick="window.moveGuestPipeline('${g.id}')">Move</button>
+        <select id="detail-room-select" class="lock-input" style="flex:1;height:44px;margin:0" onchange="window.updateDetailRoomAction('${g.id}')">${roomOptionsHtml(g.aptId)}</select>
+        <button id="detail-room-action-btn" class="btn btn-primary" style="flex:none;min-height:44px;padding:0 14px">Move</button>
       </div>
+      <div id="detail-room-swap-info" style="display:none;margin-top:8px"></div>
       <p style="font-size:11px;color:var(--muted);margin-top:8px">AdminAction → RoomAssignment · guest link unchanged</p>
     </div>`:''}
     <p style="font-size:12px;color:var(--muted);margin-top:8px;">${esc(fmtDate(g.arrivalDate))} → ${esc(fmtDate(g.checkoutDate||door?.checkout||''))} · ${esc(g.contact||'no contact')}</p>
@@ -1929,7 +2074,9 @@ window.openDetail=function(guestId){
     <button class="btn" style="width:100%;margin-top:12px" onclick="window.openAptEditor('${g.aptId||''}')">Edit apartment instructions</button>
   `;
   document.getElementById('detail').classList.add('open');
+  if(g.matchedReservationId)updateDetailRoomAction(guestId);
 };
+window.updateDetailRoomAction=updateDetailRoomAction;
 window.closeDetail=function(){document.getElementById('detail').classList.remove('open');};
 window.showPassport=function(){document.getElementById('pp-gate').style.display='none';document.getElementById('pp-view').classList.add('show');};
 window.approvePassport=async function(guestId){
@@ -2620,44 +2767,55 @@ function hkSortScore(room,dateStr){
   return pBase+slack;
 }
 function hkDepartingGuestForm(roomCode,dateStr,coRes){
-  const byDate=guestData.find(g=>!g.companionGuest&&g.aptId===roomCode&&g.checkoutDate===dateStr);
-  if(byDate)return byDate;
-  if(coRes)return guestData.find(g=>!g.companionGuest&&(g.matchedReservationId===coRes.id||g.matchedReservationId===coRes.reservationNumber))||null;
-  return null;
+  if(coRes){
+    const linked=findFormForReservation(coRes);
+    if(linked)return linked;
+  }
+  const co=normalizeStayDate(dateStr);
+  return guestData.find(g=>!g.companionGuest&&g.aptId===roomCode&&normalizeStayDate(g.checkoutDate)===co)||null;
 }
 function hkGuestFormForRoom(roomCode,dateStr,nextRes){
-  const forms=guestData.filter(g=>!g.companionGuest&&g.aptId===roomCode&&g.arrivalDate===dateStr);
-  if(forms.length)return forms[0];
   if(nextRes){
-    return guestData.find(g=>!g.companionGuest&&(g.matchedReservationId===nextRes.id||g.matchedReservationId===nextRes.reservationNumber))||null;
+    const linked=findFormForReservation(nextRes);
+    if(linked)return linked;
   }
-  return null;
+  const ci=normalizeStayDate(dateStr);
+  return guestData.find(g=>!g.companionGuest&&g.aptId===roomCode&&normalizeStayDate(g.arrivalDate)===ci)||null;
 }
-function hkGuestCount(res){
+function hkParseGuestNum(v){
+  if(v==null||v==='')return 0;
+  if(typeof v==='number')return v>0?v:0;
+  const n=parseInt(String(v),10);
+  return Number.isFinite(n)&&n>0?n:0;
+}
+function hkGuestCountFromRes(res){
   if(!res)return 0;
-  if(typeof res.guests==='number')return res.guests;
-  if(typeof res.guests==='string'&&res.guests!=='')return parseInt(res.guests,10)||0;
-  if(res.adults!=null||res.children!=null){
-    return (parseInt(String(res.adults||0),10)||0)+(parseInt(String(res.children||0),10)||0);
-  }
+  let n=hkParseGuestNum(res.guests);
+  if(n)return n;
+  n=hkParseGuestNum(res.guestCount);
+  if(n)return n;
+  const adults=hkParseGuestNum(res.adults);
+  const children=hkParseGuestNum(res.children||res.child||res.kids);
+  if(adults||children)return adults+children;
   return 0;
 }
-function hkGuestLine(res,count,verb){
-  if(count>0)return `${count} ${verb}`;
-  if(res?.guest)return `${_stripRoomNum(res.guest)} ${verb}`;
-  if(res)return verb==='arriving'?'Arriving':'Leaving';
-  return '—';
+function hkGuestCount(res,form,statusOverride){
+  const override=hkParseGuestNum(statusOverride);
+  if(override)return override;
+  const fromRes=hkGuestCountFromRes(res);
+  if(fromRes)return fromRes;
+  return hkParseGuestNum(form?.guests);
 }
-function hkBeddingAlert(roomCode,guests){
-  if(guests<1)return null;
-  const c=roomCode.toLowerCase();
-  if(/^0-/.test(c))return guests>=4?'Extra sofa bed sheets needed':null;
-  if(['6-1','6-2','6-4','7-1','7-2','7-4'].includes(c))return guests>=5?'Extra sheets needed':null;
-  if(c==='6-3')return guests>=9?'Extra sheets needed':null;
-  if(['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3'].includes(c))return guests>=3?'Extra sheets needed':null;
-  if(['vgl-st1','vgl-st2'].includes(c))return guests>=3?'Extra sheets needed':null;
-  if(['vgl-ap3','vgl-ap4'].includes(c))return guests>=5?'Extra sheets needed':null;
-  return null;
+function hkGuestCountHtml(res,count,verb){
+  if(count>0)return `<span class="hk-card__count-line">${HK_GUEST_ICON}<span>${esc(String(count))} ${esc(verb)}</span></span>`;
+  if(res?.guest)return esc(_stripRoomNum(res.guest)+' '+verb);
+  if(res)return esc(verb==='arriving'?'Arriving':'Leaving');
+  return esc('—');
+}
+function hkBeddingAlertHtml(roomCode,guests){
+  const alert=hkBeddingAlert(roomCode,guests);
+  if(!alert)return '';
+  return `<div class="hk-bedding-alert">${HK_SHEET_ICON}<span>${esc(alert.text)}</span></div>`;
 }
 function hkDayTabLabel(offset,dateStr){
   if(offset===-1)return 'Yesterday';
@@ -2706,9 +2864,9 @@ async function renderHk(){
     const form=hkGuestFormForRoom(room.code,dateStr,nextRes);
     const departing=hkDepartingGuestForm(room.code,dateStr,co);
     const guestCheckedOut=departing?.guestConfirmedCheckout===true;
-    const outGuests=hkGuestCount(co);
-    const inGuests=hkGuestCount(nextRes);
-    const beddingAlert=nextRes?hkBeddingAlert(room.code,inGuests):null;
+    const outGuests=hkGuestCount(co,departing,st.guestCount);
+    const inGuests=hkGuestCount(nextRes,form,st.guestCount);
+    const beddingHtml=nextRes?hkBeddingAlertHtml(room.code,inGuests):'';
     const coTime=st.checkOutTime||co?.checkoutTime||hkSettings.defaultCheckOut||'12:00';
     const ciTime=st.checkInTime||formatGuestArrival(form,nextRes);
     const nextSameDay=nextRes&&nextRes.checkin===dateStr;
@@ -2721,11 +2879,11 @@ async function renderHk(){
       <div class="hk-card__top"><div><div class="hk-card__room">${esc(room.code)}</div><div class="hk-card__name">${esc(room.name)}</div></div>
       <span class="pill ${done?'pill-ok':'pill-await'}">${done?'Done':'Pending'}</span></div>
       <div class="hk-card__times">
-        <div class="hk-card__time"><b>Checkout</b>${esc(coTime)}<div class="hk-card__count">${esc(hkGuestLine(co,outGuests,'leaving'))}</div></div>
-        <div class="hk-card__time${inBoxCls}"><b>Check-in</b>${nextRes?`<div class="hk-card__when">${esc(whenLabel)}</div>${esc(ciTime)}<div class="hk-card__count">${esc(hkGuestLine(nextRes,inGuests,'arriving'))}</div>`:'<div class="hk-card__count">No booking</div>'}</div>
+        <div class="hk-card__time"><b>Checkout</b>${esc(coTime)}<div class="hk-card__count">${hkGuestCountHtml(co,outGuests,'leaving')}</div></div>
+        <div class="hk-card__time${inBoxCls}"><b>Check-in</b>${nextRes?`<div class="hk-card__when">${esc(whenLabel)}</div>${esc(ciTime)}<div class="hk-card__count">${hkGuestCountHtml(nextRes,inGuests,'arriving')}</div>`:'<div class="hk-card__count">No booking</div>'}</div>
       </div>
       ${guestCheckedOut?'<div class="hk-guest-out">Guest checked out</div>':''}
-      ${beddingAlert?`<div class="hk-bedding-alert">${esc(beddingAlert)}</div>`:''}
+      ${beddingHtml}
       <div class="hk-card__foot"><span style="font-size:12px;color:var(--muted)">${co?.guest?esc(_stripRoomNum(co.guest)):'—'}</span>
       <button type="button" class="hk-done${done?' undo':''}" onclick="toggleHkDone('${esc(room.code)}','${dateStr}')">${done?'Undo':'Done'}</button></div>
     </div>`;
@@ -2847,13 +3005,45 @@ async function _loadResCache(){
   _resLoading=false;rebuildFormMaps();render();
 }
 
+async function refreshReservationsNow(){
+  try{
+    const cutoff=new Date(Date.now()-365*864e5).toISOString().slice(0,10);
+    const snap=await getDocs(query(collection(db,'reservations'),where('checkin','>=',cutoff),orderBy('checkin','desc'),limit(1000)));
+    _resCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+    rebuildFormMaps();
+    if(currentTab==='stay')renderStay();
+    else render();
+  }catch(e){console.error('[refreshReservationsNow]',e);}
+}
+
+let _resSubscribed=false;
+function _subscribeResCache(){
+  if(_resSubscribed)return;
+  _resSubscribed=true;
+  const cutoff=new Date(Date.now()-365*864e5).toISOString().slice(0,10);
+  onSnapshot(
+    query(collection(db,'reservations'),where('checkin','>=',cutoff),orderBy('checkin','desc'),limit(1000)),
+    snap=>{
+      _resCache=snap.docs.map(d=>({id:d.id,...d.data()}));
+      _resLoading=false;
+      rebuildFormMaps();
+      if(loaded>=2)render();
+    },
+    err=>{
+      console.error('[reservations snapshot]',err);
+      if(_resCache===null)_resCache=[];
+      _resLoading=false;
+    }
+  );
+}
+
 let loaded=0;
 function checkLoaded(){
   loaded++;
   if(loaded>=2){
     document.getElementById('loading').style.display='none';
     switchTab(currentTab);
-    _loadResCache();
+    _subscribeResCache();
     loadElevatorOnce();
     loadRequests(true);
     loadGuestSettings();
@@ -2901,6 +3091,6 @@ onSnapshot(doc(db,'globals','elevator_code'),snap=>{
   loadElevatorOnce();
 });
 setInterval(()=>{if(currentTab==='elevator')renderElevator();loadElevatorOnce();},60000);
-setTimeout(()=>{document.getElementById('loading').style.display='none';if(!_resCache)_loadResCache();if(loaded<2)switchTab(currentTab);},5000);
+setTimeout(()=>{document.getElementById('loading').style.display='none';if(!_resCache&&!_resSubscribed)_loadResCache();if(loaded<2)switchTab(currentTab);},5000);
 switchTab(currentTab);
 </script></body></html>

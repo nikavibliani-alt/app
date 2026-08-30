@@ -180,6 +180,13 @@ async function runAdminAction(ctx, params) {
 
   const result = await ctx.runRoomAssignment(roomParams);
 
+  if (result.ok && ctx.runGuestUnlock) {
+    const guestIds = result.data?.affectedGuestIds || [];
+    for (const guestId of guestIds) {
+      await ctx.runGuestUnlock({ guestId, actor, forceManual: null, correlationId });
+    }
+  }
+
   await ctx.logRun({
     controller: 'AdminAction',
     action: actionType,

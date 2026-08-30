@@ -27,7 +27,7 @@ Shared unlock rules (browser + server): `shared/guest-unlock.js` ↔ `pipeline-f
 
 | File | What uses pipeline |
 |------|-------------------|
-| `checkin-admin-sandbox.html` | `force_unlock`, `move_guest` via `shared/pipeline-admin.js` |
+| `checkin-admin-sandbox.html` | `force_unlock`, `move_guest`, `swap_guests` via `shared/pipeline-admin.js`; live reservations `onSnapshot`; HK via `shared/hk-bedding.js` |
 | `checkin-guest-sandbox-2.html` | `shared/guest-unlock.js`; registration via `pipeline-guestRegister` (Firestore fallback when **not** in emulator mode) |
 | `shared/pipeline-admin.js` | Callable client → `pipeline-adminAction` |
 | `shared/pipeline-guest.js` | Callable client → `pipeline-guestRegister` |
@@ -45,15 +45,24 @@ Shared unlock rules (browser + server): `shared/guest-unlock.js` ↔ `pipeline-f
 | Callable E2E (recommended) | Functions emulator + sandbox HTML | **No** |
 | Callable E2E (optional) | Deploy callables to Firebase | Yes — only after sandbox sign-off |
 
-Expected unit tests: **49/49 pass** (elevator + room assignment + admin action + guest unlock + guest register).
+Expected unit tests: **53/53 pass** (elevator + room assignment + admin action + guest unlock + guest register + swap unlock recompute + midnight mid-stay).
+
+**CI:** GitHub Actions runs `npm test` + guest-unlock sync check on every PR that touches `pipeline-functions/` or `shared/guest-unlock.js`.
 
 ---
 
 ## 1. Unit tests
 
 ```bash
-cd pipeline-functions && npm install && npm test
+cd ~/app/pipeline-functions
+npm install
+npm test
+npm run check:unlock
 ```
+
+If unlock sync fails: `node scripts/sync-guest-unlock.js` from repo root.
+
+**Note:** `check:unlock` exists on branch `cursor/pipeline-stability-7e07` (or after that PR merges to main).
 
 ---
 
@@ -79,9 +88,11 @@ git checkout cursor/pipeline-room-assignment-7e07
 ```bash
 cd ~/app
 git fetch origin
-git checkout cursor/pipeline-room-assignment-7e07
-git pull origin cursor/pipeline-room-assignment-7e07
+git checkout cursor/hk-guest-count-7e07
+git pull origin cursor/hk-guest-count-7e07
 ```
+
+Run **one command per line**. Do not paste `# comment` text on the same line as `git checkout` — the shell will treat it as extra branch names and fail.
 
 Replace `~/app` with wherever you keep the project (e.g. `~/Projects/app`).
 
@@ -98,7 +109,7 @@ npm test
 npm run emulator:setup
 ```
 
-Expected: `npm test` reports **49 pass**. `emulator:setup` creates `.secret.local` with `ADMIN_ACTION_PASSWORD=maxela2026` (same as admin sandbox password).
+Expected: `npm test` reports **53 pass**. `emulator:setup` creates `.secret.local` with `ADMIN_ACTION_PASSWORD=maxela2026` (same as admin sandbox password).
 
 ### Start emulator
 
@@ -117,6 +128,22 @@ firebase emulators:start --only functions:pipeline --project sleepy-5c962
 ```
 
 Emulator listens on **`127.0.0.1:5001`**. Emulator UI (optional): **`http://127.0.0.1:4000`**.
+
+**Port already in use?** An old emulator or dev server is still running. Free the ports, then retry:
+
+```bash
+lsof -i :4000 -i :5001 -i :8080
+kill $(lsof -t -i :4000) 2>/dev/null
+kill $(lsof -t -i :5001) 2>/dev/null
+```
+
+Or skip the UI entirely (callables still work on 5001):
+
+```bash
+npm run emulator:lite
+```
+
+Uses `firebase.emulator-lite.json` at repo root (UI disabled — no port 4000 needed).
 
 You must be logged in to Firebase CLI with access to `sleepy-5c962` so Admin SDK in the emulator can reach Firestore:
 
@@ -156,8 +183,10 @@ With emulator running, open admin sandbox (see URLs above):
 
 - [ ] **Grant Access** on a guest with arrival today → `force_unlock`; `checkin_guests.manualUnlock` + `unlockState` updated; log in `system_logs` (`AdminAction`, `GuestUnlock`)
 - [ ] **Move room** on guest with `matchedReservationId` → `reservations.roomCode` + `checkin_guests.aptId` updated atomically; `room_moves` audit doc; guest doc **ID unchanged**
-- [ ] **Conflict block** — move into occupied overlapping room → UI shows conflict message, no partial writes
-- [ ] **HK tab** still works (direct `hk_status` write — not migrated yet)
+- [ ] **Swap rooms** — pick occupied target → **Swap** button → both guests exchange rooms; unlock recomputed (no stale "Awaiting unlock" after swap)
+- [ ] **Conflict block** — move into occupied overlapping room without swap → UI shows conflict message, no partial writes
+- [ ] **Repeated swaps** (~10+) — reservation cache stays live; room/form linking correct
+- [ ] **HK tab** — guest count from `reservations.guestCount`; bedding alerts per `shared/hk-bedding.js`; readable contrast on yellow cards (direct `hk_status` write — not migrated yet)
 
 ---
 
