@@ -6,10 +6,13 @@ import { fileURLToPath } from 'url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ICON_DIR = join(ROOT, 'node_modules/@tabler/icons/icons/outline');
+const CUSTOM_ICON_FILES = {
+  'tour-bus': join(ROOT, 'assets/icons/tour-bus.svg'),
+};
 
 const ICON_NAMES = [
   'key', 'wifi', 'elevator', 'layout-grid', 'wash-machine', 'sparkles',
-  'map-route', 'plane-arrival', 'star', 'file-text', 'message-circle',
+  'sparkles', 'plane-arrival', 'star', 'file-text', 'message-circle',
   'home', 'map-pin', 'calendar', 'message-2', 'chevrons-up', 'dots', 'square-check',
   'bell', 'map-2', 'lock', 'alert-triangle', 'slash', 'currency-dollar', 'loader',
   'check', 'copy', 'pencil', 'clock', 'users', 'trash', 'x', 'menu',
@@ -23,8 +26,8 @@ const ALIASES = {
   services: 'layout-grid',
   laundry: 'wash-machine',
   cleaning: 'sparkles',
-  tour: 'map-route',
-  landmark: 'map-route',
+  tour: 'tour-bus',
+  landmark: 'tour-bus',
   transfer: 'plane-arrival',
   recs: 'star',
   rules: 'file-text',
@@ -66,6 +69,9 @@ function loadIcon(name) {
 
 const entries = {};
 for (const name of ICON_NAMES) entries[name] = loadIcon(name);
+for (const [name, file] of Object.entries(CUSTOM_ICON_FILES)) {
+  entries[name] = extractInner(readFileSync(file, 'utf8'));
+}
 for (const [alias, target] of Object.entries(ALIASES)) {
   entries[alias] = entries[target];
 }
@@ -75,7 +81,7 @@ const lines = Object.entries(entries)
   .map(([k, v]) => `  "${k}": ${JSON.stringify(v)},`)
   .join('\n');
 
-const out = `/** Tabler Icons — MIT · https://tabler.io/icons · built by scripts/build-icons.js */
+const out = `/** Tabler Icons + custom assets · built by scripts/build-icons.js */
 export const APP_ICONS={
 ${lines}
 };
