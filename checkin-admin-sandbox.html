@@ -270,8 +270,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830a';
-  if(!/[?&]build=20260830a(?:&|$)/.test(location.search)){
+  var BUILD='20260830b';
+  if(!/[?&]build=20260830b(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -741,7 +741,7 @@ async function loadGuestSettings(){
       if(d.roomCategories)gsRoomCategories=d.roomCategories;
       if(d.locationInfo)gsLocationInfo=d.locationInfo;
       if(d.waitingTabs)gsWaitingTabs={...WAITING_TABS_DEFAULTS,...d.waitingTabs};
-      if(d.hkSettings)hkSettings={...hkSettings,...d.hkSettings};
+      if(d.hkSettings)hkSettings={defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByRoom:{},...hkSettings,...d.hkSettings,cleanMinutesByRoom:{...(hkSettings.cleanMinutesByRoom||{}),...(d.hkSettings.cleanMinutesByRoom||{})}};
     }
   }catch(e){console.warn(e);}
   gsLoaded=true;
@@ -1865,6 +1865,8 @@ const HK_ROOMS=[
   {code:'tab-1',name:'Tab 1',group:'Centre'},{code:'tab-2',name:'Tab 2',group:'Centre'},{code:'tab-3',name:'Tab 3',group:'Centre'},
   {code:'abashidze',name:'Abashidze',group:'Abashidze'},
 ];
+const HK_DAY_START=-7;
+const HK_DAY_END=6;
 let hkActiveDay=0;
 
 const HK_ROLE_LABELS={shartava:'Shartava',centre:'Centre',vgl:'VGL',admin:'All properties'};
@@ -1995,19 +1997,33 @@ function hkGuestCount(res){
   if(!res)return 0;
   if(typeof res.guests==='number')return res.guests;
   if(typeof res.guests==='string'&&res.guests!=='')return parseInt(res.guests,10)||0;
-  if(res.adults)return parseInt(String(res.adults),10)||0;
+  if(res.adults!=null||res.children!=null){
+    return (parseInt(String(res.adults||0),10)||0)+(parseInt(String(res.children||0),10)||0);
+  }
   return 0;
+}
+function hkGuestLine(res,count,verb){
+  if(count>0)return `${count} ${verb}`;
+  if(res?.guest)return `${_stripRoomNum(res.guest)} ${verb}`;
+  if(res)return verb==='arriving'?'Arriving':'Leaving';
+  return '—';
 }
 function hkBeddingAlert(roomCode,guests){
   if(guests<1)return null;
   const c=roomCode.toLowerCase();
-  if(/^0-/.test(c))return guests>=4?'⚠️ Extra sofa bed sheets needed':null;
-  if(['6-1','6-2','6-4','7-1','7-2','7-4'].includes(c))return guests>=5?'⚠️ Extra sheets needed':null;
-  if(c==='6-3')return guests>=9?'⚠️ Extra sheets needed':null;
-  if(['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3'].includes(c))return guests>=3?'⚠️ Extra sheets needed':null;
-  if(['vgl-st1','vgl-st2'].includes(c))return guests>=3?'⚠️ Extra sheets needed':null;
-  if(['vgl-ap3','vgl-ap4'].includes(c))return guests>=5?'⚠️ Extra sheets needed':null;
+  if(/^0-/.test(c))return guests>=4?'Extra sofa bed sheets needed':null;
+  if(['6-1','6-2','6-4','7-1','7-2','7-4'].includes(c))return guests>=5?'Extra sheets needed':null;
+  if(c==='6-3')return guests>=9?'Extra sheets needed':null;
+  if(['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3'].includes(c))return guests>=3?'Extra sheets needed':null;
+  if(['vgl-st1','vgl-st2'].includes(c))return guests>=3?'Extra sheets needed':null;
+  if(['vgl-ap3','vgl-ap4'].includes(c))return guests>=5?'Extra sheets needed':null;
   return null;
+}
+function hkDayTabLabel(offset,dateStr){
+  if(offset===-1)return 'Yesterday';
+  if(offset===0)return 'Today';
+  if(offset===1)return 'Tomorrow';
+  return new Date(dateStr+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric'});
 }
 function hkTaskRooms(dateStr){
   return HK_ROOMS.filter(r=>hkGetCheckout(r.code,dateStr));
@@ -2018,13 +2034,21 @@ async function renderHk(){
   const listEl=document.getElementById('hk-list');
   if(!tabsEl||!listEl)return;
   let tabs='';
-  for(let i=0;i<7;i++){
+  for(let i=HK_DAY_START;i<=HK_DAY_END;i++){
     const ds=hkAddDays(i);
-    const n=hkTaskRooms(ds).length;
-    tabs+=`<button type="button" class="filter-chip${i===hkActiveDay?' active':''}" onclick="hkPickDay(${i})">${i===0?'Today':i===1?'Tomorrow':new Date(ds+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric'})}${n?` (${n})`:''}</button>`;
+    const n=_resCache?hkTaskRooms(ds).length:0;
+    tabs+=`<button type="button" class="filter-chip${i===hkActiveDay?' active':''}" onclick="hkPickDay(${i})">${hkDayTabLabel(i,ds)}${n?` (${n})`:''}</button>`;
   }
   tabsEl.innerHTML=tabs;
+  requestAnimationFrame(()=>{
+    const active=tabsEl.querySelector('.filter-chip.active');
+    if(active)active.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'});
+  });
   const dateStr=hkAddDays(hkActiveDay);
+  if(_resCache===null){
+    listEl.innerHTML='<div class="empty">Loading reservations…</div>';
+    return;
+  }
   try{
     const snap=await getDocs(query(collection(db,'hk_status'),where('date','==',dateStr)));
     snap.docs.forEach(d=>{hkStatusData[d.id]=d.data();});
@@ -2057,13 +2081,13 @@ async function renderHk(){
       <div class="hk-card__top"><div><div class="hk-card__room">${esc(room.code)}</div><div class="hk-card__name">${esc(room.name)}</div></div>
       <span class="pill ${done?'pill-ok':'pill-await'}">${done?'Done':'Pending'}</span></div>
       <div class="hk-card__times">
-        <div class="hk-card__time"><b>Checkout</b>${esc(coTime)}<div class="hk-card__count">${outGuests>0?`👥 ${outGuests} leaving`:'👥 —'}</div></div>
-        <div class="hk-card__time${inBoxCls}"><b>Check-in</b>${nextRes?`<div class="hk-card__when">${esc(whenLabel)}</div>${esc(ciTime)}<div class="hk-card__count">${inGuests>0?`👥 ${inGuests} arriving`:'No booking'}</div>`:'<div class="hk-card__count">No booking</div>'}</div>
+        <div class="hk-card__time"><b>Checkout</b>${esc(coTime)}<div class="hk-card__count">${esc(hkGuestLine(co,outGuests,'leaving'))}</div></div>
+        <div class="hk-card__time${inBoxCls}"><b>Check-in</b>${nextRes?`<div class="hk-card__when">${esc(whenLabel)}</div>${esc(ciTime)}<div class="hk-card__count">${esc(hkGuestLine(nextRes,inGuests,'arriving'))}</div>`:'<div class="hk-card__count">No booking</div>'}</div>
       </div>
-      ${guestCheckedOut?'<div class="hk-guest-out">✓ Guest checked out</div>':''}
+      ${guestCheckedOut?'<div class="hk-guest-out">Guest checked out</div>':''}
       ${beddingAlert?`<div class="hk-bedding-alert">${esc(beddingAlert)}</div>`:''}
       <div class="hk-card__foot"><span style="font-size:12px;color:var(--muted)">${co?.guest?esc(_stripRoomNum(co.guest)):'—'}</span>
-      <button type="button" class="hk-done${done?' undo':''}" onclick="toggleHkDone('${esc(room.code)}','${dateStr}')">${done?'Undo':'✓ Done'}</button></div>
+      <button type="button" class="hk-done${done?' undo':''}" onclick="toggleHkDone('${esc(room.code)}','${dateStr}')">${done?'Undo':'Done'}</button></div>
     </div>`;
   }
   let html='';
@@ -2087,7 +2111,7 @@ window.toggleHkDone=async function(roomCode,dateStr){
       const snap=await getDocs(query(collection(db,'checkin_guests'),where('aptId','==',roomCode),where('arrivalDate','==',dateStr)));
       for(const d of snap.docs){await updateDoc(d.ref,{manualUnlock:true,unlockedAt:serverTimestamp()});}
     }
-    toast(next?'Room marked done ✓':'Undone');
+    toast(next?'Room marked done':'Undone');
     renderHk();rebuildFormMaps();if(currentTab==='stay')renderStay();
   }catch(e){toast('HK save failed: '+e.message);}
 };
