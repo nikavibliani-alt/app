@@ -314,6 +314,18 @@ html.admin-authed #app{display:block;}
 .hk-pin-card h3{font-size:14px;font-weight:700;margin-bottom:4px;}
 .hk-pin-card p{font-size:12px;color:var(--muted);margin-bottom:12px;}
 .hk-pin-input{width:100%;height:52px;border:1.5px solid var(--line);border-radius:var(--r);font-family:var(--mono);font-size:24px;letter-spacing:8px;text-align:center;margin-bottom:10px;}
+.hk-team-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
+.hk-team-card__body{flex:1;min-width:0;}
+.hk-team-card__title{font-size:14px;font-weight:700;}
+.hk-team-card__sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.hk-team-card__actions{display:flex;gap:6px;flex-shrink:0;}
+.hk-team-edit{margin-top:10px;padding:14px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);}
+.hk-team-rooms{max-height:280px;overflow-y:auto;margin-top:10px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);}
+.hk-team-room-chk{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);}
+.hk-team-room-chk:last-child{border-bottom:none;}
+.hk-team-room-chk input{width:18px;height:18px;flex-shrink:0;}
+.hk-team-room-chk__code{font-family:var(--mono);font-size:12px;font-weight:700;min-width:56px;}
+.hk-team-room-chk__name{font-size:12px;color:var(--muted);}
 .nav-cfg-preview{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 10px 10px;margin-bottom:14px;}
 .nav-cfg-preview__label{font-size:10px;font-weight:500;letter-spacing:.04em;color:var(--muted);margin-bottom:8px;}
 .nav-cfg-preview__bar{display:flex;gap:2px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:4px;}
@@ -406,8 +418,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830x';
-  if(!/[?&]build=20260830x(?:&|$)/.test(location.search)){
+  var BUILD='20260831a';
+  if(!/[?&]build=20260831a(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -668,7 +680,7 @@ html.admin-authed #app{display:block;}
  */
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
-const SANDBOX_BUILD='20260830x';
+const SANDBOX_BUILD='20260831a';
 (function migrateSandboxBuild(){
   try{
     if(localStorage.getItem('maxela_sandbox_build')!==SANDBOX_BUILD){
@@ -1392,7 +1404,8 @@ const HK_CLEAN_TYPES=[
 ];
 let gsWaitingTabs={...WAITING_TABS_DEFAULTS};
 let _hkCleanDetailOpen=false;
-let hkSettings={defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS},cleanMinutesByRoom:{}};
+let hkSettings={defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS},cleanMinutesByRoom:{},teams:[]};
+let _hkTeamEdit=null;
 let gsVisibility=JSON.parse(JSON.stringify(SECTION_DEFAULTS));
 let gsLaundry=[...LAUNDRY_DEFAULTS];
 let gsServices=SERVICE_DEFAULTS.map(s=>({...s}));
@@ -1425,10 +1438,11 @@ async function loadGuestSettings(){
         gsWaitingTabs=wt;
       }
       if(d.hkSettings)hkSettings={
-        defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS},cleanMinutesByRoom:{},
+        defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS},cleanMinutesByRoom:{},teams:[],
         ...hkSettings,...d.hkSettings,
         cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS,...(hkSettings.cleanMinutesByType||{}),...(d.hkSettings.cleanMinutesByType||{})},
         cleanMinutesByRoom:{...(hkSettings.cleanMinutesByRoom||{}),...(d.hkSettings.cleanMinutesByRoom||{})},
+        teams:Array.isArray(d.hkSettings.teams)?d.hkSettings.teams:(hkSettings.teams||[]),
       };
       if(d.whatsappMessages)waSettings=mergeWaSettings(d.whatsappMessages);
     }
@@ -1640,12 +1654,129 @@ async function loadAndRenderGuestSettings(){
 }
 
 /* ── HK settings (More → PINs, cleaner apps, defaults) ── */
-const HK_ROLES=[
-  {id:'shartava',label:'Shartava Team',desc:'Shartava housekeeping'},
-  {id:'centre',label:'Centre Team',desc:'City centre housekeeping'},
-  {id:'vgl',label:'VGL Team',desc:'VGL studios & apartments'},
-  {id:'admin',label:'Admin PIN',desc:'All rooms across properties'},
-];
+const HK_ADMIN_ROLE={id:'admin',label:'Admin PIN',desc:'All rooms across properties'};
+function hkBuildDefaultTeams(){
+  const rooms=getHkRooms();
+  const bySite={shartava:[],centre:[],vgl:[],abashidze:[]};
+  rooms.forEach(r=>{
+    const s=hkSiteId(r.code);
+    if(bySite[s])bySite[s].push(r.code);
+  });
+  const teams=[];
+  if(bySite.shartava.length)teams.push({id:'shartava',label:'Shartava Team',roomCodes:bySite.shartava});
+  if(bySite.centre.length)teams.push({id:'centre',label:'Centre Team',roomCodes:bySite.centre});
+  if(bySite.vgl.length)teams.push({id:'vgl',label:'VGL Team',roomCodes:bySite.vgl});
+  if(bySite.abashidze.length)teams.push({id:'abashidze',label:'Abashidze Team',roomCodes:bySite.abashidze});
+  return teams;
+}
+function hkEnsureTeams(){
+  if(!hkSettings.teams||!hkSettings.teams.length){
+    hkSettings.teams=hkBuildDefaultTeams();
+  }
+}
+function hkGetTeams(){hkEnsureTeams();return hkSettings.teams||[];}
+function hkTeamPinRoles(){
+  return [...hkGetTeams().map(t=>({id:t.id,label:t.label,desc:`${(t.roomCodes||[]).length} apartments`})),HK_ADMIN_ROLE];
+}
+function hkRoomsForTeam(teamId){
+  if(!teamId||teamId==='admin')return getHkRooms();
+  const team=hkGetTeams().find(t=>t.id===teamId);
+  if(!team?.roomCodes?.length)return [];
+  const set=new Set(team.roomCodes.map(c=>String(c).toLowerCase()));
+  return getHkRooms().filter(r=>set.has(String(r.code).toLowerCase()));
+}
+function hkRoomsForRole(){
+  return hkRoomsForTeam(hkStoredRole()||'admin');
+}
+function hkNewTeamId(label){
+  const base=String(label||'team').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'team';
+  let id=base,n=2;
+  while(hkGetTeams().some(t=>t.id===id)){id=base+'-'+n;n++;}
+  return id;
+}
+function hkTeamRoomBlocks(){
+  const groups=[
+    {title:'Shartava',rooms:getHkRooms().filter(r=>hkSiteId(r.code)==='shartava')},
+    {title:'City Centre · Orb & Tab',rooms:getHkRooms().filter(r=>hkSiteId(r.code)==='centre')},
+    {title:'VGL',rooms:getHkRooms().filter(r=>hkSiteId(r.code)==='vgl')},
+    {title:'Abashidze',rooms:getHkRooms().filter(r=>hkSiteId(r.code)==='abashidze')},
+  ].filter(g=>g.rooms.length);
+  const selected=new Set((_hkTeamEdit?.roomCodes||[]).map(c=>String(c).toLowerCase()));
+  return groups.map(g=>`
+    <div class="section-hd" style="margin-top:8px"><h2>${esc(g.title)}</h2></div>
+    <div class="hk-team-rooms">${g.rooms.map(r=>{
+      const on=selected.has(String(r.code).toLowerCase());
+      return`<label class="hk-team-room-chk"><input type="checkbox" ${on?'checked':''} onchange="hkToggleTeamRoom('${esc(r.code)}',this.checked)"><span class="hk-team-room-chk__code">${esc(r.code)}</span><span class="hk-team-room-chk__name">${esc(r.name)}</span></label>`;
+    }).join('')}</div>`).join('');
+}
+function renderHkTeamEdit(){
+  if(!_hkTeamEdit)return '';
+  const isNew=!_hkTeamEdit._existing;
+  return`<div class="hk-team-edit">
+    <div class="field"><label>Team name</label>
+      <input class="apt-input" id="hk-team-label" value="${esc(_hkTeamEdit.label||'')}" placeholder="e.g. VGL morning crew">
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin:10px 0 4px">Apartments this team cleans — each apartment can belong to one team only.</div>
+    ${hkTeamRoomBlocks()}
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button type="button" class="btn btn-primary" style="flex:1" onclick="hkSaveTeamEdit()">${isNew?'Create team':'Save team'}</button>
+      <button type="button" class="btn" onclick="hkCancelTeamEdit()">Cancel</button>
+    </div>
+  </div>`;
+}
+window.hkOpenTeamEdit=function(teamId){
+  if(teamId){
+    const t=hkGetTeams().find(x=>x.id===teamId);
+    if(!t)return;
+    _hkTeamEdit={id:t.id,label:t.label,roomCodes:[...(t.roomCodes||[])],_existing:true};
+  }else{
+    _hkTeamEdit={id:'',label:'',roomCodes:[],_existing:false};
+  }
+  renderHkSettings();
+};
+window.hkCancelTeamEdit=function(){_hkTeamEdit=null;renderHkSettings();};
+window.hkToggleTeamRoom=function(code,on){
+  if(!_hkTeamEdit)return;
+  const c=String(code);
+  const list=_hkTeamEdit.roomCodes||[];
+  const ix=list.findIndex(x=>String(x).toLowerCase()===c.toLowerCase());
+  if(on&&ix<0)_hkTeamEdit.roomCodes=[...list,c];
+  else if(!on&&ix>=0)_hkTeamEdit.roomCodes=list.filter((_,i)=>i!==ix);
+};
+window.hkSaveTeamEdit=async function(){
+  if(!_hkTeamEdit)return;
+  const label=(document.getElementById('hk-team-label')?.value||'').trim();
+  if(!label){toast('Enter a team name');return;}
+  const roomCodes=[...(_hkTeamEdit.roomCodes||[])];
+  if(!roomCodes.length){toast('Select at least one apartment');return;}
+  hkEnsureTeams();
+  let id=_hkTeamEdit.id||hkNewTeamId(label);
+  const team={id,label,roomCodes};
+  const others=hkSettings.teams.filter(t=>t.id!==id);
+  const codeSet=new Set(roomCodes.map(c=>String(c).toLowerCase()));
+  hkSettings.teams=[
+    ...others.map(t=>({...t,roomCodes:(t.roomCodes||[]).filter(c=>!codeSet.has(String(c).toLowerCase()))})),
+    team,
+  ];
+  try{
+    await setDoc(doc(db,'checkin_admin','config'),{hkSettings,updatedAt:serverTimestamp()},{merge:true});
+    _hkTeamEdit=null;
+    toast('Team saved ✓');
+    renderHkSettings();
+    if(currentTab==='hk')renderHk();
+  }catch(e){toast('Failed: '+e.message);}
+};
+window.hkDeleteTeam=async function(teamId){
+  if(!confirm('Delete this team? Cleaners will no longer see it.'))return;
+  hkEnsureTeams();
+  hkSettings.teams=hkSettings.teams.filter(t=>t.id!==teamId);
+  try{
+    await setDoc(doc(db,'checkin_admin','config'),{hkSettings,updatedAt:serverTimestamp()},{merge:true});
+    if(_hkTeamEdit?.id===teamId)_hkTeamEdit=null;
+    toast('Team deleted');
+    renderHkSettings();
+  }catch(e){toast('Failed: '+e.message);}
+};
 function hkCleanTypeId(roomCode){
   const c=String(roomCode||'').toLowerCase();
   for(const t of HK_CLEAN_TYPES){if(t.match(c))return t.id;}
@@ -1703,10 +1834,25 @@ function renderHkSettings(){
   wrap.innerHTML=`
     <div class="more-section" style="margin-top:0">Cleaner apps</div>
     <div class="more-list" style="margin-bottom:16px">
-      <a class="more-item" href="HK-Shartava.html" target="_blank" rel="noopener">Shartava HK</a>
-      <a class="more-item" href="HK-Centre.html" target="_blank" rel="noopener">Centre HK</a>
+      <a class="more-item" href="HK.html" target="_blank" rel="noopener">All properties HK</a>
+      <a class="more-item" href="HK-Shartava.html" target="_blank" rel="noopener">Shartava HK (legacy)</a>
+      <a class="more-item" href="HK-Centre.html" target="_blank" rel="noopener">Centre HK (legacy)</a>
     </div>
-    <div class="section-hd"><h2>Standard times</h2></div>
+    <div class="section-hd"><h2>Teams &amp; apartments</h2></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Create teams and assign apartments. Each team sees only their apartments on the cleaner app after entering their PIN.</p>
+    ${hkGetTeams().map(t=>`<div class="hk-team-card">
+      <div class="hk-team-card__body">
+        <div class="hk-team-card__title">${esc(t.label)}</div>
+        <div class="hk-team-card__sub">${(t.roomCodes||[]).length} apartments · PIN below</div>
+      </div>
+      <div class="hk-team-card__actions">
+        <button type="button" class="btn" onclick="hkOpenTeamEdit('${esc(t.id)}')">Edit</button>
+        <button type="button" class="btn btn-danger" onclick="hkDeleteTeam('${esc(t.id)}')">Delete</button>
+      </div>
+    </div>`).join('')}
+    ${!_hkTeamEdit?`<button type="button" class="btn" style="width:100%;margin-bottom:12px" onclick="hkOpenTeamEdit(null)">+ Add team</button>`:''}
+    ${renderHkTeamEdit()}
+    <div class="section-hd" style="margin-top:8px"><h2>Standard times</h2></div>
     <div class="card">
       <div class="field"><label>Checkout time</label>
         <input id="hk-default-checkout" type="time" value="${esc(hkSettings.defaultCheckOut||'12:00')}" style="width:100%;height:44px;padding:0 12px;border:1.5px solid var(--line);border-radius:var(--r);font-size:16px;background:var(--surface);">
@@ -1928,7 +2074,7 @@ window.resetWaSettings=function(){
 
 function renderHkPins(){
   const el=document.getElementById('hkpins-list');if(!el)return;
-  el.innerHTML=HK_ROLES.map(r=>`
+  el.innerHTML=hkTeamPinRoles().map(r=>`
     <div class="hk-pin-card">
       <h3>${esc(r.label)}</h3>
       <p>${esc(r.desc)}</p>
@@ -3301,7 +3447,10 @@ const HK_DAY_END=6;
 let hkActiveDay=0;
 let _hkAdminModal=null;
 
-const HK_ROLE_LABELS={shartava:'Shartava',centre:'Centre',vgl:'VGL',admin:'All properties'};
+const HK_ROLE_LABELS={admin:'All properties'};
+function hkRefreshRoleLabels(){
+  hkGetTeams().forEach(t=>{HK_ROLE_LABELS[t.id]=t.label;});
+}
 function hkStoredRole(){
   return localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role')||'';
 }
@@ -3309,6 +3458,7 @@ function isHkAdmin(){
   return true;
 }
 function updateHkCleanerBadge(){
+  hkRefreshRoleLabels();
   const el=document.getElementById('hk-role-badge');
   if(!el)return;
   const role=hkStoredRole();
@@ -3481,14 +3631,14 @@ function hkDayTabLabel(offset,dateStr){
   return new Date(dateStr+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric'});
 }
 function hkTaskRooms(dateStr){
-  const coRooms=getHkRooms().filter(r=>hkGetCheckout(r.code,dateStr));
+  const coRooms=hkRoomsForRole().filter(r=>hkGetCheckout(r.code,dateStr));
   const seen=new Set(coRooms.map(r=>r.code));
   const manual=[];
   for(const key of Object.keys(hkStatusData)){
     if(!key.endsWith('_'+dateStr))continue;
     const roomCode=key.slice(0,-(dateStr.length+1));
     if(seen.has(roomCode))continue;
-    const room=getHkRooms().find(r=>r.code===roomCode);
+    const room=hkRoomsForRole().find(r=>r.code===roomCode);
     if(room){manual.push(room);seen.add(roomCode);}
   }
   return [...coRooms,...manual];

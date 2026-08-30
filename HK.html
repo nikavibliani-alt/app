@@ -276,6 +276,9 @@ const ROOMS=[
 
 let reservations=[];
 let cleaningStatus={};
+let _hkTeams=[];
+let _hkTeamById={};
+let _hkTeamLabels={admin:'📍 All Properties'};
 
 let activeDay=0;
 let loadCount=0;
@@ -375,13 +378,33 @@ function renderTabs(){
   el.innerHTML=html;
 }
 // ── PIN / AUTH ────────────────────────────────────────────────────────────────
-let _hkPins={shartava:'',centre:'',vgl:'',admin:''};
+let _hkPins={};
 let _pinsReady=false;
-const ROLE_LABELS={shartava:'📍 Shartava',centre:'📍 Centre',vgl:'📍 VGL HK',admin:'📍 All Properties'};
 let _pinBuf='';
 
+function hkSiteFromCode(code){
+  const c=String(code||'').toLowerCase();
+  if(/^orb-|^tab-/.test(c))return 'centre';
+  if(/^vgl-/.test(c))return 'vgl';
+  if(c==='abashidze')return 'abashidze';
+  return 'shartava';
+}
+function hkRefreshTeamLabels(){
+  _hkTeamById={};
+  _hkTeamLabels={admin:'📍 All Properties'};
+  _hkTeams.forEach(t=>{
+    _hkTeamById[t.id]=t;
+    _hkTeamLabels[t.id]='📍 '+t.label;
+  });
+}
 function getActiveRooms(){
   const role=localStorage.getItem('hk_role')||'';
+  if(!role||role==='admin')return ROOMS;
+  const team=_hkTeamById[role];
+  if(team?.roomCodes?.length){
+    const set=new Set(team.roomCodes.map(c=>String(c).toLowerCase()));
+    return ROOMS.filter(r=>set.has(String(r.code).toLowerCase()));
+  }
   if(role==='shartava')return ROOMS.filter(r=>r.location==='shartava');
   if(role==='centre')return ROOMS.filter(r=>r.location==='centre');
   if(role==='vgl')return ROOMS.filter(r=>r.location==='vgl');
@@ -404,15 +427,14 @@ function _submitPin(){
     return;
   }
   let matchedRole=null;
-  if(_pinBuf&&_pinBuf===_hkPins.shartava)matchedRole='shartava';
-  else if(_pinBuf&&_pinBuf===_hkPins.centre)matchedRole='centre';
-  else if(_pinBuf&&_pinBuf===_hkPins.vgl)matchedRole='vgl';
-  else if(_pinBuf&&_pinBuf===_hkPins.admin)matchedRole='admin';
+  for(const [id,pin] of Object.entries(_hkPins)){
+    if(_pinBuf&&pin&&_pinBuf===pin){matchedRole=id;break;}
+  }
   if(matchedRole){
     localStorage.setItem('hk_role',matchedRole);
     document.getElementById('pin-screen').style.display='none';
     document.getElementById('app').style.display='';
-    const lb=document.getElementById('loc-badge');if(lb)lb.textContent=ROLE_LABELS[matchedRole];
+    const lb=document.getElementById('loc-badge');if(lb)lb.textContent=_hkTeamLabels[matchedRole]||matchedRole;
     render();
   } else {
     const e=document.getElementById('pin-err');if(e)e.textContent='Wrong PIN — try again';
@@ -429,9 +451,9 @@ window.logout=function(){
 // Restore session from localStorage on load
 (function(){
   const role=localStorage.getItem('hk_role');
-  if(role&&role in ROLE_LABELS){
+  if(role&&_hkTeamLabels[role]){
     document.getElementById('app').style.display='';
-    const lb=document.getElementById('loc-badge');if(lb)lb.textContent=ROLE_LABELS[role];
+    const lb=document.getElementById('loc-badge');if(lb)lb.textContent=_hkTeamLabels[role];
   } else {
     document.getElementById('pin-screen').style.display='flex';
   }
@@ -439,10 +461,12 @@ window.logout=function(){
 
 function getCleanerName(){
   const role=localStorage.getItem('hk_role')||'';
+  const team=_hkTeamById[role];
+  if(team?.label)return team.label;
+  if(role==='admin')return 'Admin';
   if(role==='shartava')return 'Shartava Team';
   if(role==='centre')return 'Centre Team';
   if(role==='vgl')return 'VGL Team';
-  if(role==='admin')return 'Admin';
   return '';
 }
 function statusKey(roomCode,date){return roomCode+'_'+(typeof date==='string'?date.slice(0,10):fmtDate(date));}
@@ -619,9 +643,9 @@ onSnapshot(collection(db,'hk_status'),snap=>{
 
 
 
-// Load PINs from Firebase
 onSnapshot(collection(db,'hk_pins'),snap=>{
-  snap.docs.forEach(d=>{if(d.id in _hkPins)_hkPins[d.id]=d.data().pin||'';});
+  _hkPins={};
+  snap.docs.forEach(d=>{_hkPins[d.id]=d.data().pin||'';});
   _pinsReady=true;
   const sub=document.getElementById('pin-sub');
   if(sub&&sub.textContent!=='Enter your PIN to continue')sub.textContent='Enter your PIN to continue';
@@ -630,6 +654,33 @@ onSnapshot(collection(db,'hk_pins'),snap=>{
   const sub=document.getElementById('pin-sub');
   if(sub)sub.textContent='Connection error — refresh page';
 });
+
+onSnapshot(doc(db,'checkin_admin','config'),snap=>{
+  const teams=snap.exists()?snap.data()?.hkSettings?.teams:null;
+  if(Array.isArray(teams)&&teams.length)_hkTeams=teams;
+  hkRefreshTeamLabels();
+  const role=localStorage.getItem('hk_role');
+  const lb=document.getElementById('loc-badge');
+  if(role&&lb&&_hkTeamLabels[role])lb.textContent=_hkTeamLabels[role];
+  render();
+},(e)=>console.error('hk config listener error:',e));
+
+onSnapshot(collection(db,'checkin_rooms'),snap=>{
+  const list=snap.docs
+    .filter(d=>d.data().active!==false&&d.data().showInHk!==false)
+    .map(d=>{
+      const data=d.data();
+      return{
+        code:d.id,
+        name:data.displayName||d.id,
+        group:data.group||'',
+        location:data.site||hkSiteFromCode(d.id),
+      };
+    })
+    .sort((a,b)=>String(a.code).localeCompare(String(b.code)));
+  if(list.length)ROOMS=list;
+  if(loadCount<1)checkReady();else render();
+},(e)=>console.error('checkin_rooms listener error:',e));
 
 // safety fallback
 setTimeout(()=>{
