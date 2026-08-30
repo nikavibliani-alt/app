@@ -373,8 +373,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830q';
-  if(!/[?&]build=20260830q(?:&|$)/.test(location.search)){
+  var BUILD='20260830r';
+  if(!/[?&]build=20260830r(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -1609,6 +1609,8 @@ window.waInsertChip=function(targetId,token){
 function renderWaSettings(){
   const root=document.getElementById('wasettings-root');
   if(!root)return;
+  try{
+  if(!waSettings.checkinInvite)waSettings.checkinInvite={...WA_MSG_DEFAULTS.checkinInvite};
   if(!waSettings.checkinInvite[_waInviteProp])waSettings.checkinInvite[_waInviteProp]=WA_MSG_DEFAULTS.checkinInvite[_waInviteProp]||'';
   const inviteChips=['{{firstName}}','{{checkinUrl}}'].map(t=>
     `<button type="button" class="wa-chip" onclick="waInsertChip('wa-invite-editor','${t}')">${t}</button>`).join('');
@@ -1664,6 +1666,21 @@ function renderWaSettings(){
       </div>
     </div>`;
   waUpdatePreview();
+  }catch(e){
+    console.error('[renderWaSettings]',e);
+    root.innerHTML=`<div class="empty" style="padding:24px 16px;text-align:center;line-height:1.5">Could not open WhatsApp templates.<br><span style="font-size:12px;color:var(--muted)">${esc(String(e.message||e))}</span></div>`;
+  }
+}
+async function loadAndRenderWaSettings(){
+  const root=document.getElementById('wasettings-root');
+  if(root)root.innerHTML='<div class="empty">Loading templates…</div>';
+  try{
+    if(!waLoaded)await loadGuestSettings();
+    renderWaSettings();
+  }catch(e){
+    console.error('[loadAndRenderWaSettings]',e);
+    if(root)root.innerHTML='<div class="empty">Could not load templates. Check connection and refresh.</div>';
+  }
 }
 window.saveWaSettings=async function(){
   waReadFormIntoSettings();
@@ -2056,7 +2073,7 @@ window.switchTab=function(tab){
   if(tab==='hk')renderHk();
   if(tab==='hksettings')renderHkSettings();
   if(tab==='guestsettings')loadAndRenderGuestSettings();
-  if(tab==='wasettings'){if(!waLoaded)loadGuestSettings().then(()=>renderWaSettings());else renderWaSettings();}
+  if(tab==='wasettings')loadAndRenderWaSettings();
   if(tab==='failures')renderFailures();
   if(tab==='navsettings')renderNavSettings();
   closeDetail();closeReqDetail();closeGpEditor();
