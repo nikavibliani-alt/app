@@ -599,6 +599,13 @@ const db=getFirestore(fb);
 const fns=getFunctions(fb,'europe-west1');
 const _usingPipelineEmulator=connectPipelineFunctionsEmulator(fns,connectFunctionsEmulator);
 if(_usingPipelineEmulator){mountEmulatorBanner();console.info('[sandbox] pipeline functions → emulator 127.0.0.1:5001');}
+else if(!document.getElementById('admin-sandbox-banner')){
+  const el=document.createElement('div');
+  el.id='admin-sandbox-banner';
+  el.innerHTML='Admin sandbox · <a href="sandbox-index.html" style="color:#fff;text-decoration:underline">Testing hub</a> · not live';
+  el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99998;padding:5px 12px;background:#7a5a0a;color:#fff;font:600 11px/1.4 system-ui,sans-serif;text-align:center;';
+  document.body.prepend(el);
+}
 const pipelineAdmin=createPipelineAdminClient(fns,httpsCallable);
 function _pipelineCallableHint(){
   if(_usingPipelineEmulator||shouldUseFunctionsEmulator())

@@ -23,9 +23,10 @@ Read that file before any major edit. It contains:
 ## Quick start for agents
 
 1. Read `GUEST_CHECKIN_REDESIGN.md` §0, §9, §16, §18, §20.
-2. Edit **`checkin-guest-sandbox-2.html` only** (unless explicitly doing Sandbox 3 or cutover).
-3. Use the **Sandbox 2 dev toolbar** at the bottom of the page to jump screens/phases without Firebase.
-4. Do **not** edit `checkin-guest-v2.html` until host approves cutover (§7).
+2. Edit **`checkin-guest-sandbox-2.html`** and **`checkin-admin-sandbox.html`** only (unless cutover approved).
+3. Test at **https://app.maxelaapartments.com/sandbox-index.html** before touching live files.
+4. See **`docs/SANDBOX_TESTING.md`** for the full checklist.
+5. Do **not** edit `checkin-guest-v2.html` or `checkin-admin.html` until host approves cutover (§7).
 
 ## Related docs
 
