@@ -556,6 +556,7 @@ function _submitPin(){
   else if(_pinBuf&&_pinBuf===_hkPins.admin)matchedRole='admin';
   if(matchedRole){
     localStorage.setItem('hk_shartava_role',matchedRole);
+    if(matchedRole==='admin')localStorage.setItem('hk_role','admin');
     document.getElementById('pin-screen').style.display='none';
     document.getElementById('app').style.display='';
     const lb=document.getElementById('loc-badge');if(lb)lb.textContent=ROLE_LABELS[matchedRole];
@@ -590,7 +591,10 @@ function getCleanerName(){
   if(role==='admin')return 'Admin';
   return '';
 }
-function isAdmin(){return localStorage.getItem('hk_shartava_role')==='admin';}
+function isAdmin(){
+  const r=localStorage.getItem('hk_shartava_role')||localStorage.getItem('hk_role')||'';
+  return r==='admin';
+}
 function statusKey(roomCode,date){return roomCode+'_'+(typeof date==='string'?date.slice(0,10):fmtDate(date));}
 
 // ── GUEST REQUESTS ───────────────────────────────────────────────────────────

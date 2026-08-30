@@ -295,10 +295,6 @@ html.admin-authed #app{display:block;}
 .nav-cfg-body{flex:1;min-width:0;}
 .nav-cfg-body__label{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;}
 .nav-cfg-body select{width:100%;min-height:40px;border:1.5px solid var(--line);border-radius:var(--rs);font-size:14px;font-family:var(--sans);padding:0 10px;background:var(--bg);}
-.nav-cfg-star{flex-shrink:0;width:56px;height:56px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;-webkit-tap-highlight-color:transparent;transition:transform .22s cubic-bezier(.34,1.4,.64,1);}
-.nav-cfg-star svg{width:36px;height:36px;stroke:var(--line);fill:none;stroke-width:1.5;transition:stroke .2s,fill .2s,transform .2s;}
-.nav-cfg-star.on svg{stroke:#d97706;fill:#fbbf24;filter:drop-shadow(0 2px 4px rgba(217,119,6,.3));}
-.nav-cfg-star:active{transform:scale(1.14);}
 .nav-cfg-landing{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;height:34px;padding:0 10px;border:1.5px solid var(--line);border-radius:999px;background:var(--bg);color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;cursor:pointer;font-family:var(--sans);-webkit-tap-highlight-color:transparent;transition:border-color .15s,background .15s,color .15s;}
 .nav-cfg-landing__dot{width:7px;height:7px;border-radius:50%;border:1.5px solid currentColor;background:transparent;flex-shrink:0;}
 .nav-cfg-landing.on{border-color:var(--green);background:var(--green-bg);color:var(--green);}
@@ -312,7 +308,24 @@ html.admin-authed #app{display:block;}
 .nav-cfg-remove{flex-shrink:0;width:36px;height:36px;border:none;background:transparent;color:var(--muted);font-size:20px;cursor:pointer;border-radius:8px;-webkit-tap-highlight-color:transparent;}
 .nav-cfg-remove:disabled{opacity:.2;cursor:default;}
 .nav-cfg-placeholder{border:2px dashed var(--line);border-radius:var(--r);background:var(--bg);opacity:.85;transition:height 380ms cubic-bezier(.22,1,.36,1),margin 380ms cubic-bezier(.22,1,.36,1),opacity 380ms ease;box-sizing:border-box;}
-.apt-order-row{display:flex;flex-direction:column;gap:2px;flex-shrink:0;justify-content:center;}
+.apt-order-row{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;flex-shrink:0;}
+.apt-order-arrow{width:44px;height:40px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;-webkit-tap-highlight-color:transparent;transition:color .15s,transform .15s;}
+.apt-order-arrow svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;}
+.apt-order-arrow:active:not(:disabled){color:var(--ink);transform:scale(1.06);}
+.apt-order-arrow:disabled{opacity:.22;cursor:default;}
+.hk-admin-bar{margin-bottom:12px;}
+.hk-card__admin{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
+.hk-card__admin-btn{height:32px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;font-family:var(--sans);}
+.hk-card__admin-btn.danger{color:var(--red);border-color:#fca5a5;background:var(--red-bg);}
+.hk-admin-modal{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:240;display:flex;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom);}
+.hk-admin-modal[hidden]{display:none;}
+.hk-admin-modal__sheet{width:min(100%,480px);background:var(--surface);border-radius:16px 16px 0 0;padding:18px 16px 16px;max-height:85vh;overflow:auto;}
+.hk-admin-modal__title{font-size:16px;font-weight:700;margin-bottom:12px;}
+.hk-admin-modal__actions{display:flex;gap:8px;margin-top:14px;}
+.hk-admin-modal__actions .btn{flex:1;}
+.hk-move-days{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.hk-move-day{padding:8px 12px;border:1.5px solid var(--line);border-radius:999px;background:var(--bg);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+.hk-move-day:active{background:var(--green-bg);border-color:var(--green);color:var(--green);}
 .save-bar{position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(100%,480px);padding:10px 14px;background:var(--ink);color:#fff;display:none;align-items:center;justify-content:space-between;gap:10px;z-index:90;box-shadow:0 -4px 20px rgba(0,0,0,.12);}
 .save-bar.show{display:flex;}
 .save-bar button{min-height:40px;padding:0 16px;border-radius:var(--rs);font-weight:700;font-size:13px;cursor:pointer;border:none;font-family:var(--sans);}
@@ -322,8 +335,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830h';
-  if(!/[?&]build=20260830h(?:&|$)/.test(location.search)){
+  var BUILD='20260830i';
+  if(!/[?&]build=20260830i(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -427,6 +440,16 @@ html.admin-authed #app{display:block;}
       <span class="hk-legend__item"><span class="hk-legend__dot hk-legend__dot--green"></span>Free 2+ days</span>
     </div>
     <div id="hk-list"></div>
+    <div id="hk-admin-modal" class="hk-admin-modal" hidden>
+      <div class="hk-admin-modal__sheet">
+        <div class="hk-admin-modal__title" id="hk-admin-modal-title">HK schedule</div>
+        <div id="hk-admin-modal-body"></div>
+        <div class="hk-admin-modal__actions">
+          <button type="button" class="btn" onclick="hkCloseAdminModal()">Cancel</button>
+          <button type="button" class="btn btn-primary" id="hk-admin-modal-save" onclick="hkSaveAdminModal()">Save</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="pane" id="pane-hksettings">
@@ -2274,10 +2297,8 @@ function renderAptsList(){
       const hint=photoN?photoN+' photo'+(photoN!==1?'s':''):(d.instructions?'Has instructions':'No instructions');
       html+=`<div class="apt-pill-row">
         <div class="apt-order-row">
-          <button type="button" class="apt-order-btn" onclick="event.stopPropagation();moveRoomOrder('${esc(a.id)}','first')" ${idx<=0?'disabled':''} aria-label="Move first">1st</button>
-          <button type="button" class="apt-order-btn" onclick="event.stopPropagation();moveRoomOrder('${esc(a.id)}',-1)" ${idx<=0?'disabled':''} aria-label="Move up">↑</button>
-          <button type="button" class="apt-order-btn" onclick="event.stopPropagation();moveRoomOrder('${esc(a.id)}',1)" ${idx<0||idx>=globalList.length-1?'disabled':''} aria-label="Move down">↓</button>
-          <button type="button" class="apt-order-btn" onclick="event.stopPropagation();moveRoomOrder('${esc(a.id)}','last')" ${idx<0||idx>=globalList.length-1?'disabled':''} aria-label="Move last">Last</button>
+          <button type="button" class="apt-order-arrow" onclick="event.stopPropagation();moveRoomOrder('${esc(a.id)}',-1)" ${idx<=0?'disabled':''} aria-label="Move up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+          <button type="button" class="apt-order-arrow" onclick="event.stopPropagation();moveRoomOrder('${esc(a.id)}',1)" ${idx<0||idx>=globalList.length-1?'disabled':''} aria-label="Move down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
         </div>
         <button type="button" class="apt-pill" onclick="window.openAptEditor('${esc(a.id)}')">
           <span class="apt-dot" style="background:${ok?'var(--green)':'var(--red)'}"></span>
@@ -2501,20 +2522,29 @@ window.doReplacePhoto=async function(idx,input){
 };
 
 /* ── Housekeeping (built into admin) ── */
-const HK_DAY_START=-7;
+const HK_DAY_START=-1;
 const HK_DAY_END=6;
 let hkActiveDay=0;
+let _hkAdminModal=null;
 
 const HK_ROLE_LABELS={shartava:'Shartava',centre:'Centre',vgl:'VGL',admin:'All properties'};
+function hkStoredRole(){
+  return localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role')||'';
+}
+function isHkAdmin(){
+  return hkStoredRole()==='admin'||!!document.getElementById('app')?.offsetParent;
+}
 function updateHkCleanerBadge(){
   const el=document.getElementById('hk-role-badge');
   if(!el)return;
-  const role=localStorage.getItem('hk_role')||'';
+  const role=hkStoredRole();
   if(role&&HK_ROLE_LABELS[role]){el.textContent='Logged in: '+HK_ROLE_LABELS[role];el.hidden=false;}
+  else if(isHkAdmin()){el.textContent='Admin schedule control';el.hidden=false;}
   else el.hidden=true;
 }
 window.hkCleanerLogout=function(){
   localStorage.removeItem('hk_role');
+  localStorage.removeItem('hk_shartava_role');
   updateHkCleanerBadge();
   toast('HK app logged out — open Cleaner app to see PIN screen');
 };
@@ -2666,7 +2696,17 @@ function hkDayTabLabel(offset,dateStr){
   return new Date(dateStr+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric'});
 }
 function hkTaskRooms(dateStr){
-  return getHkRooms().filter(r=>hkGetCheckout(r.code,dateStr));
+  const coRooms=getHkRooms().filter(r=>hkGetCheckout(r.code,dateStr));
+  const seen=new Set(coRooms.map(r=>r.code));
+  const manual=[];
+  for(const key of Object.keys(hkStatusData)){
+    if(!key.endsWith('_'+dateStr))continue;
+    const roomCode=key.slice(0,-(dateStr.length+1));
+    if(seen.has(roomCode))continue;
+    const room=getHkRooms().find(r=>r.code===roomCode);
+    if(room){manual.push(room);seen.add(roomCode);}
+  }
+  return [...coRooms,...manual];
 }
 async function renderHk(){
   updateHkCleanerBadge();
@@ -2694,7 +2734,9 @@ async function renderHk(){
     snap.docs.forEach(d=>{hkStatusData[d.id]=d.data();});
   }catch(e){console.warn('[HK] status load',e);}
   const rooms=hkTaskRooms(dateStr);
-  if(!rooms.length){listEl.innerHTML='<div class="empty">No checkout rooms this day</div>';return;}
+  const admin=isHkAdmin();
+  const adminBar=admin?`<div class="hk-admin-bar"><button type="button" class="btn btn-primary" style="width:100%" onclick="hkOpenAddRoom('${dateStr}')">+ Add room to this day</button></div>`:'';
+  if(!rooms.length){listEl.innerHTML=adminBar+'<div class="empty">No checkout rooms this day</div>';return;}
   const tomorrowStr=hkTomorrowStr(dateStr);
   rooms.sort((a,b)=>hkSortScore(a,dateStr)-hkSortScore(b,dateStr));
   function hkBuildCard(room){
@@ -2717,6 +2759,12 @@ async function renderHk(){
     const priorityCls={red:'hk-priority-red',yellow:'hk-priority-yellow',green:'hk-priority-green'}[priority];
     const inBoxCls=nextSameDay?' tb-urgent':nextTomorrow?' tb-yellow':'';
     const whenLabel=nextRes?(nextSameDay?'Today':nextTomorrow?'Tomorrow':nextRes.checkin):'';
+    const hasRealCo=!!co;
+    const adminBtns=admin?`<div class="hk-card__admin">
+      <button type="button" class="hk-card__admin-btn" onclick="hkOpenEditRoom('${esc(room.code)}','${dateStr}')">Edit times</button>
+      <button type="button" class="hk-card__admin-btn" onclick="hkOpenMoveRoom('${esc(room.code)}','${dateStr}')">Move day</button>
+      ${hasRealCo?'':`<button type="button" class="hk-card__admin-btn danger" onclick="hkRemoveRoom('${esc(room.code)}','${dateStr}')">Remove</button>`}
+    </div>`:'';
     return`<div class="hk-card ${priorityCls}${done?' done':''}">
       <div class="hk-card__top"><div><div class="hk-card__room">${esc(room.code)}</div><div class="hk-card__name">${esc(room.name)}</div></div>
       <span class="pill ${done?'pill-ok':'pill-await'}">${done?'Done':'Pending'}</span></div>
@@ -2728,9 +2776,10 @@ async function renderHk(){
       ${beddingAlert?`<div class="hk-bedding-alert">${esc(beddingAlert)}</div>`:''}
       <div class="hk-card__foot"><span style="font-size:12px;color:var(--muted)">${co?.guest?esc(_stripRoomNum(co.guest)):'—'}</span>
       <button type="button" class="hk-done${done?' undo':''}" onclick="toggleHkDone('${esc(room.code)}','${dateStr}')">${done?'Undo':'Done'}</button></div>
+      ${adminBtns}
     </div>`;
   }
-  let html='';
+  let html=adminBar;
   hkActiveSites().forEach(site=>{
     const siteRooms=rooms.filter(r=>hkSiteId(r.code)===site.id);
     if(!siteRooms.length)return;
@@ -2740,6 +2789,101 @@ async function renderHk(){
   listEl.innerHTML=html;
 }
 window.hkPickDay=function(i){hkActiveDay=i;renderHk();};
+
+function hkCloseAdminModal(){
+  _hkAdminModal=null;
+  const el=document.getElementById('hk-admin-modal');
+  if(el)el.hidden=true;
+}
+window.hkOpenAddRoom=function(dateStr){
+  const onDay=new Set(hkTaskRooms(dateStr).map(r=>r.code));
+  const options=getHkRooms().filter(r=>!onDay.has(r.code));
+  if(!options.length){toast('All rooms already on this day');return;}
+  _hkAdminModal={mode:'add',dateStr};
+  document.getElementById('hk-admin-modal-title').textContent='Add room to '+dateStr;
+  document.getElementById('hk-admin-modal-body').innerHTML=`
+    <label class="apt-label">Room</label>
+    <select class="apt-input" id="hk-admin-room">${options.map(r=>`<option value="${esc(r.code)}">${esc(r.code)} · ${esc(r.name)}</option>`).join('')}</select>`;
+  document.getElementById('hk-admin-modal-save').style.display='';
+  document.getElementById('hk-admin-modal').hidden=false;
+};
+window.hkOpenEditRoom=function(roomCode,dateStr){
+  const key=roomCode+'_'+dateStr;
+  const st=hkStatusData[key]||{};
+  const co=hkGetCheckout(roomCode,dateStr);
+  _hkAdminModal={mode:'edit',roomCode,dateStr};
+  document.getElementById('hk-admin-modal-title').textContent=roomCode+' · '+dateStr;
+  document.getElementById('hk-admin-modal-body').innerHTML=`
+    <label class="apt-label">Checkout time</label>
+    <input class="apt-input" type="time" id="hk-admin-co" value="${esc(st.checkOutTime||co?.checkoutTime||hkSettings.defaultCheckOut||'12:00')}">
+    <label class="apt-label" style="margin-top:10px">Check-in time</label>
+    <input class="apt-input" type="time" id="hk-admin-ci" value="${esc(st.checkInTime||hkSettings.defaultCheckIn||'15:00')}">`;
+  document.getElementById('hk-admin-modal-save').style.display='';
+  document.getElementById('hk-admin-modal').hidden=false;
+};
+window.hkOpenMoveRoom=function(roomCode,dateStr){
+  _hkAdminModal={mode:'move',roomCode,dateStr};
+  document.getElementById('hk-admin-modal-title').textContent='Move '+roomCode+' to…';
+  const chips=[];
+  for(let i=HK_DAY_START;i<=HK_DAY_END;i++){
+    const ds=hkAddDays(i);
+    if(ds===dateStr)continue;
+    chips.push(`<button type="button" class="hk-move-day" onclick="hkMoveRoom('${esc(roomCode)}','${dateStr}','${ds}')">${esc(hkDayTabLabel(i,ds))}</button>`);
+  }
+  document.getElementById('hk-admin-modal-body').innerHTML=`<p style="font-size:12px;color:var(--muted);margin-bottom:4px">Pick a day:</p><div class="hk-move-days">${chips.join('')}</div>`;
+  document.getElementById('hk-admin-modal-save').style.display='none';
+  document.getElementById('hk-admin-modal').hidden=false;
+};
+window.hkMoveRoom=async function(roomCode,fromDate,toDate){
+  if(fromDate===toDate)return;
+  const key=roomCode+'_'+fromDate;
+  const st={...(hkStatusData[key]||{}),roomCode,date:fromDate};
+  try{
+    await setDoc(doc(db,'hk_status',roomCode+'_'+toDate),{
+      ...st,roomCode,date:toDate,manuallyAdded:true,updatedAt:serverTimestamp(),
+    },{merge:true});
+    if(!hkGetCheckout(roomCode,fromDate))await deleteDoc(doc(db,'hk_status',key));
+    toast('Moved to '+toDate);
+    hkCloseAdminModal();
+    renderHk();
+  }catch(e){toast('Move failed: '+e.message);}
+};
+window.hkRemoveRoom=async function(roomCode,dateStr){
+  if(hkGetCheckout(roomCode,dateStr)){toast('Cannot remove — real checkout on this day');return;}
+  if(!confirm(`Remove ${roomCode} from ${dateStr}?`))return;
+  try{
+    await deleteDoc(doc(db,'hk_status',roomCode+'_'+dateStr));
+    delete hkStatusData[roomCode+'_'+dateStr];
+    toast('Removed from schedule');
+    renderHk();
+  }catch(e){toast('Remove failed: '+e.message);}
+};
+window.hkSaveAdminModal=async function(){
+  if(!_hkAdminModal)return;
+  try{
+    if(_hkAdminModal.mode==='add'){
+      const roomCode=document.getElementById('hk-admin-room')?.value;
+      if(!roomCode)return;
+      const dateStr=_hkAdminModal.dateStr;
+      await setDoc(doc(db,'hk_status',roomCode+'_'+dateStr),{
+        roomCode,date:dateStr,done:false,manuallyAdded:true,updatedAt:serverTimestamp(),
+      },{merge:true});
+      toast('Room added');
+    }else if(_hkAdminModal.mode==='edit'){
+      const {roomCode,dateStr}=_hkAdminModal;
+      await setDoc(doc(db,'hk_status',roomCode+'_'+dateStr),{
+        roomCode,date:dateStr,
+        checkOutTime:document.getElementById('hk-admin-co')?.value||'12:00',
+        checkInTime:document.getElementById('hk-admin-ci')?.value||'15:00',
+        updatedAt:serverTimestamp(),
+      },{merge:true});
+      toast('Times saved');
+    }
+    hkCloseAdminModal();
+    renderHk();
+  }catch(e){toast('Save failed: '+e.message);}
+};
+
 window.toggleHkDone=async function(roomCode,dateStr){
   const key=roomCode+'_'+dateStr;
   const cur=!!(hkStatusData[key]?.done);
