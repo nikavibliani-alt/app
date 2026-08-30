@@ -1589,6 +1589,39 @@ function cardStatus(r,form){
   return{label:'AWAITING UNLOCK',cls:'pill-await',key:'need'};
 }
 function fmtDate(s){if(!s)return'—';return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
+function datesOverlap(aIn,aOut,bIn,bOut){if(!aIn||!aOut||!bIn||!bOut)return false;return aIn<bOut&&bIn<aOut;}
+function resolveReservationId(ref){
+  if(!ref)return null;
+  const r=(_resCache||[]).find(x=>x.id===ref||x.reservationNumber===ref);
+  return r?r.id:ref;
+}
+function isSameReservation(r,ref){
+  if(!ref)return false;
+  return r.id===ref||r.reservationNumber===ref;
+}
+function guestStayDates(g){
+  const door=(_resCache||[]).find(r=>isSameReservation(r,g.matchedReservationId));
+  return{checkin:g.arrivalDate||door?.checkin||'',checkout:g.checkoutDate||door?.checkout||''};
+}
+function guestDisplayNameForRes(r){
+  const form=getForm(r)||guestData.find(g=>isSameReservation(r,g.matchedReservationId));
+  if(form)return _stripRoomNum(form.nameRoman||form.name||'Guest');
+  return _stripRoomNum(r.guest||'Guest');
+}
+function findRoomConflictForGuest(g,targetRoom){
+  if(!g||!targetRoom)return null;
+  const dates=guestStayDates(g);
+  if(!dates.checkin||!dates.checkout)return null;
+  const room=targetRoom.toLowerCase();
+  for(const r of(_resCache||[])){
+    if(isSameReservation(r,g.matchedReservationId))continue;
+    if((r.status||'').toUpperCase()==='CANCELLED')continue;
+    if((r.roomCode||r.room||'').toLowerCase()!==room)continue;
+    const rd={checkin:r.checkin||r.checkIn||'',checkout:r.checkout||r.checkOut||''};
+    if(datesOverlap(dates.checkin,dates.checkout,rd.checkin,rd.checkout))return r;
+  }
+  return null;
+}
 function nights(r){return Math.max(0,Math.round((new Date(r.checkout+'T00:00:00Z')-new Date(r.checkin+'T00:00:00Z'))/864e5));}
 function datesStr(r,mode){
   const n=nights(r);
@@ -1865,7 +1898,8 @@ window.moveGuestPipeline=async function(guestId){
   const g=guestData.find(x=>x.id===guestId);
   if(!g||!newRoom)return;
   if(newRoom===g.aptId){toast('Already in '+newRoom);return;}
-  const resId=g.matchedReservationId;
+  if(findRoomConflictForGuest(g,newRoom)){updateDetailRoomAction(guestId);toast('Room occupied — use Swap');return;}
+  const resId=resolveReservationId(g.matchedReservationId);
   if(!resId){toast('No linked reservation — cannot move via pipeline');return;}
   try{
     const r=await pipelineAdmin({
@@ -1876,6 +1910,7 @@ window.moveGuestPipeline=async function(guestId){
     });
     if(!r.ok){
       toast(r.errorCode==='CONFLICT'?'Room conflict — pick another room or swap':(r.message||'Move failed'));
+      updateDetailRoomAction(guestId);
       return;
     }
     toast('Moved to '+newRoom+' ✓');
@@ -1885,6 +1920,67 @@ window.moveGuestPipeline=async function(guestId){
     toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Error: '+e.message);
   }
 };
+
+window.swapGuestPipeline=async function(guestId){
+  const newRoom=document.getElementById('detail-room-select')?.value;
+  const g=guestData.find(x=>x.id===guestId);
+  if(!g||!newRoom)return;
+  const conflict=findRoomConflictForGuest(g,newRoom);
+  if(!conflict){toast('Room is free — use Move');updateDetailRoomAction(guestId);return;}
+  const resId=resolveReservationId(g.matchedReservationId);
+  const otherResId=conflict.id;
+  if(!resId||!otherResId){toast('Missing reservation link — cannot swap');return;}
+  const selfName=_stripRoomNum(g.nameRoman||g.name||'Guest');
+  const otherName=guestDisplayNameForRes(conflict);
+  const fromRoom=g.aptId||'—';
+  if(!confirm(`Swap rooms with ${otherName}?\n\n${selfName} → ${newRoom}\n${otherName} → ${fromRoom}`))return;
+  try{
+    const r=await pipelineAdmin({
+      password:_ADMIN_PWD,
+      actionType:'swap_guests',
+      payload:{reservationId:resId,otherReservationId:otherResId},
+      actor:'admin-sandbox',
+    });
+    if(!r.ok){toast(r.message||'Swap failed');return;}
+    toast(`Swapped with ${otherName} ✓`);
+    openDetail(guestId);
+  }catch(e){
+    console.error('[swapGuestPipeline]',e);
+    toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Error: '+e.message);
+  }
+};
+
+function updateDetailRoomAction(guestId){
+  const g=guestData.find(x=>x.id===guestId);
+  const select=document.getElementById('detail-room-select');
+  const btn=document.getElementById('detail-room-action-btn');
+  const info=document.getElementById('detail-room-swap-info');
+  if(!g||!select||!btn||!info)return;
+  const newRoom=select.value;
+  const currentRoom=g.aptId||'';
+  if(newRoom===currentRoom){
+    btn.textContent='Move';
+    btn.disabled=true;
+    btn.onclick=null;
+    info.style.display='none';
+    info.innerHTML='';
+    return;
+  }
+  btn.disabled=false;
+  const conflict=findRoomConflictForGuest(g,newRoom);
+  if(conflict){
+    const otherName=guestDisplayNameForRes(conflict);
+    btn.textContent='Swap';
+    btn.onclick=()=>window.swapGuestPipeline(guestId);
+    info.style.display='block';
+    info.innerHTML=`<span style="font-size:12px;color:var(--muted);line-height:1.4">Swap with <strong style="color:var(--text)">${esc(otherName)}</strong> — they move to <strong style="color:var(--text)">${esc(currentRoom)}</strong></span>`;
+  }else{
+    btn.textContent='Move';
+    btn.onclick=()=>window.moveGuestPipeline(guestId);
+    info.style.display='none';
+    info.innerHTML='';
+  }
+}
 
 window.openDetail=function(guestId){
   const g=guestData.find(x=>x.id===guestId);if(!g){toast('Guest not found');return;}
@@ -1919,9 +2015,10 @@ window.openDetail=function(guestId){
     ${g.matchedReservationId?`<div style="margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs)">
       <div style="font-size:12px;font-weight:700;margin-bottom:8px">Move room (pipeline)</div>
       <div style="display:flex;gap:8px;align-items:center">
-        <select id="detail-room-select" class="lock-input" style="flex:1;height:44px;margin:0">${roomOptionsHtml(g.aptId)}</select>
-        <button class="btn btn-primary" style="flex:none;min-height:44px;padding:0 14px" onclick="window.moveGuestPipeline('${g.id}')">Move</button>
+        <select id="detail-room-select" class="lock-input" style="flex:1;height:44px;margin:0" onchange="window.updateDetailRoomAction('${g.id}')">${roomOptionsHtml(g.aptId)}</select>
+        <button id="detail-room-action-btn" class="btn btn-primary" style="flex:none;min-height:44px;padding:0 14px">Move</button>
       </div>
+      <div id="detail-room-swap-info" style="display:none;margin-top:8px"></div>
       <p style="font-size:11px;color:var(--muted);margin-top:8px">AdminAction → RoomAssignment · guest link unchanged</p>
     </div>`:''}
     <p style="font-size:12px;color:var(--muted);margin-top:8px;">${esc(fmtDate(g.arrivalDate))} → ${esc(fmtDate(g.checkoutDate||door?.checkout||''))} · ${esc(g.contact||'no contact')}</p>
@@ -1929,7 +2026,9 @@ window.openDetail=function(guestId){
     <button class="btn" style="width:100%;margin-top:12px" onclick="window.openAptEditor('${g.aptId||''}')">Edit apartment instructions</button>
   `;
   document.getElementById('detail').classList.add('open');
+  if(g.matchedReservationId)updateDetailRoomAction(guestId);
 };
+window.updateDetailRoomAction=updateDetailRoomAction;
 window.closeDetail=function(){document.getElementById('detail').classList.remove('open');};
 window.showPassport=function(){document.getElementById('pp-gate').style.display='none';document.getElementById('pp-view').classList.add('show');};
 window.approvePassport=async function(guestId){
