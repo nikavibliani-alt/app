@@ -1,0 +1,17 @@
+{
+  "name": "Maxela / SleepyPMS",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "static-web-server",
+      "command": "python3 -m http.server 8080 --bind 0.0.0.0",
+      "description": "Serves the static HTML apps (guest check-in, admin, pricing, housekeeping) from the repo root at http://localhost:8080"
+    }
+  ],
+  "ports": [
+    {
+      "name": "static-web-server",
+      "port": 8080
+    }
+  ]
+}

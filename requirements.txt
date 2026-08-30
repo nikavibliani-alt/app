@@ -1,0 +1,15 @@
+# Python dependencies for the Maxela pricing + sync scripts.
+# Pinned to match the versions used by the GitHub Actions workflows
+# (.github/workflows/minihotel_reservation_sync.yml and pricing_engine.yml).
+#
+# These scripts run against the live Firebase project and MiniHotel and
+# therefore require secrets at runtime (FIREBASE_SERVICE_ACCOUNT, MINIHOTEL_*,
+# ANTHROPIC_API_KEY, SERPAPI_KEY, SENDGRID_KEY). Installing these packages lets
+# the scripts import and start locally; supply the secrets to run them fully.
+
+requests
+beautifulsoup4
+firebase-admin==6.5.0
+google-cloud-firestore==2.13.1
+cryptography
+anthropic
