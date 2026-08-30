@@ -334,8 +334,11 @@ function getPriority(roomCode,date){
 function getGuestCount(res){
   if(!res)return 0;
   if(typeof res.guests==='number')return res.guests;
-  if(typeof res.guests==='string'&&res.guests!=='')return parseInt(res.guests)||0;
-  if(res.adults)return parseInt(String(res.adults))||0;
+  if(typeof res.guests==='string'&&res.guests!=='')return parseInt(res.guests,10)||0;
+  const adults=parseInt(String(res.adults||0),10)||0;
+  const children=parseInt(String(res.children||res.child||res.kids||0),10)||0;
+  if(adults>0||children>0)return adults+children;
+  if(res.guestCount!=null&&res.guestCount!=='')return parseInt(String(res.guestCount),10)||0;
   return 0;
 }
 function getBeddingAlert(roomCode,guests){

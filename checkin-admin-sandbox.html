@@ -2756,30 +2756,47 @@ function hkSortScore(room,dateStr){
   return pBase+slack;
 }
 function hkDepartingGuestForm(roomCode,dateStr,coRes){
-  const byDate=guestData.find(g=>!g.companionGuest&&g.aptId===roomCode&&g.checkoutDate===dateStr);
-  if(byDate)return byDate;
-  if(coRes)return guestData.find(g=>!g.companionGuest&&(g.matchedReservationId===coRes.id||g.matchedReservationId===coRes.reservationNumber))||null;
-  return null;
+  if(coRes){
+    const linked=findFormForReservation(coRes);
+    if(linked)return linked;
+  }
+  const co=normalizeStayDate(dateStr);
+  return guestData.find(g=>!g.companionGuest&&g.aptId===roomCode&&normalizeStayDate(g.checkoutDate)===co)||null;
 }
 function hkGuestFormForRoom(roomCode,dateStr,nextRes){
-  const forms=guestData.filter(g=>!g.companionGuest&&g.aptId===roomCode&&g.arrivalDate===dateStr);
-  if(forms.length)return forms[0];
   if(nextRes){
-    return guestData.find(g=>!g.companionGuest&&(g.matchedReservationId===nextRes.id||g.matchedReservationId===nextRes.reservationNumber))||null;
+    const linked=findFormForReservation(nextRes);
+    if(linked)return linked;
   }
-  return null;
+  const ci=normalizeStayDate(dateStr);
+  return guestData.find(g=>!g.companionGuest&&g.aptId===roomCode&&normalizeStayDate(g.arrivalDate)===ci)||null;
 }
-function hkGuestCount(res){
+function hkParseGuestNum(v){
+  if(v==null||v==='')return 0;
+  if(typeof v==='number')return v>0?v:0;
+  const n=parseInt(String(v),10);
+  return Number.isFinite(n)&&n>0?n:0;
+}
+function hkGuestCountFromRes(res){
   if(!res)return 0;
-  if(typeof res.guests==='number')return res.guests;
-  if(typeof res.guests==='string'&&res.guests!=='')return parseInt(res.guests,10)||0;
-  if(res.adults!=null||res.children!=null){
-    return (parseInt(String(res.adults||0),10)||0)+(parseInt(String(res.children||0),10)||0);
-  }
+  let n=hkParseGuestNum(res.guests);
+  if(n)return n;
+  n=hkParseGuestNum(res.guestCount);
+  if(n)return n;
+  const adults=hkParseGuestNum(res.adults);
+  const children=hkParseGuestNum(res.children||res.child||res.kids);
+  if(adults||children)return adults+children;
   return 0;
 }
+function hkGuestCount(res,form,statusOverride){
+  const override=hkParseGuestNum(statusOverride);
+  if(override)return override;
+  const fromRes=hkGuestCountFromRes(res);
+  if(fromRes)return fromRes;
+  return hkParseGuestNum(form?.guests);
+}
 function hkGuestLine(res,count,verb){
-  if(count>0)return `${count} ${verb}`;
+  if(count>0)return `👥 ${count} ${verb}`;
   if(res?.guest)return `${_stripRoomNum(res.guest)} ${verb}`;
   if(res)return verb==='arriving'?'Arriving':'Leaving';
   return '—';
@@ -2842,8 +2859,8 @@ async function renderHk(){
     const form=hkGuestFormForRoom(room.code,dateStr,nextRes);
     const departing=hkDepartingGuestForm(room.code,dateStr,co);
     const guestCheckedOut=departing?.guestConfirmedCheckout===true;
-    const outGuests=hkGuestCount(co);
-    const inGuests=hkGuestCount(nextRes);
+    const outGuests=hkGuestCount(co,departing,st.guestCount);
+    const inGuests=hkGuestCount(nextRes,form,st.guestCount);
     const beddingAlert=nextRes?hkBeddingAlert(room.code,inGuests):null;
     const coTime=st.checkOutTime||co?.checkoutTime||hkSettings.defaultCheckOut||'12:00';
     const ciTime=st.checkInTime||formatGuestArrival(form,nextRes);
