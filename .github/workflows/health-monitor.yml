@@ -1,0 +1,35 @@
+name: Health monitor
+
+on:
+  schedule:
+    # 08:00 Tbilisi (UTC+4) = 04:00 UTC
+    - cron: '0 4,16 * * *'
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install script dependencies
+        run: npm install
+        working-directory: scripts
+
+      - name: Install pipeline deps (for npm test)
+        run: npm ci
+        working-directory: pipeline-functions
+
+      - name: Run health monitor
+        run: node health-monitor.js
+        working-directory: scripts
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          HEALTH_ALERT_EMAIL: ${{ secrets.HEALTH_ALERT_EMAIL }}

@@ -2,6 +2,9 @@ name: MiniHotel Reservation Sync
 
 on:
   workflow_dispatch:
+  schedule:
+    # Every 3 hours — keeps reservations fresh for admin + guest search
+    - cron: '0 */3 * * *'
   push:
     branches:
       - main
