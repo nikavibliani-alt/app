@@ -1238,6 +1238,7 @@ import{isGuestUnlocked,tbilisiHour as sharedTbilisiHour}from"./shared/guest-unlo
 import{createPipelineGuestClient}from"./shared/pipeline-guest.js";
 import{buildRegisterPrimaryPayload,buildRegisterCompanionPayload,buildUpdateProfilePayload}from"./shared/guest-register.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
+import{GUEST_APP_VERSION}from"./shared/guest-app-version.js";
 // Storage rules (set in Firebase Console):
 //   match /passport_uploads/{allPaths=**} {
 //     allow write: if true;
@@ -4462,7 +4463,7 @@ setupDateInput();
      ══════════════════════════════════════════════════════════════════ -->
 <div id="sb-toolbar">
   <div class="sb-head">
-    <span class="sb-title">Sandbox 2 · Cursor design</span>
+    <span class="sb-title">Sandbox · v${GUEST_APP_VERSION}</span>
     <button class="sb-collapse-btn" onclick="window._sbToggleCollapse()">hide</button>
   </div>
 

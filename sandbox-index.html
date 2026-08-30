@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maxela — Sandbox testing hub</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f4f6f9;color:#1a1d24;line-height:1.5;padding:20px;max-width:520px;margin:0 auto}
+.badge{display:inline-block;background:#fef3c7;color:#92400e;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:.06em;margin-bottom:12px}
+h1{font-size:22px;font-weight:800;margin-bottom:6px}
+.sub{color:#5a6472;font-size:14px;margin-bottom:20px}
+.card{display:block;background:#fff;border:1px solid #dfe3ea;border-radius:14px;padding:16px;margin-bottom:10px;text-decoration:none;color:inherit;box-shadow:0 4px 16px rgba(0,0,0,.04)}
+.card:hover{border-color:#1a56db}
+.card h2{font-size:16px;margin-bottom:4px}
+.card p{font-size:13px;color:#5a6472}
+.card .tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#1a56db;margin-bottom:6px}
+.card.live{border-color:#81c995;background:#f0fdf4}
+.card.live .tag{color:#137333}
+.note{margin-top:20px;padding:14px;background:#e8f0fe;border-radius:12px;font-size:13px;color:#1a3a5c}
+.note b{display:block;margin-bottom:6px}
+footer{margin-top:24px;font-size:12px;color:#888}
+footer a{color:#1a56db}
+</style>
+</head>
+<body>
+<span class="badge">SANDBOX — NOT LIVE FOR GUESTS</span>
+<h1>Maxela testing hub</h1>
+<p class="sub">Use these links to check the new system before go-live. Guests still use <strong>checkin-guest.html</strong> until you cut over.</p>
+
+<a class="card" href="checkin-admin-sandbox.html">
+  <div class="tag">Admin · new</div>
+  <h2>Admin sandbox</h2>
+  <p>Stay, swap, HK, elevator, apartments, pipeline moves</p>
+</a>
+
+<a class="card" href="checkin-guest-sandbox-2.html">
+  <div class="tag">Guest · new design</div>
+  <h2>Guest sandbox 2</h2>
+  <p>New check-in flow — test registration, unlock, elevator QR</p>
+</a>
+
+<a class="card live" href="checkin-guest.html">
+  <div class="tag">Guest · live today</div>
+  <h2>checkin-guest.html</h2>
+  <p>What guests actually use now (redirects to v2)</p>
+</a>
+
+<a class="card live" href="checkin-admin.html">
+  <div class="tag">Admin · live today</div>
+  <h2>checkin-admin.html</h2>
+  <p>Your current admin panel</p>
+</a>
+
+<a class="card" href="HK.html">
+  <div class="tag">HK</div>
+  <h2>HK app (all sites incl. VGL)</h2>
+  <p>Housekeeping — use this for VGL, not HK-Shartava alone</p>
+</a>
+
+<a class="card" href="SYSTEM_MAP_BEGINNER_2026.html">
+  <div class="tag">Docs</div>
+  <h2>System map (beginner)</h2>
+  <p>How live vs sandbox fits together</p>
+</a>
+
+<div class="note">
+  <b>Checklist</b>
+  Test admin + guest sandbox on your phone with a real tomorrow arrival. When both pass → go live by copying sandbox files to checkin-guest.html and merging to main on GitHub.
+  <br><br>
+  Full guide: <code>docs/SANDBOX_TESTING.md</code> in the repo.
+</div>
+
+<footer>
+  Firebase: sleepy-5c962 · Hosted on GitHub Pages<br>
+  <a href="docs/SANDBOX_TESTING.md">Sandbox testing doc</a> (in repo)
+</footer>
+</body>
+</html>
