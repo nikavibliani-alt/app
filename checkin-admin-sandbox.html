@@ -324,19 +324,20 @@ html.admin-authed #app{display:block;}
 .nav-cfg-landing.on{border-color:var(--green);background:var(--green-bg);color:var(--green);}
 .nav-cfg-landing.on .nav-cfg-landing__dot{background:currentColor;border-color:currentColor;}
 .nav-cfg-landing:active{opacity:.85;}
-.nav-cfg-arrows{flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding-left:4px;}
-.nav-cfg-arrow{width:48px;height:44px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;-webkit-tap-highlight-color:transparent;transition:color .18s,transform .18s;}
-.nav-cfg-arrow svg{width:28px;height:28px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;}
-.nav-cfg-arrow:active:not(:disabled){color:var(--ink);transform:scale(1.08);}
-.nav-cfg-arrow:disabled{opacity:.22;cursor:default;}
 .nav-cfg-remove{flex-shrink:0;width:36px;height:36px;border:none;background:transparent;color:var(--muted);font-size:20px;cursor:pointer;border-radius:8px;-webkit-tap-highlight-color:transparent;}
 .nav-cfg-remove:disabled{opacity:.2;cursor:default;}
 .nav-cfg-placeholder{border:2px dashed var(--line);border-radius:var(--r);background:var(--bg);opacity:.85;transition:height 380ms cubic-bezier(.22,1,.36,1),margin 380ms cubic-bezier(.22,1,.36,1),opacity 380ms ease;box-sizing:border-box;}
-.apt-order-row{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;flex-shrink:0;}
-.apt-order-arrow{width:44px;height:40px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;-webkit-tap-highlight-color:transparent;transition:color .15s,transform .15s;}
-.apt-order-arrow svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;}
-.apt-order-arrow:active:not(:disabled){color:var(--ink);transform:scale(1.06);}
-.apt-order-arrow:disabled{opacity:.22;cursor:default;}
+.apt-reorder-hint{font-size:12px;color:var(--ink-2);margin:-4px 0 10px;padding:8px 12px;background:var(--amber-bg);border:1px solid #f5d89a;border-radius:var(--r);line-height:1.45;}
+.apt-drag{flex-shrink:0;width:36px;align-self:stretch;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--muted);cursor:grab;padding:0;-webkit-tap-highlight-color:transparent;touch-action:none;}
+.apt-drag:active{cursor:grabbing;color:var(--ink);}
+.apt-drag svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;opacity:.55;}
+.apt-pill-row.is-dragging .apt-pill{box-shadow:0 14px 44px rgba(0,0,0,.14);border-color:var(--ink);}
+.apt-pill-row.is-dragging{opacity:.97;z-index:1000;}
+.apt-pill-row.reorder-mode .apt-pill-hide{display:none;}
+.apt-pill-row.reorder-mode .apt-pill{cursor:default;}
+.apt-pill-static{display:flex;align-items:center;gap:10px;flex:1;padding:12px 14px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);font-family:var(--sans);text-align:left;}
+.apt-placeholder{border:2px dashed var(--line);border-radius:var(--r);background:var(--bg);opacity:.85;margin-bottom:6px;transition:height 380ms cubic-bezier(.22,1,.36,1),opacity 380ms ease;box-sizing:border-box;}
+.apt-group__rooms.reorder-active{position:relative;}
 .hk-admin-bar{margin-bottom:12px;}
 .hk-card__admin{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
 .hk-card__admin-btn{height:32px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;font-family:var(--sans);}
@@ -391,8 +392,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830s';
-  if(!/[?&]build=20260830s(?:&|$)/.test(location.search)){
+  var BUILD='20260830t';
+  if(!/[?&]build=20260830t(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -473,8 +474,10 @@ html.admin-authed #app{display:block;}
     <div class="apt-sync-note">MiniHotel sync updates reservations only — your room list and apartment content stay as you set them here.</div>
     <div class="apt-toolbar">
       <button type="button" class="btn btn-primary" onclick="toggleAddRoomForm()">+ Add room</button>
+      <button type="button" class="btn" id="apt-reorder-btn" onclick="toggleAptReorder()">Rearrange</button>
       <button type="button" class="btn" onclick="toggleHiddenRooms()">Hidden rooms</button>
     </div>
+    <div id="apt-reorder-hint" class="apt-reorder-hint" hidden>Drag <strong>≡</strong> to reorder rooms · tap <strong>Done</strong> when finished</div>
     <div id="add-room-form" class="apt-add-form" hidden></div>
     <div id="apts-list"></div>
     <div id="apts-inactive" hidden></div>
@@ -525,7 +528,7 @@ html.admin-authed #app{display:block;}
   </div>
 
   <div class="pane" id="pane-navsettings">
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Drag to reorder · ↑↓ to nudge · tap <strong>Landing</strong> for first tab opened.</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Drag <strong>≡</strong> to reorder · tap <strong>Landing</strong> for first tab opened.</p>
     <div id="nav-preview" class="nav-cfg-preview"></div>
     <div id="nav-slots" class="nav-cfg-list"></div>
     <button type="button" class="btn" style="width:100%;margin-top:12px" id="nav-add-btn" onclick="addNavSlot()">+ Add tab</button>
@@ -728,6 +731,156 @@ window.toggleAptGroup=function(groupName){
 window.toggleAptFold=function(foldId){
   document.getElementById(foldId)?.classList.toggle('collapsed');
 };
+let _aptReorderMode=false;
+let _aptDrag=null;
+let _aptDragRaf=0;
+let _aptLongPressTimer=null;
+let _aptLongPressStartY=0;
+window.toggleAptReorder=function(){
+  if(_aptDrag?.active)return;
+  _aptReorderMode=!_aptReorderMode;
+  renderAptsList();
+};
+window.aptRowPressStart=function(e){
+  if(_aptReorderMode||_aptDrag?.active||e.button!==0)return;
+  const row=e.currentTarget;
+  _aptLongPressStartY=e.clientY;
+  _aptLongPressTimer=setTimeout(()=>{
+    _aptLongPressTimer=null;
+    try{navigator.vibrate?.(12);}catch(err){}
+    _aptReorderMode=true;
+    renderAptsList();
+    toast('Rearrange mode — drag ≡ to move');
+  },480);
+  const cancel=()=>{
+    if(_aptLongPressTimer){clearTimeout(_aptLongPressTimer);_aptLongPressTimer=null;}
+    row.removeEventListener('pointerup',cancel);
+    row.removeEventListener('pointercancel',cancel);
+    row.removeEventListener('pointermove',move);
+  };
+  const move=ev=>{
+    if(Math.abs(ev.clientY-_aptLongPressStartY)>10)cancel();
+  };
+  row.addEventListener('pointerup',cancel,{once:true});
+  row.addEventListener('pointercancel',cancel,{once:true});
+  row.addEventListener('pointermove',move);
+};
+function aptFlipListSiblings(list,mutate){
+  const items=[...list.querySelectorAll('.apt-pill-row:not(.is-dragging)')];
+  const first=new Map(items.map(el=>[el.dataset.room,el.getBoundingClientRect().top]));
+  mutate();
+  requestAnimationFrame(()=>{
+    items.forEach(el=>{
+      const f=first.get(el.dataset.room);
+      if(f==null)return;
+      const now=el.getBoundingClientRect().top;
+      const dy=f-now;
+      if(Math.abs(dy)<1)return;
+      el.style.transition='none';
+      el.style.transform=`translateY(${dy}px)`;
+      requestAnimationFrame(()=>{
+        el.style.transition='transform 380ms cubic-bezier(.22,1,.36,1)';
+        el.style.transform='';
+      });
+    });
+  });
+}
+window.aptDragPointerDown=function(e,roomCode){
+  if(!_aptReorderMode||_aptDrag?.active||e.button!==0)return;
+  const handle=e.currentTarget;
+  const row=handle.closest('.apt-pill-row');
+  const list=row?.closest('.apt-group__rooms');
+  if(!row||!list)return;
+  e.preventDefault();
+  e.stopPropagation();
+  const rect=row.getBoundingClientRect();
+  const placeholder=document.createElement('div');
+  placeholder.className='apt-placeholder';
+  placeholder.style.height=rect.height+'px';
+  list.insertBefore(placeholder,row);
+  row.classList.add('is-dragging');
+  row.style.position='fixed';
+  row.style.left=rect.left+'px';
+  row.style.top=rect.top+'px';
+  row.style.width=rect.width+'px';
+  row.style.margin='0';
+  row.style.zIndex='10000';
+  document.body.appendChild(row);
+  _aptDrag={active:true,roomCode,row,list,placeholder,offsetY:e.clientY-rect.top,pointerId:e.pointerId,pendingY:e.clientY};
+  handle.setPointerCapture(e.pointerId);
+  document.addEventListener('pointermove',aptDragPointerMove);
+  document.addEventListener('pointerup',aptDragPointerEnd);
+  document.addEventListener('pointercancel',aptDragPointerEnd);
+};
+function aptDragPointerMove(e){
+  if(!_aptDrag?.active||e.pointerId!==_aptDrag.pointerId)return;
+  e.preventDefault();
+  _aptDrag.pendingY=e.clientY;
+  if(_aptDragRaf)return;
+  _aptDragRaf=requestAnimationFrame(aptDragTick);
+}
+function aptDragTick(){
+  _aptDragRaf=0;
+  const d=_aptDrag;
+  if(!d?.active)return;
+  const y=d.pendingY;
+  d.row.style.top=(y-d.offsetY)+'px';
+  const siblings=[...d.list.querySelectorAll('.apt-pill-row:not(.is-dragging), .apt-placeholder')];
+  let targetSib=null;
+  for(const sib of siblings){
+    const r=sib.getBoundingClientRect();
+    const mid=r.top+r.height/2;
+    if(y<mid){targetSib=sib;break;}
+  }
+  const curPhIdx=[...d.list.children].indexOf(d.placeholder);
+  const phIdx=targetSib?[...d.list.children].indexOf(targetSib):d.list.children.length;
+  if(phIdx===curPhIdx||phIdx<0)return;
+  aptFlipListSiblings(d.list,()=>{
+    if(targetSib)d.list.insertBefore(d.placeholder,targetSib);
+    else d.list.appendChild(d.placeholder);
+  });
+}
+function aptDragCleanupListeners(){
+  document.removeEventListener('pointermove',aptDragPointerMove);
+  document.removeEventListener('pointerup',aptDragPointerEnd);
+  document.removeEventListener('pointercancel',aptDragPointerEnd);
+}
+async function persistAptOrderFromDom(){
+  const listEl=document.getElementById('apts-list');
+  if(!listEl)return;
+  const ordered=[];
+  listEl.querySelectorAll('.apt-group').forEach(grp=>{
+    grp.querySelectorAll('.apt-pill-row[data-room]').forEach(row=>ordered.push(row.dataset.room));
+  });
+  if(!ordered.length)return;
+  try{
+    await Promise.all(ordered.map((code,i)=>
+      setDoc(doc(db,'checkin_rooms',code),{sortOrder:i*10,updatedAt:serverTimestamp()},{merge:true})
+    ));
+  }catch(e){toast('Reorder save failed: '+e.message);}
+}
+function aptDragPointerEnd(e){
+  if(!_aptDrag?.active)return;
+  const d=_aptDrag;
+  if(e?.pointerId&&e.pointerId!==d.pointerId)return;
+  if(_aptDragRaf){cancelAnimationFrame(_aptDragRaf);_aptDragRaf=0;}
+  aptDragCleanupListeners();
+  const handle=d.row.querySelector('.apt-drag');
+  if(handle){try{handle.releasePointerCapture(d.pointerId);}catch(err){}}
+  d.row.classList.remove('is-dragging');
+  d.row.style.position='';
+  d.row.style.left='';
+  d.row.style.top='';
+  d.row.style.width='';
+  d.row.style.margin='';
+  d.row.style.transform='';
+  d.row.style.transition='';
+  d.row.style.zIndex='';
+  d.list.insertBefore(d.row,d.placeholder);
+  d.placeholder.remove();
+  _aptDrag=null;
+  persistAptOrderFromDom();
+}
 
 function roomsSorted(activeOnly=true){
   return Object.values(roomsData)
@@ -902,9 +1055,8 @@ window.resetNavConfig=async function(){
   renderNavBar();
   toast('Reset to default');
 };
-const NAV_ARROW_UP=featherIcon('chevron-up',20,2);
-const NAV_ARROW_DN=featherIcon('chevron-down',20,2);
 const NAV_DRAG_SVG=featherIcon('menu',18,2);
+const APT_DRAG_SVG=featherIcon('menu',18,2);
 let _navDrag=null;
 
 function renderNavPreview(){
@@ -932,10 +1084,6 @@ function navCfgRowHtml(id,i){
       </select>
     </div>
     <button type="button" class="nav-cfg-landing${isLand?' on':''}" aria-label="Set as landing tab" aria-pressed="${isLand}" onclick="navSetLanding(${i})"><span class="nav-cfg-landing__dot"></span><span>Landing</span></button>
-    <div class="nav-cfg-arrows">
-      <button type="button" class="nav-cfg-arrow" aria-label="Move up" onclick="navMoveSlot(${i},-1)" ${i===0?'disabled':''}>${NAV_ARROW_UP}</button>
-      <button type="button" class="nav-cfg-arrow" aria-label="Move down" onclick="navMoveSlot(${i},1)" ${i>=n-1?'disabled':''}>${NAV_ARROW_DN}</button>
-    </div>
     <button type="button" class="nav-cfg-remove" aria-label="Remove tab" onclick="navRemoveSlot(${i})" ${n<=NAV_MIN?'disabled':''}>×</button>
   </div>`;
 }
@@ -989,16 +1137,6 @@ window.navSetLanding=function(i){
   if(!confirm(`Set "${label}" as the landing tab?\n\nThis tab opens first when you launch the admin app.`))return;
   navConfigDraft.landingTab=id;
   renderNavSettings();
-};
-window.navMoveSlot=function(i,dir){
-  if(!navConfigDraft||dir!==-1&&dir!==1)return;
-  const j=i+dir;
-  if(j<0||j>=navConfigDraft.slots.length)return;
-  navFlipReorder(()=>{
-    const s=navConfigDraft.slots;
-    [s[i],s[j]]=[s[j],s[i]];
-    renderNavSettings();
-  });
 };
 window.navRemoveSlot=function(i){
   if(!navConfigDraft||navConfigDraft.slots.length<=NAV_MIN)return;
@@ -2584,23 +2722,15 @@ window.saveNewRoom=async function(){
     openAptEditor(code);
   }catch(e){toast('Add failed: '+e.message);}
 };
-window.moveRoomOrder=async function(roomCode,dir){
-  const list=roomsSorted(true);
-  const idx=list.findIndex(r=>r.roomCode===roomCode);
-  let j;
-  if(dir==='first')j=0;
-  else if(dir==='last')j=list.length-1;
-  else j=idx+dir;
-  if(idx<0||j<0||j>=list.length||j===idx)return;
-  const a=list[idx],b=list[j];
-  const aOrder=a.sortOrder??idx,bOrder=b.sortOrder??j;
-  try{
-    await Promise.all([
-      setDoc(doc(db,'checkin_rooms',a.roomCode),{sortOrder:bOrder,updatedAt:serverTimestamp()},{merge:true}),
-      setDoc(doc(db,'checkin_rooms',b.roomCode),{sortOrder:aOrder,updatedAt:serverTimestamp()},{merge:true}),
-    ]);
-  }catch(e){toast('Reorder failed: '+e.message);}
-};
+function updateAptReorderUi(){
+  const btn=document.getElementById('apt-reorder-btn');
+  const hint=document.getElementById('apt-reorder-hint');
+  if(btn){
+    btn.textContent=_aptReorderMode?'Done':'Rearrange';
+    btn.classList.toggle('btn-primary',_aptReorderMode);
+  }
+  if(hint)hint.hidden=!_aptReorderMode;
+}
 window.hideRoom=async function(roomCode){
   if(!confirm('Hide '+roomCode+' from lists? Existing reservations are unchanged.'))return;
   try{
@@ -2637,6 +2767,8 @@ function renderAptsList(){
   const listEl=document.getElementById('apts-list');
   const inactiveEl=document.getElementById('apts-inactive');
   if(!listEl)return;
+  if(_aptDrag?.active)return;
+  updateAptReorderUi();
   if(!Object.keys(roomsData).length){
     listEl.innerHTML='<div class="empty">Loading rooms…</div>';
     if(inactiveEl)inactiveEl.hidden=true;
@@ -2648,37 +2780,42 @@ function renderAptsList(){
     if(!seen.has(a.group)){seen.set(a.group,[]);groups.push(a.group);}
     seen.get(a.group).push(a);
   }
-  const globalList=roomsSorted(true);
   const collapsed=getCollapsedAptGroups();
   let html='';
   for(const g of groups){
     const rooms=seen.get(g);
-    const isCollapsed=collapsed.has(g);
+    const isCollapsed=collapsed.has(g)&&!_aptReorderMode;
     html+=`<div class="apt-group${isCollapsed?' collapsed':''}">
-      <button type="button" class="apt-group__hd" data-group="${esc(g)}" onclick="toggleAptGroup(this.dataset.group)">
+      <button type="button" class="apt-group__hd" data-group="${esc(g)}" onclick="toggleAptGroup(this.dataset.group)"${_aptReorderMode?' disabled style="opacity:.55"':''}>
         <span class="apt-group__toggle" aria-hidden="true">${isCollapsed?featherIcon('plus',16,2.2):featherIcon('minus',16,2.2)}</span>
         <span class="apt-group__title">${esc(g)}</span>
         <span class="apt-group__count">${rooms.length}</span>
       </button>
-      <div class="apt-group__rooms">`;
+      <div class="apt-group__rooms${_aptReorderMode?' reorder-active':''}">`;
     for(const a of rooms){
-      const idx=globalList.findIndex(r=>r.roomCode===a.id);
       const d=aptData[a.id]||{};
       const ok=!!(d.tuyaDeviceId||d.doorCode);
       const photoN=(d.photos||[]).length;
       const hint=photoN?photoN+' photo'+(photoN!==1?'s':''):(d.instructions?'Has instructions':'No instructions');
-      html+=`<div class="apt-pill-row">
-        <div class="apt-order-row">
-          <button type="button" class="apt-order-arrow" onclick="event.stopPropagation();moveRoomOrder('${esc(a.id)}',-1)" ${idx<=0?'disabled':''} aria-label="Move up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
-          <button type="button" class="apt-order-arrow" onclick="event.stopPropagation();moveRoomOrder('${esc(a.id)}',1)" ${idx<0||idx>=globalList.length-1?'disabled':''} aria-label="Move down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
-        </div>
-        <button type="button" class="apt-pill" onclick="window.openAptEditor('${esc(a.id)}')">
-          <span class="apt-dot" style="background:${ok?'var(--green)':'var(--red)'}"></span>
-          <span class="apt-pill__code">${esc(a.code)}</span>
-          <span class="apt-pill__name">${esc(a.name)} · ${esc(hint)}</span>
-        </button>
-        <button type="button" class="apt-pill-hide" onclick="hideRoom('${esc(a.id)}')" title="Hide room">Hide</button>
-      </div>`;
+      if(_aptReorderMode){
+        html+=`<div class="apt-pill-row reorder-mode" data-room="${esc(a.id)}">
+          <button type="button" class="apt-drag" aria-label="Drag to reorder" onpointerdown="aptDragPointerDown(event,'${esc(a.id)}')">${APT_DRAG_SVG}</button>
+          <div class="apt-pill-static">
+            <span class="apt-dot" style="background:${ok?'var(--green)':'var(--red)'}"></span>
+            <span class="apt-pill__code">${esc(a.code)}</span>
+            <span class="apt-pill__name">${esc(a.name)} · ${esc(hint)}</span>
+          </div>
+        </div>`;
+      }else{
+        html+=`<div class="apt-pill-row" data-room="${esc(a.id)}" onpointerdown="aptRowPressStart(event)">
+          <button type="button" class="apt-pill" onclick="window.openAptEditor('${esc(a.id)}')">
+            <span class="apt-dot" style="background:${ok?'var(--green)':'var(--red)'}"></span>
+            <span class="apt-pill__code">${esc(a.code)}</span>
+            <span class="apt-pill__name">${esc(a.name)} · ${esc(hint)}</span>
+          </button>
+          <button type="button" class="apt-pill-hide" onclick="hideRoom('${esc(a.id)}')" title="Hide room">Hide</button>
+        </div>`;
+      }
     }
     html+='</div></div>';
   }
