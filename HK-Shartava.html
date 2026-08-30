@@ -4,27 +4,32 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Sleepy HK</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --bg:#f5f5f7;--surface:#fff;--border:#e8e8ed;--border2:#d1d1d6;
-  --text:#1c1c1e;--muted:#6e6e73;--hint:#aeaeb2;
+  --bg:#FAFAF9;--surface:#fff;--border:#E8E4E0;--border2:#D8D4D0;
+  --text:#2C2C2A;--muted:#6B6B68;--hint:#9A9A97;
   --red:#dc2626;--red-bg:#fef2f2;--red-border:#fca5a5;--red-dark:#991b1b;
   --yellow:#d97706;--yellow-bg:#fffbeb;--yellow-border:#fcd34d;--yellow-dark:#92400e;
   --green:#16a34a;--green-bg:#f0fdf4;--green-border:#86efac;--green-dark:#166534;
   --blue:#2563eb;--blue-bg:#eff6ff;--blue-border:#93c5fd;
+  --sans:'Inter',-apple-system,system-ui,sans-serif;
+  --serif:'Playfair Display',Georgia,serif;
+  --mono:ui-monospace,'SF Mono','Cascadia Code',monospace;
   --r:14px;--rs:10px;
 }
-html,body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:15px;min-height:100vh;padding-bottom:3rem;}
+html,body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;font-weight:400;letter-spacing:-.01em;min-height:100vh;padding-bottom:3rem;-webkit-font-smoothing:antialiased;}
 html,body,button,input{touch-action:manipulation;}
 @keyframes spin{to{transform:rotate(360deg);}}
 @keyframes pop{0%{transform:scale(0.95);opacity:0;}100%{transform:scale(1);opacity:1;}}
 
 /* Loading */
 .loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:999;}
-.loading-logo{font-size:22px;font-weight:700;letter-spacing:-0.02em;}
-.loading-logo span{color:var(--blue);}
+.loading-logo{font-family:var(--serif);font-style:italic;font-size:24px;font-weight:500;letter-spacing:-0.02em;}
+.loading-logo span{font-style:normal;font-weight:600;color:var(--blue);}
 .spinner{width:22px;height:22px;border:2.5px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;}
 
 /* Toast */
@@ -34,10 +39,10 @@ html,body,button,input{touch-action:manipulation;}
 /* Header */
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:0.85rem 1rem 0.7rem;position:sticky;top:0;z-index:50;}
 .header-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.logo{font-size:15px;font-weight:700;letter-spacing:-0.02em;}
-.logo span{color:var(--blue);}
-.loc-badge{font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);}
-.header-date{font-size:12px;color:var(--muted);margin-top:4px;font-family:'DM Mono',monospace;}
+.logo{font-family:var(--serif);font-style:italic;font-size:17px;font-weight:500;letter-spacing:-0.02em;}
+.logo span{font-style:normal;font-weight:600;color:var(--blue);}
+.loc-badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);}
+.header-date{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--mono);}
 .sync-row{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--hint);margin-top:3px;}
 .sdot{width:6px;height:6px;border-radius:50%;background:var(--hint);}
 .sdot.live{background:#22c55e;}
@@ -63,7 +68,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 
 /* Content */
 .container{padding:0.75rem 1rem;}
-.group-label{font-size:11px;font-weight:700;color:var(--hint);text-transform:uppercase;letter-spacing:0.08em;margin:1rem 0 0.5rem;padding:0 0.1rem;}
+.group-label{font-size:12px;font-weight:600;color:var(--hint);letter-spacing:.02em;margin:1rem 0 0.5rem;padding:0 0.1rem;}
 
 /* Task card */
 .task-card{border-radius:var(--r);margin-bottom:8px;overflow:hidden;border:2px solid transparent;animation:pop 0.2s ease;position:relative;}
@@ -80,9 +85,9 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .priority-yellow .priority-bar{background:var(--yellow);}
 .priority-green .priority-bar{background:var(--green);}
 .room-info{flex:1;min-width:0;}
-.room-code{font-size:20px;font-weight:700;letter-spacing:-0.02em;font-family:'DM Mono',monospace;line-height:1.1;}
+.room-code{font-size:20px;font-weight:600;letter-spacing:-0.02em;font-family:var(--mono);line-height:1.1;}
 .room-name{font-size:12px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.priority-chip{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;}
+.priority-chip{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;letter-spacing:.01em;flex-shrink:0;}
 .chip-red{background:var(--red);color:#fff;}
 .chip-yellow{background:var(--yellow);color:#fff;}
 .chip-green{background:var(--green);color:#fff;}
@@ -93,13 +98,13 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .tb-out{background:#fff;border-color:var(--red-border);}
 .tb-in{background:#fff;border-color:var(--green-border);}
 .tb-free{background:#fff;border-color:var(--border);}
-.tb-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px;}
+.tb-label{font-size:10px;font-weight:500;letter-spacing:.03em;margin-bottom:3px;}
 .tb-out .tb-label{color:var(--red);}
 .tb-in .tb-label{color:var(--green);}
 .tb-free .tb-label{color:var(--hint);}
-.tb-time{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;line-height:1.1;}
+.tb-time{font-family:var(--mono);font-size:16px;font-weight:600;line-height:1.1;}
 .tb-guest{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.tb-count{font-size:14px;font-weight:700;margin-top:4px;}
+.tb-count{font-size:13px;font-weight:600;margin-top:4px;display:inline-flex;align-items:center;gap:4px;}
 .tb-out .tb-count{color:var(--red-dark);}
 .tb-in .tb-count{color:var(--green-dark);}
 .tb-when{font-size:12px;font-weight:800;letter-spacing:0.02em;margin-bottom:2px;}
@@ -107,14 +112,18 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .tb-in.tb-urgent .tb-when{color:var(--green);font-size:14px;}
 .tb-in.tb-urgent{background:var(--green-bg);border-color:var(--green);border-width:2px;}
 .tb-in.tb-urgent .tb-time{font-size:20px;}
-.done-section-label{font-size:11px;font-weight:700;color:var(--hint);text-transform:uppercase;letter-spacing:0.08em;margin:1.25rem 0 0.5rem;padding:0 0.1rem;opacity:0.6;}
-
+.done-section-label{font-size:12px;font-weight:600;color:var(--hint);letter-spacing:.02em;margin:1.25rem 0 0.5rem;padding:0 0.1rem;opacity:0.7;display:inline-flex;align-items:center;gap:4px;}
+.notes-lbl{font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--yellow-dark);margin-bottom:2px;display:inline-flex;align-items:center;gap:4px;}
+.cleaner-label{font-size:13px;color:var(--muted);font-weight:500;flex:1;display:inline-flex;align-items:center;gap:5px;}
+.bedding-alert{display:inline-flex;align-items:flex-start;gap:6px;margin:0 1rem 0.6rem;background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--rs);padding:8px 10px;font-size:13px;font-weight:500;color:#9a3412;line-height:1.4;}
+.om{display:inline-block;vertical-align:-0.12em;flex-shrink:0;}
+.icon-row{display:inline-flex;align-items:center;gap:5px;}
+.admin-icon-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--surface);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;-webkit-tap-highlight-color:transparent;}
+.admin-icon-btn--del{border-color:var(--red-border);background:var(--red-bg);color:var(--red);font-size:13px;font-weight:600;}
 .notes-box{margin:0 1rem 0.6rem;background:#fff;border-radius:var(--rs);padding:8px 10px;border:1px solid var(--yellow-border);}
-.notes-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--yellow-dark);margin-bottom:2px;}
 .notes-txt{font-size:13px;color:var(--text);}
 
 .card-footer{display:flex;align-items:center;gap:8px;padding:0 1rem 0.85rem;}
-.cleaner-label{font-size:13px;color:var(--muted);font-weight:500;flex:1;}
 .done-btn{height:36px;padding:0 16px;border:none;border-radius:var(--rs);font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;transition:all 0.15s;}
 .btn-mark{background:var(--green);color:#fff;}
 .btn-mark:active{opacity:0.85;}
@@ -122,18 +131,17 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 
 /* Empty */
 .empty{text-align:center;padding:3rem 1rem;color:var(--hint);}
-.empty-icon{font-size:44px;margin-bottom:12px;}
+.empty-icon{margin-bottom:12px;line-height:0;}
 .empty-title{font-size:15px;font-weight:600;color:var(--muted);margin-bottom:6px;}
 .empty-sub{font-size:13px;}
 
-.bedding-alert{margin:0 1rem 0.6rem;background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--rs);padding:8px 10px;font-size:13px;font-weight:600;color:#9a3412;}
 .guest-count{font-size:11px;color:var(--muted);margin-top:3px;}
 
 /* Summary bar */
 .summary-bar{background:var(--surface);border-top:1px solid var(--border);padding:0.75rem 1rem;display:flex;gap:12px;justify-content:center;position:fixed;bottom:0;left:0;right:0;}
 .sum-item{text-align:center;}
-.sum-num{font-size:18px;font-weight:700;font-family:'DM Mono',monospace;}
-.sum-lbl{font-size:10px;color:var(--hint);font-weight:500;text-transform:uppercase;letter-spacing:0.05em;}
+.sum-num{font-size:18px;font-weight:600;font-family:var(--mono);}
+.sum-lbl{font-size:10px;color:var(--hint);font-weight:500;letter-spacing:.02em;}
 .sum-red{color:var(--red);}
 .sum-yellow{color:var(--yellow);}
 .sum-green{color:var(--green);}
@@ -142,7 +150,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 /* Guest Requests */
 .requests-section{margin:10px 12px 0;}
 .requests-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
-.requests-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;}
+.requests-title{font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--muted);}
 .requests-badge{background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;}
 .req-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:6px;overflow:hidden;}
 .req-card-header{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
@@ -187,7 +195,9 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:3000;display:none;align-items:center;justify-content:center;padding:1rem;}
 .modal-overlay.open{display:flex;}
 .modal-box{background:var(--surface);border-radius:var(--r);padding:1.5rem;width:min(340px,100%);box-shadow:0 8px 40px rgba(0,0,0,0.2);animation:pop 0.18s ease;}
-.modal-title{font-size:16px;font-weight:700;margin-bottom:1rem;}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:1rem;display:inline-flex;align-items:center;gap:6px;}
+.om-attrib{text-align:center;font-size:10px;color:var(--hint);padding:10px 1rem 5.5rem;line-height:1.5;}
+.om-attrib a{color:var(--muted);text-decoration:none;}
 .modal-sub{font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:1rem;}
 .modal-field{margin-bottom:12px;}
 .modal-label{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;}
@@ -299,7 +309,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 <!-- Edit Room Modal -->
 <div class="modal-overlay" id="edit-room-modal">
   <div class="modal-box">
-    <div class="modal-title">✏️ Edit Room Details</div>
+    <div class="modal-title"><span id="er-title-icon"></span> Edit room details</div>
     <div id="er-label" class="modal-sub"></div>
     <input type="hidden" id="er-room-code">
     <input type="hidden" id="er-date-val">
@@ -334,7 +344,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
   <div class="header-row">
     <div class="logo">Sleepy <span>HK</span></div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <div class="loc-badge" id="loc-badge">📍 Shartava</div>
+      <div class="loc-badge" id="loc-badge"></div>
       <button class="logout-btn" onclick="window.logout()">Log out</button>
     </div>
   </div>
@@ -358,8 +368,9 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
   <div class="sum-item"><div class="sum-num sum-red" id="sum-red">0</div><div class="sum-lbl">Urgent</div></div>
   <div class="sum-item"><div class="sum-num sum-yellow" id="sum-yellow">0</div><div class="sum-lbl">Today</div></div>
   <div class="sum-item"><div class="sum-num sum-green" id="sum-green">0</div><div class="sum-lbl">Free</div></div>
-  <div class="sum-item"><div class="sum-num sum-done" id="sum-done">0</div><div class="sum-lbl">Done ✓</div></div>
+  <div class="sum-item"><div class="sum-num sum-done" id="sum-done">0</div><div class="sum-lbl">Done</div></div>
 </div>
+<p class="om-attrib">Icons by <a href="https://openmoji.org" target="_blank" rel="noopener">OpenMoji</a> · CC BY-SA 4.0</p>
 </div>
 
 <script type="module">
@@ -375,6 +386,17 @@ const fb=initializeApp({
   appId:"1:152940098906:web:bf245230d705c0a62c2f63"
 });
 const db=getFirestore(fb);
+
+const OM_BASE='https://cdn.jsdelivr.net/npm/openmoji@15.0.0/color/svg';
+function om(code,size=16,alt=''){
+  return `<img class="om" src="${OM_BASE}/${code}.svg" width="${size}" height="${size}" alt="${alt}" loading="lazy" draggable="false">`;
+}
+function setLocBadge(role){
+  const lb=document.getElementById('loc-badge');
+  if(!lb)return;
+  const names={shartava:'Shartava',centre:'Centre',admin:'All Properties'};
+  lb.innerHTML=`${om('1F4CD',14,'Location')} ${names[role]||role}`;
+}
 
 // ── ROOM DEFINITIONS ──────────────────────────────────────
 const ROOMS=[
@@ -493,10 +515,10 @@ function getGuestCount(res){
 function getBeddingAlert(roomCode,guests){
   if(guests<1)return null;
   const c=roomCode.toLowerCase();
-  if(/^0-/.test(c))return guests>=4?'⚠️ Extra sofa bed sheets needed':null;
-  if(['6-1','6-2','6-4','7-1','7-2','7-4'].includes(c))return guests>=5?'⚠️ Extra sheets needed':null;
-  if(c==='6-3')return guests>=9?'⚠️ Extra sheets needed':null;
-  if(['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3'].includes(c))return guests>=3?'⚠️ Extra sheets needed':null;
+  if(/^0-/.test(c))return guests>=4?'Extra sofa bed sheets needed':null;
+  if(['6-1','6-2','6-4','7-1','7-2','7-4'].includes(c))return guests>=5?'Extra sheets needed':null;
+  if(c==='6-3')return guests>=9?'Extra sheets needed':null;
+  if(['orb-1','orb-2','orb-3','tab-1','tab-2','tab-3'].includes(c))return guests>=3?'Extra sheets needed':null;
   return null;
 }
 function getTaskRooms(date){
@@ -525,7 +547,6 @@ function renderTabs(){
 // ── PIN / AUTH ────────────────────────────────────────────────────────────────
 let _hkPins={shartava:'',centre:'',admin:''};
 let _pinsReady=false;
-const ROLE_LABELS={shartava:'📍 Shartava',centre:'📍 Centre',admin:'📍 All Properties'};
 let _pinBuf='';
 
 function getActiveRooms(){
@@ -559,7 +580,7 @@ function _submitPin(){
     if(matchedRole==='admin')localStorage.setItem('hk_role','admin');
     document.getElementById('pin-screen').style.display='none';
     document.getElementById('app').style.display='';
-    const lb=document.getElementById('loc-badge');if(lb)lb.textContent=ROLE_LABELS[matchedRole];
+    const lb=document.getElementById('loc-badge');if(lb)setLocBadge(matchedRole);
     render();
   } else {
     const e=document.getElementById('pin-err');if(e)e.textContent='Wrong PIN — try again';
@@ -576,9 +597,9 @@ window.logout=function(){
 // Restore session from localStorage on load
 (function(){
   const role=localStorage.getItem('hk_shartava_role');
-  if(role&&ROLE_LABELS[role]){
+  if(role){
     document.getElementById('app').style.display='';
-    const lb=document.getElementById('loc-badge');if(lb)lb.textContent=ROLE_LABELS[role];
+    setLocBadge(role);
   } else {
     document.getElementById('pin-screen').style.display='flex';
   }
@@ -673,7 +694,7 @@ function renderGuestRequests(){
     }else{
       actionsHtml=`<div class="req-actions">
         <button class="req-btn req-btn-done" onclick="window.markReqDone('${r.id}')">✓ Done</button>
-        ${sid==='cleaning'?`<button class="req-btn req-btn-time" onclick="window.startChangeTime('${r.id}')">🕐 Time</button>`:''}
+        ${sid==='cleaning'?`<button class="req-btn req-btn-time icon-row" onclick="window.startChangeTime('${r.id}')">${om('1F550',15,'Time')} Time</button>`:''}
         <button class="req-btn req-btn-dismiss" onclick="window.dismissReq('${r.id}')">Dismiss</button>
       </div>`;
     }
@@ -792,7 +813,7 @@ function render(){
   const adminToolbar=isAdmin()?`<button class="admin-add-btn" onclick="window.addRoom()">+ Add Room</button>`:'';
   if(!checkoutRooms.length){
     main.innerHTML=adminToolbar+`<div class="empty">
-      <div class="empty-icon">✨</div>
+      <div class="empty-icon">${om('2728',48,'All clear')}</div>
       <div class="empty-title">Nothing to clean today</div>
       <div class="empty-sub">No checkouts or overdue rooms — have a great day!</div>
     </div>`;
@@ -841,7 +862,7 @@ function render(){
     const outBox=`<div class="time-box tb-out">
       <div class="tb-label">Checkout</div>
       <div class="tb-time">${coTime}</div>
-      ${outGuestsDisplay>0?`<div class="tb-count">👥 ${outGuestsDisplay} leaving</div>`:'<div class="tb-count" style="color:var(--hint);">👥 —</div>'}
+      ${outGuestsDisplay>0?`<div class="tb-count">${om('1F465',15,'Guests')} ${outGuestsDisplay} leaving</div>`:'<div class="tb-count" style="color:var(--hint);">'+om('1F465',15,'Guests')+' —</div>'}
     </div>`;
     let inBox='';
     if(nextRes||sData.checkInTime){
@@ -852,7 +873,7 @@ function render(){
         ${whenLabel?`<div class="tb-when">${whenLabel}</div>`:''}
         ${checkinDateLabel?`<div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${checkinDateLabel}</div>`:''}
         <div class="tb-time">${ciTime}</div>
-        ${inGuestsDisplay>0?`<div class="tb-count">👥 ${inGuestsDisplay} arriving</div>`:''}
+        ${inGuestsDisplay>0?`<div class="tb-count">${om('1F465',15,'Guests')} ${inGuestsDisplay} arriving</div>`:''}
       </div>`;
     } else {
       inBox=`<div class="time-box tb-free">
@@ -860,9 +881,9 @@ function render(){
         <div class="tb-time" style="color:var(--hint);font-size:13px;">No reservation</div>
       </div>`;
     }
-    const notesHtml=co?.notes?`<div class="notes-box"><div class="notes-lbl">📝 Notes</div><div class="notes-txt">${co.notes}</div></div>`:'';
-    const beddingHtml=beddingAlert?`<div class="bedding-alert">${beddingAlert}</div>`:'';
-    const adminCtrl=admin?`<button onclick="window.editRoom('${room.code}','${ds}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Edit details">✏️</button><button onclick="window.removeRoom('${room.code}','${ds}')" style="width:30px;height:30px;border-radius:50%;border:1px solid var(--red-border);background:var(--red-bg);cursor:pointer;font-size:13px;font-weight:700;color:var(--red);display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Remove">✕</button>`:'';
+    const notesHtml=co?.notes?`<div class="notes-box"><div class="notes-lbl">${om('1F4DD',13,'Notes')} Notes</div><div class="notes-txt">${co.notes}</div></div>`:'';
+    const beddingHtml=beddingAlert?`<div class="bedding-alert">${om('26A0',14,'Warning')} ${beddingAlert}</div>`:'';
+    const adminCtrl=admin?`<button type="button" class="admin-icon-btn" onclick="window.editRoom('${room.code}','${ds}')" title="Edit details">${om('270F',16,'Edit')}</button><button type="button" class="admin-icon-btn admin-icon-btn--del" onclick="window.removeRoom('${room.code}','${ds}')" title="Remove">✕</button>`:'';
     return `<div class="task-card priority-${priority}${isDone?' done-card':''}" data-key="${key}">
       <div class="card-top">
         <div class="priority-bar"></div>
@@ -878,7 +899,7 @@ function render(){
       <div class="times-row">${outBox}${inBox}</div>
       ${notesHtml}${beddingHtml}
       <div class="card-footer">
-        <span class="cleaner-label">🧹 ${getCleanerName()}</span>
+        <span class="cleaner-label">${om('1F9F9',16,'Cleaner')} ${getCleanerName()}</span>
         <button class="done-btn ${isDone?'btn-undo':'btn-mark'}" onclick="window.toggleDone('${room.code}','${ds}')">
           ${isDone?'Undo':'✓ Done'}
         </button>
@@ -901,7 +922,7 @@ function render(){
   // Done rooms at bottom
   if(doneRooms.length){
     sumDone=doneRooms.length;
-    html+=`<div class="done-section-label">✓ Completed (${doneRooms.length})</div>`;
+    html+=`<div class="done-section-label">${om('2714',13,'Done')} Completed (${doneRooms.length})</div>`;
     doneRooms.forEach(room=>html+=buildCard(room,true));
   }
 
@@ -1006,6 +1027,8 @@ window.editRoom=function(roomCode,dateStr){
   if(ciSel)ciSel.value=sData.checkInTime||'14:00';
   if(guestInp)guestInp.value=sData.guestCount||'';
   document.getElementById('edit-room-modal').classList.add('open');
+  const ic=document.getElementById('er-title-icon');
+  if(ic)ic.innerHTML=om('270F',18,'Edit');
 };
 window.closeEditRoom=function(){
   document.getElementById('edit-room-modal').classList.remove('open');

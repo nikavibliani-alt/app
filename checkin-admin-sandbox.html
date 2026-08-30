@@ -9,7 +9,7 @@
 <title>Maxela Admin — Sandbox (HK)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -18,6 +18,7 @@
   --line:#E8E4E0;--green:#2d6b50;--green-bg:#edf5f0;--red:#8b2020;--red-bg:#fdf0f0;
   --amber:#6B5A2E;--amber-bg:#faf6ee;--blue:#1a4a7a;--blue-bg:#eef3fa;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --serif:'Playfair Display',Georgia,'Times New Roman',serif;
   --mono:ui-monospace,'SF Mono','Cascadia Code','Segoe UI Mono',monospace;
   --nav-h:64px;--r:10px;--rs:6px;
   --label:11px;--label-weight:500;--label-track:.04em;
@@ -33,8 +34,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15p
 .toast.show{opacity:1;}
 #lock-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:1000;padding:24px;}
 html.admin-authed #lock-screen{display:none;}
-.lock-brand{font-size:22px;font-weight:600;letter-spacing:-.02em;}
-.lock-brand span{color:var(--green);}
+.lock-brand{font-size:24px;font-weight:400;letter-spacing:-.02em;font-family:var(--serif);font-style:italic;}
+.lock-brand span{font-style:italic;font-weight:500;}
 .lock-sub{font-size:13px;color:var(--muted);margin-bottom:8px;}
 .lock-input{width:100%;max-width:280px;height:48px;padding:0 16px;border:1.5px solid var(--line);border-radius:var(--r);font-size:16px;background:var(--surface);}
 .lock-btn{width:100%;max-width:280px;height:48px;background:var(--ink);color:#fff;border:none;border-radius:var(--r);font-size:15px;font-weight:600;cursor:pointer;}
@@ -172,6 +173,8 @@ html.admin-authed #app{display:block;}
 .more-list{display:flex;flex-direction:column;gap:8px;}
 .more-item{display:flex;align-items:center;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);text-decoration:none;color:inherit;font-weight:600;font-size:15px;width:100%;cursor:pointer;font-family:var(--sans);}
 .more-item span{font-size:12px;color:var(--muted);font-weight:500;margin-left:auto;}
+.om-attrib{text-align:center;font-size:10px;color:var(--muted);padding:20px 8px 8px;line-height:1.5;}
+.om-attrib a{color:var(--ink-2);text-decoration:none;}
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,480px);height:calc(var(--nav-h) + env(safe-area-inset-bottom));
   padding-bottom:env(safe-area-inset-bottom);background:var(--surface);border-top:1px solid var(--line);display:flex;z-index:100;box-shadow:0 -4px 20px rgba(0,0,0,.06);}
 .nav__btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:transparent;
@@ -338,8 +341,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830k';
-  if(!/[?&]build=20260830k(?:&|$)/.test(location.search)){
+  var BUILD='20260830l';
+  if(!/[?&]build=20260830l(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -497,6 +500,7 @@ html.admin-authed #app{display:block;}
       <a class="more-item" href="admin-search-test.html" target="_blank" rel="noopener">Search debugger</a>
       <button class="more-item" type="button" onclick="adminSignOut()">Sign out</button>
     </div>
+    <p class="om-attrib">Tab icons are custom SVG. HK app uses <a href="https://openmoji.org" target="_blank" rel="noopener">OpenMoji</a> (CC BY-SA 4.0).</p>
   </div>
 
   <nav class="nav" id="main-nav">
