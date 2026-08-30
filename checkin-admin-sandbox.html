@@ -406,8 +406,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830u';
-  if(!/[?&]build=20260830u(?:&|$)/.test(location.search)){
+  var BUILD='20260830w';
+  if(!/[?&]build=20260830w(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -425,6 +425,36 @@ html.admin-authed #app{display:block;}
   }catch(e){}
 })();
 </script>
+<script>
+(function(){
+  var PWD='maxela2026',KEY='maxela_admin_authed';
+  function unlock(){
+    var inp=document.getElementById('lock-input'),err=document.getElementById('lock-error');
+    if(!inp)return;
+    var val=(inp.value||'').trim();
+    if(val===PWD){
+      try{localStorage.setItem(KEY,'yes_'+Date.now());}catch(e){}
+      document.documentElement.classList.add('admin-authed');
+      var lock=document.getElementById('lock-screen');
+      if(lock)lock.style.display='none';
+      var loading=document.getElementById('loading');
+      if(loading)loading.style.display='none';
+    }else{
+      inp.classList.add('shake');
+      setTimeout(function(){inp.classList.remove('shake');},300);
+      inp.value='';
+      if(err){err.textContent='Incorrect password';setTimeout(function(){err.textContent='';},2500);}
+      inp.focus();
+    }
+  }
+  window.adminUnlock=unlock;
+  try{
+    var t=localStorage.getItem(KEY);
+    if(t&&t.indexOf('yes_')===0&&Date.now()-parseInt(t.slice(4),10)<90*24*3600*1000)
+      document.documentElement.classList.add('admin-authed');
+  }catch(e){}
+})();
+</script>
 </head>
 <body>
 <div id="loading"><div class="spinner"></div><div style="font-size:13px;color:var(--muted)">Loading admin…</div></div>
@@ -432,8 +462,10 @@ html.admin-authed #app{display:block;}
 <div id="lock-screen">
   <div class="lock-brand"><span>Maxela</span> Admin</div>
   <div class="lock-sub">Sandbox · mobile ops</div>
-  <input class="lock-input" type="password" id="lock-input" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')adminUnlock()">
-  <button class="lock-btn" onclick="adminUnlock()">Enter</button>
+  <form id="lock-form" onsubmit="event.preventDefault();adminUnlock();return false;">
+  <input class="lock-input" type="password" id="lock-input" placeholder="Password" autocomplete="current-password">
+  <button class="lock-btn" type="submit">Enter</button>
+  </form>
   <div class="lock-err" id="lock-error"></div>
 </div>
 <div id="app">
@@ -636,7 +668,7 @@ html.admin-authed #app{display:block;}
  */
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
-const SANDBOX_BUILD='20260830v';
+const SANDBOX_BUILD='20260830w';
 (function migrateSandboxBuild(){
   try{
     if(localStorage.getItem('maxela_sandbox_build')!==SANDBOX_BUILD){
@@ -659,13 +691,16 @@ const PRESET='maxela_uploads';
 })();
 window.adminUnlock=function(){
   const inp=document.getElementById('lock-input'),err=document.getElementById('lock-error');
-  if(inp.value===_ADMIN_PWD){
+  const val=(inp?.value||'').trim();
+  if(val===_ADMIN_PWD){
     localStorage.setItem(_ADMIN_KEY,'yes_'+Date.now());
     document.documentElement.classList.add('admin-authed');
     document.getElementById('lock-screen').style.display='none';
+    document.getElementById('loading').style.display='none';
   }else{
     inp.classList.add('shake');setTimeout(()=>inp.classList.remove('shake'),300);
     inp.value='';err.textContent='Incorrect password';setTimeout(()=>err.textContent='',2500);
+    inp.focus();
   }
 };
 window.adminSignOut=function(){localStorage.removeItem(_ADMIN_KEY);location.reload();};
@@ -2382,10 +2417,6 @@ window.unlockGuest=async function(guestId){
 
 function roomOptionsHtml(selected){
   return getRoomOrder().map(r=>`<option value="${esc(r)}"${r===(selected||'')?' selected':''}>${esc(r)}</option>`).join('');
-}
-function datesOverlap(aIn,aOut,bIn,bOut){
-  if(!aIn||!aOut||!bIn||!bOut)return false;
-  return aIn<bOut&&bIn<aOut;
 }
 function resolveReservation(matchedId){
   if(!matchedId)return null;
