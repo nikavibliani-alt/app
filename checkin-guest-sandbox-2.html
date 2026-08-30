@@ -1435,7 +1435,7 @@ function _updateRulesForApt(){
   if(sub&&['6-3','6-4'].includes(aptId))
     sub.textContent='Quiet hours after 10 PM. No running or jumping inside.';
 }
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
 function getCheckInHour(){
   // Read configured check-in hour from apt data (default 14)

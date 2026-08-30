@@ -1529,6 +1529,7 @@ window.resolveSearchFailure=async function(id){
 
 
 function toast(msg,ms=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),ms);}
+<<<<<<< HEAD
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function pipelineRoomToast(r,okMsg){
   const warns=r?.data?.unlockWarnings;
@@ -1543,6 +1544,9 @@ function guestReservationManual(g){
   const door=(_resCache||[]).find(r=>isSameReservation(r,g.matchedReservationId));
   return door&&(door.manualRoom===true||door.manualRoom==='true');
 }
+=======
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+>>>>>>> 52263f6 (Fix esc() to escape quotes in HTML attributes (guest + admin sandboxes))
 function tbilisiNow(){return new Date(Date.now()+4*3600*1000);}
 function tbilisiToday(){return tbilisiNow().toISOString().slice(0,10);}
 function tbilisiHourLocal(){return tbilisiNow().getUTCHours();}
@@ -2999,8 +3003,10 @@ window.updateElevator=async function(){
   let rtdbOk=false,fsOk=false,errMsg='';
   try{await setDoc(doc(db,'globals','elevator_code'),{...updates,code,updatedAt:serverTimestamp(),source:'manual',lastCode:code},{merge:true});fsOk=true;}
   catch(e){errMsg='Firestore: '+e.message;}
-  try{const res=await fetch(RTDB_URL,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});rtdbOk=res.ok;if(!rtdbOk)errMsg=(errMsg?errMsg+'; ':'')+'RTDB HTTP '+res.status;}
-  catch(e){errMsg=(errMsg?errMsg+'; ':'')+'RTDB: '+e.message;}
+  if(fsOk){
+    try{const res=await fetch(RTDB_URL,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});rtdbOk=res.ok;if(!rtdbOk)errMsg=(errMsg?errMsg+'; ':'')+'RTDB HTTP '+res.status;}
+    catch(e){errMsg=(errMsg?errMsg+'; ':'')+'RTDB: '+e.message;}
+  }
   btn.disabled=false;
   if(rtdbOk&&fsOk){
     elevData={code,qrCode,updatedAt:{seconds:Math.floor(nowMs/1000)},source:'manual',lastCode:code,_source:'manual'};
