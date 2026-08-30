@@ -83,6 +83,17 @@ test('no arrivalDate before check-in hour → waiting', () => {
   assert.equal(r.reason, 'no_arrival');
 });
 
+test('mid-stay after midnight Tbilisi (Aug31 00:53, arrived Aug30)', () => {
+  const r = computeGuestUnlock({
+    guest: { arrivalDate: '2026-08-30' },
+    today: '2026-08-31',
+    hour: 0,
+    checkInHour: 15,
+  });
+  assert.equal(r.unlocked, true);
+  assert.equal(r.reason, 'mid_stay');
+});
+
 test('runGuestUnlock force_unlock writes derived fields', async () => {
   const { tbilisiToday } = require('../lib/guest-unlock');
   const today = tbilisiToday();
