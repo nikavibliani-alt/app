@@ -530,7 +530,7 @@ function render(){
     const outBox=`<div class="time-box tb-out">
       <div class="tb-label">Checkout</div>
       <div class="tb-time">${co?.checkoutTime||'12:00'}</div>
-      ${outGuests>0?`<div class="tb-count">👥 ${outGuests} leaving</div>`:'<div class="tb-count" style="color:var(--hint);">👥 —</div>'}
+      ${outGuests>0?`<div class="tb-count">${outGuests} leaving</div>`:'<div class="tb-count" style="color:var(--hint);">—</div>'}
     </div>`;
     let inBox='';
     if(nextRes){
@@ -539,7 +539,7 @@ function render(){
         <div class="tb-label">Check-in</div>
         <div class="tb-when">${whenLabel}</div>
         <div class="tb-time">${nextRes.checkinTime||'14:00'}</div>
-        ${inGuests>0?`<div class="tb-count">👥 ${inGuests} arriving</div>`:''}
+        ${inGuests>0?`<div class="tb-count">${inGuests} arriving</div>`:''}
       </div>`;
     } else {
       inBox=`<div class="time-box tb-free">

@@ -130,6 +130,7 @@ html.admin-authed #app{display:block;}
 .pill-ok{background:var(--green-bg);color:var(--green);}
 .pill-in{background:#e8f0fe;color:#1a56a0;}
 .pill-multi{background:var(--bg);color:var(--muted);margin-left:6px;}
+.pill-manual{background:#fef3c7;color:#92400e;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.04em;}
 .elev-status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:16px;flex-wrap:wrap;}
 .elev-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .elev-dot.fresh{background:var(--green);box-shadow:0 0 0 3px rgba(45,106,79,.2);}
@@ -582,6 +583,7 @@ import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverT
 import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour,normalizeStayDate}from"./shared/guest-unlock.js";
 import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON}from"./shared/hk-bedding.js";
+import{DEFAULT_ROOMS_SEED,ROOM_SITES}from"./shared/room-registry.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 
@@ -604,40 +606,10 @@ function _pipelineCallableHint(){
   return 'Add ?emulator=1 and start emulator, or deploy pipeline-adminAction (see SANDBOX_BACKEND_HANDOFF.md)';
 }
 
-/** One-time seed for empty checkin_rooms — admin owns the list after seed. */
-const DEFAULT_ROOMS_SEED=[
-  {roomCode:'0-1',displayName:'Small Room 1',displayCode:'0-1',group:'Shartava — 0- Rooms',sortOrder:0,site:'shartava',showInHk:true,minihotelNames:['0-1']},
-  {roomCode:'0-2',displayName:'Small Room 2',displayCode:'0-2',group:'Shartava — 0- Rooms',sortOrder:1,site:'shartava',showInHk:true,minihotelNames:['0-2']},
-  {roomCode:'0-3',displayName:'Small Room 3',displayCode:'0-3',group:'Shartava — 0- Rooms',sortOrder:2,site:'shartava',showInHk:true,minihotelNames:['0-3']},
-  {roomCode:'0-4',displayName:'Small Room 4',displayCode:'0-4',group:'Shartava — 0- Rooms',sortOrder:3,site:'shartava',showInHk:true,minihotelNames:['0-4']},
-  {roomCode:'0-5',displayName:'Small Room 5',displayCode:'0-5',group:'Shartava — 0- Rooms',sortOrder:4,site:'shartava',showInHk:true,minihotelNames:['0-5']},
-  {roomCode:'6-1',displayName:'Apartment 6-1',displayCode:'6-1',group:'Shartava — 6- Apartments',sortOrder:10,site:'shartava',showInHk:true,minihotelNames:['M-6-1']},
-  {roomCode:'6-2',displayName:'Apartment 6-2',displayCode:'6-2',group:'Shartava — 6- Apartments',sortOrder:11,site:'shartava',showInHk:true,minihotelNames:['M-6-2']},
-  {roomCode:'6-3',displayName:'Apartment 6-3',displayCode:'6-3',group:'Shartava — 6- Apartments',sortOrder:12,site:'shartava',showInHk:true,minihotelNames:['M-6-3']},
-  {roomCode:'6-4',displayName:'Apartment 6-4',displayCode:'6-4',group:'Shartava — 6- Apartments',sortOrder:13,site:'shartava',showInHk:true,minihotelNames:['M-6-4']},
-  {roomCode:'7-1',displayName:'Apartment 7-1',displayCode:'7-1',group:'Shartava — 7- Apartments',sortOrder:20,site:'shartava',showInHk:true,minihotelNames:['M-7-1']},
-  {roomCode:'7-2',displayName:'Apartment 7-2',displayCode:'7-2',group:'Shartava — 7- Apartments',sortOrder:21,site:'shartava',showInHk:true,minihotelNames:['M-7-2']},
-  {roomCode:'7-4',displayName:'Apartment 7-4',displayCode:'7-4',group:'Shartava — 7- Apartments',sortOrder:22,site:'shartava',showInHk:true,minihotelNames:['M-7-4']},
-  {roomCode:'orb-1',displayName:'Orb Building, Unit 1',displayCode:'Orb 1',group:'City Centre — Orb',sortOrder:30,site:'centre',showInHk:true,minihotelNames:['Midamo 1']},
-  {roomCode:'orb-2',displayName:'Orb Building, Unit 2',displayCode:'Orb 2',group:'City Centre — Orb',sortOrder:31,site:'centre',showInHk:true,minihotelNames:['Midamo 2']},
-  {roomCode:'orb-3',displayName:'Orb Building, Unit 3',displayCode:'Orb 3',group:'City Centre — Orb',sortOrder:32,site:'centre',showInHk:true,minihotelNames:['Midamo 3']},
-  {roomCode:'tab-1',displayName:'Tab Building, Unit 1',displayCode:'Tab 1',group:'City Centre — Tab',sortOrder:40,site:'centre',showInHk:true,minihotelNames:['T-1']},
-  {roomCode:'tab-2',displayName:'Tab Building, Unit 2',displayCode:'Tab 2',group:'City Centre — Tab',sortOrder:41,site:'centre',showInHk:true,minihotelNames:['T-2']},
-  {roomCode:'tab-3',displayName:'Tab Building, Unit 3',displayCode:'Tab 3',group:'City Centre — Tab',sortOrder:42,site:'centre',showInHk:true,minihotelNames:['T-3']},
-  {roomCode:'vgl-st1',displayName:'VGL Studio 1',displayCode:'vgl-st1',group:'VGL',sortOrder:50,site:'vgl',showInHk:true,minihotelNames:['VGL_ST1']},
-  {roomCode:'vgl-st2',displayName:'VGL Studio 2',displayCode:'vgl-st2',group:'VGL',sortOrder:51,site:'vgl',showInHk:true,minihotelNames:['VGL_ST2']},
-  {roomCode:'vgl-ap3',displayName:'VGL Apartment 3',displayCode:'vgl-ap3',group:'VGL',sortOrder:52,site:'vgl',showInHk:true,minihotelNames:['VGL_AP3']},
-  {roomCode:'vgl-ap4',displayName:'VGL Apartment 4',displayCode:'vgl-ap4',group:'VGL',sortOrder:53,site:'vgl',showInHk:true,minihotelNames:['VGL_AP4']},
-  {roomCode:'abashidze',displayName:'Abashidze',displayCode:'abashidze',group:'Abashidze',sortOrder:60,site:'abashidze',showInHk:true,minihotelNames:[]},
-];
-const ROOM_SITES=[
-  {id:'shartava',label:'Shartava'},
-  {id:'centre',label:'City Centre'},
-  {id:'vgl',label:'VGL'},
-  {id:'abashidze',label:'Abashidze'},
-];
+/** Synced from shared/room-registry.js — edit that file to add new apartments. */
 let roomsData={};
 let roomsSeeding=false;
+let _roomsRegistrySynced=false;
 let _showAddRoomForm=false;
 let _showHiddenRooms=false;
 
@@ -675,17 +647,27 @@ function parseMinihotelNames(raw){
   if(Array.isArray(raw))return raw.map(s=>String(s).trim()).filter(Boolean);
   return String(raw||'').split(/[,;]+/).map(s=>s.trim()).filter(Boolean);
 }
-async function ensureRoomsSeeded(){
+async function syncRoomsFromSeed(){
   if(roomsSeeding)return;
-  const snap=await getDocs(collection(db,'checkin_rooms'));
-  if(!snap.empty)return;
   roomsSeeding=true;
   try{
-    for(const r of DEFAULT_ROOMS_SEED){
-      await setDoc(doc(db,'checkin_rooms',r.roomCode),{...r,active:true,updatedAt:serverTimestamp()},{merge:true});
+    const snap=await getDocs(collection(db,'checkin_rooms'));
+    const existing=new Set(snap.docs.map(d=>d.id));
+    const missing=DEFAULT_ROOMS_SEED.filter(r=>!existing.has(r.roomCode));
+    if(snap.empty){
+      for(const r of DEFAULT_ROOMS_SEED){
+        await setDoc(doc(db,'checkin_rooms',r.roomCode),{...r,active:true,updatedAt:serverTimestamp()},{merge:true});
+        await setDoc(doc(db,'checkin_apartments',r.roomCode),{updatedAt:serverTimestamp()},{merge:true});
+      }
+      toast('Room list initialized ('+DEFAULT_ROOMS_SEED.length+' rooms)');
+    }else if(missing.length){
+      for(const r of missing){
+        await setDoc(doc(db,'checkin_rooms',r.roomCode),{...r,active:true,updatedAt:serverTimestamp()},{merge:true});
+        await setDoc(doc(db,'checkin_apartments',r.roomCode),{updatedAt:serverTimestamp()},{merge:true});
+      }
+      toast('Added '+missing.length+' new room(s) from registry');
     }
-    toast('Room list initialized from defaults');
-  }catch(e){console.error('[rooms seed]',e);toast('Room seed failed: '+e.message);}
+  }catch(e){console.error('[rooms sync]',e);toast('Room sync failed: '+e.message);}
   roomsSeeding=false;
 }
 
@@ -1540,7 +1522,20 @@ window.resolveSearchFailure=async function(id){
 
 
 function toast(msg,ms=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),ms);}
-function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function pipelineRoomToast(r,okMsg){
+  const warns=r?.data?.unlockWarnings;
+  if(warns?.length)toast(okMsg+' · unlock warning for '+warns.length+' guest(s) — check logs');
+  else toast(okMsg);
+}
+function reservationManualBadge(grp){
+  const manual=grp.some(r=>r.manualRoom===true||r.manualRoom==='true');
+  return manual?'<span class="pill pill-manual">MANUAL</span>':'';
+}
+function guestReservationManual(g){
+  const door=(_resCache||[]).find(r=>isSameReservation(r,g.matchedReservationId));
+  return door&&(door.manualRoom===true||door.manualRoom==='true');
+}
 function tbilisiNow(){return new Date(Date.now()+4*3600*1000);}
 function tbilisiToday(){return tbilisiNow().toISOString().slice(0,10);}
 function tbilisiHourLocal(){return tbilisiNow().getUTCHours();}
@@ -1756,8 +1751,9 @@ function renderCard(grp,mode){
   const guests=grp.reduce((s,r)=>s+(r.guests||1),0);
   const sub=[src,ref?'#'+ref:'',guests>1?guests+' guests':'',rawPhone||''].filter(Boolean).join(' · ');
   const open=form?`onclick="window.openDetail('${form.id}')" style="cursor:pointer"`:'';
+  const manualBadge=reservationManualBadge(grp);
   return`<div class="card" ${open}>
-    <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${st.cls}">${st.label}</span></div>
+    <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${st.cls}">${st.label}</span>${manualBadge}</div>
     <div class="card__name">${esc(name)}${multi}</div>
     <div class="card__dates">${esc(datesStr(grp[0],mode))}</div>
     ${sub?`<div class="card__sub">${esc(sub)}</div>`:''}
@@ -1959,7 +1955,7 @@ window.moveGuestPipeline=async function(guestId){
       updateDetailRoomAction(guestId);
       return;
     }
-    toast('Moved to '+newRoom+' ✓');
+    pipelineRoomToast(r,'Moved to '+newRoom+' ✓');
     await refreshReservationsNow();
     openDetail(guestId);
   }catch(e){
@@ -1989,11 +1985,34 @@ window.swapGuestPipeline=async function(guestId){
       actor:'admin-sandbox',
     });
     if(!r.ok){toast(r.message||'Swap failed');return;}
-    toast(`Swapped with ${otherName} ✓`);
+    pipelineRoomToast(r,'Swapped with '+otherName+' ✓');
     await refreshReservationsNow();
     openDetail(guestId);
   }catch(e){
     console.error('[swapGuestPipeline]',e);
+    toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Error: '+e.message);
+  }
+};
+
+window.releaseToMinihotel=async function(guestId){
+  const g=guestData.find(x=>x.id===guestId);
+  if(!g?.matchedReservationId){toast('No linked reservation');return;}
+  const resId=resolveReservationId(g.matchedReservationId);
+  if(!resId)return;
+  if(!confirm('Release this booking back to MiniHotel room control?'))return;
+  try{
+    const r=await pipelineAdmin({
+      password:_ADMIN_PWD,
+      actionType:'release_to_minihotel',
+      payload:{reservationId:resId},
+      actor:'admin-sandbox',
+    });
+    if(!r.ok){toast(r.message||'Release failed');return;}
+    toast('Released to MiniHotel ✓');
+    await refreshReservationsNow();
+    openDetail(guestId);
+  }catch(e){
+    console.error('[releaseToMinihotel]',e);
     toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Error: '+e.message);
   }
 };
@@ -2061,12 +2080,13 @@ window.openDetail=function(guestId){
       </div>
     </div>
     ${g.matchedReservationId?`<div style="margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs)">
-      <div style="font-size:12px;font-weight:700;margin-bottom:8px">Move room (pipeline)</div>
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px">Move room (pipeline)${guestReservationManual(g)?' <span class="pill pill-manual">MANUAL</span>':''}</div>
       <div style="display:flex;gap:8px;align-items:center">
         <select id="detail-room-select" class="lock-input" style="flex:1;height:44px;margin:0" onchange="window.updateDetailRoomAction('${g.id}')">${roomOptionsHtml(g.aptId)}</select>
         <button id="detail-room-action-btn" class="btn btn-primary" style="flex:none;min-height:44px;padding:0 14px">Move</button>
       </div>
       <div id="detail-room-swap-info" style="display:none;margin-top:8px"></div>
+      ${guestReservationManual(g)?`<button class="btn" style="width:100%;margin-top:8px" onclick="window.releaseToMinihotel('${g.id}')">Release to MiniHotel (clear manual pin)</button>`:''}
       <p style="font-size:11px;color:var(--muted);margin-top:8px">AdminAction → RoomAssignment · guest link unchanged</p>
     </div>`:''}
     <p style="font-size:12px;color:var(--muted);margin-top:8px;">${esc(fmtDate(g.arrivalDate))} → ${esc(fmtDate(g.checkoutDate||door?.checkout||''))} · ${esc(g.contact||'no contact')}</p>
@@ -2970,10 +2990,10 @@ window.updateElevator=async function(){
     display_code:code,qr_code:qrCode,code,lastCode:code,expires_at:String(nowMs+24*3600*1000),updatedAt:String(nowMs),source:'manual'
   };
   let rtdbOk=false,fsOk=false,errMsg='';
-  try{const res=await fetch(RTDB_URL,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});rtdbOk=res.ok;if(!rtdbOk)errMsg='RTDB HTTP '+res.status;}
-  catch(e){errMsg='RTDB: '+e.message;}
   try{await setDoc(doc(db,'globals','elevator_code'),{...updates,code,updatedAt:serverTimestamp(),source:'manual',lastCode:code},{merge:true});fsOk=true;}
-  catch(e){errMsg=(errMsg?errMsg+'; ':'')+'Firestore: '+e.message;}
+  catch(e){errMsg='Firestore: '+e.message;}
+  try{const res=await fetch(RTDB_URL,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});rtdbOk=res.ok;if(!rtdbOk)errMsg=(errMsg?errMsg+'; ':'')+'RTDB HTTP '+res.status;}
+  catch(e){errMsg=(errMsg?errMsg+'; ':'')+'RTDB: '+e.message;}
   btn.disabled=false;
   if(rtdbOk&&fsOk){
     elevData={code,qrCode,updatedAt:{seconds:Math.floor(nowMs/1000)},source:'manual',lastCode:code,_source:'manual'};
@@ -3054,7 +3074,10 @@ function checkLoaded(){
 onSnapshot(collection(db,'checkin_rooms'),async snap=>{
   roomsData={};
   snap.docs.forEach(d=>{roomsData[d.id]={roomCode:d.id,...d.data()};});
-  if(!snap.docs.length&&!roomsSeeding)await ensureRoomsSeeded();
+  if(!_roomsRegistrySynced&&!roomsSeeding){
+    _roomsRegistrySynced=true;
+    await syncRoomsFromSeed();
+  }
   if(loaded>=2){
     render();
     if(currentTab==='hksettings')renderHkSettings();

@@ -6,7 +6,8 @@
  *   0-*           — 4th guest  (sofa bed sheets)
  *   6-1,6-2,6-4,7-1,7-2,7-4 — after 4th (= 5+ guests)
  *   6-3           — after 8th (= 9+ guests)
- *   orb-*, tab-*  — 3rd guest (Orbeliani / Tabidze studios)
+ *   orb-*, tab-*, vgl-st-*  — 3rd guest
+ *   vgl-ap*       — after 4th (= 5+ guests)
  */
 
 export const HK_GUEST_ICON =
@@ -30,8 +31,11 @@ export function hkBeddingAlert(roomCode, guests) {
   if (c === '6-3') {
     return n >= 9 ? { kind: 'sheets', text: 'Extra sheets needed' } : null;
   }
-  if (/^(orb|tab)-/.test(c)) {
+  if (/^(orb|tab|vgl-st)-/.test(c)) {
     return n >= 3 ? { kind: 'sheets', text: 'Extra sheets needed' } : null;
+  }
+  if (/^vgl-ap/.test(c)) {
+    return n >= 5 ? { kind: 'sheets', text: 'Extra sheets needed' } : null;
   }
   return null;
 }

@@ -133,3 +133,28 @@ test('recomputes unlock for affected guests after swap', async () => {
   assert.deepEqual(ctx.unlockCalls.map((c) => c.guestId), ['g1', 'g2']);
   assert.ok(ctx.unlockCalls.every((c) => c.forceManual === null));
 });
+
+test('surfaces unlock warnings when recompute fails after swap', async () => {
+  const ctx = makeCtx({
+    ok: true,
+    errorCode: 'SWAPPED',
+    message: 'Swapped',
+    data: { affectedGuestIds: ['g1', 'g2'] },
+  });
+  ctx.runGuestUnlock = async (params) => {
+    ctx.unlockCalls = ctx.unlockCalls || [];
+    ctx.unlockCalls.push(params);
+    if (params.guestId === 'g2') return { ok: false, message: 'Guest not found' };
+    return { ok: true, errorCode: 'RECOMPUTED', message: 'Unlocked' };
+  };
+  const result = await runAdminAction(ctx, {
+    actionType: 'swap_guests',
+    payload: { reservationId: 'a', otherReservationId: 'b' },
+    actor: 'admin',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.data.unlockWarnings.length, 1);
+  assert.equal(result.data.unlockWarnings[0].guestId, 'g2');
+  const finalLog = ctx.logs[ctx.logs.length - 1];
+  assert.equal(finalLog.status, 'warn');
+});

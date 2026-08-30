@@ -180,23 +180,32 @@ async function runAdminAction(ctx, params) {
 
   const result = await ctx.runRoomAssignment(roomParams);
 
+  const unlockWarnings = [];
   if (result.ok && ctx.runGuestUnlock) {
     const guestIds = result.data?.affectedGuestIds || [];
     for (const guestId of guestIds) {
-      await ctx.runGuestUnlock({ guestId, actor, forceManual: null, correlationId });
+      const unlockResult = await ctx.runGuestUnlock({ guestId, actor, forceManual: null, correlationId });
+      if (!unlockResult.ok) {
+        unlockWarnings.push({ guestId, message: unlockResult.message || 'Unlock recompute failed' });
+      }
     }
   }
+
+  const outputData = result.data ? { ...result.data } : null;
+  if (outputData && unlockWarnings.length) outputData.unlockWarnings = unlockWarnings;
 
   await ctx.logRun({
     controller: 'AdminAction',
     action: actionType,
-    status: result.ok ? 'ok' : result.errorCode === 'CONFLICT' || result.errorCode === 'NOOP' ? 'warn' : 'error',
-    message: result.message,
+    status: result.ok ? (unlockWarnings.length ? 'warn' : 'ok') : result.errorCode === 'CONFLICT' || result.errorCode === 'NOOP' ? 'warn' : 'error',
+    message: unlockWarnings.length
+      ? `${result.message}; unlock warnings: ${unlockWarnings.length}`
+      : result.message,
     input,
     output: {
       ok: result.ok,
       errorCode: result.errorCode || null,
-      data: result.data || null,
+      data: outputData,
     },
     correlationId,
   });
@@ -205,7 +214,7 @@ async function runAdminAction(ctx, params) {
     ok: result.ok,
     errorCode: result.errorCode || (result.ok ? 'OK' : 'FAILED'),
     message: result.message,
-    data: result.data || null,
+    data: outputData,
   };
 }
 

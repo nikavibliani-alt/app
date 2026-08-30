@@ -48,6 +48,10 @@ ROOM_TO_PROPERTY["orb-2"] = "ORBE_1"
 ROOM_TO_PROPERTY["orb-3"] = "ORBE_2"
 for _i in [1, 2, 4]:
     ROOM_TO_PROPERTY[f"7-{_i}"] = "MAXELA"
+for _code, _ptype in [
+    ('vgl-st1', 'VGL'), ('vgl-st2', 'VGL'), ('vgl-ap3', 'VGL'), ('vgl-ap4', 'VGL'),
+]:
+    ROOM_TO_PROPERTY[_code] = _ptype
 
 
 def parse_date(d):
