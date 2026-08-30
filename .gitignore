@@ -12,3 +12,16 @@ pipeline-functions/.secret.local
 # Catch all firebase debug logs
 firebase-debug*.log
 design-reference/
+
+# scripts/ — Node dependencies, not source
+scripts/node_modules/
+
+# Python dev environment
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Firebase local emulator / CLI state
+.firebase/
+firebase-export-*/
