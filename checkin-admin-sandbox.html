@@ -65,7 +65,10 @@ html.admin-authed #app{display:block;}
 .card__name{font-size:16px;font-weight:600;margin-bottom:4px;letter-spacing:-.01em;}
 .card__dates{font-size:13px;color:var(--muted);}
 .card__sub{font-size:12px;color:var(--muted);margin-top:2px;}
-.card__actions{display:flex;gap:8px;margin-top:12px;}
+.card__actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.failures-toolbar{display:flex;justify-content:flex-end;margin-bottom:12px;}
+.btn-danger{color:var(--red);border-color:#fecaca;background:#fef2f2;}
+.btn-danger:active{background:#fee2e2;}
 .btn{flex:1;min-height:48px;border-radius:var(--r);font-size:14px;font-weight:600;cursor:pointer;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-family:var(--sans);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;}
 .btn:disabled{opacity:.35;cursor:not-allowed;}
 .btn-primary{background:var(--ink);color:#fff;border-color:var(--ink);}
@@ -392,8 +395,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830t';
-  if(!/[?&]build=20260830t(?:&|$)/.test(location.search)){
+  var BUILD='20260830u';
+  if(!/[?&]build=20260830u(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -524,6 +527,7 @@ html.admin-authed #app{display:block;}
   </div>
 
   <div class="pane" id="pane-failures">
+    <div id="failures-toolbar" class="failures-toolbar" hidden></div>
     <div id="failures-list"></div>
   </div>
 
@@ -558,7 +562,7 @@ html.admin-authed #app{display:block;}
       <a class="more-item" href="admin-search-test.html" target="_blank" rel="noopener">Search debugger</a>
       <button class="more-item" type="button" onclick="adminSignOut()">Sign out</button>
     </div>
-    <p class="om-attrib">Icons by <a href="https://feathericons.com/" target="_blank" rel="noopener">Feather</a> (MIT)</p>
+    <p class="om-attrib">Icons by <a href="https://lucide.dev/" target="_blank" rel="noopener">Lucide</a> (ISC)</p>
   </div>
 
   <nav class="nav" id="main-nav">
@@ -940,8 +944,8 @@ const NAV_MIN=2;
 const NAV_MAX=5;
 const NAV_POOL={
   stay:{label:'Stay',pane:'stay',icon:'calendar',extra:''},
-  hk:{label:'HK',pane:'hk',icon:'check-square',extra:''},
-  elevator:{label:'Elevator',pane:'elevator',icon:'chevrons-up',extra:'<span class="dot"></span>',navId:'nav-elev'},
+  hk:{label:'HK',pane:'hk',icon:'bed',extra:''},
+  elevator:{label:'Elevator',pane:'elevator',icon:'arrow-up-down',extra:'<span class="dot"></span>',navId:'nav-elev'},
   requests:{label:'Requests',pane:'requests',icon:'message-square',extra:'<span class="badge" id="req-badge">0</span>',navId:'nav-req'},
   apts:{label:'Apts',pane:'apts',icon:'home',extra:''},
 };
@@ -1318,7 +1322,11 @@ const GP_PROPS=[
   {id:'ROOMS',label:'Rooms'},{id:'MAXELA',label:'Maxela'},{id:'BIG_APT',label:'Big Apt'},
   {id:'FREEDOM',label:'Freedom'},{id:'ORBELIANI',label:'Orbeliani'},
 ];
-const GP_ICON_MAP={key:'key',wifi:'wifi',elevator:'chevrons-up',services:'grid',laundry:'package',cleaning:'check-square',tour:'map',transfer:'truck',recs:'star',rules:'file-text',contact:'message-circle',home:'home',location:'map-pin'};
+const GP_ICON_MAP={
+  key:'key',wifi:'wifi',elevator:'arrow-up-down',services:'layout-grid',
+  laundry:'washing-machine',cleaning:'sparkles',tour:'compass',transfer:'plane',
+  recs:'star',rules:'file-text',contact:'message-circle',home:'home',location:'map-pin',
+};
 function gpIcon(name,size=18){return featherIcon(GP_ICON_MAP[name]||name,size,1.8);}
 const GP_TILES=[
   {id:'checkin',icon:'key',label:'Check-in',group:'essential',noEdit:true},
@@ -1894,7 +1902,18 @@ function updateSfBadge(){
   if(b){b.textContent=n;b.style.display=n?'inline-flex':'none';}
 }
 function renderFailures(){
-  const el=document.getElementById('failures-list');if(!el)return;
+  const el=document.getElementById('failures-list');
+  const toolbar=document.getElementById('failures-toolbar');
+  if(!el)return;
+  if(toolbar){
+    if(searchFailures.length){
+      toolbar.hidden=false;
+      toolbar.innerHTML=`<button type="button" class="btn btn-danger" onclick="deleteAllSearchFailures()">Delete all (${searchFailures.length})</button>`;
+    }else{
+      toolbar.hidden=true;
+      toolbar.innerHTML='';
+    }
+  }
   if(!searchFailures.length){el.innerHTML='<div class="empty">No unresolved failed searches</div>';return;}
   el.innerHTML=searchFailures.map(f=>{
     const ts=f.timestamp?.toDate?f.timestamp.toDate():null;
@@ -1914,10 +1933,28 @@ function renderFailures(){
       <div class="card__actions">
         ${wa?`<a class="btn" href="${wa}" target="_blank" rel="noopener">WhatsApp</a>`:'<button class="btn" disabled>WhatsApp</button>'}
         <button class="btn btn-primary" onclick="resolveSearchFailure('${f.id}')">Resolve</button>
+        <button class="btn btn-danger" onclick="deleteSearchFailure('${f.id}')">Delete</button>
       </div>
     </div>`;
   }).join('');
 }
+window.deleteSearchFailure=async function(id){
+  if(!confirm('Delete this failed search permanently?'))return;
+  try{
+    await deleteDoc(doc(db,'search_failures',id));
+    searchFailures=searchFailures.filter(f=>f.id!==id);
+    updateSfBadge();renderFailures();toast('Deleted');
+  }catch(e){toast('Delete failed: '+e.message);}
+};
+window.deleteAllSearchFailures=async function(){
+  if(!searchFailures.length)return;
+  if(!confirm(`Delete all ${searchFailures.length} failed searches permanently?`))return;
+  try{
+    await Promise.all(searchFailures.map(f=>deleteDoc(doc(db,'search_failures',f.id))));
+    searchFailures=[];
+    updateSfBadge();renderFailures();toast('All deleted');
+  }catch(e){toast('Delete failed: '+e.message);}
+};
 window.resolveSearchFailure=async function(id){
   try{
     await updateDoc(doc(db,'search_failures',id),{resolved:true,resolvedAt:serverTimestamp()});

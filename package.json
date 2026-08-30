@@ -1,0 +1,9 @@
+{
+  "type": "module",
+  "scripts": {
+    "build:icons": "node scripts/build-icons.js"
+  },
+  "devDependencies": {
+    "lucide": "^1.37.0"
+  }
+}
