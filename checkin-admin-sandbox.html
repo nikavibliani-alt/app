@@ -406,8 +406,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830w';
-  if(!/[?&]build=20260830w(?:&|$)/.test(location.search)){
+  var BUILD='20260830x';
+  if(!/[?&]build=20260830x(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -668,7 +668,7 @@ html.admin-authed #app{display:block;}
  */
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
-const SANDBOX_BUILD='20260830w';
+const SANDBOX_BUILD='20260830x';
 (function migrateSandboxBuild(){
   try{
     if(localStorage.getItem('maxela_sandbox_build')!==SANDBOX_BUILD){
@@ -1336,7 +1336,7 @@ const SERVICE_DEFAULTS=[
   {id:'laundry',name:'Laundry',price:0,note:'',desc:'We collect, wash & return.'},
   {id:'cleaning',name:'Room Cleaning',price:30,note:'',desc:'Professional mid-stay cleaning'},
   {id:'city_tour',name:'City Tour',price:50,note:'per person',desc:'Guided tours around Tbilisi'},
-  {id:'airport_transfer',name:'Airport Transfer',price:0,note:'on request',desc:'Door-to-door transfer'},
+  {id:'airport_transfer',name:'Shuttle service',price:0,note:'on request',desc:'Door-to-door airport shuttle'},
   {id:'custom',name:'Other Request',price:0,note:'',desc:'Anything else we can help with?'},
 ];
 const ROOM_CATEGORY_DEFAULTS={
@@ -1359,7 +1359,7 @@ const GP_PROPS=[
 ];
 const GP_ICON_MAP={
   key:'key',wifi:'wifi',elevator:'arrow-up-down',services:'layout-grid',
-  laundry:'washing-machine',cleaning:'sparkles',tour:'compass',transfer:'plane',
+  laundry:'washing-machine',cleaning:'sparkles',tour:'compass',transfer:'plane-arrival',
   recs:'star',rules:'file-text',contact:'message-circle',home:'home',location:'map-pin',
 };
 function gpIcon(name,size=18){return featherIcon(GP_ICON_MAP[name]||name,size,1.8);}
@@ -1371,12 +1371,16 @@ const GP_TILES=[
   {id:'laundry',icon:'laundry',label:'Laundry',group:'service',edit:'laundry'},
   {id:'cleaning',icon:'cleaning',label:'Cleaning',group:'service',edit:'service'},
   {id:'city_tour',icon:'tour',label:'Tours',group:'service',edit:'service'},
-  {id:'airport_transfer',icon:'transfer',label:'Transfer',group:'service',edit:'service'},
+  {id:'airport_transfer',icon:'transfer',label:'Shuttle service',group:'service',edit:'service'},
   {id:'recs',icon:'recs',label:'Recs',group:'content',edit:'text'},
   {id:'rules',icon:'rules',label:'Rules',group:'content',edit:'text'},
   {id:'contact',icon:'contact',label:'Contact',group:'content',edit:'text'},
 ];
-const WAITING_TABS_DEFAULTS={location:true,shuttle:false,tours:false};
+const WAITING_TABS_DEFAULTS={location:true,tours:false};
+const GP_WAITING_TABS=[
+  {id:'location',label:'Location',icon:'location'},
+  {id:'tours',label:'Tours',icon:'tour'},
+];
 const HK_CLEAN_TYPE_DEFAULTS={'0-':45,'6-7':90,'6-3':120,'orb-tab':50,'vgl':90,'abashidze':90,default:75};
 const HK_CLEAN_TYPES=[
   {id:'0-',label:'0- rooms',hint:'Small rooms · 0-1, 0-2, …',match:c=>/^0-/.test(c)},
@@ -1408,14 +1412,18 @@ async function loadGuestSettings(){
       if(d.visibility)gsVisibility={...JSON.parse(JSON.stringify(SECTION_DEFAULTS)),...d.visibility};
       if(d.laundryItems)gsLaundry=d.laundryItems;
       if(d.services){
-        const nameToId={'Cleaning':'cleaning','Room Cleaning':'cleaning','City Tour':'city_tour','Airport Transfer':'airport_transfer','Other Request':'custom','Laundry':'laundry'};
+        const nameToId={'Cleaning':'cleaning','Room Cleaning':'cleaning','City Tour':'city_tour','Airport Transfer':'airport_transfer','Shuttle service':'airport_transfer','Other Request':'custom','Laundry':'laundry'};
         gsServices=d.services.map(s=>{const id=s.id||nameToId[s.name]||'';const def=SERVICE_DEFAULTS.find(x=>x.id===id)||{};return{...def,...s,id};});
         for(const def of SERVICE_DEFAULTS){if(!gsServices.find(s=>s.id===def.id))gsServices.push({...def});}
       }
       if(d.sectionLabels)gsSectionLabels=d.sectionLabels;
       if(d.roomCategories)gsRoomCategories=d.roomCategories;
       if(d.locationInfo)gsLocationInfo=d.locationInfo;
-      if(d.waitingTabs)gsWaitingTabs={...WAITING_TABS_DEFAULTS,...d.waitingTabs};
+      if(d.waitingTabs){
+        const wt={...WAITING_TABS_DEFAULTS,...d.waitingTabs};
+        delete wt.shuttle;
+        gsWaitingTabs=wt;
+      }
       if(d.hkSettings)hkSettings={
         defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS},cleanMinutesByRoom:{},
         ...hkSettings,...d.hkSettings,
@@ -1432,9 +1440,11 @@ function gsMarkDirty(){gsDirty=true;document.getElementById('gs-save-bar')?.clas
 window.gsDiscard=async function(){gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');gsLoaded=false;await loadGuestSettings();renderGuestSettings();toast('Discarded');};
 window.gsSaveAll=async function(){
   try{
+    const waitingTabs={...gsWaitingTabs};
+    delete waitingTabs.shuttle;
     await setDoc(doc(db,'checkin_admin','config'),{
       visibility:gsVisibility,laundryItems:gsLaundry,services:gsServices,sectionLabels:gsSectionLabels,
-      roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,waitingTabs:gsWaitingTabs,hkSettings,
+      roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,waitingTabs,hkSettings,
       updatedAt:serverTimestamp()
     });
     gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');
@@ -1475,13 +1485,18 @@ function renderGuestSettings(){
     <div style="font-size:12px;font-weight:500;letter-spacing:.02em;color:var(--muted);margin-bottom:6px">Guest preview</div>
     <div class="gp-preview">${preview}</div>
     <div class="section-hd" style="margin-top:8px"><h2>Waiting phase tabs</h2></div>
-    ${[{id:'location',label:'Location'},{id:'shuttle',label:'Shuttle service'},{id:'tours',label:'Tours'}].map(t=>{
+    <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Before check-in unlocks. Location on by default; Tours off. Shuttle service uses the same toggle as the Shuttle service under Services — no duplicate setting.</p>
+    ${GP_WAITING_TABS.map(t=>{
       const checked=t.id==='location'?gsWaitingTabs.location!==false:gsWaitingTabs[t.id]===true;
       return`<div class="gp-row">
-      <div class="gp-row__icon">${gpIcon(t.id==='location'?'location':'tour')}</div>
-      <div class="gp-row__body"><div class="gp-row__title">${esc(t.label)}</div></div>
+      <div class="gp-row__icon">${gpIcon(t.icon)}</div>
+      <div class="gp-row__body"><div class="gp-row__title">${esc(t.label)}</div><div class="gp-row__sub">Waiting screen tab</div></div>
       <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${checked?'checked':''} onchange="gsToggleWaitingTab('${t.id}',this.checked)"><span class="switch-track"></span></label>
     </div>`;}).join('')}
+    <div class="gp-row gp-row--muted" style="opacity:.85">
+      <div class="gp-row__icon">${gpIcon('transfer')}</div>
+      <div class="gp-row__body"><div class="gp-row__title">Shuttle service</div><div class="gp-row__sub">Same as Shuttle service under Services — shown while waiting when that service is on</div></div>
+    </div>
     <div class="section-hd" style="margin-top:8px"><h2>Home tiles</h2></div>
     ${GP_TILES.filter(t=>t.group==='essential').map(row).join('')}
     <div class="section-hd" style="margin-top:8px"><h2>Services</h2></div>

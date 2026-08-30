@@ -1039,7 +1039,7 @@ body{padding-bottom:72px;}
       <div class="home-tabs home-tabs--top home-tabs--waiting" id="home-tabs">
         <div class="tab-bar">
           <button class="tab-btn" id="tab-location" onclick="window.openPage('location')"><span id="t-tab-location">Location</span></button>
-          <button class="tab-btn" id="tab-shuttle" onclick="window.openPage('shuttle')"><span id="t-tab-shuttle">Shuttle service</span></button>
+          <button class="tab-btn" id="tab-transfer" onclick="window.openPage('transfer')"><span id="t-tab-transfer">Shuttle service</span></button>
           <button class="tab-btn" id="tab-tours" onclick="window.openPage('tours')"><span id="t-tab-tours">Tours</span></button>
         </div>
       </div>
@@ -1190,9 +1190,9 @@ body{padding-bottom:72px;}
     <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-location">Location &amp; Parking</div></div>
     <div class="subpage-body" id="pg-body-location"></div>
   </div>
-  <div class="page" id="page-content-shuttle">
-    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-shuttle">Shuttle service</div></div>
-    <div class="subpage-body" id="pg-body-shuttle"></div>
+  <div class="page" id="page-content-transfer">
+    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-transfer">Shuttle service</div></div>
+    <div class="subpage-body" id="pg-body-transfer"></div>
   </div>
   <div class="page" id="page-content-tours">
     <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-tours">Tours</div></div>
@@ -1346,7 +1346,7 @@ function _nudgeHomeScrollOnce(){
   });
 }
 
-const _CONTENT_TYPES=['wifi','services','recs','rules','contact','location','shuttle','tours'];
+const _CONTENT_TYPES=['wifi','services','recs','rules','contact','location','transfer','tours'];
 
 function _navToContent(type,title,body){
   const titleEl=document.getElementById('pg-title-'+type);
@@ -1695,8 +1695,8 @@ function applyTranslations(){
     't-passport-title':'pt','t-passport-hint':'ph','t-greeting-label':'gl',
     't-reg-hint':'searchInstructions','t-name-label':'fullName',
     't-waiting-label':'cl','t-waiting-sub':'waitingSub',
-    't-tab-location':'tabLocation','t-tab-shuttle':'tabShuttle','t-tab-tours':'tabTours',
-    't-tab-loc-empty':'tabLocEmpty','t-tab-shuttle-empty':'tabShuttleEmpty','t-tab-tours-empty':'tabToursEmpty',
+    't-tab-location':'tabLocation','t-tab-transfer':'tabShuttle','t-tab-tours':'tabTours',
+    't-tab-loc-empty':'tabLocEmpty','t-tab-transfer-empty':'tabShuttleEmpty','t-tab-tours-empty':'tabToursEmpty',
     't-btn-location':'btnLocation','t-btn-parking':'btnParking',
     't-wifi-lbl':'wifiLbl','t-door-lbl':'doorLbl','t-elev-lbl':'elevLbl',
     't-elev-scan':'elevScan','t-elev-type':'elevType','t-elev-fallback':'elevFallback',
@@ -2857,12 +2857,17 @@ async function getFullCfg(){
 }
 
 function _applyWaitingTabs(cfg){
-  const wt=(cfg||guestFullCfg||{}).waitingTabs||{location:true,shuttle:false,tours:false};
+  const wt=(cfg||guestFullCfg||{}).waitingTabs||{location:true,tours:false};
   let any=false;
-  [['location','tab-location'],['shuttle','tab-shuttle'],['tours','tab-tours']].forEach(([key,id])=>{
+  const tabs=[
+    ['location','tab-location',()=>wt.location!==false],
+    ['transfer','tab-transfer',()=>sectionVisible('airport_transfer')],
+    ['tours','tab-tours',()=>wt.tours===true],
+  ];
+  tabs.forEach(([,id,showFn])=>{
     const el=document.getElementById(id);
     if(!el)return;
-    const show=key==='location'?wt.location!==false:wt[key]===true;
+    const show=showFn();
     el.style.display=show?'':'none';
     if(show)any=true;
   });
@@ -2879,6 +2884,7 @@ async function _ensureServicesConfigLoaded(){
     if(cfgData.visibility&&!guestCfgVisibility)guestCfgVisibility=cfgData.visibility;
     if(cfgData.services)guestSvcs=cfgData.services;
     _laundryLoaded=true;
+    _applyWaitingTabs(cfgData);
   }catch(e){}
 }
 
@@ -2888,7 +2894,7 @@ function _serviceIcons(){
     cleaning:`<svg viewBox="0 0 24 24"${s} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22v-4l9-9"/><path d="m15 3-3 3 5 5 3-3a2 2 0 0 0 0-2.83L17.83 3a2 2 0 0 0-2.83 0z"/><path d="M6 18H3"/></svg>`,
     laundry:`<svg viewBox="0 0 24 24"${s} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><circle cx="12" cy="13" r="4"/><line x1="6" y1="7" x2="6.01" y2="7"/><line x1="10" y1="7" x2="16" y2="7"/></svg>`,
     tour:`<svg viewBox="0 0 24 24"${s} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
-    transfer:`<svg viewBox="0 0 24 24"${s} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v5h-3"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>`,
+    transfer:`<svg viewBox="0 0 24 24"${s} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15.157 11.81 19.987 13.105a2 2 0 1 1-1.036 3.863L4.462 13.086 3.117 6.514l2.898.776 1.414 2.45 2.898.776-.12-7.279 2.898.777 2.052 7.797"/><path d="M3 21h18"/></svg>`,
     custom:`<svg viewBox="0 0 24 24"${s} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
     all:`<svg viewBox="0 0 24 24"${s} stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V10.5a6 6 0 0 1 12 0V16l1.5 2.5h-15L6 16z"/><path d="M10 21h4"/></svg>`,
   };
@@ -2912,7 +2918,7 @@ function _getGuestServicesCatalog(){
     cleaning:{icon:_I.cleaning,name:{en:'Room Cleaning',ka:'ოთახის დასუფთავება',ru:'Уборка номера',ar:'تنظيف الغرفة'},desc:{en:'Professional mid-stay cleaning',ka:'დასუფთავება ყოფნის დროს',ru:'Профессиональная уборка',ar:'تنظيف احترافي'},price:_priceLabel('cleaning','30 GEL'),hasTime:true},
     laundry:{icon:_I.laundry,name:{en:'Laundry',ka:'სამრეცხაო',ru:'Стирка',ar:'غسيل'},desc:{en:'We collect, wash & return',ka:'ვაგროვებთ, ვრეცხავთ, ვაბრუნებთ',ru:'Собираем, стираем, возвращаем',ar:'نجمع ونغسل ونعيد'},price:_laundryTilePrice,hasTime:true},
     tour:{icon:_I.tour,name:{en:'Tours',ka:'ტურები',ru:'Экскурсии',ar:'الجولات'},desc:{en:'Guided tours around Tbilisi',ka:'გიდური ტური თბილისში',ru:'Экскурсии по Тбилиси',ar:'جولات مرشدة في تبليسي'},price:_priceLabel('city_tour','50 GEL/person'),hasTime:false},
-    transfer:{icon:_I.transfer,name:{en:'Airport Transfer',ka:'ტრანსფერი',ru:'Трансфер',ar:'نقل المطار'},desc:{en:'Comfortable airport transfer',ka:'კომფორტული ტრანსფერი',ru:'Комфортный трансфер',ar:'نقل مريح'},price:_priceLabel('airport_transfer','On request'),hasTime:false},
+    transfer:{icon:_I.transfer,name:{en:'Shuttle service',ka:'შატლის სერვისი',ru:'Трансфер',ar:'خدمة النقل'},desc:{en:'Comfortable airport shuttle',ka:'კომფორტული აეროპორტის შატლი',ru:'Комфортный трансфер из аэропорта',ar:'نقل مريح من المطار'},price:_priceLabel('airport_transfer','On request'),hasTime:false},
     custom:{icon:_I.custom,name:{en:'Other Request',ka:'სხვა მოთხოვნა',ru:'Другое',ar:'طلب آخر'},desc:{en:'Anything else we can help with?',ka:'სხვა რამე გჭირდებათ?',ru:'Чем ещё помочь?',ar:'أي شيء آخر؟'},price:'',hasTime:false},
   };
   return order.map(id=>{
@@ -3068,7 +3074,7 @@ try{
   })||activeReservation;
   if(type==='wifi'&&!isUnlocked()){openLocked(pageRes);return;}
   const d=aptData||{};
-  const titles={wifi:t('tw'),services:t('tsv'),recs:t('tr'),rules:t('tru'),contact:t('tco'),shuttle:t('tabShuttle'),tours:t('tabTours')};
+  const titles={wifi:t('tw'),services:t('tsv'),recs:t('tr'),rules:t('tru'),contact:t('tco'),transfer:t('tabShuttle'),tours:t('tabTours')};
   let body='';
 
   if(type==='wifi'){
@@ -3171,11 +3177,11 @@ try{
   // FIX 1 — Shuttle/Tours tabs open as a real subpage now, same mechanism as
   // Location, instead of toggling an inline panel. Reuses the same service
   // catalog + admin visibility the Staying-phase chips already use.
-  if(type==='shuttle'||type==='tours'){
+  if(type==='transfer'||type==='tours'){
     await _ensureServicesConfigLoaded();
     const cat=_getGuestServicesCatalog();
-    const svc=cat.find(s=>s.id===(type==='shuttle'?'transfer':'tour'));
-    const btnLabel=type==='shuttle'?t('tabRequestPickup'):t('tabAskTours');
+    const svc=cat.find(s=>s.id===(type==='transfer'?'transfer':'tour'));
+    const btnLabel=type==='transfer'?t('tabRequestPickup'):t('tabAskTours');
     body=`<div style="padding:0 4px;">${_svcSubpageCard(svc,btnLabel)}</div>`;
   }
 
@@ -3409,7 +3415,7 @@ window.editRequest=function(){
   _editingReqId=currentReqId;
   _trPrefill=r;
   window.closeRequestDetail();
-  window.openSvc('transfer',r.serviceName||'Airport Transfer',false);
+  window.openSvc('transfer',r.serviceName||'Shuttle service',false);
 };
 function refreshMyRequestsSection(){
   console.log('REFRESH called, section:', document.getElementById('my-requests-section'), 'requests count:', myRequests.length);
