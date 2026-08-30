@@ -1547,8 +1547,11 @@ function guestStatus(g){
   const hkKey=(g.aptId||'')+'_'+today;
   const aptCheckIn=aptData[g.aptId]?.checkInTime||'';
   const checkInHour=aptCheckIn?parseInt(String(aptCheckIn).split(':')[0],10):CHECK_IN_HOUR;
+  const door=(_resCache||[]).find(r=>isSameReservation(r,g.matchedReservationId));
+  const arrivalDate=g.arrivalDate||door?.checkin||door?.checkIn||'';
   const r=computeGuestUnlock({
     guest:g,
+    arrivalDate,
     checkInHour:Number.isFinite(checkInHour)?checkInHour:CHECK_IN_HOUR,
     hkDone:hkStatusData[hkKey]?.done===true,
     today,

@@ -124,6 +124,7 @@ test('move into empty room updates reservation + guest mirror + audit', async ()
 
   assert.equal(result.ok, true);
   assert.equal(result.errorCode, 'MOVED');
+  assert.deepEqual(result.data.affectedGuestIds, ['g1']);
   assert.equal(ctx.store.reservations.get('res1').roomCode, '6-3');
   assert.equal(ctx.store.guests.get('g1').aptId, '6-3');
   assert.equal(ctx.store.roomMoves.length, 1);
@@ -214,6 +215,7 @@ test('swap exchanges rooms and mirrors both guests', async () => {
 
   assert.equal(result.ok, true);
   assert.equal(ctx.store.roomMoves.length, 2);
+  assert.deepEqual(result.data.affectedGuestIds.sort(), ['g1', 'g2']);
 });
 
 test('release_to_minihotel clears manualRoom and writes audit in txn', async () => {

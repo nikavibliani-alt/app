@@ -110,3 +110,26 @@ test('routes move_guest with correlationId propagated', async () => {
   });
   assert.equal(ctx.calls[0].correlationId, 'adm_corr_1');
 });
+
+test('recomputes unlock for affected guests after swap', async () => {
+  const ctx = makeCtx({
+    ok: true,
+    errorCode: 'SWAPPED',
+    message: 'ok',
+    data: { affectedGuestIds: ['g1', 'g2'] },
+  });
+  ctx.runGuestUnlock = async (params) => {
+    ctx.unlockCalls = ctx.unlockCalls || [];
+    ctx.unlockCalls.push(params);
+    return { ok: true, errorCode: 'RECOMPUTED', message: 'Unlocked' };
+  };
+  const result = await runAdminAction(ctx, {
+    actionType: 'swap_guests',
+    payload: { reservationId: 'a', otherReservationId: 'b' },
+    actor: 'admin',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(ctx.unlockCalls.length, 2);
+  assert.deepEqual(ctx.unlockCalls.map((c) => c.guestId), ['g1', 'g2']);
+  assert.ok(ctx.unlockCalls.every((c) => c.forceManual === null));
+});

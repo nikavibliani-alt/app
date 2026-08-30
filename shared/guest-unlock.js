@@ -45,21 +45,16 @@ function computeGuestUnlock(opts = {}) {
   const hkDone = opts.hkDone === true;
   const arrival = opts.arrivalDate || guest.arrivalDate || '';
 
-  // Admin manual unlock must work even when arrivalDate is missing on the doc.
-  if (!arrival) {
-    if (guest.manualUnlock === true) {
-      return { state: 'unlocked', unlocked: true, label: 'Unlocked', cls: 'unlocked', reason: 'manual_unlock' };
+  if (arrival) {
+    if (today > arrival) {
+      return { state: 'unlocked', unlocked: true, label: 'Checked in', cls: 'unlocked', reason: 'mid_stay' };
     }
-    return { state: 'locked', unlocked: false, label: 'Waiting', cls: 'waiting', reason: 'no_arrival' };
-  }
-  if (today > arrival) {
-    return { state: 'unlocked', unlocked: true, label: 'Checked in', cls: 'unlocked', reason: 'mid_stay' };
-  }
-  if (today < arrival) {
-    return { state: 'locked', unlocked: false, label: 'Arrives ' + arrival, cls: 'waiting', reason: 'before_arrival' };
+    if (today < arrival) {
+      return { state: 'locked', unlocked: false, label: 'Arrives ' + arrival, cls: 'waiting', reason: 'before_arrival' };
+    }
   }
 
-  // today === arrival
+  // Arrival day, or no arrivalDate — time / HK / manual rules (matches live admin HTML)
   if (guest.manualUnlock === true) {
     return { state: 'unlocked', unlocked: true, label: 'Unlocked', cls: 'unlocked', reason: 'manual_unlock' };
   }
@@ -71,6 +66,9 @@ function computeGuestUnlock(opts = {}) {
   }
   if (hkDone) {
     return { state: 'locked', unlocked: false, label: 'Ready 11am', cls: 'waiting', reason: 'hk_ready_wait_11' };
+  }
+  if (!arrival) {
+    return { state: 'locked', unlocked: false, label: 'Waiting', cls: 'waiting', reason: 'no_arrival' };
   }
   return { state: 'locked', unlocked: false, label: 'Waiting', cls: 'waiting', reason: 'awaiting_hk_or_hour' };
 }
