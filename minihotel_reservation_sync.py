@@ -174,6 +174,25 @@ def fetch_reservations(session, from_date, to_date):
     return reservations
 
 
+def build_room_map(db):
+    """Merge hardcoded ROOM_MAP with admin checkin_rooms minihotelNames."""
+    merged = dict(ROOM_MAP)
+    try:
+        for snap in db.collection('checkin_rooms').stream():
+            data = snap.to_dict() or {}
+            room_code = snap.id
+            names = data.get('minihotelNames') or []
+            if isinstance(names, str):
+                names = [n.strip() for n in names.split(',') if n.strip()]
+            for name in names:
+                if name:
+                    merged[name] = room_code
+        print(f'Room map: {len(merged)} entries ({len(merged) - len(ROOM_MAP)} from checkin_rooms)')
+    except Exception as e:
+        print(f'WARN: checkin_rooms map load failed, using defaults: {e}')
+    return merged
+
+
 def transform_reservation(r):
     """Transform a MiniHotel reservation to Firestore format."""
     room_mh = r.get('roomNumber', '')
@@ -765,6 +784,8 @@ def main():
     print(f"Date range: {from_date} → {to_date}")
 
     db = init_firestore()
+    global ROOM_MAP
+    ROOM_MAP = build_room_map(db)
 
     session = login_minihotel()
     reservations = fetch_reservations(session, from_date, to_date)

@@ -201,6 +201,19 @@ html.admin-authed #app{display:block;}
 .day-chip__n{display:block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);margin-top:4px;}
 .apt-group{margin-bottom:16px;}
 .apt-group__title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:4px 2px 8px;}
+.apt-sync-note{font-size:12px;color:var(--muted);background:var(--blue-bg);border:1px solid #c7d9ef;border-radius:var(--r);padding:10px 12px;margin-bottom:12px;line-height:1.45;}
+.apt-toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.apt-toolbar .btn{flex:none;min-height:40px;padding:0 14px;font-size:13px;}
+.apt-pill-row{display:flex;align-items:stretch;gap:4px;margin-bottom:6px;}
+.apt-pill-row .apt-pill{flex:1;margin-bottom:0;}
+.apt-pill-order{display:flex;flex-direction:column;gap:2px;flex-shrink:0;justify-content:center;}
+.apt-order-btn{width:28px;height:22px;border:1px solid var(--line);border-radius:6px;background:var(--surface);font-size:10px;cursor:pointer;font-family:var(--sans);color:var(--muted);}
+.apt-order-btn:disabled{opacity:.3;cursor:default;}
+.apt-pill-hide{width:40px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;flex-shrink:0;font-family:var(--sans);}
+.apt-add-form{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:14px;}
+.apt-add-form h3{font-size:15px;font-weight:700;margin-bottom:10px;}
+.apt-inactive-hd{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:16px 2px 8px;margin-top:8px;border-top:1px solid var(--line);}
+.apt-pill.inactive{opacity:.55;}
 .apt-pill{display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;margin-bottom:6px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);cursor:pointer;font-family:var(--sans);text-align:left;}
 .apt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .apt-pill__code{font-family:var(--mono);font-weight:700;font-size:14px;}
@@ -257,10 +270,17 @@ html.admin-authed #app{display:block;}
 .hk-pin-card h3{font-size:14px;font-weight:700;margin-bottom:4px;}
 .hk-pin-card p{font-size:12px;color:var(--muted);margin-bottom:12px;}
 .hk-pin-input{width:100%;height:52px;border:1.5px solid var(--line);border-radius:var(--r);font-family:var(--mono);font-size:24px;letter-spacing:8px;text-align:center;margin-bottom:10px;}
-.nav-slot{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);margin-bottom:8px;}
-.nav-slot__grip{color:var(--muted);font-size:16px;user-select:none;}
-.nav-slot__label{flex:1;font-weight:700;font-size:14px;}
-.nav-slot select{flex:1;min-height:40px;border:1.5px solid var(--line);border-radius:var(--rs);font-size:14px;font-family:var(--sans);padding:0 10px;background:var(--bg);}
+.nav-slot{display:flex;align-items:center;gap:8px;padding:12px 14px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);margin-bottom:8px;}
+.nav-slot.landing{border-color:var(--green);box-shadow:inset 0 0 0 1px var(--green);}
+.nav-slot__grip{color:var(--muted);font-size:16px;user-select:none;flex-shrink:0;}
+.nav-slot__body{flex:1;min-width:0;}
+.nav-slot__label{font-weight:700;font-size:14px;margin-bottom:4px;}
+.nav-slot select{width:100%;min-height:40px;border:1.5px solid var(--line);border-radius:var(--rs);font-size:14px;font-family:var(--sans);padding:0 10px;background:var(--bg);}
+.nav-slot__actions{display:flex;flex-direction:column;gap:2px;flex-shrink:0;}
+.nav-slot__btn{width:34px;height:20px;border:1px solid var(--line);border-radius:6px;background:var(--surface);font-size:9px;font-weight:700;cursor:pointer;font-family:var(--sans);color:var(--muted);}
+.nav-slot__btn:disabled{opacity:.3;cursor:default;}
+.nav-slot__btn.land.on{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+.apt-order-row{display:flex;flex-direction:column;gap:2px;flex-shrink:0;justify-content:center;}
 .save-bar{position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(100%,480px);padding:10px 14px;background:var(--ink);color:#fff;display:none;align-items:center;justify-content:space-between;gap:10px;z-index:90;box-shadow:0 -4px 20px rgba(0,0,0,.12);}
 .save-bar.show{display:flex;}
 .save-bar button{min-height:40px;padding:0 16px;border-radius:var(--rs);font-weight:700;font-size:13px;cursor:pointer;border:none;font-family:var(--sans);}
@@ -270,8 +290,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830b';
-  if(!/[?&]build=20260830b(?:&|$)/.test(location.search)){
+  var BUILD='20260830d';
+  if(!/[?&]build=20260830d(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -349,7 +369,14 @@ html.admin-authed #app{display:block;}
   </div>
 
   <div class="pane" id="pane-apts">
+    <div class="apt-sync-note">MiniHotel sync updates <strong>reservations only</strong> (dates, guest names, room moves). Your room list, order, WiFi, and instructions stay exactly as you set them here.</div>
+    <div class="apt-toolbar">
+      <button type="button" class="btn btn-primary" onclick="toggleAddRoomForm()">+ Add room</button>
+      <button type="button" class="btn" onclick="toggleHiddenRooms()">Hidden rooms</button>
+    </div>
+    <div id="add-room-form" class="apt-add-form" hidden></div>
     <div id="apts-list"></div>
+    <div id="apts-inactive" hidden></div>
   </div>
 
   <div class="pane" id="pane-hk">
@@ -383,9 +410,10 @@ html.admin-authed #app{display:block;}
   </div>
 
   <div class="pane" id="pane-navsettings">
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Pick 3 shortcuts for the bottom bar. <strong>More</strong> is always last.</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.45">Choose <strong>2–5 tabs</strong> for the bottom bar. <strong>More</strong> is always last. Star marks the <strong>landing tab</strong> when you open the app.</p>
     <div id="nav-slots"></div>
-    <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveNavConfig()">Apply tab bar</button>
+    <button type="button" class="btn" style="width:100%;margin-top:4px" id="nav-add-btn" onclick="addNavSlot()">+ Add tab</button>
+    <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveNavConfig()">Save tab bar</button>
     <button class="btn" style="width:100%;margin-top:8px" onclick="resetNavConfig()">Reset to default</button>
   </div>
 
@@ -393,7 +421,7 @@ html.admin-authed #app{display:block;}
     <div class="more-section">Operations</div>
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('hk')">Housekeeping<span class="more-hint">Daily task board · checkouts &amp; done</span></button>
-      <button class="more-item" type="button" onclick="switchTab('apts')">Apartments<span class="more-hint">Check-in instructions</span></button>
+      <button class="more-item" type="button" onclick="switchTab('apts')">Apartments<span class="more-hint">Add · reorder · WiFi · instructions</span></button>
       <button class="more-item" type="button" onclick="switchTab('failures')" id="more-failures-btn">Failed searches<span class="more-badge" id="sf-more-badge" style="display:none">0</span></button>
     </div>
     <div class="more-section">Guest experience</div>
@@ -406,7 +434,7 @@ html.admin-authed #app{display:block;}
     </div>
     <div class="more-section">App</div>
     <div class="more-list">
-      <button class="more-item" type="button" onclick="switchTab('navsettings')">Tab bar layout<span class="more-hint">Reorder bottom nav</span></button>
+      <button class="more-item" type="button" onclick="switchTab('navsettings')">Tab bar layout<span class="more-hint">Add tabs · reorder · landing page</span></button>
       <a class="more-item" href="admin-search-test.html" target="_blank" rel="noopener">Search debugger<span class="more-hint">Open</span></a>
       <button class="more-item" type="button" onclick="adminSignOut()">Sign out</button>
     </div>
@@ -532,26 +560,90 @@ function _pipelineCallableHint(){
   return 'Add ?emulator=1 and start emulator, or deploy pipeline-adminAction (see SANDBOX_BACKEND_HANDOFF.md)';
 }
 
-const APARTMENTS=[
-  {id:'0-1',code:'0-1',name:'Small Room 1',group:'Shartava — 0- Rooms'},
-  {id:'0-2',code:'0-2',name:'Small Room 2',group:'Shartava — 0- Rooms'},
-  {id:'0-3',code:'0-3',name:'Small Room 3',group:'Shartava — 0- Rooms'},
-  {id:'0-4',code:'0-4',name:'Small Room 4',group:'Shartava — 0- Rooms'},
-  {id:'0-5',code:'0-5',name:'Small Room 5',group:'Shartava — 0- Rooms'},
-  {id:'6-1',code:'6-1',name:'Apartment 6-1',group:'Shartava — 6- Apartments'},
-  {id:'6-2',code:'6-2',name:'Apartment 6-2',group:'Shartava — 6- Apartments'},
-  {id:'6-3',code:'6-3',name:'Apartment 6-3',group:'Shartava — 6- Apartments'},
-  {id:'6-4',code:'6-4',name:'Apartment 6-4',group:'Shartava — 6- Apartments'},
-  {id:'7-1',code:'7-1',name:'Apartment 7-1',group:'Shartava — 7- Apartments'},
-  {id:'7-2',code:'7-2',name:'Apartment 7-2',group:'Shartava — 7- Apartments'},
-  {id:'7-4',code:'7-4',name:'Apartment 7-4',group:'Shartava — 7- Apartments'},
-  {id:'orb-1',code:'Orb 1',name:'Orb Building, Unit 1',group:'City Centre — Orb'},
-  {id:'orb-2',code:'Orb 2',name:'Orb Building, Unit 2',group:'City Centre — Orb'},
-  {id:'orb-3',code:'Orb 3',name:'Orb Building, Unit 3',group:'City Centre — Orb'},
-  {id:'tab-1',code:'Tab 1',name:'Tab Building, Unit 1',group:'City Centre — Tab'},
-  {id:'tab-2',code:'Tab 2',name:'Tab Building, Unit 2',group:'City Centre — Tab'},
-  {id:'tab-3',code:'Tab 3',name:'Tab Building, Unit 3',group:'City Centre — Tab'},
+/** One-time seed for empty checkin_rooms — admin owns the list after seed. */
+const DEFAULT_ROOMS_SEED=[
+  {roomCode:'0-1',displayName:'Small Room 1',displayCode:'0-1',group:'Shartava — 0- Rooms',sortOrder:0,site:'shartava',showInHk:true,minihotelNames:['0-1']},
+  {roomCode:'0-2',displayName:'Small Room 2',displayCode:'0-2',group:'Shartava — 0- Rooms',sortOrder:1,site:'shartava',showInHk:true,minihotelNames:['0-2']},
+  {roomCode:'0-3',displayName:'Small Room 3',displayCode:'0-3',group:'Shartava — 0- Rooms',sortOrder:2,site:'shartava',showInHk:true,minihotelNames:['0-3']},
+  {roomCode:'0-4',displayName:'Small Room 4',displayCode:'0-4',group:'Shartava — 0- Rooms',sortOrder:3,site:'shartava',showInHk:true,minihotelNames:['0-4']},
+  {roomCode:'0-5',displayName:'Small Room 5',displayCode:'0-5',group:'Shartava — 0- Rooms',sortOrder:4,site:'shartava',showInHk:true,minihotelNames:['0-5']},
+  {roomCode:'6-1',displayName:'Apartment 6-1',displayCode:'6-1',group:'Shartava — 6- Apartments',sortOrder:10,site:'shartava',showInHk:true,minihotelNames:['M-6-1']},
+  {roomCode:'6-2',displayName:'Apartment 6-2',displayCode:'6-2',group:'Shartava — 6- Apartments',sortOrder:11,site:'shartava',showInHk:true,minihotelNames:['M-6-2']},
+  {roomCode:'6-3',displayName:'Apartment 6-3',displayCode:'6-3',group:'Shartava — 6- Apartments',sortOrder:12,site:'shartava',showInHk:true,minihotelNames:['M-6-3']},
+  {roomCode:'6-4',displayName:'Apartment 6-4',displayCode:'6-4',group:'Shartava — 6- Apartments',sortOrder:13,site:'shartava',showInHk:true,minihotelNames:['M-6-4']},
+  {roomCode:'7-1',displayName:'Apartment 7-1',displayCode:'7-1',group:'Shartava — 7- Apartments',sortOrder:20,site:'shartava',showInHk:true,minihotelNames:['M-7-1']},
+  {roomCode:'7-2',displayName:'Apartment 7-2',displayCode:'7-2',group:'Shartava — 7- Apartments',sortOrder:21,site:'shartava',showInHk:true,minihotelNames:['M-7-2']},
+  {roomCode:'7-4',displayName:'Apartment 7-4',displayCode:'7-4',group:'Shartava — 7- Apartments',sortOrder:22,site:'shartava',showInHk:true,minihotelNames:['M-7-4']},
+  {roomCode:'orb-1',displayName:'Orb Building, Unit 1',displayCode:'Orb 1',group:'City Centre — Orb',sortOrder:30,site:'centre',showInHk:true,minihotelNames:['Midamo 1']},
+  {roomCode:'orb-2',displayName:'Orb Building, Unit 2',displayCode:'Orb 2',group:'City Centre — Orb',sortOrder:31,site:'centre',showInHk:true,minihotelNames:['Midamo 2']},
+  {roomCode:'orb-3',displayName:'Orb Building, Unit 3',displayCode:'Orb 3',group:'City Centre — Orb',sortOrder:32,site:'centre',showInHk:true,minihotelNames:['Midamo 3']},
+  {roomCode:'tab-1',displayName:'Tab Building, Unit 1',displayCode:'Tab 1',group:'City Centre — Tab',sortOrder:40,site:'centre',showInHk:true,minihotelNames:['T-1']},
+  {roomCode:'tab-2',displayName:'Tab Building, Unit 2',displayCode:'Tab 2',group:'City Centre — Tab',sortOrder:41,site:'centre',showInHk:true,minihotelNames:['T-2']},
+  {roomCode:'tab-3',displayName:'Tab Building, Unit 3',displayCode:'Tab 3',group:'City Centre — Tab',sortOrder:42,site:'centre',showInHk:true,minihotelNames:['T-3']},
+  {roomCode:'vgl-st1',displayName:'VGL Studio 1',displayCode:'vgl-st1',group:'VGL',sortOrder:50,site:'vgl',showInHk:true,minihotelNames:['VGL_ST1']},
+  {roomCode:'vgl-st2',displayName:'VGL Studio 2',displayCode:'vgl-st2',group:'VGL',sortOrder:51,site:'vgl',showInHk:true,minihotelNames:['VGL_ST2']},
+  {roomCode:'vgl-ap3',displayName:'VGL Apartment 3',displayCode:'vgl-ap3',group:'VGL',sortOrder:52,site:'vgl',showInHk:true,minihotelNames:['VGL_AP3']},
+  {roomCode:'vgl-ap4',displayName:'VGL Apartment 4',displayCode:'vgl-ap4',group:'VGL',sortOrder:53,site:'vgl',showInHk:true,minihotelNames:['VGL_AP4']},
+  {roomCode:'abashidze',displayName:'Abashidze',displayCode:'abashidze',group:'Abashidze',sortOrder:60,site:'abashidze',showInHk:true,minihotelNames:[]},
 ];
+const ROOM_SITES=[
+  {id:'shartava',label:'Shartava'},
+  {id:'centre',label:'City Centre'},
+  {id:'vgl',label:'VGL'},
+  {id:'abashidze',label:'Abashidze'},
+];
+let roomsData={};
+let roomsSeeding=false;
+let _showAddRoomForm=false;
+let _showHiddenRooms=false;
+
+function roomsSorted(activeOnly=true){
+  return Object.values(roomsData)
+    .filter(r=>!activeOnly||r.active!==false)
+    .sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)||String(a.roomCode).localeCompare(String(b.roomCode)));
+}
+function getApartments(){
+  return roomsSorted(true).map(r=>({
+    id:r.roomCode,
+    code:r.displayCode||r.roomCode,
+    name:r.displayName||r.roomCode,
+    group:r.group||'Other',
+  }));
+}
+function getHkRooms(){
+  return roomsSorted(true).filter(r=>r.showInHk!==false).map(r=>({
+    code:r.roomCode,
+    name:r.displayName||r.roomCode,
+    group:r.group||'',
+    site:r.site||'shartava',
+  }));
+}
+function getRoomOrder(){return roomsSorted(true).map(r=>r.roomCode);}
+function getAptMeta(roomCode){
+  const r=roomsData[roomCode];
+  if(!r)return{id:roomCode,code:roomCode,name:roomCode,group:''};
+  return{id:roomCode,code:r.displayCode||roomCode,name:r.displayName||roomCode,group:r.group||''};
+}
+function normalizeRoomCode(raw){
+  return String(raw||'').trim().toLowerCase().replace(/\s+/g,'-');
+}
+function parseMinihotelNames(raw){
+  if(Array.isArray(raw))return raw.map(s=>String(s).trim()).filter(Boolean);
+  return String(raw||'').split(/[,;]+/).map(s=>s.trim()).filter(Boolean);
+}
+async function ensureRoomsSeeded(){
+  if(roomsSeeding)return;
+  const snap=await getDocs(collection(db,'checkin_rooms'));
+  if(!snap.empty)return;
+  roomsSeeding=true;
+  try{
+    for(const r of DEFAULT_ROOMS_SEED){
+      await setDoc(doc(db,'checkin_rooms',r.roomCode),{...r,active:true,updatedAt:serverTimestamp()},{merge:true});
+    }
+    toast('Room list initialized from defaults');
+  }catch(e){console.error('[rooms seed]',e);toast('Room seed failed: '+e.message);}
+  roomsSeeding=false;
+}
 
 let aptData={},guestData=[],hkStatusData={},_resCache=null,_resLoading=false;
 let elevData=null,stayFilter='overview',upcomingDay=null,_currentAptId=null;
@@ -562,7 +654,7 @@ function loadSavedTab(){
     const t=localStorage.getItem(_TAB_KEY);
     if(t&&VALID_TABS.has(t))return t;
   }catch(e){}
-  return 'stay';
+  return loadNavConfig().landingTab||'stay';
 }
 let currentTab=loadSavedTab();
 let reqData=[],reqFilter='all',_reqLoading=false;
@@ -570,25 +662,61 @@ let hkPinsData={shartava:'',centre:'',vgl:'',admin:''};
 let searchFailures=[];
 let _formById=new Map();
 
-const _NAV_KEY='maxela_admin_nav_v4';
+const _NAV_KEY='maxela_admin_nav_v5';
+const NAV_MIN=2;
+const NAV_MAX=5;
 const NAV_POOL={
   stay:{label:'Stay',pane:'stay',svg:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',extra:''},
+  hk:{label:'HK',pane:'hk',svg:'<svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>',extra:''},
   elevator:{label:'Elevator',pane:'elevator',svg:'<svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 8v8M9 11l3-3 3 3"/></svg>',extra:'<span class="dot"></span>',navId:'nav-elev'},
   requests:{label:'Requests',pane:'requests',svg:'<svg viewBox="0 0 24 24"><path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M8 8h8M8 12h5"/></svg>',extra:'<span class="badge" id="req-badge">0</span>',navId:'nav-req'},
   apts:{label:'Apts',pane:'apts',svg:'<svg viewBox="0 0 24 24"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-8h6v8"/></svg>',extra:''},
-  guestsettings:{label:'Guest',pane:'guestsettings',svg:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>',extra:''},
 };
-const DEFAULT_NAV_SLOTS=['stay','requests','elevator'];
+const DEFAULT_NAV_CONFIG={slots:['stay','requests','elevator'],landingTab:'stay'};
+let navConfigDraft=null;
 
-function loadNavSlots(){
+function normalizeNavConfig(raw){
+  const slots=Array.isArray(raw?.slots)?raw.slots.filter(id=>NAV_POOL[id]):[];
+  while(slots.length<NAV_MIN){
+    const next=DEFAULT_NAV_CONFIG.slots.find(id=>!slots.includes(id))||'stay';
+    slots.push(next);
+  }
+  const unique=[...new Set(slots)].slice(0,NAV_MAX);
+  while(unique.length<NAV_MIN){
+    const next=DEFAULT_NAV_CONFIG.slots.find(id=>!unique.includes(id))||'stay';
+    unique.push(next);
+  }
+  let landing=raw?.landingTab||DEFAULT_NAV_CONFIG.landingTab;
+  if(!unique.includes(landing))landing=unique[0];
+  return{slots:unique,landingTab:landing};
+}
+function loadNavConfig(){
   try{
     const s=JSON.parse(localStorage.getItem(_NAV_KEY)||'null');
-    if(Array.isArray(s?.slots)&&s.slots.length===3&&s.slots.every(id=>NAV_POOL[id])&&!s.slots.includes('hk'))
-      return [...s.slots];
+    if(s?.slots)return normalizeNavConfig(s);
+    const v4=JSON.parse(localStorage.getItem('maxela_admin_nav_v4')||'null');
+    if(Array.isArray(v4?.slots)&&v4.slots.length>=NAV_MIN)
+      return normalizeNavConfig({slots:v4.slots,landingTab:v4.slots[0]});
   }catch(e){}
-  return [...DEFAULT_NAV_SLOTS];
+  return normalizeNavConfig(DEFAULT_NAV_CONFIG);
 }
+function loadNavSlots(){return loadNavConfig().slots;}
 let navSlots=loadNavSlots();
+
+function applyNavConfig(cfg){
+  const norm=normalizeNavConfig(cfg);
+  localStorage.setItem(_NAV_KEY,JSON.stringify(norm));
+  navConfigDraft=norm;
+  navSlots=norm.slots;
+  renderNavBar();
+  if(currentTab==='navsettings')renderNavSettings();
+}
+async function loadNavConfigFromFirestore(){
+  try{
+    const snap=await getDoc(doc(db,'checkin_admin','config'));
+    if(snap.exists()&&snap.data().navConfig)applyNavConfig(snap.data().navConfig);
+  }catch(e){console.warn('[navConfig]',e);}
+}
 
 function renderNavBar(){
   navSlots=loadNavSlots();
@@ -606,40 +734,117 @@ function renderNavBar(){
   if(elevData)document.getElementById('nav-elev')?.classList.toggle('has-alert',elevFreshness().cls==='old');
 }
 
-window.saveNavConfig=function(){
+window.saveNavConfig=async function(){
+  const cfg=navConfigDraft||loadNavConfig();
   const slots=[];
-  for(let i=0;i<3;i++){
+  for(let i=0;i<cfg.slots.length;i++){
     const sel=document.getElementById('nav-slot-'+i);
     if(sel)slots.push(sel.value);
   }
-  if(new Set(slots).size<3){toast('Each tab must be different');return;}
-  localStorage.setItem(_NAV_KEY,JSON.stringify({slots}));
-  navSlots=slots;
-  renderNavBar();
-  toast('Tab bar updated ✓');
-  switchTab('more');
+  if(slots.length<NAV_MIN||slots.length>NAV_MAX){toast('Need '+NAV_MIN+'–'+NAV_MAX+' tabs');return;}
+  if(new Set(slots).size<slots.length){toast('Each tab must be different');return;}
+  let landing=cfg.landingTab;
+  if(!slots.includes(landing))landing=slots[0];
+  const norm=normalizeNavConfig({slots,landingTab:landing});
+  try{
+    localStorage.setItem(_NAV_KEY,JSON.stringify(norm));
+    await setDoc(doc(db,'checkin_admin','config'),{navConfig:norm,updatedAt:serverTimestamp()},{merge:true});
+    navConfigDraft=norm;
+    navSlots=norm.slots;
+    renderNavBar();
+    toast('Tab bar saved');
+    switchTab('more');
+  }catch(e){toast('Save failed: '+e.message);}
 };
-window.resetNavConfig=function(){
+window.resetNavConfig=async function(){
   localStorage.removeItem(_NAV_KEY);
-  navSlots=[...DEFAULT_NAV_SLOTS];
+  localStorage.removeItem('maxela_admin_nav_v4');
+  navConfigDraft=normalizeNavConfig(DEFAULT_NAV_CONFIG);
+  navSlots=navConfigDraft.slots;
+  try{
+    await setDoc(doc(db,'checkin_admin','config'),{navConfig:navConfigDraft,updatedAt:serverTimestamp()},{merge:true});
+  }catch(e){}
   renderNavSettings();
   renderNavBar();
   toast('Reset to default');
 };
 function renderNavSettings(){
-  navSlots=loadNavSlots();
+  const cfg=navConfigDraft||loadNavConfig();
+  navConfigDraft={...cfg,slots:[...cfg.slots]};
   const el=document.getElementById('nav-slots');
   if(!el)return;
-  el.innerHTML=navSlots.map((id,i)=>`
-    <div class="nav-slot">
-      <span class="nav-slot__grip">${i+1}</span>
-      <span class="nav-slot__label">Slot ${i+1}</span>
-      <select id="nav-slot-${i}" onchange="previewNavSlot(${i},this.value)">
-        ${Object.entries(NAV_POOL).map(([k,d])=>`<option value="${k}"${k===id?' selected':''}>${d.label}</option>`).join('')}
-      </select>
-    </div>`).join('');
+  el.innerHTML=navConfigDraft.slots.map((id,i)=>{
+    const isLand=navConfigDraft.landingTab===id;
+    return`<div class="nav-slot${isLand?' landing':''}" draggable="true" data-idx="${i}"
+      ondragstart="navDragStart(event,${i})" ondragover="navDragOver(event)" ondrop="navDrop(event,${i})">
+      <span class="nav-slot__grip">⋮⋮</span>
+      <div class="nav-slot__body">
+        <div class="nav-slot__label">Tab ${i+1}${isLand?' · Landing':''}</div>
+        <select id="nav-slot-${i}" onchange="navSlotPick(${i},this.value)">
+          ${Object.entries(NAV_POOL).map(([k,d])=>`<option value="${k}"${k===id?' selected':''}>${d.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="nav-slot__actions">
+        <button type="button" class="nav-slot__btn land${isLand?' on':''}" title="Landing tab" onclick="navSetLanding(${i})">★</button>
+        <button type="button" class="nav-slot__btn" onclick="navMoveSlot(${i},-1)" ${i===0?'disabled':''}>↑</button>
+        <button type="button" class="nav-slot__btn" onclick="navMoveSlot(${i},1)" ${i===navConfigDraft.slots.length-1?'disabled':''}>↓</button>
+        <button type="button" class="nav-slot__btn" onclick="navMoveSlot(${i},-999)" ${i===0?'disabled':''}>1st</button>
+        <button type="button" class="nav-slot__btn" onclick="navMoveSlot(${i},999)" ${i===navConfigDraft.slots.length-1?'disabled':''}>Last</button>
+        <button type="button" class="nav-slot__btn" onclick="navRemoveSlot(${i})" ${navConfigDraft.slots.length<=NAV_MIN?'disabled':''}>×</button>
+      </div>
+    </div>`;
+  }).join('');
+  const addBtn=document.getElementById('nav-add-btn');
+  if(addBtn)addBtn.disabled=navConfigDraft.slots.length>=NAV_MAX;
 }
-window.previewNavSlot=function(){/* apply on save only */};
+window.navSlotPick=function(i,val){
+  if(!navConfigDraft)return;
+  navConfigDraft.slots[i]=val;
+  if(navConfigDraft.landingTab&&!navConfigDraft.slots.includes(navConfigDraft.landingTab))
+    navConfigDraft.landingTab=navConfigDraft.slots[0];
+  renderNavSettings();
+};
+window.navSetLanding=function(i){
+  if(!navConfigDraft)return;
+  navConfigDraft.landingTab=navConfigDraft.slots[i];
+  renderNavSettings();
+};
+window.navMoveSlot=function(i,dir){
+  if(!navConfigDraft)return;
+  const s=navConfigDraft.slots;
+  let j;
+  if(dir===-999)j=0;
+  else if(dir===999)j=s.length-1;
+  else j=i+dir;
+  if(j<0||j>=s.length||j===i)return;
+  const tmp=s[i];s[i]=s[j];s[j]=tmp;
+  renderNavSettings();
+};
+window.navRemoveSlot=function(i){
+  if(!navConfigDraft||navConfigDraft.slots.length<=NAV_MIN)return;
+  const removed=navConfigDraft.slots.splice(i,1)[0];
+  if(navConfigDraft.landingTab===removed)navConfigDraft.landingTab=navConfigDraft.slots[0];
+  renderNavSettings();
+};
+window.addNavSlot=function(){
+  if(!navConfigDraft)navConfigDraft=loadNavConfig();
+  if(navConfigDraft.slots.length>=NAV_MAX){toast('Maximum '+NAV_MAX+' tabs');return;}
+  const next=Object.keys(NAV_POOL).find(id=>!navConfigDraft.slots.includes(id))||'stay';
+  navConfigDraft.slots.push(next);
+  renderNavSettings();
+};
+let _navDragIdx=null;
+window.navDragStart=function(e,i){_navDragIdx=i;e.dataTransfer.effectAllowed='move';};
+window.navDragOver=function(e){e.preventDefault();e.dataTransfer.dropEffect='move';};
+window.navDrop=function(e,i){
+  e.preventDefault();
+  if(_navDragIdx==null||_navDragIdx===i||!navConfigDraft)return;
+  const s=navConfigDraft.slots;
+  const [item]=s.splice(_navDragIdx,1);
+  s.splice(i,0,item);
+  _navDragIdx=null;
+  renderNavSettings();
+};
 
 /* ── Guest page settings ── */
 const SECTION_DEFAULTS={
@@ -966,8 +1171,10 @@ function renderHkSettings(){
         <span style="font-size:11px;color:var(--muted);width:28px">min</span>
       </div>`;
     }).join('')}</div>`;
-  const shartava=HK_ROOMS.filter(r=>hkSiteId(r)==='shartava');
-  const centre=HK_ROOMS.filter(r=>hkSiteId(r)==='centre');
+  const shartava=getHkRooms().filter(r=>hkSiteId(r.code)==='shartava');
+  const centre=getHkRooms().filter(r=>hkSiteId(r.code)==='centre');
+  const vgl=getHkRooms().filter(r=>hkSiteId(r.code)==='vgl');
+  const abash=getHkRooms().filter(r=>hkSiteId(r.code)==='abashidze');
   wrap.innerHTML=`
     <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Task board: <strong>More → Housekeeping</strong>. List order is calculated automatically — staff only see the sorted list.</p>
     <div class="more-section" style="margin-top:0">Cleaner apps (staff)</div>
@@ -987,6 +1194,8 @@ function renderHkSettings(){
     </div>
     ${siteBlock('Shartava · cleaning minutes',shartava)}
     ${siteBlock('City Centre · Orb &amp; Tab',centre)}
+    ${vgl.length?siteBlock('VGL · cleaning minutes',vgl):''}
+    ${abash.length?siteBlock('Abashidze · cleaning minutes',abash):''}
     <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveHkSettings()">Save HK settings</button>
     <div class="more-section" style="margin-top:16px">Staff login PINs</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px">4-digit codes for legacy HK apps.</p>
@@ -995,7 +1204,7 @@ function renderHkSettings(){
 }
 window.saveHkSettings=async function(){
   if(!hkSettings.cleanMinutesByRoom)hkSettings.cleanMinutesByRoom={};
-  HK_ROOMS.forEach(r=>{
+  getHkRooms().forEach(r=>{
     const v=parseInt(document.getElementById('hk-clean-'+r.code)?.value,10);
     if(Number.isFinite(v)&&v>=20)hkSettings.cleanMinutesByRoom[r.code]=v;
   });
@@ -1144,8 +1353,7 @@ function buildWaUrl(phone,guestName,hasForm){
   return'https://wa.me/'+phone+'?text='+encodeURIComponent(msg);
 }
 
-const ROOM_ORDER=['0-1','0-2','0-3','0-4','0-5','6-1','6-2','6-3','6-4','7-1','7-2','7-4','tab-1','tab-2','tab-3','orb-1','orb-2','orb-3'];
-function roomSortKey(r){const i=ROOM_ORDER.indexOf((r.roomCode||'').toLowerCase());return i>=0?i:99;}
+function roomSortKey(r){const i=getRoomOrder().indexOf((r.roomCode||'').toLowerCase());return i>=0?i:999;}
 function byRoom(a,b){return roomSortKey(a)-roomSortKey(b);}
 function groupByBaseNum(list){
   const map=new Map(),order=[];
@@ -1331,7 +1539,7 @@ const TAB_META={
   hksettings:{title:'HK settings',sub:'Staff PINs · cleaner apps · defaults'},
   guestsettings:{title:'Guest page',sub:'Tiles, services, waiting tabs & location'},
   failures:{title:'Failed searches',sub:'Guests who could not find booking'},
-  navsettings:{title:'Tab bar',sub:'Customize bottom navigation'},
+  navsettings:{title:'Tab bar',sub:'Add tabs · reorder · landing page'},
   more:{title:'More',sub:'All admin tools'},
 };
 const MORE_TABS=new Set(['more','apts','guestsettings','navsettings','failures','elevator','hksettings','hk']);
@@ -1390,7 +1598,7 @@ window.unlockGuest=async function(guestId){
 };
 
 function roomOptionsHtml(selected){
-  return ROOM_ORDER.map(r=>`<option value="${esc(r)}"${r===(selected||'')?' selected':''}>${esc(r)}</option>`).join('');
+  return getRoomOrder().map(r=>`<option value="${esc(r)}"${r===(selected||'')?' selected':''}>${esc(r)}</option>`).join('');
 }
 
 window.moveGuestPipeline=async function(guestId){
@@ -1665,42 +1873,200 @@ window.deleteCompleted=async function(){
   }catch(e){toast('Delete failed: '+e.message);}
 };
 
-/* ── Apartments ── */
+/* ── Apartments (room registry + content editor) ── */
+function roomGroupOptions(selected){
+  const groups=[...new Set(roomsSorted(true).map(r=>r.group).filter(Boolean))];
+  DEFAULT_ROOMS_SEED.forEach(r=>{if(r.group&&!groups.includes(r.group))groups.push(r.group);});
+  return groups.map(g=>`<option value="${esc(g)}"${g===(selected||'')?' selected':''}>${esc(g)}</option>`).join('');
+}
+window.toggleAddRoomForm=function(){
+  _showAddRoomForm=!_showAddRoomForm;
+  renderAddRoomForm();
+};
+window.toggleHiddenRooms=function(){
+  _showHiddenRooms=!_showHiddenRooms;
+  renderAptsList();
+};
+function renderAddRoomForm(){
+  const el=document.getElementById('add-room-form');
+  if(!el)return;
+  if(!_showAddRoomForm){el.hidden=true;el.innerHTML='';return;}
+  el.hidden=false;
+  el.innerHTML=`
+    <h3>Add room</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.45">Room code is permanent — it links reservations from MiniHotel. Use lowercase with dashes (e.g. <code>6-1</code>, <code>orb-2</code>).</p>
+    <label class="apt-label">Room code</label>
+    <input class="apt-input" id="new-room-code" placeholder="6-1" autocapitalize="off" autocomplete="off">
+    <label class="apt-label">Display name</label>
+    <input class="apt-input" id="new-room-name" placeholder="Apartment 6-1">
+    <label class="apt-label">Short code (shown on pills)</label>
+    <input class="apt-input" id="new-room-display" placeholder="6-1">
+    <label class="apt-label">Group</label>
+    <input class="apt-input" id="new-room-group" list="room-group-list" placeholder="Shartava — 6- Apartments">
+    <datalist id="room-group-list">${roomGroupOptions()}</datalist>
+    <label class="apt-label">Site</label>
+    <select class="apt-input" id="new-room-site">${ROOM_SITES.map(s=>`<option value="${s.id}">${esc(s.label)}</option>`).join('')}</select>
+    <label class="apt-label">MiniHotel room names (comma-separated)</label>
+    <input class="apt-input" id="new-room-mh" placeholder="M-6-1">
+    <p style="font-size:11px;color:var(--muted);margin:6px 0 10px">Sync uses these to match reservations. Built-in defaults still apply if left empty.</p>
+    <label class="apt-label" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="new-room-hk" checked> Show on HK board</label>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button type="button" class="btn btn-primary" style="flex:1" onclick="saveNewRoom()">Create room</button>
+      <button type="button" class="btn" style="flex:1" onclick="toggleAddRoomForm()">Cancel</button>
+    </div>`;
+}
+window.saveNewRoom=async function(){
+  const code=normalizeRoomCode(document.getElementById('new-room-code')?.value);
+  const displayName=document.getElementById('new-room-name')?.value.trim();
+  const displayCode=document.getElementById('new-room-display')?.value.trim()||code;
+  const group=document.getElementById('new-room-group')?.value.trim()||'Other';
+  const site=document.getElementById('new-room-site')?.value||'shartava';
+  const minihotelNames=parseMinihotelNames(document.getElementById('new-room-mh')?.value);
+  const showInHk=!!document.getElementById('new-room-hk')?.checked;
+  if(!code||!/^[a-z0-9-]+$/.test(code)){toast('Invalid room code');return;}
+  if(!displayName){toast('Display name required');return;}
+  if(roomsData[code]){toast('Room code already exists');return;}
+  const maxOrder=roomsSorted(true).reduce((m,r)=>Math.max(m,r.sortOrder??0),0);
+  try{
+    await setDoc(doc(db,'checkin_rooms',code),{
+      roomCode:code,displayName,displayCode,group,site,showInHk,minihotelNames,
+      sortOrder:maxOrder+1,active:true,updatedAt:serverTimestamp(),
+    },{merge:true});
+    await setDoc(doc(db,'checkin_apartments',code),{updatedAt:serverTimestamp()},{merge:true});
+    _showAddRoomForm=false;
+    toast('Room added');
+    renderAddRoomForm();
+    openAptEditor(code);
+  }catch(e){toast('Add failed: '+e.message);}
+};
+window.moveRoomOrder=async function(roomCode,dir){
+  const list=roomsSorted(true);
+  const idx=list.findIndex(r=>r.roomCode===roomCode);
+  let j;
+  if(dir==='first')j=0;
+  else if(dir==='last')j=list.length-1;
+  else j=idx+dir;
+  if(idx<0||j<0||j>=list.length||j===idx)return;
+  const a=list[idx],b=list[j];
+  const aOrder=a.sortOrder??idx,bOrder=b.sortOrder??j;
+  try{
+    await Promise.all([
+      setDoc(doc(db,'checkin_rooms',a.roomCode),{sortOrder:bOrder,updatedAt:serverTimestamp()},{merge:true}),
+      setDoc(doc(db,'checkin_rooms',b.roomCode),{sortOrder:aOrder,updatedAt:serverTimestamp()},{merge:true}),
+    ]);
+  }catch(e){toast('Reorder failed: '+e.message);}
+};
+window.hideRoom=async function(roomCode){
+  if(!confirm('Hide '+roomCode+' from lists? Existing reservations are unchanged.'))return;
+  try{
+    await setDoc(doc(db,'checkin_rooms',roomCode),{active:false,updatedAt:serverTimestamp()},{merge:true});
+    toast('Room hidden');
+  }catch(e){toast('Hide failed: '+e.message);}
+};
+window.restoreRoom=async function(roomCode){
+  try{
+    await setDoc(doc(db,'checkin_rooms',roomCode),{active:true,updatedAt:serverTimestamp()},{merge:true});
+    toast('Room restored');
+  }catch(e){toast('Restore failed: '+e.message);}
+};
+window.saveRoomMeta=async function(roomCode){
+  const displayName=document.getElementById('room-meta-name')?.value.trim();
+  const displayCode=document.getElementById('room-meta-code')?.value.trim();
+  const group=document.getElementById('room-meta-group')?.value.trim();
+  const site=document.getElementById('room-meta-site')?.value;
+  const minihotelNames=parseMinihotelNames(document.getElementById('room-meta-mh')?.value);
+  const showInHk=!!document.getElementById('room-meta-hk')?.checked;
+  if(!displayName){toast('Display name required');return;}
+  try{
+    await setDoc(doc(db,'checkin_rooms',roomCode),{
+      displayName,displayCode:displayCode||roomCode,group:group||'Other',site,
+      minihotelNames,showInHk,updatedAt:serverTimestamp(),
+    },{merge:true});
+    toast('Room settings saved');
+    const title=document.getElementById('apt-ed-title');
+    if(title)title.textContent=(displayCode||roomCode)+' · '+displayName;
+    renderAptsList();
+  }catch(e){toast('Save failed: '+e.message);}
+};
 function renderAptsList(){
-  const groups=[];
-  const seen=new Map();
-  for(const a of APARTMENTS){
+  const listEl=document.getElementById('apts-list');
+  const inactiveEl=document.getElementById('apts-inactive');
+  if(!listEl)return;
+  if(!Object.keys(roomsData).length){
+    listEl.innerHTML='<div class="empty">Loading rooms…</div>';
+    if(inactiveEl)inactiveEl.hidden=true;
+    return;
+  }
+  const apartments=getApartments();
+  const groups=[],seen=new Map();
+  for(const a of apartments){
     if(!seen.has(a.group)){seen.set(a.group,[]);groups.push(a.group);}
     seen.get(a.group).push(a);
   }
+  const globalList=roomsSorted(true);
   let html='';
   for(const g of groups){
     html+=`<div class="apt-group"><div class="apt-group__title">${esc(g)}</div>`;
     for(const a of seen.get(g)){
+      const idx=globalList.findIndex(r=>r.roomCode===a.id);
       const d=aptData[a.id]||{};
       const ok=!!(d.tuyaDeviceId||d.doorCode);
       const photoN=(d.photos||[]).length;
       const hint=photoN?photoN+' photo'+(photoN!==1?'s':''):(d.instructions?'Has instructions':'No instructions');
-      html+=`<button type="button" class="apt-pill" onclick="window.openAptEditor('${a.id}')">
-        <span class="apt-dot" style="background:${ok?'var(--green)':'var(--red)'}"></span>
-        <span class="apt-pill__code">${esc(a.code)}</span>
-        <span class="apt-pill__name">${esc(a.name)} · ${esc(hint)}</span>
-      </button>`;
+      html+=`<div class="apt-pill-row">
+        <div class="apt-order-row">
+          <button type="button" class="apt-order-btn" onclick="event.stopPropagation();moveRoomOrder('${esc(a.id)}','first')" ${idx<=0?'disabled':''} aria-label="Move first">1st</button>
+          <button type="button" class="apt-order-btn" onclick="event.stopPropagation();moveRoomOrder('${esc(a.id)}',-1)" ${idx<=0?'disabled':''} aria-label="Move up">↑</button>
+          <button type="button" class="apt-order-btn" onclick="event.stopPropagation();moveRoomOrder('${esc(a.id)}',1)" ${idx<0||idx>=globalList.length-1?'disabled':''} aria-label="Move down">↓</button>
+          <button type="button" class="apt-order-btn" onclick="event.stopPropagation();moveRoomOrder('${esc(a.id)}','last')" ${idx<0||idx>=globalList.length-1?'disabled':''} aria-label="Move last">Last</button>
+        </div>
+        <button type="button" class="apt-pill" onclick="window.openAptEditor('${esc(a.id)}')">
+          <span class="apt-dot" style="background:${ok?'var(--green)':'var(--red)'}"></span>
+          <span class="apt-pill__code">${esc(a.code)}</span>
+          <span class="apt-pill__name">${esc(a.name)} · ${esc(hint)}</span>
+        </button>
+        <button type="button" class="apt-pill-hide" onclick="hideRoom('${esc(a.id)}')" title="Hide room">Hide</button>
+      </div>`;
     }
     html+='</div>';
   }
-  document.getElementById('apts-list').innerHTML=html||'<div class="empty">No apartments</div>';
+  listEl.innerHTML=html||'<div class="empty">No active rooms — add one above</div>';
+  if(inactiveEl){
+    const hidden=Object.values(roomsData).filter(r=>r.active===false);
+    if(_showHiddenRooms&&hidden.length){
+      inactiveEl.hidden=false;
+      inactiveEl.innerHTML=`<div class="apt-inactive-hd">Hidden rooms (${hidden.length})</div>`+
+        hidden.sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)).map(r=>{
+          const d=aptData[r.roomCode]||{};
+          const ok=!!(d.tuyaDeviceId||d.doorCode);
+          return`<div class="apt-pill-row">
+            <button type="button" class="apt-pill inactive" onclick="window.openAptEditor('${esc(r.roomCode)}')">
+              <span class="apt-dot" style="background:${ok?'var(--green)':'var(--red)'}"></span>
+              <span class="apt-pill__code">${esc(r.displayCode||r.roomCode)}</span>
+              <span class="apt-pill__name">${esc(r.displayName||r.roomCode)} · hidden</span>
+            </button>
+            <button type="button" class="apt-pill-hide" onclick="restoreRoom('${esc(r.roomCode)}')">Restore</button>
+          </div>`;
+        }).join('');
+    }else{
+      inactiveEl.hidden=true;
+      inactiveEl.innerHTML='';
+    }
+  }
+  if(_showAddRoomForm)renderAddRoomForm();
 }
 
 window.openAptEditor=function(aptId){
   if(!aptId)return;
-  const apt=APARTMENTS.find(a=>a.id===aptId);if(!apt)return;
+  const apt=getAptMeta(aptId);
+  const meta=roomsData[aptId]||{};
   _currentAptId=aptId;
   const d=aptData[aptId]||{};
   const initMode=(!!d.doorCode&&!d.tuyaDeviceId)?'manual':'auto';
   const photos=d.photos||[];
   const caps=d.photoCaptions||[];
   document.getElementById('apt-ed-title').textContent=apt.code+' · '+apt.name;
+  const mhNames=(meta.minihotelNames||[]).join(', ');
   const steps=photos.map((url,i)=>`
     <div class="apt-step">
       <img src="${esc(url)}" alt="Step ${i+1}" onclick="document.getElementById('replace-${i}').click()">
@@ -1717,6 +2083,25 @@ window.openAptEditor=function(aptId){
     </div>`).join('')||'<div style="font-size:13px;color:var(--muted);padding:8px 0;">No photos yet.</div>';
 
   document.getElementById('apt-ed-body').innerHTML=`
+    <div class="apt-card">
+      <div class="apt-card-hd">Room settings · <span style="font-family:var(--mono);font-size:12px">${esc(aptId)}</span></div>
+      <div class="apt-card-bd">
+        <p style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.45">Room code cannot change — reservations link to it. Hide a room from the list instead of deleting.</p>
+        <label class="apt-label">Display name</label>
+        <input class="apt-input" id="room-meta-name" value="${esc(meta.displayName||apt.name)}">
+        <label class="apt-label">Short code (pill label)</label>
+        <input class="apt-input" id="room-meta-code" value="${esc(meta.displayCode||apt.code)}">
+        <label class="apt-label">Group</label>
+        <input class="apt-input" id="room-meta-group" list="room-group-list-ed" value="${esc(meta.group||apt.group||'')}">
+        <datalist id="room-group-list-ed">${roomGroupOptions(meta.group)}</datalist>
+        <label class="apt-label">Site</label>
+        <select class="apt-input" id="room-meta-site">${ROOM_SITES.map(s=>`<option value="${s.id}"${(meta.site||'shartava')===s.id?' selected':''}>${esc(s.label)}</option>`).join('')}</select>
+        <label class="apt-label">MiniHotel room names</label>
+        <input class="apt-input" id="room-meta-mh" value="${esc(mhNames)}" placeholder="M-6-1, …">
+        <label class="apt-label" style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="room-meta-hk" ${meta.showInHk!==false?'checked':''}> Show on HK board</label>
+        <button type="button" class="btn" style="width:100%;margin-top:10px" onclick="saveRoomMeta('${esc(aptId)}')">Save room settings</button>
+      </div>
+    </div>
     <div class="apt-card">
       <div class="apt-card-hd">Smart lock · ${d.tuyaDeviceId?'Tuya':d.doorCode?'Manual':'Not set'}</div>
       <div class="apt-card-bd">
@@ -1803,7 +2188,7 @@ window.saveAptData=async function(){
     updatedAt:serverTimestamp()
   };
   try{
-    await setDoc(doc(db,'checkin_apartments',aptId),data);
+    await setDoc(doc(db,'checkin_apartments',aptId),data,{merge:true});
     aptData[aptId]={...aptData[aptId],...data};
     toast('Saved ✓');
     renderAptsList();
@@ -1857,14 +2242,6 @@ window.doReplacePhoto=async function(idx,input){
 };
 
 /* ── Housekeeping (built into admin) ── */
-const HK_ROOMS=[
-  {code:'0-1',name:'Small room 1',group:'0- Rooms'},{code:'0-2',name:'Small room 2',group:'0- Rooms'},{code:'0-3',name:'Small room 3',group:'0- Rooms'},{code:'0-4',name:'Small room 4',group:'0- Rooms'},{code:'0-5',name:'Small room 5',group:'0- Rooms'},
-  {code:'6-1',name:'Apartment 6-1',group:'6- Apartments'},{code:'6-2',name:'Apartment 6-2',group:'6- Apartments'},{code:'6-3',name:'Apartment 6-3',group:'6- Apartments'},{code:'6-4',name:'Apartment 6-4',group:'6- Apartments'},
-  {code:'7-1',name:'Apartment 7-1',group:'7- Apartments'},{code:'7-2',name:'Apartment 7-2',group:'7- Apartments'},{code:'7-4',name:'Apartment 7-4',group:'7- Apartments'},
-  {code:'orb-1',name:'Orb 1',group:'Centre'},{code:'orb-2',name:'Orb 2',group:'Centre'},{code:'orb-3',name:'Orb 3',group:'Centre'},
-  {code:'tab-1',name:'Tab 1',group:'Centre'},{code:'tab-2',name:'Tab 2',group:'Centre'},{code:'tab-3',name:'Tab 3',group:'Centre'},
-  {code:'abashidze',name:'Abashidze',group:'Abashidze'},
-];
 const HK_DAY_START=-7;
 const HK_DAY_END=6;
 let hkActiveDay=0;
@@ -1910,12 +2287,23 @@ function formatGuestArrival(form,res){
   if(/^\d{2}:\d{2}$/.test(w))return w;
   return res?.checkinTime||hkSettings.defaultCheckIn||'15:00';
 }
-const HK_SITES=[
+const HK_SITES_ALL=[
   {id:'shartava',title:'Shartava'},
   {id:'centre',title:'City Centre · Orb & Tab'},
+  {id:'vgl',title:'VGL'},
+  {id:'abashidze',title:'Abashidze'},
 ];
 function hkSiteId(roomCode){
-  return/^orb-|^tab-/i.test(roomCode)?'centre':'shartava';
+  const r=roomsData[roomCode];
+  if(r?.site)return r.site;
+  if(/^orb-|^tab-/i.test(roomCode))return 'centre';
+  if(/^vgl-/i.test(roomCode))return 'vgl';
+  if(roomCode==='abashidze')return 'abashidze';
+  return 'shartava';
+}
+function hkActiveSites(){
+  const ids=new Set(getHkRooms().map(r=>hkSiteId(r.code)));
+  return HK_SITES_ALL.filter(s=>ids.has(s.id));
 }
 function hkDefaultCleanMinutes(roomCode){
   const c=String(roomCode||'').toLowerCase();
@@ -2026,7 +2414,7 @@ function hkDayTabLabel(offset,dateStr){
   return new Date(dateStr+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric'});
 }
 function hkTaskRooms(dateStr){
-  return HK_ROOMS.filter(r=>hkGetCheckout(r.code,dateStr));
+  return getHkRooms().filter(r=>hkGetCheckout(r.code,dateStr));
 }
 async function renderHk(){
   updateHkCleanerBadge();
@@ -2091,7 +2479,7 @@ async function renderHk(){
     </div>`;
   }
   let html='';
-  HK_SITES.forEach(site=>{
+  hkActiveSites().forEach(site=>{
     const siteRooms=rooms.filter(r=>hkSiteId(r.code)===site.id);
     if(!siteRooms.length)return;
     html+=`<div class="hk-site-hd">${esc(site.title)}</div>`;
@@ -2192,6 +2580,7 @@ function render(){
   else if(currentTab==='elevator')renderElevator();
   else if(currentTab==='requests')buildRequestsUI();
   else if(currentTab==='guestsettings'&&gsLoaded)renderGuestSettings();
+  else if(currentTab==='hksettings')renderHkSettings();
   else if(currentTab==='failures')renderFailures();
 }
 
@@ -2216,9 +2605,19 @@ function checkLoaded(){
     loadElevatorOnce();
     loadRequests(true);
     loadGuestSettings();
+    loadNavConfigFromFirestore();
   }
 }
 
+onSnapshot(collection(db,'checkin_rooms'),async snap=>{
+  roomsData={};
+  snap.docs.forEach(d=>{roomsData[d.id]={roomCode:d.id,...d.data()};});
+  if(!snap.docs.length&&!roomsSeeding)await ensureRoomsSeeded();
+  if(loaded>=2){
+    render();
+    if(currentTab==='hksettings')renderHkSettings();
+  }
+});
 onSnapshot(collection(db,'checkin_apartments'),snap=>{
   aptData={};snap.docs.forEach(d=>{aptData[d.id]=d.data();});
   if(loaded>=2)render();else checkLoaded();
