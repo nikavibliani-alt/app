@@ -258,7 +258,18 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 
 /* ── LOCKED SCREEN ── */
 .locked-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:2.5rem 1.5rem;text-align:center;margin-bottom:1rem;}
-.lc-icon{font-size:38px;margin-bottom:12px;}
+.lc-icon{display:flex;align-items:center;justify-content:center;color:var(--muted);margin-bottom:12px;}
+.lc-icon svg{width:40px;height:40px;}
+.passport-banner__icon{display:flex;align-items:center;justify-content:center;flex:none;line-height:0;}
+.passport-banner__icon svg{width:22px;height:22px;}
+.spin-icon svg{animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.blocked-icon,.farewell-icon{display:flex;align-items:center;justify-content:center;margin-bottom:16px;color:var(--muted);}
+.blocked-icon svg{width:40px;height:40px;}
+.farewell-icon svg{width:52px;height:52px;color:var(--ink);}
+.cash-note{display:flex;align-items:flex-start;gap:8px;}
+.cash-note svg{flex:none;margin-top:1px;}
+.rec-map{display:inline-flex;align-items:center;gap:5px;}
 .lc-title{font-family:var(--serif);font-size:22px;font-weight:400;margin-bottom:8px;letter-spacing:-0.01em;}
 .lc-sub{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:16px;}
 .countdown{font-family:var(--mono);font-size:40px;font-weight:500;color:var(--ink);letter-spacing:0.05em;}
@@ -1238,6 +1249,8 @@ import{isGuestUnlocked,tbilisiHour as sharedTbilisiHour}from"./shared/guest-unlo
 import{createPipelineGuestClient}from"./shared/pipeline-guest.js";
 import{buildRegisterPrimaryPayload,buildRegisterCompanionPayload,buildUpdateProfilePayload}from"./shared/guest-register.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
+import{featherIcon}from"./shared/feather-icons.js";
+const fi=(name,size=18,stroke=1.8)=>featherIcon(name,size,stroke);
 // Storage rules (set in Firebase Console):
 //   match /passport_uploads/{allPaths=**} {
 //     allow write: if true;
@@ -2455,7 +2468,7 @@ function renderPassportBanner(){
   if(sr?.overrideByAdmin!==false)return;
   const banner=document.createElement('div');
   banner.id='passport-warning-banner';
-  banner.innerHTML=`<div style="margin:0 16px 16px;padding:16px 20px;background:#dc2626;color:#fff;border-radius:16px;font-size:15px;line-height:1.5;"><b>⚠️ Your ID document wasn't verified.</b><br>Please upload a valid passport or national ID.<div style="margin-top:10px;"><button onclick="document.getElementById('reupload-passport').click()" style="background:#fff;color:#dc2626;border:none;padding:8px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Upload again</button></div></div>`;
+  banner.innerHTML=`<div style="margin:0 16px 16px;padding:16px 20px;background:#dc2626;color:#fff;border-radius:16px;font-size:15px;line-height:1.5;display:flex;gap:12px;align-items:flex-start;"><span style="flex:none;margin-top:2px;">${fi('alert-triangle',22,2)}</span><div><b>Your ID document wasn't verified.</b><br>Please upload a valid passport or national ID.<div style="margin-top:10px;"><button onclick="document.getElementById('reupload-passport').click()" style="background:#fff;color:#dc2626;border:none;padding:8px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Upload again</button></div></div></div>`;
   const greeting=document.querySelector('#page-home .greeting');
   if(greeting)greeting.parentNode.insertBefore(banner,greeting.nextSibling);
 }
@@ -2482,7 +2495,7 @@ window.handlePassportReupload=async function(input){
   if(!file)return;
   input.value='';
   const el=document.getElementById('passport-warn-banner');
-  if(el)el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon">⏳</div><div class="passport-banner__body"><div class="passport-banner__title">Uploading...</div></div></div>`;
+  if(el)el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon spin-icon">${fi('loader',22,2)}</div><div class="passport-banner__body"><div class="passport-banner__title">Uploading...</div></div></div>`;
   let newUrl=guestData?.passportUrl||null;
   try{newUrl=await uploadToFirebaseStorage(file);}catch(e){}
   if(guestId&&newUrl){
@@ -2490,7 +2503,7 @@ window.handlePassportReupload=async function(input){
     try{await setDoc(doc(db,'checkin_guests',guestId),update,{merge:true});}catch(e){}
     guestData={...guestData,...update};
   }
-  if(el)el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon">⏳</div><div class="passport-banner__body"><div class="passport-banner__title">Verifying your document...</div></div></div>`;
+  if(el)el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon spin-icon">${fi('loader',22,2)}</div><div class="passport-banner__body"><div class="passport-banner__title">Verifying your document...</div></div></div>`;
   renderPassportBanner();
   // Run AI scan in background and update Firestore when done
   scanPassport(file).then(async()=>{
@@ -2525,7 +2538,7 @@ function showBlockedScreen(){
   if(menuLabel)menuLabel.style.display='none';
   document.getElementById('passport-warning-banner')?.remove();
   document.getElementById('tiles-grid').innerHTML=`<div style="text-align:center;padding:64px 24px 40px;">
-    <div style="font-size:40px;margin-bottom:16px;">🚫</div>
+    <div class="blocked-icon">${fi('slash',40,1.8)}</div>
     <div style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:10px;">Access Revoked</div>
     <div style="font-size:14px;color:var(--muted);line-height:1.6;">Your access has been revoked.<br>Please contact the host.</div>
   </div>`;
@@ -2559,7 +2572,7 @@ function showHome(){
     if(aptEl){aptEl.className='greeting__apt';aptEl.innerHTML='<span class="swatch"></span><b>Maxela · Tbilisi</b>';}
     document.getElementById('tiles-grid').innerHTML=
       `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3rem 1.5rem 4rem;">
-        <div style="font-size:52px;margin-bottom:1.25rem;">🌟</div>
+        <div class="farewell-icon">${fi('star',52,1.6)}</div>
         <div style="font-size:22px;font-weight:600;color:var(--ink);margin-bottom:10px;letter-spacing:-0.01em;">Thank you for staying with us!</div>
         <div style="font-size:15px;color:var(--muted);line-height:1.7;">Safe travels. We hope to see you again soon.</div>
       </div>`;
@@ -2685,53 +2698,53 @@ function _renderTilesNow(){
   if(_hkTodayData===null&&!_hkFetching)refreshHkToday(); // kick off first fetch if not started
   _renderHeroContent(); // sandbox: keep hero daily key (door/elevator/wifi/floor) in sync with same data tiles used
   const u=isUnlocked();
-  const _ARR=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>`;
+  const _ARR=fi('chevron-right',14,2);
   const ssid=(aptData&&aptData.wifiName)?aptData.wifiName:'';
   const _detailsUrl='checkin-details.html?apt='+encodeURIComponent(aptId)+(isPreview?'&preview=true':'');
   const _tiles=[];
   if(sectionVisible('checkin'))_tiles.push(`
     <div class="tile checkin-tile${u?'':' locked'}" onclick="window.location.href='${_detailsUrl}'">
-      <div class="tile__icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L21 2"/><path d="M15.5 7.5l3 3"/><path d="M18 5l2.5 2.5"/></svg></div>
+      <div class="tile__icon">${fi('key',20,1.8)}</div>
       <div><div class="tile__title">${t('tc')}</div><div class="tile__sub">${t('tcs')}</div></div>
       <div class="tile__arrow">${_ARR}</div>
     </div>`);
   if(sectionVisible('wifi'))_tiles.push(`
     <div class="tile wifi${u?'':' locked'}" onclick="window.openPage('wifi')">
-      <div class="tile__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.5C7.5 3.5 16.5 3.5 22 8.5"/><path d="M5.5 12C9 8.7 15 8.7 18.5 12"/><path d="M9 15.5c1.7-1.7 4.3-1.7 6 0"/><circle cx="12" cy="19" r=".8" fill="currentColor" stroke="none"/></svg></div>
+      <div class="tile__icon">${fi('wifi',18,1.8)}</div>
       <div><div class="tile__title">${t('tw')}</div><div class="tile__sub">${_sLabel('wifi',t('tws'))}</div></div>
       <div style="display:flex;align-items:center;gap:8px;">${ssid?`<span class="ssid">${esc(ssid)}</span>`:''}<div class="tile__arrow">${_ARR}</div></div>
     </div>`);
   if(sectionVisible('location'))_tiles.push(`
     <div class="tile" onclick="window.openPage('location')">
-      <div class="tile__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>
+      <div class="tile__icon">${fi('map-pin',18,1.8)}</div>
       <div class="tile__title">${t('tlo')}</div>
       <div class="tile__sub">${t('tlos')}</div>
       <div class="tile__arrow">${_ARR}</div>
     </div>`);
   if(sectionVisible('services'))_tiles.push(`
     <div class="tile" onclick="window.openPage('services')">
-      <div class="tile__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V10.5a6 6 0 0 1 12 0V16l1.5 2.5h-15L6 16z"/><path d="M10 21h4"/></svg></div>
+      <div class="tile__icon">${fi('bell',18,1.8)}</div>
       <div class="tile__title">${t('tsv')}</div>
       <div class="tile__sub">${t('tsvs')}</div>
       <div class="tile__arrow">${_ARR}</div>
     </div>`);
   if(sectionVisible('recs'))_tiles.push(`
     <div class="tile" onclick="window.openPage('recs')">
-      <div class="tile__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4l-6 2.5V20l6-2.5 6 2.5 6-2.5V4l-6 2.5L9 4z"/><path d="M9 4v13.5M15 6.5V20"/></svg></div>
+      <div class="tile__icon">${fi('star',18,1.8)}</div>
       <div class="tile__title">${t('tr')}</div>
       <div class="tile__sub">${_sLabel('recs',t('trs'))}</div>
       <div class="tile__arrow">${_ARR}</div>
     </div>`);
   if(sectionVisible('rules'))_tiles.push(`
     <div class="tile" onclick="window.openPage('rules')">
-      <div class="tile__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></div>
+      <div class="tile__icon">${fi('file-text',18,1.8)}</div>
       <div class="tile__title">${t('tru')}</div>
       <div class="tile__sub">${_sLabel('rules',t('trus'))}</div>
       <div class="tile__arrow">${_ARR}</div>
     </div>`);
   if(sectionVisible('contact'))_tiles.push(`
     <div class="tile" onclick="window.openPage('contact')">
-      <div class="tile__icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 1 1-3.4-6.55L21 4l-1.45 3.4A7.97 7.97 0 0 1 21 12z"/></svg></div>
+      <div class="tile__icon">${fi('message-circle',18,1.8)}</div>
       <div class="tile__title">${t('tco')}</div>
       <div class="tile__sub">${_sLabel('contact',t('tcos'))}</div>
       <div class="tile__arrow">${_ARR}</div>
@@ -2740,8 +2753,8 @@ function _renderTilesNow(){
 }
 
 // ── Code hero card builder ────────────────────────────────────────────────────
-const _SVG_KEY=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L21 2"/><path d="M15.5 7.5l3 3"/><path d="M18 5l2.5 2.5"/></svg>`;
-const _SVG_BLDG=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M12 3v18"/><path d="M8 9l-1.5 2L5 9"/></svg>`;
+const _SVG_KEY=fi('key',10,1.8);
+const _SVG_BLDG=fi('home',10,1.8);
 function resolveElevatorCode(text){
   if(!text||!text.includes('#elevatorcode'))return text;
   const updatedAt=elevatorData?.updatedAt?.seconds||0;
@@ -2750,8 +2763,8 @@ function resolveElevatorCode(text){
   return text.replace(/#elevatorcode/g,code);
 }
 
-const _SVG_COPY=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15"/></svg>`;
-const _SVG_CHECK=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M5 12.5l4.5 4.5L19 7"/></svg>`;
+const _SVG_COPY=fi('copy',11,1.8);
+const _SVG_CHECK=fi('check',11,2);
 const _SVG_WA=`<svg width="20" height="20" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>`;
 
 function buildCodeHero({kind,labelText,code,copyCode,statusLabel,statusTime,infoText,suffix=''}){
@@ -3102,7 +3115,7 @@ try{
   if(type==='services'){
     await _ensureServicesConfigLoaded();
     const SVCS=_getGuestServicesCatalog();
-    body=`<div style="background:var(--gold-light);border:1px solid var(--gold-border);border-radius:var(--rs);padding:0.75rem 1rem;margin-bottom:1rem;font-size:13px;color:var(--text);line-height:1.5;">💵 Payment is directly to the cleaning staff in cash.</div>`;
+    body=`<div class="cash-note" style="background:var(--gold-light);border:1px solid var(--gold-border);border-radius:var(--rs);padding:0.75rem 1rem;margin-bottom:1rem;font-size:13px;color:var(--text);line-height:1.5;">${fi('dollar-sign',16,2)}<span>Payment is directly to the cleaning staff in cash.</span></div>`;
     body+=SVCS.map(s=>`<div class="service-card" onclick="window.openSvc('${s.id}','${esc(s.name[lang]||s.name.en)}',${s.hasTime})">
       <div class="sc-icon">${s.icon.replace('<svg','<svg width="22" height="22"')}</div>
       <div class="sc-info"><div class="sc-name">${esc(s.name[lang]||s.name.en)}</div><div class="sc-desc">${esc(s.desc[lang]||s.desc.en)}</div></div>
@@ -3128,7 +3141,7 @@ try{
       <div class="rec-type">${esc(r.type||'Place')}</div>
       <div class="rec-name">${esc(r.name||'')}</div>
       <div class="rec-desc">${esc(r.desc||'')}</div>
-      ${r.mapsUrl?`<a class="rec-map" href="${esc(r.mapsUrl)}" target="_blank">📍 Open in Maps</a>`:''}
+      ${r.mapsUrl?`<a class="rec-map" href="${esc(r.mapsUrl)}" target="_blank">${fi('map-pin',14,2)} Open in Maps</a>`:''}
     </div>`).join('')
     :`<div style="text-align:center;padding:3rem;color:var(--hint);font-size:14px;">Recommendations coming soon</div>`;
   }
@@ -3211,7 +3224,7 @@ function openLocked(res){
     ?`Available from ${esc(dateStr)}`
     :`Check-in instructions will be available on your check-in day from ${String(getCheckInHour()).padStart(2,'0')}:00`;
   _navToContent('wifi',t('tw'),`<div class="locked-card">
-    <div class="lc-icon">🔒</div>
+    <div class="lc-icon">${fi('lock',40,1.8)}</div>
     <div class="lc-title">${t('lt')}</div>
     <div class="lc-sub" style="margin-bottom:0">${t('ls')}</div>
     <div style="margin-top:14px;font-size:17px;font-weight:500;color:var(--ink);">${availMsg}</div>

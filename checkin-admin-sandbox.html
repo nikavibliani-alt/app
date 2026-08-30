@@ -341,8 +341,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260830l';
-  if(!/[?&]build=20260830l(?:&|$)/.test(location.search)){
+  var BUILD='20260830m';
+  if(!/[?&]build=20260830m(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -500,7 +500,7 @@ html.admin-authed #app{display:block;}
       <a class="more-item" href="admin-search-test.html" target="_blank" rel="noopener">Search debugger</a>
       <button class="more-item" type="button" onclick="adminSignOut()">Sign out</button>
     </div>
-    <p class="om-attrib">Tab icons are custom SVG. HK app uses <a href="https://openmoji.org" target="_blank" rel="noopener">OpenMoji</a> (CC BY-SA 4.0).</p>
+    <p class="om-attrib">Icons by <a href="https://feathericons.com/" target="_blank" rel="noopener">Feather</a> (MIT)</p>
   </div>
 
   <nav class="nav" id="main-nav">
@@ -603,6 +603,7 @@ import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gsta
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour}from"./shared/guest-unlock.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
+import{featherIcon}from"./shared/feather-icons.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -717,12 +718,13 @@ const _NAV_KEY='maxela_admin_nav_v5';
 const NAV_MIN=2;
 const NAV_MAX=5;
 const NAV_POOL={
-  stay:{label:'Stay',pane:'stay',svg:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',extra:''},
-  hk:{label:'HK',pane:'hk',svg:'<svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>',extra:''},
-  elevator:{label:'Elevator',pane:'elevator',svg:'<svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 8v8M9 11l3-3 3 3"/></svg>',extra:'<span class="dot"></span>',navId:'nav-elev'},
-  requests:{label:'Requests',pane:'requests',svg:'<svg viewBox="0 0 24 24"><path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M8 8h8M8 12h5"/></svg>',extra:'<span class="badge" id="req-badge">0</span>',navId:'nav-req'},
-  apts:{label:'Apts',pane:'apts',svg:'<svg viewBox="0 0 24 24"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-8h6v8"/></svg>',extra:''},
+  stay:{label:'Stay',pane:'stay',icon:'calendar',extra:''},
+  hk:{label:'HK',pane:'hk',icon:'check-square',extra:''},
+  elevator:{label:'Elevator',pane:'elevator',icon:'chevrons-up',extra:'<span class="dot"></span>',navId:'nav-elev'},
+  requests:{label:'Requests',pane:'requests',icon:'message-square',extra:'<span class="badge" id="req-badge">0</span>',navId:'nav-req'},
+  apts:{label:'Apts',pane:'apts',icon:'home',extra:''},
 };
+function navTabSvg(id,size=22){return featherIcon(NAV_POOL[id]?.icon||'circle',size,1.8);}
 const DEFAULT_NAV_CONFIG={slots:['stay','requests','elevator'],landingTab:'stay'};
 let navConfigDraft=null;
 
@@ -790,9 +792,9 @@ function renderNavBar(){
   for(const id of navSlots){
     const d=NAV_POOL[id];
     if(!d)continue;
-    html+=`<button class="nav__btn${currentTab===d.pane?' active':''}" data-tab="${d.pane}" onclick="switchTab('${d.pane}')" ${d.navId?`id="${d.navId}"`:''}>${d.svg}${d.label}${d.extra||''}</button>`;
+    html+=`<button class="nav__btn${currentTab===d.pane?' active':''}" data-tab="${d.pane}" onclick="switchTab('${d.pane}')" ${d.navId?`id="${d.navId}"`:''}>${navTabSvg(id)}${d.label}${d.extra||''}</button>`;
   }
-  html+=`<button class="nav__btn${currentTab==='more'||['apts','guestsettings','navsettings','failures','elevator','hksettings','hk'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</button>`;
+  html+=`<button class="nav__btn${currentTab==='more'||['apts','guestsettings','navsettings','failures','elevator','hksettings','hk'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')">${featherIcon('more-horizontal',22,1.8)}More</button>`;
   nav.innerHTML=html;
   updateRequestsBadge();
   if(elevData)document.getElementById('nav-elev')?.classList.toggle('has-alert',elevFreshness().cls==='old');
@@ -832,9 +834,9 @@ window.resetNavConfig=async function(){
   renderNavBar();
   toast('Reset to default');
 };
-const NAV_ARROW_UP='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
-const NAV_ARROW_DN='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>';
-const NAV_DRAG_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="17" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="17" r="1.2" fill="currentColor" stroke="none"/></svg>';
+const NAV_ARROW_UP=featherIcon('chevron-up',20,2);
+const NAV_ARROW_DN=featherIcon('chevron-down',20,2);
+const NAV_DRAG_SVG=featherIcon('menu',18,2);
 let _navDrag=null;
 
 function renderNavPreview(){
@@ -843,9 +845,9 @@ function renderNavPreview(){
   const tabs=navConfigDraft.slots.map(id=>{
     const d=NAV_POOL[id];if(!d)return '';
     const land=navConfigDraft.landingTab===id?' landing':'';
-    return`<div class="nav-cfg-preview__tab${land}">${d.svg}${esc(d.label)}</div>`;
+    return`<div class="nav-cfg-preview__tab${land}">${navTabSvg(id,18)}${esc(d.label)}</div>`;
   }).join('');
-  el.innerHTML=`<div class="nav-cfg-preview__label">Preview</div><div class="nav-cfg-preview__bar">${tabs}<div class="nav-cfg-preview__tab more"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/><circle cx="5" cy="12" r="1.5" fill="currentColor"/></svg>More</div></div>`;
+  el.innerHTML=`<div class="nav-cfg-preview__label">Preview</div><div class="nav-cfg-preview__bar">${tabs}<div class="nav-cfg-preview__tab more">${featherIcon('more-horizontal',18,1.8)}More</div></div>`;
 }
 
 function navCfgRowHtml(id,i){
@@ -854,7 +856,7 @@ function navCfgRowHtml(id,i){
   const n=navConfigDraft.slots.length;
   return`<div class="nav-cfg-item${isLand?' landing':''}" data-idx="${i}" data-tab-id="${esc(id)}">
     <button type="button" class="nav-cfg-drag" aria-label="Drag to reorder" onpointerdown="navDragPointerDown(event,${i})">${NAV_DRAG_SVG}</button>
-    <div class="nav-cfg-icon">${d.svg}</div>
+    <div class="nav-cfg-icon">${navTabSvg(id,20)}</div>
     <div class="nav-cfg-body">
       <div class="nav-cfg-body__label">Tab ${i+1}${isLand?' · Opens on launch':''}</div>
       <select id="nav-slot-${i}" onchange="navSlotPick(${i},this.value)">
@@ -1110,26 +1112,8 @@ const GP_PROPS=[
   {id:'ROOMS',label:'Rooms'},{id:'MAXELA',label:'Maxela'},{id:'BIG_APT',label:'Big Apt'},
   {id:'FREEDOM',label:'Freedom'},{id:'ORBELIANI',label:'Orbeliani'},
 ];
-function gpIcon(name,size=18){
-  const s=size;
-  const icons={
-    key:'<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
-    wifi:'<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>',
-    elevator:'<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 8v8M9 11l3-3 3 3"/>',
-    services:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
-    laundry:'<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/>',
-    cleaning:'<path d="M9 3h6l-1 9H10L9 3z"/><path d="M3 21c0-4 2-7 9-7s9 3 9 7"/><path d="M12 14v7"/>',
-    tour:'<polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>',
-    transfer:'<path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
-    recs:'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
-    rules:'<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
-    contact:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
-    home:'<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
-    location:'<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>',
-  };
-  const inner=icons[name]||icons.recs;
-  return`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
-}
+const GP_ICON_MAP={key:'key',wifi:'wifi',elevator:'chevrons-up',services:'grid',laundry:'package',cleaning:'check-square',tour:'map',transfer:'truck',recs:'star',rules:'file-text',contact:'message-circle',home:'home',location:'map-pin'};
+function gpIcon(name,size=18){return featherIcon(GP_ICON_MAP[name]||name,size,1.8);}
 const GP_TILES=[
   {id:'checkin',icon:'key',label:'Check-in',group:'essential',noEdit:true},
   {id:'wifi',icon:'wifi',label:'WiFi',group:'essential',edit:'wifi'},
