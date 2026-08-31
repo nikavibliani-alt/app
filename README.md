@@ -6,6 +6,8 @@ Static guest check-in portal hosted at **https://app.maxelaapartments.com/**
 
 | File | Role | Live URL |
 |------|------|----------|
+| **`checkin-admin.html`** | **Production admin (live)** | https://app.maxelaapartments.com/checkin-admin.html |
+| **`checkin-admin-sandbox.html`** | Dev admin sandbox | https://app.maxelaapartments.com/checkin-admin-sandbox.html |
 | **`checkin-guest.html`** | **Production guest app (live)** | https://app.maxelaapartments.com/checkin-guest.html |
 | **`checkin-guest-sandbox-2.html`** | Dev sandbox (+ toolbar) | https://app.maxelaapartments.com/checkin-guest-sandbox-2.html |
 | `checkin-guest-v2.html` | Redirect → checkin-guest.html | https://app.maxelaapartments.com/checkin-guest-v2.html |
@@ -23,12 +25,9 @@ Read that file before any major edit. It contains:
 
 ## Quick start for agents
 
-1. Read `GUEST_CHECKIN_REDESIGN.md` §0, §9, §16, §18, §20.
-2. Edit **`checkin-guest-sandbox-2.html`** and **`checkin-admin-sandbox.html`** only (unless cutover approved).
-3. Test at **https://app.maxelaapartments.com/sandbox-index.html** before touching live files.
-4. See **`docs/SANDBOX_TESTING.md`** for the full checklist.
-5. See **`CLAUDE_CODE_REPORT.md`** for Claude Code status (sandbox signed off 2026-08-31).
-6. Do **not** edit `checkin-guest-v2.html` or `checkin-admin.html` until host approves cutover (§7).
+1. Edit **`checkin-admin-sandbox.html`** or **`checkin-guest-sandbox-2.html`**, test on sandbox URLs.
+2. Promote: `node scripts/build-admin-production.js` and/or `node scripts/build-guest-production.js`.
+3. See **`docs/SANDBOX_TESTING.md`** for URLs and backend notes.
 
 ## Related docs
 
