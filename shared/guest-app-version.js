@@ -6,7 +6,7 @@
  * Production URL stays: https://app.maxelaapartments.com/checkin-guest.html
  */
 
-export const GUEST_APP_VERSION = '1.0.0';
+export const GUEST_APP_VERSION = '1.1.0';
 export const GUEST_APP_URL = 'https://app.maxelaapartments.com/checkin-guest.html';
 
 /** @param {string} guestToken */
