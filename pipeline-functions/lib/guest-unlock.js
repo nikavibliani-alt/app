@@ -42,6 +42,11 @@ function computeGuestUnlock(opts = {}) {
     return { state: 'blocked', unlocked: false, label: 'Blocked', cls: 'waiting', reason: 'blocked' };
   }
 
+  // Admin force-unlock overrides arrival date / HK / time gates
+  if (guest.manualUnlock === true) {
+    return { state: 'unlocked', unlocked: true, label: 'Unlocked', cls: 'unlocked', reason: 'manual_unlock' };
+  }
+
   const today = opts.today || tbilisiToday();
   const hour = opts.hour != null ? opts.hour : tbilisiHour();
   const checkInHour = opts.checkInHour != null ? opts.checkInHour : DEFAULT_CHECK_IN_HOUR;
@@ -57,10 +62,7 @@ function computeGuestUnlock(opts = {}) {
     }
   }
 
-  // Arrival day, or no arrivalDate — time / HK / manual rules (matches live admin HTML)
-  if (guest.manualUnlock === true) {
-    return { state: 'unlocked', unlocked: true, label: 'Unlocked', cls: 'unlocked', reason: 'manual_unlock' };
-  }
+  // Arrival day, or no arrivalDate — time / HK rules (matches live admin HTML)
   if (hour >= checkInHour) {
     return { state: 'unlocked', unlocked: true, label: 'Unlocked', cls: 'unlocked', reason: 'check_in_hour' };
   }

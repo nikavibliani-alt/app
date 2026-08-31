@@ -14,6 +14,16 @@ test('before arrival → locked', () => {
   assert.equal(r.reason, 'before_arrival');
 });
 
+test('manualUnlock before arrival day → unlocked', () => {
+  const r = computeGuestUnlock({
+    guest: { arrivalDate: '2026-09-05', manualUnlock: true },
+    today: '2026-09-01',
+    hour: 8,
+  });
+  assert.equal(r.unlocked, true);
+  assert.equal(r.reason, 'manual_unlock');
+});
+
 test('mid-stay → unlocked', () => {
   assert.equal(
     isGuestUnlocked({ guest: { arrivalDate: '2026-09-01' }, today: '2026-09-03', hour: 10 }),

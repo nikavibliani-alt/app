@@ -2365,10 +2365,16 @@ function rebuildFormMaps(){
 }
 function getForm(r){return _formById.get(r.id)||null;}
 
+function formAccessGranted(form,r){
+  if(!form)return false;
+  if(form.manualUnlock===true)return true;
+  if(siblingGuestForms(form).some(s=>s.manualUnlock===true))return true;
+  return guestStatus(form,r).cls==='unlocked';
+}
 function cardStatus(r,form){
   if(!form)return{label:'NO FORM',cls:'pill-pending',key:'nof'};
   if(form.guestConfirmedCheckin===true)return{label:'CHECKED IN',cls:'pill-in',key:'checked'};
-  if(guestStatus(form,r).cls==='unlocked')return{label:'ACCESS GRANTED',cls:'pill-ok',key:'unlocked'};
+  if(formAccessGranted(form,r))return{label:'ACCESS GRANTED',cls:'pill-ok',key:'unlocked'};
   return{label:'AWAITING UNLOCK',cls:'pill-await',key:'need'};
 }
 function fmtDate(s){if(!s)return'—';return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
@@ -2732,12 +2738,18 @@ window.switchTab=function(tab){
 };
 
 window.unlockGuest=async function(guestId){
-  if(!confirm('Grant access for this guest now?'))return;
+  const g=guestData.find(x=>x.id===guestId);
+  const targets=g?siblingGuestForms(g):[];
+  const n=targets.length||1;
+  if(!confirm(`Grant access for ${n>1?n+' linked forms':'this guest'} now?`))return;
   try{
-    const r=await pipelineAdmin({password:_ADMIN_PWD,actionType:'force_unlock',payload:{guestId},actor:'admin-sandbox'});
-    if(!r.ok){toast(r.message||'Failed');return;}
-    const g=guestData.find(x=>x.id===guestId);
-    if(g){g.manualUnlock=true;g.unlockedAt=g.unlockedAt||new Date();}
+    const list=targets.length?targets:[g].filter(Boolean);
+    for(const t of list){
+      const r=await pipelineAdmin({password:_ADMIN_PWD,actionType:'force_unlock',payload:{guestId:t.id},actor:'admin-sandbox'});
+      if(!r.ok){toast(r.message||'Failed');return;}
+      t.manualUnlock=true;
+      t.unlockedAt=t.unlockedAt||new Date();
+    }
     toast('Access granted ✓');
     render();
     if(document.getElementById('detail')?.classList.contains('open'))openDetail(guestId);
