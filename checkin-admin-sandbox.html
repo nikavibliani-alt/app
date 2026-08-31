@@ -58,6 +58,9 @@ html.standalone-hk.hk-authed.hk-tab-settings #pane-hksettings{display:block!impo
 html.standalone-hk #detail,html.standalone-hk #apt-editor-overlay,html.standalone-hk #req-detail,html.standalone-hk #gp-editor-overlay,html.standalone-hk #gs-save-bar{display:none!important;}
 html.standalone-hk .hk-cleaner-link{display:none;}
 html.standalone-hk.hk-admin-role .hk-cleaner-link{display:inline;}
+/* Disable double-tap zoom on HK phones (HK-legacy.html) */
+html.standalone-hk,html.standalone-hk body,html.standalone-hk button,html.standalone-hk input{touch-action:manipulation;}
+html.standalone-hk .hk-pin-key,html.standalone-hk .hk-done,html.standalone-hk .filter-chip,html.standalone-hk .btn,html.standalone-hk .hk-card,html.standalone-hk .hk-pin-pad{touch-action:manipulation;-webkit-user-select:none;user-select:none;}
 #hk-pin-screen{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:1001;padding:24px;}
 html.standalone-hk:not(.hk-authed) #hk-pin-screen{display:flex;}
 html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
@@ -70,7 +73,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .hk-pin-dot.filled{background:var(--ink);border-color:var(--ink);}
 .hk-pin-err{font-size:13px;color:var(--red);min-height:20px;margin-bottom:16px;font-weight:500;}
 .hk-pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:210px;margin:0 auto;}
-.hk-pin-key{height:58px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);font-family:var(--mono);font-size:22px;font-weight:500;cursor:pointer;color:var(--ink);-webkit-tap-highlight-color:transparent;}
+.hk-pin-key{height:58px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);font-family:var(--mono);font-size:22px;font-weight:500;cursor:pointer;color:var(--ink);-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;}
 .hk-pin-key:active{background:var(--bg);}
 .app-header{padding:14px 16px 10px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50;}
 .app-header__row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
@@ -446,7 +449,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .wa-rule{display:flex;gap:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:var(--rs);margin-bottom:14px;font-size:12px;color:var(--ink-2);line-height:1.45;}
 .wa-rule svg{flex:none;width:16px;height:16px;color:var(--muted);margin-top:1px;}
 </style>
-<script>window.__STANDALONE_HK__=/[?&]app=hk(?:&|$)/.test(location.search)||/(?:^|\/)HK\.html$/i.test(location.pathname);if(window.__STANDALONE_HK__){document.documentElement.classList.add('standalone-hk');try{var role=localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role');if(role){document.documentElement.classList.add('hk-authed');if(role==='admin')document.documentElement.classList.add('hk-admin-role');}}catch(e){}}</script>
+<script>window.__STANDALONE_HK__=/[?&]app=hk(?:&|$)/.test(location.search)||/(?:^|\/)HK(?:-app)?\.html$/i.test(location.pathname);if(window.__STANDALONE_HK__){document.documentElement.classList.add('standalone-hk');document.addEventListener('dblclick',function(e){e.preventDefault();},{passive:false,capture:true});try{var role=localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role');if(role){document.documentElement.classList.add('hk-authed');if(role==='admin')document.documentElement.classList.add('hk-admin-role');}}catch(e){}}</script>
 <script>
 (function(){
   var BUILD=window.__STANDALONE_HK__?'20260831hk3':'20260831g';

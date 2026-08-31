@@ -18,7 +18,7 @@ html = html.replace(
 
 html = html.replace(
   /<script>window\.__STANDALONE_HK__=[\s\S]*?<\/script>\n/,
-  '<script>window.__STANDALONE_HK__=true;document.documentElement.classList.add(\'standalone-hk\');try{var role=localStorage.getItem(\'hk_role\')||localStorage.getItem(\'hk_shartava_role\');if(role){document.documentElement.classList.add(\'hk-authed\');if(role===\'admin\')document.documentElement.classList.add(\'hk-admin-role\');}}catch(e){}</script>\n'
+  '<script>window.__STANDALONE_HK__=true;document.documentElement.classList.add(\'standalone-hk\');document.addEventListener(\'dblclick\',function(e){e.preventDefault();},{passive:false,capture:true});try{var role=localStorage.getItem(\'hk_role\')||localStorage.getItem(\'hk_shartava_role\');if(role){document.documentElement.classList.add(\'hk-authed\');if(role===\'admin\')document.documentElement.classList.add(\'hk-admin-role\');}}catch(e){}</script>\n'
 );
 
 // Remove cache-buster redirect entirely — caused URI Too Long loops on cleaner phones.
