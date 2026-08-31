@@ -21,11 +21,14 @@ function makeStore(initial = {}, opts = {}) {
   }
 
   function guestIdsForReservation(reservationId) {
-    const ids = [];
+    const ids = new Set();
+    const res = reservations.get(reservationId);
+    const num = res?.reservationNumber;
     for (const [id, data] of guests) {
-      if (data.matchedReservationId === reservationId) ids.push(id);
+      if (data.matchedReservationId === reservationId) ids.add(id);
+      else if (num != null && data.matchedReservationId === num) ids.add(id);
     }
-    return ids;
+    return [...ids];
   }
 
   async function runTransaction(fn) {
@@ -216,6 +219,24 @@ test('swap exchanges rooms and mirrors both guests', async () => {
   assert.equal(result.ok, true);
   assert.equal(ctx.store.roomMoves.length, 2);
   assert.deepEqual(result.data.affectedGuestIds.sort(), ['g1', 'g2']);
+});
+
+test('move mirrors guest linked by reservationNumber (not doc id)', async () => {
+  const ctx = makeStore({
+    reservations: { res1: res('6-1', '2026-09-01', '2026-09-05', { reservationNumber: 'BK-99' }) },
+    guests: { g1: { aptId: '6-1', matchedReservationId: 'BK-99' } },
+  });
+
+  const result = await runRoomAssignment(ctx, {
+    mode: 'move',
+    assignmentId: 'res1',
+    toRoomCode: '6-3',
+    actor: 'test',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(ctx.store.reservations.get('res1').roomCode, '6-3');
+  assert.equal(ctx.store.guests.get('g1').aptId, '6-3');
 });
 
 test('release_to_minihotel clears manualRoom and writes audit in txn', async () => {

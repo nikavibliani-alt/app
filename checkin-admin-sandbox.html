@@ -2283,6 +2283,13 @@ function guestStatus(g,res){
   return{label:r.label,cls:r.cls};
 }
 
+function guestAssignedRoom(g){
+  const door=(_resCache||[]).find(r=>isSameReservation(r,g?.matchedReservationId));
+  return(door?.roomCode||door?.room||g?.aptId||'').trim();
+}
+function reservationForGuest(g){
+  return(_resCache||[]).find(r=>isSameReservation(r,g?.matchedReservationId))||null;
+}
 function findFormForReservation(r){
   if(!r)return null;
   const linked=guestData.filter(g=>!g.companionGuest&&isSameReservation(r,g.matchedReservationId));
@@ -2318,17 +2325,6 @@ function rebuildFormMaps(){
     if(_formById.has(r.id))continue;
     const f=findFormForReservation(r);
     if(f)_formById.set(r.id,f);
-  }
-  const byGC=new Map();
-  for(const r of res){
-    const key=_stripRoomNum(r.guest||'').toLowerCase()+'|'+(r.checkin||'');
-    if(!byGC.has(key))byGC.set(key,[]);
-    byGC.get(key).push(r);
-  }
-  for(const group of byGC.values()){
-    if(group.length<2)continue;
-    const shared=group.reduce((f,r)=>f||_formById.get(r.id),null);
-    if(shared)for(const r of group)if(!_formById.has(r.id))_formById.set(r.id,shared);
   }
 }
 function getForm(r){return _formById.get(r.id)||null;}
@@ -2450,7 +2446,12 @@ function renderCard(grp,mode){
   const sorted=[...grp].sort(byRoom);
   const form=grp.reduce((f,r)=>f||getForm(r),null);
   const st=cardStatus(sorted[0],form);
-  const roomStr=sorted.map(r=>{const f=getForm(r);return f?.aptId||r.roomCode||'—';}).join(' · ');
+  const roomStr=sorted.map(r=>{
+    const rc=r.roomCode||r.room||'';
+    if(rc)return rc;
+    const f=getForm(r);
+    return f?.aptId||'—';
+  }).join(' · ');
   const name=_stripRoomNum(grp[0].guest||'')||'—';
   const multi=grp.length>1?`<span class="pill pill-multi">MULTI</span>`:'';
   const rawPhone=(form?.contact||grp.reduce((p,r)=>p||r.phone||r.guest_phone||r.guestPhone||'','')||'').trim();
@@ -2719,7 +2720,7 @@ window.moveGuestPipeline=async function(guestId){
   const newRoom=document.getElementById('detail-room-select')?.value;
   const g=guestData.find(x=>x.id===guestId);
   if(!g||!newRoom)return;
-  if(newRoom===g.aptId){toast('Already in '+newRoom);return;}
+  if(newRoom===guestAssignedRoom(g)){toast('Already in '+newRoom);return;}
   const res=resolveReservation(g.matchedReservationId);
   if(!res?.id){toast('No linked reservation');return;}
   const checkin=g.arrivalDate||res.checkin||'';
@@ -2804,12 +2805,14 @@ window.swapGuestPipeline=async function(guestId){
   if(!g||!newRoom)return;
   const conflict=findRoomConflictForGuest(g,newRoom);
   if(!conflict){toast('Room is free — use Move');updateDetailRoomAction(guestId);return;}
-  const resId=resolveReservationId(g.matchedReservationId);
-  const otherResId=conflict.id;
-  if(!resId||!otherResId){toast('Missing reservation link — cannot swap');return;}
+  const res=resolveReservation(g.matchedReservationId);
+  const conflictRes=resolveReservation(conflict.id||conflict.reservationNumber);
+  const resId=res?.id||resolveReservationId(g.matchedReservationId);
+  const otherResId=conflictRes?.id||conflict.id;
+  if(!resId||!otherResId||!res||!conflictRes){toast('Missing reservation link — cannot swap');return;}
   const selfName=_stripRoomNum(g.nameRoman||g.name||'Guest');
   const otherName=guestDisplayNameForRes(conflict);
-  const fromRoom=g.aptId||'—';
+  const fromRoom=guestAssignedRoom(g)||'—';
   if(!confirm(`Swap rooms with ${otherName}?\n\n${selfName} → ${newRoom}\n${otherName} → ${fromRoom}`))return;
   try{
     const r=await pipelineAdmin({
@@ -2818,13 +2821,26 @@ window.swapGuestPipeline=async function(guestId){
       payload:{reservationId:resId,otherReservationId:otherResId},
       actor:'admin-sandbox',
     });
-    if(!r.ok){toast(r.message||'Swap failed');return;}
+    if(!r.ok){
+      await swapGuestsLocal(res,conflictRes);
+      toast(`Swapped with ${otherName} ✓`);
+      await refreshReservationsNow();
+      openDetail(guestId);
+      return;
+    }
     pipelineRoomToast(r,'Swapped with '+otherName+' ✓');
     await refreshReservationsNow();
     openDetail(guestId);
   }catch(e){
-    console.error('[swapGuestPipeline]',e);
-    toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Error: '+e.message);
+    try{
+      await swapGuestsLocal(res,conflictRes);
+      toast(`Swapped with ${otherName} ✓`);
+      await refreshReservationsNow();
+      openDetail(guestId);
+    }catch(err){
+      console.error('[swapGuestPipeline]',err,e);
+      toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Error: '+(err.message||e.message));
+    }
   }
 };
 
@@ -2858,7 +2874,7 @@ function updateDetailRoomAction(guestId){
   const info=document.getElementById('detail-room-swap-info');
   if(!g||!select||!btn||!info)return;
   const newRoom=select.value;
-  const currentRoom=g.aptId||'';
+  const currentRoom=guestAssignedRoom(g);
   if(newRoom===currentRoom){
     btn.textContent='Move';
     btn.disabled=true;
@@ -2885,11 +2901,13 @@ function updateDetailRoomAction(guestId){
 
 window.openDetail=function(guestId){
   const g=guestData.find(x=>x.id===guestId);if(!g){toast('Guest not found');return;}
-  document.getElementById('detail-title').textContent=_stripRoomNum(g.nameRoman||g.name||'Guest')+' · '+(g.aptId||'');
-  const st=g.guestConfirmedCheckin?{label:'CHECKED IN',cls:'pill-in'}:cardStatus({roomCode:g.aptId},g);
+  const door=reservationForGuest(g);
+  const assignedRoom=guestAssignedRoom(g);
+  const aptDrift=door&&(door.roomCode||door.room)&&g.aptId&&assignedRoom!==g.aptId;
+  document.getElementById('detail-title').textContent=_stripRoomNum(g.nameRoman||g.name||'Guest')+' · '+assignedRoom;
+  const st=g.guestConfirmedCheckin?{label:'CHECKED IN',cls:'pill-in'}:cardStatus(door||{roomCode:assignedRoom},g);
   const passportUrl=g.passportUrl||'';
-  const door=(_resCache||[]).find(r=>r.id===g.matchedReservationId||r.reservationNumber===g.matchedReservationId);
-  const doorCode=door?.tuyaPassword||aptData[g.aptId]?.doorCode||'—';
+  const doorCode=door?.tuyaPassword||aptData[assignedRoom]?.doorCode||aptData[g.aptId]?.doorCode||'—';
   const waPhone=normalizeWaPhone(g.contact||'');
   document.getElementById('detail-body').innerHTML=`
     <div style="margin-bottom:12px"><span class="pill ${st.cls}">${st.label}</span></div>
@@ -2905,7 +2923,8 @@ window.openDetail=function(guestId){
       </div>
     </div>
     <div class="room-block">
-      <h3>Room ${esc(g.aptId||'—')}</h3>
+      <h3>Room ${esc(assignedRoom)}</h3>
+      ${aptDrift?`<p style="font-size:12px;color:var(--amber);margin-bottom:8px">Guest form still says ${esc(g.aptId)} — use Move/Swap or wait for sync</p>`:''}
       <div style="font-size:12px;color:var(--muted)">Smart lock</div>
       <div class="door">${esc(doorCode)}</div>
       <div class="card__actions">
@@ -2916,7 +2935,7 @@ window.openDetail=function(guestId){
     ${g.matchedReservationId?`<div style="margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs)">
       <div style="font-size:12px;font-weight:700;margin-bottom:8px">Move room (pipeline)${guestReservationManual(g)?' <span class="pill pill-manual">MANUAL</span>':''}</div>
       <div style="display:flex;gap:8px;align-items:center">
-        <select id="detail-room-select" class="lock-input" style="flex:1;height:44px;margin:0" onchange="window.updateDetailRoomAction('${g.id}')">${roomOptionsHtml(g.aptId)}</select>
+        <select id="detail-room-select" class="lock-input" style="flex:1;height:44px;margin:0" onchange="window.updateDetailRoomAction('${g.id}')">${roomOptionsHtml(assignedRoom)}</select>
         <button id="detail-room-action-btn" class="btn btn-primary" style="flex:none;min-height:44px;padding:0 14px">Move</button>
       </div>
       <div id="detail-room-swap-info" style="display:none;margin-top:8px"></div>
@@ -4151,6 +4170,26 @@ function _subscribeResCache(){
   );
 }
 
+async function repairGuestRoomDrift(){
+  if(!guestData.length||!_resCache)return 0;
+  let n=0;
+  for(const g of guestData){
+    if(g.companionGuest)continue;
+    const door=reservationForGuest(g);
+    if(!door)continue;
+    if(door.manualRoom===true||door.manualRoom==='true')continue;
+    const rc=(door.roomCode||door.room||'').trim();
+    if(!rc||!g.aptId||g.aptId===rc)continue;
+    try{
+      await setDoc(doc(db,'checkin_guests',g.id),{aptId:rc,updatedAt:serverTimestamp()},{merge:true});
+      g.aptId=rc;
+      n++;
+    }catch(e){console.warn('[repairGuestRoomDrift]',g.id,e);}
+  }
+  if(n>0)rebuildFormMaps();
+  return n;
+}
+
 let loaded=0;
 function checkLoaded(){
   loaded++;
@@ -4165,6 +4204,7 @@ function checkLoaded(){
       loadRequests(true);
       loadGuestSettings();
       loadNavConfigFromFirestore();
+      repairGuestRoomDrift().then(n=>{if(n>0){render();toast(`Fixed ${n} guest room${n>1?'s':''} from booking data`);}});
     }
   }
 }

@@ -524,11 +524,15 @@ function buildLiveCtx() {
   }
 
   async function listGuestIdsForReservation(reservationId) {
-    const snap = await db
-      .collection('checkin_guests')
-      .where('matchedReservationId', '==', reservationId)
-      .get();
-    return snap.docs.map((d) => d.id);
+    const ids = new Set();
+    const addIds = (snap) => snap.docs.forEach((d) => ids.add(d.id));
+    addIds(await db.collection('checkin_guests').where('matchedReservationId', '==', reservationId).get());
+    const resSnap = await db.collection('reservations').doc(reservationId).get();
+    const num = resSnap.exists ? resSnap.data().reservationNumber : null;
+    if (num != null && String(num) !== String(reservationId)) {
+      addIds(await db.collection('checkin_guests').where('matchedReservationId', '==', num).get());
+    }
+    return [...ids];
   }
 
   async function runTransaction(fn) {
@@ -546,10 +550,23 @@ function buildLiveCtx() {
           return map;
         },
         async listGuestIdsForReservation(reservationId) {
-          const snap = await txn.get(
-            db.collection('checkin_guests').where('matchedReservationId', '==', reservationId)
+          const ids = new Set();
+          const addIds = (snap) => snap.docs.forEach((d) => ids.add(d.id));
+          addIds(
+            await txn.get(
+              db.collection('checkin_guests').where('matchedReservationId', '==', reservationId)
+            )
           );
-          return snap.docs.map((d) => d.id);
+          const resSnap = await txn.get(db.collection('reservations').doc(reservationId));
+          const num = resSnap.exists ? resSnap.data().reservationNumber : null;
+          if (num != null && String(num) !== String(reservationId)) {
+            addIds(
+              await txn.get(
+                db.collection('checkin_guests').where('matchedReservationId', '==', num)
+              )
+            );
+          }
+          return [...ids];
         },
         updateReservation(reservationId, patch) {
           const ref = db.collection('reservations').doc(reservationId);
