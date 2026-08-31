@@ -194,5 +194,5 @@ checkin-admin-sandbox.html        ← admin + HK (sandbox)
 checkin-guest-sandbox-2.html      ← guest flow (sandbox)
 docs/ADD_APARTMENT_GUIDE.md       ← add rooms/buildings
 PROJECT_ARCHIVE.md                ← full project history
-CLAUDE_CODE_REPORT.md             ← handoff for reviewers
+docs/AGENT_HANDOFF.md              ← agent entry (replaces CLAUDE_CODE_REPORT.md)
 ```

@@ -22,16 +22,16 @@ Read that file before any major edit. It contains:
 
 ## Quick start for agents
 
-1. Read `GUEST_CHECKIN_REDESIGN.md` §0, §9, §16, §18, §20.
-2. Edit **`checkin-guest-sandbox-2.html`** and **`checkin-admin-sandbox.html`** only (unless cutover approved).
-3. Test at **https://app.maxelaapartments.com/sandbox-index.html** before touching live files.
-4. See **`docs/SANDBOX_TESTING.md`** for the full checklist.
-5. See **`CLAUDE_CODE_REPORT.md`** for Claude Code status (sandbox signed off 2026-08-31).
-6. Do **not** edit `checkin-guest-v2.html` or `checkin-admin.html` until host approves cutover (§7).
+1. Read **`docs/AGENT_HANDOFF.md`** first, then `docs/SANDBOX_TESTING.md`.
+2. Read `GUEST_CHECKIN_REDESIGN.md` §0, §9, §13 for design rules (§20 points back to AGENT_HANDOFF).
+3. Edit **`checkin-guest-sandbox-2.html`** and **`checkin-admin-sandbox.html`** only (unless cutover approved).
+4. Test at **https://app.maxelaapartments.com/sandbox-index.html** before touching live files.
+5. Do **not** edit `checkin-guest-v2.html` or `checkin-admin.html` until host approves cutover (§7).
 
 ## Related docs
 
-- `GUEST_CHECKIN_REDESIGN.md` — coordination + build log + Claude prompt
+- `GUEST_CHECKIN_REDESIGN.md` — coordination + build log
+- `docs/AGENT_HANDOFF.md` — agent entry point (replaces deprecated `CLAUDE_CODE_REPORT.md`)
 - `CHECKIN_GUEST_SPEC.md` — technical audit of production guest page
 - `CODEBASE.md` — system map
 

@@ -81,9 +81,10 @@ Docs: `MASTER_ARCHITECTURE_CURSOR.md`, `PIPELINE_DESIGN_CURSOR.md`, `BACKEND_MAP
 - **Elevator save** — Firestore before RTDB
 - **Docs:** `BACKEND_MAP.md`, `docs/ADD_APARTMENT_GUIDE.md`, this file
 
-### Sandbox complete on main (2026-08-31)
+### Sandbox on main (2026-08-31)
 
-- Host sign-off: **sandbox works fine** on GitHub Pages
+- Informal host feedback (Cursor chat): **sandbox works fine** on GitHub Pages
+- **Not** recorded as formal phone-checklist completion — see unchecked items in `docs/SANDBOX_TESTING.md`
 - Merged: full UI polish, admin login fix, shuttle service + plane icon, HK teams + apartment allocation
 - Live guest/admin HTML **still not cutover**
 - Backend callables still **not deployed** (optional; sandbox has fallbacks)
@@ -106,7 +107,7 @@ Docs: `MASTER_ARCHITECTURE_CURSOR.md`, `PIPELINE_DESIGN_CURSOR.md`, `BACKEND_MAP
 
 | PR | Branch | Topic |
 |----|--------|-------|
-| — | `main` | Sandbox signed off 2026-08-31; see `CLAUDE_CODE_REPORT.md` |
+| — | `main` | Sandbox on GitHub Pages; go-live pending phone checklist — see `docs/AGENT_HANDOFF.md` |
 
 *(Older PRs #26–#30 may be merged or superseded — check GitHub for current open PRs.)*
 
@@ -171,11 +172,12 @@ Full guide: **`docs/ADD_APARTMENT_GUIDE.md`**
 ## Files to read first on a new project
 
 1. `PROJECT_ARCHIVE.md` (this file)
-2. `BACKEND_MAP.md`
-3. `docs/ADD_APARTMENT_GUIDE.md`
-4. `CLAUDE_CODE_REPORT.md`
-5. `SANDBOX_BACKEND_HANDOFF.md`
-6. `MASTER_ARCHITECTURE_CURSOR.md`
+2. `docs/AGENT_HANDOFF.md`
+3. `docs/SANDBOX_TESTING.md`
+4. `BACKEND_MAP.md`
+5. `docs/ADD_APARTMENT_GUIDE.md`
+6. `SANDBOX_BACKEND_HANDOFF.md`
+7. `MASTER_ARCHITECTURE_CURSOR.md`
 
 ---
 

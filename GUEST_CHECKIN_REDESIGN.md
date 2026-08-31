@@ -4,7 +4,7 @@
 > Used by Cursor Cloud Agent and Claude / Claude Code.  
 > Do not start coding a section until it is claimed below and the system model in §2–§5 is still accurate.
 
-**Status:** **Sandbox signed off (2026-08-31)** — works on main / GitHub Pages; production URL unchanged until cutover  
+**Status:** **Sandbox on main / GitHub Pages** — not live for guests until cutover; phone checklist in `docs/SANDBOX_TESTING.md` still governs go-live  
 **Sandbox file (build here):** `checkin-guest-sandbox-2.html` → https://app.maxelaapartments.com/checkin-guest-sandbox-2.html  
 **Other sandboxes:** `checkin-guest-sandbox.html` (Sandbox 1, Claude) · `checkin-guest-sandbox-3.html` (portal experiment, parked — §19)  
 **Production file / final URL:** `checkin-guest-v2.html` → https://app.maxelaapartments.com/checkin-guest-v2.html  
@@ -1053,48 +1053,16 @@ Same Firebase/JS module as production `checkin-guest-v2.html` (registration, unl
 
 ## 20. Prompt for Claude — continue from here (2026-08-31)
 
-Copy everything inside the block below into Claude / Claude Code:
+**Do not use the old block below** — it pointed at deprecated `CLAUDE_CODE_REPORT.md` and overstated sign-off.
 
-```
-Read these files first:
-1. CLAUDE_CODE_REPORT.md — CURRENT STATUS (host signed off sandbox Aug 2026)
-2. GUEST_CHECKIN_REDESIGN.md — §0, §9, §13 (design rules)
-3. docs/SANDBOX_TESTING.md — what's live on GitHub Pages
-4. checkin-guest-sandbox-2.html + checkin-admin-sandbox.html — canonical sandbox files
+**Current entry point:** copy the prompt from **`docs/AGENT_HANDOFF.md`** (bottom of that file). It references:
 
-HOST STATUS (2026-08-31):
-Sandbox works fine on main. Do NOT redo Phase 1 shell, shuttle merge, or HK teams —
-those are merged and live at:
-  https://app.maxelaapartments.com/sandbox-index.html
+1. `docs/AGENT_HANDOFF.md` — read order + accurate status
+2. `docs/SANDBOX_TESTING.md` — URLs, phone checklist, go-live steps (**ground truth**)
+3. `SANDBOX_BACKEND_HANDOFF.md` + `BACKEND_MAP.md` — backend
+4. This file — §13 design rules, §9 workstreams (history, not a live task queue)
 
-DO NOT EDIT (until host approves cutover):
-- checkin-guest-v2.html, checkin-guest.html
-- checkin-admin.html
-
-SANDBOX URLS (production hosting, real Firebase data):
-- Admin: https://app.maxelaapartments.com/checkin-admin-sandbox.html
-- Guest: https://app.maxelaapartments.com/checkin-guest-sandbox-2.html
-
-BACKEND:
-- pipeline-adminAction / pipeline-guestRegister are NOT deployed yet
-- Sandbox works with Firestore fallbacks; deploy only when host asks
-- See SANDBOX_BACKEND_HANDOFF.md for emulator + deploy commands
-
-YOUR DEFAULT TASK unless host says otherwise:
-- Small fixes / polish in sandbox files only
-- Or cutover prep docs (no live file swap without explicit approval)
-- Or pipeline review: cd pipeline-functions && npm test
-
-DESIGN RULES (still apply):
-- §13 tokens: white cards, ink text, #2C2C2A CTAs, no gold button backgrounds
-- Do not rename JS-referenced IDs (§13.5)
-- Do not change unlock math / searchReservation() unless fixing a confirmed bug
-
-WHEN DONE:
-- Update §9 workstream table + §12 changelog if you claim a workstream
-- Commit on cursor/* branch, push, PR to main
-- Tell host: sandbox URL tested + what changed
-```
+**Status note:** Sandbox HTML is deployed on GitHub Pages but **not live for guests**. Informal host feedback (*"works fine"*) is **not** cutover authorization. Complete the phone checklist in `docs/SANDBOX_TESTING.md` before go-live.
 
 ---
 
