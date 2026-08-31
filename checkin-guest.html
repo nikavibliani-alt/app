@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -632,6 +632,8 @@ body{padding-bottom:0;}
 .dk-elev{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;}
 .dk-elev__qr{display:none;width:148px;height:148px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;align-items:center;justify-content:center;box-sizing:border-box;}
 .dk-elev__qr canvas{display:block;max-width:100%;height:auto;}
+.elev-qr-mount{display:flex;align-items:center;justify-content:center;line-height:0;}
+.elev-qr-mount img,.elev-qr-mount canvas{display:block!important;max-width:132px;max-height:132px;border-radius:4px;}
 .dk-qr-ph{display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;letter-spacing:0.12em;color:var(--muted);background:repeating-linear-gradient(135deg,#f5f2ee 0 8px,#fff 8px 16px);border-radius:8px;}
 .dk-elev__scan-hint{font-size:12px;color:var(--muted);line-height:1.4;margin:10px 0 0;}
 .dk-elev__meta{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--line);}
@@ -1385,81 +1387,47 @@ function _startElevatorSync(){
   }));
 }
 let _elevatorQrDrawToken=0;
-let _qrLibPromise=null;
-function _ensureQrLibrary(){
-  if(typeof window.QRCode!=='undefined'&&typeof window.QRCode.toCanvas==='function')return Promise.resolve(true);
-  if(_qrLibPromise)return _qrLibPromise;
-  _qrLibPromise=new Promise(resolve=>{
-    const done=ok=>{if(!ok)_qrLibPromise=null;resolve(!!ok);};
-    if(document.querySelector('script[data-elev-qr-lib]')){done(typeof window.QRCode!=='undefined');return;}
-    const s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
-    s.dataset.elevQrLib='1';
-    s.onload=()=>done(typeof window.QRCode!=='undefined');
-    s.onerror=()=>done(false);
-    document.head.appendChild(s);
-  });
-  return _qrLibPromise;
-}
-async function _drawElevatorQr(text){
+function _drawElevatorQr(text){
   const token=++_elevatorQrDrawToken;
   const qrWrap=document.getElementById('hero-elevator-qr');
-  const qrCanvas=document.getElementById('hero-elevator-qr-canvas');
   const qrPh=document.getElementById('hero-elevator-qr-ph');
+  const qrCanvas=document.getElementById('hero-elevator-qr-canvas');
   const payload=String(text||'').trim();
-  if(!qrWrap||!payload){
-    if(qrWrap)qrWrap.style.display='none';
-    return false;
-  }
+  if(!qrWrap||!payload){if(qrWrap)qrWrap.style.display='none';return Promise.resolve(false);}
   qrWrap.style.display='flex';
-  const showOk=()=>{
-    if(token!==_elevatorQrDrawToken)return;
-    if(qrCanvas)qrCanvas.style.display='block';
-    if(qrPh)qrPh.style.display='none';
-    const img=qrWrap.querySelector('img.elev-qr-img');
-    if(img)img.style.display='block';
-  };
-  const showFail=()=>{
-    if(token!==_elevatorQrDrawToken)return;
-    if(qrCanvas)qrCanvas.style.display='none';
-    const img=qrWrap.querySelector('img.elev-qr-img');
-    if(img)img.style.display='none';
+  if(qrCanvas)qrCanvas.style.display='none';
+  const oldImg=qrWrap.querySelector('img.elev-qr-img');
+  if(oldImg)oldImg.remove();
+  let mount=qrWrap.querySelector('.elev-qr-mount');
+  if(!mount){
+    mount=document.createElement('div');
+    mount.className='elev-qr-mount';
+    qrWrap.insertBefore(mount,qrPh||null);
+  }
+  mount.innerHTML='';
+  if(typeof QRCode!=='function'){
+    mount.style.display='none';
     if(qrPh){qrPh.style.display='flex';qrPh.textContent='QR';}
-  };
-  await _ensureQrLibrary();
-  if(typeof window.QRCode==='undefined'||typeof window.QRCode.toCanvas!=='function'){showFail();return false;}
-  const opts={width:132,margin:1,color:{dark:'#2C2C2A',light:'#FFFFFF'}};
-  if(qrCanvas){
-    try{
-      const ctx=qrCanvas.getContext('2d');
-      if(ctx)ctx.clearRect(0,0,qrCanvas.width,qrCanvas.height);
-      await window.QRCode.toCanvas(qrCanvas,payload,opts);
-      if(token!==_elevatorQrDrawToken)return false;
-      const img=qrWrap.querySelector('img.elev-qr-img');
-      if(img)img.style.display='none';
-      showOk();
-      return true;
-    }catch(e){console.warn('[elevator QR canvas]',e);}
+    return Promise.resolve(false);
   }
   try{
-    const url=await window.QRCode.toDataURL(payload,opts);
-    if(token!==_elevatorQrDrawToken)return false;
-    let img=qrWrap.querySelector('img.elev-qr-img');
-    if(!img){
-      img=document.createElement('img');
-      img.className='elev-qr-img';
-      img.alt='Elevator QR code';
-      img.style.cssText='display:block;width:132px;height:132px;border-radius:8px;';
-      qrWrap.insertBefore(img,qrPh||null);
-    }
-    img.src=url;
-    if(qrCanvas)qrCanvas.style.display='none';
-    showOk();
-    return true;
-  }catch(e2){
-    console.warn('[elevator QR dataurl]',e2);
-    showFail();
-    return false;
+    new QRCode(mount,{
+      text:payload,
+      width:132,
+      height:132,
+      colorDark:'#2C2C2A',
+      colorLight:'#FFFFFF',
+      correctLevel:QRCode.CorrectLevel.M
+    });
+    if(token!==_elevatorQrDrawToken)return Promise.resolve(false);
+    mount.style.display='flex';
+    if(qrPh)qrPh.style.display='none';
+    return Promise.resolve(true);
+  }catch(e){
+    console.warn('[elevator QR]',e,payload);
+    mount.style.display='none';
+    if(qrPh){qrPh.style.display='flex';qrPh.textContent='QR';}
+    return Promise.resolve(false);
   }
 }
 function _normalizeElevatorData(raw){
@@ -3014,10 +2982,19 @@ function buildContactHero({labelText,message,kind='apartment'}){
 function _openQrFullscreen(qrText){
   const overlay=document.getElementById('qr-fullscreen-overlay');
   if(!overlay)return;
-  const canvas=document.getElementById('qr-fullscreen-canvas');
-  if(canvas){
-    canvas.width=0;canvas.height=0;
-    QRCode.toCanvas(canvas,qrText,{width:280,color:{dark:'#000000',light:'#FFFFFF'}});
+  let mount=document.getElementById('qr-fullscreen-mount');
+  if(!mount){
+    mount=document.createElement('div');
+    mount.id='qr-fullscreen-mount';
+    const inner=overlay.querySelector('.qr-fullscreen-inner');
+    if(inner){
+      document.getElementById('qr-fullscreen-canvas')?.remove();
+      inner.insertBefore(mount,inner.firstChild);
+    }
+  }
+  mount.innerHTML='';
+  if(typeof QRCode==='function'){
+    try{new QRCode(mount,{text:String(qrText),width:280,height:280,colorDark:'#000000',colorLight:'#FFFFFF',correctLevel:QRCode.CorrectLevel.M});}catch(e){}
   }
   overlay.classList.remove('hidden');
 }
