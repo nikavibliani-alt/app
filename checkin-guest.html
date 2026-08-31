@@ -1392,12 +1392,19 @@ function _startElevatorSync(){
   }));
 }
 let _elevatorQrDrawToken=0;
+let _lastQrCode='';
 function _drawElevatorQr(text){
+  const payload=String(text||'').trim();
+  // Same code as last successful draw — skip the rebuild. _renderHeroContent()
+  // (and this function with it) fires far more often than the elevator code
+  // actually changes, and mount.innerHTML='' + new QRCode(...) below flashes the
+  // QR every time even when the payload is byte-identical to what's on screen.
+  if(payload&&payload===_lastQrCode)return Promise.resolve(true);
+  _lastQrCode=payload;
   const token=++_elevatorQrDrawToken;
   const qrWrap=document.getElementById('hero-elevator-qr');
   const qrPh=document.getElementById('hero-elevator-qr-ph');
   const qrCanvas=document.getElementById('hero-elevator-qr-canvas');
-  const payload=String(text||'').trim();
   if(!qrWrap||!payload){if(qrWrap)qrWrap.style.display='none';return Promise.resolve(false);}
   qrWrap.style.display='flex';
   if(qrCanvas)qrCanvas.style.display='none';
