@@ -1003,8 +1003,8 @@ body{padding-bottom:0;}
     <!-- Unlocked: Location | Parking. Waiting uses tabs below countdown -->
     <div class="home-quick" id="home-quick">
       <div class="home-loc-row" id="home-loc-row">
-        <button type="button" class="home-loc-btn" id="t-btn-location" onclick="window.openPage('location')">Location</button>
-        <button type="button" class="home-loc-btn home-loc-btn--park" id="t-btn-parking" onclick="window.openParkingWindow()">Parking</button>
+        <button type="button" class="home-loc-btn" id="t-btn-location" onclick="window._tapWithFeedback(this,()=>window.openPage('location'))">Location</button>
+        <button type="button" class="home-loc-btn home-loc-btn--park" id="t-btn-parking" onclick="window._tapWithFeedback(this,()=>window.openParkingWindow())">Parking</button>
       </div>
       <div class="home-svc-area" id="home-svc-area"></div>
     </div>
@@ -1016,9 +1016,9 @@ body{padding-bottom:0;}
            panel toggle. Order locked: tabs → countdown → What You Booked. -->
       <div class="home-tabs home-tabs--top home-tabs--waiting" id="home-tabs">
         <div class="tab-bar">
-          <button class="tab-btn" id="tab-location" onclick="window.openPage('location')"><span id="t-tab-location">Location</span></button>
-          <button class="tab-btn" id="tab-transfer" onclick="window.openPage('transfer')"><span id="t-tab-transfer">Shuttle service</span></button>
-          <button class="tab-btn" id="tab-tours" onclick="window.openPage('tours')"><span id="t-tab-tours">Tours</span></button>
+          <button class="tab-btn" id="tab-location" onclick="window._tapWithFeedback(this,()=>window.openPage('location'))"><span id="t-tab-location">Location</span></button>
+          <button class="tab-btn" id="tab-transfer" onclick="window._tapWithFeedback(this,()=>window.openPage('transfer'))"><span id="t-tab-transfer">Shuttle service</span></button>
+          <button class="tab-btn" id="tab-tours" onclick="window._tapWithFeedback(this,()=>window.openPage('tours'))"><span id="t-tab-tours">Tours</span></button>
         </div>
       </div>
 
@@ -3295,6 +3295,20 @@ async function _getLocationData(){
   const locDefaults={ROOMS:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},MAXELA:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},BIG_APT:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},FREEDOM:{address:'Galaktion Tabidze St. 3/5, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},ORBELIANI:{address:'Atoneli St. 9, Tbilisi',parkingEnabled:false,parkingDesc:''}};
   return {...(locDefaults[prop]||{}),...((cfg.locationInfo||{})[prop]||{})};
 }
+
+// Visual feedback for buttons whose action is async with no other loading UI —
+// without this, a slow/cold fetch (config not cached yet, flaky connection) reads
+// as "nothing happened" and the guest taps again. dataset.loading also blocks a
+// second tap from starting a duplicate fetch while the first is still in flight.
+window._tapWithFeedback=async function(btn,fn){
+  if(!btn||btn.dataset.loading)return;
+  btn.dataset.loading='1';
+  btn.style.opacity='0.6';
+  try{await fn();}finally{
+    delete btn.dataset.loading;
+    btn.style.opacity='';
+  }
+};
 
 window.openPage=async function(type){
 try{
