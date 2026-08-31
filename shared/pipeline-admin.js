@@ -1,6 +1,6 @@
 /**
  * Sandbox client for pipeline AdminAction callable.
- * Deployed: pipeline-adminAction · Emulator: adminAction (no codebase prefix).
+ * Deployed: adminAction · Emulator: adminAction
  */
 
 import { pipelineCallableName } from './pipeline-emulator.js';
