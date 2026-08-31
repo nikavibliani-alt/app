@@ -2362,6 +2362,30 @@ function isSameReservation(r,ref){
   if(!ref)return false;
   return r.id===ref||r.reservationNumber===ref;
 }
+function reservationBaseNum(ref){
+  if(!ref)return '';
+  const r=(_resCache||[]).find(x=>x.id===ref||x.reservationNumber===ref);
+  const raw=(r?.reservationNumber||ref||'').toString();
+  return raw.replace(/_\d+$/,'');
+}
+function siblingReservations(ref){
+  const base=reservationBaseNum(ref);
+  if(!base)return [];
+  return nonCancelled().filter(r=>{
+    const b=(r.reservationNumber||r.id||'').toString().replace(/_\d+$/,'');
+    return b===base;
+  }).sort(byRoom);
+}
+function guestFormForReservation(res){
+  if(!res)return null;
+  const linked=guestData.filter(g=>!g.companionGuest&&isSameReservation(res,g.matchedReservationId));
+  if(linked.length===1)return linked[0];
+  if(linked.length>1){
+    const rc=(res.roomCode||res.room||'').trim();
+    return linked.find(g=>g.aptId===rc)||linked[0];
+  }
+  return findFormForReservation(res);
+}
 function guestStayDates(g){
   const door=(_resCache||[]).find(r=>isSameReservation(r,g.matchedReservationId));
   return{checkin:g.arrivalDate||door?.checkin||'',checkout:g.checkoutDate||door?.checkout||''};
@@ -2758,20 +2782,23 @@ async function moveGuestLocal(g,res,newRoom){
   g.aptId=newRoom;
 }
 
-window.moveGuestPipeline=async function(guestId){
-  const newRoom=document.getElementById('detail-room-select')?.value;
+window.moveGuestPipeline=async function(guestId,resDocId){
+  const suffix=resDocId?`-${resDocId}`:'';
+  const newRoom=document.getElementById('detail-room-select'+suffix)?.value;
   const g=guestData.find(x=>x.id===guestId);
   if(!g||!newRoom)return;
-  if(newRoom===guestAssignedRoom(g)){toast('Already in '+newRoom);return;}
-  const res=resolveReservation(g.matchedReservationId);
+  const res=resDocId?(_resCache||[]).find(r=>r.id===resDocId):resolveReservation(g.matchedReservationId);
+  const roomForm=guestFormForReservation(res)||g;
+  const currentRoom=(res?.roomCode||res?.room||roomForm?.aptId||guestAssignedRoom(g)||'').trim();
+  if(newRoom===currentRoom){toast('Already in '+newRoom);return;}
   if(!res?.id){toast('No linked reservation');return;}
-  const checkin=g.arrivalDate||res.checkin||'';
-  const checkout=g.checkoutDate||res.checkout||'';
+  const checkin=roomForm.arrivalDate||res.checkin||'';
+  const checkout=roomForm.checkoutDate||res.checkout||'';
   const conflict=findRoomConflict(res.id,newRoom,checkin,checkout);
   if(conflict){
-    const sameType=hkCleanTypeId(g.aptId)===hkCleanTypeId(newRoom);
+    const sameType=hkCleanTypeId(currentRoom||roomForm.aptId)===hkCleanTypeId(newRoom);
     if(!sameType){
-      toast('Room occupied — pick a free room or another '+hkCleanTypeId(g.aptId)+' room to swap');
+      toast('Room occupied — pick a free room or another '+hkCleanTypeId(currentRoom||roomForm.aptId)+' room to swap');
       return;
     }
     const conflictRes=resolveReservation(conflict.id||conflict.reservationNumber);
@@ -2779,13 +2806,13 @@ window.moveGuestPipeline=async function(guestId){
     try{
       const r=await swapGuestsPipeline(res.id,conflictRes.id);
       if(r.ok){
-        pipelineRoomToast(r,`Swapped ${g.aptId} ↔ ${newRoom} ✓`);
+        pipelineRoomToast(r,`Swapped ${currentRoom} ↔ ${newRoom} ✓`);
         openDetail(guestId);
         return;
       }
     }catch(e){}
     await swapGuestsLocal(res,conflictRes);
-    toast(`Swapped ${g.aptId} ↔ ${newRoom} ✓`);
+    toast(`Swapped ${currentRoom} ↔ ${newRoom} ✓`);
     openDetail(guestId);
     return;
   }
@@ -2800,30 +2827,30 @@ window.moveGuestPipeline=async function(guestId){
       if(r.errorCode==='CONFLICT'){
         const c=r.data?.conflict;
         const conflictRes=c?resolveReservation(c.reservationId||c.id):resolveReservation(findRoomConflict(res.id,newRoom,checkin,checkout)?.id);
-        if(conflictRes&&hkCleanTypeId(g.aptId)===hkCleanTypeId(newRoom)){
+        if(conflictRes&&hkCleanTypeId(currentRoom||roomForm.aptId)===hkCleanTypeId(newRoom)){
           try{
             let sr=await swapGuestsPipeline(res.id,conflictRes.id);
             if(!sr.ok)await swapGuestsLocal(res,conflictRes);
-            else pipelineRoomToast(sr,`Swapped ${g.aptId} ↔ ${newRoom} ✓`);
-            if(!sr.ok)toast(`Swapped ${g.aptId} ↔ ${newRoom} ✓`);
+            else pipelineRoomToast(sr,`Swapped ${currentRoom} ↔ ${newRoom} ✓`);
+            if(!sr.ok)toast(`Swapped ${currentRoom} ↔ ${newRoom} ✓`);
             openDetail(guestId);
             return;
           }catch(swapErr){
             await swapGuestsLocal(res,conflictRes);
-            toast(`Swapped ${g.aptId} ↔ ${newRoom} ✓`);
+            toast(`Swapped ${currentRoom} ↔ ${newRoom} ✓`);
             openDetail(guestId);
             return;
           }
         }
       }
       if(/functions|internal|not-found/i.test(r.message||'')){
-        await moveGuestLocal(g,res,newRoom);
+        await moveGuestLocal(roomForm,res,newRoom);
         toast('Moved to '+newRoom+' ✓');
         openDetail(guestId);
         return;
       }
       toast(r.message||'Move failed');
-      updateDetailRoomAction(guestId);
+      updateDetailRoomAction(guestId,resDocId);
       return;
     }
     pipelineRoomToast(r,'Moved to '+newRoom+' ✓');
@@ -2831,7 +2858,7 @@ window.moveGuestPipeline=async function(guestId){
     openDetail(guestId);
   }catch(e){
     try{
-      await moveGuestLocal(g,res,newRoom);
+      await moveGuestLocal(roomForm,res,newRoom);
       toast('Moved to '+newRoom+' ✓');
       openDetail(guestId);
     }catch(err){
@@ -2841,20 +2868,22 @@ window.moveGuestPipeline=async function(guestId){
   }
 };
 
-window.swapGuestPipeline=async function(guestId){
-  const newRoom=document.getElementById('detail-room-select')?.value;
+window.swapGuestPipeline=async function(guestId,resDocId){
+  const suffix=resDocId?`-${resDocId}`:'';
+  const newRoom=document.getElementById('detail-room-select'+suffix)?.value;
   const g=guestData.find(x=>x.id===guestId);
   if(!g||!newRoom)return;
-  const conflict=findRoomConflictForGuest(g,newRoom);
-  if(!conflict){toast('Room is free — use Move');updateDetailRoomAction(guestId);return;}
-  const res=resolveReservation(g.matchedReservationId);
+  const res=resDocId?(_resCache||[]).find(r=>r.id===resDocId):resolveReservation(g.matchedReservationId);
+  const roomForm=guestFormForReservation(res)||g;
+  const conflict=findRoomConflictForGuest(roomForm,newRoom);
+  if(!conflict){toast('Room is free — use Move');updateDetailRoomAction(guestId,resDocId);return;}
   const conflictRes=resolveReservation(conflict.id||conflict.reservationNumber);
-  const resId=res?.id||resolveReservationId(g.matchedReservationId);
+  const resId=res?.id||resolveReservationId(roomForm.matchedReservationId||g.matchedReservationId);
   const otherResId=conflictRes?.id||conflict.id;
   if(!resId||!otherResId||!res||!conflictRes){toast('Missing reservation link — cannot swap');return;}
-  const selfName=_stripRoomNum(g.nameRoman||g.name||'Guest');
+  const selfName=_stripRoomNum(roomForm.nameRoman||roomForm.name||g.nameRoman||g.name||'Guest');
   const otherName=guestDisplayNameForRes(conflict);
-  const fromRoom=guestAssignedRoom(g)||'—';
+  const fromRoom=(res.roomCode||res.room||roomForm.aptId||'—');
   if(!confirm(`Swap rooms with ${otherName}?\n\n${selfName} → ${newRoom}\n${otherName} → ${fromRoom}`))return;
   try{
     const r=await pipelineAdmin({
@@ -2909,14 +2938,17 @@ window.releaseToMinihotel=async function(guestId){
   }
 };
 
-function updateDetailRoomAction(guestId){
+function updateDetailRoomAction(guestId,resDocId){
   const g=guestData.find(x=>x.id===guestId);
-  const select=document.getElementById('detail-room-select');
-  const btn=document.getElementById('detail-room-action-btn');
-  const info=document.getElementById('detail-room-swap-info');
+  const res=resDocId?(_resCache||[]).find(r=>r.id===resDocId):resolveReservation(g?.matchedReservationId);
+  const suffix=resDocId?`-${resDocId}`:'';
+  const select=document.getElementById('detail-room-select'+suffix);
+  const btn=document.getElementById('detail-room-action-btn'+suffix);
+  const info=document.getElementById('detail-room-swap-info'+suffix);
   if(!g||!select||!btn||!info)return;
+  const roomForm=guestFormForReservation(res)||g;
   const newRoom=select.value;
-  const currentRoom=guestAssignedRoom(g);
+  const currentRoom=(res?.roomCode||res?.room||roomForm?.aptId||guestAssignedRoom(g)||'').trim();
   if(newRoom===currentRoom){
     btn.textContent='Move';
     btn.disabled=true;
@@ -2926,16 +2958,16 @@ function updateDetailRoomAction(guestId){
     return;
   }
   btn.disabled=false;
-  const conflict=findRoomConflictForGuest(g,newRoom);
+  const conflict=findRoomConflictForGuest(roomForm,newRoom);
   if(conflict){
     const otherName=guestDisplayNameForRes(conflict);
     btn.textContent='Swap';
-    btn.onclick=()=>window.swapGuestPipeline(guestId);
+    btn.onclick=()=>window.swapGuestPipeline(guestId,resDocId);
     info.style.display='block';
     info.innerHTML=`<span style="font-size:12px;color:var(--muted);line-height:1.4">Swap with <strong style="color:var(--text)">${esc(otherName)}</strong> — they move to <strong style="color:var(--text)">${esc(currentRoom)}</strong></span>`;
   }else{
     btn.textContent='Move';
-    btn.onclick=()=>window.moveGuestPipeline(guestId);
+    btn.onclick=()=>window.moveGuestPipeline(guestId,resDocId);
     info.style.display='none';
     info.innerHTML='';
   }
@@ -2943,16 +2975,47 @@ function updateDetailRoomAction(guestId){
 
 window.openDetail=function(guestId){
   const g=guestData.find(x=>x.id===guestId);if(!g){toast('Guest not found');return;}
-  const door=reservationForGuest(g);
-  const assignedRoom=guestAssignedRoom(g);
-  const aptDrift=door&&(door.roomCode||door.room)&&g.aptId&&assignedRoom!==g.aptId;
-  document.getElementById('detail-title').textContent=_stripRoomNum(g.nameRoman||g.name||'Guest')+' · '+assignedRoom;
-  const st=g.guestConfirmedCheckin?{label:'CHECKED IN',cls:'pill-in'}:cardStatus(door||{roomCode:assignedRoom},g);
+  const sibs=siblingReservations(g.matchedReservationId);
+  const isMulti=sibs.length>1;
+  const door=reservationForGuest(g)||sibs[0]||null;
+  const titleRooms=(isMulti?sibs.map(r=>r.roomCode||r.room):[guestAssignedRoom(g)]).filter(Boolean).join(' · ');
+  document.getElementById('detail-title').textContent=_stripRoomNum(g.nameRoman||g.name||'Guest')+' · '+titleRooms;
+  const st=g.guestConfirmedCheckin?{label:'CHECKED IN',cls:'pill-in'}:cardStatus(door||{roomCode:titleRooms.split(' · ')[0]},g);
   const passportUrl=g.passportUrl||'';
-  const doorCode=door?.tuyaPassword||aptData[assignedRoom]?.doorCode||aptData[g.aptId]?.doorCode||'—';
   const waPhone=normalizeWaPhone(g.contact||'');
+  const roomBlocks=(isMulti?sibs:[door||{roomCode:guestAssignedRoom(g)}]).map(res=>{
+    const rc=(res?.roomCode||res?.room||guestAssignedRoom(g)||'').trim();
+    const roomForm=guestFormForReservation(res)||(isSameReservation(res,g.matchedReservationId)?g:null);
+    const doorCode=res?.tuyaPassword||aptData[rc]?.doorCode||aptData[roomForm?.aptId]?.doorCode||'—';
+    const drift=res&&roomForm&&rc&&roomForm.aptId&&roomForm.aptId!==rc;
+    const unlockBtn=roomForm&&!roomForm.manualUnlock&&guestStatus(roomForm,res).cls!=='unlocked'?`<button class="btn btn-primary" onclick="window.unlockGuest('${roomForm.id}')">Grant Access</button>`:'';
+    return`<div class="room-block">
+      <h3>Room ${esc(rc)}${isMulti?' <span class="pill pill-multi">MULTI</span>':''}${res&&(res.manualRoom===true||res.manualRoom==='true')?' <span class="pill pill-manual">MANUAL</span>':''}</h3>
+      ${drift?`<p style="font-size:12px;color:var(--amber);margin-bottom:8px">Guest form still says ${esc(roomForm.aptId)} — use Move/Swap or wait for sync</p>`:''}
+      <div style="font-size:12px;color:var(--muted)">Smart lock</div>
+      <div class="door">${esc(doorCode)}</div>
+      <div class="card__actions">${unlockBtn}${waPhone&&roomForm===g?`<a class="btn" href="https://wa.me/${waPhone}" target="_blank">WhatsApp</a>`:''}</div>
+    </div>`;
+  }).join('');
+  const moveBlocks=isMulti?sibs.map(res=>{
+    const rc=(res.roomCode||res.room||'').trim();
+    const manual=res.manualRoom===true||res.manualRoom==='true';
+    return`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px">${esc(rc)}${manual?' <span class="pill pill-manual">MANUAL</span>':''}</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="detail-room-select-${esc(res.id)}" class="lock-input" style="flex:1;height:44px;margin:0" onchange="window.updateDetailRoomAction('${g.id}','${esc(res.id)}')">${roomOptionsHtml(rc)}</select>
+        <button id="detail-room-action-btn-${esc(res.id)}" class="btn btn-primary" style="flex:none;min-height:44px;padding:0 14px">Move</button>
+      </div>
+      <div id="detail-room-swap-info-${esc(res.id)}" style="display:none;margin-top:8px"></div>
+    </div>`;
+  }).join(''):`<div style="display:flex;gap:8px;align-items:center">
+        <select id="detail-room-select" class="lock-input" style="flex:1;height:44px;margin:0" onchange="window.updateDetailRoomAction('${g.id}')">${roomOptionsHtml(guestAssignedRoom(g))}</select>
+        <button id="detail-room-action-btn" class="btn btn-primary" style="flex:none;min-height:44px;padding:0 14px">Move</button>
+      </div>
+      <div id="detail-room-swap-info" style="display:none;margin-top:8px"></div>`;
+  const bookingRef=reservationBaseNum(g.matchedReservationId)||g.matchedReservationId||'';
   document.getElementById('detail-body').innerHTML=`
-    <div style="margin-bottom:12px"><span class="pill ${st.cls}">${st.label}</span></div>
+    <div style="margin-bottom:12px"><span class="pill ${st.cls}">${st.label}</span>${isMulti?' <span class="pill pill-multi">MULTI · '+sibs.length+' rooms</span>':''}</div>
     <div class="passport-gate" id="pp-gate">
       <p>Passport / ID is hidden until you need it.</p>
       <button class="btn btn-primary" style="width:100%" onclick="window.showPassport()">Check passport</button>
@@ -2964,32 +3027,22 @@ window.openDetail=function(guestId){
         <button class="btn" onclick="window.rejectPassport('${g.id}')">Reject</button>
       </div>
     </div>
-    <div class="room-block">
-      <h3>Room ${esc(assignedRoom)}</h3>
-      ${aptDrift?`<p style="font-size:12px;color:var(--amber);margin-bottom:8px">Guest form still says ${esc(g.aptId)} — use Move/Swap or wait for sync</p>`:''}
-      <div style="font-size:12px;color:var(--muted)">Smart lock</div>
-      <div class="door">${esc(doorCode)}</div>
-      <div class="card__actions">
-        ${g.manualUnlock||guestStatus(g,door).cls==='unlocked'?'':`<button class="btn btn-primary" onclick="window.unlockGuest('${g.id}')">Grant Access</button>`}
-        ${waPhone?`<a class="btn" href="https://wa.me/${waPhone}" target="_blank">WhatsApp</a>`:''}
-      </div>
-    </div>
+    ${roomBlocks}
     ${g.matchedReservationId?`<div style="margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs)">
       <div style="font-size:12px;font-weight:700;margin-bottom:8px">Move room (pipeline)${guestReservationManual(g)?' <span class="pill pill-manual">MANUAL</span>':''}</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <select id="detail-room-select" class="lock-input" style="flex:1;height:44px;margin:0" onchange="window.updateDetailRoomAction('${g.id}')">${roomOptionsHtml(assignedRoom)}</select>
-        <button id="detail-room-action-btn" class="btn btn-primary" style="flex:none;min-height:44px;padding:0 14px">Move</button>
-      </div>
-      <div id="detail-room-swap-info" style="display:none;margin-top:8px"></div>
+      ${moveBlocks}
       ${guestReservationManual(g)?`<button class="btn" style="width:100%;margin-top:8px" onclick="window.releaseToMinihotel('${g.id}')">Release to MiniHotel (clear manual pin)</button>`:''}
-      <p style="font-size:11px;color:var(--muted);margin-top:8px">AdminAction → RoomAssignment · guest link unchanged</p>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px">AdminAction → RoomAssignment · one row per room on multi bookings</p>
     </div>`:''}
     <p style="font-size:12px;color:var(--muted);margin-top:8px;">${esc(fmtDate(g.arrivalDate))} → ${esc(fmtDate(g.checkoutDate||door?.checkout||''))} · ${esc(g.contact||'no contact')}</p>
-    ${g.matchedReservationId?`<p style="font-size:12px;color:var(--muted);">Booking ${esc(g.matchedReservationId)}</p>`:''}
+    ${bookingRef?`<p style="font-size:12px;color:var(--muted);">Booking #${esc(bookingRef)}</p>`:''}
     <button class="btn" style="width:100%;margin-top:12px" onclick="window.openAptEditor('${g.aptId||''}')">Edit apartment instructions</button>
   `;
   document.getElementById('detail').classList.add('open');
-  if(g.matchedReservationId)updateDetailRoomAction(guestId);
+  if(g.matchedReservationId){
+    if(isMulti)sibs.forEach(res=>updateDetailRoomAction(g.id,res.id));
+    else updateDetailRoomAction(g.id);
+  }
 };
 window.updateDetailRoomAction=updateDetailRoomAction;
 window.closeDetail=function(){document.getElementById('detail').classList.remove('open');};
