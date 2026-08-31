@@ -246,6 +246,170 @@ def transform_reservation(r):
     }
 
 
+def dates_overlap(a_in, a_out, b_in, b_out):
+    """True when two stay ranges overlap (exclusive checkout)."""
+    if not all([a_in, a_out, b_in, b_out]):
+        return False
+    return a_in < b_out and b_in < a_out
+
+
+def live_room_for_doc(doc_id, res_num, live_entries):
+    """Map a Firestore doc id to MiniHotel's current room for that booking."""
+    if not live_entries:
+        return None
+    if doc_id == res_num:
+        rooms = {e['roomCode'] for e in live_entries.values() if e.get('roomCode')}
+        return next(iter(rooms)) if len(rooms) == 1 else None
+    if doc_id.startswith(res_num + '_'):
+        suffix = doc_id[len(res_num) + 1:]
+        if suffix in live_entries:
+            return live_entries[suffix].get('roomCode')
+        for key, entry in live_entries.items():
+            if entry.get('roomCode') == suffix:
+                return suffix
+    return None
+
+
+def build_live_room_index(api_reservations):
+    """reservationNumber -> {memberId|roomCode -> {roomCode, checkin, checkout}}"""
+    res_num_counts = {}
+    for r in api_reservations:
+        if r.get('status', '') not in VALID_STATUSES:
+            continue
+        if r.get('roomNumber', '') not in ROOM_MAP:
+            continue
+        rn = str(r.get('reservationNumber', '') or '').strip()
+        if rn:
+            res_num_counts[rn] = res_num_counts.get(rn, 0) + 1
+
+    index = {}
+    for r in api_reservations:
+        if r.get('status', '') not in VALID_STATUSES:
+            continue
+        room_code = ROOM_MAP.get(r.get('roomNumber', ''))
+        if not room_code:
+            continue
+        rn = str(r.get('reservationNumber', '') or '').strip()
+        if not rn:
+            continue
+        member_id = r.get('memberId', '')
+        is_multi = res_num_counts.get(rn, 1) > 1
+        if member_id:
+            key = member_id
+        elif is_multi:
+            key = room_code
+        else:
+            key = rn
+        index.setdefault(rn, {})[key] = {
+            'roomCode': room_code,
+            'checkin': parse_date(r.get('checkIn')),
+            'checkout': parse_date(r.get('checkOut')),
+        }
+    return index
+
+
+def auto_release_conflicting_manualroom(db, api_reservations, from_date, to_date):
+    """Clear stale manualRoom pins that have drifted from MiniHotel's live room.
+
+    When an admin move (manualRoom:true) left a guest pinned to a room that MiniHotel
+    has since changed, the frozen room can be wrong in two ways:
+
+    1. Visible double-booking — the frozen room now overlaps another live guest,
+       e.g. Ilia pinned to 0-3 while MiniHotel shows 0-2 and Emiliya is actually in 0-3.
+    2. Silent drift — no one else is fighting over the frozen room (so nothing looks
+       broken in the UI), but the guest is quietly shown in the wrong room and the
+       MiniHotel room they actually belong in sits correctly free. e.g. Nina pinned to
+       0-2 while MiniHotel shows 0-1 and nobody else needs 0-1 for her dates.
+
+    Auto-release covers both: release whenever the frozen pin disagrees with MiniHotel
+    AND applying the live room would not displace anyone (target room free for those
+    dates). If the target room is occupied by someone else, we leave the pin in place —
+    that's a case a human should look at (could be an intentional admin move MiniHotel
+    hasn't caught up with yet), and it keeps surfacing via the MANUALROOM DRIFT log.
+    """
+    coll = db.collection('reservations')
+    live_index = build_live_room_index(api_reservations)
+
+    snap = coll \
+        .where('checkout', '>=', from_date) \
+        .where('checkout', '<=', to_date) \
+        .get()
+
+    active_stays = []
+    for doc in snap:
+        data = doc.to_dict() or {}
+        if (data.get('status') or '').upper() == 'CANCELLED':
+            continue
+        room = data.get('roomCode') or data.get('room')
+        ci = data.get('checkin')
+        co = data.get('checkout')
+        if not room or not ci or not co:
+            continue
+        active_stays.append({
+            'id': doc.id,
+            'resNum': str(data.get('reservationNumber') or '').strip(),
+            'guest': data.get('guest') or '',
+            'room': room,
+            'checkin': ci,
+            'checkout': co,
+            'manualRoom': bool(data.get('manualRoom')),
+        })
+
+    releases = []
+    for stay in active_stays:
+        if not stay['manualRoom']:
+            continue
+        rn = stay['resNum']
+        if not rn:
+            continue
+        live_room = live_room_for_doc(stay['id'], rn, live_index.get(rn, {}))
+        frozen = stay['room']
+        if not live_room or live_room == frozen:
+            continue
+
+        frozen_room_overlap = False
+        target_room_occupied = False
+        for other in active_stays:
+            if other['id'] == stay['id']:
+                continue
+            overlaps_dates = dates_overlap(stay['checkin'], stay['checkout'],
+                                            other['checkin'], other['checkout'])
+            if not overlaps_dates:
+                continue
+            if other['room'] == frozen:
+                frozen_room_overlap = True
+            if other['room'] == live_room:
+                target_room_occupied = True
+
+        if frozen_room_overlap:
+            releases.append((stay['id'], rn, live_room, frozen, stay['guest'], 'overlap'))
+        elif not target_room_occupied:
+            releases.append((stay['id'], rn, live_room, frozen, stay['guest'], 'silent_drift'))
+        # else: frozen room is quiet but target room is occupied by someone else —
+        # leave the pin; a human should look at this one (see MANUALROOM DRIFT log).
+
+    if not releases:
+        return 0
+
+    batch = db.batch()
+    for doc_id, _rn, live_room, _frozen, guest, reason in releases:
+        ref = coll.document(doc_id)
+        batch.update(ref, {
+            'roomCode': live_room,
+            'allRooms': live_room,
+            'manualRoom': False,
+            'syncedAt': firestore.SERVER_TIMESTAMP,
+        })
+        print(f"  Auto-released manualRoom ({reason}): {doc_id} ({guest}) → {live_room}")
+    batch.commit()
+
+    for doc_id, rn, live_room, _frozen, _guest, _reason in releases:
+        propagate_room_change(db, doc_id, rn, live_room)
+
+    print(f"Auto-released {len(releases)} conflicting manualRoom override(s)")
+    return len(releases)
+
+
 def propagate_room_change(db, reservation_doc_id, reservation_number, new_room):
     """Propagate a roomCode correction into checkin_guests.aptId.
 
@@ -320,6 +484,9 @@ def sync_to_firestore(db, reservations):
         ref = coll.document(doc_id)
         existing = ref.get()
         payload = dict(doc)
+        live_room_code = payload.get('roomCode')
+        if live_room_code:
+            payload['minihotelLiveRoom'] = live_room_code
         if existing.exists:
             _ed = existing.to_dict()
             if not _ed.get('manualRoom'):
@@ -340,9 +507,9 @@ def sync_to_firestore(db, reservations):
                 print(f"  ⚠️  MANUALROOM DRIFT: {doc_id} ({doc.get('guest')}) is frozen at "
                       f"roomCode='{frozen_room}' but MiniHotel now shows '{live_room}'. "
                       f"If this is stale, clear manualRoom or update roomCode by hand.")
+            # Keep minihotelRoom updating so admin can see live PMS room vs pinned roomCode.
             payload.pop('roomCode', None)
             payload.pop('allRooms', None)
-            payload.pop('minihotelRoom', None)
         batch.set(ref, payload, merge=True)
         count += 1
 
@@ -795,6 +962,9 @@ def main():
     session = login_minihotel()
     reservations = fetch_reservations(session, from_date, to_date)
     synced = sync_to_firestore(db, reservations)
+
+    # Drop stale manualRoom pins that double-book a room (e.g. pinned 0-3, MiniHotel says 0-2)
+    auto_release_conflicting_manualroom(db, reservations, from_date, to_date)
 
     # Fetch phone/email/country for upcoming check-ins
     fetch_guest_details(session, db, reservations)

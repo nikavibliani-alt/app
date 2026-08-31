@@ -166,6 +166,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .pill-in{background:#e8f0fe;color:#1a56a0;}
 .pill-multi{background:var(--bg);color:var(--muted);margin-left:6px;}
 .pill-manual{background:#fef3c7;color:#92400e;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.04em;}
+.pill-drift{background:#fee2e2;color:#991b1b;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.04em;}
 .elev-status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:16px;flex-wrap:wrap;}
 .elev-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .elev-dot.fresh{background:var(--green);box-shadow:0 0 0 3px rgba(45,106,79,.2);}
@@ -2235,6 +2236,17 @@ function reservationManualBadge(grp){
   const manual=grp.some(r=>r.manualRoom===true||r.manualRoom==='true');
   return manual?'<span class="pill pill-manual">MANUAL</span>':'';
 }
+function reservationDriftBadge(grp){
+  for(const r of grp){
+    if(!(r.manualRoom===true||r.manualRoom==='true'))continue;
+    const pinned=(r.roomCode||r.room||'').trim();
+    const live=(r.minihotelLiveRoom||'').trim();
+    if(pinned&&live&&pinned!==live){
+      return `<span class="pill pill-drift" title="MiniHotel shows ${esc(live)}">MH→${esc(live)}</span>`;
+    }
+  }
+  return '';
+}
 function guestReservationManual(g){
   const door=(_resCache||[]).find(r=>isSameReservation(r,g.matchedReservationId));
   return door&&(door.manualRoom===true||door.manualRoom==='true');
@@ -2461,8 +2473,9 @@ function renderCard(grp,mode){
   const sub=[src,ref?'#'+ref:'',guests>1?guests+' guests':'',rawPhone||''].filter(Boolean).join(' · ');
   const open=form?`onclick="window.openDetail('${form.id}')" style="cursor:pointer"`:'';
   const manualBadge=reservationManualBadge(grp);
+  const driftBadge=reservationDriftBadge(grp);
   return`<div class="card" ${open}>
-    <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${st.cls}">${st.label}</span>${manualBadge}</div>
+    <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${st.cls}">${st.label}</span>${manualBadge}${driftBadge}</div>
     <div class="card__name">${esc(name)}${multi}</div>
     <div class="card__dates">${esc(datesStr(grp[0],mode))}</div>
     ${sub?`<div class="card__sub">${esc(sub)}</div>`:''}
