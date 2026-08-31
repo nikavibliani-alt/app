@@ -1,6 +1,6 @@
 # Sandbox testing — check everything here before go-live
 
-**Rule:** Guest **cutover complete (2026-08-31)** — `checkin-guest.html` is the live app. Admin sandbox still for testing; live admin unchanged until cutover.
+**Rule:** **Full cutover complete (2026-08-31)** — `checkin-guest.html` and `checkin-admin.html` are live. Edit sandbox files, then promote with build scripts.
 
 **Hosting:** GitHub Pages → `https://app.maxelaapartments.com/`  
 **Database:** Firebase `sleepy-5c962` (same as production — sandbox uses real data)
@@ -22,7 +22,8 @@ Or use the links below directly.
 | App | URL | Password |
 |-----|-----|----------|
 | **Hub** | https://app.maxelaapartments.com/sandbox-index.html | — |
-| **Admin (new)** | https://app.maxelaapartments.com/checkin-admin-sandbox.html | same as live admin |
+| **Admin (live)** | https://app.maxelaapartments.com/checkin-admin.html |
+| **Admin (dev sandbox)** | https://app.maxelaapartments.com/checkin-admin-sandbox.html |
 | **Guest (new design)** | https://app.maxelaapartments.com/checkin-guest-sandbox-2.html | — |
 | **Guest + emulator** | …/checkin-guest-sandbox-2.html?emulator=1 | local functions only |
 | **Map (beginner)** | https://app.maxelaapartments.com/SYSTEM_MAP_BEGINNER_2026.html | — |
@@ -33,7 +34,7 @@ Or use the links below directly.
 |-----|-----|
 | Guest (live — new design) | https://app.maxelaapartments.com/checkin-guest.html |
 | Guest (old bookmark) | https://app.maxelaapartments.com/checkin-guest-v2.html → redirects |
-| Admin (you use today) | https://app.maxelaapartments.com/checkin-admin.html |
+| Admin (you use today) | https://app.maxelaapartments.com/checkin-admin.html (new design) |
 
 ---
 
@@ -99,12 +100,11 @@ Admin: `http://127.0.0.1:8080/checkin-admin-sandbox.html?emulator=1`
 
 ---
 
-## Guest cutover (done 2026-08-31)
+## Full cutover (done 2026-08-31)
 
-1. ~~Copy `checkin-guest-sandbox-2.html` → `checkin-guest.html`~~ ✅
-2. (Later) copy admin sandbox → `checkin-admin.html`
-3. Merge to **`main`** on GitHub → site updates ✅
-4. Deploy backend functions in daylight (optional — registration has Firestore fallback)
+1. ~~Guest: sandbox-2 → `checkin-guest.html`~~ ✅
+2. ~~Admin: sandbox → `checkin-admin.html`~~ ✅ (`node scripts/build-admin-production.js`)
+3. Backend: `adminAction` + `guestRegister` on Firebase ✅
 
 See `docs/GUEST_LINK_STRATEGY.md`.
 

@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Maxela — Sandbox testing hub</title>
+<title>Maxela — Dev hub</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;background:#f4f6f9;color:#1a1d24;line-height:1.5;padding:20px;max-width:520px;margin:0 auto}
-.badge{display:inline-block;background:#fef3c7;color:#92400e;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:.06em;margin-bottom:12px}
+.badge{display:inline-block;background:#dcfce7;color:#166534;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:.06em;margin-bottom:12px}
 h1{font-size:22px;font-weight:800;margin-bottom:6px}
 .sub{color:#5a6472;font-size:14px;margin-bottom:20px}
 .card{display:block;background:#fff;border:1px solid #dfe3ea;border-radius:14px;padding:16px;margin-bottom:10px;text-decoration:none;color:inherit;box-shadow:0 4px 16px rgba(0,0,0,.04)}
@@ -17,64 +17,54 @@ h1{font-size:22px;font-weight:800;margin-bottom:6px}
 .card .tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#1a56db;margin-bottom:6px}
 .card.live{border-color:#81c995;background:#f0fdf4}
 .card.live .tag{color:#137333}
+.card.dev{border-color:#fde68a;background:#fffbeb}
+.card.dev .tag{color:#92400e}
 .note{margin-top:20px;padding:14px;background:#e8f0fe;border-radius:12px;font-size:13px;color:#1a3a5c}
 .note b{display:block;margin-bottom:6px}
 footer{margin-top:24px;font-size:12px;color:#888}
-footer a{color:#1a56db}
 </style>
 </head>
 <body>
-<span class="badge" style="background:#dcfce7;color:#166534">GUEST LIVE · ADMIN SANDBOX</span>
-<h1>Maxela testing hub</h1>
-<p class="sub"><strong>Guest check-in is live</strong> at <code>checkin-guest.html</code> (new design). Admin sandbox still for testing before admin cutover.</p>
+<span class="badge">LIVE — guest + admin</span>
+<h1>Maxela apps</h1>
+<p class="sub">Production URLs below. Use <strong>sandbox</strong> files only when testing changes before promoting.</p>
 
-<a class="card" href="checkin-admin-sandbox.html">
-  <div class="tag">Admin · new</div>
-  <h2>Admin sandbox</h2>
-  <p>Stay, swap, HK, elevator, apartments, pipeline moves</p>
+<a class="card live" href="checkin-admin.html">
+  <div class="tag">Admin · live</div>
+  <h2>checkin-admin.html</h2>
+  <p>New admin — Stay, HK, swap, elevator, pipeline backend</p>
 </a>
 
 <a class="card live" href="checkin-guest.html">
   <div class="tag">Guest · live</div>
   <h2>checkin-guest.html</h2>
-  <p>New guest check-in — production URL for WhatsApp and bookings</p>
+  <p>Guest check-in — WhatsApp / booking link</p>
 </a>
 
-<a class="card" href="checkin-guest-sandbox-2.html">
-  <div class="tag">Guest · dev sandbox</div>
+<a class="card dev" href="checkin-admin-sandbox.html">
+  <div class="tag">Dev sandbox</div>
+  <h2>Admin sandbox</h2>
+  <p>Test admin changes → run <code>node scripts/build-admin-production.js</code></p>
+</a>
+
+<a class="card dev" href="checkin-guest-sandbox-2.html">
+  <div class="tag">Dev sandbox</div>
   <h2>Guest sandbox 2</h2>
-  <p>Same app + dev toolbar — use for testing changes before promoting</p>
-</a>
-
-<a class="card live" href="checkin-admin.html">
-  <div class="tag">Admin · live today</div>
-  <h2>checkin-admin.html</h2>
-  <p>Your current admin panel</p>
+  <p>Test guest changes → run <code>node scripts/build-guest-production.js</code></p>
 </a>
 
 <a class="card" href="HK.html">
   <div class="tag">HK</div>
-  <h2>HK app (all sites incl. VGL)</h2>
-  <p>Housekeeping — use this for VGL, not HK-Shartava alone</p>
-</a>
-
-<a class="card" href="SYSTEM_MAP_BEGINNER_2026.html">
-  <div class="tag">Docs</div>
-  <h2>System map (beginner)</h2>
-  <p>How live vs sandbox fits together</p>
+  <h2>HK app</h2>
+  <p>Housekeeping — all sites incl. VGL</p>
 </a>
 
 <div class="note">
-  <b>Status (2026-08-31)</b>
-  Guest cutover complete — <code>checkin-guest.html</code> is the new app. Old <code>checkin-guest-v2.html</code> redirects here.
-  Admin still on <code>checkin-admin.html</code>; test changes in admin sandbox first.
-  <br><br>
-  Optional: deploy backend callables in daylight — see <code>docs/SANDBOX_TESTING.md</code> step 4.
+  <b>Backend</b>
+  Pipeline functions <code>adminAction</code> + <code>guestRegister</code> deployed on Firebase.
+  Promote script: <code>docs/SANDBOX_TESTING.md</code>
 </div>
 
-<footer>
-  Firebase: sleepy-5c962 · Hosted on GitHub Pages<br>
-  <a href="docs/SANDBOX_TESTING.md">Sandbox testing doc</a> (in repo)
-</footer>
+<footer>Firebase: sleepy-5c962 · GitHub Pages</footer>
 </body>
 </html>

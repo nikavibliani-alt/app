@@ -418,8 +418,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260831b';
-  if(!/[?&]build=20260831b(?:&|$)/.test(location.search)){
+  var BUILD='20260831d';
+  if(!/[?&]build=20260831d(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -680,7 +680,7 @@ html.admin-authed #app{display:block;}
  */
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
-const SANDBOX_BUILD='20260831b';
+const SANDBOX_BUILD='20260831d';
 (function migrateSandboxBuild(){
   try{
     if(localStorage.getItem('maxela_sandbox_build')!==SANDBOX_BUILD){
