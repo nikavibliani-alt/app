@@ -630,10 +630,10 @@ body{padding-bottom:0;}
 
 /* Elevator: QR on top, 6-digit code under — no copy (typed at the pad) */
 .dk-elev{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;}
-.dk-elev__qr{display:none;width:148px;height:148px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;align-items:center;justify-content:center;box-sizing:border-box;}
-.dk-elev__qr canvas{display:block;max-width:100%;height:auto;}
-.elev-qr-mount{display:flex;align-items:center;justify-content:center;line-height:0;}
-.elev-qr-mount img,.elev-qr-mount canvas{display:block!important;max-width:132px;max-height:132px;border-radius:4px;}
+.dk-elev__qr{display:none;width:148px;height:148px;min-width:148px;max-width:148px;flex-shrink:0;padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;align-items:center;justify-content:center;box-sizing:border-box;overflow:hidden;}
+#hero-elevator-qr-canvas{display:none!important;}
+.elev-qr-mount{width:132px;height:132px;flex-shrink:0;display:flex;align-items:center;justify-content:center;line-height:0;overflow:hidden;}
+.elev-qr-mount img,.elev-qr-mount canvas,.elev-qr-img{display:block!important;width:132px!important;height:132px!important;max-width:132px!important;max-height:132px!important;border-radius:4px;object-fit:contain;image-rendering:pixelated;}
 .dk-qr-ph{display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;letter-spacing:0.12em;color:var(--muted);background:repeating-linear-gradient(135deg,#f5f2ee 0 8px,#fff 8px 16px);border-radius:8px;}
 .dk-elev__scan-hint{font-size:12px;color:var(--muted);line-height:1.4;margin:10px 0 0;}
 .dk-elev__meta{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--line);}
@@ -1420,6 +1420,16 @@ function _drawElevatorQr(text){
       correctLevel:QRCode.CorrectLevel.M
     });
     if(token!==_elevatorQrDrawToken)return Promise.resolve(false);
+    const img=mount.querySelector('img');
+    const canvas=mount.querySelector('canvas');
+    if(img){
+      img.className='elev-qr-img';
+      img.width=132;
+      img.height=132;
+      img.style.width='132px';
+      img.style.height='132px';
+    }
+    if(canvas)canvas.style.display='none';
     mount.style.display='flex';
     if(qrPh)qrPh.style.display='none';
     return Promise.resolve(true);

@@ -630,8 +630,8 @@ body{padding-bottom:72px;}
 
 /* Elevator: QR on top, 6-digit code under — no copy (typed at the pad) */
 .dk-elev{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;}
-.dk-elev__qr{display:none;width:148px;height:148px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;align-items:center;justify-content:center;box-sizing:border-box;}
-.dk-elev__qr canvas{display:block;max-width:100%;height:auto;}
+.dk-elev__qr{display:none;width:148px;height:148px;min-width:148px;max-width:148px;flex-shrink:0;padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;align-items:center;justify-content:center;box-sizing:border-box;overflow:hidden;}
+#hero-elevator-qr-canvas{width:132px!important;height:132px!important;max-width:132px!important;max-height:132px!important;object-fit:contain;image-rendering:pixelated;}
 .dk-qr-ph{display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;letter-spacing:0.12em;color:var(--muted);background:repeating-linear-gradient(135deg,#f5f2ee 0 8px,#fff 8px 16px);border-radius:8px;}
 .dk-elev__scan-hint{font-size:12px;color:var(--muted);line-height:1.4;margin:10px 0 0;}
 .dk-elev__meta{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--line);}
@@ -4203,6 +4203,8 @@ function _renderHeroContent(){
         if(qrCanvas&&window.QRCode){
           try{
             QRCode.toCanvas(qrCanvas,String(qrPayload||elevCode),{width:132,color:{dark:'#2C2C2A',light:'#FFFFFF'}});
+            qrCanvas.style.width='132px';
+            qrCanvas.style.height='132px';
             drawn=true;
           }catch(e){drawn=false;}
         }
