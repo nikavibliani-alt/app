@@ -44,6 +44,34 @@ html.admin-authed #lock-screen{display:none;}
 .lock-input.shake{animation:shake .3s;}
 #app{display:none;min-height:100vh;padding-bottom:calc(var(--nav-h) + 12px);}
 html.admin-authed #app{display:block;}
+html.standalone-hk #lock-screen{display:none!important;}
+html.standalone-hk .app-header{display:none;}
+html.standalone-hk #main-nav{display:none;}
+html.standalone-hk #app{display:none;padding-bottom:12px;}
+html.standalone-hk.hk-authed #app{display:block;}
+html.standalone-hk .toast{bottom:16px;}
+html.standalone-hk .pane{display:none!important;}
+html.standalone-hk.hk-authed #pane-hk{display:block!important;}
+html.standalone-hk.hk-authed #pane-hksettings{display:none!important;}
+html.standalone-hk.hk-authed.hk-tab-settings #pane-hk{display:none!important;}
+html.standalone-hk.hk-authed.hk-tab-settings #pane-hksettings{display:block!important;}
+html.standalone-hk #detail,html.standalone-hk #apt-editor-overlay,html.standalone-hk #req-detail,html.standalone-hk #gp-editor-overlay,html.standalone-hk #gs-save-bar{display:none!important;}
+html.standalone-hk .hk-cleaner-link{display:none;}
+html.standalone-hk.hk-admin-role .hk-cleaner-link{display:inline;}
+#hk-pin-screen{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:1001;padding:24px;}
+html.standalone-hk:not(.hk-authed) #hk-pin-screen{display:flex;}
+html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
+.hk-pin-screen-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:28px 22px;width:min(300px,100%);text-align:center;box-shadow:0 8px 32px rgba(44,44,42,.08);}
+.hk-pin-logo{font-size:22px;font-weight:400;letter-spacing:-.02em;margin-bottom:4px;font-family:var(--serif);font-style:italic;}
+.hk-pin-logo span{font-style:italic;font-weight:500;}
+.hk-pin-sub{font-size:13px;color:var(--muted);margin-bottom:20px;}
+.hk-pin-dots{display:flex;gap:14px;justify-content:center;margin-bottom:10px;}
+.hk-pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);background:transparent;transition:all .12s;}
+.hk-pin-dot.filled{background:var(--ink);border-color:var(--ink);}
+.hk-pin-err{font-size:13px;color:var(--red);min-height:20px;margin-bottom:16px;font-weight:500;}
+.hk-pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:210px;margin:0 auto;}
+.hk-pin-key{height:58px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);font-family:var(--mono);font-size:22px;font-weight:500;cursor:pointer;color:var(--ink);-webkit-tap-highlight-color:transparent;}
+.hk-pin-key:active{background:var(--bg);}
 .app-header{padding:14px 16px 10px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50;}
 .app-header__row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
 .app-header__main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
@@ -416,10 +444,11 @@ html.admin-authed #app{display:block;}
 .wa-rule{display:flex;gap:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:var(--rs);margin-bottom:14px;font-size:12px;color:var(--ink-2);line-height:1.45;}
 .wa-rule svg{flex:none;width:16px;height:16px;color:var(--muted);margin-top:1px;}
 </style>
+<script>window.__STANDALONE_HK__=/[?&]app=hk(?:&|$)/.test(location.search)||/(?:^|\/)HK\.html$/i.test(location.pathname);if(window.__STANDALONE_HK__){document.documentElement.classList.add('standalone-hk');try{var role=localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role');if(role){document.documentElement.classList.add('hk-authed');if(role==='admin')document.documentElement.classList.add('hk-admin-role');}}catch(e){}}</script>
 <script>
 (function(){
-  var BUILD='20260831c';
-  if(!/[?&]build=20260831c(?:&|$)/.test(location.search)){
+  var BUILD='20260831e'
+  if(!/[?&]build=20260831(?:e|hk)(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -471,6 +500,33 @@ html.admin-authed #app{display:block;}
 <body>
 <div id="loading"><div class="spinner"></div><div style="font-size:13px;color:var(--muted)">Loading admin…</div></div>
 <div class="toast" id="toast"></div>
+<div id="hk-pin-screen">
+  <div class="hk-pin-screen-card">
+    <div class="hk-pin-logo">Sleepy <span>HK</span></div>
+    <div class="hk-pin-sub" id="hk-pin-sub">Connecting…</div>
+    <div class="hk-pin-dots">
+      <div class="hk-pin-dot" id="hk-pin-dot-0"></div>
+      <div class="hk-pin-dot" id="hk-pin-dot-1"></div>
+      <div class="hk-pin-dot" id="hk-pin-dot-2"></div>
+      <div class="hk-pin-dot" id="hk-pin-dot-3"></div>
+    </div>
+    <div class="hk-pin-err" id="hk-pin-err"></div>
+    <div class="hk-pin-pad">
+      <button type="button" class="hk-pin-key" onclick="window.hkPinKey('1')">1</button>
+      <button type="button" class="hk-pin-key" onclick="window.hkPinKey('2')">2</button>
+      <button type="button" class="hk-pin-key" onclick="window.hkPinKey('3')">3</button>
+      <button type="button" class="hk-pin-key" onclick="window.hkPinKey('4')">4</button>
+      <button type="button" class="hk-pin-key" onclick="window.hkPinKey('5')">5</button>
+      <button type="button" class="hk-pin-key" onclick="window.hkPinKey('6')">6</button>
+      <button type="button" class="hk-pin-key" onclick="window.hkPinKey('7')">7</button>
+      <button type="button" class="hk-pin-key" onclick="window.hkPinKey('8')">8</button>
+      <button type="button" class="hk-pin-key" onclick="window.hkPinKey('9')">9</button>
+      <button type="button" class="hk-pin-key" onclick="window.hkPinKey('del')" style="font-size:16px;">⌫</button>
+      <button type="button" class="hk-pin-key" onclick="window.hkPinKey('0')">0</button>
+      <button type="button" class="hk-pin-key" onclick="window.hkPinKey('del')" style="font-size:16px;color:var(--muted);">✕</button>
+    </div>
+  </div>
+</div>
 <div id="lock-screen">
   <div class="lock-brand"><span>Maxela</span> Admin</div>
   <div class="lock-sub">Property operations</div>
@@ -488,7 +544,7 @@ html.admin-authed #app{display:block;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 831c · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 831e · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -680,7 +736,7 @@ html.admin-authed #app{display:block;}
  */
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
-const ADMIN_BUILD='20260831c';
+const ADMIN_BUILD='20260831e';
 (function migrateAdminBuild(){
   try{
     if(localStorage.getItem('maxela_admin_prod_build')!==ADMIN_BUILD){
@@ -726,6 +782,10 @@ import{DEFAULT_ROOMS_SEED,ROOM_SITES}from"./shared/room-registry.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 import{featherIcon}from"./shared/feather-icons.js";
+
+const STANDALONE_HK=typeof window!=='undefined'&&(window.__STANDALONE_HK__===true||/(?:^|\/)HK\.html$/i.test(location.pathname)||/[?&]app=hk(?:&|$)/.test(location.search));
+let _hkPinBuf='';
+let _hkPinsReady=false;
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -1022,6 +1082,7 @@ function loadNavSlots(){return loadNavConfig().slots;}
 let navSlots=loadNavSlots();
 
 function loadSavedTab(){
+  if(STANDALONE_HK)return 'hk';
   try{
     const t=localStorage.getItem(_TAB_KEY);
     if(t&&VALID_TABS.has(t))return t;
@@ -1679,7 +1740,9 @@ function hkRoomsForTeam(teamId){
   return getHkRooms().filter(r=>set.has(String(r.code).toLowerCase()));
 }
 function hkRoomsForRole(){
-  return hkRoomsForTeam(hkStoredRole()||'admin');
+  const role=hkStoredRole();
+  if(STANDALONE_HK&&!role)return [];
+  return hkRoomsForTeam(role||'admin');
 }
 function hkNewTeamId(label){
   const base=String(label||'team').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'team';
@@ -2532,10 +2595,18 @@ window.goBack=function(){
   if(document.getElementById('apt-editor-overlay')?.classList.contains('open')){closeAptEditor();return;}
   if(document.getElementById('req-detail')?.classList.contains('open')){closeReqDetail();return;}
   if(document.getElementById('detail')?.classList.contains('open')){closeDetail();return;}
-  if(MORE_SUB_PAGES.has(currentTab))switchTab('more');
+  if(MORE_SUB_PAGES.has(currentTab)){
+    if(STANDALONE_HK&&currentTab==='hksettings')switchTab('hk');
+    else switchTab('more');
+  }
 };
 
 window.switchTab=function(tab){
+  if(STANDALONE_HK){
+    if(tab==='hksettings'&&!isHkAdmin())tab='hk';
+    if(tab!=='hk'&&tab!=='hksettings')tab='hk';
+    document.documentElement.classList.toggle('hk-tab-settings',tab==='hksettings');
+  }
   if(!VALID_TABS.has(tab))tab='stay';
   currentTab=tab;
   try{localStorage.setItem(_TAB_KEY,tab);}catch(e){}
@@ -3454,6 +3525,7 @@ function hkStoredRole(){
   return localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role')||'';
 }
 function isHkAdmin(){
+  if(STANDALONE_HK)return hkStoredRole()==='admin';
   return true;
 }
 function updateHkCleanerBadge(){
@@ -3461,15 +3533,74 @@ function updateHkCleanerBadge(){
   const el=document.getElementById('hk-role-badge');
   if(!el)return;
   const role=hkStoredRole();
-  if(role&&HK_ROLE_LABELS[role]){el.textContent='Logged in: '+HK_ROLE_LABELS[role];el.hidden=false;}
+  if(role&&HK_ROLE_LABELS[role]){el.textContent=HK_ROLE_LABELS[role];el.hidden=false;}
   else if(isHkAdmin()){el.textContent='Admin schedule control';el.hidden=false;}
   else el.hidden=true;
+}
+function _hkUpdatePinDots(){
+  for(let i=0;i<4;i++){
+    const d=document.getElementById('hk-pin-dot-'+i);
+    if(d)d.classList.toggle('filled',_hkPinBuf.length>i);
+  }
+}
+function _hkSubmitPin(){
+  if(!STANDALONE_HK)return;
+  if(!_hkPinsReady){
+    const e=document.getElementById('hk-pin-err');
+    if(e)e.textContent='Still connecting — try again';
+    _hkPinBuf='';_hkUpdatePinDots();
+    setTimeout(()=>{const e=document.getElementById('hk-pin-err');if(e)e.textContent='';},2000);
+    return;
+  }
+  let matched=null;
+  for(const [id,pin] of Object.entries(hkPinsData)){
+    if(_hkPinBuf&&pin&&_hkPinBuf===pin){matched=id;break;}
+  }
+  if(matched){
+    localStorage.setItem('hk_role',matched);
+    document.documentElement.classList.add('hk-authed');
+    document.documentElement.classList.toggle('hk-admin-role',matched==='admin');
+    _hkPinBuf='';_hkUpdatePinDots();
+    updateHkCleanerBadge();
+    switchTab('hk');
+  }else{
+    const e=document.getElementById('hk-pin-err');
+    if(e)e.textContent='Wrong PIN — try again';
+    _hkPinBuf='';_hkUpdatePinDots();
+    setTimeout(()=>{const e=document.getElementById('hk-pin-err');if(e)e.textContent='';},2000);
+  }
+}
+window.hkPinKey=function(k){
+  if(!STANDALONE_HK)return;
+  if(k==='del'){_hkPinBuf=_hkPinBuf.slice(0,-1);}
+  else if(_hkPinBuf.length<4){_hkPinBuf+=k;}
+  _hkUpdatePinDots();
+  if(_hkPinBuf.length===4)setTimeout(_hkSubmitPin,120);
+};
+async function hkInitStandalone(){
+  await loadGuestSettings();
+  hkRefreshRoleLabels();
+  const role=hkStoredRole();
+  if(role&&HK_ROLE_LABELS[role]){
+    document.documentElement.classList.add('hk-authed');
+    document.documentElement.classList.toggle('hk-admin-role',role==='admin');
+  }
+  _subscribeResCache();
+  switchTab('hk');
+  const sub=document.getElementById('hk-pin-sub');
+  if(sub)sub.textContent=_hkPinsReady?'Enter your team PIN':'Connecting…';
 }
 window.hkCleanerLogout=function(){
   localStorage.removeItem('hk_role');
   localStorage.removeItem('hk_shartava_role');
+  if(STANDALONE_HK){
+    document.documentElement.classList.remove('hk-authed','hk-admin-role','hk-tab-settings');
+    _hkPinBuf='';_hkUpdatePinDots();
+    const sub=document.getElementById('hk-pin-sub');
+    if(sub)sub.textContent=_hkPinsReady?'Enter your team PIN':'Connecting…';
+  }
   updateHkCleanerBadge();
-  toast('HK app logged out — open Cleaner app to see PIN screen');
+  toast(STANDALONE_HK?'Logged out':'HK app logged out — open Cleaner app to see PIN screen');
 };
 
 function hkFmtDate(d){
@@ -3969,12 +4100,16 @@ function checkLoaded(){
   loaded++;
   if(loaded>=2){
     document.getElementById('loading').style.display='none';
-    switchTab(currentTab);
-    _subscribeResCache();
-    loadElevatorOnce();
-    loadRequests(true);
-    loadGuestSettings();
-    loadNavConfigFromFirestore();
+    if(STANDALONE_HK){
+      hkInitStandalone();
+    }else{
+      switchTab(currentTab);
+      _subscribeResCache();
+      loadElevatorOnce();
+      loadRequests(true);
+      loadGuestSettings();
+      loadNavConfigFromFirestore();
+    }
   }
 }
 
@@ -4004,6 +4139,11 @@ onSnapshot(query(collection(db,'hk_status'),where('date','==',tbilisiToday())),s
 });
 onSnapshot(collection(db,'hk_pins'),snap=>{
   snap.docs.forEach(d=>{hkPinsData[d.id]=d.data().pin||'';});
+  _hkPinsReady=true;
+  if(STANDALONE_HK){
+    const sub=document.getElementById('hk-pin-sub');
+    if(sub&&sub.textContent==='Connecting…')sub.textContent='Enter your team PIN';
+  }
   if(loaded>=2&&currentTab==='hksettings')renderHkSettings();
 });
 onSnapshot(query(collection(db,'search_failures'),where('resolved','==',false)),snap=>{
@@ -4021,6 +4161,6 @@ onSnapshot(doc(db,'globals','elevator_code'),snap=>{
   loadElevatorOnce();
 });
 setInterval(()=>{if(currentTab==='elevator')renderElevator();loadElevatorOnce();},60000);
-setTimeout(()=>{document.getElementById('loading').style.display='none';if(!_resCache&&!_resSubscribed)_loadResCache();if(loaded<2)switchTab(currentTab);},5000);
-switchTab(currentTab);
+setTimeout(()=>{document.getElementById('loading').style.display='none';if(!_resCache&&!_resSubscribed)_loadResCache();if(loaded<2){if(STANDALONE_HK)hkInitStandalone();else switchTab(currentTab);}},5000);
+if(!STANDALONE_HK)switchTab(currentTab);
 </script></body></html>

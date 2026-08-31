@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Sleepy HK</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#f5f5f7;--surface:#fff;--border:#e8e8ed;--border2:#d1d1d6;
+  --text:#1c1c1e;--muted:#6e6e73;--hint:#aeaeb2;
+  --red:#dc2626;--red-bg:#fef2f2;--red-border:#fca5a5;--red-dark:#991b1b;
+  --yellow:#d97706;--yellow-bg:#fffbeb;--yellow-border:#fcd34d;--yellow-dark:#92400e;
+  --green:#16a34a;--green-bg:#f0fdf4;--green-border:#86efac;--green-dark:#166534;
+  --blue:#2563eb;--blue-bg:#eff6ff;--blue-border:#93c5fd;
+  --r:14px;--rs:10px;
+}
+html,body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:15px;min-height:100vh;padding-bottom:3rem;}
+html,body,button,input{touch-action:manipulation;}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes pop{0%{transform:scale(0.95);opacity:0;}100%{transform:scale(1);opacity:1;}}
+
+/* Loading */
+.loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:999;}
+.loading-logo{font-size:22px;font-weight:700;letter-spacing:-0.02em;}
+.loading-logo span{color:var(--blue);}
+.spinner{width:22px;height:22px;border:2.5px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;}
+
+/* Toast */
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1c1c1e;color:#fff;font-size:13px;font-weight:500;padding:9px 20px;border-radius:20px;z-index:9999;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;}
+
+/* Header */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0.85rem 1rem 0.7rem;position:sticky;top:0;z-index:50;}
+.header-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.logo{font-size:15px;font-weight:700;letter-spacing:-0.02em;}
+.logo span{color:var(--blue);}
+.loc-badge{font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border);}
+.header-date{font-size:12px;color:var(--muted);margin-top:4px;font-family:'DM Mono',monospace;}
+.sync-row{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--hint);margin-top:3px;}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--hint);}
+.sdot.live{background:#22c55e;}
+.sdot.err{background:var(--red);}
+
+/* Day tabs */
+.day-tabs{display:flex;gap:6px;padding:0.75rem 1rem;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.day-tabs::-webkit-scrollbar{display:none;}
+.day-tab{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:transparent;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--muted);transition:all 0.15s;-webkit-tap-highlight-color:transparent;}
+.day-tab.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+.tab-count{font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
+.day-tab .tab-count{background:rgba(255,255,255,0.25);color:#fff;}
+.day-tab:not(.active) .tab-count{background:var(--red);color:#fff;}
+.day-tab:not(.active) .tab-count.zero{display:none;}
+
+/* Legend */
+.legend{display:flex;gap:10px;padding:0.6rem 1rem;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--muted);}
+.leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.leg-red{background:var(--red);}
+.leg-yellow{background:var(--yellow);}
+.leg-green{background:var(--green);}
+
+/* Content */
+.container{padding:0.75rem 1rem;}
+.group-label{font-size:11px;font-weight:700;color:var(--hint);text-transform:uppercase;letter-spacing:0.08em;margin:1rem 0 0.5rem;padding:0 0.1rem;}
+
+/* Task card */
+.task-card{border-radius:var(--r);margin-bottom:8px;overflow:hidden;border:2px solid transparent;animation:pop 0.2s ease;position:relative;}
+.task-card.priority-red{background:var(--red-bg);border-color:var(--red-border);}
+.task-card.priority-yellow{background:var(--yellow-bg);border-color:var(--yellow-border);}
+.task-card.priority-green{background:var(--green-bg);border-color:var(--green-border);}
+.task-card.done-card{opacity:0.55;filter:grayscale(0.3);}
+@keyframes cardSlideDown{0%{transform:translateY(0);opacity:1;}60%{transform:translateY(12px);}100%{transform:translateY(0);opacity:0.55;}}
+.task-card.card-completing{animation:cardSlideDown 0.32s ease forwards!important;}
+
+.card-top{display:flex;align-items:center;gap:10px;padding:0.85rem 1rem 0.6rem;}
+.priority-bar{width:4px;height:44px;border-radius:2px;flex-shrink:0;}
+.priority-red .priority-bar{background:var(--red);}
+.priority-yellow .priority-bar{background:var(--yellow);}
+.priority-green .priority-bar{background:var(--green);}
+.room-info{flex:1;min-width:0;}
+.room-code{font-size:20px;font-weight:700;letter-spacing:-0.02em;font-family:'DM Mono',monospace;line-height:1.1;}
+.room-name{font-size:12px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.priority-chip{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;}
+.chip-red{background:var(--red);color:#fff;}
+.chip-yellow{background:var(--yellow);color:#fff;}
+.chip-green{background:var(--green);color:#fff;}
+.chip-done{background:var(--border);color:var(--muted);}
+
+.times-row{display:flex;gap:6px;padding:0 1rem 0.6rem;}
+.time-box{flex:1;border-radius:var(--rs);padding:7px 10px;border:1px solid;}
+.tb-out{background:#fff;border-color:var(--red-border);}
+.tb-in{background:#fff;border-color:var(--green-border);}
+.tb-free{background:#fff;border-color:var(--border);}
+.tb-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px;}
+.tb-out .tb-label{color:var(--red);}
+.tb-in .tb-label{color:var(--green);}
+.tb-free .tb-label{color:var(--hint);}
+.tb-time{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;line-height:1.1;}
+.tb-guest{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tb-count{font-size:14px;font-weight:700;margin-top:4px;}
+.tb-out .tb-count{color:var(--red-dark);}
+.tb-in .tb-count{color:var(--green-dark);}
+.tb-when{font-size:12px;font-weight:800;letter-spacing:0.02em;margin-bottom:2px;}
+.tb-in .tb-when{color:var(--green-dark);}
+.tb-in.tb-urgent .tb-when{color:var(--green);font-size:14px;}
+.tb-in.tb-urgent{background:var(--green-bg);border-color:var(--green);border-width:2px;}
+.tb-in.tb-urgent .tb-time{font-size:20px;}
+.done-section-label{font-size:11px;font-weight:700;color:var(--hint);text-transform:uppercase;letter-spacing:0.08em;margin:1.25rem 0 0.5rem;padding:0 0.1rem;opacity:0.6;}
+
+.notes-box{margin:0 1rem 0.6rem;background:#fff;border-radius:var(--rs);padding:8px 10px;border:1px solid var(--yellow-border);}
+.notes-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--yellow-dark);margin-bottom:2px;}
+.notes-txt{font-size:13px;color:var(--text);}
+
+.card-footer{display:flex;align-items:center;gap:8px;padding:0 1rem 0.85rem;}
+.cleaner-label{font-size:13px;color:var(--muted);font-weight:500;flex:1;}
+.done-btn{height:36px;padding:0 16px;border:none;border-radius:var(--rs);font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;transition:all 0.15s;}
+.btn-mark{background:var(--green);color:#fff;}
+.btn-mark:active{opacity:0.85;}
+.btn-undo{background:var(--border);color:var(--muted);}
+
+/* Empty */
+.empty{text-align:center;padding:3rem 1rem;color:var(--hint);}
+.empty-icon{font-size:44px;margin-bottom:12px;}
+.empty-title{font-size:15px;font-weight:600;color:var(--muted);margin-bottom:6px;}
+.empty-sub{font-size:13px;}
+
+.bedding-alert{margin:0 1rem 0.6rem;background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--rs);padding:8px 10px;font-size:13px;font-weight:600;color:#9a3412;}
+.guest-count{font-size:11px;color:var(--muted);margin-top:3px;}
+
+/* Summary bar */
+.summary-bar{background:var(--surface);border-top:1px solid var(--border);padding:0.75rem 1rem;display:flex;gap:12px;justify-content:center;position:fixed;bottom:0;left:0;right:0;}
+.sum-item{text-align:center;}
+.sum-num{font-size:18px;font-weight:700;font-family:'DM Mono',monospace;}
+.sum-lbl{font-size:10px;color:var(--hint);font-weight:500;text-transform:uppercase;letter-spacing:0.05em;}
+.sum-red{color:var(--red);}
+.sum-yellow{color:var(--yellow);}
+.sum-green{color:var(--green);}
+.sum-done{color:var(--muted);}
+
+/* PIN screen */
+.pin-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:2000;padding:1rem;}
+.pin-card{background:var(--surface);border-radius:var(--r);padding:2rem 1.5rem;width:min(300px,100%);text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.12);}
+.pin-logo{font-size:22px;font-weight:700;letter-spacing:-0.02em;margin-bottom:4px;}
+.pin-logo span{color:var(--blue);}
+.pin-sub{font-size:13px;color:var(--hint);margin-bottom:1.5rem;}
+.pin-dots{display:flex;gap:14px;justify-content:center;margin-bottom:10px;}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border2);background:transparent;transition:all 0.12s;}
+.pin-dot.filled{background:var(--blue);border-color:var(--blue);}
+.pin-err{font-size:13px;color:var(--red);min-height:20px;margin-bottom:1rem;font-weight:500;}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:210px;margin:0 auto;}
+.pin-key{height:58px;border:1.5px solid var(--border);border-radius:var(--rs);background:var(--surface);font-family:'DM Mono',monospace;font-size:22px;font-weight:500;cursor:pointer;color:var(--text);-webkit-tap-highlight-color:transparent;transition:background 0.1s;}
+.pin-key:active{background:var(--blue-bg);}
+.logout-btn{height:28px;padding:0 10px;border:1px solid var(--border);border-radius:20px;background:transparent;font-size:12px;font-weight:500;cursor:pointer;color:var(--muted);font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;}
+.logout-btn:active{background:var(--border);}
+</style>
+</head>
+<body>
+
+<div class="loading" id="loading">
+  <div class="loading-logo">Sleepy <span>HK</span></div>
+  <div class="spinner"></div>
+  <div style="font-size:13px;color:var(--hint);">Loading...</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- PIN screen -->
+<div class="pin-screen" id="pin-screen" style="display:none;">
+  <div class="pin-card">
+    <div class="pin-logo">Sleepy <span>HK</span></div>
+    <div class="pin-sub" id="pin-sub">Connecting to server...</div>
+    <div class="pin-dots">
+      <div class="pin-dot" id="dot-0"></div>
+      <div class="pin-dot" id="dot-1"></div>
+      <div class="pin-dot" id="dot-2"></div>
+      <div class="pin-dot" id="dot-3"></div>
+    </div>
+    <div class="pin-err" id="pin-err"></div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="window.pinKey('1')">1</button>
+      <button class="pin-key" onclick="window.pinKey('2')">2</button>
+      <button class="pin-key" onclick="window.pinKey('3')">3</button>
+      <button class="pin-key" onclick="window.pinKey('4')">4</button>
+      <button class="pin-key" onclick="window.pinKey('5')">5</button>
+      <button class="pin-key" onclick="window.pinKey('6')">6</button>
+      <button class="pin-key" onclick="window.pinKey('7')">7</button>
+      <button class="pin-key" onclick="window.pinKey('8')">8</button>
+      <button class="pin-key" onclick="window.pinKey('9')">9</button>
+      <button class="pin-key" onclick="window.pinKey('del')" style="font-size:16px;">⌫</button>
+      <button class="pin-key" onclick="window.pinKey('0')">0</button>
+      <button class="pin-key" onclick="window.pinKey('del')" style="font-size:16px;color:var(--hint);">✕</button>
+    </div>
+  </div>
+</div>
+
+<!-- App (hidden until PIN entered) -->
+<div id="app" style="display:none;">
+<header>
+  <div class="header-row">
+    <div class="logo">Sleepy <span>HK</span></div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="loc-badge" id="loc-badge">📍 Shartava</div>
+      <button class="logout-btn" onclick="window.logout()">Log out</button>
+    </div>
+  </div>
+  <div class="header-date" id="hdr-date"></div>
+  <div class="sync-row"><div class="sdot" id="sdot"></div><span id="slbl">Connecting...</span></div>
+</header>
+
+<div class="day-tabs" id="day-tabs"></div>
+
+<div class="legend">
+  <div class="leg-item"><div class="leg-dot leg-red"></div>Same-day check-in</div>
+  <div class="leg-item"><div class="leg-dot leg-yellow"></div>Check-in tomorrow</div>
+  <div class="leg-item"><div class="leg-dot leg-green"></div>No reservation yet</div>
+</div>
+
+<div class="container" id="main-list"></div>
+
+<div class="summary-bar" id="sum-bar" style="display:none;">
+  <div class="sum-item"><div class="sum-num sum-red" id="sum-red">0</div><div class="sum-lbl">Urgent</div></div>
+  <div class="sum-item"><div class="sum-num sum-yellow" id="sum-yellow">0</div><div class="sum-lbl">Today</div></div>
+  <div class="sum-item"><div class="sum-num sum-green" id="sum-green">0</div><div class="sum-lbl">Free</div></div>
+  <div class="sum-item"><div class="sum-num sum-done" id="sum-done">0</div><div class="sum-lbl">Done ✓</div></div>
+</div>
+</div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import{getFirestore,collection,doc,setDoc,updateDoc,getDocs,query,where,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+const fb=initializeApp({
+  apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
+  authDomain:"sleepy-5c962.firebaseapp.com",
+  projectId:"sleepy-5c962",
+  storageBucket:"sleepy-5c962.firebasestorage.app",
+  messagingSenderId:"152940098906",
+  appId:"1:152940098906:web:bf245230d705c0a62c2f63"
+});
+const db=getFirestore(fb);
+
+// ── ROOM DEFINITIONS ──────────────────────────────────────
+const ROOMS=[
+  // 0- small rooms
+  {code:'0-1',name:'Small room 1',group:'0- Rooms',location:'shartava'},
+  {code:'0-2',name:'Small room 2',group:'0- Rooms',location:'shartava'},
+  {code:'0-3',name:'Small room 3',group:'0- Rooms',location:'shartava'},
+  {code:'0-4',name:'Small room 4',group:'0- Rooms',location:'shartava'},
+  {code:'0-5',name:'Small room 5',group:'0- Rooms',location:'shartava'},
+  // 6- apartments
+  {code:'6-1',name:'Apartment 6-1',group:'6- Apartments',location:'shartava'},
+  {code:'6-2',name:'Apartment 6-2',group:'6- Apartments',location:'shartava'},
+  {code:'6-3',name:'Apartment 6-3',group:'6- Apartments',location:'shartava'},
+  {code:'6-4',name:'Apartment 6-4',group:'6- Apartments',location:'shartava'},
+  // 7- apartments
+  {code:'7-1',name:'Apartment 7-1',group:'7- Apartments',location:'shartava'},
+  {code:'7-2',name:'Apartment 7-2',group:'7- Apartments',location:'shartava'},
+  {code:'7-4',name:'Apartment 7-4',group:'7- Apartments',location:'shartava'},
+  // Centre - Orb
+  {code:'orb-1',name:'Orb 1',group:'Centre — Orb',location:'centre'},
+  {code:'orb-2',name:'Orb 2',group:'Centre — Orb',location:'centre'},
+  {code:'orb-3',name:'Orb 3',group:'Centre — Orb',location:'centre'},
+  // Centre - Tab
+  {code:'tab-1',name:'Tab 1',group:'Centre — Tab',location:'centre'},
+  {code:'tab-2',name:'Tab 2',group:'Centre — Tab',location:'centre'},
+  {code:'tab-3',name:'Tab 3',group:'Centre — Tab',location:'centre'},
+  // VGL
+  {code:'vgl-st1',name:'VGL Studio 1',group:'VGL — Studios',location:'vgl'},
+  {code:'vgl-st2',name:'VGL Studio 2',group:'VGL — Studios',location:'vgl'},
+  {code:'vgl-ap3',name:'VGL Apartment 3',group:'VGL — Apartments',location:'vgl'},
+  {code:'vgl-ap4',name:'VGL Apartment 4',group:'VGL — Apartments',location:'vgl'},
+];
+
+
+
+let reservations=[];
+let cleaningStatus={};
+let _hkTeams=[];
+let _hkTeamById={};
+let _hkTeamLabels={admin:'📍 All Properties'};
+
+let activeDay=0;
+let loadCount=0;
+
+function fmtDate(d){if(typeof d==='string'&&/^\d{4}-\d{2}-\d{2}/.test(d))return d.slice(0,10);const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dy=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dy}`;}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+function parseDate(s){if(!s)return new Date('invalid');if(typeof s.toDate==='function')return s.toDate();return new Date(String(s).substring(0,10)+'T00:00:00');}
+function today(){const d=new Date();d.setHours(0,0,0,0);return d;}
+function tomorrow(){return addDays(today(),1);}
+
+function setSyncing(s){
+  const d=document.getElementById('sdot');
+  const l=document.getElementById('slbl');
+  if(d)d.className='sdot'+(s==='live'?' live':s==='err'?' err':'');
+  if(l)l.textContent=s==='live'?'Live sync':s==='err'?'Offline':'Connecting...';
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+function targetDate(){return addDays(today(),activeDay);}
+
+function getResForRoom(roomCode,date){
+  const ds=fmtDate(date);
+  return reservations.filter(r=>r.roomCode===roomCode&&r.checkin<=ds&&r.checkout>ds);
+}
+
+function getCheckoutToday(roomCode,date){
+  const ds=fmtDate(date);
+  return reservations.find(r=>r.roomCode===roomCode&&r.checkout===ds);
+}
+
+function getNextCheckin(roomCode,afterDate){
+  const ds=fmtDate(afterDate);
+  return reservations
+    .filter(r=>r.roomCode===roomCode&&r.checkin>=ds)
+    .sort((a,b)=>a.checkin.localeCompare(b.checkin))[0]||null;
+}
+
+function getPriority(roomCode,date){
+  const co=getCheckoutToday(roomCode,date);
+  if(!co)return null; // no checkout = nothing to clean
+  const ds=fmtDate(date);
+  const nextRes=getNextCheckin(roomCode,addDays(date,1));
+  if(!nextRes)return 'green';
+  const nextCI=nextRes.checkin;
+  const todayDs=fmtDate(date);
+  const tomorrowDs=fmtDate(addDays(date,1));
+  if(nextCI===ds)return 'red';       // same day checkin
+  if(nextCI===tomorrowDs)return 'yellow'; // next day checkin
+  return 'green';                    // free
+}
+
+function getGuestCount(res){
+  if(!res)return 0;
+  if(typeof res.guests==='number')return res.guests;
+  if(typeof res.guests==='string'&&res.guests!=='')return parseInt(res.guests,10)||0;
+  const adults=parseInt(String(res.adults||0),10)||0;
+  const children=parseInt(String(res.children||res.child||res.kids||0),10)||0;
+  if(adults>0||children>0)return adults+children;
+  if(res.guestCount!=null&&res.guestCount!=='')return parseInt(String(res.guestCount),10)||0;
+  return 0;
+}
+function getBeddingAlert(roomCode,guests){
+  if(guests<1)return null;
+  const c=String(roomCode||'').toLowerCase();
+  if(/^0-/.test(c))return guests>=4?'Extra sofa bed sheets needed':null;
+  if(['6-1','6-2','6-4','7-1','7-2','7-4'].includes(c))return guests>=5?'Extra sheets needed':null;
+  if(c==='6-3')return guests>=9?'Extra sheets needed':null;
+  if(/^(orb|tab)-/.test(c))return guests>=3?'Extra sheets needed':null;
+  return null;
+}
+function getTaskRooms(date){
+  const ds=fmtDate(date);
+  const active=getActiveRooms();
+  const coRooms=active.filter(r=>getCheckoutToday(r.code,date));
+  // Include rooms manually added via admin (hk_status entry but no checkout reservation)
+  const statusCodes=Object.keys(cleaningStatus).filter(k=>k.endsWith('_'+ds)).map(k=>k.slice(0,-(ds.length+1)));
+  const manualRooms=active.filter(r=>statusCodes.includes(r.code)&&!coRooms.find(c=>c.code===r.code));
+  return [...coRooms,...manualRooms];
+}
+
+function renderTabs(){
+  const el=document.getElementById('day-tabs');
+  if(!el)return;
+  const DAY=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let html='';
+  for(let i=0;i<7;i++){
+    const d=addDays(today(),i);
+    const count=getTaskRooms(d).length;
+    if(!count&&i>0)continue; // Today always shown even with 0 checkouts
+    const label=i===0?'Today':i===1?'Tomorrow':DAY[d.getDay()]+' '+d.getDate();
+    html+=`<button class="day-tab${activeDay===i?' active':''}" onclick="window.switchDay(${i})">${label} <span class="tab-count${count?'':' zero'}">${count||''}</span></button>`;
+  }
+  el.innerHTML=html;
+}
+// ── PIN / AUTH ────────────────────────────────────────────────────────────────
+let _hkPins={};
+let _pinsReady=false;
+let _pinBuf='';
+
+function hkSiteFromCode(code){
+  const c=String(code||'').toLowerCase();
+  if(/^orb-|^tab-/.test(c))return 'centre';
+  if(/^vgl-/.test(c))return 'vgl';
+  if(c==='abashidze')return 'abashidze';
+  return 'shartava';
+}
+function hkRefreshTeamLabels(){
+  _hkTeamById={};
+  _hkTeamLabels={admin:'📍 All Properties'};
+  _hkTeams.forEach(t=>{
+    _hkTeamById[t.id]=t;
+    _hkTeamLabels[t.id]='📍 '+t.label;
+  });
+}
+function getActiveRooms(){
+  const role=localStorage.getItem('hk_role')||'';
+  if(!role||role==='admin')return ROOMS;
+  const team=_hkTeamById[role];
+  if(team?.roomCodes?.length){
+    const set=new Set(team.roomCodes.map(c=>String(c).toLowerCase()));
+    return ROOMS.filter(r=>set.has(String(r.code).toLowerCase()));
+  }
+  if(role==='shartava')return ROOMS.filter(r=>r.location==='shartava');
+  if(role==='centre')return ROOMS.filter(r=>r.location==='centre');
+  if(role==='vgl')return ROOMS.filter(r=>r.location==='vgl');
+  return ROOMS;
+}
+function _updateDots(){
+  for(let i=0;i<4;i++){const d=document.getElementById('dot-'+i);if(d)d.className='pin-dot'+(_pinBuf.length>i?' filled':'');}
+}
+window.pinKey=function(k){
+  if(k==='del'){_pinBuf=_pinBuf.slice(0,-1);}
+  else if(_pinBuf.length<4){_pinBuf+=k;}
+  _updateDots();
+  if(_pinBuf.length===4)setTimeout(_submitPin,120);
+};
+function _submitPin(){
+  if(!_pinsReady){
+    const e=document.getElementById('pin-err');if(e)e.textContent='Still connecting — try again';
+    _pinBuf='';_updateDots();
+    setTimeout(()=>{const e=document.getElementById('pin-err');if(e)e.textContent='';},2000);
+    return;
+  }
+  let matchedRole=null;
+  for(const [id,pin] of Object.entries(_hkPins)){
+    if(_pinBuf&&pin&&_pinBuf===pin){matchedRole=id;break;}
+  }
+  if(matchedRole){
+    localStorage.setItem('hk_role',matchedRole);
+    document.getElementById('pin-screen').style.display='none';
+    document.getElementById('app').style.display='';
+    const lb=document.getElementById('loc-badge');if(lb)lb.textContent=_hkTeamLabels[matchedRole]||matchedRole;
+    render();
+  } else {
+    const e=document.getElementById('pin-err');if(e)e.textContent='Wrong PIN — try again';
+    _pinBuf='';_updateDots();
+    setTimeout(()=>{const e=document.getElementById('pin-err');if(e)e.textContent='';},2000);
+  }
+}
+window.logout=function(){
+  localStorage.removeItem('hk_role');
+  document.getElementById('app').style.display='none';
+  document.getElementById('pin-screen').style.display='flex';
+  _pinBuf='';_updateDots();
+};
+// Restore session from localStorage on load
+(function(){
+  const role=localStorage.getItem('hk_role');
+  if(role&&_hkTeamLabels[role]){
+    document.getElementById('app').style.display='';
+    const lb=document.getElementById('loc-badge');if(lb)lb.textContent=_hkTeamLabels[role];
+  } else {
+    document.getElementById('pin-screen').style.display='flex';
+  }
+})();
+
+function getCleanerName(){
+  const role=localStorage.getItem('hk_role')||'';
+  const team=_hkTeamById[role];
+  if(team?.label)return team.label;
+  if(role==='admin')return 'Admin';
+  if(role==='shartava')return 'Shartava Team';
+  if(role==='centre')return 'Centre Team';
+  if(role==='vgl')return 'VGL Team';
+  return '';
+}
+function statusKey(roomCode,date){return roomCode+'_'+(typeof date==='string'?date.slice(0,10):fmtDate(date));}
+
+window.switchDay=function(day){activeDay=day;render();}
+
+window.toggleDone=async function(roomCode,dateStr){
+  const key=roomCode+'_'+dateStr;
+  const current=cleaningStatus[key]||false;
+  cleaningStatus[key]=!current;
+  if(!current){
+    // Marking done: animate card out, then re-render with it at bottom
+    const card=document.querySelector(`[data-key="${key}"]`);
+    if(card){card.classList.add('card-completing');setTimeout(()=>render(),320);}
+    else render();
+  } else {
+    render(); // Undo: immediately put card back at top
+  }
+  try{
+    await setDoc(doc(db,'hk_status',key),{
+      done:!current,roomCode,date:dateStr,
+      cleaner:getCleanerName(),updatedAt:serverTimestamp()
+    });
+    toast(!current?'✓ Marked as cleaned!':'Marked as pending');
+    if(!current){
+      const snap=await getDocs(query(collection(db,'checkin_guests'),where('aptId','==',roomCode),where('arrivalDate','==',dateStr)));
+      snap.forEach(d=>updateDoc(d.ref,{manualUnlock:true,unlockedAt:serverTimestamp()}));
+    }
+  }catch(e){toast('Save failed');cleaningStatus[key]=current;render();}
+}
+
+
+function render(){
+  const date=targetDate();
+  const ds=fmtDate(date);
+  console.log(`[HK] render() — activeDay=${activeDay} | targetDate=${ds} | today=${fmtDate(today())} | reservations in memory=${reservations.length}`);
+
+  renderTabs();
+
+  // get rooms with checkouts + manually-added admin rooms
+  const checkoutRooms=getTaskRooms(date);
+  console.log(`[HK] checkouts on ${ds}:`, checkoutRooms.map(r=>r.code));
+
+  const main=document.getElementById('main-list');
+  if(!checkoutRooms.length){
+    main.innerHTML=`<div class="empty">
+      <div class="empty-icon">✨</div>
+      <div class="empty-title">No checkouts on this day</div>
+      <div class="empty-sub">Nothing to clean — have a great day!</div>
+    </div>`;
+    document.getElementById('sum-bar').style.display='none';
+    return;
+  }
+
+  // Split pending vs done, keep priority sort only for pending
+  const priorityOrder={red:0,yellow:1,green:2};
+  const pendingRooms=checkoutRooms.filter(r=>!(cleaningStatus[statusKey(r.code,ds)]||false));
+  const doneRooms=checkoutRooms.filter(r=>cleaningStatus[statusKey(r.code,ds)]||false);
+  pendingRooms.sort((a,b)=>{
+    const pa=getPriority(a.code,date)||'green';
+    const pb=getPriority(b.code,date)||'green';
+    if(priorityOrder[pa]!==priorityOrder[pb])return priorityOrder[pa]-priorityOrder[pb];
+    return a.code.localeCompare(b.code);
+  });
+  doneRooms.sort((a,b)=>a.code.localeCompare(b.code));
+
+  const pendingGroups={};
+  pendingRooms.forEach(r=>{if(!pendingGroups[r.group])pendingGroups[r.group]=[];pendingGroups[r.group].push(r);});
+
+  let html='';
+  let sumRed=0,sumYellow=0,sumGreen=0,sumDone=0;
+
+  function buildCard(room,isDone){
+    const priority=getPriority(room.code,date)||'green';
+    const co=getCheckoutToday(room.code,date);
+    const nextRes=getNextCheckin(room.code,date);
+    const outGuests=getGuestCount(co);
+    const inGuests=getGuestCount(nextRes);
+    const beddingAlert=nextRes?getBeddingAlert(room.code,inGuests):null;
+    const key=statusKey(room.code,ds);
+    const chipLabel={red:'Urgent',yellow:'Today',green:'Free'}[priority];
+    const chipCls={red:'chip-red',yellow:'chip-yellow',green:'chip-green'}[priority];
+    const nextCheckinSameDay=nextRes&&nextRes.checkin===ds;
+    const nextCheckinNextDay=nextRes&&nextRes.checkin===fmtDate(addDays(date,1));
+    const outBox=`<div class="time-box tb-out">
+      <div class="tb-label">Checkout</div>
+      <div class="tb-time">${co?.checkoutTime||'12:00'}</div>
+      ${outGuests>0?`<div class="tb-count">${outGuests} leaving</div>`:'<div class="tb-count" style="color:var(--hint);">—</div>'}
+    </div>`;
+    let inBox='';
+    if(nextRes){
+      const whenLabel=nextCheckinSameDay?'TODAY':nextCheckinNextDay?'TOMORROW':nextRes.checkin;
+      inBox=`<div class="time-box tb-in${nextCheckinSameDay?' tb-urgent':''}">
+        <div class="tb-label">Check-in</div>
+        <div class="tb-when">${whenLabel}</div>
+        <div class="tb-time">${nextRes.checkinTime||'14:00'}</div>
+        ${inGuests>0?`<div class="tb-count">${inGuests} arriving</div>`:''}
+      </div>`;
+    } else {
+      inBox=`<div class="time-box tb-free">
+        <div class="tb-label">Next check-in</div>
+        <div class="tb-time" style="color:var(--hint);font-size:13px;">No reservation</div>
+      </div>`;
+    }
+    const notesHtml=co?.notes?`<div class="notes-box"><div class="notes-lbl">📝 Notes</div><div class="notes-txt">${co.notes}</div></div>`:'';
+    const beddingHtml=beddingAlert?`<div class="bedding-alert">${beddingAlert}</div>`:'';
+    return `<div class="task-card priority-${priority}${isDone?' done-card':''}" data-key="${key}">
+      <div class="card-top">
+        <div class="priority-bar"></div>
+        <div class="room-info">
+          <div class="room-code">${room.code}</div>
+          <div class="room-name">${room.name}</div>
+        </div>
+        <div class="priority-chip ${isDone?'chip-done':chipCls}">${isDone?'Done ✓':chipLabel}</div>
+      </div>
+      <div class="times-row">${outBox}${inBox}</div>
+      ${notesHtml}${beddingHtml}
+      <div class="card-footer">
+        <span class="cleaner-label">🧹 ${getCleanerName()}</span>
+        <button class="done-btn ${isDone?'btn-undo':'btn-mark'}" onclick="window.toggleDone('${room.code}','${ds}')">
+          ${isDone?'Undo':'✓ Done'}
+        </button>
+      </div>
+    </div>`;
+  }
+
+  // Pending rooms grouped by building
+  Object.entries(pendingGroups).forEach(([grp,rooms])=>{
+    html+=`<div class="group-label">${grp}</div>`;
+    rooms.forEach(room=>{
+      const priority=getPriority(room.code,date)||'green';
+      if(priority==='red')sumRed++;
+      else if(priority==='yellow')sumYellow++;
+      else sumGreen++;
+      html+=buildCard(room,false);
+    });
+  });
+
+  // Done rooms at bottom
+  if(doneRooms.length){
+    sumDone=doneRooms.length;
+    html+=`<div class="done-section-label">✓ Completed (${doneRooms.length})</div>`;
+    doneRooms.forEach(room=>html+=buildCard(room,true));
+  }
+
+  main.innerHTML=html;
+  document.getElementById('sum-bar').style.display='flex';
+  document.getElementById('sum-red').textContent=sumRed;
+  document.getElementById('sum-yellow').textContent=sumYellow;
+  document.getElementById('sum-green').textContent=sumGreen;
+  document.getElementById('sum-done').textContent=sumDone+'/'+checkoutRooms.length;
+}
+
+function checkReady(){loadCount++;if(loadCount>=1){document.getElementById('loading').style.display='none';render();setSyncing('live');}}
+
+// set date
+document.getElementById('hdr-date').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+onSnapshot(collection(db,'reservations'),snap=>{
+  reservations=snap.docs.map(d=>({id:d.id,...d.data()}));
+  console.log(`[HK] reservations loaded: ${reservations.length} total`);
+  reservations.forEach(r=>console.log(`  ${r.id} | guest="${r.guest}" | roomCode="${r.roomCode}" | checkin=${r.checkin} | checkout=${r.checkout}`));
+  if(loadCount<1)checkReady();else render();
+},(e)=>{console.error('reservations listener error:',e);setSyncing('err');});
+
+onSnapshot(collection(db,'properties'),snap=>{
+  // properties not used — HK uses hardcoded ROOMS array
+},(e)=>console.error('properties listener error:',e));
+
+onSnapshot(collection(db,'hk_status'),snap=>{
+  snap.docs.forEach(d=>{cleaningStatus[d.id]=d.data().done||false;});
+  render();
+});
+
+
+
+onSnapshot(collection(db,'hk_pins'),snap=>{
+  _hkPins={};
+  snap.docs.forEach(d=>{_hkPins[d.id]=d.data().pin||'';});
+  _pinsReady=true;
+  const sub=document.getElementById('pin-sub');
+  if(sub&&sub.textContent!=='Enter your PIN to continue')sub.textContent='Enter your PIN to continue';
+},(e)=>{
+  _pinsReady=false;
+  const sub=document.getElementById('pin-sub');
+  if(sub)sub.textContent='Connection error — refresh page';
+});
+
+onSnapshot(doc(db,'checkin_admin','config'),snap=>{
+  const teams=snap.exists()?snap.data()?.hkSettings?.teams:null;
+  if(Array.isArray(teams)&&teams.length)_hkTeams=teams;
+  hkRefreshTeamLabels();
+  const role=localStorage.getItem('hk_role');
+  const lb=document.getElementById('loc-badge');
+  if(role&&lb&&_hkTeamLabels[role])lb.textContent=_hkTeamLabels[role];
+  render();
+},(e)=>console.error('hk config listener error:',e));
+
+onSnapshot(collection(db,'checkin_rooms'),snap=>{
+  const list=snap.docs
+    .filter(d=>d.data().active!==false&&d.data().showInHk!==false)
+    .map(d=>{
+      const data=d.data();
+      return{
+        code:d.id,
+        name:data.displayName||d.id,
+        group:data.group||'',
+        location:data.site||hkSiteFromCode(d.id),
+      };
+    })
+    .sort((a,b)=>String(a.code).localeCompare(String(b.code)));
+  if(list.length)ROOMS=list;
+  if(loadCount<1)checkReady();else render();
+},(e)=>console.error('checkin_rooms listener error:',e));
+
+// safety fallback
+setTimeout(()=>{
+  document.getElementById('loading').style.display='none';
+  render();
+},5000);
+</script>
+</body>
+</html>
