@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * Promote checkin-admin-sandbox.html → HK.html (standalone housekeeping app).
- * Same HK board as admin tab, with PIN login for cleaners.
+ * Promote checkin-admin-sandbox.html → hk-app.html (full HK board).
+ * HK.html is a tiny loader (no cache-buster loops) that opens hk-app.html.
  */
 const fs = require('fs');
 const path = require('path');
@@ -10,8 +10,6 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const src = path.join(root, 'checkin-admin-sandbox.html');
 let html = fs.readFileSync(src, 'utf8');
-
-const HK_BUILD = '20260831hk3';
 
 html = html.replace(
   '<title>Maxela Admin — Sandbox (HK)</title>',
@@ -23,9 +21,10 @@ html = html.replace(
   '<script>window.__STANDALONE_HK__=true;document.documentElement.classList.add(\'standalone-hk\');try{var role=localStorage.getItem(\'hk_role\')||localStorage.getItem(\'hk_shartava_role\');if(role){document.documentElement.classList.add(\'hk-authed\');if(role===\'admin\')document.documentElement.classList.add(\'hk-admin-role\');}}catch(e){}</script>\n'
 );
 
+// Remove cache-buster redirect entirely — caused URI Too Long loops on cleaner phones.
 html = html.replace(
-  /var BUILD=window\.__STANDALONE_HK__\?'[^']+':'[^']+';/,
-  `var BUILD='${HK_BUILD}';`
+  /<script>\n\(function\(\)\{\n  var BUILD=[\s\S]*?\}\)\(\);\n<\/script>\n/,
+  ''
 );
 
 html = html.replace(
@@ -45,6 +44,33 @@ html = html.replace(
   '/* HK standalone — promoted from checkin-admin-sandbox.html — see GUEST_CHECKIN_REDESIGN.md §22'
 );
 
-const out = path.join(root, 'HK.html');
-fs.writeFileSync(out, html);
-console.log('Wrote', out, '(' + html.length + ' bytes)');
+const appOut = path.join(root, 'hk-app.html');
+fs.writeFileSync(appOut, html);
+console.log('Wrote', appOut, '(' + html.length + ' bytes)');
+
+const loader = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Sleepy HK</title>
+<script>
+(function(){
+  var app='hk-app.html';
+  if(location.search){location.replace(app);return;}
+  location.replace(app);
+})();
+</script>
+</head>
+<body style="font-family:system-ui,sans-serif;background:#FAFAF9;color:#6B6B68;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0">
+  Loading HK…
+</body>
+</html>
+`;
+
+const loaderOut = path.join(root, 'HK.html');
+fs.writeFileSync(loaderOut, loader);
+console.log('Wrote', loaderOut, '(' + loader.length + ' bytes)');
