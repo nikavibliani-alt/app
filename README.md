@@ -31,9 +31,10 @@ Read that file before any major edit. It contains:
 
 ## Related docs
 
-- `GUEST_CHECKIN_REDESIGN.md` — coordination + build log + Claude prompt
-- `CHECKIN_GUEST_SPEC.md` — technical audit of production guest page
-- `CODEBASE.md` — system map
+- **`docs/AGENT_HANDOFF.md`** — start here for Claude Code / Cursor
+- **`docs/OPERATIONS.md`** — MiniHotel cron-job.org, deploy, monitors
+- `GUEST_CHECKIN_REDESIGN.md` — design history + coordination
+- `docs/SANDBOX_TESTING.md` — live URLs, promote scripts
 
 ## Firebase
 

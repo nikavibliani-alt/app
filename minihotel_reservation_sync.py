@@ -5,7 +5,8 @@ minihotel_reservation_sync.py
 Syncs reservations from MiniHotel Calendar API directly to Firestore.
 Replaces the email parsing + XLSX scraping pipeline.
 
-Runs as a GitHub Action on schedule (every 30 min).
+Runs via GitHub Actions workflow `minihotel_reservation_sync.yml`.
+Production trigger: cron-job.org → workflow_dispatch (~every 10 min). See docs/OPERATIONS.md.
 Requires: FIREBASE_SERVICE_ACCOUNT, MINIHOTEL_USER, MINIHOTEL_PASS, MINIHOTEL_HOTEL secrets.
 """
 
