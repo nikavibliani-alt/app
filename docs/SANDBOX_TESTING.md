@@ -1,6 +1,6 @@
 # Sandbox testing — check everything here before go-live
 
-**Rule:** All new work stays in **sandbox files**. Live files (`checkin-admin.html`, `checkin-guest-v2.html`) stay untouched until you approve cutover.
+**Rule:** Guest **cutover complete (2026-08-31)** — `checkin-guest.html` is the live app. Admin sandbox still for testing; live admin unchanged until cutover.
 
 **Hosting:** GitHub Pages → `https://app.maxelaapartments.com/`  
 **Database:** Firebase `sleepy-5c962` (same as production — sandbox uses real data)
@@ -31,7 +31,8 @@ Or use the links below directly.
 
 | App | URL |
 |-----|-----|
-| Guest (guests use today) | https://app.maxelaapartments.com/checkin-guest.html → v2 |
+| Guest (live — new design) | https://app.maxelaapartments.com/checkin-guest.html |
+| Guest (old bookmark) | https://app.maxelaapartments.com/checkin-guest-v2.html → redirects |
 | Admin (you use today) | https://app.maxelaapartments.com/checkin-admin.html |
 
 ---
@@ -47,9 +48,9 @@ Or use the links below directly.
 └─────────────────┬───────────────────────┘
                   │ same Firebase data
 ┌─────────────────▼───────────────────────┐
-│  LIVE (guests still use this)           │
-│  • checkin-admin.html                   │
-│  • checkin-guest-v2.html                │
+│  LIVE GUEST (new design)                │
+│  • checkin-guest.html                   │
+│  • checkin-guest-v2.html → redirect     │
 └─────────────────────────────────────────┘
 ```
 
@@ -98,18 +99,18 @@ Admin: `http://127.0.0.1:8080/checkin-admin-sandbox.html?emulator=1`
 
 ---
 
-## When sandbox tests pass → go live
+## Guest cutover (done 2026-08-31)
 
-1. Copy `checkin-guest-sandbox-2.html` → `checkin-guest.html`
+1. ~~Copy `checkin-guest-sandbox-2.html` → `checkin-guest.html`~~ ✅
 2. (Later) copy admin sandbox → `checkin-admin.html`
-3. Merge to **`main`** on GitHub → site updates
-4. Deploy backend functions in daylight (optional first night — registration has Firestore fallback)
+3. Merge to **`main`** on GitHub → site updates ✅
+4. Deploy backend functions in daylight (optional — registration has Firestore fallback)
 
 See `docs/GUEST_LINK_STRATEGY.md`.
 
 ---
 
-## WhatsApp links during sandbox phase
+## WhatsApp links
 
-- **Guests (production messages):** keep `checkin-guest.html` until cutover
-- **Your own testing:** use `checkin-guest-sandbox-2.html` — do not put sandbox URL in automated guest messages yet
+- **Guests (production messages):** `https://app.maxelaapartments.com/checkin-guest.html` (new design live)
+- **Dev testing:** `checkin-guest-sandbox-2.html` (includes dev toolbar)

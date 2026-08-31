@@ -6,8 +6,9 @@ Static guest check-in portal hosted at **https://app.maxelaapartments.com/**
 
 | File | Role | Live URL |
 |------|------|----------|
-| **`checkin-guest-sandbox-2.html`** | **Canonical redesign — continue here** | https://app.maxelaapartments.com/checkin-guest-sandbox-2.html |
-| `checkin-guest-v2.html` | Production (do not replace until cutover) | https://app.maxelaapartments.com/checkin-guest-v2.html |
+| **`checkin-guest.html`** | **Production guest app (live)** | https://app.maxelaapartments.com/checkin-guest.html |
+| **`checkin-guest-sandbox-2.html`** | Dev sandbox (+ toolbar) | https://app.maxelaapartments.com/checkin-guest-sandbox-2.html |
+| `checkin-guest-v2.html` | Redirect → checkin-guest.html | https://app.maxelaapartments.com/checkin-guest-v2.html |
 | `checkin-guest-sandbox.html` | Sandbox 1 (Claude Phase 1 shell) | https://app.maxelaapartments.com/checkin-guest-sandbox.html |
 | `checkin-guest-sandbox-3.html` | Sandbox 3 — functional portal experiment (parked; host will revisit later) | https://app.maxelaapartments.com/checkin-guest-sandbox-3.html |
 

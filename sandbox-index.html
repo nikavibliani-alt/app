@@ -24,9 +24,9 @@ footer a{color:#1a56db}
 </style>
 </head>
 <body>
-<span class="badge">SANDBOX — NOT LIVE FOR GUESTS</span>
+<span class="badge" style="background:#dcfce7;color:#166534">GUEST LIVE · ADMIN SANDBOX</span>
 <h1>Maxela testing hub</h1>
-<p class="sub">Use these links to check the new system before go-live. Guests still use <strong>checkin-guest.html</strong> until you cut over.</p>
+<p class="sub"><strong>Guest check-in is live</strong> at <code>checkin-guest.html</code> (new design). Admin sandbox still for testing before admin cutover.</p>
 
 <a class="card" href="checkin-admin-sandbox.html">
   <div class="tag">Admin · new</div>
@@ -34,16 +34,16 @@ footer a{color:#1a56db}
   <p>Stay, swap, HK, elevator, apartments, pipeline moves</p>
 </a>
 
-<a class="card" href="checkin-guest-sandbox-2.html">
-  <div class="tag">Guest · new design</div>
-  <h2>Guest sandbox 2</h2>
-  <p>New check-in flow — test registration, unlock, elevator QR</p>
+<a class="card live" href="checkin-guest.html">
+  <div class="tag">Guest · live</div>
+  <h2>checkin-guest.html</h2>
+  <p>New guest check-in — production URL for WhatsApp and bookings</p>
 </a>
 
-<a class="card live" href="checkin-guest.html">
-  <div class="tag">Guest · live today</div>
-  <h2>checkin-guest.html</h2>
-  <p>What guests actually use now (redirects to v2)</p>
+<a class="card" href="checkin-guest-sandbox-2.html">
+  <div class="tag">Guest · dev sandbox</div>
+  <h2>Guest sandbox 2</h2>
+  <p>Same app + dev toolbar — use for testing changes before promoting</p>
 </a>
 
 <a class="card live" href="checkin-admin.html">
@@ -65,10 +65,11 @@ footer a{color:#1a56db}
 </a>
 
 <div class="note">
-  <b>Checklist</b>
-  Test admin + guest sandbox on your phone with a real tomorrow arrival. When both pass → go live by copying sandbox files to checkin-guest.html and merging to main on GitHub.
+  <b>Status (2026-08-31)</b>
+  Guest cutover complete — <code>checkin-guest.html</code> is the new app. Old <code>checkin-guest-v2.html</code> redirects here.
+  Admin still on <code>checkin-admin.html</code>; test changes in admin sandbox first.
   <br><br>
-  Full guide: <code>docs/SANDBOX_TESTING.md</code> in the repo.
+  Optional: deploy backend callables in daylight — see <code>docs/SANDBOX_TESTING.md</code> step 4.
 </div>
 
 <footer>
