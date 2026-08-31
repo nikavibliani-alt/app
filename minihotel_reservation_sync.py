@@ -309,11 +309,23 @@ def build_live_room_index(api_reservations):
 
 
 def auto_release_conflicting_manualroom(db, api_reservations, from_date, to_date):
-    """Clear stale manualRoom pins that double-book a room MiniHotel no longer assigns.
+    """Clear stale manualRoom pins that have drifted from MiniHotel's live room.
 
     When an admin move (manualRoom:true) left a guest pinned to a room that MiniHotel
-    has since changed, the frozen room can overlap another live guest — e.g. Ilia pinned
-    to 0-3 while MiniHotel shows 0-2 and Emiliya is actually in 0-3.
+    has since changed, the frozen room can be wrong in two ways:
+
+    1. Visible double-booking — the frozen room now overlaps another live guest,
+       e.g. Ilia pinned to 0-3 while MiniHotel shows 0-2 and Emiliya is actually in 0-3.
+    2. Silent drift — no one else is fighting over the frozen room (so nothing looks
+       broken in the UI), but the guest is quietly shown in the wrong room and the
+       MiniHotel room they actually belong in sits correctly free. e.g. Nina pinned to
+       0-2 while MiniHotel shows 0-1 and nobody else needs 0-1 for her dates.
+
+    Auto-release covers both: release whenever the frozen pin disagrees with MiniHotel
+    AND applying the live room would not displace anyone (target room free for those
+    dates). If the target room is occupied by someone else, we leave the pin in place —
+    that's a case a human should look at (could be an intentional admin move MiniHotel
+    hasn't caught up with yet), and it keeps surfacing via the MANUALROOM DRIFT log.
     """
     coll = db.collection('reservations')
     live_index = build_live_room_index(api_reservations)
@@ -354,24 +366,33 @@ def auto_release_conflicting_manualroom(db, api_reservations, from_date, to_date
         frozen = stay['room']
         if not live_room or live_room == frozen:
             continue
-        overlap = False
+
+        frozen_room_overlap = False
+        target_room_occupied = False
         for other in active_stays:
             if other['id'] == stay['id']:
                 continue
-            if other['room'] != frozen:
+            overlaps_dates = dates_overlap(stay['checkin'], stay['checkout'],
+                                            other['checkin'], other['checkout'])
+            if not overlaps_dates:
                 continue
-            if dates_overlap(stay['checkin'], stay['checkout'],
-                               other['checkin'], other['checkout']):
-                overlap = True
-                break
-        if overlap:
-            releases.append((stay['id'], rn, live_room, frozen, stay['guest']))
+            if other['room'] == frozen:
+                frozen_room_overlap = True
+            if other['room'] == live_room:
+                target_room_occupied = True
+
+        if frozen_room_overlap:
+            releases.append((stay['id'], rn, live_room, frozen, stay['guest'], 'overlap'))
+        elif not target_room_occupied:
+            releases.append((stay['id'], rn, live_room, frozen, stay['guest'], 'silent_drift'))
+        # else: frozen room is quiet but target room is occupied by someone else —
+        # leave the pin; a human should look at this one (see MANUALROOM DRIFT log).
 
     if not releases:
         return 0
 
     batch = db.batch()
-    for doc_id, _rn, live_room, _frozen, guest in releases:
+    for doc_id, _rn, live_room, _frozen, guest, reason in releases:
         ref = coll.document(doc_id)
         batch.update(ref, {
             'roomCode': live_room,
@@ -379,10 +400,10 @@ def auto_release_conflicting_manualroom(db, api_reservations, from_date, to_date
             'manualRoom': False,
             'syncedAt': firestore.SERVER_TIMESTAMP,
         })
-        print(f"  Auto-released manualRoom (overlap): {doc_id} ({guest}) → {live_room}")
+        print(f"  Auto-released manualRoom ({reason}): {doc_id} ({guest}) → {live_room}")
     batch.commit()
 
-    for doc_id, rn, live_room, _frozen, _guest in releases:
+    for doc_id, rn, live_room, _frozen, _guest, _reason in releases:
         propagate_room_change(db, doc_id, rn, live_room)
 
     print(f"Auto-released {len(releases)} conflicting manualRoom override(s)")
