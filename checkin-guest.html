@@ -1291,6 +1291,7 @@ let guestFullCfg=null;
 let guestSvcs=null; // cached services array from checkin_admin/config
 let _pendingMatches=[];
 let allMatchedReservations=[];
+let _lastActiveResKey=''; // dedupe key for the reservations-by-roomCode onSnapshot below — skips renderTiles() when the picked reservation didn't actually change
 
 function reservationBaseNum(ref){
   if(!ref)return '';
@@ -2855,6 +2856,12 @@ function showHome(){
         if(!picked)picked=_pickReservationFromPool(current)||_pickReservationFromPool(upcoming)||_pickReservationFromPool(valid);
         activeReservation=picked;
         console.log('[ResvSelect] Selected:',activeReservation?.checkin,activeReservation?.checkout,activeReservation?.roomCode,activeReservation?.tuyaPassword?'pw':'no-pw');
+        // This listener re-fires on every write to any reservation ever created for this
+        // room (cancelled/historical included), not just this guest's own — most deliveries
+        // pick the exact same reservation as before. Skip the render cascade when so.
+        const newKey=picked?(picked.id+picked.roomCode+(picked.checkin||picked.checkIn||'')):'';
+        if(newKey===_lastActiveResKey)return;
+        _lastActiveResKey=newKey;
         renderTiles();
       }
     ));
@@ -4298,6 +4305,16 @@ function _renderWalkthrough(){
   const caps=aptData?.photoCaptions||[];
   const phase=_homePhase();
   const expanded=wrap.classList.contains('wt-expanded');
+
+  // Skip the rebuild when nothing that affects the rendered output actually
+  // changed — onSnapshot listeners elsewhere can call this far more often than
+  // the guest's own data changes, and a full innerHTML rebuild flashes every
+  // <img> even when the src is identical. Key includes phase+expanded (not
+  // just photo URLs) so toggling "Show/Hide arrival instructions" — same
+  // photos, different view — still re-renders.
+  const _wtKey=phase+'|'+(expanded?1:0)+'|'+photos.join(',');
+  if(list.dataset.wtKey===_wtKey&&list.children.length>0)return;
+  list.dataset.wtKey=_wtKey;
 
   if(phase==='leaving'){
     list.innerHTML='';
