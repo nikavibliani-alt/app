@@ -2093,6 +2093,19 @@ function renderGreetingApt(){
     return;
   }
   const n=allMatchedReservations.length;
+  const rooms=allMatchedReservations.map(r=>r.roomCode||'');
+  const roomsKey=rooms.join(',');
+  // Room list unchanged (only which one is active may have changed) — update the
+  // .active class in place instead of destroying/recreating the buttons. A full
+  // rebuild mid-tap can drop the click that triggered this render in the first
+  // place, since the DOM node under the finger gets replaced out from under it.
+  if(el.dataset.aptGridKey===roomsKey&&el.querySelector('#multi-room-label.apt-grid')){
+    el.querySelectorAll('.apt-tile[data-room]').forEach(btn=>{
+      btn.classList.toggle('active',btn.dataset.room===aptId);
+    });
+    return;
+  }
+  el.dataset.aptGridKey=roomsKey;
   let html='<div id="multi-room-label" class="apt-grid" style="--apt-cols:'+n+'">';
   for(const res of allMatchedReservations){
     const room=res.roomCode||'';
@@ -2106,7 +2119,13 @@ function renderGreetingApt(){
   html+='</div>';
   el.innerHTML=html;
   el.querySelectorAll('.apt-tile[data-room]').forEach(btn=>{
-    btn.addEventListener('click',()=>window.switchApt(btn.dataset.room));
+    btn.addEventListener('click',()=>{
+      // Instant feedback — swap the active pill right away so the guest sees a
+      // response before switchApt()'s await getDoc() resolves, instead of only
+      // finding out something happened once the whole button set rebuilds.
+      el.querySelectorAll('.apt-tile').forEach(b=>b.classList.toggle('active',b===btn));
+      window.switchApt(btn.dataset.room);
+    });
   });
 }
 
@@ -2213,6 +2232,9 @@ window.copyCompanionLink=async function(btn){
 window.switchApt=async function(newRoomCode){
   console.log('Switching to:', newRoomCode);
   if(newRoomCode===aptId)return;
+  if(window._switchingApt)return; // ignore a second tap while the first switch is still loading
+  window._switchingApt=true;
+  try{
   aptId=newRoomCode;
   _hkTodayData=null; // reset HK cache for new apt
   // Pin activeReservation to the selected apt — prefer upcoming/current, fall back to any match
@@ -2269,6 +2291,9 @@ window.switchApt=async function(newRoomCode){
       renderTiles();
     }
   ));
+  }finally{
+    window._switchingApt=false;
+  }
 };
 
 async function finishRegistration_(bestRes,formData){
