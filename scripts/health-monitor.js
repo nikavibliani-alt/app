@@ -87,7 +87,7 @@ async function checkReservationSync(db) {
     return {
       name: 'MiniHotel reservation sync',
       ok: false,
-      detail: `Last syncedAt ~${ageH}h ago — enable scheduled sync in GitHub Actions`,
+      detail: `Last syncedAt ~${ageH}h ago — check cron-job.org (workflow_dispatch every ~10 min), not "enable GitHub schedule". See docs/OPERATIONS.md`,
     };
   }
   return { name: 'MiniHotel reservation sync', ok: true, detail: `Last sync ~${ageH}h ago` };
