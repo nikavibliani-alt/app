@@ -1342,8 +1342,11 @@ function _elevatorQrPayload(data){
 }
 function _elevatorIsStale(data){
   const ms=_elevatorUpdatedMs(data);
-  if(!ms)return true;
+  if(!ms)return false;
   return Date.now()-ms>36*3600*1000;
+}
+function _elevatorCodeForGuest(){
+  return _elevatorDisplayCode(elevatorData);
 }
 function _normalizeElevatorData(raw){
   if(!raw)return null;
@@ -2871,7 +2874,7 @@ const _SVG_KEY=fi('key',10,1.8);
 const _SVG_BLDG=fi('home',10,1.8);
 function resolveElevatorCode(text){
   if(!text||!text.includes('#elevatorcode'))return text;
-  const code=!_elevatorIsStale(elevatorData)?_elevatorDisplayCode(elevatorData):'';
+  const code=_elevatorCodeForGuest();
   return text.replace(/#elevatorcode/g,code||'contact host');
 }
 
@@ -4146,7 +4149,17 @@ function _floorLabel(){
 // Safe to call any time home is on screen — every element lookup is null-checked.
 function _renderHeroContent(){
   const doorEl=document.getElementById('hero-door-code');
-  const doorCode=_doorCodeForGuest();
+  let doorCode=_doorCodeForGuest();
+  if(!doorCode&&aptId&&(!aptData||!aptData.doorCode)){
+    getDoc(doc(db,'checkin_apartments',aptId)).then(s=>{
+      if(s.exists()){
+        aptData=s.data();
+        const el=document.getElementById('hero-door-code');
+        const dc=_doorCodeForGuest();
+        if(el&&dc)el.textContent=dc;
+      }
+    }).catch(()=>{});
+  }
   if(doorEl)doorEl.textContent=doorCode||'— — — —';
 
   const elevWrap=document.getElementById('hero-elevator');
@@ -4154,13 +4167,13 @@ function _renderHeroContent(){
     if(needsElevatorCode()){
       elevWrap.style.display='';
       const codeEl=document.getElementById('hero-elevator-code');
-      const elevCode=!_elevatorIsStale(elevatorData)?_elevatorDisplayCode(elevatorData):'';
+      const elevCode=_elevatorCodeForGuest();
       if(codeEl)codeEl.textContent=elevCode||'Contact host';
       const qrCanvas=document.getElementById('hero-elevator-qr-canvas');
       const qrWrap=document.getElementById('hero-elevator-qr');
       const qrPh=document.getElementById('hero-elevator-qr-ph');
       const qrPayload=_elevatorQrPayload(elevatorData);
-      if(qrWrap&&elevCode&&!_elevatorIsStale(elevatorData)){
+      if(qrWrap&&elevCode){
         qrWrap.style.display='flex';
         let drawn=false;
         if(qrCanvas&&window.QRCode){
