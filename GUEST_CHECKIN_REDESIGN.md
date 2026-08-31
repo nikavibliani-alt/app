@@ -4,7 +4,7 @@
 > Used by Cursor Cloud Agent and Claude / Claude Code.  
 > Do not start coding a section until it is claimed below and the system model in §2–§5 is still accurate.
 
-**Status:** Host decisions locked (§7) — **Sandbox 2 is the canonical redesign**; production URL unchanged until cutover  
+**Status:** **Sandbox signed off (2026-08-31)** — works on main / GitHub Pages; production URL unchanged until cutover  
 **Sandbox file (build here):** `checkin-guest-sandbox-2.html` → https://app.maxelaapartments.com/checkin-guest-sandbox-2.html  
 **Other sandboxes:** `checkin-guest-sandbox.html` (Sandbox 1, Claude) · `checkin-guest-sandbox-3.html` (portal experiment, parked — §19)  
 **Production file / final URL:** `checkin-guest-v2.html` → https://app.maxelaapartments.com/checkin-guest-v2.html  
