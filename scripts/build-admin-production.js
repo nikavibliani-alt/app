@@ -11,7 +11,7 @@ const root = path.join(__dirname, '..');
 const src = path.join(root, 'checkin-admin-sandbox.html');
 let html = fs.readFileSync(src, 'utf8');
 
-const PROD_BUILD = '20260831f';
+const PROD_BUILD = '20260831g';
 
 html = html.replace(
   '<title>Maxela Admin — Sandbox (HK)</title>',
@@ -26,16 +26,12 @@ html = html.replace(
   `Build ${PROD_BUILD.slice(-4)} · Live`
 );
 html = html.replace(
-  /var BUILD=window\.__STANDALONE_HK__\?'20260831hk2':'20260831f';/,
-  `var BUILD='${PROD_BUILD}'`
+  /var BUILD=window\.__STANDALONE_HK__\?'[^']+':'[^']+';/,
+  `var BUILD='${PROD_BUILD}';`
 );
 html = html.replace(
-  'const SANDBOX_BUILD=\'20260831f\';',
+  'const SANDBOX_BUILD=\'20260831g\';',
   `const ADMIN_BUILD='${PROD_BUILD}';`
-);
-html = html.replace(
-  /if\(!\/\[\?&\]build=20260831(?:f|hk2)/,
-  `if(!/[?&]build=${PROD_BUILD}`
 );
 
 html = html.replace(

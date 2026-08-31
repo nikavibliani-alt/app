@@ -11,7 +11,7 @@ const root = path.join(__dirname, '..');
 const src = path.join(root, 'checkin-admin-sandbox.html');
 let html = fs.readFileSync(src, 'utf8');
 
-const HK_BUILD = '20260831hk2';
+const HK_BUILD = '20260831hk3';
 
 html = html.replace(
   '<title>Maxela Admin — Sandbox (HK)</title>',
@@ -24,12 +24,8 @@ html = html.replace(
 );
 
 html = html.replace(
-  /var BUILD=window\.__STANDALONE_HK__\?'20260831hk':'20260831e';/,
+  /var BUILD=window\.__STANDALONE_HK__\?'[^']+':'[^']+';/,
   `var BUILD='${HK_BUILD}';`
-);
-html = html.replace(
-  /if\(!\/\[\?&\]build=20260831(?:f|hk2)/,
-  `if(!/[?&]build=${HK_BUILD}`
 );
 
 html = html.replace(
@@ -48,16 +44,6 @@ html = html.replace(
   '/* ADMIN SANDBOX — see GUEST_CHECKIN_REDESIGN.md §22.9',
   '/* HK standalone — promoted from checkin-admin-sandbox.html — see GUEST_CHECKIN_REDESIGN.md §22'
 );
-
-const legacyPath = path.join(root, 'HK-legacy.html');
-const currentHk = path.join(root, 'HK.html');
-if (fs.existsSync(currentHk) && !fs.existsSync(legacyPath)) {
-  const prev = fs.readFileSync(currentHk, 'utf8');
-  if (prev.length > 500) {
-    fs.writeFileSync(legacyPath, prev);
-    console.log('Archived previous HK.html → HK-legacy.html');
-  }
-}
 
 const out = path.join(root, 'HK.html');
 fs.writeFileSync(out, html);
