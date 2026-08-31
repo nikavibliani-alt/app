@@ -1848,7 +1848,7 @@ function _unlockTick(){
 function startUnlockPoller(){
   if(_unlockPollTimer)return;
   _unlockPollTimer=setInterval(_unlockTick,30000);  // pure time-check, no Firestore
-  _hkPollTimer=setInterval(refreshHkToday,60000);   // Firestore HK fetch
+  _hkPollTimer=setInterval(()=>{refreshHkToday();if(needsElevatorCode())_syncElevatorFromStores();},60000);
 }
 function stopUnlockPoller(){
   if(_unlockPollTimer){clearInterval(_unlockPollTimer);_unlockPollTimer=null;}
