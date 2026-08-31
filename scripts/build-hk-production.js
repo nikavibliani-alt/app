@@ -11,7 +11,7 @@ const root = path.join(__dirname, '..');
 const src = path.join(root, 'checkin-admin-sandbox.html');
 let html = fs.readFileSync(src, 'utf8');
 
-const HK_BUILD = '20260831hk';
+const HK_BUILD = '20260831hk2';
 
 html = html.replace(
   '<title>Maxela Admin — Sandbox (HK)</title>',
@@ -28,7 +28,7 @@ html = html.replace(
   `var BUILD='${HK_BUILD}';`
 );
 html = html.replace(
-  /if\(!\/\[\?&\]build=20260831(?:e|hk)/,
+  /if\(!\/\[\?&\]build=20260831(?:f|hk2)/,
   `if(!/[?&]build=${HK_BUILD}`
 );
 

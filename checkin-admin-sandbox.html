@@ -447,7 +447,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 <script>window.__STANDALONE_HK__=/[?&]app=hk(?:&|$)/.test(location.search)||/(?:^|\/)HK\.html$/i.test(location.pathname);if(window.__STANDALONE_HK__){document.documentElement.classList.add('standalone-hk');try{var role=localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role');if(role){document.documentElement.classList.add('hk-authed');if(role==='admin')document.documentElement.classList.add('hk-admin-role');}}catch(e){}}</script>
 <script>
 (function(){
-  var BUILD=window.__STANDALONE_HK__?'20260831hk':'20260831e';
+  var BUILD=window.__STANDALONE_HK__?'20260831hk2':'20260831f';
   if(!/[?&]build=20260831(?:e|hk)(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
@@ -736,7 +736,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
  */
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
-const SANDBOX_BUILD='20260831e';
+const SANDBOX_BUILD='20260831f';
 (function migrateSandboxBuild(){
   try{
     if(localStorage.getItem('maxela_sandbox_build')!==SANDBOX_BUILD){
@@ -3523,6 +3523,24 @@ const HK_DAY_START=-1;
 const HK_DAY_END=6;
 let hkActiveDay=0;
 let _hkAdminModal=null;
+let _hkTabScrollDay=null;
+
+function hkNormalizePin(v){
+  return v==null?'':String(v).trim();
+}
+async function hkLoadPinsOnce(){
+  try{
+    const snap=await getDocs(collection(db,'hk_pins'));
+    snap.docs.forEach(d=>{hkPinsData[d.id]=hkNormalizePin(d.data().pin);});
+    _hkPinsReady=true;
+  }catch(e){console.warn('[HK] pins load',e);}
+}
+function hkPinRolesReady(){
+  hkRefreshRoleLabels();
+  hkTeamPinRoles().forEach(r=>{
+    if(!(r.id in hkPinsData))hkPinsData[r.id]='';
+  });
+}
 
 const HK_ROLE_LABELS={admin:'All properties'};
 function hkRefreshRoleLabels(){
@@ -3559,11 +3577,13 @@ function _hkSubmitPin(){
     setTimeout(()=>{const e=document.getElementById('hk-pin-err');if(e)e.textContent='';},2000);
     return;
   }
+  const entered=hkNormalizePin(_hkPinBuf);
   let matched=null;
   for(const [id,pin] of Object.entries(hkPinsData)){
-    if(_hkPinBuf&&pin&&_hkPinBuf===pin){matched=id;break;}
+    const p=hkNormalizePin(pin);
+    if(entered&&p&&entered===p){matched=id;break;}
   }
-  if(matched){
+  if(matched&&HK_ROLE_LABELS[matched]){
     localStorage.setItem('hk_role',matched);
     document.documentElement.classList.add('hk-authed');
     document.documentElement.classList.toggle('hk-admin-role',matched==='admin');
@@ -3572,7 +3592,7 @@ function _hkSubmitPin(){
     switchTab('hk');
   }else{
     const e=document.getElementById('hk-pin-err');
-    if(e)e.textContent='Wrong PIN — try again';
+    if(e)e.textContent=entered&&!Object.values(hkPinsData).some(p=>hkNormalizePin(p))?'PINs not configured — ask admin':'Wrong PIN — try again';
     _hkPinBuf='';_hkUpdatePinDots();
     setTimeout(()=>{const e=document.getElementById('hk-pin-err');if(e)e.textContent='';},2000);
   }
@@ -3585,12 +3605,19 @@ window.hkPinKey=function(k){
   if(_hkPinBuf.length===4)setTimeout(_hkSubmitPin,120);
 };
 async function hkInitStandalone(){
-  await loadGuestSettings();
-  hkRefreshRoleLabels();
+  await Promise.all([loadGuestSettings(), hkLoadPinsOnce()]);
+  hkPinRolesReady();
   const role=hkStoredRole();
-  if(role&&HK_ROLE_LABELS[role]){
-    document.documentElement.classList.add('hk-authed');
-    document.documentElement.classList.toggle('hk-admin-role',role==='admin');
+  if(role){
+    const pinOk=hkNormalizePin(hkPinsData[role]);
+    if(pinOk&&HK_ROLE_LABELS[role]){
+      document.documentElement.classList.add('hk-authed');
+      document.documentElement.classList.toggle('hk-admin-role',role==='admin');
+    }else{
+      localStorage.removeItem('hk_role');
+      localStorage.removeItem('hk_shartava_role');
+      document.documentElement.classList.remove('hk-authed','hk-admin-role');
+    }
   }
   _subscribeResCache();
   switchTab('hk');
@@ -3781,6 +3808,7 @@ function hkTaskRooms(dateStr){
   return [...coRooms,...manual];
 }
 async function renderHk(){
+  const keepScroll=window.scrollY;
   updateHkCleanerBadge();
   const tabsEl=document.getElementById('hk-day-tabs');
   const listEl=document.getElementById('hk-list');
@@ -3792,10 +3820,13 @@ async function renderHk(){
     tabs+=`<button type="button" class="filter-chip${i===hkActiveDay?' active':''}" onclick="hkPickDay(${i})">${hkDayTabLabel(i,ds)}${n?` (${n})`:''}</button>`;
   }
   tabsEl.innerHTML=tabs;
-  requestAnimationFrame(()=>{
-    const active=tabsEl.querySelector('.filter-chip.active');
-    if(active)active.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'});
-  });
+  if(_hkTabScrollDay!==hkActiveDay){
+    _hkTabScrollDay=hkActiveDay;
+    requestAnimationFrame(()=>{
+      const active=tabsEl.querySelector('.filter-chip.active');
+      if(active)active.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'});
+    });
+  }
   const dateStr=hkAddDays(hkActiveDay);
   if(_resCache===null){
     listEl.innerHTML='<div class="empty">Loading reservations…</div>';
@@ -3859,8 +3890,9 @@ async function renderHk(){
     siteRooms.forEach(room=>{html+=hkBuildCard(room);});
   });
   listEl.innerHTML=html;
+  requestAnimationFrame(()=>window.scrollTo(0,keepScroll));
 }
-window.hkPickDay=function(i){hkActiveDay=i;renderHk();};
+window.hkPickDay=function(i){hkActiveDay=i;_hkTabScrollDay=null;renderHk();};
 
 function hkCloseAdminModal(){
   _hkAdminModal=null;
@@ -3961,12 +3993,26 @@ window.toggleHkDone=async function(roomCode,dateStr){
   const key=roomCode+'_'+dateStr;
   const cur=!!(hkStatusData[key]?.done);
   const next=!cur;
+  const nextRes=hkGetNextCheckin(roomCode,dateStr);
   try{
     await setDoc(doc(db,'hk_status',key),{done:next,roomCode,date:dateStr,updatedAt:serverTimestamp()},{merge:true});
     hkStatusData[key]={...(hkStatusData[key]||{}),done:next,roomCode,date:dateStr};
+    if(nextRes?.checkin&&nextRes.checkin>=dateStr){
+      const arrivalKey=roomCode+'_'+nextRes.checkin;
+      await setDoc(doc(db,'hk_status',arrivalKey),{done:next,roomCode,date:nextRes.checkin,updatedAt:serverTimestamp()},{merge:true});
+      hkStatusData[arrivalKey]={...(hkStatusData[arrivalKey]||{}),done:next,roomCode,date:nextRes.checkin};
+    }
     if(next){
-      const snap=await getDocs(query(collection(db,'checkin_guests'),where('aptId','==',roomCode),where('arrivalDate','==',dateStr)));
-      for(const d of snap.docs){await updateDoc(d.ref,{manualUnlock:true,unlockedAt:serverTimestamp()});}
+      const unlockIds=new Set();
+      if(nextRes&&nextRes.checkin===dateStr){
+        const form=findFormForReservation(nextRes)||hkGuestFormForRoom(roomCode,dateStr,nextRes);
+        if(form?.id)unlockIds.add(form.id);
+        const snap=await getDocs(query(collection(db,'checkin_guests'),where('aptId','==',roomCode),where('arrivalDate','==',dateStr)));
+        snap.docs.forEach(d=>unlockIds.add(d.id));
+      }
+      for(const guestId of unlockIds){
+        await updateDoc(doc(db,'checkin_guests',guestId),{manualUnlock:true,unlockedAt:serverTimestamp()});
+      }
     }
     toast(next?'Room marked done':'Undone');
     renderHk();rebuildFormMaps();if(currentTab==='stay')renderStay();
@@ -4145,7 +4191,8 @@ onSnapshot(query(collection(db,'hk_status'),where('date','==',tbilisiToday())),s
   if(loaded>=2){render();if(currentTab==='hk')renderHk();}
 });
 onSnapshot(collection(db,'hk_pins'),snap=>{
-  snap.docs.forEach(d=>{hkPinsData[d.id]=d.data().pin||'';});
+  snap.docs.forEach(d=>{hkPinsData[d.id]=hkNormalizePin(d.data().pin);});
+  if(STANDALONE_HK)hkPinRolesReady();
   _hkPinsReady=true;
   if(STANDALONE_HK){
     const sub=document.getElementById('hk-pin-sub');
