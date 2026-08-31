@@ -588,11 +588,9 @@ body{padding-bottom:0;}
    door section) */
 #page-home.phase-arriving .hero-cta--arriving{order:25;}
 #page-home.phase-arriving #hero-wifi-block{order:30;margin-bottom:10px;}
-#page-home.phase-arriving #guest-invite-card,
-#page-home.phase-arriving #guest-save-link{order:40;}
+#page-home.phase-arriving #guest-invite-card{order:40;}
 /* Staying — WiFi above "Your apartment door" walkthrough */
-#page-home.phase-staying #guest-invite-card,
-#page-home.phase-staying #guest-save-link{order:10;}
+#page-home.phase-staying #guest-invite-card{order:10;}
 #page-home.phase-staying #hero-wifi-block{order:15;margin-bottom:10px;}
 #page-home.phase-staying #hero-walkthrough{order:20;}
 #page-home.phase-staying .hero-cta--staying{order:25;}
@@ -1078,12 +1076,6 @@ body{padding-bottom:0;}
           <div class="guest-invite__title" id="t-invite-title">Share access with your group</div>
           <div class="guest-invite__sub" id="t-invite-sub">Other people in your booking can open a short form — same QR and codes, no passport check.</div>
           <button type="button" class="guest-invite__btn" id="t-invite-btn" onclick="window.openCompanionForm()">Open link for group members</button>
-        </div>
-
-        <div class="guest-invite" id="guest-save-link" style="display:none">
-          <div class="guest-invite__title">Your personal link</div>
-          <div class="guest-invite__sub">Save this link — open on any phone or browser without uploading your passport again.</div>
-          <button type="button" class="guest-invite__btn" id="guest-copy-link-btn" onclick="window.copyGuestLink(this)">Copy my link</button>
         </div>
 
         <div class="hero-walkthrough" id="hero-walkthrough">
@@ -2167,22 +2159,6 @@ async function findExistingPrimaryGuest(resId,resNum){
   }
   return null;
 }
-function updateGuestLinkCard(){
-  const card=document.getElementById('guest-save-link');
-  if(!card)return;
-  const show=!_companionGuest&&guestId&&guestData?.passportUrl&&!guestData?.companionGuest;
-  card.style.display=show?'block':'none';
-}
-window.buildGuestLink=function(){return guestId?buildGuestLink(guestId):window.location.href;};
-window.copyGuestLink=async function(btn){
-  const url=window.buildGuestLink();
-  try{
-    await navigator.clipboard.writeText(url);
-    if(btn){const o=btn.textContent;btn.textContent='Link copied!';setTimeout(()=>{btn.textContent=o;},2000);}
-    else toast('Link copied!');
-  }catch(e){toast(url);}
-};
-
 async function _getHomeLocData(){
   const cfg=await getFullCfg();
   const prop=aptPropTypeForConfig();
@@ -2436,7 +2412,6 @@ async function finishRegistration_(bestRes,formData){
   }
   _pendingReg=null;_pendingMatches=[];
   toast(t('rg'),3000);
-  updateGuestLinkCard();
   showHome();
   _saveSession();
   clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
@@ -2628,7 +2603,6 @@ window.searchReservation=async function(){
       btn.disabled=false;
       document.getElementById('t-search-btn').textContent='Find my booking';
       toast(t('gl')||'Welcome back');
-      updateGuestLinkCard();
       showHome();
       _saveSession();
       return;
@@ -2801,7 +2775,6 @@ function showHome(){
   document.getElementById('t-greeting-label').textContent=t('gl');
   applyHomePhase(); // sandbox: sets #page-home phase-* class + fills hero daily key — before first renderTiles()
   renderTiles();
-  updateGuestLinkCard();
   // Load admin guest-page config (visibility, services, prices) and re-render
   // tiles once it arrives so sectionVisibility from checkin_admin/config applies.
   getFullCfg().then(cfg=>{
@@ -4051,7 +4024,6 @@ async function init(){
         banner.textContent='Admin preview — '+(_stripRoomNum(guestData.nameRoman||guestData.name||'Guest')||aptId);
         document.body.prepend(banner);
       }
-      updateGuestLinkCard();
       showHome();
       _saveSession();
       return;
