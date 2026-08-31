@@ -1,10 +1,12 @@
 # Sandbox backend handoff — for Claude Code review
 
-**Status:** Work in progress. All changes stay in **sandbox HTML** + `pipeline-functions/` — **no live cutover** (`checkin-admin.html`, `checkin-guest-v2.html` untouched).
+**Status (2026-08-31):** **Sandbox signed off by host** — UI works on production hosting. All changes stay in **sandbox HTML** + `pipeline-functions/` — **no live cutover** (`checkin-admin.html`, `checkin-guest-v2.html` untouched).
 
-**Deploy policy:** Do **not** deploy `pipeline-adminAction` or `pipeline-guestRegister` until sandbox E2E passes and you explicitly approve. Use the **Functions emulator** for callable testing against production Firestore.
+**Host note:** *"Everything works fine in sandbox."* Backend callables still optional (not deployed); sandbox uses Firestore fallbacks / direct writes where needed.
 
-**Purpose:** When this pipeline is complete, Claude Code (or any reviewer) should run this checklist before approving production wiring.
+**Deploy policy:** Do **not** deploy `pipeline-adminAction` or `pipeline-guestRegister` until host explicitly asks. Use the **Functions emulator** only if you need strict callable E2E before deploy.
+
+**Purpose:** Reference for Claude Code when reviewing pipeline code or preparing backend deploy — not an open "sandbox broken" ticket.
 
 ---
 
@@ -230,8 +232,12 @@ After deploy, sandbox pages work **without** emulator (remove `?emulator=1` or u
 
 ## Review checklist (Claude Code)
 
+**Sandbox UI:** Host signed off 2026-08-31 — no open blockers. See `CLAUDE_CODE_REPORT.md` for current URLs and recent merges.
+
+**Backend (when deploy is requested):**
+
 - [ ] `npm test` — all pass
-- [ ] Emulator E2E — admin move + unlock + guest register
+- [ ] Emulator E2E — admin move + unlock + guest register (optional if host skips)
 - [ ] `system_logs` + `room_moves` audit rows present
 - [ ] No changes to live HTML or Python sync
 
@@ -275,4 +281,4 @@ All calls include `password` and optional `actor`.
 
 ---
 
-**Full report for Claude Code:** see **`CLAUDE_CODE_REPORT.md`**
+**Full report for Claude Code:** see **`CLAUDE_CODE_REPORT.md`** (updated 2026-08-31 — sandbox signed off)

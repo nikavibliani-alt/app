@@ -4,7 +4,7 @@
 
 **Repo:** https://github.com/nikavibliani-alt/app  
 **Firebase:** sleepy-5c962  
-**Last updated:** 2026-08-30
+**Last updated:** 2026-08-31
 
 ---
 
@@ -81,6 +81,13 @@ Docs: `MASTER_ARCHITECTURE_CURSOR.md`, `PIPELINE_DESIGN_CURSOR.md`, `BACKEND_MAP
 - **Elevator save** — Firestore before RTDB
 - **Docs:** `BACKEND_MAP.md`, `docs/ADD_APARTMENT_GUIDE.md`, this file
 
+### Sandbox complete on main (2026-08-31)
+
+- Host sign-off: **sandbox works fine** on GitHub Pages
+- Merged: full UI polish, admin login fix, shuttle service + plane icon, HK teams + apartment allocation
+- Live guest/admin HTML **still not cutover**
+- Backend callables still **not deployed** (optional; sandbox has fallbacks)
+
 ---
 
 ## Why VGL HK “didn’t work” (diagnosis)
@@ -99,11 +106,9 @@ Docs: `MASTER_ARCHITECTURE_CURSOR.md`, `PIPELINE_DESIGN_CURSOR.md`, `BACKEND_MAP
 
 | PR | Branch | Topic |
 |----|--------|-------|
-| #26 | pipeline-stability | CI, emulator:lite |
-| #28 | room-swap-ui | Swap + unlock recompute |
-| #29 | hk-guest-count | HK count + bedding |
-| #30 | claude-code-handoff | Documentation |
-| (new) | system-ready | Registry + fixes + maps |
+| — | `main` | Sandbox signed off 2026-08-31; see `CLAUDE_CODE_REPORT.md` |
+
+*(Older PRs #26–#30 may be merged or superseded — check GitHub for current open PRs.)*
 
 ---
 

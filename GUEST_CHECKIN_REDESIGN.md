@@ -1051,62 +1051,49 @@ Same Firebase/JS module as production `checkin-guest-v2.html` (registration, unl
 
 ---
 
-## 20. Prompt for Claude — continue Sandbox 2
+## 20. Prompt for Claude — continue from here (2026-08-31)
 
 Copy everything inside the block below into Claude / Claude Code:
 
 ```
-Read these files in this order before doing anything:
-1. GUEST_CHECKIN_REDESIGN.md — especially §0, §9, §13, §16, §17, §18, §20
-2. CHECKIN_GUEST_SPEC.md — technical audit (IDs, fragile areas)
-3. checkin-guest-sandbox-2.html — THE file to edit (canonical redesign)
-4. checkin-details.html — source for arrival walkthrough content to port
+Read these files first:
+1. CLAUDE_CODE_REPORT.md — CURRENT STATUS (host signed off sandbox Aug 2026)
+2. GUEST_CHECKIN_REDESIGN.md — §0, §9, §13 (design rules)
+3. docs/SANDBOX_TESTING.md — what's live on GitHub Pages
+4. checkin-guest-sandbox-2.html + checkin-admin-sandbox.html — canonical sandbox files
 
-DO NOT EDIT:
-- checkin-guest-v2.html (production — cutover only with host approval)
-- checkin-guest-sandbox-3.html (parked portal experiment — §19)
-- checkin-guest-sandbox-2.html registration/unlock/search JS logic unless fixing a bug
+HOST STATUS (2026-08-31):
+Sandbox works fine on main. Do NOT redo Phase 1 shell, shuttle merge, or HK teams —
+those are merged and live at:
+  https://app.maxelaapartments.com/sandbox-index.html
 
-CONTEXT FROM CURSOR (2026-08-25):
-The host chose Sandbox 2 over Sandbox 3. Sandbox 2 is live at:
-https://app.maxelaapartments.com/checkin-guest-sandbox-2.html
+DO NOT EDIT (until host approves cutover):
+- checkin-guest-v2.html, checkin-guest.html
+- checkin-admin.html
 
-Sandbox 2 already has (Cursor, merged to main):
-- Registration: arrival time chip picker (Tbilisi), phone divider, booking-name copy
-- Rules: SVG icons, entrance-card "(if provided)" copy
-- Passport: clean "Passport photo" + "required" header
-- Waiting: countdown + Location/Shuttle/Tours tabs under countdown + What You Booked
-- Unlocked: elevator QR first, door code, WiFi strip, Location|Parking, group invite under door code
-- Staying: horizontal service chips (admin visibility from checkin_admin/config)
-- One-time scroll to QR on first home open (not on every renderTiles refresh)
-- Dev toolbar at bottom for phase testing without Firebase
+SANDBOX URLS (production hosting, real Firebase data):
+- Admin: https://app.maxelaapartments.com/checkin-admin-sandbox.html
+- Guest: https://app.maxelaapartments.com/checkin-guest-sandbox-2.html
 
-YOUR TASK — claim workstream `inline-checkin-access` in §9:
+BACKEND:
+- pipeline-adminAction / pipeline-guestRegister are NOT deployed yet
+- Sandbox works with Firestore fallbacks; deploy only when host asks
+- See SANDBOX_BACKEND_HANDOFF.md for emulator + deploy commands
 
-Focus on Sandbox 2 Phase 2: real check-in walkthrough in #hero-walkthrough.
+YOUR DEFAULT TASK unless host says otherwise:
+- Small fixes / polish in sandbox files only
+- Or cutover prep docs (no live file swap without explicit approval)
+- Or pipeline review: cd pipeline-functions && npm test
 
-1. Open checkin-guest-sandbox-2.html, use dev toolbar → Home → Arriving (mock has 5 photos in aptData.photos + photoCaptions).
-
-2. Port the arrival instruction experience from checkin-details.html into #hero-walkthrough-list:
-   - Step cards with photo + caption (use existing .wt-card / .wt-list structure)
-   - Lightbox for photo tap (existing #lightbox)
-   - "Show arrival instructions" toggle on staying phase (#btn-show-walkthrough, .wt-expanded)
-
-3. Optionally improve waiting-phase tab panels (#panel-location, #panel-shuttle, #panel-tours) with real content stubs — Location already works via openPage('location') when unlocked; waiting guests need useful pre-arrival info.
-
-4. Keep §13 design tokens: white cards, ink text, #2C2C2A CTAs, no gold button backgrounds.
-
-5. Do not rename JS-referenced IDs (§13.5). Do not change unlock math, searchReservation(), or applyHomePhase() phase rules.
-
-VERIFY:
-- Dev toolbar: Waiting, Arriving, Staying, Leaving, Checkout Done — no console errors
-- Walkthrough renders with mock photos in Arriving
-- Register → rules → passport flow still works on real Firebase if tested
+DESIGN RULES (still apply):
+- §13 tokens: white cards, ink text, #2C2C2A CTAs, no gold button backgrounds
+- Do not rename JS-referenced IDs (§13.5)
+- Do not change unlock math / searchReservation() unless fixing a confirmed bug
 
 WHEN DONE:
-- Update GUEST_CHECKIN_REDESIGN.md §9 (mark workstream progress) and §12 changelog
-- git commit on a descriptive branch, push, open PR or merge per team workflow
-- Report: sandbox URL + screenshots of walkthrough + what's still placeholder
+- Update §9 workstream table + §12 changelog if you claim a workstream
+- Commit on cursor/* branch, push, PR to main
+- Tell host: sandbox URL tested + what changed
 ```
 
 ---

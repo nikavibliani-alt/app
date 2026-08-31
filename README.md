@@ -26,7 +26,8 @@ Read that file before any major edit. It contains:
 2. Edit **`checkin-guest-sandbox-2.html`** and **`checkin-admin-sandbox.html`** only (unless cutover approved).
 3. Test at **https://app.maxelaapartments.com/sandbox-index.html** before touching live files.
 4. See **`docs/SANDBOX_TESTING.md`** for the full checklist.
-5. Do **not** edit `checkin-guest-v2.html` or `checkin-admin.html` until host approves cutover (§7).
+5. See **`CLAUDE_CODE_REPORT.md`** for Claude Code status (sandbox signed off 2026-08-31).
+6. Do **not** edit `checkin-guest-v2.html` or `checkin-admin.html` until host approves cutover (§7).
 
 ## Related docs
 

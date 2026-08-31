@@ -1,208 +1,138 @@
-# Claude Code — Backend Pipeline Review Report
+# Claude Code — Status & Review Report
 
-**Date:** 2026-08-29  
-**Branch:** `cursor/pipeline-room-assignment-7e07`  
-**PR:** https://github.com/nikavibliani-alt/app/pull/16  
-**Scope:** Sandbox + `pipeline-functions/` only — **live HTML not touched**
+**Last updated:** 2026-08-31  
+**Branch:** `main` (sandbox work merged)  
+**Host sign-off:** Sandbox UI **works fine** — treat as current baseline. Live cutover still pending host approval.
 
 ---
 
-## Review fixes applied (2026-08-29, after Claude Code review)
+## Current state (2026-08-31) — read this first
+
+### Sandbox — ✅ signed off by host
+
+Everything below is on **`main`** and live on GitHub Pages (~1–2 min after push):
+
+| Area | URL | Notes |
+|------|-----|-------|
+| **Hub** | https://app.maxelaapartments.com/sandbox-index.html | Start here |
+| **Admin sandbox** | https://app.maxelaapartments.com/checkin-admin-sandbox.html | Password: same as live admin |
+| **Guest sandbox-2** | https://app.maxelaapartments.com/checkin-guest-sandbox-2.html | Canonical guest redesign |
+
+**Recent merges (all on main):**
+
+- Full sandbox UI: no-smoking logo, Lucide icons, drag handles, apartments reorg, WhatsApp templates
+- Admin login fix (duplicate `datesOverlap` removed)
+- Shuttle/transfer: **one "Shuttle service"** with plane-landing icon (no duplicate Transfer)
+- HK settings: **Teams** — create teams, assign apartments, PIN per team; `HK.html` filters by team
+- Pipeline/backend docs, room registry, swap UI, HK guest count + bedding, health monitor
+
+**Host (2026-08-31):** *"Everything works fine in sandbox."* — No open UI blockers reported. Elevator tab showing "Manual · 5h ago" is expected when Firebase `source` is `manual`; not a functional issue.
+
+### Live production — unchanged
+
+| File | Still live for guests/staff |
+|------|----------------------------|
+| `checkin-guest-v2.html` / `checkin-guest.html` | Yes |
+| `checkin-admin.html` | Yes |
+
+**Rule:** Do not replace live files until host explicitly approves cutover. All new work → sandbox files only.
+
+### Backend pipeline — built, not deployed to Firebase
+
+| Callable | Status |
+|----------|--------|
+| `elevatorCodeGuard` / `elevatorCodeSync` | ✅ Deployed |
+| `pipeline-adminAction` (move/swap/unlock) | Code on main; **not deployed** |
+| `pipeline-guestRegister` | Code on main; **not deployed** |
+
+Sandbox **works without deploy** via Firestore fallbacks (guest registration) and direct writes (admin move/swap in sandbox HTML). Emulator optional for strict pipeline testing — see `SANDBOX_BACKEND_HANDOFF.md`.
+
+---
+
+## What Claude Code should do next
+
+**Do not re-audit Phase 1 sandbox shell** — that work is done.
+
+Pick one of these unless host assigns something else:
+
+1. **Cutover prep** — checklist for copying sandbox → live (`docs/GUEST_LINK_STRATEGY.md`, `docs/SANDBOX_TESTING.md`)
+2. **Backend deploy review** — verify `npm test` in `pipeline-functions`, then approve deploy commands when host is ready
+3. **Small sandbox fixes only** — bugs in `checkin-admin-sandbox.html` / `checkin-guest-sandbox-2.html`; no live file edits
+4. **HK / elevator / WhatsApp** — only if host opens a new task
+
+**Files to edit:** `checkin-admin-sandbox.html`, `checkin-guest-sandbox-2.html`, `pipeline-functions/`, `shared/`  
+**Do not edit:** `checkin-admin.html`, `checkin-guest-v2.html` (until cutover)
+
+---
+
+## Architecture (unchanged)
+
+One Firestore (`sleepy-5c962`), no `v2_*` collections. Room moves via RoomAssignment when callables deployed; sandbox admin currently uses direct Firestore + pipeline client where wired.
+
+See `BACKEND_MAP.md`, `MASTER_ARCHITECTURE_CURSOR.md`, `PROJECT_ARCHIVE.md`.
+
+---
+
+## Review fixes applied (2026-08-29, pipeline branch)
 
 | Finding | Fix |
 |---------|-----|
-| 🔴 `room_moves` audit written outside transaction | Audit + success `system_logs` now written **inside** the same Firestore transaction as reservation/guest updates |
-| 🟡 `manualUnlock` ignored when `arrivalDate` missing | `computeGuestUnlock` checks `manualUnlock` before `no_arrival` early return (shared + pipeline lib) |
-| 🟡 `correlationId` never populated | AdminAction generates `adm_{hex}` and passes through to RoomAssignment / GuestUnlock logs |
-| 🟡 `isLikelyGuestToken` regex too narrow | Uses `isLegacyCompanionDocId()` — matches `tab-1_2026-09-01`, `orb-2_…`, etc. |
+| 🔴 `room_moves` audit written outside transaction | Audit + success `system_logs` now inside same Firestore transaction |
+| 🟡 `manualUnlock` ignored when `arrivalDate` missing | `computeGuestUnlock` checks `manualUnlock` before `no_arrival` early return |
+| 🟡 `correlationId` never populated | AdminAction generates `adm_{hex}` and passes through to logs |
+| 🟡 `isLikelyGuestToken` regex too narrow | Uses `isLegacyCompanionDocId()` |
 
-**Tests:** 49/49 passing (added audit rollback + manualUnlock edge case tests).
-
----
-
-We rebuilt Maxela’s check-in backend as **small pipeline controllers** (one job each, full `system_logs` logging) using **one Firestore** — no `v2_*` collections. Phase 1 elevator pipes are **already deployed**. Phases 2–4 are **implemented in code**, wired to **sandboxes only**, and **await deploy + your review** before any live cutover.
-
----
-
-## What was built
-
-### Phase 1 — Elevator (live on Firebase)
-
-| Function | Role |
-|----------|------|
-| `elevatorCodeGuard` | Rejects stale same-code AUTO writes to `globals/elevator_code` |
-| `elevatorCodeSync` | Hourly FS ↔ RTDB reconcile + manual HTTPS trigger |
-
-### Phase 2 — Room moves (code ready)
-
-| Module | Role |
-|--------|------|
-| **RoomAssignment** | Sole writer of room moves: `reservations.roomCode`, `checkin_guests.aptId`, `room_moves` audit |
-| **AdminAction** (`pipeline-adminAction`) | Admin callable: routes `move_guest`, `swap_guests`, `release_to_minihotel` |
-
-**Conflict policy (locked):** block overlapping stays; explicit swap only; no displace.
-
-### Phase 3 — Unlock (code ready)
-
-| Module | Role |
-|--------|------|
-| **GuestUnlock** | Computes `unlockState` / `unlockReason` on `checkin_guests`; `force_unlock` / `force_lock` via AdminAction |
-| **shared/guest-unlock.js** | Same rules in browser (admin + guest sandboxes) |
-
-### Phase 4 — Registration (code ready)
-
-| Module | Role |
-|--------|------|
-| **GuestRegister** (`pipeline-guestRegister`) | Creates primary guests with **stable `guestToken` doc IDs**; room from reservation only |
-| **shared/guest-register.js** | Payload builders + token helpers for guest sandbox |
-
----
-
-## Sandbox wiring (what to test)
-
-| File | Change |
-|------|--------|
-| `checkin-admin-sandbox.html` | Grant Access → `force_unlock`; Move room → `move_guest` via `shared/pipeline-admin.js` |
-| `checkin-guest-sandbox-2.html` | Registration → `pipeline-guestRegister` (fallback to direct Firestore if not deployed); `isUnlocked()` → `shared/guest-unlock.js` |
-
-**Not touched:** `checkin-admin.html`, `checkin-guest-v2.html`, `minihotel_reservation_sync.py`
+**Tests:** run `cd pipeline-functions && npm test` on current main (expect all pass).
 
 ---
 
 ## File map
 
 ```
-pipeline-functions/
-  controllers/
-    elevatorCodeGuard.js    ✅ deployed
-    elevatorCodeSync.js     ✅ deployed
-    roomAssignment.js       ✅ Phase 2
-    adminAction.js          ✅ Phase 2+3
-    guestUnlock.js          ✅ Phase 3
-    guestRegister.js        ✅ Phase 4
-  lib/
-    guest-unlock.js         (sync with shared/guest-unlock.js)
-    guest-token.js
-    dates.js, logging.js, elevator.js
-  tests/                    49 tests, all passing
+checkin-admin-sandbox.html     ← admin (canonical)
+checkin-guest-sandbox-2.html   ← guest (canonical)
+HK.html                        ← cleaner app (team-filtered rooms)
+shared/room-registry.js        ← add apartments here
+shared/hk-bedding.js
+pipeline-functions/            ← backend controllers + tests
 
-shared/
-  guest-unlock.js           browser + docs canonical unlock rules
-  guest-register.js         registration payloads
-  pipeline-admin.js         AdminAction client
-  pipeline-guest.js         GuestRegister client
-  elevator-sync.js          (existing)
-
-SANDBOX_BACKEND_HANDOFF.md  step-by-step review checklist
+CLAUDE_CODE_REPORT.md          ← this file (status for Claude)
+SANDBOX_BACKEND_HANDOFF.md     ← emulator + deploy checklist
+docs/SANDBOX_TESTING.md        ← phone test checklist
+GUEST_CHECKIN_REDESIGN.md      ← §20 updated Claude prompt
 ```
 
 ---
 
-## Sandbox E2E (emulator — no deploy until sign-off)
-
-**Policy:** Test everything in sandbox first. Use the Functions emulator; do not deploy callables until manual tests pass.
-
-**On your Mac** — clone or `cd` into the repo first (`pipeline-functions` is not in `~`):
-
-```bash
-cd ~/app/pipeline-functions
-npm install
-npm test
-npm run emulator:setup
-npm run emulator
-```
-
-Second terminal:
-
-```bash
-cd ~/app
-npx serve -p 8080 .
-```
-
-Open `http://127.0.0.1:8080/checkin-admin-sandbox.html?emulator=1`
-
-See **`SANDBOX_BACKEND_HANDOFF.md`** for clone instructions and full checklist.
-
-## Deploy commands (only after sandbox sign-off)
+## Deploy commands (only when host approves backend deploy)
 
 ```bash
 firebase functions:secrets:set ADMIN_ACTION_PASSWORD --project sleepy-5c962
-# Use same value as admin sandbox gate (maxela2026) for testing, or rotate for prod
 
 firebase deploy --only functions:pipeline:adminAction,functions:pipeline:guestRegister --project sleepy-5c962
 ```
 
-Callable names (region `europe-west1`):
-- `pipeline-adminAction`
-- `pipeline-guestRegister`
+Region: `europe-west1` · Names: `pipeline-adminAction`, `pipeline-guestRegister`
 
 ---
 
-## Claude Code review checklist
-
-### Automated
-
-- [ ] `cd pipeline-functions && npm test` → **49/49 pass**
-- [ ] No `v2_*` collection writes in `pipeline-functions/`
-- [ ] Live HTML files unchanged (`checkin-admin.html`, `checkin-guest-v2.html`)
-
-### Manual (emulator or after deploy)
-
-- [ ] Start emulator + serve sandbox HTML (see SANDBOX_BACKEND_HANDOFF.md) **or** deploy callables after sign-off
-
-- [ ] Admin sandbox: move guest → `room_moves` + both `reservations` and `checkin_guests` updated; guest `?g=` link unchanged
-- [ ] Admin sandbox: conflict move blocked with message
-- [ ] Admin sandbox: Grant Access → `manualUnlock` + `unlockState`
-- [ ] Guest sandbox-2: new registration → `guestToken` doc ID (32 hex), `guestLink` with `?g=`
-- [ ] Guest sandbox-2: open link on second browser → skip passport if already registered
-- [ ] After admin move: guest link still works, apt content follows new room
-- [ ] Firestore `system_logs`: entries for `AdminAction`, `RoomAssignment`, `GuestRegister`, `GuestUnlock`
-
-### Architecture compliance
-
-- [ ] Room moves only through RoomAssignment (admin sandbox no longer writes `roomCode` directly)
-- [ ] Primary guest IDs are stable tokens, not `{room}_{date}`
-- [ ] `manualRoom: true` set on admin moves
-- [ ] No WhatsApp/email from pipeline controllers
-
----
-
-## Still TODO (not in this PR)
-
-1. **HKStatusSync** — route HK done through pipeline (HK tab still writes `hk_status` directly)
-2. **ReservationSync** — replace `minihotel_reservation_sync.py` (do not touch until planned)
-3. **Recover Tuya function sources** in git before `functions:default` deploy
-4. **Wire live admin + guest** after sandbox sign-off on phone
-5. **Stronger auth** than password-in-callable (later phase)
-
----
-
-## Known limitations
-
-1. Sandboxes **fall back** to direct Firestore if callables not deployed (guest registration only); admin move/unlock show deploy hint toast.
-2. `guest-unlock.js` duplicated in `shared/` and `pipeline-functions/lib/` — must stay in sync manually.
-3. GuestRegister callable has **no App Check** yet (same exposure model as open Firestore rules today).
-4. Multi-room companion docs still use `{room}_{date}` IDs (by design for companions).
-
----
-
-## Suggested Claude Code prompt
+## Suggested Claude Code prompt (Aug 2026)
 
 ```
-Review branch cursor/pipeline-room-assignment-7e07 / PR #16.
+Read CLAUDE_CODE_REPORT.md (top section — host signed off sandbox).
 
-Read CLAUDE_CODE_REPORT.md and SANDBOX_BACKEND_HANDOFF.md first.
+Context: Sandbox on main works. Host said everything is fine. Live HTML untouched.
 
-Verify:
-1. npm test in pipeline-functions (49 tests)
-2. RoomAssignment conflict policy and atomic writes
-3. Sandbox wiring does not touch live HTML
-4. Guest token stability across room moves
-5. system_logs coverage
+Before any work:
+1. Confirm you are editing sandbox files only (checkin-*-sandbox*.html)
+2. cd pipeline-functions && npm test — report pass count
 
-Report any bugs or cutover blockers before we wire checkin-admin.html / checkin-guest-v2.html.
+If tasked with new work: follow GUEST_CHECKIN_REDESIGN.md §0 sandbox-first rule.
+If tasked with review only: confirm no regressions vs docs/SANDBOX_TESTING.md checklist.
+
+Do NOT reopen Phase 1 shell audit or rewrite shuttle/HK teams unless host asks.
 ```
 
 ---
 
-*Generated by Cursor Cloud Agent — update when phases complete.*
+*Updated by Cursor Cloud Agent — sync when sandbox or deploy status changes.*
