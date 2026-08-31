@@ -739,6 +739,11 @@ let _goPendingOnly=false;
 
 // ── HELPERS ───────────────────────────────────────
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+const GUEST_APP_URL='https://app.maxelaapartments.com/checkin-guest.html';
+function guestViewAsUrl(guestId){return GUEST_APP_URL+'?g='+encodeURIComponent(guestId);}
+function guestAptPreviewUrl(aptId){return GUEST_APP_URL+'?preview=true&apt='+encodeURIComponent(aptId||'');}
+function canViewAsGuest(g){return!!(g&&!g.companionGuest&&g.passportUrl);}
+window.viewGuestAsGuest=function(guestId){window.open(guestViewAsUrl(guestId),'_blank','noopener');};
 function toast(msg,duration=2500){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('show');
@@ -1011,7 +1016,11 @@ function renderGuests(){
     if(label==='AWAITING UNLOCK'&&form){
       extra=`<button class="go-action go-action-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Grant Access</button>`;
     }else if(label==='UNLOCKED'){
-      extra=`<a class="go-action" href="checkin-guest-v2.html?preview=true&apt=${encodeURIComponent(r.roomCode||'')}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View Page</a>`;
+      if(form&&canViewAsGuest(form)){
+        extra=`<a class="go-action" href="${guestViewAsUrl(form.id)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View as guest</a>`;
+      }else{
+        extra=`<a class="go-action" href="${guestAptPreviewUrl(r.roomCode)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Preview apt</a>`;
+      }
     }else if(sub==='departure'){
       extra='';
     }else if(form){
@@ -1396,7 +1405,7 @@ window.openAptDrawer=function(aptId){
         <div class="apt-editor-sub">${esc(apt.name)}</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <button class="apt-test-btn" onclick="window.open('checkin-guest-v2.html?preview=true&apt='+window._currentAptId,'_blank')" style="font-size:12px;padding:6px 12px;">Preview Guest View</button>
+        <button class="apt-test-btn" onclick="window.open(guestAptPreviewUrl(window._currentAptId),'_blank')" style="font-size:12px;padding:6px 12px;">Preview apartment</button>
         <button class="apt-save-btn" onclick="window.saveAptData('${aptId}')">Save changes</button>
       </div>
     </div>
@@ -2042,6 +2051,7 @@ window.viewGuest=function(guestId){
         <div style="font-size:12px;color:var(--muted);">${timeStr}</div>
       </div>
       ${passportHtml}
+      ${canViewAsGuest(g)?`<button class="btn" style="width:100%;margin-top:12px;min-height:44px;background:var(--surface);border:1px solid var(--border);" onclick="window.viewGuestAsGuest('${guestId}')">View as guest — see their screen</button>`:''}
       <hr style="margin:1.25rem 0;border:none;border-top:1px solid var(--border);">
       <div class="form-group">
         <div class="form-label" style="margin-bottom:8px;">Rooms</div>
@@ -2093,7 +2103,8 @@ window.viewGuest=function(guestId){
         </div>
       </div>
       ${passportHtml}
-      ${!g.manualUnlock?`<button class="btn btn-green" style="width:100%;margin-top:1rem;min-height:44px;" onclick="window.unlockGuest('${guestId}');closeDrawer()">Unlock check-in now</button>`:''}
+      ${canViewAsGuest(g)?`<button class="btn" style="width:100%;margin-top:12px;min-height:44px;background:var(--surface);border:1px solid var(--border);" onclick="window.viewGuestAsGuest('${guestId}')">View as guest — see their screen</button>`:''}
+      ${!g.manualUnlock?`<button class="btn btn-green" style="width:100%;margin-top:12px;min-height:44px;" onclick="window.unlockGuest('${guestId}');closeDrawer()">Unlock check-in now</button>`:''}
       <hr style="margin:1.25rem 0;border:none;border-top:1px solid var(--border);">
       <div class="form-group">
         <div class="form-label">Change Room</div>

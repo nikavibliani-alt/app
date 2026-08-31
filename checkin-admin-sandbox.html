@@ -418,8 +418,8 @@ html.admin-authed #app{display:block;}
 </style>
 <script>
 (function(){
-  var BUILD='20260831a';
-  if(!/[?&]build=20260831a(?:&|$)/.test(location.search)){
+  var BUILD='20260831b';
+  if(!/[?&]build=20260831b(?:&|$)/.test(location.search)){
     var q=location.search?location.search+'&':'?';
     location.replace(location.pathname+q+'build='+BUILD+location.hash);
     return;
@@ -680,7 +680,7 @@ html.admin-authed #app{display:block;}
  */
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
-const SANDBOX_BUILD='20260831a';
+const SANDBOX_BUILD='20260831b';
 (function migrateSandboxBuild(){
   try{
     if(localStorage.getItem('maxela_sandbox_build')!==SANDBOX_BUILD){
@@ -1529,7 +1529,7 @@ function renderGuestSettings(){
       <div class="gp-row__body"><div class="gp-row__title">${esc(loc.address||def.address||'Address')}</div><div class="gp-row__sub">${loc.parkingEnabled?'Parking on':'No parking section'}</div></div>
       <span class="gp-row__chev">›</span>
     </button>
-    <button class="btn" style="width:100%;margin-top:12px" onclick="window.open('checkin-guest-sandbox-2.html?preview=true','_blank')">Preview guest sandbox</button>
+    <button class="btn" style="width:100%;margin-top:12px" onclick="window.open(guestAptPreviewUrl(''),'_blank')">Preview guest app (empty)</button>
     <div style="height:72px"></div>`;
 }
 
@@ -2162,6 +2162,11 @@ window.resolveSearchFailure=async function(id){
 
 function toast(msg,ms=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),ms);}
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+const GUEST_APP_URL='https://app.maxelaapartments.com/checkin-guest.html';
+function guestViewAsUrl(guestId){return GUEST_APP_URL+'?g='+encodeURIComponent(guestId);}
+function guestAptPreviewUrl(aptId){return GUEST_APP_URL+'?preview=true&apt='+encodeURIComponent(aptId||'');}
+function canViewAsGuest(g){return!!(g&&!g.companionGuest&&g.passportUrl);}
+window.viewGuestAsGuest=function(guestId){window.open(guestViewAsUrl(guestId),'_blank','noopener');};
 function pipelineRoomToast(r,okMsg){
   const warns=r?.data?.unlockWarnings;
   if(warns?.length)toast(okMsg+' · unlock warning for '+warns.length+' guest(s) — check logs');
@@ -2387,6 +2392,7 @@ function renderCard(grp,mode){
   const waBtn=wa?`<a class="btn" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`:`<button class="btn" disabled>WhatsApp</button>`;
   let grant='';
   if(st.key==='need'&&form)grant=`<button class="btn btn-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Grant Access</button>`;
+  else if(form&&canViewAsGuest(form))grant=`<button class="btn" onclick="event.stopPropagation();window.viewGuestAsGuest('${form.id}')">View as guest</button><button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
   else if(form)grant=`<button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
   else grant=`<button class="btn" disabled>No form yet</button>`;
   const src=grp[0].source||grp[0].channel||'';
@@ -3326,7 +3332,7 @@ window.openAptEditor=function(aptId){
       <div class="apt-card-hd">Guest link</div>
       <div class="apt-card-bd">
         <button class="btn" style="width:100%" onclick="navigator.clipboard.writeText('https://app.maxelaapartments.com/checkin-guest.html?apt=${encodeURIComponent(aptId)}').then(()=>toast('Link copied'))">Copy check-in URL</button>
-        <button class="btn" style="width:100%;margin-top:8px" onclick="window.open('checkin-guest-sandbox-2.html?preview=true&apt=${encodeURIComponent(aptId)}','_blank')">Preview guest view</button>
+        <button class="btn" style="width:100%;margin-top:8px" onclick="window.open(guestAptPreviewUrl('${encodeURIComponent(aptId)}'),'_blank')">Preview apartment layout</button>
       </div>
     </div>
     <div class="apt-fold collapsed" id="apt-fold-registry">
