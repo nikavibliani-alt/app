@@ -1265,6 +1265,7 @@ const pipelineGuest=createPipelineGuestClient(guestFns,httpsCallable);
 (async function(){try{const cfg=await getDoc(doc(db,'globals','config'));if(cfg.exists())_geminiKey=cfg.data().geminiKey||'';}catch(e){}})();
 
 const WA='995593000724';
+const RTDB_ELEVATOR_URL='https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json';
 
 const params=new URLSearchParams(window.location.search);
 let aptId=params.get('apt')||'';
@@ -1293,6 +1294,7 @@ let guestData=null;
 let aptData=null;
 let activeReservation=null; // reservation matching this apt with tuyaPassword
 let isPreview=false; // admin preview mode flag
+let _adminPreviewMode=params.get('adminPreview')==='1';
 let myRequests=[];
 let currentSvcId=null;
 let currentSvcName=null;
@@ -1311,6 +1313,162 @@ let guestFullCfg=null;
 let guestSvcs=null; // cached services array from checkin_admin/config
 let _pendingMatches=[];
 let allMatchedReservations=[];
+
+function reservationBaseNum(ref){
+  if(!ref)return '';
+  return String(ref).trim().replace(/_\d+$/,'');
+}
+async function loadSiblingReservations(resIdOrNum){
+  if(!resIdOrNum)return [];
+  try{
+    const {getDocs:_getDocs}=await import('https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js');
+    let base=reservationBaseNum(resIdOrNum);
+    try{
+      const snap=await getDoc(doc(db,'reservations',resIdOrNum));
+      if(snap.exists())base=reservationBaseNum(snap.data().reservationNumber||snap.id)||base;
+    }catch(e){}
+    if(!base)return [];
+    const sibSnap=await _getDocs(query(
+      collection(db,'reservations'),
+      where('reservationNumber','>=',base),
+      where('reservationNumber','<=',base+'\uf8ff')
+    ));
+    return sibSnap.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(r=>(r.status||'').toUpperCase()!=='CANCELLED')
+      .filter(r=>reservationBaseNum(r.reservationNumber||r.id)===base)
+      .sort((a,b)=>(a.roomCode||'').localeCompare(b.roomCode||''));
+  }catch(e){
+    console.warn('[loadSiblingReservations]',e);
+    return [];
+  }
+}
+function _activeReservationsForGuest(){
+  const today=tbilisiToday();
+  return(allMatchedReservations||[]).filter(r=>{
+    const co=r.checkout||r.checkOut||'';
+    return co&&co>=today;
+  });
+}
+function _elevatorUpdatedMs(data){
+  if(!data)return 0;
+  const u=data.updatedAt;
+  if(u?.seconds)return u.seconds*1000;
+  if(typeof u==='number')return u>1e12?u:u*1000;
+  if(typeof u==='string'){
+    const n=parseInt(u,10);
+    if(n>0)return n>1e12?n:n*1000;
+  }
+  return 0;
+}
+function _elevatorDisplayCode(data){
+  if(!data)return '';
+  return String(data.display_code||data.code||data.lastCode||'').trim();
+}
+function _elevatorQrPayload(data){
+  if(!data)return '';
+  return String(data.qr_code||_elevatorDisplayCode(data)||'').trim();
+}
+function _elevatorIsStale(data){
+  const ms=_elevatorUpdatedMs(data);
+  if(!ms)return true;
+  return Date.now()-ms>36*3600*1000;
+}
+function _normalizeElevatorData(raw){
+  if(!raw)return null;
+  const code=_elevatorDisplayCode(raw);
+  if(!code)return null;
+  const ms=_elevatorUpdatedMs(raw);
+  return{...raw,code,display_code:code,updatedAt:ms?{seconds:Math.floor(ms/1000)}:raw.updatedAt};
+}
+function _applyElevatorSnap(raw){
+  const norm=_normalizeElevatorData(raw);
+  if(!norm)return;
+  elevatorData=norm;
+  if(document.getElementById('page-home')?.classList.contains('active'))renderTiles();
+}
+async function _seedElevatorFromRtdb(){
+  try{
+    const r=await fetch(RTDB_ELEVATOR_URL);
+    const d=await r.json();
+    if(d)_applyElevatorSnap(d);
+  }catch(e){}
+}
+function _doorCodeForGuest(){
+  const fromRes=activeReservation?.tuyaPassword||'';
+  if(fromRes)return String(fromRes);
+  const fromApt=aptData?.doorCode||'';
+  if(fromApt)return String(fromApt);
+  return '';
+}
+function _stripRoomNum(s){return(s||'').replace(/\s+0\d+\s+/,' ').replace(/\s+/g,' ').trim();}
+function _pickReservationFromPool(pool){
+  if(!pool.length)return null;
+  const gn=_stripRoomNum(guestData?.nameRoman||guestData?.name||'').toLowerCase();
+  if(gn){
+    const byName=pool.filter(r=>_stripRoomNum(r.guest||r.guestName||'').toLowerCase()===gn);
+    if(byName.length){
+      const withPw=byName.filter(r=>r.tuyaPassword);
+      return(withPw.length?withPw:byName).sort((a,b)=>{
+        const ca=a.checkin||a.checkIn||'',cb=b.checkin||b.checkIn||'';
+        return ca<cb?-1:ca>cb?1:0;
+      })[0];
+    }
+  }
+  const withPw=pool.filter(r=>r.tuyaPassword);
+  return(withPw.length?withPw:pool).sort((a,b)=>{
+    const ca=a.checkin||a.checkIn||'',cb=b.checkin||b.checkIn||'';
+    return ca<cb?-1:ca>cb?1:0;
+  })[0]||null;
+}
+function _syncGuestReservationContext(){
+  const today=tbilisiToday();
+  const active=_activeReservationsForGuest();
+  if(active.length){
+    allMatchedReservations=active;
+    try{localStorage.setItem('maxela_all_res',JSON.stringify(active));}catch(e){}
+  }
+  const forApt=active.filter(r=>(r.roomCode||'')===aptId);
+  if(forApt.length){
+    activeReservation=forApt[0];
+    return;
+  }
+  if(guestData?.matchedReservationId){
+    const m=active.find(r=>r.id===guestData.matchedReservationId);
+    if(m){activeReservation=m;return;}
+  }
+  const ci=guestData?.arrivalDate||'';
+  const co=guestData?.checkoutDate||'';
+  if(ci){
+    const byDates=active.find(r=>{
+      const rc=r.checkin||r.checkIn||'';
+      const rco=r.checkout||r.checkOut||'';
+      return rc===ci&&(!co||!rco||rco===co);
+    });
+    if(byDates){activeReservation=byDates;return;}
+  }
+  if(active.length)activeReservation=active[0];
+}
+async function _hydrateGuestReservations(){
+  const ref=guestData?.matchedReservationId;
+  if(!ref)return;
+  const sibs=await loadSiblingReservations(ref);
+  if(sibs.length){
+    allMatchedReservations=sibs;
+    try{localStorage.setItem('maxela_all_res',JSON.stringify(sibs));}catch(e){}
+  }
+  _syncGuestReservationContext();
+  const resRoom=activeReservation?.roomCode||'';
+  if(resRoom&&resRoom!==aptId){
+    aptId=resRoom;
+    guestData={...guestData,aptId:resRoom};
+    localStorage.setItem('maxela_apt_id',resRoom);
+    try{
+      const s=await getDoc(doc(db,'checkin_apartments',resRoom));
+      if(s.exists())aptData=s.data();
+    }catch(e){}
+    setDoc(doc(db,'checkin_guests',guestId),{aptId:resRoom},{merge:true}).catch(()=>{});
+  }
+}
 
 function _showPage(pageId){
   if(pageId!=='page-home')_homeInitialScrollDone=false;
@@ -1633,6 +1791,7 @@ document.addEventListener('visibilitychange',()=>{
 
 // ── UNLOCK GATE (shared/guest-unlock.js — same rules as admin sandbox + pipeline GuestUnlock) ──
 function isUnlocked(){
+  if(_adminPreviewMode||isPreview)return true;
   if(!guestData)return false;
   const arrival=guestData.arrivalDate||activeReservation?.checkin||activeReservation?.checkIn||'';
   return isGuestUnlocked({
@@ -2046,8 +2205,9 @@ window.switchApt=async function(newRoomCode){
   renderTiles();
   // Restart elevator subscription if this apt needs it
   if(needsElevatorCode()){
+    _seedElevatorFromRtdb();
     _homeSnaps.push(onSnapshot(doc(db,'globals','elevator_code'),snap=>{
-      elevatorData=snap.exists()?snap.data():null;
+      _applyElevatorSnap(snap.exists()?snap.data():null);
       renderTiles();
     }));
   }
@@ -2363,14 +2523,20 @@ window.searchReservation=async function(){
       wrap.appendChild(errEl);
       return;
     }
-    // Build the multi-room sibling group strictly by exact reservationNumber match —
-    // NEVER by name/date fuzzy match — so a different guest's room can't be pulled in.
+    // Build the multi-room sibling group by base reservation number (007004961_001 + _002).
     let group=[_bestMatch];
-    const _primaryRn=String(_bestMatch.reservationNumber||'').trim();
-    if(_primaryRn){
+    const _primaryRn=String(_bestMatch.reservationNumber||_bestMatch.id||'').trim();
+    const _baseRn=reservationBaseNum(_primaryRn);
+    if(_baseRn){
       try{
-        const sibSnap=await _getDocs(query(collection(db,'reservations'),where('reservationNumber','==',_primaryRn)));
-        const sibs=sibSnap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
+        const sibSnap=await _getDocs(query(
+          collection(db,'reservations'),
+          where('reservationNumber','>=',_baseRn),
+          where('reservationNumber','<=',_baseRn+'\uf8ff')
+        ));
+        const sibs=sibSnap.docs.map(d=>({id:d.id,...d.data()}))
+          .filter(r=>(r.status||'').toUpperCase()!=='CANCELLED')
+          .filter(r=>reservationBaseNum(r.reservationNumber||r.id)===_baseRn);
         if(sibs.length)group=sibs;
       }catch(e){console.warn('[MultiRoom] sibling lookup failed, using single match',e);}
     }
@@ -2381,11 +2547,16 @@ window.searchReservation=async function(){
     if(existing?.passportUrl&&!_companionGuest){
       guestId=existing.id;
       guestData={...existing,id:existing.id};
-      aptId=existing.aptId||_bestMatch.roomCode||'';
+      aptId=_bestMatch.roomCode||existing.aptId||'';
       activeReservation=_bestMatch;
+      allMatchedReservations=group;
       localStorage.setItem('maxela_guest_id',guestId);
       localStorage.setItem('maxela_apt_id',aptId);
       localStorage.setItem('maxela_g_'+aptId,guestId);
+      localStorage.setItem('maxela_all_res',JSON.stringify(group));
+      if(_bestMatch.roomCode&&_bestMatch.roomCode!==existing.aptId){
+        setDoc(doc(db,'checkin_guests',guestId),{aptId:_bestMatch.roomCode,matchedReservationId:_bestMatch.id||existing.matchedReservationId},{merge:true}).catch(()=>{});
+      }
       btn.disabled=false;
       document.getElementById('t-search-btn').textContent='Find my booking';
       toast(t('gl')||'Welcome back');
@@ -2537,7 +2708,8 @@ function showHome(){
 
   // Post-checkout: every reservation has ended — show thank-you, skip all tiles
   const _today=tbilisiToday();
-  if(allMatchedReservations.length>0&&allMatchedReservations.every(r=>{
+  const _liveRes=_activeReservationsForGuest();
+  if(_liveRes.length===0&&allMatchedReservations.length>0&&allMatchedReservations.every(r=>{
     const co=r.checkout||r.checkOut||'';return co&&co<_today;
   })){
     const home=document.getElementById('page-home');
@@ -2621,8 +2793,9 @@ function showHome(){
   }
   // Subscribe to elevator code for floors 6 & 7
   if(needsElevatorCode()){
+    _seedElevatorFromRtdb();
     _homeSnaps.push(onSnapshot(doc(db,'globals','elevator_code'),snap=>{
-      elevatorData=snap.exists()?snap.data():null;
+      _applyElevatorSnap(snap.exists()?snap.data():null);
     }));
   }
   // Subscribe to reservations for this apartment — find the active one with a Tuya password
@@ -2632,32 +2805,31 @@ function showHome(){
       snap=>{
         const today=tbilisiToday();
         const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
-        // Never use a reservation where checkout is in the past
         const valid=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=today;});
-        // Prefer: current stay (checkin <= today <= checkout), then upcoming (checkin > today)
         const current=valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return ci&&ci<=today;});
         const upcoming=valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return !ci||ci>today;});
-        function pickBest(pool){
-          const withPw=pool.filter(r=>r.tuyaPassword);
-          return(withPw.length?withPw:pool).sort((a,b)=>{
-            const ca=a.checkin||a.checkIn||'',cb=b.checkin||b.checkIn||'';
-            return ca<cb?-1:ca>cb?1:0;
-          })[0]||null;
-        }
-        // If guest has a matchedReservationId, pin to it first (only if not expired)
         const matchedId=guestData?.matchedReservationId;
         let picked=null;
-        // For multi-room guests who switched to a secondary room, matchedReservationId refers to the
-        // primary room and won't match here. Check allMatchedReservations for the current aptId first.
         const _knownIds=allMatchedReservations.filter(r=>r.roomCode===aptId).map(r=>r.id).filter(Boolean);
         if(_knownIds.length){const _m=valid.find(r=>_knownIds.includes(r.id));if(_m)picked=_m;}
         if(!picked&&matchedId){
           const matched=valid.find(r=>r.id===matchedId);
           if(matched)picked=matched;
         }
-        if(!picked)picked=pickBest(current)||pickBest(upcoming);
+        if(!picked){
+          const ci=guestData?.arrivalDate||'';
+          const co=guestData?.checkoutDate||'';
+          if(ci){
+            picked=valid.find(r=>{
+              const rc=r.checkin||r.checkIn||'';
+              const rco=r.checkout||r.checkOut||'';
+              return rc===ci&&(!co||!rco||rco===co);
+            })||null;
+          }
+        }
+        if(!picked)picked=_pickReservationFromPool(current)||_pickReservationFromPool(upcoming)||_pickReservationFromPool(valid);
         activeReservation=picked;
-        console.log('[ResvSelect] Selected:',activeReservation?.checkin,activeReservation?.checkout,activeReservation?.roomCode);
+        console.log('[ResvSelect] Selected:',activeReservation?.checkin,activeReservation?.checkout,activeReservation?.roomCode,activeReservation?.tuyaPassword?'pw':'no-pw');
         renderTiles();
       }
     ));
@@ -2735,10 +2907,8 @@ const _SVG_KEY=fi('key',10,1.8);
 const _SVG_BLDG=fi('home',10,1.8);
 function resolveElevatorCode(text){
   if(!text||!text.includes('#elevatorcode'))return text;
-  const updatedAt=elevatorData?.updatedAt?.seconds||0;
-  const isStale=!updatedAt||(Date.now()/1000-updatedAt>36*3600);
-  const code=(!isStale&&elevatorData?.code)?elevatorData.code:'contact host';
-  return text.replace(/#elevatorcode/g,code);
+  const code=!_elevatorIsStale(elevatorData)?_elevatorDisplayCode(elevatorData):'';
+  return text.replace(/#elevatorcode/g,code||'contact host');
 }
 
 const _SVG_COPY=fi('copy',11,1.8);
@@ -3774,26 +3944,21 @@ async function init(){
       guestId=_urlGuestToken;
       guestData={...guestDocData,id:_urlGuestToken};
       aptId=guestDocData.aptId||'';
+      if(_adminPreviewMode)isPreview=true;
+      await _hydrateGuestReservations();
+      if(!aptId)aptId=guestData.aptId||activeReservation?.roomCode||'';
       localStorage.setItem('maxela_guest_id',guestId);
       localStorage.setItem('maxela_apt_id',aptId);
       if(aptId)localStorage.setItem('maxela_g_'+aptId,guestId);
-      try{
-        const _resId=guestData.matchedReservationId;
-        if(_resId){
-          const _resSnap=await getDoc(doc(db,'reservations',_resId));
-          if(_resSnap.exists()){
-            const _newRoom=_resSnap.data().roomCode;
-            if(_newRoom&&_newRoom!==aptId){
-              aptId=_newRoom;guestData={...guestData,aptId:_newRoom};
-              localStorage.setItem('maxela_apt_id',_newRoom);
-              setDoc(doc(db,'checkin_guests',guestId),{aptId:_newRoom},{merge:true}).catch(()=>{});
-            }
-          }
-        }
-      }catch(e){}
       try{const as=await getDoc(doc(db,'checkin_apartments',aptId));if(as.exists())aptData=as.data();}catch(e){}
       document.getElementById('loading').style.display='none';
       document.getElementById('app').style.display='block';
+      if(_adminPreviewMode){
+        const banner=document.createElement('div');
+        banner.style.cssText='position:fixed;top:0;left:0;width:100%;background:#2C2C2A;color:#fff;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;text-align:center;padding:6px 12px;z-index:9999;';
+        banner.textContent='Admin preview — '+(_stripRoomNum(guestData.nameRoman||guestData.name||'Guest')||aptId);
+        document.body.prepend(banner);
+      }
       updateGuestLinkCard();
       showHome();
       _saveSession();
@@ -3872,27 +4037,8 @@ async function init(){
           allMatchedReservations=[];
           // falls through to register page
         }else{
-          // Session valid — restore home screen
+          await _hydrateGuestReservations();
           try{const as=await getDoc(doc(db,'checkin_apartments',aptId));if(as.exists())aptData=as.data();}catch(e){}
-          // Catch room reassignments made after check-in
-          try{
-            const _resId=guestData.matchedReservationId;
-            if(_resId){
-              const _resSnap=await getDoc(doc(db,'reservations',_resId));
-              if(_resSnap.exists()){
-                const _newRoom=_resSnap.data().roomCode;
-                const _storedRoom=aptId,_guestDocRoom=guestData.aptId||'';
-                if(_newRoom&&(_newRoom!==_storedRoom||_newRoom!==_guestDocRoom)){
-                  console.log('[RoomFix] Corrected from',_storedRoom||_guestDocRoom,'to',_newRoom);
-                  if(_storedRoom&&_storedRoom!==_newRoom)localStorage.removeItem('maxela_g_'+_storedRoom);
-                  aptId=_newRoom;guestData={...guestData,aptId:_newRoom};
-                  localStorage.setItem('maxela_apt_id',_newRoom);
-                  try{const _as=await getDoc(doc(db,'checkin_apartments',_newRoom));if(_as.exists())aptData=_as.data();}catch(e){}
-                  setDoc(doc(db,'checkin_guests',savedGuest),{aptId:_newRoom},{merge:true}).catch(()=>{});
-                }
-              }
-            }
-          }catch(e){console.error('[RoomFix] Error:',e);}
           document.getElementById('loading').style.display='none';
           document.getElementById('app').style.display='block';
           showHome();
@@ -3907,6 +4053,7 @@ async function init(){
         }
       }else{
         // No checkout date on guestData — proceed to home (can't expire what we don't know)
+        await _hydrateGuestReservations();
         try{const as=await getDoc(doc(db,'checkin_apartments',aptId));if(as.exists())aptData=as.data();}catch(e){}
         document.getElementById('loading').style.display='none';
         document.getElementById('app').style.display='block';
@@ -4036,29 +4183,26 @@ function _floorLabel(){
 // Safe to call any time home is on screen — every element lookup is null-checked.
 function _renderHeroContent(){
   const doorEl=document.getElementById('hero-door-code');
-  if(doorEl)doorEl.textContent=activeReservation?.tuyaPassword||'— — — —';
+  const doorCode=_doorCodeForGuest();
+  if(doorEl)doorEl.textContent=doorCode||'— — — —';
 
   const elevWrap=document.getElementById('hero-elevator');
   if(elevWrap){
     if(needsElevatorCode()){
       elevWrap.style.display='';
       const codeEl=document.getElementById('hero-elevator-code');
-      if(codeEl){
-        const updatedAt=elevatorData?.updatedAt?.seconds||0;
-        const isStale=!updatedAt||(Date.now()/1000-updatedAt>36*3600);
-        codeEl.textContent=(!isStale&&elevatorData?.code)?elevatorData.code:'Contact host';
-      }
-      // Box stays hidden (see HTML) until the QR actually draws — a slow/blocked
-      // CDN script must never leave a ~150px dead gap in the card (FINDING-001).
+      const elevCode=!_elevatorIsStale(elevatorData)?_elevatorDisplayCode(elevatorData):'';
+      if(codeEl)codeEl.textContent=elevCode||'Contact host';
       const qrCanvas=document.getElementById('hero-elevator-qr-canvas');
       const qrWrap=document.getElementById('hero-elevator-qr');
       const qrPh=document.getElementById('hero-elevator-qr-ph');
-      if(qrWrap&&elevatorData?.code){
+      const qrPayload=_elevatorQrPayload(elevatorData);
+      if(qrWrap&&elevCode&&!_elevatorIsStale(elevatorData)){
         qrWrap.style.display='flex';
         let drawn=false;
         if(qrCanvas&&window.QRCode){
           try{
-            QRCode.toCanvas(qrCanvas,String(elevatorData.code),{width:132,color:{dark:'#2C2C2A',light:'#FFFFFF'}});
+            QRCode.toCanvas(qrCanvas,String(qrPayload||elevCode),{width:132,color:{dark:'#2C2C2A',light:'#FFFFFF'}});
             drawn=true;
           }catch(e){drawn=false;}
         }

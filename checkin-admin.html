@@ -2227,10 +2227,25 @@ window.resolveSearchFailure=async function(id){
 function toast(msg,ms=2500){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),ms);}
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 const GUEST_APP_URL='https://app.maxelaapartments.com/checkin-guest.html';
-function guestViewAsUrl(guestId){return GUEST_APP_URL+'?g='+encodeURIComponent(guestId);}
+function guestViewAsUrl(guestId){return GUEST_APP_URL+'?g='+encodeURIComponent(guestId)+'&adminPreview=1';}
 function guestAptPreviewUrl(aptId){return GUEST_APP_URL+'?preview=true&apt='+encodeURIComponent(aptId||'');}
-function canViewAsGuest(g){return!!(g&&!g.companionGuest&&g.passportUrl);}
+function canPreviewGuest(g){return!!(g&&!g.companionGuest);}
+function canViewAsGuest(g){return canPreviewGuest(g)&&!!g.passportUrl;}
 window.viewGuestAsGuest=function(guestId){window.open(guestViewAsUrl(guestId),'_blank','noopener');};
+function siblingGuestForms(g){
+  const base=reservationBaseNum(g?.matchedReservationId);
+  if(!base)return g?[g]:[];
+  return guestData.filter(x=>!x.companionGuest&&reservationBaseNum(x.matchedReservationId)===base);
+}
+function unlockButtonHtml(roomForm,res){
+  if(!roomForm)return '';
+  if(roomForm.blocked===true)return'';
+  const st=guestStatus(roomForm,res);
+  if(st.cls==='unlocked'||roomForm.manualUnlock===true){
+    return'<button class="btn" disabled style="opacity:1;cursor:default">Access granted</button>';
+  }
+  return`<button class="btn btn-primary" onclick="window.unlockGuest('${roomForm.id}')">Grant Access</button>`;
+}
 function pipelineRoomToast(r,okMsg){
   const warns=r?.data?.unlockWarnings;
   if(warns?.length)toast(okMsg+' · unlock warning for '+warns.length+' guest(s) — check logs');
@@ -2310,18 +2325,23 @@ function findFormForReservation(r){
   const ci=normalizeStayDate(r.checkin||r.checkIn);
   const rc=r.roomCode||r.room||'';
   const rn=_stripRoomNum(r.guest||'').toLowerCase();
+  const co=normalizeStayDate(r.checkout||r.checkOut);
   if(rn&&ci){
     const byName=guestData.find(g=>{
       if(g.companionGuest||g.matchedReservationId)return false;
       const gn=_stripRoomNum((g.nameRoman||g.name||'').trim()).toLowerCase();
-      return gn===rn&&normalizeStayDate(g.arrivalDate)===ci;
+      if(gn!==rn||normalizeStayDate(g.arrivalDate)!==ci)return false;
+      if(co&&normalizeStayDate(g.checkoutDate)&&normalizeStayDate(g.checkoutDate)!==co)return false;
+      return true;
     });
     if(byName)return byName;
   }
   if(rc&&ci){
     return guestData.find(g=>{
       if(g.companionGuest||g.matchedReservationId)return false;
-      return g.aptId===rc&&normalizeStayDate(g.arrivalDate)===ci;
+      if(g.aptId!==rc||normalizeStayDate(g.arrivalDate)!==ci)return false;
+      if(co&&normalizeStayDate(g.checkoutDate)&&normalizeStayDate(g.checkoutDate)!==co)return false;
+      return true;
     })||null;
   }
   return null;
@@ -2341,7 +2361,7 @@ function getForm(r){return _formById.get(r.id)||null;}
 function cardStatus(r,form){
   if(!form)return{label:'NO FORM',cls:'pill-pending',key:'nof'};
   if(form.guestConfirmedCheckin===true)return{label:'CHECKED IN',cls:'pill-in',key:'checked'};
-  if(guestStatus(form,r).cls==='unlocked')return{label:'UNLOCKED',cls:'pill-ok',key:'unlocked'};
+  if(guestStatus(form,r).cls==='unlocked')return{label:'ACCESS GRANTED',cls:'pill-ok',key:'unlocked'};
   return{label:'AWAITING UNLOCK',cls:'pill-await',key:'need'};
 }
 function fmtDate(s){if(!s)return'—';return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
@@ -2514,8 +2534,8 @@ function renderCard(grp,mode){
   const wa=buildWaUrl(normalizeWaPhone(rawPhone),name,!!form,sorted[0].roomCode);
   const waBtn=wa?`<a class="btn" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`:`<button class="btn" disabled>WhatsApp</button>`;
   let grant='';
-  if(st.key==='need'&&form)grant=`<button class="btn btn-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Grant Access</button>`;
-  else if(form&&canViewAsGuest(form))grant=`<button class="btn" onclick="event.stopPropagation();window.viewGuestAsGuest('${form.id}')">View as guest</button><button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
+  if(st.key==='need'&&form)grant=unlockButtonHtml(form,sorted[0]);
+  else if(form&&canPreviewGuest(form))grant=`<button class="btn" onclick="event.stopPropagation();window.viewGuestAsGuest('${form.id}')">Preview</button><button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
   else if(form)grant=`<button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
   else grant=`<button class="btn" disabled>No form yet</button>`;
   const src=grp[0].source||grp[0].channel||'';
@@ -2709,11 +2729,41 @@ window.unlockGuest=async function(guestId){
   try{
     const r=await pipelineAdmin({password:_ADMIN_PWD,actionType:'force_unlock',payload:{guestId},actor:'admin'});
     if(!r.ok){toast(r.message||'Failed');return;}
+    const g=guestData.find(x=>x.id===guestId);
+    if(g){g.manualUnlock=true;g.unlockedAt=g.unlockedAt||new Date();}
     toast('Access granted ✓');
+    render();
+    if(document.getElementById('detail')?.classList.contains('open'))openDetail(guestId);
   }catch(e){
     console.error('[unlockGuest]',e);
     toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Failed: '+e.message);
   }
+};
+window.blockGuest=async function(guestId){
+  const g=guestData.find(x=>x.id===guestId);
+  if(!g){toast('Guest not found');return;}
+  const targets=siblingGuestForms(g);
+  if(!confirm(`Block ${targets.length>1?targets.length+' linked forms for this booking':'this guest'}? They will see "Access Revoked" on their page.`))return;
+  try{
+    await Promise.all(targets.map(t=>updateDoc(doc(db,'checkin_guests',t.id),{blocked:true,blockedAt:serverTimestamp()})));
+    targets.forEach(t=>{t.blocked=true;});
+    toast('Guest blocked');
+    render();
+    if(document.getElementById('detail')?.classList.contains('open'))openDetail(guestId);
+  }catch(e){toast('Failed: '+e.message);}
+};
+window.unblockGuest=async function(guestId){
+  const g=guestData.find(x=>x.id===guestId);
+  if(!g){toast('Guest not found');return;}
+  const targets=siblingGuestForms(g);
+  if(!confirm(`Unblock ${targets.length>1?targets.length+' linked forms':'this guest'}?`))return;
+  try{
+    await Promise.all(targets.map(t=>updateDoc(doc(db,'checkin_guests',t.id),{blocked:false})));
+    targets.forEach(t=>{t.blocked=false;});
+    toast('Guest unblocked ✓');
+    render();
+    if(document.getElementById('detail')?.classList.contains('open'))openDetail(guestId);
+  }catch(e){toast('Failed: '+e.message);}
 };
 
 function roomOptionsHtml(selected){
@@ -2981,7 +3031,7 @@ window.openDetail=function(guestId){
     const roomForm=guestFormForReservation(res)||(isSameReservation(res,g.matchedReservationId)?g:null);
     const doorCode=res?.tuyaPassword||aptData[rc]?.doorCode||aptData[roomForm?.aptId]?.doorCode||'—';
     const drift=res&&roomForm&&rc&&roomForm.aptId&&roomForm.aptId!==rc;
-    const unlockBtn=roomForm&&!roomForm.manualUnlock&&guestStatus(roomForm,res).cls!=='unlocked'?`<button class="btn btn-primary" onclick="window.unlockGuest('${roomForm.id}')">Grant Access</button>`:'';
+    const unlockBtn=roomForm?unlockButtonHtml(roomForm,res):'';
     return`<div class="room-block">
       <h3>Room ${esc(rc)}${isMulti?' <span class="pill pill-multi">MULTI</span>':''}${res&&(res.manualRoom===true||res.manualRoom==='true')?' <span class="pill pill-manual">MANUAL</span>':''}</h3>
       ${drift?`<p style="font-size:12px;color:var(--amber);margin-bottom:8px">Guest form still says ${esc(roomForm.aptId)} — use Move/Swap or wait for sync</p>`:''}
@@ -3008,7 +3058,7 @@ window.openDetail=function(guestId){
       <div id="detail-room-swap-info" style="display:none;margin-top:8px"></div>`;
   const bookingRef=reservationBaseNum(g.matchedReservationId)||g.matchedReservationId||'';
   document.getElementById('detail-body').innerHTML=`
-    <div style="margin-bottom:12px"><span class="pill ${st.cls}">${st.label}</span>${isMulti?' <span class="pill pill-multi">MULTI · '+sibs.length+' rooms</span>':''}</div>
+    <div style="margin-bottom:12px"><span class="pill ${st.cls}">${st.label}</span>${isMulti?' <span class="pill pill-multi">MULTI · '+sibs.length+' rooms</span>':''}${g.blocked===true?' <span class="pill pill-cancelled">BLOCKED</span>':''}</div>
     <div class="passport-gate" id="pp-gate">
       <p>Passport / ID is hidden until you need it.</p>
       <button class="btn btn-primary" style="width:100%" onclick="window.showPassport()">Check passport</button>
@@ -3029,6 +3079,12 @@ window.openDetail=function(guestId){
     </div>`:''}
     <p style="font-size:12px;color:var(--muted);margin-top:8px;">${esc(fmtDate(g.arrivalDate))} → ${esc(fmtDate(g.checkoutDate||door?.checkout||''))} · ${esc(g.contact||'no contact')}</p>
     ${bookingRef?`<p style="font-size:12px;color:var(--muted);">Booking #${esc(bookingRef)}</p>`:''}
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn" style="flex:1" onclick="window.viewGuestAsGuest('${g.id}')">Preview guest page</button>
+      ${g.blocked===true
+        ?`<button class="btn btn-primary" style="flex:1" onclick="window.unblockGuest('${g.id}')">Unblock guest</button>`
+        :`<button class="btn" style="flex:1;border-color:var(--red);color:var(--red)" onclick="window.blockGuest('${g.id}')">Block guest</button>`}
+    </div>
     <button class="btn" style="width:100%;margin-top:12px" onclick="window.openAptEditor('${g.aptId||''}')">Edit apartment instructions</button>
   `;
   document.getElementById('detail').classList.add('open');
