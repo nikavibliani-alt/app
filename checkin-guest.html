@@ -1348,6 +1348,84 @@ function _elevatorIsStale(data){
 function _elevatorCodeForGuest(){
   return _elevatorDisplayCode(elevatorData);
 }
+let _elevatorQrDrawToken=0;
+let _qrLibPromise=null;
+function _ensureQrLibrary(){
+  if(typeof window.QRCode!=='undefined'&&typeof window.QRCode.toCanvas==='function')return Promise.resolve(true);
+  if(_qrLibPromise)return _qrLibPromise;
+  _qrLibPromise=new Promise(resolve=>{
+    const done=ok=>{if(!ok)_qrLibPromise=null;resolve(!!ok);};
+    if(document.querySelector('script[data-elev-qr-lib]')){done(typeof window.QRCode!=='undefined');return;}
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+    s.dataset.elevQrLib='1';
+    s.onload=()=>done(typeof window.QRCode!=='undefined');
+    s.onerror=()=>done(false);
+    document.head.appendChild(s);
+  });
+  return _qrLibPromise;
+}
+async function _drawElevatorQr(text){
+  const token=++_elevatorQrDrawToken;
+  const qrWrap=document.getElementById('hero-elevator-qr');
+  const qrCanvas=document.getElementById('hero-elevator-qr-canvas');
+  const qrPh=document.getElementById('hero-elevator-qr-ph');
+  const payload=String(text||'').trim();
+  if(!qrWrap||!payload){
+    if(qrWrap)qrWrap.style.display='none';
+    return false;
+  }
+  qrWrap.style.display='flex';
+  const showOk=()=>{
+    if(token!==_elevatorQrDrawToken)return;
+    if(qrCanvas)qrCanvas.style.display='block';
+    if(qrPh)qrPh.style.display='none';
+    const img=qrWrap.querySelector('img.elev-qr-img');
+    if(img)img.style.display='block';
+  };
+  const showFail=()=>{
+    if(token!==_elevatorQrDrawToken)return;
+    if(qrCanvas)qrCanvas.style.display='none';
+    const img=qrWrap.querySelector('img.elev-qr-img');
+    if(img)img.style.display='none';
+    if(qrPh){qrPh.style.display='flex';qrPh.textContent='QR';}
+  };
+  await _ensureQrLibrary();
+  if(typeof window.QRCode==='undefined'||typeof window.QRCode.toCanvas!=='function'){showFail();return false;}
+  const opts={width:132,margin:1,color:{dark:'#2C2C2A',light:'#FFFFFF'}};
+  if(qrCanvas){
+    try{
+      const ctx=qrCanvas.getContext('2d');
+      if(ctx)ctx.clearRect(0,0,qrCanvas.width,qrCanvas.height);
+      await window.QRCode.toCanvas(qrCanvas,payload,opts);
+      if(token!==_elevatorQrDrawToken)return false;
+      const img=qrWrap.querySelector('img.elev-qr-img');
+      if(img)img.style.display='none';
+      showOk();
+      return true;
+    }catch(e){console.warn('[elevator QR canvas]',e);}
+  }
+  try{
+    const url=await window.QRCode.toDataURL(payload,opts);
+    if(token!==_elevatorQrDrawToken)return false;
+    let img=qrWrap.querySelector('img.elev-qr-img');
+    if(!img){
+      img=document.createElement('img');
+      img.className='elev-qr-img';
+      img.alt='Elevator QR code';
+      img.style.cssText='display:block;width:132px;height:132px;border-radius:8px;';
+      qrWrap.insertBefore(img,qrPh||null);
+    }
+    img.src=url;
+    if(qrCanvas)qrCanvas.style.display='none';
+    showOk();
+    return true;
+  }catch(e2){
+    console.warn('[elevator QR dataurl]',e2);
+    showFail();
+    return false;
+  }
+}
 function _normalizeElevatorData(raw){
   if(!raw)return null;
   const code=_elevatorDisplayCode(raw);
@@ -4168,25 +4246,13 @@ function _renderHeroContent(){
       elevWrap.style.display='';
       const codeEl=document.getElementById('hero-elevator-code');
       const elevCode=_elevatorCodeForGuest();
+      const qrText=_elevatorQrPayload(elevatorData)||elevCode;
       if(codeEl)codeEl.textContent=elevCode||'Contact host';
-      const qrCanvas=document.getElementById('hero-elevator-qr-canvas');
-      const qrWrap=document.getElementById('hero-elevator-qr');
-      const qrPh=document.getElementById('hero-elevator-qr-ph');
-      const qrPayload=_elevatorQrPayload(elevatorData);
-      if(qrWrap&&elevCode){
-        qrWrap.style.display='flex';
-        let drawn=false;
-        if(qrCanvas&&window.QRCode){
-          try{
-            QRCode.toCanvas(qrCanvas,String(qrPayload||elevCode),{width:132,color:{dark:'#2C2C2A',light:'#FFFFFF'}});
-            drawn=true;
-          }catch(e){drawn=false;}
-        }
-        if(qrCanvas)qrCanvas.style.display=drawn?'block':'none';
-        if(qrPh)qrPh.style.display=drawn?'none':'flex';
-        if(drawn&&!_homeInitialScrollDone)_nudgeHomeScrollOnce();
-      }else if(qrWrap){
-        qrWrap.style.display='none';
+      if(elevCode){
+        _drawElevatorQr(qrText).then(ok=>{if(ok&&!_homeInitialScrollDone)_nudgeHomeScrollOnce();});
+      }else{
+        const qrWrap=document.getElementById('hero-elevator-qr');
+        if(qrWrap)qrWrap.style.display='none';
       }
     }else{
       elevWrap.style.display='none';
