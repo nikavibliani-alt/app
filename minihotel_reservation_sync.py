@@ -825,8 +825,11 @@ def fetch_guest_details(session, db, reservations):
             continue
         doc_id = ",".join(d.id for d in docs)
 
-        # Skip if phone already stored on all matching docs
-        if all(d.to_dict().get('phone') for d in docs):
+        # Re-fetch when guest count still missing even if phone was stored earlier
+        if all(d.to_dict().get('phone') for d in docs) and all(
+            (d.to_dict().get('guestCount') or d.to_dict().get('guests') or d.to_dict().get('adults'))
+            for d in docs
+        ):
             skipped += 1
             continue
 
@@ -877,10 +880,29 @@ def fetch_guest_details(session, db, reservations):
     print(f"Guest details: {updated} updated, {skipped} skipped, {errors} errors")
 
 
+def parse_guest_counts_from_remarks(remarks_text):
+    """Parse OTA remarks text, e.g. 'Adult Count:2' / 'Child Count:1'."""
+    if not remarks_text:
+        return {}
+    adults_m = re.search(r'Adult Count:\s*(\d+)', remarks_text, re.IGNORECASE)
+    child_m = re.search(r'Child(?:ren)? Count:\s*(\d+)', remarks_text, re.IGNORECASE)
+    out = {}
+    if adults_m:
+        out['adults'] = int(adults_m.group(1))
+    if child_m:
+        out['children'] = int(child_m.group(1))
+    if 'adults' in out or 'children' in out:
+        total = out.get('adults', 0) + out.get('children', 0)
+        if total > 0:
+            out['guests'] = total
+            out['guestCount'] = total
+    return out
+
+
 def fetch_booking_ids(session, db, reservations):
     """
-    For OTA reservations (source=booking/expedia) in the current sync window that
-    are missing bookingId, fetch the detail endpoint and parse remarks.printed.
+    For OTA reservations (source=booking/expedia) fetch MiniHotel detail API and parse
+    remarks.printed for bookingId and guest counts (Adult Count / Child Count).
     Handles multi-room bookings by querying all Firestore docs per reservationNumber.
     """
     ota_sources = {'booking', 'expedia'}
@@ -901,14 +923,22 @@ def fetch_booking_ids(session, db, reservations):
             seen.add(rn)
             targets.append(rn)
 
-    print(f"Checking bookingId for {len(targets)} OTA reservations...")
+    print(f"Checking OTA remarks (bookingId + guest counts) for {len(targets)} reservations...")
     updated = skipped = errors = 0
 
     for res_num in targets:
         try:
-            # Check if ANY Firestore doc for this reservation already has bookingId
             docs = list(coll.where('reservationNumber', '==', res_num).stream())
-            if any(d.to_dict().get('bookingId') for d in docs):
+            if not docs:
+                skipped += 1
+                continue
+            doc_payloads = [d.to_dict() or {} for d in docs]
+            needs_booking_id = not any(p.get('bookingId') for p in doc_payloads)
+            needs_guests = not any(
+                p.get('guestCount') or p.get('guests') or p.get('adults')
+                for p in doc_payloads
+            )
+            if not needs_booking_id and not needs_guests:
                 skipped += 1
                 continue
 
@@ -924,17 +954,30 @@ def fetch_booking_ids(session, db, reservations):
                 continue
 
             remarks = (resp.json().get('remarks') or {}).get('printed') or ''
-            m = re.search(r'Booking id[:\s]+(\d+)', remarks, re.IGNORECASE)
-            if not m:
-                skipped += 1
-                time.sleep(0.5)
-                continue
+            update = {}
 
-            booking_id = m.group(1)
-            for doc in docs:
-                doc.reference.set({'bookingId': booking_id}, merge=True)
-            print(f"  {res_num}: bookingId={booking_id} ({len(docs)} doc(s))")
-            updated += 1
+            if needs_booking_id:
+                m = re.search(r'Booking id[:\s]+(\d+)', remarks, re.IGNORECASE)
+                if m:
+                    update['bookingId'] = m.group(1)
+
+            if needs_guests:
+                guest_fields = parse_guest_counts_from_remarks(remarks)
+                if guest_fields:
+                    update.update(guest_fields)
+
+            if update:
+                for doc in docs:
+                    doc.reference.set(update, merge=True)
+                parts = []
+                if update.get('bookingId'):
+                    parts.append(f"bookingId={update['bookingId']}")
+                if update.get('guestCount'):
+                    parts.append(f"guests={update['guestCount']}")
+                print(f"  {res_num}: {', '.join(parts)} ({len(docs)} doc(s))")
+                updated += 1
+            else:
+                skipped += 1
 
         except Exception as e:
             print(f"  {res_num}: error: {e}")
@@ -942,7 +985,7 @@ def fetch_booking_ids(session, db, reservations):
 
         time.sleep(0.5)
 
-    print(f"Booking IDs: {updated} fetched/updated, {skipped} skipped, {errors} errors")
+    print(f"OTA remarks: {updated} updated, {skipped} skipped, {errors} errors")
 
 
 def main():
