@@ -91,6 +91,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .card__top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;}
 .card__room{font-family:var(--mono);font-size:16px;font-weight:600;letter-spacing:.03em;}
 .card__name{font-size:16px;font-weight:600;margin-bottom:4px;letter-spacing:-.01em;}
+.card__guests{font-size:13px;color:var(--muted);margin-bottom:4px;}
 .card__dates{font-size:13px;color:var(--muted);}
 .card__sub{font-size:12px;color:var(--muted);margin-top:2px;}
 .card__actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
@@ -2447,6 +2448,29 @@ function scheduleBuckets(){
   };
 }
 
+function parseStayGuestNum(v){
+  if(v==null||v==='')return 0;
+  if(typeof v==='number')return v>0?v:0;
+  const n=parseInt(String(v),10);
+  return Number.isFinite(n)&&n>0?n:0;
+}
+function guestCountFromRes(r){
+  if(!r)return 0;
+  let n=parseStayGuestNum(r.guests);
+  if(n)return n;
+  n=parseStayGuestNum(r.guestCount);
+  if(n)return n;
+  const adults=parseStayGuestNum(r.adults);
+  const children=parseStayGuestNum(r.children||r.child||r.kids);
+  if(adults||children)return adults+children;
+  return 0;
+}
+function stayGuestCount(grp,form){
+  let total=0;
+  for(const r of grp)total+=guestCountFromRes(r);
+  if(!total&&form)total=parseStayGuestNum(form.guests);
+  return total>0?total:1;
+}
 function renderCard(grp,mode){
   const sorted=[...grp].sort(byRoom);
   const form=grp.reduce((f,r)=>f||getForm(r),null);
@@ -2469,14 +2493,16 @@ function renderCard(grp,mode){
   else grant=`<button class="btn" disabled>No form yet</button>`;
   const src=grp[0].source||grp[0].channel||'';
   const ref=grp[0].reservationNumber||grp[0].bookingId||'';
-  const guests=grp.reduce((s,r)=>s+(r.guests||1),0);
-  const sub=[src,ref?'#'+ref:'',guests>1?guests+' guests':'',rawPhone||''].filter(Boolean).join(' · ');
+  const guestCount=stayGuestCount(grp,form);
+  const guestCountLabel=guestCount+' guest'+(guestCount===1?'':'s');
+  const sub=[src,ref?'#'+ref:'',rawPhone||''].filter(Boolean).join(' · ');
   const open=form?`onclick="window.openDetail('${form.id}')" style="cursor:pointer"`:'';
   const manualBadge=reservationManualBadge(grp);
   const driftBadge=reservationDriftBadge(grp);
   return`<div class="card" ${open}>
     <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${st.cls}">${st.label}</span>${manualBadge}${driftBadge}</div>
     <div class="card__name">${esc(name)}${multi}</div>
+    <div class="card__guests">${esc(guestCountLabel)}</div>
     <div class="card__dates">${esc(datesStr(grp[0],mode))}</div>
     ${sub?`<div class="card__sub">${esc(sub)}</div>`:''}
     <div class="card__actions">${waBtn}${grant}</div>
@@ -3570,9 +3596,20 @@ function hkPinRolesReady(){
   });
 }
 
-const HK_ROLE_LABELS={admin:'All properties'};
+const HK_ROLE_LABELS={
+  admin:'All properties',
+  shartava:'Shartava Team',
+  centre:'Centre Team',
+  vgl:'VGL Team',
+  abashidze:'Abashidze Team',
+};
 function hkRefreshRoleLabels(){
   hkGetTeams().forEach(t=>{HK_ROLE_LABELS[t.id]=t.label;});
+}
+function hkPinRoleAllowed(roleId){
+  if(!roleId)return false;
+  if(roleId==='admin')return true;
+  return Object.prototype.hasOwnProperty.call(hkPinsData,roleId);
 }
 function hkStoredRole(){
   return localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role')||'';
@@ -3611,7 +3648,7 @@ function _hkSubmitPin(){
     const p=hkNormalizePin(pin);
     if(entered&&p&&entered===p){matched=id;break;}
   }
-  if(matched&&HK_ROLE_LABELS[matched]){
+  if(matched&&hkPinRoleAllowed(matched)){
     localStorage.setItem('hk_role',matched);
     document.documentElement.classList.add('hk-authed');
     document.documentElement.classList.toggle('hk-admin-role',matched==='admin');
@@ -3638,7 +3675,7 @@ async function hkInitStandalone(){
   const role=hkStoredRole();
   if(role){
     const pinOk=hkNormalizePin(hkPinsData[role]);
-    if(pinOk&&HK_ROLE_LABELS[role]){
+    if(pinOk&&hkPinRoleAllowed(role)){
       document.documentElement.classList.add('hk-authed');
       document.documentElement.classList.toggle('hk-admin-role',role==='admin');
     }else{
