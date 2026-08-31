@@ -1338,15 +1338,51 @@ function _elevatorDisplayCode(data){
 }
 function _elevatorQrPayload(data){
   if(!data)return '';
-  return String(data.qr_code||_elevatorDisplayCode(data)||'').trim();
-}
-function _elevatorIsStale(data){
-  const ms=_elevatorUpdatedMs(data);
-  if(!ms)return false;
-  return Date.now()-ms>36*3600*1000;
+  return String(data.qr_code||data.qrCode||'').trim();
 }
 function _elevatorCodeForGuest(){
-  return _elevatorDisplayCode(elevatorData);
+  if(!elevatorData)return '';
+  return String(elevatorData.code||elevatorData.display_code||'').trim();
+}
+let _elevatorFsData=null;
+function _buildElevatorMerged(rtdbData,fsData){
+  const rtdbTs=rtdbData?parseInt(rtdbData.updatedAt||0,10):0;
+  const fsTs=fsData?_elevatorUpdatedMs(fsData):0;
+  if(rtdbData&&rtdbTs>=fsTs){
+    const code=String(rtdbData.display_code||rtdbData.code||'').trim();
+    const qr=String(rtdbData.qr_code||'').trim();
+    return{code,display_code:code,qr_code:qr,qrCode:qr,updatedAt:{seconds:Math.floor(rtdbTs/1000)},source:rtdbData.source||'auto',_source:'rtdb'};
+  }
+  if(fsData){
+    const code=String(fsData.display_code||fsData.code||fsData.lastCode||'').trim();
+    const qr=String(fsData.qr_code||fsData.qrCode||rtdbData?.qr_code||'').trim();
+    const ms=_elevatorUpdatedMs(fsData);
+    return{...fsData,code,display_code:code,qr_code:qr,qrCode:qr,updatedAt:ms?{seconds:Math.floor(ms/1000)}:fsData.updatedAt,_source:'firestore'};
+  }
+  if(rtdbData){
+    const code=String(rtdbData.display_code||rtdbData.code||'').trim();
+    const qr=String(rtdbData.qr_code||'').trim();
+    return{code,display_code:code,qr_code:qr,qrCode:qr,updatedAt:{seconds:Math.floor(rtdbTs/1000)},source:rtdbData.source||'auto',_source:'rtdb'};
+  }
+  return null;
+}
+async function _syncElevatorFromStores(){
+  let rtdbData=null;
+  try{
+    const r=await fetch(RTDB_ELEVATOR_URL);
+    if(r.ok)rtdbData=await r.json();
+  }catch(e){}
+  const merged=_buildElevatorMerged(rtdbData,_elevatorFsData);
+  if(!merged)return;
+  elevatorData=merged;
+  if(document.getElementById('page-home')?.classList.contains('active'))renderTiles();
+}
+function _startElevatorSync(){
+  _syncElevatorFromStores();
+  _homeSnaps.push(onSnapshot(doc(db,'globals','elevator_code'),snap=>{
+    _elevatorFsData=snap.exists()?snap.data():null;
+    _syncElevatorFromStores();
+  }));
 }
 let _elevatorQrDrawToken=0;
 let _qrLibPromise=null;
@@ -1427,24 +1463,7 @@ async function _drawElevatorQr(text){
   }
 }
 function _normalizeElevatorData(raw){
-  if(!raw)return null;
-  const code=_elevatorDisplayCode(raw);
-  if(!code)return null;
-  const ms=_elevatorUpdatedMs(raw);
-  return{...raw,code,display_code:code,updatedAt:ms?{seconds:Math.floor(ms/1000)}:raw.updatedAt};
-}
-function _applyElevatorSnap(raw){
-  const norm=_normalizeElevatorData(raw);
-  if(!norm)return;
-  elevatorData=norm;
-  if(document.getElementById('page-home')?.classList.contains('active'))renderTiles();
-}
-async function _seedElevatorFromRtdb(){
-  try{
-    const r=await fetch(RTDB_ELEVATOR_URL);
-    const d=await r.json();
-    if(d)_applyElevatorSnap(d);
-  }catch(e){}
+  return _buildElevatorMerged(null,raw);
 }
 function _doorCodeForGuest(){
   const fromRes=activeReservation?.tuyaPassword||'';
@@ -2249,13 +2268,7 @@ window.switchApt=async function(newRoomCode){
   renderGreetingApt();
   renderTiles();
   // Restart elevator subscription if this apt needs it
-  if(needsElevatorCode()){
-    _seedElevatorFromRtdb();
-    _homeSnaps.push(onSnapshot(doc(db,'globals','elevator_code'),snap=>{
-      _applyElevatorSnap(snap.exists()?snap.data():null);
-      renderTiles();
-    }));
-  }
+  if(needsElevatorCode())_startElevatorSync();
   // Restart reservation subscription for the new apt.
   // Capture the room we subscribed for — if aptId changes again before this fires, ignore.
   const _snapRoom=aptId;
@@ -2837,12 +2850,7 @@ function showHome(){
     }
   }
   // Subscribe to elevator code for floors 6 & 7
-  if(needsElevatorCode()){
-    _seedElevatorFromRtdb();
-    _homeSnaps.push(onSnapshot(doc(db,'globals','elevator_code'),snap=>{
-      _applyElevatorSnap(snap.exists()?snap.data():null);
-    }));
-  }
+  if(needsElevatorCode())_startElevatorSync();
   // Subscribe to reservations for this apartment — find the active one with a Tuya password
   if(aptId){
     _homeSnaps.push(onSnapshot(
