@@ -1,8 +1,10 @@
 # Sandbox backend handoff — for Claude Code review
 
-**Status (2026-08-31):** **Sandbox signed off by host** — UI works on production hosting. All changes stay in **sandbox HTML** + `pipeline-functions/` — **no live cutover** (`checkin-admin.html`, `checkin-guest-v2.html` untouched).
+**Status (2026-08-31):** Sandbox UI is on **production hosting** (GitHub Pages) but **not live for guests**. All changes stay in **sandbox HTML** + `pipeline-functions/` — **no live cutover** (`checkin-admin.html`, `checkin-guest-v2.html` untouched).
 
-**Host note:** *"Everything works fine in sandbox."* Backend callables still optional (not deployed); sandbox uses Firestore fallbacks / direct writes where needed.
+**Agent entry point:** `docs/AGENT_HANDOFF.md` (not `CLAUDE_CODE_REPORT.md`, deprecated).
+
+**Host note (informal, Cursor chat):** *"Everything works fine in sandbox."* That is **not** the same as completing the phone checklist in `docs/SANDBOX_TESTING.md` or approving cutover. Backend callables still optional (not deployed); sandbox uses Firestore fallbacks / direct writes where needed.
 
 **Deploy policy:** Do **not** deploy `pipeline-adminAction` or `pipeline-guestRegister` until host explicitly asks. Use the **Functions emulator** only if you need strict callable E2E before deploy.
 
@@ -47,7 +49,7 @@ Shared unlock rules (browser + server): `shared/guest-unlock.js` ↔ `pipeline-f
 | Callable E2E (recommended) | Functions emulator + sandbox HTML | **No** |
 | Callable E2E (optional) | Deploy callables to Firebase | Yes — only after sandbox sign-off |
 
-Expected unit tests: **49/49 pass** (elevator + room assignment + admin action + guest unlock + guest register).
+Expected unit tests: **54/54 pass** (elevator + room assignment + admin action + guest unlock + guest register).
 
 **CI:** GitHub Actions runs `npm test` + guest-unlock sync check on every PR that touches `pipeline-functions/` or `shared/guest-unlock.js`.
 
@@ -232,7 +234,7 @@ After deploy, sandbox pages work **without** emulator (remove `?emulator=1` or u
 
 ## Review checklist (Claude Code)
 
-**Sandbox UI:** Host signed off 2026-08-31 — no open blockers. See `CLAUDE_CODE_REPORT.md` for current URLs and recent merges.
+**Sandbox UI:** Deployed on GitHub Pages; formal phone checklist status unknown — see `docs/SANDBOX_TESTING.md`. See `docs/AGENT_HANDOFF.md` for current URLs and agent read order.
 
 **Backend (when deploy is requested):**
 
@@ -281,4 +283,4 @@ All calls include `password` and optional `actor`.
 
 ---
 
-**Full report for Claude Code:** see **`CLAUDE_CODE_REPORT.md`** (updated 2026-08-31 — sandbox signed off)
+**Full report for Claude Code:** see **`docs/AGENT_HANDOFF.md`** (`CLAUDE_CODE_REPORT.md` is deprecated)
