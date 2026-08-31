@@ -1,6 +1,6 @@
 /**
  * Sandbox client for pipeline GuestRegister callable.
- * Deployed: pipeline-guestRegister · Emulator: guestRegister
+ * Deployed: guestRegister · Emulator: guestRegister
  */
 
 import { pipelineCallableName } from './pipeline-emulator.js';
