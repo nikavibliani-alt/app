@@ -1,4 +1,19 @@
 {
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "firebase-debug*.log",
+      "**/.*",
+      "serviceAccountKey.json",
+      "node_modules/**",
+      "tuya-functions/**",
+      "pipeline-functions/**",
+      "sandbox_rebuild/**",
+      "scripts/**"
+    ]
+  },
   "functions": [
     {
       "source": "tuya-functions",

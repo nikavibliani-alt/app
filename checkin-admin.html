@@ -4532,4 +4532,13 @@ onSnapshot(doc(db,'globals','elevator_code'),snap=>{
 setInterval(()=>{if(currentTab==='elevator')renderElevator();loadElevatorOnce();},60000);
 setTimeout(()=>{document.getElementById('loading').style.display='none';if(!_resCache&&!_resSubscribed)_loadResCache();if(loaded<2){if(STANDALONE_HK)hkInitStandalone();else switchTab(currentTab);}},5000);
 if(!STANDALONE_HK)switchTab(currentTab);
-</script></body></html>
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .catch(err => console.warn('[SW] registration failed', err));
+  });
+}
+</script>
+</body></html>
