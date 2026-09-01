@@ -2,6 +2,13 @@
   "hosting": {
     "public": ".",
     "cleanUrls": true,
+    "redirects": [
+      {
+        "source": "/",
+        "destination": "/checkin-guest",
+        "type": 301
+      }
+    ],
     "ignore": [
       "firebase.json",
       ".firebaserc",
@@ -12,7 +19,33 @@
       "tuya-functions/**",
       "pipeline-functions/**",
       "sandbox_rebuild/**",
-      "scripts/**"
+      "scripts/**",
+      "index.html",
+      "clear-reservations.html",
+      "import-reservations.html",
+      "checkin-admin-backup.html",
+      "checkin-admin-legacy.html",
+      "admin-search-test.html",
+      "tuya-test.html",
+      "SleepyDashboard.html",
+      "SleepyPMS.html",
+      "TukaTracker.html",
+      "VenuTracker Update.html",
+      "sandbox-index.html",
+      "SYSTEM_MAP.html",
+      "SYSTEM_MAP_CURSOR.html",
+      "checkin-guest-sandbox.html",
+      "checkin-guest-sandbox-2.html",
+      "checkin-guest-sandbox-3.html",
+      "checkin-admin-sandbox.html",
+      "HK-legacy.html",
+      "hk-manage.html",
+      "*.md",
+      "*.py",
+      "*.json",
+      "*.yml",
+      "*.patch*",
+      "CNAME"
     ]
   },
   "functions": [
