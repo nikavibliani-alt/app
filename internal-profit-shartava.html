@@ -284,10 +284,29 @@ align-items:center;justify-content:center;font-family:sans-serif;">
 
 <script>
 (function(){
-  const PROFIT_PIN = 'maxela2026';
   const KEY = 'profit_authed_v1';
-  
-  function checkProfitPin(){
+
+  // SECURITY NOTE: profit_settings/pins is publicly readable (no auth)
+  // via the Firestore REST API below, since this page reads it without
+  // signing in. Accepted for now — it stops casual access, not a
+  // determined reader. Add Firebase Auth-gated Firestore rules later
+  // if real protection is needed.
+  async function getProfitPin(tracker) {
+    try {
+      const r = await fetch(
+        'https://firestore.googleapis.com/v1/projects/sleepy-5c962' +
+        '/databases/(default)/documents/profit_settings/pins'
+      );
+      const data = await r.json();
+      const pin = data.fields?.[tracker]?.stringValue;
+      return pin || 'maxela2026'; // fallback if not set
+    } catch(e) {
+      return 'maxela2026'; // fallback on error
+    }
+  }
+
+  async function checkProfitPin(){
+    const PROFIT_PIN = await getProfitPin('shartava');
     const val = document.getElementById('profit-pin').value;
     if(val === PROFIT_PIN){
       sessionStorage.setItem(KEY, '1');
@@ -298,10 +317,10 @@ align-items:center;justify-content:center;font-family:sans-serif;">
     }
   }
   window.checkProfitPin = checkProfitPin;
-  
+
   // Allow Enter key
-  document.getElementById('profit-pin').addEventListener('keydown', function(e){
-    if(e.key === 'Enter') checkProfitPin();
+  document.getElementById('profit-pin').addEventListener('keydown', async function(e){
+    if(e.key === 'Enter') await checkProfitPin();
   });
   
   // Check if already authed this session
