@@ -171,6 +171,11 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .pill-multi{background:var(--bg);color:var(--muted);margin-left:6px;}
 .pill-manual{background:#fef3c7;color:#92400e;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.04em;}
 .pill-drift{background:#fee2e2;color:#991b1b;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.04em;}
+.source-badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;color:#fff;vertical-align:middle;margin-left:6px;letter-spacing:0.02em;}
+.source-badge--airbnb{background:#FF5A5F;}
+.source-badge--booking{background:#003580;}
+.source-badge--expedia{background:#FFC72C;color:#1a1a1a;}
+.source-badge--direct{background:#2d6a4f;}
 .elev-status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:16px;flex-wrap:wrap;}
 .elev-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .elev-dot.fresh{background:var(--green);box-shadow:0 0 0 3px rgba(45,106,79,.2);}
@@ -1443,6 +1448,7 @@ const HK_CLEAN_TYPES=[
 let gsWaitingTabs={...WAITING_TABS_DEFAULTS};
 let _hkCleanDetailOpen=false;
 let hkSettings={defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS},cleanMinutesByRoom:{},teams:[]};
+let hkCategoryCapacity={ROOMS:{default:2},MAXELA:{default:2},BIG_APT:{default:6},FREEDOM:{default:2},ORBELIANI:{default:2},VGL:{default:2}};
 let _hkTeamEdit=null;
 let gsVisibility=JSON.parse(JSON.stringify(SECTION_DEFAULTS));
 let gsLaundry=[...LAUNDRY_DEFAULTS];
@@ -1482,6 +1488,7 @@ async function loadGuestSettings(){
         cleanMinutesByRoom:{...(hkSettings.cleanMinutesByRoom||{}),...(d.hkSettings.cleanMinutesByRoom||{})},
         teams:Array.isArray(d.hkSettings.teams)?d.hkSettings.teams:(hkSettings.teams||[]),
       };
+      if(d.categoryCapacity)hkCategoryCapacity={...hkCategoryCapacity,...d.categoryCapacity};
       if(d.whatsappMessages)waSettings=mergeWaSettings(d.whatsappMessages);
     }
   }catch(e){console.warn(e);}
@@ -2215,6 +2222,11 @@ function pipelineRoomToast(r,okMsg){
 function reservationManualBadge(grp){
   const manual=grp.some(r=>r.manualRoom===true||r.manualRoom==='true');
   return manual?'<span class="pill pill-manual">MANUAL</span>':'';
+}
+const SOURCE_BADGES={airbnb:{label:'Airbnb',cls:'source-badge--airbnb'},booking:{label:'Booking',cls:'source-badge--booking'},expedia:{label:'Expedia',cls:'source-badge--expedia'}};
+function sourceBadgeHtml(source){
+  const def=SOURCE_BADGES[(source||'').toLowerCase()]||{label:'Direct',cls:'source-badge--direct'};
+  return `<span class="source-badge ${def.cls}">${esc(def.label)}</span>`;
 }
 function reservationDriftBadge(grp){
   for(const r of grp){
@@ -3827,7 +3839,7 @@ function hkGuestCountHtml(res,count,verb){
   return esc('—');
 }
 function hkBeddingAlertHtml(roomCode,guests){
-  const alert=hkBeddingAlert(roomCode,guests);
+  const alert=hkBeddingAlert(roomCode,guests,aptData[roomCode]?.normalCapacity,hkCategoryCapacity);
   if(!alert)return '';
   return `<div class="hk-bedding-alert">${HK_SHEET_ICON}<span>${esc(alert.text)}</span></div>`;
 }
@@ -3915,8 +3927,8 @@ async function renderHk(){
       <div class="hk-card__top"><div><div class="hk-card__room">${esc(room.code)}</div><div class="hk-card__name">${esc(room.name)}</div></div>
       <span class="pill ${done?'pill-ok':'pill-await'}">${done?'Done':'Pending'}</span></div>
       <div class="hk-card__times">
-        <div class="hk-card__time"><b>Checkout</b>${esc(coTime)}<div class="hk-card__count">${hkGuestCountHtml(co,outGuests,'leaving')}</div></div>
-        <div class="hk-card__time${inBoxCls}"><b>Check-in</b>${nextRes?`<div class="hk-card__when">${esc(whenLabel)}</div>${esc(ciTime)}<div class="hk-card__count">${hkGuestCountHtml(nextRes,inGuests,'arriving')}</div>`:'<div class="hk-card__count">No booking</div>'}</div>
+        <div class="hk-card__time"><b>Checkout</b>${admin&&co?sourceBadgeHtml(co.source):''}${esc(coTime)}<div class="hk-card__count">${hkGuestCountHtml(co,outGuests,'leaving')}</div></div>
+        <div class="hk-card__time${inBoxCls}"><b>Check-in</b>${admin&&nextRes?sourceBadgeHtml(nextRes.source):''}${nextRes?`<div class="hk-card__when">${esc(whenLabel)}</div>${esc(ciTime)}<div class="hk-card__count">${hkGuestCountHtml(nextRes,inGuests,'arriving')}</div>`:'<div class="hk-card__count">No booking</div>'}</div>
       </div>
       ${guestCheckedOut?'<div class="hk-guest-out">Guest checked out</div>':''}
       ${beddingHtml}
