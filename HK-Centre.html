@@ -96,6 +96,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .tb-guest{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
 .notes-box{margin:0 1rem 0.6rem;background:#fff;border-radius:var(--rs);padding:8px 10px;border:1px solid var(--yellow-border);}
+.bedding-alert{display:inline-flex;align-items:flex-start;gap:6px;margin:0 1rem 0.6rem;background:var(--yellow-bg);border:1px solid var(--yellow-border);border-radius:var(--rs);padding:8px 10px;font-size:13px;font-weight:500;color:var(--yellow-dark);line-height:1.4;}
 .notes-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--yellow-dark);margin-bottom:2px;}
 .notes-txt{font-size:13px;color:var(--text);}
 
@@ -161,6 +162,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,collection,doc,setDoc,updateDoc,getDocs,query,where,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{hkBeddingAlert}from"./shared/hk-bedding.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -242,6 +244,16 @@ function getNextCheckin(roomCode,afterDate){
     .sort((a,b)=>a.checkin.localeCompare(b.checkin))[0]||null;
 }
 
+function getGuestCount(res){
+  if(!res)return 0;
+  if(typeof res.guests==='number')return res.guests;
+  if(typeof res.guests==='string'&&res.guests!=='')return parseInt(res.guests)||0;
+  const adults=parseInt(String(res.adults||0))||0;
+  const children=parseInt(String(res.children||res.child||res.kids||0))||0;
+  if(adults>0)return adults+children;
+  if(res.guestCount)return parseInt(String(res.guestCount))||0;
+  return 0;
+}
 function getPriority(roomCode,date){
   const co=getCheckoutToday(roomCode,date);
   if(!co)return null; // no checkout = nothing to clean
@@ -410,6 +422,8 @@ function render(){
       }
 
       const notesHtml=co?.notes?`<div class="notes-box"><div class="notes-lbl">📝 Notes</div><div class="notes-txt">${co.notes}</div></div>`:'';
+      const beddingAlert=nextRes?hkBeddingAlert(room.code,getGuestCount(nextRes))?.text:null;
+      const beddingHtml=beddingAlert?`<div class="bedding-alert">⚠️ ${beddingAlert}</div>`:'';
 
       const cleanerOptions=CLEANERS.map(c=>`<option value="${c}"${assignedCleaner===c?' selected':''}>${c}</option>`).join('');
 
@@ -423,7 +437,7 @@ function render(){
           <div class="priority-chip ${done?'chip-done':chipCls}">${done?'Done ✓':chipLabel}</div>
         </div>
         <div class="times-row">${outBox}${inBox}</div>
-        ${notesHtml}
+        ${notesHtml}${beddingHtml}
         <div class="card-footer">
           <select class="cleaner-sel" id="sel-${key}" onchange="window.saveCleaner('${room.code}','${ds}',this.value)">
             <option value="">Assign cleaner...</option>

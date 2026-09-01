@@ -376,6 +376,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import{getFirestore,collection,doc,setDoc,deleteDoc,updateDoc,getDocs,query,where,onSnapshot,serverTimestamp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{hkBeddingAlert}from"./shared/hk-bedding.js";
 
 const fb=initializeApp({
   apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -511,15 +512,6 @@ function getGuestCount(res){
   // Firestore field written by minihotel_reservation_sync.py detail fetch
   if(res.guestCount)return parseInt(String(res.guestCount))||0;
   return 0;
-}
-function getBeddingAlert(roomCode,guests){
-  if(guests<1)return null;
-  const c=String(roomCode||'').toLowerCase();
-  if(/^0-/.test(c))return guests>=4?'Extra sofa bed sheets needed':null;
-  if(['6-1','6-2','6-4','7-1','7-2','7-4'].includes(c))return guests>=5?'Extra sheets needed':null;
-  if(c==='6-3')return guests>=9?'Extra sheets needed':null;
-  if(/^(orb|tab)-/.test(c))return guests>=3?'Extra sheets needed':null;
-  return null;
 }
 function getTaskRooms(date){
   const ds=fmtDate(date);
@@ -845,7 +837,7 @@ function render(){
     const nextRes=getNextCheckin(room.code,date);
     const outGuests=getGuestCount(co);
     const inGuests=getGuestCount(nextRes);
-    const beddingAlert=nextRes?getBeddingAlert(room.code,inGuests):null;
+    const beddingAlert=nextRes?hkBeddingAlert(room.code,inGuests)?.text:null;
     const key=statusKey(room.code,ds);
     const sData=statusData[key]||{};
     const admin=isAdmin();

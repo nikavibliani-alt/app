@@ -1901,6 +1901,20 @@ function hkVisibleCleanTypes(){
   const codes=getHkRooms().map(r=>String(r.code||'').toLowerCase());
   return HK_CLEAN_TYPES.filter(t=>codes.some(c=>t.match(c)));
 }
+const _hkCapSaveTimers={};
+function hkSetRoomCapacity(code,val){
+  clearTimeout(_hkCapSaveTimers[code]);
+  _hkCapSaveTimers[code]=setTimeout(async()=>{
+    const n=parseInt(val,10);
+    const cap=(Number.isFinite(n)&&n>0)?n:0;
+    aptData[code]=aptData[code]||{};
+    aptData[code].normalCapacity=cap;
+    try{
+      await setDoc(doc(db,'checkin_apartments',code),{normalCapacity:cap},{merge:true});
+    }catch(e){console.error('[hkSetRoomCapacity]',e);}
+  },500);
+}
+window.hkSetRoomCapacity=hkSetRoomCapacity;
 function renderHkSettings(){
   const wrap=document.getElementById('hksettings-root');
   if(!wrap)return;
@@ -1924,10 +1938,13 @@ function renderHkSettings(){
       const typeDef=hkTypeCleanMinutes(typeId);
       const val=hkSettings.cleanMinutesByRoom[r.code]??typeDef;
       const override=hkSettings.cleanMinutesByRoom[r.code]!=null;
+      const capVal=aptData[r.code]?.normalCapacity||'';
       return`<div class="hk-clean-row">
         <div class="hk-clean-row__meta"><div class="hk-clean-row__code">${esc(r.code)}${override?' · override':''}</div><div class="hk-clean-row__name">${esc(r.name)} · default ${typeDef} min</div></div>
         <input type="number" min="20" max="240" step="5" id="hk-clean-${esc(r.code)}" value="${val}" aria-label="Minutes for ${esc(r.code)}">
         <span style="font-size:11px;color:var(--muted);width:28px">min</span>
+        <input type="number" min="1" max="30" step="1" placeholder="auto" value="${esc(String(capVal))}" aria-label="Normal capacity for ${esc(r.code)}" oninput="hkSetRoomCapacity('${esc(r.code)}',this.value)">
+        <span style="font-size:11px;color:var(--muted);width:52px">cap</span>
       </div>`;
     }).join('')}</div>`;
   const shartava=getHkRooms().filter(r=>hkSiteId(r.code)==='shartava');
@@ -4010,7 +4027,7 @@ function hkGuestCountHtml(res,count,verb){
   return esc('—');
 }
 function hkBeddingAlertHtml(roomCode,guests){
-  const alert=hkBeddingAlert(roomCode,guests);
+  const alert=hkBeddingAlert(roomCode,guests,aptData[roomCode]?.normalCapacity);
   if(!alert)return '';
   return `<div class="hk-bedding-alert">${HK_SHEET_ICON}<span>${esc(alert.text)}</span></div>`;
 }
