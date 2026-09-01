@@ -4098,8 +4098,8 @@ async function renderHk(){
       <div class="hk-card__top"><div><div class="hk-card__room">${esc(room.code)}</div><div class="hk-card__name">${esc(room.name)}</div></div>
       <span class="pill ${done?'pill-ok':'pill-await'}">${done?'Done':'Pending'}</span></div>
       <div class="hk-card__times">
-        <div class="hk-card__time"><b>Checkout</b>${esc(coTime)}<div class="hk-card__count">${hkGuestCountHtml(co,outGuests,'leaving')}</div></div>
-        <div class="hk-card__time${inBoxCls}"><b>Check-in</b>${nextRes?`<div class="hk-card__when">${esc(whenLabel)}</div>${esc(ciTime)}<div class="hk-card__count">${hkGuestCountHtml(nextRes,inGuests,'arriving')}</div>`:'<div class="hk-card__count">No booking</div>'}</div>
+        <div class="hk-card__time"><b>Checkout</b>${admin&&co?sourceBadgeHtml(co.source):''}${esc(coTime)}<div class="hk-card__count">${hkGuestCountHtml(co,outGuests,'leaving')}</div></div>
+        <div class="hk-card__time${inBoxCls}"><b>Check-in</b>${admin&&nextRes?sourceBadgeHtml(nextRes.source):''}${nextRes?`<div class="hk-card__when">${esc(whenLabel)}</div>${esc(ciTime)}<div class="hk-card__count">${hkGuestCountHtml(nextRes,inGuests,'arriving')}</div>`:'<div class="hk-card__count">No booking</div>'}</div>
       </div>
       ${guestCheckedOut?'<div class="hk-guest-out">Guest checked out</div>':''}
       ${beddingHtml}
