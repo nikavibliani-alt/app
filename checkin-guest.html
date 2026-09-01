@@ -1892,7 +1892,20 @@ window.setLang=function(l){
   document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick').includes("'"+l+"'")));
   applyTranslations();
   if(document.getElementById('page-home').classList.contains('active'))renderTiles();
+  const homePill=document.getElementById('lang-pill-label-home');
+  if(homePill)homePill.textContent=l==='ka'?'ქარ':l==='ar'?'ع':l.toUpperCase();
 }
+
+window.cycleLang=function(){
+  const LANGS=['en','ka','ru','ar'];
+  const current=lang||'en';
+  const nextIndex=(LANGS.indexOf(current)+1)%LANGS.length;
+  setLang(LANGS[nextIndex]);
+  // Update the top bar pill label to show current language
+  const label=document.getElementById('lang-pill-label-home');
+  if(label)label.textContent=LANGS[nextIndex].toUpperCase()
+    .replace('KA','ქარ').replace('AR','ع');
+};
 
 function applyTranslations(){
   const map={
