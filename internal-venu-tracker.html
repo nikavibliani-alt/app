@@ -299,7 +299,7 @@ align-items:center;justify-content:center;font-family:sans-serif;">
     const PROFIT_PIN = await getProfitPin('venu');
     const val = document.getElementById('profit-pin').value;
     if(val === PROFIT_PIN){
-      sessionStorage.setItem(KEY, '1');
+      localStorage.setItem(KEY, '1');
       document.getElementById('profit-gate').style.display = 'none';
     } else {
       document.getElementById('profit-pin-error').style.display = 'block';
@@ -314,7 +314,7 @@ align-items:center;justify-content:center;font-family:sans-serif;">
   });
   
   // Check if already authed this session
-  if(sessionStorage.getItem(KEY) !== '1'){
+  if(localStorage.getItem(KEY) !== '1'){
     document.getElementById('profit-gate').style.display = 'flex';
   }
 })();
