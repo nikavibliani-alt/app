@@ -9,6 +9,32 @@
         "type": 301
       }
     ],
+    "rewrites": [
+      {
+        "source": "/profit/shartava",
+        "destination": "/internal-profit-shartava.html"
+      },
+      {
+        "source": "/profit/tuka",
+        "destination": "/internal-tuka-tracker.html"
+      },
+      {
+        "source": "/profit/venu",
+        "destination": "/internal-venu-tracker.html"
+      },
+      {
+        "source": "/checkin-guest",
+        "destination": "/checkin-guest.html"
+      },
+      {
+        "source": "/checkin-admin",
+        "destination": "/checkin-admin.html"
+      },
+      {
+        "source": "/hk-app",
+        "destination": "/hk-app.html"
+      }
+    ],
     "ignore": [
       "firebase.json",
       ".firebaserc",
@@ -20,7 +46,6 @@
       "pipeline-functions/**",
       "sandbox_rebuild/**",
       "scripts/**",
-      "index.html",
       "clear-reservations.html",
       "import-reservations.html",
       "checkin-admin-backup.html",
@@ -29,8 +54,6 @@
       "tuya-test.html",
       "SleepyDashboard.html",
       "SleepyPMS.html",
-      "TukaTracker.html",
-      "VenuTracker Update.html",
       "sandbox-index.html",
       "SYSTEM_MAP.html",
       "SYSTEM_MAP_CURSOR.html",

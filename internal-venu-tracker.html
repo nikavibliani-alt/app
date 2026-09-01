@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Tuka Tracker</title>
+<title>Venu Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
   --bg:#f5f5f7;--surface:#fff;--border:#e8e8ed;--border2:#d1d1d6;
   --text:#1c1c1e;--muted:#6e6e73;--hint:#aeaeb2;
-  --green:#0071a7;--green-bg:#f0f8ff;--green-border:#b3d9f0;
+  --green:#1a7f4b;--green-bg:#f0faf5;--green-border:#b7e8cc;
   --red:#c0392b;--red-bg:#fff5f5;
   --blue:#0071e3;--blue-bg:#f0f6ff;
   --orange:#b35c00;--orange-bg:#fff8f0;--orange-border:#ffd6a0;
@@ -58,14 +58,22 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .tax-note{font-size:10px;color:var(--hint);font-family:'JetBrains Mono',monospace;margin-top:3px;}
 .exp-item{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid var(--border);}
 .exp-item:last-child{border-bottom:none;}
-.exp-cat-badge{font-size:10px;font-weight:600;background:var(--bg);border:1px solid var(--border);border-radius:var(--rsm);padding:2px 7px;color:var(--muted);white-space:nowrap;}
-.exp-amt{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;flex:1;text-align:right;}
-.exp-del{background:none;border:1px solid var(--border);border-radius:var(--rsm);cursor:pointer;color:var(--hint);font-size:13px;padding:2px 7px;line-height:1;background:var(--red-bg);color:var(--red);}
-.exp-edit{background:var(--blue-bg);border:1px solid var(--blue);border-radius:var(--rsm);cursor:pointer;color:var(--blue);font-size:13px;padding:2px 7px;line-height:1;flex-shrink:0;}
+
 .paid-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0;}
 .paid-biz{background:#f0f0f0;color:#555;}
 .paid-nika{background:#eff4ff;color:#1d4ed8;}
-.paid-tuka{background:#f0fdf4;color:#166534;}
+.paid-venu{background:#f0fdf4;color:#166534;}
+.exp-cat-badge{font-size:10px;font-weight:600;background:var(--bg);border:1px solid var(--border);border-radius:var(--rsm);padding:2px 7px;color:var(--muted);white-space:nowrap;}
+.exp-amt{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;flex:1;text-align:right;}
+.exp-edit{background:none;border:1px solid var(--border);border-radius:var(--rsm);cursor:pointer;color:var(--muted);font-size:11px;padding:2px 7px;line-height:1;transition:all 0.12s;}
+.exp-edit:hover{background:var(--accent-bg);color:var(--accent);border-color:var(--accent);}
+.exp-inline-edit{display:flex;flex-wrap:wrap;gap:6px;padding:8px 0;border-bottom:1px solid var(--border);align-items:center;}
+.exp-inline-edit input,.exp-inline-edit select{height:32px;padding:0 8px;border:1px solid var(--border);border-radius:var(--rsm);font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--bg);outline:none;}
+.exp-inline-edit input{width:80px;}
+.exp-inline-edit input:focus,.exp-inline-edit select:focus{border-color:var(--accent);}
+.exp-save-btn{height:32px;padding:0 12px;background:var(--green);color:#fff;border:none;border-radius:var(--rsm);font-size:12px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
+.exp-cancel-btn{height:32px;padding:0 10px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:var(--rsm);font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;}
+.exp-del{background:none;border:1px solid var(--border);border-radius:var(--rsm);cursor:pointer;color:var(--hint);font-size:13px;padding:2px 7px;line-height:1;background:var(--red-bg);color:var(--red);}
 .exp-total-row{display:flex;justify-content:space-between;padding:6px 0 0;margin-top:3px;border-top:1px solid var(--border);font-size:12px;}
 .exp-total-row .lbl{color:var(--muted);font-weight:500;}
 .exp-total-row .val{font-family:'JetBrains Mono',monospace;font-weight:600;}
@@ -78,10 +86,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .sv.neg{color:var(--red);}
 .people-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
 .person-card{border-radius:var(--rs);padding:0.85rem 1rem;border:1px solid var(--border);}
-.pc-tuka{background:var(--green-bg);border-color:var(--green-border);}
+.pc-venu{background:var(--green-bg);border-color:var(--green-border);}
 .pc-us{background:var(--orange-bg);border-color:var(--orange-border);}
 .pc-name{font-size:11px;font-weight:600;margin-bottom:4px;}
-.pc-tuka .pc-name{color:var(--green);}
+.pc-venu .pc-name{color:var(--green);}
 .pc-us .pc-name{color:var(--orange);}
 .pc-usd{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;}
 .pc-gel{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-top:2px;}
@@ -139,7 +147,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   .mi-name.current-month{color:var(--blue);font-weight:600;}
   .mi-sub{font-size:11px;color:var(--hint);margin-top:1px;}
   .mi-profits{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0;}
-  .mi-tuka{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:var(--green);}
+  .mi-venu{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:var(--green);}
   .mi-us{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:var(--orange);}
   .mi-chevron{color:var(--hint);font-size:18px;flex-shrink:0;}
 
@@ -221,7 +229,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   .d-income-label{font-size:11px;color:var(--muted);font-weight:500;display:flex;align-items:center;gap:5px;}
   .d-direct-row{display:flex;gap:6px;}
   .d-direct-row input{flex:1;}
-  .d-add-exp-row{display:grid;grid-template-columns:1fr 85px 85px 36px;gap:6px;align-items:center;margin-bottom:8px;}
+  .d-add-exp-row{display:grid;grid-template-columns:1fr 75px 130px 100px 36px;gap:6px;align-items:center;margin-bottom:8px;}
   .d-add-exp-btn{height:36px;background:var(--green);color:#fff;border:none;border-radius:var(--rs);font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
   .d-add-exp-btn:hover{opacity:0.9;}
   .d-calc-btn{width:100%;height:42px;background:var(--green);color:#fff;border:none;border-radius:var(--r);font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-top:10px;}
@@ -235,9 +243,67 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 </style>
 </head>
 <body>
+<div id="profit-gate" style="display:none;position:fixed;
+top:0;left:0;width:100%;height:100%;background:#FAFAF9;
+z-index:99999;display:flex;flex-direction:column;
+align-items:center;justify-content:center;font-family:sans-serif;">
+  <div style="text-align:center;padding:40px;">
+    <div style="font-size:24px;font-weight:600;
+      margin-bottom:8px;color:#2C2C2A;">Maxela</div>
+    <div style="font-size:14px;color:#8C8C8A;
+      margin-bottom:32px;">Enter PIN to continue</div>
+    <input id="profit-pin" type="password" 
+      inputmode="numeric" placeholder="PIN"
+      style="width:100%;max-width:200px;padding:14px;
+      font-size:18px;text-align:center;border:1.5px solid #E0D8D0;
+      border-radius:12px;outline:none;margin-bottom:16px;
+      display:block;margin-left:auto;margin-right:auto;">
+    <button onclick="checkProfitPin()"
+      style="width:100%;max-width:200px;padding:14px;
+      background:#2C2C2A;color:#fff;border:none;
+      border-radius:24px;font-size:16px;font-weight:600;
+      cursor:pointer;display:block;margin:0 auto;">
+      Continue
+    </button>
+    <div id="profit-pin-error" style="color:#dc2626;
+      font-size:13px;margin-top:12px;display:none;">
+      Wrong PIN. Try again.
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const PROFIT_PIN = 'maxela2026';
+  const KEY = 'profit_authed_v1';
+  
+  function checkProfitPin(){
+    const val = document.getElementById('profit-pin').value;
+    if(val === PROFIT_PIN){
+      sessionStorage.setItem(KEY, '1');
+      document.getElementById('profit-gate').style.display = 'none';
+    } else {
+      document.getElementById('profit-pin-error').style.display = 'block';
+      document.getElementById('profit-pin').value = '';
+    }
+  }
+  window.checkProfitPin = checkProfitPin;
+  
+  // Allow Enter key
+  document.getElementById('profit-pin').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') checkProfitPin();
+  });
+  
+  // Check if already authed this session
+  if(sessionStorage.getItem(KEY) !== '1'){
+    document.getElementById('profit-gate').style.display = 'flex';
+  }
+})();
+</script>
+
 
 <div class="loading-overlay" id="loading">
-  <div class="loading-logo">Tuka <span>Tracker</span></div>
+  <div class="loading-logo">Venu <span>Tracker</span></div>
   <div class="spinner"></div>
   <div style="font-size:13px;color:var(--hint);">Connecting to cloud...</div>
 </div>
@@ -248,7 +314,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <!-- List screen -->
   <div class="screen off-right" id="m-screen-list">
     <div class="app-header">
-      <div class="header-title">Tuka <span>Tracker</span></div>
+      <div class="header-title">Venu <span>Tracker</span></div>
       <div class="sync-dot" id="m-sdot"></div>
       <div class="header-action" id="m-btn-add-year">+ Year</div>
     </div>
@@ -277,7 +343,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <!-- ══════════════ DESKTOP HTML ══════════════ -->
 <div class="desktop-only" id="d-root">
   <div class="topbar">
-    <div class="logo">Tuka <span>Tracker</span></div>
+    <div class="logo">Venu <span>Tracker</span></div>
     <div class="year-bar-d" id="d-year-bar"></div>
     <div class="sync-wrap"><div class="sync-dot" id="d-sdot"></div><span id="d-sync-label">Connecting</span></div>
   </div>
@@ -311,9 +377,8 @@ let mScreen='list';  // mobile
 let mKey=null;       // mobile current month key
 let cache={};
 let saveTimer=null;
+let editingExpId=null;
 let pendingSaves={};
-let _activeKey=null;
-let _activeRefresh=null;
 
 // ── helpers ──────────────────────────────
 function n2(x){return Math.abs(x).toFixed(2);}
@@ -326,7 +391,7 @@ function getM(k){return cache[k]||{rate:2.65,airbnb:0,booking:0,direct:0,directC
 function saveM(k,m){cache[k]=m;pendingSaves[k]=true;clearTimeout(saveTimer);setSyncDot('syncing');saveTimer=setTimeout(flush,1200);}
 async function flush(){
   const keys=Object.keys(pendingSaves);pendingSaves={};
-  try{await Promise.all(keys.map(k=>setDoc(doc(db,'tuka_months',k),cache[k])));setSyncDot('synced');}
+  try{await Promise.all(keys.map(k=>setDoc(doc(db,'months',k),cache[k])));setSyncDot('synced');}
   catch(e){setSyncDot('error');showToast('Sync failed');}
 }
 function setSyncDot(s){
@@ -369,21 +434,27 @@ function wireDetail(key,onSave){
     document.getElementById('r-usd').value=(1/v).toFixed(4);
     const m=getM(key);m.rate=1/v;saveM(key,m);updateBtax(key);if(onSave)onSave();
   };
-  ['f-airbnb','f-direct','f-dcur'].forEach(id=>{
+  ['f-airbnb','f-booking','f-direct','f-dcur'].forEach(id=>{
     const el=document.getElementById(id);if(!el)return;
     el.oninput=()=>{saveIncome(key);if(onSave)onSave();};
     el.onchange=()=>{saveIncome(key);if(onSave)onSave();};
   });
 }
 
-function updateBtax(key){}
+function updateBtax(key){
+  const m=getM(key);const rate=m.rate||2.65;
+  const raw=parseFloat(document.getElementById('f-booking')?.value)||0;
+  const el=document.getElementById('f-btax');if(!el)return;
+  if(raw>0){const tax=raw*0.075;const net=raw-tax;el.textContent='Tax: '+fgel(tax)+' · Net: '+fgel(net)+' = '+fusd(net/rate);}
+  else el.textContent='';
+}
 function saveIncome(key){
   const m=getM(key);
   m.airbnb=parseFloat(document.getElementById('f-airbnb')?.value)||0;
-  m.booking=0;
+  m.booking=parseFloat(document.getElementById('f-booking')?.value)||0;
   m.direct=parseFloat(document.getElementById('f-direct')?.value)||0;
   m.directCur=document.getElementById('f-dcur')?.value||'USD';
-  saveM(key,m);
+  saveM(key,m);updateBtax(key);
 }
 function addExp(key,onRender){
   const amt=parseFloat(document.getElementById('f-exp-amt').value);
@@ -392,14 +463,36 @@ function addExp(key,onRender){
   const catCustomEl=document.getElementById('f-exp-custom');
   const catCustom=catCustomEl?catCustomEl.value.trim():'';
   const cat=catSel==='Other'&&catCustom?catCustom:catSel;
+  const paidBy=document.getElementById('f-exp-paid')?.value||'business';
   if(!amt||amt<=0){alert('Enter a valid amount');return;}
   if(catSel==='Other'&&!catCustom){alert('Please enter a custom category name');return;}
   const m=getM(key);if(!m.expenses)m.expenses=[];
-  const paidBy=document.getElementById('f-exp-paid')?.value||'business';
   m.expenses.push({amt,cat,cur,paidBy,id:Date.now()});saveM(key,m);
   document.getElementById('f-exp-amt').value='';
   if(catCustomEl)catCustomEl.value='';
   onRender(key);
+}
+
+window.saveExpEdit=function(key,id){
+  const m=getM(key);
+  const exp=m.expenses.find(e=>e.id===id);
+  if(!exp)return;
+  const newAmt=parseFloat(document.getElementById('edit-amt-'+id)?.value);
+  if(!newAmt||newAmt<=0){alert('Enter a valid amount');return;}
+  exp.amt=newAmt;
+  exp.cur=document.getElementById('edit-cur-'+id)?.value||'GEL';
+  exp.cat=document.getElementById('edit-cat-'+id)?.value||exp.cat;
+  exp.paidBy=document.getElementById('edit-paid-'+id)?.value||'business';
+  saveM(key,m);
+  editingExpId=null;
+  if(typeof mRefreshLists==='function')mRefreshLists(key);
+  else if(typeof dRefreshLists==='function')dRefreshLists(key);
+}
+
+window.cancelExpEdit=function(key){
+  editingExpId=null;
+  if(typeof mRefreshLists==='function')mRefreshLists(key);
+  else if(typeof dRefreshLists==='function')dRefreshLists(key);
 }
 function delExp(key,id,onRender){const m=getM(key);m.expenses=m.expenses.filter(e=>e.id!==id);saveM(key,m);onRender(key);}
 function renderExpList(key,onDel){
@@ -411,14 +504,41 @@ function renderExpList(key,onDel){
   if(!exps.length){list.innerHTML='<div class="empty-msg">No expenses yet</div>';return;}
   list.innerHTML='';
   exps.forEach(e=>{
-    const cur=e.cur||'GEL';const r=document.createElement('div');r.className='exp-item';
-    const del=document.createElement('button');del.className='exp-del';del.textContent='×';del.onclick=()=>onDel(key,e.id);
-    const edit=document.createElement('button');edit.className='exp-edit';edit.textContent='✎';edit.onclick=()=>window.startExpEdit(e.id);
-    const pb=e.paidBy||'business';
-    const pbLabel={business:'💼 Biz',nika:'👤 Nika',tuka:'👤 Tuka'}[pb]||'💼 Biz';
-    const pbCls={business:'paid-biz',nika:'paid-nika',tuka:'paid-tuka'}[pb]||'paid-biz';
-    r.innerHTML=`<span class="exp-cat-badge">${e.cat}</span><span class="cur-tag ${cur==='USD'?'usd':'gel'}" style="flex-shrink:0;">${cur}</span><span class="exp-amt">${famt(e.amt,cur)}</span><span class="paid-badge ${pbCls}">${pbLabel}</span>`;
-    r.dataset.id=String(e.id);r.appendChild(edit);r.appendChild(del);list.appendChild(r);
+    const cur=e.cur||'GEL';
+    const paidBy=e.paidBy||'business';
+    const paidLabel={business:'💼 Biz',nika:'👤 Nika',venu:'👤 Venu'}[paidBy]||'💼 Biz';
+    const paidCls={business:'paid-biz',nika:'paid-nika',venu:'paid-venu'}[paidBy]||'paid-biz';
+
+    if(editingExpId===e.id){
+      // inline edit row
+      const editRow=document.createElement('div');
+      editRow.className='exp-inline-edit';
+      editRow.innerHTML=`
+        <input type="text" inputmode="decimal" id="edit-amt-${e.id}" value="${e.amt}" min="0" step="1" placeholder="Amount">
+        <select id="edit-cur-${e.id}">
+          <option value="GEL"${cur==='GEL'?' selected':''}>GEL</option>
+          <option value="USD"${cur==='USD'?' selected':''}>USD</option>
+        </select>
+        <select id="edit-cat-${e.id}">
+          ${['Cleaning','Laundry','Maintenance','Bills','Supplies','Commission','Other'].map(c=>`<option${e.cat===c?' selected':''}>${c}</option>`).join('')}
+          ${!['Cleaning','Laundry','Maintenance','Bills','Supplies','Commission','Other'].includes(e.cat)?`<option selected>${e.cat}</option>`:''}
+        </select>
+        <select id="edit-paid-${e.id}">
+          <option value="business"${paidBy==='business'?' selected':''}>💼 Business</option>
+          <option value="nika"${paidBy==='nika'?' selected':''}>👤 Nika</option>
+          <option value="venu"${paidBy==='venu'?' selected':''}>👤 Venu</option>
+        </select>
+        <button class="exp-save-btn" onclick="window.saveExpEdit('${key}',${e.id})">Save</button>
+        <button class="exp-cancel-btn" onclick="window.cancelExpEdit('${key}')">Cancel</button>`;
+      list.appendChild(editRow);
+    } else {
+      const r=document.createElement('div');r.className='exp-item';
+      const del=document.createElement('button');del.className='exp-del';del.textContent='×';del.onclick=()=>onDel(key,e.id);
+      const edit=document.createElement('button');edit.className='exp-edit';edit.textContent='Edit';
+      edit.onclick=()=>{editingExpId=e.id;renderExpList(key,onDel);};
+      r.innerHTML=`<span class="exp-cat-badge">${e.cat}</span><span class="cur-tag ${cur==='USD'?'usd':'gel'}" style="flex-shrink:0;">${cur}</span><span class="exp-amt">${famt(e.amt,cur)}</span><span class="paid-badge ${paidCls}">${paidLabel}</span>`;
+      r.appendChild(edit);r.appendChild(del);list.appendChild(r);
+    }
   });
   const tr=document.createElement('div');tr.className='exp-total-row';
   tr.innerHTML='<span class="lbl">Total (GEL)</span><span class="val">'+fgel(tg)+'</span>';list.appendChild(tr);
@@ -463,20 +583,24 @@ function doCalc(key,saveSnap){
   const directRaw=m.direct||0;const directCur=m.directCur||'USD';
   const directUsd=directCur==='USD'?directRaw:directRaw/rate;
   const totalInc=airbnb+bookNetUsd+directUsd;
-  const bizGel=(m.expenses||[]).reduce((s,e)=>s+toGel(e.amt,e.cur||'GEL',rate),0);
+  // split expenses by who paid
+  const allExp=m.expenses||[];
+  const bizGel=allExp.reduce((s,e)=>s+toGel(e.amt,e.cur||'GEL',rate),0);
+  const nikaPaidGel=allExp.filter(e=>(e.paidBy||'business')==='nika').reduce((s,e)=>s+toGel(e.amt,e.cur||'GEL',rate),0);
+  const venuPaidGel=allExp.filter(e=>(e.paidBy||'business')==='venu').reduce((s,e)=>s+toGel(e.amt,e.cur||'GEL',rate),0);
+  const nikaPaidUsd=nikaPaidGel/rate;
+  const venuPaidUsd=venuPaidGel/rate;
   const bizUsd=bizGel/rate;
-  const nikaPaidGel=(m.expenses||[]).filter(e=>(e.paidBy||'business')==='nika').reduce((s,e)=>s+toGel(e.amt,e.cur||'GEL',rate),0);
-  const tukaPaidGel=(m.expenses||[]).filter(e=>(e.paidBy||'business')==='tuka').reduce((s,e)=>s+toGel(e.amt,e.cur||'GEL',rate),0);
-  const nikaPaidUsd=nikaPaidGel/rate;const tukaPaidUsd=tukaPaidGel/rate;
   const netUsd=totalInc-bizUsd;const netGel=netUsd*rate;
   const perGel=(m.personal||[]).reduce((s,e)=>s+toGel(e.amt,e.cur||'GEL',rate),0);
   const ourUsd=netUsd*0.2;const ourGel=ourUsd*rate;
-  const tukaUsd=netUsd*0.8;const tukaGel=tukaUsd*rate;
-  const tFUsd=tukaUsd-perGel/rate+tukaPaidUsd;const tFGel=tukaGel-perGel+tukaPaidGel;
+  const venuUsd=netUsd*0.8;const venuGel=venuUsd*rate;
+  // reimbursements: add back to whoever paid personally
+  const vFUsd=venuUsd-perGel/rate+venuPaidUsd;const vFGel=venuGel-perGel+venuPaidGel;
   const ourFinalUsd=ourUsd+nikaPaidUsd;const ourFinalGel=ourGel+nikaPaidGel;
   const ppl=document.getElementById('f-people');
   if(ppl)ppl.innerHTML=`
-    <div class="person-card pc-tuka"><div class="pc-name">Tuka (80%)</div><div class="pc-usd">${fusd(tFUsd)}</div><div class="pc-gel">${fgel(tFGel)}</div></div>
+    <div class="person-card pc-venu"><div class="pc-name">Venu (80%)</div><div class="pc-usd">${fusd(vFUsd)}</div><div class="pc-gel">${fgel(vFGel)}</div></div>
     <div class="person-card pc-us"><div class="pc-name">Our share (20%)</div><div class="pc-usd">${fusd(ourFinalUsd)}</div><div class="pc-gel">${fgel(ourFinalGel)}</div></div>`;
   const bc=document.getElementById('f-breakdown');
   if(bc){
@@ -488,35 +612,37 @@ function doCalc(key,saveSnap){
     addStep(bc,'Expenses ('+fgel(bizGel)+')',-bizUsd,'usd','neg');
     addStep(bc,'Net profit',netUsd,'usd');
     addStep(bc,'Our 20%',ourUsd,'usd','pos');
-    addStep(bc,'Tuka 80%',tukaUsd,'usd','pos');
-    if(perGel>0)addStep(bc,'Tuka personal',-perGel/rate,'usd','neg');
+    addStep(bc,'Venu 80%',venuUsd,'usd','pos');
+    if(perGel>0)addStep(bc,'Venu personal expenses',-perGel/rate,'usd','neg');
     if(nikaPaidUsd>0)addStep(bc,'Nika reimbursement (+)',nikaPaidUsd,'usd','pos');
-    if(tukaPaidUsd>0)addStep(bc,'Tuka reimbursement (+)',tukaPaidUsd,'usd','pos');
+    if(venuPaidUsd>0)addStep(bc,'Venu reimbursement (+)',venuPaidUsd,'usd','pos');
   }
   let t=key.replace('_',' ')+' — Income Distribution\n─────────────────────────\n\n';
   t+='Airbnb Income: '+fusd(airbnb)+'\n';
   if(bookRaw>0)t+='Booking Income: '+fgel(bookRaw)+' - '+fgel(bookTax)+' (7.5% Tax) = '+fgel(bookNet)+' ('+fusd(bookNetUsd)+')\n';
   if(directRaw>0)t+='Direct Reservation: '+(directCur==='USD'?fusd(directRaw):fgel(directRaw))+' = '+fusd(directUsd)+'\n';
   t+='Total Income: '+fusd(totalInc)+'\n\n';
-  if((m.expenses||[]).length){const paidLabels={business:'',nika:' [Nika paid]',tuka:' [Tuka paid]'};t+='Business Expenses:\n';m.expenses.forEach(e=>{t+='  '+e.cat+': '+famt(e.amt,e.cur||'GEL')+(paidLabels[e.paidBy||'business']||'')+'\n';});t+='Total: '+fgel(bizGel)+' = '+fusd(bizUsd)+'\n\n';}
-  if(perGel>0){t+='Tuka Personal Expenses:\n';(m.personal||[]).forEach(e=>{t+='  '+e.note+': '+famt(e.amt,e.cur||'GEL')+'\n';});t+='Total: '+fgel(perGel)+'\n\n';}
+  if((m.expenses||[]).length){
+    const paidLabels={business:'',nika:' [Nika paid]',venu:' [Venu paid]'};
+    t+='Business Expenses:\n';
+    m.expenses.forEach(e=>{t+='  '+e.cat+': '+famt(e.amt,e.cur||'GEL')+(paidLabels[e.paidBy||'business']||'')+'\n';});
+    t+='Total: '+fgel(bizGel)+' = '+fusd(bizUsd)+'\n\n';
+  }
+  if(perGel>0){t+='Venu Personal Expenses:\n';(m.personal||[]).forEach(e=>{t+='  '+e.note+': '+famt(e.amt,e.cur||'GEL')+'\n';});t+='Total: '+fgel(perGel)+'\n\n';}
   t+='Net Income: '+fusd(netUsd)+' / '+fgel(netGel)+'\n\n─────────────────────────\nDistribution\n\n';
-  t+='Tuka (80%): '+fusd(tukaUsd)+' / '+fgel(tukaGel)+'\n';
+  t+='Venu (80%): '+fusd(venuUsd)+' / '+fgel(venuGel)+'\n';
   if(perGel>0)t+='Personal Expenses: -'+fgel(perGel)+'\n';
-  if(tukaPaidGel>0)t+='Tuka reimbursement: +'+fgel(tukaPaidGel)+'\n';
-  t+='Tuka Net: '+fusd(tFUsd)+' / '+fgel(tFGel)+'\n\nOur Share (20%): '+fusd(ourUsd)+' / '+fgel(ourGel)+'\n';
-  if(nikaPaidGel>0)t+='Nika reimbursement: +'+fgel(nikaPaidGel)+'\n';
-  t+='Our Net: '+fusd(ourFinalUsd)+' / '+fgel(ourFinalGel)+'\n\nRate: 1 USD = '+rate.toFixed(2)+' GEL';
+  t+='Venu Net: '+fusd(vFUsd)+' / '+fgel(vFGel)+'\n\nOur Share (20%): '+fusd(ourUsd)+' / '+fgel(ourGel)+'\n\nRate: 1 USD = '+rate.toFixed(2)+' GEL';
   const tpl=document.getElementById('f-tpl');if(tpl)tpl.textContent=t;
-  if(saveSnap){m.snapshot={tukaUsd:tFUsd,tukaGel:tFGel,ourUsd:ourFinalUsd,ourGel:ourFinalGel};saveM(key,m);showToast('Saved & synced ✓');}
-  return{tFUsd,tFGel,ourUsd,ourGel};
+  if(saveSnap){m.snapshot={venuUsd:vFUsd,venuGel:vFGel,ourUsd:ourFinalUsd,ourGel:ourFinalGel};saveM(key,m);showToast('Saved & synced ✓');}
+  return{vFUsd,vFGel,ourUsd,ourGel};
 }
 
 function summaryHTML(yr){
   let ti=0,tv=0,tvg=0,tu=0,tug=0,done=0;
   MONTHS.forEach(mon=>{
     const m=getM(mkey(yr,mon));const r=m.rate||2.65;
-    if(m.snapshot){tv+=m.snapshot.tukaUsd;tvg+=m.snapshot.tukaGel;tu+=m.snapshot.ourUsd;tug+=m.snapshot.ourGel;done++;}
+    if(m.snapshot){tv+=m.snapshot.venuUsd;tvg+=m.snapshot.venuGel;tu+=m.snapshot.ourUsd;tug+=m.snapshot.ourGel;done++;}
     ti+=(m.airbnb||0)+((m.booking||0)*0.925/r)+((m.directCur||'USD')==='USD'?(m.direct||0):(m.direct||0)/r);
   });
   let rows='';
@@ -524,7 +650,7 @@ function summaryHTML(yr){
     const m=getM(mkey(yr,mon));const isCur=isCurMonth(mon,yr);
     rows+=m.snapshot
       ?`<div class="month-row${isCur?' current-row':''}"><span style="color:var(--muted);font-weight:500;min-width:90px;">${mon}${isCur?' 📍':''}</span>
-          <div style="display:flex;gap:16px;"><span style="font-family:'JetBrains Mono',monospace;font-weight:500;color:var(--green);">${fusd(m.snapshot.tukaUsd)}</span><span style="font-family:'JetBrains Mono',monospace;font-weight:500;color:var(--orange);">${fusd(m.snapshot.ourUsd)}</span></div></div>`
+          <div style="display:flex;gap:16px;"><span style="font-family:'JetBrains Mono',monospace;font-weight:500;color:var(--green);">${fusd(m.snapshot.venuUsd)}</span><span style="font-family:'JetBrains Mono',monospace;font-weight:500;color:var(--orange);">${fusd(m.snapshot.ourUsd)}</span></div></div>`
       :`<div class="month-row${isCur?' current-row':''}"><span style="color:var(--muted);">${mon}${isCur?' 📍':''}</span><span style="color:var(--hint);font-size:12px;">No data yet</span></div>`;
   });
   return{ti,tv,tvg,tu,tug,done,rows};
@@ -561,12 +687,12 @@ function mRenderYearBar(){
 function mRenderList(){
   const area=document.getElementById('m-list-area');area.innerHTML='';
   let tv=0,tu=0,done=0;
-  MONTHS.forEach(mon=>{const m=getM(mkey(activeYear,mon));if(m.snapshot){tv+=m.snapshot.tukaUsd;tu+=m.snapshot.ourUsd;done++;}});
+  MONTHS.forEach(mon=>{const m=getM(mkey(activeYear,mon));if(m.snapshot){tv+=m.snapshot.venuUsd;tu+=m.snapshot.ourUsd;done++;}});
 
   const sc=document.createElement('div');sc.className='summary-tap';
   sc.innerHTML=`<div class="summary-tap-header"><span class="summary-tap-title">${activeYear} — tap for summary</span><span style="color:var(--hint);font-size:18px;">›</span></div>
     <div class="sc-grid">
-      <div class="sc-item"><div class="sc-label">Tuka total</div><div class="sc-val green">${fusd(tv)}</div></div>
+      <div class="sc-item"><div class="sc-label">Venu total</div><div class="sc-val green">${fusd(tv)}</div></div>
       <div class="sc-item"><div class="sc-label">Our total</div><div class="sc-val orange">${fusd(tu)}</div></div>
     </div><div class="sc-footer">${done} of 12 months calculated</div>`;
   sc.onclick=mOpenSummary;area.appendChild(sc);
@@ -578,7 +704,7 @@ function mRenderList(){
     const row=document.createElement('div');row.className='month-item';
     row.innerHTML=`<div class="mi-dot${snap?' done':isCur?' current':''}"></div>
       <div class="mi-body"><div class="mi-name${isCur?' current-month':''}">${mon}${isCur?' 📍':''}</div><div class="mi-sub">${snap?'Calculated':isCur?'Current month':'No data yet'}</div></div>
-      ${snap?`<div class="mi-profits"><div class="mi-tuka">${fusd(snap.tukaUsd)}</div><div class="mi-us">${fusd(snap.ourUsd)}</div></div>`:''}
+      ${snap?`<div class="mi-profits"><div class="mi-venu">${fusd(snap.venuUsd)}</div><div class="mi-us">${fusd(snap.ourUsd)}</div></div>`:''}
       <div class="mi-chevron">›</div>`;
     row.onclick=()=>mOpenMonth(key,mon);wrap.appendChild(row);
   });
@@ -594,7 +720,7 @@ function mOpenSummary(){
       <div class="sc-grid">
         <div class="sc-item"><div class="sc-label">Total income</div><div class="sc-val blue">${fusd(ti)}</div></div>
         <div class="sc-item"><div class="sc-label">Net profit</div><div class="sc-val green">${fusd(tv+tu)}</div></div>
-        <div class="sc-item"><div class="sc-label">Tuka total</div><div class="sc-val green">${fusd(tv)}</div><div class="sc-sub">${fgel(tvg)}</div></div>
+        <div class="sc-item"><div class="sc-label">Venu total</div><div class="sc-val green">${fusd(tv)}</div><div class="sc-sub">${fgel(tvg)}</div></div>
         <div class="sc-item"><div class="sc-label">Our total</div><div class="sc-val orange">${fusd(tu)}</div><div class="sc-sub">${fgel(tug)}</div></div>
       </div><div class="sc-footer">${done} of 12 months calculated</div>
     </div>
@@ -631,7 +757,7 @@ function mBuildDetail(key){
       <div class="m-ds-header"><span class="m-ds-title">Income</span></div>
       <div class="m-ds-body">
         <div class="m-income-field"><div class="m-income-label">Airbnb <span class="cur-tag usd">USD</span></div><input type="text" id="f-airbnb" value="${m.airbnb||''}" min="0" inputmode="decimal" placeholder="0.00"></div>
-
+        <div class="m-income-field"><div class="m-income-label">Booking <span class="cur-tag gel">GEL</span> <span style="font-size:11px;color:var(--hint);">7.5% tax auto</span></div><input type="text" id="f-booking" value="${m.booking||''}" min="0" inputmode="decimal" placeholder="0.00"><div class="tax-note" id="f-btax"></div></div>
         <div class="m-income-field"><div class="m-income-label">Direct reservation</div><div class="m-income-row"><input type="text" id="f-direct" value="${m.direct||''}" min="0" inputmode="decimal" placeholder="0.00"><select id="f-dcur" style="width:90px;flex-shrink:0;"><option value="USD" ${(m.directCur||'USD')==='USD'?'selected':''}>USD</option><option value="GEL" ${(m.directCur||'USD')==='GEL'?'selected':''}>GEL</option></select></div></div>
       </div>
     </div>
@@ -639,14 +765,20 @@ function mBuildDetail(key){
       <div class="m-ds-header"><span class="m-ds-title">Business expenses</span><span class="card-badge" id="f-exp-total" style="color:var(--red);">0.00</span></div>
       <div class="m-ds-body">
         <div class="m-add-row"><input type="text" id="f-exp-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-exp-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select></div>
-        <div class="m-add-row2"><select id="f-exp-cat" onchange="toggleCustomExp(this)"><option>Cleaning</option><option>Laundry</option><option>Maintenance</option><option>Bills</option><option>Supplies</option><option>Commission</option><option>Other</option></select></div>
-        <div class="m-add-row2"><select id="f-exp-paid" style="width:100%;height:46px;padding:0 12px;border:1px solid var(--border);border-radius:var(--rs);font-family:Inter,sans-serif;font-size:14px;background:var(--bg);outline:none;"><option value="business">💼 Business paid</option><option value="nika">👤 Nika paid (reimbursed from profit)</option><option value="tuka">👤 Tuka paid (reimbursed from profit)</option></select><button class="m-add-btn" id="m-btn-add-exp">+ Add</button></div>
+        <div class="m-add-row2"><select id="f-exp-cat" onchange="toggleCustomExp(this)"><option>Cleaning</option><option>Laundry</option><option>Maintenance</option><option>Bills</option><option>Supplies</option><option>Commission</option><option>Other</option></select><button class="m-add-btn" id="m-btn-add-exp">+ Add</button></div>
         <div id="f-exp-custom-wrap" style="display:none;margin-bottom:8px;"><input type="text" id="f-exp-custom" placeholder="Type category name"></div>
+        <div style="margin-bottom:8px;">
+          <select id="f-exp-paid" style="width:100%;height:46px;padding:0 12px;border:1px solid var(--border);border-radius:var(--rs);font-family:Inter,sans-serif;font-size:14px;background:var(--bg);outline:none;">
+            <option value="business">💼 Business paid</option>
+            <option value="nika">👤 Nika paid (reimbursed from profit)</option>
+            <option value="venu">👤 Venu paid (reimbursed from profit)</option>
+          </select>
+        </div>
         <div id="f-exp-list"></div>
       </div>
     </div>
     <div class="m-detail-section">
-      <div class="m-ds-header"><span class="m-ds-title">Tuka personal expenses</span><span class="card-badge" id="f-per-total" style="color:var(--orange);">0.00</span></div>
+      <div class="m-ds-header"><span class="m-ds-title">Venu personal expenses</span><span class="card-badge" id="f-per-total" style="color:var(--orange);">0.00</span></div>
       <div class="m-ds-body">
         <div class="m-add-row"><input type="text" id="f-per-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-per-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select></div>
         <div class="m-add-row2"><input type="text" id="f-per-note" placeholder="Note"><button class="m-add-btn" id="m-btn-add-per">+ Add</button></div>
@@ -666,14 +798,14 @@ function mBuildDetail(key){
   // wire events
   document.getElementById('r-usd').oninput=()=>{const v=parseFloat(document.getElementById('r-usd').value)||2.65;document.getElementById('r-gel').value=(1/v).toFixed(4);const m2=getM(key);m2.rate=v;saveM(key,m2);updateBtax(key);};
   document.getElementById('r-gel').oninput=()=>{const v=parseFloat(document.getElementById('r-gel').value)||0.3774;document.getElementById('r-usd').value=(1/v).toFixed(4);const m2=getM(key);m2.rate=1/v;saveM(key,m2);updateBtax(key);};
-  ['f-airbnb','f-direct','f-dcur'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.oninput=()=>saveIncome(key);el.onchange=()=>saveIncome(key);});
+  ['f-airbnb','f-booking','f-direct','f-dcur'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.oninput=()=>saveIncome(key);el.onchange=()=>saveIncome(key);});
   document.getElementById('m-btn-add-exp').onclick=()=>addExp(key,(k)=>renderExpList(k,(k2,id)=>delExp(k2,id,(k3)=>renderExpList(k3,(k4,id2)=>delExp(k4,id2,()=>{})))));
   document.getElementById('m-btn-add-per').onclick=()=>addPer(key,(k)=>renderPerList(k,(k2,id)=>delPer(k2,id,()=>renderPerList(k2,(k3,id2)=>delPer(k3,id2,()=>{})))));
   document.getElementById('m-btn-add-exp').onclick=()=>addExp(key,()=>mRefreshLists(key));
   document.getElementById('m-btn-add-per').onclick=()=>addPer(key,()=>mRefreshLists(key));
   document.getElementById('m-btn-calc').onclick=()=>{doCalc(key,true);document.getElementById('f-results').classList.remove('hidden');setTimeout(()=>document.getElementById('f-results').scrollIntoView({behavior:'smooth',block:'start'}),50);if(IS_MOBILE)mRenderList();};
   document.getElementById('m-btn-copy').onclick=()=>navigator.clipboard.writeText(document.getElementById('f-tpl').textContent).then(()=>showToast('Copied!'));
-  updateBtax(key);mRefreshLists(key);_activeKey=key;_activeRefresh=()=>mRefreshLists(key);
+  updateBtax(key);mRefreshLists(key);
   if(m.snapshot)doCalc(key,false);
 }
 
@@ -723,7 +855,7 @@ function dRenderSummary(){
     <div class="card"><div class="sc-grid">
       <div class="sc-item"><div class="sc-label">Total income</div><div class="sc-val blue">${fusd(ti)}</div></div>
       <div class="sc-item"><div class="sc-label">Net profit</div><div class="sc-val green">${fusd(tv+tu)}</div></div>
-      <div class="sc-item"><div class="sc-label">Tuka total</div><div class="sc-val green">${fusd(tv)}</div><div class="sc-sub">${fgel(tvg)}</div></div>
+      <div class="sc-item"><div class="sc-label">Venu total</div><div class="sc-val green">${fusd(tv)}</div><div class="sc-sub">${fgel(tvg)}</div></div>
       <div class="sc-item"><div class="sc-label">Our total</div><div class="sc-val orange">${fusd(tu)}</div><div class="sc-sub">${fgel(tug)}</div></div>
     </div><div class="sc-footer">${done} of 12 months calculated</div></div>
     <div class="card"><div class="card-header"><span class="card-title">Month by month</span><span style="font-size:11px;color:var(--hint);">Venu · Us</span></div><div class="card-body">${rows}</div></div>`;
@@ -743,20 +875,22 @@ function dRenderMonthPanel(key,mon){
       <div class="card-header"><span class="card-title">Income</span></div>
       <div class="card-body"><div class="d-income-grid">
         <div class="d-income-field"><div class="d-income-label">Airbnb <span class="cur-tag usd">USD</span></div><input type="text" id="f-airbnb" value="${m.airbnb||''}" min="0" inputmode="decimal" placeholder="0.00"></div>
-
+        <div class="d-income-field"><div class="d-income-label">Booking <span class="cur-tag gel">GEL</span> <span style="font-size:10px;color:var(--hint);">7.5% auto</span></div><input type="text" id="f-booking" value="${m.booking||''}" min="0" inputmode="decimal" placeholder="0.00"><div class="tax-note" id="f-btax"></div></div>
         <div class="d-income-field"><div class="d-income-label">Direct reservation</div><div class="d-direct-row"><input type="text" id="f-direct" value="${m.direct||''}" min="0" inputmode="decimal" placeholder="0.00"><select id="f-dcur" style="width:80px;flex-shrink:0;"><option value="USD" ${(m.directCur||'USD')==='USD'?'selected':''}>USD</option><option value="GEL" ${(m.directCur||'USD')==='GEL'?'selected':''}>GEL</option></select></div></div>
       </div></div>
     </div>
     <div class="card">
       <div class="card-header"><span class="card-title">Business expenses</span><span class="card-badge" id="f-exp-total" style="color:var(--red);">0.00</span></div>
       <div class="card-body">
-        <div class="d-add-exp-row"><input type="text" id="f-exp-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-exp-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select><select id="f-exp-cat" onchange="toggleCustomExp(this)"><option>Cleaning</option><option>Laundry</option><option>Maintenance</option><option>Bills</option><option>Supplies</option><option>Commission</option><option>Other</option></select><select id="f-exp-paid"><option value="business">💼 Business</option><option value="nika">👤 Nika</option><option value="tuka">👤 Tuka</option></select><button class="d-add-exp-btn" id="d-btn-add-exp">+ Add</button></div>
+        <div class="d-add-exp-row"><input type="text" id="f-exp-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-exp-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select><select id="f-exp-cat" onchange="toggleCustomExp(this)"><option>Cleaning</option><option>Laundry</option><option>Maintenance</option><option>Bills</option><option>Supplies</option><option>Commission</option><option>Other</option></select>
+          <select id="f-exp-paid"><option value="business">💼 Business</option><option value="nika">👤 Nika</option><option value="venu">👤 Venu</option></select>
+          <button class="d-add-exp-btn" id="d-btn-add-exp">+ Add</button></div>
         <div id="f-exp-custom-wrap" style="display:none;margin-bottom:8px;"><input type="text" id="f-exp-custom" placeholder="Type category name"></div>
         <div id="f-exp-list"></div>
       </div>
     </div>
     <div class="card">
-      <div class="card-header"><span class="card-title">Tuka personal expenses</span><span class="card-badge" id="f-per-total" style="color:var(--orange);">0.00</span></div>
+      <div class="card-header"><span class="card-title">Venu personal expenses</span><span class="card-badge" id="f-per-total" style="color:var(--orange);">0.00</span></div>
       <div class="card-body">
         <div class="d-add-exp-row"><input type="text" id="f-per-amt" min="0" inputmode="decimal" placeholder="Amount"><select id="f-per-cur"><option value="GEL">GEL</option><option value="USD">USD</option></select><input type="text" id="f-per-note" placeholder="Note"><button class="d-add-exp-btn" id="d-btn-add-per">+ Add</button></div>
         <div id="f-per-list"></div>
@@ -771,12 +905,12 @@ function dRenderMonthPanel(key,mon){
 
   document.getElementById('r-usd').oninput=()=>{const v=parseFloat(document.getElementById('r-usd').value)||2.65;document.getElementById('r-gel').value=(1/v).toFixed(4);const m2=getM(key);m2.rate=v;saveM(key,m2);updateBtax(key);};
   document.getElementById('r-gel').oninput=()=>{const v=parseFloat(document.getElementById('r-gel').value)||0.3774;document.getElementById('r-usd').value=(1/v).toFixed(4);const m2=getM(key);m2.rate=1/v;saveM(key,m2);updateBtax(key);};
-  ['f-airbnb','f-direct','f-dcur'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.oninput=()=>saveIncome(key);el.onchange=()=>saveIncome(key);});
+  ['f-airbnb','f-booking','f-direct','f-dcur'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.oninput=()=>saveIncome(key);el.onchange=()=>saveIncome(key);});
   document.getElementById('d-btn-add-exp').onclick=()=>addExp(key,()=>dRefreshLists(key));
   document.getElementById('d-btn-add-per').onclick=()=>addPer(key,()=>dRefreshLists(key));
   document.getElementById('d-btn-calc').onclick=()=>{doCalc(key,true);document.getElementById('f-results').classList.remove('hidden');dRenderSidebar();};
   document.getElementById('d-btn-copy').onclick=()=>navigator.clipboard.writeText(document.getElementById('f-tpl').textContent).then(()=>showToast('Copied!'));
-  updateBtax(key);dRefreshLists(key);_activeKey=key;_activeRefresh=()=>dRefreshLists(key);
+  updateBtax(key);dRefreshLists(key);
   if(m.snapshot)doCalc(key,false);
 }
 
@@ -796,59 +930,28 @@ window.toggleCustomExp=function(sel){
   const wrap=document.getElementById('f-exp-custom-wrap');
   if(wrap)wrap.style.display=sel.value==='Other'?'block':'none';
 };
-// ══════════════ EXPENSE EDIT ══════════════
-window.startExpEdit=function(id){
-  if(!_activeKey)return;
-  const m=getM(_activeKey);
-  const e=(m.expenses||[]).find(x=>x.id===id);
-  if(!e)return;
-  const row=document.querySelector(`.exp-item[data-id="${id}"]`);
-  if(!row)return;
-  const cur=e.cur||'GEL';const pb=e.paidBy||'business';
-  const stdCats=['Cleaning','Laundry','Maintenance','Bills','Supplies','Commission'];
-  const isCustom=!stdCats.includes(e.cat);const catVal=isCustom?'Other':e.cat;
-  const catOpts=stdCats.map(c=>`<option value="${c}"${catVal===c?' selected':''}>${c}</option>`).join('')+`<option value="Other"${catVal==='Other'?' selected':''}>Other</option>`;
-  const s='border:1px solid var(--border);border-radius:var(--rs);background:var(--bg);';
-  row.innerHTML=`<div style="display:flex;flex-direction:column;gap:6px;width:100%;padding:2px 0;">
-    <div style="display:flex;gap:6px;">
-      <input type="text" id="eeamt${id}" value="${e.amt}" min="0" inputmode="decimal" style="flex:1;height:34px;font-size:13px;padding:4px 8px;${s}">
-      <select id="eecur${id}" style="width:70px;height:34px;font-size:13px;padding:4px 6px;${s}"><option value="GEL"${cur==='GEL'?' selected':''}>GEL</option><option value="USD"${cur==='USD'?' selected':''}>USD</option></select>
-    </div>
-    <div style="display:flex;gap:6px;">
-      <select id="eecat${id}" onchange="document.getElementById('eecc${id}').style.display=this.value==='Other'?'block':'none'" style="flex:1;height:34px;font-size:13px;padding:4px 6px;${s}">${catOpts}</select>
-      <select id="eepaid${id}" style="flex:1;height:34px;font-size:13px;padding:4px 6px;${s}"><option value="business"${pb==='business'?' selected':''}>💼 Biz</option><option value="nika"${pb==='nika'?' selected':''}>👤 Nika</option><option value="tuka"${pb==='tuka'?' selected':''}>👤 Tuka</option></select>
-    </div>
-    <input type="text" id="eecc${id}" value="${isCustom?e.cat:''}" placeholder="Custom category" style="display:${catVal==='Other'?'block':'none'};height:34px;font-size:13px;padding:4px 8px;${s}">
-    <div style="display:flex;gap:6px;">
-      <button onclick="window.saveExpEdit(${id})" style="flex:1;height:32px;background:var(--green);color:#fff;border:none;border-radius:var(--rs);font-size:12px;font-weight:600;cursor:pointer;">Save</button>
-      <button onclick="window.cancelExpEdit()" style="flex:1;height:32px;background:var(--bg);border:1px solid var(--border);border-radius:var(--rs);font-size:12px;cursor:pointer;color:var(--muted);">Cancel</button>
-    </div>
-  </div>`;
-};
-window.saveExpEdit=function(id){
-  if(!_activeKey)return;
-  const m=getM(_activeKey);
-  const idx=(m.expenses||[]).findIndex(x=>x.id===id);
-  if(idx<0)return;
-  const amt=parseFloat(document.getElementById('eeamt'+id)?.value);
-  if(!amt||amt<=0){alert('Enter a valid amount');return;}
-  const cur=document.getElementById('eecur'+id)?.value||'GEL';
-  const catSel=document.getElementById('eecat'+id)?.value||'';
-  const catCustom=(document.getElementById('eecc'+id)?.value||'').trim();
-  const cat=catSel==='Other'?(catCustom||m.expenses[idx].cat):catSel;
-  const paidBy=document.getElementById('eepaid'+id)?.value||'business';
-  m.expenses[idx]={...m.expenses[idx],amt,cur,cat,paidBy};
-  saveM(_activeKey,m);
-  if(_activeRefresh)_activeRefresh();
-};
-window.cancelExpEdit=function(){
-  if(_activeRefresh)_activeRefresh();
-};
 // ══════════════ LIVE CURRENCY ══════════════
 let liveRate=null;
 
 async function fetchLiveRate(){
   try{
+    // Use NBG (National Bank of Georgia) official rate API
+    const res=await fetch('https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json');
+    const data=await res.json();
+    const usdEntry=data&&data[0]&&data[0].currencies&&data[0].currencies.find(c=>c.code==='USD');
+    if(usdEntry&&usdEntry.rate){
+      liveRate=parseFloat((usdEntry.rate/usdEntry.quantity).toFixed(4));
+      const curKey=mkey(CUR_YEAR,CUR_MONTH);
+      const m=getM(curKey);
+      m.rate=liveRate;
+      saveM(curKey,m);
+      updateRateDisplay();
+      showToast('💱 NBG rate: 1 USD = '+liveRate.toFixed(4)+' ₾');
+      return;
+    }
+  }catch(e){}
+  try{
+    // Fallback: exchangerate-api free tier
     const res=await fetch('https://open.er-api.com/v6/latest/USD');
     const data=await res.json();
     const rate=data.rates&&data.rates.GEL;
@@ -877,7 +980,7 @@ function updateRateDisplay(){
 async function init(){
   setSyncDot('syncing');
   try{
-    const snap=await getDocs(collection(db,'tuka_months'));
+    const snap=await getDocs(collection(db,'months'));
     snap.forEach(d=>{cache[d.id]=d.data();});
     setSyncDot('synced');
   }catch(e){setSyncDot('error');}
@@ -899,7 +1002,7 @@ async function init(){
   }
 
   // real-time sync
-  onSnapshot(collection(db,'tuka_months'),snap=>{
+  onSnapshot(collection(db,'months'),snap=>{
     snap.docChanges().forEach(ch=>{
       if(ch.type==='modified'||ch.type==='added')cache[ch.doc.id]=ch.doc.data();
     });
@@ -911,6 +1014,7 @@ async function init(){
 document.addEventListener('input',e=>{
   if(e.target.getAttribute('inputmode')==='decimal'){const v=e.target.value;if(v.includes(','))e.target.value=v.replace(/,/g,'.');}
 });
+
 init();
 </script>
 </body>

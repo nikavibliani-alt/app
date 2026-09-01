@@ -253,6 +253,64 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 </style>
 </head>
 <body>
+<div id="profit-gate" style="display:none;position:fixed;
+top:0;left:0;width:100%;height:100%;background:#FAFAF9;
+z-index:99999;display:flex;flex-direction:column;
+align-items:center;justify-content:center;font-family:sans-serif;">
+  <div style="text-align:center;padding:40px;">
+    <div style="font-size:24px;font-weight:600;
+      margin-bottom:8px;color:#2C2C2A;">Maxela</div>
+    <div style="font-size:14px;color:#8C8C8A;
+      margin-bottom:32px;">Enter PIN to continue</div>
+    <input id="profit-pin" type="password" 
+      inputmode="numeric" placeholder="PIN"
+      style="width:100%;max-width:200px;padding:14px;
+      font-size:18px;text-align:center;border:1.5px solid #E0D8D0;
+      border-radius:12px;outline:none;margin-bottom:16px;
+      display:block;margin-left:auto;margin-right:auto;">
+    <button onclick="checkProfitPin()"
+      style="width:100%;max-width:200px;padding:14px;
+      background:#2C2C2A;color:#fff;border:none;
+      border-radius:24px;font-size:16px;font-weight:600;
+      cursor:pointer;display:block;margin:0 auto;">
+      Continue
+    </button>
+    <div id="profit-pin-error" style="color:#dc2626;
+      font-size:13px;margin-top:12px;display:none;">
+      Wrong PIN. Try again.
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const PROFIT_PIN = 'maxela2026';
+  const KEY = 'profit_authed_v1';
+  
+  function checkProfitPin(){
+    const val = document.getElementById('profit-pin').value;
+    if(val === PROFIT_PIN){
+      sessionStorage.setItem(KEY, '1');
+      document.getElementById('profit-gate').style.display = 'none';
+    } else {
+      document.getElementById('profit-pin-error').style.display = 'block';
+      document.getElementById('profit-pin').value = '';
+    }
+  }
+  window.checkProfitPin = checkProfitPin;
+  
+  // Allow Enter key
+  document.getElementById('profit-pin').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') checkProfitPin();
+  });
+  
+  // Check if already authed this session
+  if(sessionStorage.getItem(KEY) !== '1'){
+    document.getElementById('profit-gate').style.display = 'flex';
+  }
+})();
+</script>
+
 
 <div class="loading-overlay" id="loading">
   <div class="loading-logo">Profit <span>Split</span></div>
