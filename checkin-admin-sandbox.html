@@ -1939,12 +1939,13 @@ function renderHkSettings(){
       const val=hkSettings.cleanMinutesByRoom[r.code]??typeDef;
       const override=hkSettings.cleanMinutesByRoom[r.code]!=null;
       const capVal=aptData[r.code]?.normalCapacity||'';
-      return`<div class="hk-clean-row">
+      return`<div class="hk-clean-row" style="flex-wrap:wrap">
         <div class="hk-clean-row__meta"><div class="hk-clean-row__code">${esc(r.code)}${override?' · override':''}</div><div class="hk-clean-row__name">${esc(r.name)} · default ${typeDef} min</div></div>
         <input type="number" min="20" max="240" step="5" id="hk-clean-${esc(r.code)}" value="${val}" aria-label="Minutes for ${esc(r.code)}">
         <span style="font-size:11px;color:var(--muted);width:28px">min</span>
         <input type="number" min="1" max="30" step="1" placeholder="auto" value="${esc(String(capVal))}" aria-label="Normal capacity for ${esc(r.code)}" oninput="hkSetRoomCapacity('${esc(r.code)}',this.value)">
-        <span style="font-size:11px;color:var(--muted);width:52px">cap</span>
+        <span style="font-size:11px;color:var(--muted);width:auto;white-space:nowrap">Normal capacity (guests)</span>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;flex-basis:100%;">Alert shows in HK when guests exceed this number</div>
       </div>`;
     }).join('')}</div>`;
   const shartava=getHkRooms().filter(r=>hkSiteId(r.code)==='shartava');
@@ -1990,7 +1991,7 @@ function renderHkSettings(){
     </div>
     <div class="section-hd" style="margin-top:12px"><h2>Cleaning duration</h2></div>
     <div class="hk-clean-grid">${typeRows}</div>
-    <button type="button" class="btn hk-clean-expand" onclick="_hkCleanDetailOpen=!_hkCleanDetailOpen;renderHkSettings()">${_hkCleanDetailOpen?'Hide per-room overrides':'Per-room overrides…'}</button>
+    <button type="button" class="btn hk-clean-expand" onclick="_hkCleanDetailOpen=!_hkCleanDetailOpen;renderHkSettings()">${_hkCleanDetailOpen?'Hide per-room settings':'Per-room cleaning & bedding capacity…'}</button>
     ${detailBlock}
     <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveHkSettings()">Save HK settings</button>
     <div class="more-section" style="margin-top:16px">Staff PINs</div>
