@@ -1480,6 +1480,7 @@ const HK_CLEAN_TYPES=[
 ];
 let gsWaitingTabs={...WAITING_TABS_DEFAULTS};
 let _hkCleanDetailOpen=false;
+window.hkToggleCleanDetail=function(){_hkCleanDetailOpen=!_hkCleanDetailOpen;renderHkSettings();};
 let hkSettings={defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS},cleanMinutesByRoom:{},teams:[]};
 let _hkTeamEdit=null;
 let gsVisibility=JSON.parse(JSON.stringify(SECTION_DEFAULTS));
@@ -1984,7 +1985,7 @@ function renderHkSettings(){
     </div>
     <div class="section-hd" style="margin-top:12px"><h2>Cleaning duration</h2></div>
     <div class="hk-clean-grid">${typeRows}</div>
-    <button type="button" class="btn hk-clean-expand" onclick="_hkCleanDetailOpen=!_hkCleanDetailOpen;renderHkSettings()">${_hkCleanDetailOpen?'Hide per-room settings':'Per-room cleaning & bedding capacity…'}</button>
+    <button type="button" class="btn hk-clean-expand" onclick="window.hkToggleCleanDetail()">${_hkCleanDetailOpen?'Hide per-room settings':'Per-room cleaning & bedding capacity…'}</button>
     ${detailBlock}
     <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveHkSettings()">Save HK settings</button>
     <div class="more-section" style="margin-top:16px">Staff PINs</div>
