@@ -305,8 +305,10 @@ align-items:center;justify-content:center;font-family:sans-serif;">
     if(e.key === 'Enter') await checkProfitPin();
   });
   
-  // Check if already authed this session
-  if(localStorage.getItem(KEY) !== '1'){
+  // Check if already authed (persists across visits via localStorage)
+  if(localStorage.getItem(KEY) === '1'){
+    document.getElementById('profit-gate').style.display = 'none';
+  } else {
     document.getElementById('profit-gate').style.display = 'flex';
   }
 })();
