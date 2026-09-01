@@ -171,6 +171,11 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .pill-multi{background:var(--bg);color:var(--muted);margin-left:6px;}
 .pill-manual{background:#fef3c7;color:#92400e;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.04em;}
 .pill-drift{background:#fee2e2;color:#991b1b;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.04em;}
+.source-badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;color:#fff;vertical-align:middle;margin-left:6px;letter-spacing:0.02em;}
+.source-badge--airbnb{background:#FF5A5F;}
+.source-badge--booking{background:#003580;}
+.source-badge--expedia{background:#FFC72C;color:#1a1a1a;}
+.source-badge--direct{background:#2d6a4f;}
 .elev-status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:16px;flex-wrap:wrap;}
 .elev-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 .elev-dot.fresh{background:var(--green);box-shadow:0 0 0 3px rgba(45,106,79,.2);}
@@ -2296,6 +2301,11 @@ function reservationManualBadge(grp){
   const manual=grp.some(r=>r.manualRoom===true||r.manualRoom==='true');
   return manual?'<span class="pill pill-manual">MANUAL</span>':'';
 }
+const SOURCE_BADGES={airbnb:{label:'Airbnb',cls:'source-badge--airbnb'},booking:{label:'Booking',cls:'source-badge--booking'},expedia:{label:'Expedia',cls:'source-badge--expedia'}};
+function sourceBadgeHtml(source){
+  const def=SOURCE_BADGES[(source||'').toLowerCase()]||{label:'Direct',cls:'source-badge--direct'};
+  return `<span class="source-badge ${def.cls}">${esc(def.label)}</span>`;
+}
 function reservationDriftBadge(grp){
   for(const r of grp){
     if(!(r.manualRoom===true||r.manualRoom==='true'))continue;
@@ -2579,17 +2589,16 @@ function renderCard(grp,mode){
   else if(form&&canPreviewGuest(form))grant=`<button class="btn" onclick="event.stopPropagation();window.viewGuestAsGuest('${form.id}')">Preview</button><button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
   else if(form)grant=`<button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
   else grant=`<button class="btn" disabled>No form yet</button>`;
-  const src=grp[0].source||grp[0].channel||'';
   const ref=grp[0].reservationNumber||grp[0].bookingId||'';
   const guestCount=stayGuestCount(grp,form);
   const guestCountLabel=guestCount+' guest'+(guestCount===1?'':'s');
-  const sub=[src,ref?'#'+ref:'',rawPhone||''].filter(Boolean).join(' · ');
+  const sub=[ref?'#'+ref:'',rawPhone||''].filter(Boolean).join(' · ');
   const open=form?`onclick="window.openDetail('${form.id}')" style="cursor:pointer"`:'';
   const manualBadge=reservationManualBadge(grp);
   const driftBadge=reservationDriftBadge(grp);
   return`<div class="card" ${open}>
     <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${st.cls}">${st.label}</span>${manualBadge}${driftBadge}</div>
-    <div class="card__name">${esc(name)}${multi}</div>
+    <div class="card__name">${esc(name)}${multi}${sourceBadgeHtml(grp[0].source)}</div>
     <div class="card__guests">${esc(guestCountLabel)}</div>
     <div class="card__dates">${esc(datesStr(grp[0],mode))}</div>
     ${sub?`<div class="card__sub">${esc(sub)}</div>`:''}
@@ -3099,7 +3108,7 @@ window.openDetail=function(guestId){
       <div id="detail-room-swap-info" style="display:none;margin-top:8px"></div>`;
   const bookingRef=reservationBaseNum(g.matchedReservationId)||g.matchedReservationId||'';
   document.getElementById('detail-body').innerHTML=`
-    <div style="margin-bottom:12px"><span class="pill ${st.cls}">${st.label}</span>${isMulti?' <span class="pill pill-multi">MULTI · '+sibs.length+' rooms</span>':''}${g.blocked===true?' <span class="pill pill-cancelled">BLOCKED</span>':''}</div>
+    <div style="margin-bottom:12px"><span class="pill ${st.cls}">${st.label}</span>${isMulti?' <span class="pill pill-multi">MULTI · '+sibs.length+' rooms</span>':''}${g.blocked===true?' <span class="pill pill-cancelled">BLOCKED</span>':''}${sourceBadgeHtml(door?.source||sibs[0]?.source||'')}</div>
     <div class="passport-gate" id="pp-gate">
       <p>Passport / ID is hidden until you need it.</p>
       <button class="btn btn-primary" style="width:100%" onclick="window.showPassport()">Check passport</button>
