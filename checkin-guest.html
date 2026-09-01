@@ -76,6 +76,8 @@ body{
 .topbar__right{display:flex;align-items:center;gap:10px;}
 .lang-pill{height:44px;padding:0 14px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;font-family:var(--mono);font-size:11px;color:var(--ink-2);background:var(--surface);cursor:pointer;}
 .lang-pill svg{width:11px;height:11px;opacity:.75;}
+.lang-option{display:block;width:100%;text-align:left;padding:10px 14px;font-size:13px;font-family:var(--sans);background:none;border:none;border-radius:8px;cursor:pointer;color:var(--ink);white-space:nowrap;}
+.lang-option:hover,.lang-option.active{background:#F5F5F4;font-weight:600;}
 .avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#6B6B68,#2C2C2A);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:500;letter-spacing:0.02em;box-shadow:0 0 0 2px var(--bg),0 0 0 3px var(--line);}
 
 /* ── GREETING ── */
@@ -982,10 +984,18 @@ body{padding-bottom:0;}
     <div class="topbar">
       <div class="brand"><span>Maxela</span><small>apts</small></div>
       <div class="topbar__right">
-        <button class="lang-pill" onclick="window.cycleLang()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"/></svg>
-          <span id="lang-pill-label-home">EN</span>
-        </button>
+        <div style="position:relative;">
+          <button class="lang-pill" onclick="window.cycleLang(event)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"/></svg>
+            <span id="lang-pill-label-home">EN</span>
+          </button>
+          <div id="lang-dropdown" style="display:none;position:absolute;top:100%;right:0;background:#fff;border:1.5px solid #E0D8D0;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.10);padding:6px;z-index:9999;min-width:110px;" onclick="event.stopPropagation()">
+            <button class="lang-option" onclick="selectLang('en')">🇬🇧 English</button>
+            <button class="lang-option" onclick="selectLang('ka')">🇬🇪 ქართული</button>
+            <button class="lang-option" onclick="selectLang('ru')">🇷🇺 Русский</button>
+            <button class="lang-option" onclick="selectLang('ar')">🇸🇦 العربية</button>
+          </div>
+        </div>
         <button class="lang-pill" onclick="window.logout()" style="gap:5px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           <span>Sign out</span>
@@ -1896,16 +1906,29 @@ window.setLang=function(l){
   if(homePill)homePill.textContent=l==='ka'?'ქარ':l==='ar'?'ع':l.toUpperCase();
 }
 
-window.cycleLang=function(){
-  const LANGS=['en','ka','ru','ar'];
-  const current=lang||'en';
-  const nextIndex=(LANGS.indexOf(current)+1)%LANGS.length;
-  setLang(LANGS[nextIndex]);
-  // Update the top bar pill label to show current language
-  const label=document.getElementById('lang-pill-label-home');
-  if(label)label.textContent=LANGS[nextIndex].toUpperCase()
-    .replace('KA','ქარ').replace('AR','ع');
+window.cycleLang=function(e){
+  if(e)e.stopPropagation();
+  const dd=document.getElementById('lang-dropdown');
+  if(!dd)return;
+  const isOpen=dd.style.display!=='none';
+  dd.style.display=isOpen?'none':'block';
+  // Mark current active language
+  dd.querySelectorAll('.lang-option').forEach(btn=>{
+    btn.classList.toggle('active',
+      btn.getAttribute('onclick').includes("'"+(lang||'en')+"'"));
+  });
 };
+
+window.selectLang=function(l){
+  setLang(l);
+  const dd=document.getElementById('lang-dropdown');
+  if(dd)dd.style.display='none';
+};
+
+document.addEventListener('click',function(){
+  const dd=document.getElementById('lang-dropdown');
+  if(dd)dd.style.display='none';
+});
 
 function applyTranslations(){
   const map={
