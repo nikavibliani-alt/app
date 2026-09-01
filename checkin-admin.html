@@ -1421,11 +1421,18 @@ const ROOM_CATEGORY_DEFAULTS={
   ORBELIANI:{name:'Orbeliani Suite',maxGuests:3,amenities:['Free WiFi','City View','Historic District'],photos:[]},
 };
 const LOCATION_INFO_DEFAULTS={
-  ROOMS:{address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
-  MAXELA:{address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
-  BIG_APT:{address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
-  FREEDOM:{address:'Galaktion Tabidze St. 3/5, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
-  ORBELIANI:{address:'Atoneli St. 9, Tbilisi',mapsUrl:'',neighborhood:'',parkingEnabled:false,parkingDesc:'',parkingMapsUrl:'',parkingMediaUrl:''},
+  ROOMS:{address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:''},
+  MAXELA:{address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:''},
+  BIG_APT:{address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:''},
+  FREEDOM:{address:'Galaktion Tabidze St. 3/5, Tbilisi',mapsUrl:'',neighborhood:''},
+  ORBELIANI:{address:'Atoneli St. 9, Tbilisi',mapsUrl:'',neighborhood:''},
+};
+const PARKING_INFO_DEFAULTS={
+  ROOMS:{parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
+  MAXELA:{parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
+  BIG_APT:{parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
+  FREEDOM:{parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
+  ORBELIANI:{parkingEnabled:false,parkingDesc:'',parkingMapsUrl:'',parkingMediaUrl:''},
 };
 const GP_PROPS=[
   {id:'ROOMS',label:'Rooms'},{id:'MAXELA',label:'Maxela'},{id:'BIG_APT',label:'Big Apt'},
@@ -1434,7 +1441,7 @@ const GP_PROPS=[
 const GP_ICON_MAP={
   key:'key',wifi:'wifi',elevator:'arrow-up-down',services:'layout-grid',
   laundry:'washing-machine',cleaning:'sparkles',tour:'compass',transfer:'plane-arrival',
-  recs:'star',rules:'file-text',contact:'message-circle',home:'home',location:'map-pin',
+  recs:'star',rules:'file-text',contact:'message-circle',home:'home',location:'map-pin',parking:'truck',
 };
 function gpIcon(name,size=18){return featherIcon(GP_ICON_MAP[name]||name,size,1.8);}
 const GP_TILES=[
@@ -1449,6 +1456,8 @@ const GP_TILES=[
   {id:'recs',icon:'recs',label:'Recs',group:'content',edit:'text'},
   {id:'rules',icon:'rules',label:'Rules',group:'content',edit:'text'},
   {id:'contact',icon:'contact',label:'Contact',group:'content',edit:'text'},
+  {id:'location',icon:'location',label:'Location',group:'content',edit:'location'},
+  {id:'parking',icon:'parking',label:'Parking',group:'content',edit:'parking'},
 ];
 const WAITING_TABS_DEFAULTS={location:true,tours:false};
 const GP_WAITING_TABS=[
@@ -1476,6 +1485,7 @@ let gsLoaded=false;
 let gsSectionLabels={};
 let gsRoomCategories={};
 let gsLocationInfo={};
+let gsParkingInfo={};
 let gsDirty=false;
 let _gpEditCtx=null;
 
@@ -1494,6 +1504,7 @@ async function loadGuestSettings(){
       if(d.sectionLabels)gsSectionLabels=d.sectionLabels;
       if(d.roomCategories)gsRoomCategories=d.roomCategories;
       if(d.locationInfo)gsLocationInfo=d.locationInfo;
+      if(d.parkingInfo)gsParkingInfo=d.parkingInfo;
       if(d.waitingTabs){
         const wt={...WAITING_TABS_DEFAULTS,...d.waitingTabs};
         delete wt.shuttle;
@@ -1520,7 +1531,7 @@ window.gsSaveAll=async function(){
     delete waitingTabs.shuttle;
     await setDoc(doc(db,'checkin_admin','config'),{
       visibility:gsVisibility,laundryItems:gsLaundry,services:gsServices,sectionLabels:gsSectionLabels,
-      roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,waitingTabs,hkSettings,
+      roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,parkingInfo:gsParkingInfo,waitingTabs,hkSettings,
       updatedAt:serverTimestamp()
     });
     gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');
@@ -1555,7 +1566,6 @@ function renderGuestSettings(){
   };
   const cat=gsRoomCategories[gsProp]||{};
   const def=ROOM_CATEGORY_DEFAULTS[gsProp]||{};
-  const loc=gsLocationInfo[gsProp]||LOCATION_INFO_DEFAULTS[gsProp]||{};
   root.innerHTML=`
     <div class="gp-prop-row">${props}</div>
     <div style="font-size:12px;font-weight:500;letter-spacing:.02em;color:var(--muted);margin-bottom:6px">Guest preview</div>
@@ -1583,12 +1593,6 @@ function renderGuestSettings(){
     <button type="button" class="gp-row" style="width:100%;cursor:pointer;border:none;font-family:var(--sans)" onclick="openGpEditor('room_category')">
       <div class="gp-row__icon">${gpIcon('home')}</div>
       <div class="gp-row__body"><div class="gp-row__title">${esc(cat.name||def.name||'Room category')}</div><div class="gp-row__sub">Photos, amenities, max guests</div></div>
-      <span class="gp-row__chev">›</span>
-    </button>
-    <div class="section-hd" style="margin-top:8px"><h2>Location</h2></div>
-    <button type="button" class="gp-row" style="width:100%;cursor:pointer;border:none;font-family:var(--sans)" onclick="openGpEditor('location')">
-      <div class="gp-row__icon">${gpIcon('location')}</div>
-      <div class="gp-row__body"><div class="gp-row__title">${esc(loc.address||def.address||'Address')}</div><div class="gp-row__sub">${loc.parkingEnabled?'Parking on':'No parking section'}</div></div>
       <span class="gp-row__chev">›</span>
     </button>
     <button class="btn" style="width:100%;margin-top:12px" onclick="window.open(guestAptPreviewUrl(''),'_blank')">Preview guest app (empty)</button>
@@ -1622,17 +1626,33 @@ window.openGpEditor=function(ctx){
       <div style="display:flex;flex-wrap:gap:6px;margin-bottom:10px">${amenities.map((a,i)=>`<span style="font-size:12px;padding:4px 10px;background:var(--bg);border-radius:999px">${esc(a)} <button type="button" style="border:none;background:none;cursor:pointer" onclick="gpRemoveAmenity(${i})">×</button></span>`).join('')}</div>
       <div class="apt-row"><input class="apt-input" id="gp-new-amenity" placeholder="Add amenity" style="margin:0"><button class="btn" onclick="gpAddAmenity()">Add</button></div>`;
   }else if(ctx==='location'){
-    title.textContent='Location & parking';
+    title.textContent='Location';
     const loc=gsLocationInfo[gsProp]||{};
     const def=LOCATION_INFO_DEFAULTS[gsProp]||{};
     const data={...def,...loc};
     body.innerHTML=`
       <label class="apt-label">Address</label><input class="apt-input" value="${esc(data.address||'')}" oninput="gpSetLoc('address',this.value)">
       <label class="apt-label">Google Maps URL</label><input class="apt-input" value="${esc(data.mapsUrl||'')}" oninput="gpSetLoc('mapsUrl',this.value)" placeholder="https://maps.google.com/…">
-      <label class="apt-label">Neighborhood blurb</label><textarea class="apt-textarea" oninput="gpSetLoc('neighborhood',this.value)">${esc(data.neighborhood||'')}</textarea>
-      <div class="gp-row" style="margin:12px 0"><div class="gp-row__body"><div class="gp-row__title">Parking section</div></div>
-        <label class="switch"><input type="checkbox" ${data.parkingEnabled?'checked':''} onchange="gpSetLoc('parkingEnabled',this.checked)"><span class="switch-track"></span></label></div>
-      <label class="apt-label">Parking description</label><textarea class="apt-textarea" oninput="gpSetLoc('parkingDesc',this.value)">${esc(data.parkingDesc||'')}</textarea>`;
+      <label class="apt-label">Neighborhood blurb</label><textarea class="apt-textarea" oninput="gpSetLoc('neighborhood',this.value)">${esc(data.neighborhood||'')}</textarea>`;
+  }else if(ctx==='parking'){
+    title.textContent='Parking';
+    const park=gsParkingInfo[gsProp]||{};
+    const def=PARKING_INFO_DEFAULTS[gsProp]||{};
+    const data={...def,...park};
+    const media=data.parkingMediaUrl||'';
+    const isVideo=/\.(mp4|mov|webm|avi)$/i.test(media)||media.includes('/video/');
+    const mediaPreview=media
+      ?`<div style="margin:8px 0">${isVideo?`<video controls playsinline style="width:100%;border-radius:12px" src="${esc(media)}"></video>`:`<img src="${esc(media)}" style="width:100%;border-radius:12px;object-fit:cover">`}
+         <button type="button" class="btn" style="width:100%;margin-top:6px" onclick="gpSetParking('parkingMediaUrl','')">Remove photo/video</button></div>`
+      :'';
+    body.innerHTML=`
+      <div class="gp-row" style="margin-bottom:12px"><div class="gp-row__body"><div class="gp-row__title">Parking section</div><div class="gp-row__sub">Shown to guests when on</div></div>
+        <label class="switch"><input type="checkbox" ${data.parkingEnabled?'checked':''} onchange="gpSetParking('parkingEnabled',this.checked)"><span class="switch-track"></span></label></div>
+      <label class="apt-label">Parking description</label><textarea class="apt-textarea" oninput="gpSetParking('parkingDesc',this.value)">${esc(data.parkingDesc||'')}</textarea>
+      <label class="apt-label">Parking Google Maps URL</label><input class="apt-input" value="${esc(data.parkingMapsUrl||'')}" oninput="gpSetParking('parkingMapsUrl',this.value)" placeholder="https://maps.google.com/…">
+      <label class="apt-label">Parking photo or video</label>
+      ${mediaPreview}
+      <input type="file" accept="image/*,video/*" onchange="gpUploadParkingMedia(this)">`;
   }else if(ctx==='wifi'){
     title.textContent='WiFi defaults';
     body.innerHTML=`
@@ -1696,6 +1716,20 @@ window.gpSetCat=function(f,v){
 window.gpSetLoc=function(f,v){
   if(!gsLocationInfo[gsProp])gsLocationInfo[gsProp]={...LOCATION_INFO_DEFAULTS[gsProp]};
   gsLocationInfo[gsProp][f]=v;gsMarkDirty();
+};
+window.gpSetParking=function(f,v){
+  if(!gsParkingInfo[gsProp])gsParkingInfo[gsProp]={...PARKING_INFO_DEFAULTS[gsProp]};
+  gsParkingInfo[gsProp][f]=v;gsMarkDirty();
+  if(f==='parkingMediaUrl')window.openGpEditor('parking');
+};
+window.gpUploadParkingMedia=async function(input){
+  const file=input.files?.[0];if(!file)return;
+  try{
+    toast('Uploading…',15000);
+    const url=await uploadToCloudinary(file,'maxela/parking-media');
+    window.gpSetParking('parkingMediaUrl',url);
+    toast('Uploaded ✓');
+  }catch(e){toast('Upload failed: '+e.message);}
 };
 window.gpAddAmenity=function(){
   const v=document.getElementById('gp-new-amenity')?.value.trim();if(!v)return;

@@ -1007,7 +1007,7 @@ body{padding-bottom:0;}
     <div class="home-quick" id="home-quick">
       <div class="home-loc-row" id="home-loc-row">
         <button type="button" class="home-loc-btn" id="t-btn-location" onclick="window._tapWithFeedback(this,()=>window.openPage('location'))">Location</button>
-        <button type="button" class="home-loc-btn home-loc-btn--park" id="t-btn-parking" onclick="window._tapWithFeedback(this,()=>window.openParkingWindow())">Parking</button>
+        <button type="button" class="home-loc-btn home-loc-btn--park" id="t-btn-parking" onclick="window._tapWithFeedback(this,()=>window.openPage('parking'))">Parking</button>
       </div>
       <div class="home-svc-area" id="home-svc-area"></div>
     </div>
@@ -1162,8 +1162,12 @@ body{padding-bottom:0;}
     <div class="subpage-body" id="pg-body-contact"></div>
   </div>
   <div class="page" id="page-content-location">
-    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-location">Location &amp; Parking</div></div>
+    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-location">Location</div></div>
     <div class="subpage-body" id="pg-body-location"></div>
+  </div>
+  <div class="page" id="page-content-parking">
+    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-parking">Parking</div></div>
+    <div class="subpage-body" id="pg-body-parking"></div>
   </div>
   <div class="page" id="page-content-transfer">
     <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-transfer">Shuttle service</div></div>
@@ -1174,12 +1178,6 @@ body{padding-bottom:0;}
     <div class="subpage-body" id="pg-body-tours"></div>
   </div>
 
-</div>
-
-<div id="parking-only-view" style="display:none;min-height:100vh;padding:24px 20px 40px;background:var(--bg);max-width:560px;margin:0 auto;">
-  <h1 style="font-family:var(--serif);font-size:22px;margin-bottom:8px;color:var(--ink);">Parking guide</h1>
-  <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Video and directions for finding parking</p>
-  <div id="parking-only-body"></div>
 </div>
 
 <div id="subpages"></div>
@@ -1553,7 +1551,7 @@ function _nudgeHomeScrollOnce(){
   });
 }
 
-const _CONTENT_TYPES=['wifi','services','recs','rules','contact','location','transfer','tours'];
+const _CONTENT_TYPES=['wifi','services','recs','rules','contact','location','parking','transfer','tours'];
 
 function _navToContent(type,title,body){
   const titleEl=document.getElementById('pg-title-'+type);
@@ -2159,24 +2157,24 @@ async function findExistingPrimaryGuest(resId,resNum){
   }
   return null;
 }
-async function _getHomeLocData(){
+async function _getParkingData(){
   const cfg=await getFullCfg();
   const prop=aptPropTypeForConfig();
-  const locDefaults={ROOMS:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},MAXELA:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},BIG_APT:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},FREEDOM:{address:'Galaktion Tabidze St. 3/5, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},ORBELIANI:{address:'Atoneli St. 9, Tbilisi',parkingEnabled:false,parkingDesc:''}};
-  return{...(locDefaults[prop]||{}),...((cfg.locationInfo||{})[prop]||{})};
+  const parkDefaults={ROOMS:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'},MAXELA:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'},BIG_APT:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'},FREEDOM:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'},ORBELIANI:{parkingEnabled:false,parkingDesc:''}};
+  return{...(parkDefaults[prop]||{}),...((cfg.parkingInfo||{})[prop]||{})};
 }
 
-window.openParkingWindow=async function(){
+// Hides/shows the home-screen Parking button based on parkingInfo[prop].parkingEnabled.
+// Fire-and-forget (not awaited by its caller) — same non-blocking pattern already used
+// for the door-code apartment fetch a few lines up in _renderHeroContent().
+async function _updateParkingButtonVisibility(){
+  const btn=document.getElementById('t-btn-parking');
+  if(!btn)return;
   try{
-    const locData=await _getHomeLocData();
-    const pageUrl=locData.parkingPageUrl;
-    if(pageUrl){window.open(pageUrl,'_blank','noopener');return;}
-    const apt=encodeURIComponent(aptId||'');
-    window.open(window.location.pathname+'?view=parking&apt='+apt,'_blank','noopener');
-  }catch(e){
-    window.open(window.location.pathname+'?view=parking','_blank','noopener');
-  }
-};
+    const parkData=await _getParkingData();
+    btn.style.display=parkData.parkingEnabled===false?'none':'';
+  }catch(e){}
+}
 
 async function _initCompanionFromRes(){
   if(!_companionGuest||!_resParam)return;
@@ -3274,10 +3272,11 @@ window.wybToggle=function(){
 
 // Shared by openPage('location') (full subpage)
 // (inline waiting-tab panel) — same admin config + per-property fallback, one source of truth.
+// Location-only now — parking lives in its own parkingInfo field, read by _getParkingData().
 async function _getLocationData(){
   const cfg=await getFullCfg();
   const prop=aptPropTypeForConfig();
-  const locDefaults={ROOMS:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},MAXELA:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},BIG_APT:{address:'Zhiuli Shartava St. 37, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},FREEDOM:{address:'Galaktion Tabidze St. 3/5, Tbilisi',parkingEnabled:true,parkingDesc:'Paid parking available nearby'},ORBELIANI:{address:'Atoneli St. 9, Tbilisi',parkingEnabled:false,parkingDesc:''}};
+  const locDefaults={ROOMS:{address:'Zhiuli Shartava St. 37, Tbilisi'},MAXELA:{address:'Zhiuli Shartava St. 37, Tbilisi'},BIG_APT:{address:'Zhiuli Shartava St. 37, Tbilisi'},FREEDOM:{address:'Galaktion Tabidze St. 3/5, Tbilisi'},ORBELIANI:{address:'Atoneli St. 9, Tbilisi'}};
   return {...(locDefaults[prop]||{}),...((cfg.locationInfo||{})[prop]||{})};
 }
 
@@ -3309,7 +3308,7 @@ try{
   })||activeReservation;
   if(type==='wifi'&&!isUnlocked()){openLocked(pageRes);return;}
   const d=aptData||{};
-  const titles={wifi:t('tw'),services:t('tsv'),recs:t('tr'),rules:t('tru'),contact:t('tco'),transfer:t('tabShuttle'),tours:t('tabTours')};
+  const titles={wifi:t('tw'),services:t('tsv'),recs:t('tr'),rules:t('tru'),contact:t('tco'),transfer:t('tabShuttle'),tours:t('tabTours'),location:'Location',parking:'Parking'};
   let body='';
 
   if(type==='wifi'){
@@ -3392,20 +3391,25 @@ try{
     const neighborhood=locData.neighborhood
       ?`<div class="loc-section"><div class="loc-section-title">Neighborhood</div><div class="loc-desc">${esc(locData.neighborhood)}</div></div>`
       :'';
-    const _pm=locData.parkingMediaUrl||'';
+    body=`<div style="padding:0 4px;">
+      <div class="loc-address">${esc(locData.address||'')}</div>
+      ${mapsBtn}
+      ${neighborhood}
+    </div>`;
+  }
+
+  if(type==='parking'){
+    const parkData=await _getParkingData();
+    const _pm=parkData.parkingMediaUrl||'';
     const parkingMedia=_pm
       ?(/\.(mp4|mov|webm|avi)$/i.test(_pm)||_pm.includes('/video/')
         ?`<video controls playsinline style="width:100%;border-radius:12px;margin-top:12px;" src="${esc(_pm)}"></video>`
         :`<img src="${esc(_pm)}" style="width:100%;border-radius:12px;margin-top:12px;object-fit:cover;max-height:220px;">`)
       :'';
-    const parkingSection=locData.parkingEnabled
-      ?`<div class="loc-section"><div class="loc-section-title">Parking</div><div class="loc-desc">${esc(locData.parkingDesc||'Paid parking available nearby')}</div>${locData.parkingMapsUrl?`<a href="${esc(locData.parkingMapsUrl)}" target="_blank" class="loc-parking-btn">Open parking in Maps</a>`:''}${parkingMedia}</div>`
-      :'';
-    body=`<div style="padding:0 4px;">
-      <div class="loc-address">${esc(locData.address||'')}</div>
-      ${mapsBtn}
-      ${neighborhood}
-      ${parkingSection}
+    body=parkData.parkingEnabled===false
+      ?`<div style="text-align:center;padding:3rem;color:var(--hint);font-size:14px;">Parking info not available</div>`
+      :`<div style="padding:0 4px;">
+      <div class="loc-section"><div class="loc-desc">${esc(parkData.parkingDesc||'Paid parking available nearby')}</div>${parkData.parkingMapsUrl?`<a href="${esc(parkData.parkingMapsUrl)}" target="_blank" class="loc-parking-btn">Open parking in Maps</a>`:''}${parkingMedia}</div>
     </div>`;
   }
 
@@ -3954,31 +3958,6 @@ async function loadGuestDataWithRetry(guestId,retries=3){
   return{data:null,found:null}; // null = network failure (unknown)
 }
 
-async function showParkingOnlyView(){
-  document.getElementById('loading').style.display='none';
-  document.getElementById('app').style.display='none';
-  const pv=document.getElementById('parking-only-view');
-  if(pv)pv.style.display='block';
-  const aptQ=params.get('apt')||'';
-  if(aptQ)aptId=aptQ;
-  try{
-    const locData=await _getHomeLocData();
-    const _pm=locData.parkingMediaUrl||'';
-    let media='';
-    if(_pm){
-      if(/\.(mp4|mov|webm|avi)$/i.test(_pm)||_pm.includes('/video/'))
-        media='<video controls playsinline style="width:100%;border-radius:12px;margin-top:8px;" src="'+esc(_pm)+'"></video>';
-      else media='<img src="'+esc(_pm)+'" style="width:100%;border-radius:12px;margin-top:8px;object-fit:cover;">';
-    }
-    const body=document.getElementById('parking-only-body');
-    if(body)body.innerHTML='<p style="font-size:14px;color:var(--ink);line-height:1.55;margin-bottom:12px;">'+esc(locData.parkingDesc||'Paid parking available nearby')+'</p>'+media+
-      (locData.parkingMapsUrl?'<a href="'+esc(locData.parkingMapsUrl)+'" target="_blank" rel="noopener" class="loc-parking-btn" style="margin-top:16px;display:flex;">Open parking in Maps</a>':'');
-  }catch(e){
-    const body=document.getElementById('parking-only-body');
-    if(body)body.innerHTML='<p style="color:var(--muted);">Parking guide will be available soon.</p>';
-  }
-}
-
 function _showCompanionBanner(){
   if(!_companionGuest)return;
   const reg=document.getElementById('page-register');
@@ -3993,10 +3972,6 @@ function _showCompanionBanner(){
 }
 
 async function init(){
-  if(params.get('view')==='parking'){
-    await showParkingOnlyView();
-    return;
-  }
   if(_companionGuest){
     _showCompanionBanner();
     await _initCompanionFromRes();
@@ -4245,6 +4220,7 @@ function _floorLabel(){
 // #hero-floor-info/#hero-door-photo) from the same data source _renderTilesNow() uses.
 // Safe to call any time home is on screen — every element lookup is null-checked.
 function _renderHeroContent(){
+  _updateParkingButtonVisibility();
   const doorEl=document.getElementById('hero-door-code');
   let doorCode=_doorCodeForGuest();
   if(!doorCode&&aptId&&(!aptData||!aptData.doorCode)){
