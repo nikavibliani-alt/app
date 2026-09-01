@@ -268,6 +268,24 @@ align-items:center;justify-content:center;font-family:sans-serif;">
 (function(){
   const KEY = 'profit_authed_v1';
 
+  function setProfitCookie(){
+    // Set cookie that expires in 365 days
+    const d = new Date();
+    d.setTime(d.getTime() + (365*24*60*60*1000));
+    document.cookie = KEY + '=1;expires=' + d.toUTCString() +
+      ';path=/;SameSite=Strict';
+  }
+
+  function getProfitCookie(){
+    const name = KEY + '=';
+    const ca = document.cookie.split(';');
+    for(let i=0;i<ca.length;i++){
+      let c = ca[i].trim();
+      if(c.indexOf(name)===0) return c.substring(name.length,c.length);
+    }
+    return '';
+  }
+
   // SECURITY NOTE: profit_settings/pins is publicly readable (no auth)
   // via the Firestore REST API below, since this page reads it without
   // signing in. Accepted for now — it stops casual access, not a
@@ -291,7 +309,7 @@ align-items:center;justify-content:center;font-family:sans-serif;">
     const PROFIT_PIN = await getProfitPin('tuka');
     const val = document.getElementById('profit-pin').value;
     if(val === PROFIT_PIN){
-      localStorage.setItem(KEY, '1');
+      setProfitCookie();
       document.getElementById('profit-gate').style.display = 'none';
     } else {
       document.getElementById('profit-pin-error').style.display = 'block';
@@ -305,8 +323,8 @@ align-items:center;justify-content:center;font-family:sans-serif;">
     if(e.key === 'Enter') await checkProfitPin();
   });
   
-  // Check if already authed (persists across visits via localStorage)
-  if(localStorage.getItem(KEY) === '1'){
+  // Check if already authed (persists via cookie — survives iOS Safari home-screen bookmark localStorage clearing)
+  if(getProfitCookie() === '1'){
     document.getElementById('profit-gate').style.display = 'none';
   } else {
     document.getElementById('profit-gate').style.display = 'flex';
