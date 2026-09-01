@@ -142,12 +142,6 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .hk-site-hd{font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--ink-2);padding:14px 2px 8px;margin-top:4px;border-top:1px solid var(--line);}
 .hk-site-hd:first-child{border-top:none;margin-top:0;padding-top:4px;}
 .hk-clean-grid{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
-.profit-pin-row{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:10px;}
-.profit-pin-row__label{font-weight:700;font-size:14px;margin-bottom:8px;}
-.profit-pin-row__field{display:flex;gap:8px;align-items:center;}
-.profit-pin-row__field input{flex:1;height:44px;padding:0 12px;border:1.5px solid var(--line);border-radius:var(--r);font-size:16px;background:var(--surface);font-family:var(--mono);}
-.profit-pin-toggle{width:44px;height:44px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);font-size:16px;cursor:pointer;flex-shrink:0;}
-.profit-pin-saved{color:var(--green);font-size:12px;margin-top:6px;font-weight:600;}
 .hk-cap-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-top:10px;}
 .hk-cap-card__hd{font-weight:700;font-size:14px;margin-bottom:8px;}
 .hk-cap-card__row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
@@ -653,10 +647,6 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
     <div id="hksettings-root"></div>
   </div>
 
-  <div class="pane" id="pane-profitsettings">
-    <div id="profitsettings-root"></div>
-  </div>
-
   <div class="pane" id="pane-guestsettings">
     <div id="guestsettings-root"></div>
   </div>
@@ -694,10 +684,6 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
     <div class="more-section">Housekeeping setup</div>
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('hksettings')">HK settings</button>
-    </div>
-    <div class="more-section">Profit Trackers</div>
-    <div class="more-list">
-      <button class="more-item" type="button" onclick="switchTab('profitsettings')">Profit Tracker PINs</button>
     </div>
     <div class="more-section">App</div>
     <div class="more-list">
@@ -1069,7 +1055,7 @@ async function syncRoomsFromSeed(){
 let aptData={},guestData=[],hkStatusData={},_resCache=null,_resLoading=false;
 let elevData=null,stayFilter='overview',upcomingDay=null,_currentAptId=null;
 const _TAB_KEY='maxela_admin_tab';
-const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','guestsettings','wasettings','failures','navsettings','hksettings','profitsettings','more']);
+const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','guestsettings','wasettings','failures','navsettings','hksettings','more']);
 
 const _NAV_KEY='maxela_admin_nav_v5';
 const NAV_MIN=2;
@@ -1980,63 +1966,6 @@ function renderBeddingCapacitySection(){
     </div>`;
   }).join('');
 }
-let profitPins={shartava:'',tuka:'',venu:''};
-let profitPinsLoaded=false;
-async function loadProfitPins(){
-  try{
-    const snap=await getDoc(doc(db,'profit_settings','pins'));
-    if(snap.exists()){
-      const d=snap.data();
-      profitPins={shartava:d.shartava||'',tuka:d.tuka||'',venu:d.venu||''};
-    }
-  }catch(e){console.warn('[profitPins] load failed',e);}
-  profitPinsLoaded=true;
-}
-window.toggleProfitPinVisibility=function(id){
-  const el=document.getElementById('profit-pin-'+id);
-  if(!el)return;
-  el.type=el.type==='password'?'text':'password';
-};
-window.saveProfitPin=async function(id){
-  const el=document.getElementById('profit-pin-'+id);
-  if(!el)return;
-  const val=el.value||'';
-  try{
-    await setDoc(doc(db,'profit_settings','pins'),{[id]:val},{merge:true});
-    profitPins[id]=val;
-    const savedEl=document.getElementById('profit-pin-saved-'+id);
-    if(savedEl){
-      savedEl.style.display='block';
-      clearTimeout(savedEl._hideTimer);
-      savedEl._hideTimer=setTimeout(()=>{savedEl.style.display='none';},2000);
-    }
-  }catch(e){toast('Failed to save PIN: '+e.message);}
-};
-async function renderProfitSettings(){
-  const wrap=document.getElementById('profitsettings-root');
-  if(!wrap)return;
-  if(!profitPinsLoaded){
-    wrap.innerHTML='<div class="empty">Loading…</div>';
-    await loadProfitPins();
-  }
-  const row=(id,label)=>`
-    <div class="profit-pin-row">
-      <div class="profit-pin-row__label">${esc(label)}</div>
-      <div class="profit-pin-row__field">
-        <input type="password" id="profit-pin-${id}" value="${esc(profitPins[id]||'')}" placeholder="PIN" aria-label="${esc(label)} PIN">
-        <button type="button" class="profit-pin-toggle" onclick="toggleProfitPinVisibility('${id}')" aria-label="Show or hide PIN">👁</button>
-      </div>
-      <button type="button" class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveProfitPin('${id}')">Save</button>
-      <div class="profit-pin-saved" id="profit-pin-saved-${id}" style="display:none">Saved</div>
-    </div>`;
-  wrap.innerHTML=`
-    <div class="section-hd"><h2>Profit Tracker PINs</h2></div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Each PIN gates its tracker at app.maxelaapartments.com/profit/&lt;name&gt;. Stored in Firestore, readable without auth by the tracker pages — a light deterrent, not real security.</p>
-    ${row('shartava','Shartava')}
-    ${row('tuka','Tuka')}
-    ${row('venu','Venu')}
-  `;
-}
 function renderHkSettings(){
   const wrap=document.getElementById('hksettings-root');
   if(!wrap)return;
@@ -2855,15 +2784,14 @@ const TAB_META={
   apts:{title:'Apartments',sub:'WiFi, instructions, photo steps'},
   hk:{title:'Housekeeping',sub:'Daily task board · checkouts & done'},
   hksettings:{title:'HK settings',sub:'Staff PINs · cleaner apps · defaults'},
-  profitsettings:{title:'Profit Trackers',sub:'PINs for Shartava, Tuka & Venu trackers'},
   guestsettings:{title:'Guest page',sub:'Tiles, services, waiting tabs & location'},
   wasettings:{title:'WhatsApp messages',sub:'Outreach templates · check-in invites & replies'},
   failures:{title:'Failed searches',sub:'Guests who could not find booking'},
   navsettings:{title:'Tab bar',sub:'Add tabs · reorder · landing page'},
   more:{title:'More',sub:'All admin tools'},
 };
-const MORE_TABS=new Set(['more','apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','profitsettings','hk']);
-const MORE_SUB_PAGES=new Set(['apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','profitsettings','hk']);
+const MORE_TABS=new Set(['more','apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','hk']);
+const MORE_SUB_PAGES=new Set(['apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','hk']);
 
 function updateHeaderBack(){
   const btn=document.getElementById('header-back');
@@ -4468,7 +4396,6 @@ function render(){
   else if(currentTab==='requests')buildRequestsUI();
   else if(currentTab==='guestsettings'&&gsLoaded)renderGuestSettings();
   else if(currentTab==='hksettings')renderHkSettings();
-  else if(currentTab==='profitsettings')renderProfitSettings();
   else if(currentTab==='failures')renderFailures();
 }
 

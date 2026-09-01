@@ -11,15 +11,15 @@
     ],
     "rewrites": [
       {
-        "source": "/profit/shartava",
+        "source": "/profit/sh-t937c6gzg7z8",
         "destination": "/internal-profit-shartava.html"
       },
       {
-        "source": "/profit/tuka",
+        "source": "/profit/tk-3uohi9r7hvtk",
         "destination": "/internal-tuka-tracker.html"
       },
       {
-        "source": "/profit/venu",
+        "source": "/profit/vn-kctuee7onrah",
         "destination": "/internal-venu-tracker.html"
       },
       {
