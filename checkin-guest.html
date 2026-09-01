@@ -1702,10 +1702,7 @@ function getCheckinTimeSlots(arrivalDate){
     return {slots,hide:false,mode:'future'};
   }
   if(arrivalDate<today){
-    slots.push(..._slotHours(ci,23));
-    slots.push(_slotLateNight());
-    slots.push(_slotNextMorning());
-    return {slots,hide:false,mode:'past'};
+    return {slots:[],hide:true,mode:'past'};
   }
   // arrivalDate === today (Tbilisi)
   if(hour<ci){
@@ -1756,7 +1753,7 @@ window.refreshCheckinTimePicker=function(){
   if(hide||!slots.length){
     row.style.display='none';
     if(mode==='today-done')hidden.value='asap';
-    else if(!arrival)hidden.value='';
+    else if(!arrival||mode==='past')hidden.value='';
     window.updateCheckinTimeNotice();
     return;
   }
