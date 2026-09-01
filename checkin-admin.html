@@ -142,6 +142,11 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .hk-site-hd{font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--ink-2);padding:14px 2px 8px;margin-top:4px;border-top:1px solid var(--line);}
 .hk-site-hd:first-child{border-top:none;margin-top:0;padding-top:4px;}
 .hk-clean-grid{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.hk-cap-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-top:10px;}
+.hk-cap-card__hd{font-weight:700;font-size:14px;margin-bottom:8px;}
+.hk-cap-card__row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.hk-cap-card__row input{width:64px;height:36px;text-align:center;border:1.5px solid var(--line);border-radius:8px;font-family:var(--mono);font-size:15px;font-weight:700;background:var(--surface);}
+.hk-cap-card__applies{font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.4;}
 .hk-clean-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);}
 .hk-clean-row__meta{flex:1;min-width:0;}
 .hk-clean-row__code{font-family:var(--mono);font-size:13px;font-weight:700;}
@@ -790,7 +795,7 @@ import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app
 import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit,runTransaction}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour,normalizeStayDate}from"./shared/guest-unlock.js";
-import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON}from"./shared/hk-bedding.js";
+import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON,hkPropertyGroupForRoom}from"./shared/hk-bedding.js";
 import{DEFAULT_ROOMS_SEED,ROOM_SITES}from"./shared/room-registry.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
@@ -1481,6 +1486,17 @@ const HK_CLEAN_TYPES=[
 let gsWaitingTabs={...WAITING_TABS_DEFAULTS};
 let _hkCleanDetailOpen=false;
 window.hkToggleCleanDetail=function(){_hkCleanDetailOpen=!_hkCleanDetailOpen;renderHkSettings();};
+const HK_CAPACITY_GROUPS=[
+  {id:'ROOMS',label:'Rooms'},
+  {id:'MAXELA',label:'Maxela Apartments'},
+  {id:'BIG_APT',label:'3-Bedroom Apartment'},
+  {id:'FREEDOM',label:'Tabidze Studio'},
+  {id:'ORBELIANI',label:'Orbeliani Suite'},
+  {id:'VGL',label:'VGL Studios & Apartments'},
+];
+let hkCategoryCapacity={ROOMS:{default:2},MAXELA:{default:2},BIG_APT:{default:6},FREEDOM:{default:2},ORBELIANI:{default:2},VGL:{default:2}};
+let _hkCapDetailOpen={};
+window.hkToggleCapDetail=function(groupId){_hkCapDetailOpen[groupId]=!_hkCapDetailOpen[groupId];renderHkSettings();};
 let hkSettings={defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS},cleanMinutesByRoom:{},teams:[]};
 let _hkTeamEdit=null;
 let gsVisibility=JSON.parse(JSON.stringify(SECTION_DEFAULTS));
@@ -1523,6 +1539,7 @@ async function loadGuestSettings(){
         cleanMinutesByRoom:{...(hkSettings.cleanMinutesByRoom||{}),...(d.hkSettings.cleanMinutesByRoom||{})},
         teams:Array.isArray(d.hkSettings.teams)?d.hkSettings.teams:(hkSettings.teams||[]),
       };
+      if(d.categoryCapacity)hkCategoryCapacity={...hkCategoryCapacity,...d.categoryCapacity};
       if(d.whatsappMessages)waSettings=mergeWaSettings(d.whatsappMessages);
     }
   }catch(e){console.warn(e);}
@@ -1909,6 +1926,46 @@ function hkSetRoomCapacity(code,val){
   },500);
 }
 window.hkSetRoomCapacity=hkSetRoomCapacity;
+const _hkCatCapSaveTimers={};
+function hkSetCategoryCapacity(groupId,val){
+  clearTimeout(_hkCatCapSaveTimers[groupId]);
+  _hkCatCapSaveTimers[groupId]=setTimeout(async()=>{
+    const n=parseInt(val,10);
+    const cap=(Number.isFinite(n)&&n>0)?n:0;
+    hkCategoryCapacity[groupId]={default:cap};
+    try{
+      await setDoc(doc(db,'checkin_admin','config'),{categoryCapacity:hkCategoryCapacity},{merge:true});
+    }catch(e){console.error('[hkSetCategoryCapacity]',e);}
+  },500);
+}
+window.hkSetCategoryCapacity=hkSetCategoryCapacity;
+function renderBeddingCapacitySection(){
+  return HK_CAPACITY_GROUPS.map(g=>{
+    const rooms=getHkRooms().filter(r=>hkPropertyGroupForRoom(r.code)===g.id);
+    if(!rooms.length)return'';
+    const capDefault=hkCategoryCapacity[g.id]?.default||'';
+    const open=!!_hkCapDetailOpen[g.id];
+    const codesList=rooms.map(r=>esc(r.code)).join(', ');
+    const perRoomRows=open?`<div class="hk-clean-grid" style="margin-top:8px">${rooms.map(r=>{
+      const v=aptData[r.code]?.normalCapacity||'';
+      return`<div class="hk-clean-row">
+        <div class="hk-clean-row__meta"><div class="hk-clean-row__code">${esc(r.code)}</div><div class="hk-clean-row__name">${esc(r.name)}</div></div>
+        <input type="number" min="1" max="30" step="1" placeholder="${esc(String(capDefault||''))}" value="${esc(String(v))}" aria-label="Normal capacity for ${esc(r.code)}" oninput="hkSetRoomCapacity('${esc(r.code)}',this.value)">
+      </div>`;
+    }).join('')}</div>`:'';
+    return`<div class="hk-cap-card">
+      <div class="hk-cap-card__hd">${esc(g.label)}</div>
+      <div class="hk-cap-card__row">
+        <label style="font-size:12px;color:var(--muted)">Normal capacity</label>
+        <input type="number" min="1" max="30" step="1" value="${esc(String(capDefault))}" aria-label="Category default capacity for ${esc(g.label)}" oninput="hkSetCategoryCapacity('${g.id}',this.value)">
+        <span style="font-size:12px;color:var(--muted)">guests</span>
+      </div>
+      <div class="hk-cap-card__applies">Applies to: ${codesList}</div>
+      <button type="button" class="btn hk-clean-expand" onclick="window.hkToggleCapDetail('${g.id}')">${open?'Hide per-room':'Per-room ▾'}</button>
+      ${perRoomRows}
+    </div>`;
+  }).join('');
+}
 function renderHkSettings(){
   const wrap=document.getElementById('hksettings-root');
   if(!wrap)return;
@@ -1932,14 +1989,10 @@ function renderHkSettings(){
       const typeDef=hkTypeCleanMinutes(typeId);
       const val=hkSettings.cleanMinutesByRoom[r.code]??typeDef;
       const override=hkSettings.cleanMinutesByRoom[r.code]!=null;
-      const capVal=aptData[r.code]?.normalCapacity||'';
-      return`<div class="hk-clean-row" style="flex-wrap:wrap">
+      return`<div class="hk-clean-row">
         <div class="hk-clean-row__meta"><div class="hk-clean-row__code">${esc(r.code)}${override?' · override':''}</div><div class="hk-clean-row__name">${esc(r.name)} · default ${typeDef} min</div></div>
         <input type="number" min="20" max="240" step="5" id="hk-clean-${esc(r.code)}" value="${val}" aria-label="Minutes for ${esc(r.code)}">
         <span style="font-size:11px;color:var(--muted);width:28px">min</span>
-        <input type="number" min="1" max="30" step="1" placeholder="auto" value="${esc(String(capVal))}" aria-label="Normal capacity for ${esc(r.code)}" oninput="hkSetRoomCapacity('${esc(r.code)}',this.value)">
-        <span style="font-size:11px;color:var(--muted);width:auto;white-space:nowrap">Normal capacity (guests)</span>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px;flex-basis:100%;">Alert shows in HK when guests exceed this number</div>
       </div>`;
     }).join('')}</div>`;
   const shartava=getHkRooms().filter(r=>hkSiteId(r.code)==='shartava');
@@ -1985,8 +2038,11 @@ function renderHkSettings(){
     </div>
     <div class="section-hd" style="margin-top:12px"><h2>Cleaning duration</h2></div>
     <div class="hk-clean-grid">${typeRows}</div>
-    <button type="button" class="btn hk-clean-expand" onclick="window.hkToggleCleanDetail()">${_hkCleanDetailOpen?'Hide per-room settings':'Per-room cleaning & bedding capacity…'}</button>
+    <button type="button" class="btn hk-clean-expand" onclick="window.hkToggleCleanDetail()">${_hkCleanDetailOpen?'Hide per-room settings':'Per-room cleaning overrides…'}</button>
     ${detailBlock}
+    <div class="section-hd" style="margin-top:12px"><h2>Bedding capacity</h2></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:4px">HK shows an extra-sheets alert when a booking's guest count exceeds a room's normal capacity.</p>
+    ${renderBeddingCapacitySection()}
     <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveHkSettings()">Save HK settings</button>
     <div class="more-section" style="margin-top:16px">Staff PINs</div>
     <div id="hkpins-list"></div>`;
@@ -4022,7 +4078,7 @@ function hkGuestCountHtml(res,count,verb){
   return esc('—');
 }
 function hkBeddingAlertHtml(roomCode,guests){
-  const alert=hkBeddingAlert(roomCode,guests,aptData[roomCode]?.normalCapacity);
+  const alert=hkBeddingAlert(roomCode,guests,aptData[roomCode]?.normalCapacity,hkCategoryCapacity);
   if(!alert)return '';
   return `<div class="hk-bedding-alert">${HK_SHEET_ICON}<span>${esc(alert.text)}</span></div>`;
 }

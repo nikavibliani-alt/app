@@ -2,15 +2,17 @@
 /**
  * HK bedding / extra sheets rules — canonical copy for admin sandbox + HK apps.
  *
- * If a room has a `normalCapacity` configured in Firestore (checkin_apartments/{roomCode}),
- * that overrides everything below: alert fires once guests > normalCapacity.
- *
- * Otherwise, hardcoded fallback thresholds (guest count that triggers alert):
- *   0-*           — 4th guest  (sofa bed sheets)
- *   6-1,6-2,6-4,7-1,7-2,7-4 — after 4th (= 5+ guests)
- *   6-3           — after 8th (= 9+ guests)
- *   orb-*, tab-*, vgl-st-*  — 3rd guest
- *   vgl-ap*       — after 4th (= 5+ guests)
+ * Priority order:
+ *   1. Individual room override — checkin_apartments/{roomCode}.normalCapacity
+ *   2. Category default — checkin_admin/config.categoryCapacity[group].default
+ *      (group resolved from roomCode via hkPropertyGroupForRoom)
+ *   3. Hardcoded fallback thresholds (guest count that triggers alert), used only
+ *      when neither of the above is configured:
+ *        0-*           — 4th guest  (sofa bed sheets)
+ *        6-1,6-2,6-4,7-1,7-2,7-4 — after 4th (= 5+ guests)
+ *        6-3           — after 8th (= 9+ guests)
+ *        orb-*, tab-*, vgl-st-*  — 3rd guest
+ *        vgl-ap*       — after 4th (= 5+ guests)
  */
 
 export const HK_GUEST_ICON =
@@ -19,14 +21,39 @@ export const HK_GUEST_ICON =
 export const HK_SHEET_ICON =
   '<svg class="hk-icon hk-icon--sheet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7v11a2 2 0 002 2h14a2 2 0 002-2V7"/><path d="M3 7h18V5a2 2 0 00-2-2H5a2 2 0 00-2 2v2z"/><path d="M7 11h10"/></svg>';
 
+/**
+ * Maps a room code to its property/listing-category group id.
+ * @returns {'ROOMS'|'MAXELA'|'BIG_APT'|'FREEDOM'|'ORBELIANI'|'VGL'|null}
+ */
+export function hkPropertyGroupForRoom(roomCode) {
+  const c = String(roomCode || '').toLowerCase();
+  if (c === '6-3') return 'BIG_APT';
+  if (/^0-/.test(c)) return 'ROOMS';
+  if (/^(6|7)-/.test(c)) return 'MAXELA';
+  if (/^tab-/.test(c)) return 'FREEDOM';
+  if (/^orb-/.test(c)) return 'ORBELIANI';
+  if (/^vgl-/.test(c)) return 'VGL';
+  return null;
+}
+
 /** @returns {{text:string, kind:'sofa'|'sheets'}|null} */
-export function hkBeddingAlert(roomCode, guests, normalCapacity) {
+export function hkBeddingAlert(roomCode, guests, normalCapacity, categoryCapacity) {
   const n = Number(guests) || 0;
   if (n < 1) return null;
-  const cap = Number(normalCapacity) || 0;
-  if (cap > 0) {
-    return n > cap ? { kind: 'sheets', text: 'Extra sheets needed' } : null;
+
+  const roomCap = Number(normalCapacity) || 0;
+  if (roomCap > 0) {
+    return n > roomCap ? { kind: 'sheets', text: 'Extra sheets needed' } : null;
   }
+
+  const group = hkPropertyGroupForRoom(roomCode);
+  const catCap = group && categoryCapacity && categoryCapacity[group]
+    ? Number(categoryCapacity[group].default) || 0
+    : 0;
+  if (catCap > 0) {
+    return n > catCap ? { kind: 'sheets', text: 'Extra sheets needed' } : null;
+  }
+
   const c = String(roomCode || '').toLowerCase();
 
   if (/^0-/.test(c)) {
