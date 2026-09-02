@@ -1398,6 +1398,7 @@ function _startElevatorSync(){
 }
 let _elevatorQrDrawToken=0;
 let _lastQrCode='';
+let _qrRetryCount=0;
 function _drawElevatorQr(text){
   const payload=String(text||'').trim();
   // Same code as last successful draw — skip the rebuild. _renderHeroContent()
@@ -1405,7 +1406,6 @@ function _drawElevatorQr(text){
   // actually changes, and mount.innerHTML='' + new QRCode(...) below flashes the
   // QR every time even when the payload is byte-identical to what's on screen.
   if(payload&&payload===_lastQrCode)return Promise.resolve(true);
-  _lastQrCode=payload;
   const token=++_elevatorQrDrawToken;
   const qrWrap=document.getElementById('hero-elevator-qr');
   const qrPh=document.getElementById('hero-elevator-qr-ph');
@@ -1425,6 +1425,12 @@ function _drawElevatorQr(text){
   if(typeof QRCode!=='function'){
     mount.style.display='none';
     if(qrPh){qrPh.style.display='flex';qrPh.textContent='QR';}
+    // QR library not loaded yet (e.g. still fetching from CDN) — retry a few
+    // times instead of giving up permanently for this code.
+    if(_qrRetryCount<5){
+      _qrRetryCount++;
+      setTimeout(()=>_drawElevatorQr(text),1000);
+    }
     return Promise.resolve(false);
   }
   try{
@@ -1437,6 +1443,8 @@ function _drawElevatorQr(text){
       correctLevel:QRCode.CorrectLevel.M
     });
     if(token!==_elevatorQrDrawToken)return Promise.resolve(false);
+    _lastQrCode=payload;
+    _qrRetryCount=0;
     mount.style.display='flex';
     if(qrPh)qrPh.style.display='none';
     return Promise.resolve(true);
