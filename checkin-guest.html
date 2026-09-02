@@ -3216,8 +3216,16 @@ function _renderHomeQuick(){
     svcArea.innerHTML='';
     return;
   }
-  svcArea.style.display='block';
-  svcArea.innerHTML=`<div class="home-svc-scroll">${chips}${allChip}</div>`;
+  const newInnerHtml=chips+allChip;
+  const existing=svcArea.querySelector('.home-svc-scroll');
+  if(existing&&existing.innerHTML===newInnerHtml){
+    // Chips unchanged — do not rebuild, preserve scroll position
+    svcArea.style.display='block';
+  }else{
+    // Chips changed — rebuild
+    svcArea.style.display='block';
+    svcArea.innerHTML=`<div class="home-svc-scroll">${newInnerHtml}</div>`;
+  }
 }
 
 async function _renderHomeQuickAsync(){
