@@ -1305,21 +1305,37 @@ function reservationBaseNum(ref){
 async function loadSiblingReservations(resIdOrNum){
   if(!resIdOrNum)return [];
   try{
-    const {getDocs:_getDocs}=await import('https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js');
-    let base=reservationBaseNum(resIdOrNum);
-    try{
-      const snap=await getDoc(doc(db,'reservations',resIdOrNum));
-      if(snap.exists())base=reservationBaseNum(snap.data().reservationNumber||snap.id)||base;
-    }catch(e){}
+    const base=reservationBaseNum(resIdOrNum);
     if(!base)return [];
-    const sibSnap=await _getDocs(query(
-      collection(db,'reservations'),
-      where('reservationNumber','>=',base),
-      where('reservationNumber','<=',base+'\uf8ff')
-    ));
-    return sibSnap.docs.map(d=>({id:d.id,...d.data()}))
+    // (b) confirm the reservation and (c) query its siblings in parallel \u2014 (c) only
+    // needs a base derived from resIdOrNum itself, not from (b)'s confirmed doc.
+    const [snap,sibSnap]=await Promise.all([
+      getDoc(doc(db,'reservations',resIdOrNum)).catch(()=>null),
+      getDocs(query(
+        collection(db,'reservations'),
+        where('reservationNumber','>=',base),
+        where('reservationNumber','<=',base+'\uf8ff')
+      )).catch(()=>null)
+    ]);
+    let finalBase=base;
+    if(snap?.exists())finalBase=reservationBaseNum(snap.data().reservationNumber||snap.id)||base;
+    let docs=sibSnap?sibSnap.docs.map(d=>({id:d.id,...d.data()})):[];
+    if(finalBase!==base){
+      // Rare: the confirmed reservation's own number differs from the doc-ID-derived
+      // guess we queried with above \u2014 that query used the wrong range, so re-run it
+      // with the correct one. Only path left sequential, and only when actually needed.
+      try{
+        const refSnap=await getDocs(query(
+          collection(db,'reservations'),
+          where('reservationNumber','>=',finalBase),
+          where('reservationNumber','<=',finalBase+'\uf8ff')
+        ));
+        docs=refSnap.docs.map(d=>({id:d.id,...d.data()}));
+      }catch(e){}
+    }
+    return docs
       .filter(r=>(r.status||'').toUpperCase()!=='CANCELLED')
-      .filter(r=>reservationBaseNum(r.reservationNumber||r.id)===base)
+      .filter(r=>reservationBaseNum(r.reservationNumber||r.id)===finalBase)
       .sort((a,b)=>(a.roomCode||'').localeCompare(b.roomCode||''));
   }catch(e){
     console.warn('[loadSiblingReservations]',e);
@@ -1513,9 +1529,13 @@ function _syncGuestReservationContext(){
   }
   if(active.length)activeReservation=active[0];
 }
+// Returns {aptDataFetched:true} when it fetched checkin_apartments itself (room
+// changed) so callers running this in parallel with their own apartment fetch
+// know to discard that outer result instead of applying it — that outer fetch
+// was kicked off using the pre-hydrate aptId, which is now the wrong room.
 async function _hydrateGuestReservations(){
   const ref=guestData?.matchedReservationId;
-  if(!ref)return;
+  if(!ref)return null;
   const sibs=await loadSiblingReservations(ref);
   if(sibs.length){
     allMatchedReservations=sibs;
@@ -1532,7 +1552,9 @@ async function _hydrateGuestReservations(){
       if(s.exists())aptData=s.data();
     }catch(e){}
     setDoc(doc(db,'checkin_guests',guestId),{aptId:resRoom},{merge:true}).catch(()=>{});
+    return{aptDataFetched:true};
   }
+  return null;
 }
 
 function _showPage(pageId){
@@ -2836,8 +2858,8 @@ function showHome(){
         renderTiles();renderPassportBanner();
       }
     }));
-    _homeSnaps.push(onSnapshot(collection(db,'checkin_requests'),snap=>{
-      myRequests=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.guestId===guestId);
+    _homeSnaps.push(onSnapshot(query(collection(db,'checkin_requests'),where('guestId','==',guestId)),snap=>{
+      myRequests=snap.docs.map(d=>({id:d.id,...d.data()}));
     }));
     // Watch the matched reservation by ID — catches room reassignments in real time
     const _matchedResId=guestData?.matchedReservationId;
@@ -3261,7 +3283,7 @@ function _renderWybCard(cat){
   const photos=(cat.photos&&cat.photos.length)?cat.photos:(cat.photoUrl?[cat.photoUrl]:[]);
   let galleryHtml;
   if(photos.length){
-    const imgs=photos.map(p=>`<img src="${esc(p)}" alt="${esc(cat.name||'')}">`).join('');
+    const imgs=photos.map(p=>`<img src="${esc(p)}" alt="${esc(cat.name||'')}" loading="lazy">`).join('');
     const dots=photos.length>1
       ?`<div class="wyb-dots">${photos.map((_,i)=>`<div class="wyb-dot${i===0?' active':''}" data-idx="${i}"></div>`).join('')}</div>`
       :'';
@@ -4034,12 +4056,29 @@ async function init(){
       guestData={...guestDocData,id:_urlGuestToken};
       aptId=guestDocData.aptId||'';
       if(_adminPreviewMode)isPreview=true;
-      await _hydrateGuestReservations();
-      if(!aptId)aptId=guestData.aptId||activeReservation?.roomCode||'';
+      if(aptId){
+        // Common case: aptId already known from the guest doc — fetch the
+        // apartment doc in parallel with hydrating sibling reservations. If
+        // hydrate discovers a room change, it fetches checkin_apartments itself
+        // (for the NEW room) and we discard this outer result — it was fetched
+        // for the OLD room and would otherwise silently overwrite the correct data.
+        const[hydrateResult,outerApt]=await Promise.all([
+          _hydrateGuestReservations(),
+          getDoc(doc(db,'checkin_apartments',aptId)).then(as=>as.exists()?as.data():null).catch(()=>null)
+        ]);
+        if(!hydrateResult?.aptDataFetched&&outerApt)aptData=outerApt;
+      }else{
+        // Rare: guest doc has no aptId — must hydrate first so the
+        // matched-reservation fallback below has something to resolve from.
+        const hydrateResult=await _hydrateGuestReservations();
+        aptId=guestData.aptId||activeReservation?.roomCode||'';
+        if(aptId&&!hydrateResult?.aptDataFetched){
+          try{const as=await getDoc(doc(db,'checkin_apartments',aptId));if(as.exists())aptData=as.data();}catch(e){}
+        }
+      }
       localStorage.setItem('maxela_guest_id',guestId);
       localStorage.setItem('maxela_apt_id',aptId);
       if(aptId)localStorage.setItem('maxela_g_'+aptId,guestId);
-      try{const as=await getDoc(doc(db,'checkin_apartments',aptId));if(as.exists())aptData=as.data();}catch(e){}
       document.getElementById('loading').style.display='none';
       document.getElementById('app').style.display='block';
       if(_adminPreviewMode){
@@ -4125,8 +4164,11 @@ async function init(){
           allMatchedReservations=[];
           // falls through to register page
         }else{
-          await _hydrateGuestReservations();
-          try{const as=await getDoc(doc(db,'checkin_apartments',aptId));if(as.exists())aptData=as.data();}catch(e){}
+          const[hydrateResult,outerApt]=await Promise.all([
+            _hydrateGuestReservations(),
+            getDoc(doc(db,'checkin_apartments',aptId)).then(as=>as.exists()?as.data():null).catch(()=>null)
+          ]);
+          if(!hydrateResult?.aptDataFetched&&outerApt)aptData=outerApt;
           document.getElementById('loading').style.display='none';
           document.getElementById('app').style.display='block';
           showHome();
