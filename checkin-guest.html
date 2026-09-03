@@ -641,8 +641,8 @@ body{padding-bottom:0;}
 .dk-elev__qr{display:none;width:148px;height:148px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px;align-items:center;justify-content:center;box-sizing:border-box;}
 .dk-elev__qr canvas{display:block;max-width:100%;height:auto;}
 .elev-qr-mount{display:flex;align-items:center;justify-content:center;line-height:0;}
-.elev-qr-mount img{display:block!important;max-width:132px;max-height:132px;border-radius:4px;}
-.elev-qr-mount canvas{display:none!important;}
+.elev-qr-mount canvas{display:block!important;width:132px!important;height:132px!important;border-radius:4px;}
+.elev-qr-mount img{display:none!important;}
 .dk-qr-ph{display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;letter-spacing:0.12em;color:var(--muted);background:repeating-linear-gradient(135deg,#f5f2ee 0 8px,#fff 8px 16px);border-radius:8px;}
 .dk-elev__scan-hint{font-size:12px;color:var(--muted);line-height:1.4;margin:10px 0 0;}
 .dk-elev__meta{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--line);}
@@ -1459,6 +1459,18 @@ function _drawElevatorQr(text){
       correctLevel:QRCode.CorrectLevel.M
     });
     if(token!==_elevatorQrDrawToken)return Promise.resolve(false);
+    // qrcodejs draws to canvas synchronously, but only shows it (via an <img>
+    // swap) after an async data-URI support probe that can silently fail on
+    // some Android browsers — leaving both canvas and img invisible even
+    // though the canvas already has the correct QR on it. We show the canvas
+    // directly via CSS (.elev-qr-mount canvas{display:block!important}) and
+    // strip any inline display the library may set, so that CSS rule is the
+    // only thing controlling visibility.
+    const canvas=mount.querySelector('canvas');
+    if(canvas){
+      canvas.style.display='block';
+      canvas.style.removeProperty('display');
+    }
     _lastQrCode=payload;
     _qrRetryCount=0;
     mount.style.display='flex';
