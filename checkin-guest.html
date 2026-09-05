@@ -1220,6 +1220,9 @@ const fi=(name,size=18,stroke=1.8)=>featherIcon(name,size,stroke);
 //     allow write: if true;
 //     allow read: if true;  // unguessable UUID paths — same model as Cloudinary
 //   }
+// RETENTION POLICY (see docs/DATA_RETENTION.md): passport photos under
+// passport_uploads/ are retained a minimum of 1 month for chargeback
+// protection. Do not delete before checkout + 30 days.
 function _safeUUID(){
   if(typeof crypto!=='undefined'&&crypto.randomUUID)return crypto.randomUUID();
   return Date.now().toString(36)+Math.random().toString(36).slice(2,14);
@@ -2409,6 +2412,9 @@ async function finishRegistration_(bestRes,formData,opts){
   }
   const arrivalDate=arrival||bestRes?.checkin||bestRes?.checkIn||'';
   const checkoutDate=bestRes?.checkout||bestRes?.checkOut||'';
+  // RETENTION POLICY (see docs/DATA_RETENTION.md): checkin_guests/{id}.passportUrl
+  // and .passportScanResult are retained a minimum of 1 month for chargeback
+  // protection. Do not delete before checkout + 30 days.
   const profile={
     name,guests,nationality,contact,contactType:ct,passportUrl,
     passportScanResult:{},arrivalDate,checkoutDate,
