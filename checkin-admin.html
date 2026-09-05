@@ -3143,6 +3143,7 @@ window.openDetail=function(guestId){
   document.getElementById('detail-title').textContent=_stripRoomNum(g.nameRoman||g.name||'Guest')+' · '+titleRooms;
   const st=g.guestConfirmedCheckin?{label:'CHECKED IN',cls:'pill-in'}:cardStatus(door||{roomCode:titleRooms.split(' · ')[0]},g);
   const passportUrl=g.passportUrl||'';
+  const passportSkipped=!!g.passportSkipped;
   const waPhone=normalizeWaPhone(g.contact||'');
   const roomBlocks=(isMulti?sibs:[door||{roomCode:guestAssignedRoom(g)}]).map(res=>{
     const rc=(res?.roomCode||res?.room||guestAssignedRoom(g)||'').trim();
@@ -3182,11 +3183,11 @@ window.openDetail=function(guestId){
       <button class="btn btn-primary" style="width:100%" onclick="window.showPassport()">Check passport</button>
     </div>
     <div class="passport-view" id="pp-view">
-      ${passportUrl?`<img src="${esc(passportUrl)}" alt="Passport">`:'<p style="color:var(--muted);font-size:13px;margin-bottom:10px;">No passport uploaded.</p>'}
+      ${passportUrl?`<img src="${esc(passportUrl)}" alt="Passport">
       <div class="card__actions" style="margin-top:10px">
         <button class="btn btn-primary" onclick="window.approvePassport('${g.id}')">Approve ID</button>
         <button class="btn" onclick="window.rejectPassport('${g.id}')">Reject</button>
-      </div>
+      </div>`:passportSkipped?'<p style="font-size:13px;margin-bottom:10px;"><span class="pill pill-pending" style="margin-right:6px;">SKIPPED</span>Guest skipped passport upload</p>':'<p style="color:var(--muted);font-size:13px;margin-bottom:10px;">No passport submitted yet.</p>'}
     </div>
     ${roomBlocks}
     ${g.matchedReservationId?`<div style="margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs)">
