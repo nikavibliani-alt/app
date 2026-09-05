@@ -968,6 +968,9 @@ body{padding-bottom:0;}
       <span id="t-passport-submit-btn">Continue to your stay</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M9 6l6 6-6 6"/></svg>
     </button>
+    <div id="passport-skip-link" style="display:none;text-align:center;margin-top:12px;">
+      <a href="#" onclick="event.preventDefault();window.skipPassportUpload();" style="font-size:12.5px;color:var(--muted);text-decoration:underline;">Having trouble? Skip for now →</a>
+    </div>
     <div class="auth-foot">
       <div class="lang-switcher">
         <button class="lang-btn active" onclick="setLang('en')">EN</button>
@@ -1217,12 +1220,37 @@ const fi=(name,size=18,stroke=1.8)=>featherIcon(name,size,stroke);
 //     allow write: if true;
 //     allow read: if true;  // unguessable UUID paths — same model as Cloudinary
 //   }
+function _safeUUID(){
+  if(typeof crypto!=='undefined'&&crypto.randomUUID)return crypto.randomUUID();
+  return Date.now().toString(36)+Math.random().toString(36).slice(2,14);
+}
+async function compressImage(file,maxWidth=1200,quality=0.85){
+  return new Promise((resolve)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      const scale=Math.min(1,maxWidth/img.width);
+      const canvas=document.createElement('canvas');
+      canvas.width=img.width*scale;
+      canvas.height=img.height*scale;
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      canvas.toBlob(blob=>{
+        resolve(blob||file);
+      },file.type==='image/png'?'image/png':'image/jpeg',quality);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);resolve(file);};
+    img.src=url;
+  });
+}
 async function uploadToFirebaseStorage(file){
   try{
+    const compressed=await compressImage(file);
     const storage=getStorage();
-    const path='passport_uploads/'+crypto.randomUUID()+'/'+crypto.randomUUID();
+    const path='passport_uploads/'+_safeUUID()+'/'+_safeUUID();
     const storageRef=ref(storage,path);
-    await uploadBytes(storageRef,file);
+    await uploadBytes(storageRef,compressed);
     return await getDownloadURL(storageRef);
   }catch(err){
     console.log('Upload error:',err.code,err.message);
@@ -2357,20 +2385,21 @@ window.switchApt=async function(newRoomCode){
   }
 };
 
-async function finishRegistration_(bestRes,formData){
+async function finishRegistration_(bestRes,formData,opts){
+  const skipPassport=!!opts?.skipPassport;
   const {name,guests,nationality,contact,contactType:ct,arrival,expectedCheckInWindow}=formData;
   if(!aptId)aptId=bestRes.roomCode||'';
   if(aptId){
     try{const s=await getDoc(doc(db,'checkin_apartments',aptId));if(s.exists())aptData=s.data();}catch(e){}
     document.getElementById('home-apt-name').textContent=APT_NAMES[aptId]||aptId;
   }
-  const scanPromise=(passportFile&&!passportScanResult&&!_companionGuest)?scanPassport(passportFile):Promise.resolve();
+  const scanPromise=(passportFile&&!passportScanResult&&!_companionGuest&&!skipPassport)?scanPassport(passportFile):Promise.resolve();
   let passportUrl='';
-  if(_companionGuest){
+  if(_companionGuest||skipPassport){
     passportUrl='';
   }else if(passportFile){
     const uploadWithTimeout=new Promise(async(resolve,reject)=>{
-      const timer=setTimeout(()=>reject(new Error('Upload timed out after 30 seconds')),30000);
+      const timer=setTimeout(()=>reject(new Error('Upload timed out after 60 seconds')),60000);
       try{const url=await uploadToFirebaseStorage(passportFile);clearTimeout(timer);resolve(url);}
       catch(e){clearTimeout(timer);reject(e);}
     });
@@ -2384,7 +2413,7 @@ async function finishRegistration_(bestRes,formData){
     name,guests,nationality,contact,contactType:ct,passportUrl,
     passportScanResult:{},arrivalDate,checkoutDate,
     expectedCheckInWindow:expectedCheckInWindow||'',expectedCheckInTime:expectedCheckInWindow||'',
-    nameRoman:bestRes?.guest||'',
+    nameRoman:bestRes?.guest||'',passportSkipped:skipPassport,
   };
   let docId,guestLink,data;
   let usedPipeline=false;
@@ -2706,22 +2735,54 @@ window.submitPassport=async function(){
   _uploadAborted=false;
   if(!passportFile){toast('Please upload your passport or ID photo');return;}
   const btn=document.getElementById('passport-continue-btn');
+  const label=document.getElementById('t-passport-submit-btn');
+  const skipLink=document.getElementById('passport-skip-link');
+  // Clear any failsafe/skip-link state left over from a prior failed attempt
+  // before starting a new one, so they can't interfere with each other.
+  clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
+  if(skipLink)skipLink.style.display='none';
   btn.disabled=true;
-  document.getElementById('t-passport-submit-btn').textContent='Uploading...';
-  clearTimeout(_uploadResetTimer);
+  label.textContent='Uploading...';
+  // Matches the 60s upload timeout below with margin — must not fire while
+  // a real upload is still in flight, or the button would re-enable itself
+  // mid-upload and let the guest double-submit.
   _uploadResetTimer=setTimeout(()=>{
     const b=document.getElementById('passport-continue-btn');
     const s=document.getElementById('t-passport-submit-btn');
     if(b&&b.disabled){b.disabled=false;if(s)s.textContent='Continue to your stay';}
     _uploadResetTimer=null;
-  },15000);
+  },65000);
   try{
     await finishRegistration_(_pendingMatches[0].res,_pendingReg);
   }catch(e){
     clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
     btn.disabled=false;
-    document.getElementById('t-passport-submit-btn').textContent='Continue to your stay';
-    if(!_uploadAborted){toast('Upload failed — please try again.');}
+    label.textContent='Continue to your stay';
+    if(!_uploadAborted){
+      toast('Upload failed — please try again.');
+      if(skipLink)skipLink.style.display='';
+    }
+  }
+};
+
+window.skipPassportUpload=async function(){
+  _uploadAborted=false;
+  const btn=document.getElementById('passport-continue-btn');
+  const label=document.getElementById('t-passport-submit-btn');
+  const skipLink=document.getElementById('passport-skip-link');
+  clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
+  if(skipLink)skipLink.style.display='none';
+  if(btn)btn.disabled=true;
+  if(label)label.textContent='Uploading...';
+  try{
+    await finishRegistration_(_pendingMatches[0].res,_pendingReg,{skipPassport:true});
+  }catch(e){
+    if(btn)btn.disabled=false;
+    if(label)label.textContent='Continue to your stay';
+    if(!_uploadAborted){
+      toast('Something went wrong — please try again.');
+      if(skipLink)skipLink.style.display='';
+    }
   }
 };
 
