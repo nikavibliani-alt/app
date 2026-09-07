@@ -20,6 +20,7 @@ const { registerCloudFunction: registerElevatorCodeGuard } = require('./controll
 const { registerCloudFunctions: registerElevatorCodeSync } = require('./controllers/elevatorCodeSync');
 const { registerCloudFunction: registerAdminAction } = require('./controllers/adminAction');
 const { registerCloudFunction: registerGuestRegister } = require('./controllers/guestRegister');
+const { registerCloudFunctions: registerPushNotifications } = require('./controllers/pushNotifications');
 
 exports.elevatorCodeGuard = registerElevatorCodeGuard();
 
@@ -29,3 +30,9 @@ exports.elevatorCodeSyncManual = elevatorCodeSyncManual;
 
 exports.adminAction = registerAdminAction();
 exports.guestRegister = registerGuestRegister();
+
+const { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone } = registerPushNotifications();
+exports.pushOnFailedSearch = pushOnFailedSearch;
+exports.pushOnGuestCheckout = pushOnGuestCheckout;
+exports.pushOnServiceRequest = pushOnServiceRequest;
+exports.pushOnHkDone = pushOnHkDone;
