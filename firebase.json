@@ -87,8 +87,11 @@
       "hk-manage.html",
       "*.md",
       "*.py",
-      "*.json",
-      "!manifest.json",
+      "config.json",
+      "package.json",
+      "package-lock.json",
+      "skills-lock.json",
+      "firebase.emulator-lite.json",
       "*.yml",
       "*.patch*",
       "CNAME"
