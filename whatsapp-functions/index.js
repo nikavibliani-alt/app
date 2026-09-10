@@ -92,6 +92,72 @@ The Cloud Function will parse this, send the video as a separate WhatsApp messag
 
 const SUMMARY_SYSTEM_PROMPT = 'Summarize this guest WhatsApp conversation into 3-5 bullet points covering: issues they had, requests they made, how they communicated, anything notable. Be very brief.';
 
+/** Strip spaces/dashes/parens/+ so Meta and form phones compare as digits-only. */
+function normalizePhone(phone) {
+  return String(phone || '').replace(/[\s\-().]/g, '').replace(/^\+/, '').replace(/\D/g, '');
+}
+
+/** Contact values commonly stored in checkin_guests for the same WhatsApp number. */
+function phoneQueryVariants(phone) {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return [];
+  const variants = new Set([normalized, `+${normalized}`]);
+  return [...variants];
+}
+
+/**
+ * Look up a WA check-in guest by contact, trying both digits-only and +digits forms.
+ * Returns the first matching document data, or null.
+ */
+async function findGuestByWhatsAppPhone(db, phone) {
+  const variants = phoneQueryVariants(phone);
+  for (const contact of variants) {
+    const snap = await db.collection('checkin_guests')
+      .where('contact', '==', contact)
+      .where('contactType', '==', 'wa')
+      .limit(1)
+      .get();
+    if (!snap.empty) return snap.docs[0].data();
+  }
+  return null;
+}
+
+/** matchedReservationId may be "007004653_001" — base reservation number is before first _. */
+function baseReservationNumber(matchedReservationId) {
+  const raw = String(matchedReservationId || '').trim();
+  if (!raw) return '';
+  return raw.split('_')[0];
+}
+
+function guestFirstName(fullName) {
+  const name = String(fullName || '').trim();
+  if (!name) return 'Guest';
+  return name.split(/\s+/)[0];
+}
+
+async function alreadySentRoomReady(db, reservationNumber) {
+  if (!reservationNumber) return false;
+  const docs = await db.collection('whatsapp_messages')
+    .where('reservationNumber', '==', String(reservationNumber))
+    .where('job', '==', 'room_ready')
+    .where('status', '==', 'sent')
+    .limit(1)
+    .get();
+  return !docs.empty;
+}
+
+async function writeRoomReadyRecord(db, { reservationNumber, guestName, phone, status, metaMessageId = '' }) {
+  await db.collection('whatsapp_messages').add({
+    reservationNumber: String(reservationNumber || ''),
+    guestName: guestName || '',
+    phone: phone || '',
+    job: 'room_ready',
+    status,
+    metaMessageId,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+}
+
 async function callClaude({ system, messages, maxTokens = 500 }) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -164,10 +230,10 @@ exports.whatsappWebhook = onRequest(
         }
 
         const msg     = messages[0];
-        const phone   = msg.from;
+        const phone   = normalizePhone(msg.from);
         const text    = msg.text?.body;
 
-        if (!text) return res.sendStatus(200);
+        if (!text || !phone) return res.sendStatus(200);
 
         const db = getFirestore();
         const convoRef    = db.collection('whatsapp_conversations').doc(phone);
@@ -191,12 +257,8 @@ exports.whatsappWebhook = onRequest(
           .reverse()
           .map((m) => ({ role: m.role, content: m.content }));
 
-        // Look up guest by phone in checkin_guests
-        const formSnap = await db.collection('checkin_guests')
-          .where('contact', '==', phone)
-          .where('contactType', '==', 'wa')
-          .limit(1)
-          .get();
+        // Look up guest by phone in checkin_guests (digits and +digits variants)
+        const form = await findGuestByWhatsAppPhone(db, phone);
 
         let guestName     = 'Guest';
         let roomCode       = '';
@@ -204,15 +266,15 @@ exports.whatsappWebhook = onRequest(
         let checkoutDate   = '';
         let hasFilledForm  = false;
 
-        if (!formSnap.empty) {
+        if (form) {
           hasFilledForm = true;
-          const form = formSnap.docs[0].data();
           guestName = form.name || 'Guest';
           const matchedResId = form.matchedReservationId;
+          const resNumber = baseReservationNumber(matchedResId);
 
-          if (matchedResId) {
+          if (resNumber) {
             const resSnap = await db.collection('reservations')
-              .where('reservationNumber', '==', matchedResId)
+              .where('reservationNumber', '==', resNumber)
               .limit(1)
               .get();
 
@@ -326,11 +388,18 @@ exports.roomReadyNotification = onDocumentWritten(
     }
 
     const guest = snap.docs[0].data();
-    const phone = (guest.contact || '').trim();
+    const phone = normalizePhone(guest.contact);
     const name  = guest.name || 'Guest';
+    const firstName = guestFirstName(name);
+    const reservationNumber = baseReservationNumber(guest.matchedReservationId);
 
     if (!phone) {
       console.log(`roomReadyNotification: guest found but no phone for ${roomCode} / ${date}`);
+      return;
+    }
+
+    if (reservationNumber && await alreadySentRoomReady(db, reservationNumber)) {
+      console.log(`roomReadyNotification: already sent for reservation ${reservationNumber}`);
       return;
     }
 
@@ -338,15 +407,43 @@ exports.roomReadyNotification = onDocumentWritten(
       const data = await sendWhatsAppMessage({
         messaging_product: 'whatsapp',
         to: phone,
-        type: 'text',
-        text: { body: 'Your unit is ready and you can check in early. All check-in instructions are available on your check-in page. 🙌' },
+        type: 'template',
+        template: {
+          name: 'room_ready',
+          language: { code: 'en' },
+          components: [{
+            type: 'body',
+            parameters: [{ type: 'text', text: firstName }],
+          }],
+        },
       });
+
       if (data.messages) {
-        console.log(`roomReadyNotification: sent to ${name} (${phone}) — id=${data.messages[0]?.id}`);
+        const metaMessageId = data.messages[0]?.id || '';
+        await writeRoomReadyRecord(db, {
+          reservationNumber,
+          guestName: name,
+          phone,
+          status: 'sent',
+          metaMessageId,
+        });
+        console.log(`roomReadyNotification: sent to ${name} (${phone}) — id=${metaMessageId}`);
       } else {
+        await writeRoomReadyRecord(db, {
+          reservationNumber,
+          guestName: name,
+          phone,
+          status: 'failed',
+        });
         console.error(`roomReadyNotification: Meta error for ${phone} —`, JSON.stringify(data));
       }
     } catch (err) {
+      await writeRoomReadyRecord(db, {
+        reservationNumber,
+        guestName: name,
+        phone,
+        status: 'failed',
+      }).catch(() => {});
       console.error(`roomReadyNotification: fetch failed for ${phone}`, err);
     }
   }
@@ -379,17 +476,31 @@ exports.summarizeGuestConversation = onDocumentWritten(
 
     const db = getFirestore();
 
-    // Find the matching WhatsApp check-in form for this reservation
-    const formSnap = await db.collection('checkin_forms')
+    // Find the matching WhatsApp check-in form for this reservation.
+    // matchedReservationId may be the bare number or a multi-room id like "007004653_001".
+    let form = null;
+    const exactSnap = await db.collection('checkin_guests')
       .where('matchedReservationId', '==', reservationNumber)
       .where('contactType', '==', 'wa')
       .limit(1)
       .get();
 
-    if (formSnap.empty) return;
+    if (!exactSnap.empty) {
+      form = exactSnap.docs[0].data();
+    } else {
+      // Range query alone (no contactType) avoids needing a new composite index.
+      const multiSnap = await db.collection('checkin_guests')
+        .where('matchedReservationId', '>=', `${reservationNumber}_`)
+        .where('matchedReservationId', '<', `${reservationNumber}_\uf8ff`)
+        .limit(20)
+        .get();
+      const match = multiSnap.docs.find((d) => (d.data().contactType || '').toLowerCase() === 'wa');
+      if (match) form = match.data();
+    }
 
-    const form  = formSnap.docs[0].data();
-    const phone = (form.contact || '').trim();
+    if (!form) return;
+
+    const phone = normalizePhone(form.contact);
     if (!phone) return;
 
     const messagesRef = db.collection('whatsapp_conversations').doc(phone).collection('messages');
