@@ -2196,6 +2196,28 @@ function pickCheckinInviteKey(roomCode){
 let waSettings=mergeWaSettings(null);
 let waLoaded=false;
 let _waInviteProp='maxela';
+let aiBotEnabled=true;
+let aiBotLoaded=false;
+async function loadAiBotEnabled(){
+  try{
+    const snap=await getDoc(doc(db,'globals','config'));
+    aiBotEnabled=!(snap.exists()&&snap.data().aiBotEnabled===false);
+  }catch(e){console.warn('[aiBotEnabled]',e);aiBotEnabled=true;}
+  aiBotLoaded=true;
+}
+window.waSetAiBotEnabled=async function(checked){
+  const prev=aiBotEnabled;
+  aiBotEnabled=checked;
+  renderWaSettings();
+  try{
+    await setDoc(doc(db,'globals','config'),{aiBotEnabled:checked,updatedAt:serverTimestamp()},{merge:true});
+    toast(checked?'AI assistant resumed ✓':'AI assistant paused');
+  }catch(e){
+    aiBotEnabled=prev;
+    renderWaSettings();
+    toast('Save failed: '+e.message);
+  }
+};
 const WA_PREVIEW_SAMPLES={firstName:'Alex',inputName:'John Smith',inputDate:'2026-09-01',inputRef:', ref: BK-48291'};
 function waReadFormIntoSettings(){
   const url=document.getElementById('wa-checkin-url')?.value.trim();
@@ -2264,6 +2286,13 @@ function renderWaSettings(){
           <p class="wa-hero__text">Messages pre-fill when you tap WhatsApp on Stay cards or Failed searches. Guests who already submitted a form open a blank chat — no template.</p>
         </div>
       </div>
+      <div class="gp-row" style="margin-bottom:12px">
+        <div class="gp-row__body">
+          <div class="gp-row__title">AI Guest Assistant</div>
+          <div class="gp-row__sub" style="color:${aiBotEnabled?'var(--green)':'var(--muted)'};font-weight:600">${aiBotEnabled?'Active':'Paused'}</div>
+        </div>
+        <label class="switch"><input type="checkbox" ${aiBotEnabled?'checked':''} onchange="waSetAiBotEnabled(this.checked)"><span class="switch-track"></span></label>
+      </div>
       <div class="wa-rule">${featherIcon('info',16,1.8)}<span>Use placeholders exactly as shown — they are replaced with guest data when you send.</span></div>
       <div class="wa-card">
         <div class="wa-card__hd"><div><h3>Check-in link</h3><p>Shared URL inserted as {{checkinUrl}} in invite messages.</p></div></div>
@@ -2312,6 +2341,7 @@ async function loadAndRenderWaSettings(){
   if(root)root.innerHTML='<div class="empty">Loading templates…</div>';
   try{
     if(!waLoaded)await loadGuestSettings();
+    if(!aiBotLoaded)await loadAiBotEnabled();
     renderWaSettings();
   }catch(e){
     console.error('[loadAndRenderWaSettings]',e);

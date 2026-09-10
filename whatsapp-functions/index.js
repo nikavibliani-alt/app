@@ -39,6 +39,7 @@ If guest says website: Got it, we will check and fix it as soon as possible.
 
 QR code not working (already discussed earlier in conversation history):
 Reply: I see you had this issue before, let me escalate this to our team right away.
+Add [ESCALATE] on its own line after this reply.
 
 Early check-in request:
 Reply: Standard check-in is from 3pm. If the room gets ready earlier I will text you and the page will unlock automatically.
@@ -83,12 +84,20 @@ Reply: Unfortunately we do not have single beds, sorry about that.
 
 Anything outside the above topics such as complaints, maintenance issues, booking modifications, or anything complex:
 Reply: Let me check on that and get back to you shortly.
+Add [ESCALATE] on its own line after this reply.
 
 FOR SENDING VIDEOS:
 When a scenario requires a video, start your response with [VIDEO:media_id] followed by the text message on a new line.
 Example: [VIDEO:975338858914982]
 The nearest paid parking is under Carrefour...
-The Cloud Function will parse this, send the video as a separate WhatsApp message first, then send the text.`;
+The Cloud Function will parse this, send the video as a separate WhatsApp message first, then send the text.
+
+FOR ESCALATING TO THE TEAM:
+When a scenario above tells you to add [ESCALATE], or the guest's issue is complex, a complaint, a maintenance problem, or a booking modification you cannot resolve yourself, put [ESCALATE] on its own line at the very end of your reply, after the guest-facing text.
+Example:
+I see you had this issue before, let me escalate this to our team right away.
+[ESCALATE]
+The Cloud Function will parse this, notify the team, and strip the tag before the message is sent to the guest.`;
 
 const SUMMARY_SYSTEM_PROMPT = 'Summarize this guest WhatsApp conversation into 3-5 bullet points covering: issues they had, requests they made, how they communicated, anything notable. Be very brief.';
 
@@ -201,6 +210,110 @@ function toJsDate(value) {
   return isNaN(parsed.getTime()) ? null : parsed;
 }
 
+// ---- Kill switch / escalation helpers -------------------------------------
+
+async function getGlobalsConfig(db) {
+  try {
+    const snap = await db.collection('globals').doc('config').get();
+    return snap.exists ? snap.data() || {} : {};
+  } catch (err) {
+    console.error('getGlobalsConfig failed:', err);
+    return {};
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Human-like reply delay: 2-5 seconds. */
+async function humanDelay() {
+  await sleep(2000 + Math.random() * 3000);
+}
+
+/** Mark the inbound message as read via the documented Meta Cloud API payload. Best-effort. */
+async function markMessageAsRead(msgId) {
+  if (!msgId) return;
+  try {
+    const data = await sendWhatsAppMessage({
+      messaging_product: 'whatsapp',
+      status: 'read',
+      message_id: msgId,
+    });
+    if (data?.error) {
+      console.error('markMessageAsRead: Meta error —', JSON.stringify(data));
+    }
+  } catch (err) {
+    console.error('markMessageAsRead failed:', err);
+  }
+}
+
+/** Returns the current hour (0-23) in Tbilisi local time. */
+function tbilisiHour() {
+  const formatted = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tbilisi',
+    hour: 'numeric',
+    hourCycle: 'h23',
+  }).format(new Date());
+  return Number(formatted) % 24;
+}
+
+/** Night window for owner notifications: 20:00-08:59 Tbilisi time. */
+function isTbilisiNight() {
+  const h = tbilisiHour();
+  return h >= 20 || h < 9;
+}
+
+// Exact guest-facing handoff phrases from SYSTEM_PROMPT that also count as an escalation signal.
+const ESCALATION_PHRASES = [
+  'let me check on that and get back to you shortly',
+  'let me escalate this to our team right away',
+];
+
+/** Strips a trailing [ESCALATE] tag and reports whether the reply should be escalated. */
+function extractEscalation(replyText) {
+  const hasTag = /\[ESCALATE\]/i.test(replyText);
+  const text = replyText.replace(/\s*\[ESCALATE\]\s*/gi, ' ').replace(/\s+$/,'').trim();
+  const lower = text.toLowerCase();
+  const matchesPhrase = ESCALATION_PHRASES.some((p) => lower.includes(p));
+  return { text, shouldEscalate: hasTag || matchesPhrase };
+}
+
+async function writeAlert(db, { reason, phone, guestName = '', room = '', message = '' }) {
+  try {
+    await db.collection('whatsapp_alerts').add({
+      reason,
+      phone: phone || '',
+      guestName,
+      room,
+      message,
+      resolved: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.error('writeAlert failed:', err);
+  }
+}
+
+/** Best-effort free-form WhatsApp notification to the owner. Never throws. */
+async function notifyOwner(ownerPhone, text) {
+  const to = normalizePhone(ownerPhone);
+  if (!to) return;
+  try {
+    const data = await sendWhatsAppMessage({
+      messaging_product: 'whatsapp',
+      to,
+      type: 'text',
+      text: { body: text },
+    });
+    if (!data?.messages) {
+      console.error('notifyOwner: Meta error —', JSON.stringify(data));
+    }
+  } catch (err) {
+    console.error('notifyOwner: fetch failed:', err);
+  }
+}
+
 exports.whatsappWebhook = onRequest(
   { region: 'europe-west1', cors: true, secrets: ['WEBHOOK_VERIFY_TOKEN', 'META_ACCESS_TOKEN', 'META_PHONE_NUMBER_ID', 'ANTHROPIC_API_KEY'] },
   async (req, res) => {
@@ -232,12 +345,35 @@ exports.whatsappWebhook = onRequest(
         const msg     = messages[0];
         const phone   = normalizePhone(msg.from);
         const text    = msg.text?.body;
+        const msgId   = msg.id;
 
         if (!text || !phone) return res.sendStatus(200);
 
         const db = getFirestore();
         const convoRef    = db.collection('whatsapp_conversations').doc(phone);
         const messagesRef = convoRef.collection('messages');
+
+        // CHANGE 1 — kill switch: check globals/config before touching Claude
+        const globalsConfig = await getGlobalsConfig(db);
+        const aiBotEnabled  = globalsConfig.aiBotEnabled !== false; // missing/undefined -> true
+        const ownerPhone    = globalsConfig.ownerPhone || '';
+
+        if (!aiBotEnabled) {
+          // Still record the inbound message so nothing is lost while paused
+          await messagesRef.add({
+            role: 'user',
+            content: text,
+            timestamp: FieldValue.serverTimestamp(),
+          });
+
+          await writeAlert(db, { reason: 'bot_paused', phone, message: text });
+
+          if (ownerPhone) {
+            await notifyOwner(ownerPhone, `AI assistant is paused. New WhatsApp message from ${phone}: "${text}"`);
+          }
+
+          return res.sendStatus(200);
+        }
 
         // PART 1 — save incoming guest message
         await messagesRef.add({
@@ -318,6 +454,31 @@ exports.whatsappWebhook = onRequest(
           videoMediaId = videoMatch[1];
           aiReply = aiReply.slice(videoMatch[0].length).trim();
         }
+
+        // CHANGE 3 — escalation: parse/strip [ESCALATE] and check handoff phrases
+        const escalation = extractEscalation(aiReply);
+        aiReply = escalation.text;
+
+        if (escalation.shouldEscalate) {
+          await writeAlert(db, {
+            reason: 'escalation',
+            phone,
+            guestName,
+            room: roomCode,
+            message: aiReply,
+          });
+
+          if (ownerPhone && isTbilisiNight()) {
+            await notifyOwner(
+              ownerPhone,
+              `Escalation from ${guestName} (${phone})${roomCode ? ` — room ${roomCode}` : ''}: ${aiReply}`
+            );
+          }
+        }
+
+        // CHANGE 2 — best-effort read receipt, then a human-like pause before replying
+        await markMessageAsRead(msgId);
+        await humanDelay();
 
         // Send video first, if present
         if (videoMediaId) {
