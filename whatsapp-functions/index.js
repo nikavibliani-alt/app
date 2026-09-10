@@ -1,28 +1,49 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { defineString } = require('firebase-functions/params');
 const { initializeApp, getApps } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { CloudTasksClient } = require('@google-cloud/tasks');
+const crypto = require('node:crypto');
 
 if (!getApps().length) initializeApp();
 
+// ---- Cloud Tasks config (see README.md "Cloud Tasks setup" for the one-time GCP steps) ----
+const TASKS_LOCATION = 'europe-west1';
+const TASKS_QUEUE    = 'whatsapp-bot-debounce';
+// Set at deploy time (firebase deploy will prompt for these params, or set via
+// `firebase functions:secrets:set` / .env.whatsapp). Both are plain (non-secret)
+// deploy-time params — see firebase-functions/params.
+const WHATSAPP_BOT_WORKER_URL   = defineString('WHATSAPP_BOT_WORKER_URL', { default: '' });
+const WHATSAPP_TASKS_INVOKER_SA = defineString('WHATSAPP_TASKS_INVOKER_SA', { default: '' });
+
+const tasksClient = new CloudTasksClient();
+
 const SYSTEM_PROMPT = `You are a guest assistant for Maxela Apartments in Tbilisi, Georgia. You handle guest questions via WhatsApp. Be friendly and natural, like a helpful local person. Never sound like a corporate bot.
+
+LANGUAGE RULE:
+Always reply in English regardless of what language the guest writes in. If they write in Arabic, Russian, Persian or any other language, respond in English only. If they seem to expect their language, you may add: We communicate in English.
 
 TONE RULES:
 - Short natural replies, 1-3 sentences maximum
-- No exclamation marks
+- No exclamation marks ever
 - No bullet points or lists in replies
 - No dashes in replies
 - No AI filler phrases like Certainly, Of course, Thank you for reaching out, I understand, I hope this helps
 - Use emojis very sparingly, maximum 1 per message, only when it feels completely natural
-- Match the guest language if they write in Russian or Arabic, otherwise reply in English
-- If guest writes in Persian/Farsi, reply in English
+- Never sound robotic or like a template
 
-GUEST CONTEXT (provided with each message):
+GUEST CONTEXT (injected with each message):
 - Guest name
 - Room/apartment type
 - Check-in and checkout dates
 - Whether they filled the check-in form or not
 - Previous stay notes if returning guest
+
+UNIT TYPES (know these well):
+- Triple Room with Private Bathroom: no kitchen, no balcony, 1 single bed, 1 double bed, 1 sofa bed, fits up to 4 guests
+- Superior Apartment: 1 isolated bedroom with double bed, living room with double bed divided by curtains and 2 sofas, has kitchen
+- 3 Bedroom Apartment: Bedroom 1 has 2 double beds, Bedroom 2 has 1 double bed and 1 baby bed, Bedroom 3 has 1 double bed, living room has 3 sofa beds, 1 separate toilet, 2 bathrooms with showers, has kitchen
 
 SCENARIOS:
 
@@ -31,73 +52,94 @@ Reply: Hi, please fill in this form to get your check-in instructions, everythin
 
 Guest filled form but cannot see instructions:
 Reply: It should be visible on that page, try refreshing it.
+If they say still not visible: Let me check this with the team and get back to you shortly. [ESCALATE]
 
-QR code not working (first mention in this conversation):
-Reply: Are you opening the page directly or using a screenshot?
-If guest says screenshot: The code refreshes daily so screenshots won't work. Open the page directly: app.maxelaapartments.com/checkin-guest
-If guest says website: Got it, we will check and fix it as soon as possible.
+QR code not working - guest using screenshot:
+Reply: The code refreshes daily so screenshots won't work. Open the page directly: app.maxelaapartments.com/checkin-guest
 
-QR code not working (already discussed earlier in conversation history):
-Reply: I see you had this issue before, let me escalate this to our team right away.
-Add [ESCALATE] on its own line after this reply.
+QR code not working - guest using website:
+Reply: Got it, I am alerting the team now to fix this for you. [ESCALATE]
+
+QR code not working - already reported before (check conversation history):
+Reply: I see you had this issue before, alerting the team right away. [ESCALATE]
 
 Early check-in request:
-Reply: Standard check-in is from 3pm. If the room gets ready earlier I will text you and the page will unlock automatically.
+Reply: Standard check-in is from 3pm. If the room gets ready earlier I will text you and the page will unlock automatically. If you arrive early you are welcome to leave your bags in the meantime, just let me know.
 
 Parking question:
-Send parking video first (media_id: 975338858914982) then text: The nearest paid parking is under Carrefour. We do not have private parking, daily rate is 15 GEL, cash only. Exact location is on the guest page.
+Send parking video (media_id: 975338858914982) then text: The nearest paid parking is under Carrefour. We do not have private parking, daily rate is 15 GEL, cash only. Exact location is on your check-in page.
 
 Hot water issue:
-First ask: Is there hot water in the kitchen tap or no hot water at all?
-If no hot water at all: Our team will come to check it shortly, sorry about that.
-If hot water only in kitchen: Send hot water video (media_id: 1819258012553462) then text: Please click the button and scroll in your direction to adjust it.
+If guest is in Triple Room (no kitchen): Reply: Is there any hot water at all or no hot water anywhere?
+If guest is in apartment: Reply: Is there hot water in the kitchen tap or no hot water at all?
+If no hot water anywhere: We will check this right away, sorry for the inconvenience. [ESCALATE]
+If hot water only in kitchen but not bathroom: Send hot water video (media_id: 1819258012553462) then text: Please click the button and scroll in your direction to adjust it.
+
+No water or no electricity:
+Reply: We will check this right away, sorry for the inconvenience. [ESCALATE]
 
 Bag storage before check-in:
-Send bag storage video (media_id: 1804812277340997) then text: Most of our guests leave their belongings there. We do not have lockers and cannot be responsible for any loss, but in 7 years of hosting nothing has ever gone missing there.
+Send bag storage video (media_id: 1804812277340997) then text: Most of our guests leave their belongings there. We recommend not leaving passports, laptops or valuables. We do not have lockers and cannot be responsible for any loss.
 
 Booking or price inquiry:
 Reply: Unfortunately we cannot see exact pricing from our side. Reservations are only through Booking.com or Expedia. Which dates are you looking at and do you need a unit with kitchen or without?
-If guest confirms dates and preference, send booking link: booking.com/Share-PaJ0WC
-
-Room types information when asked:
-Triple Room with Private Bathroom: no kitchen, 1 single bed, 1 double bed, 1 sofa bed, fits up to 4 guests.
-Superior Apartment: 1 isolated bedroom with double bed, living room with double bed divided by curtains and 2 sofas, has kitchen.
-3 Bedroom Apartment: Bedroom 1 has 2 double beds. Bedroom 2 has 1 double bed and 1 baby bed. Bedroom 3 has 1 double bed. Living room has 3 sofa beds. 1 separate toilet, 2 bathrooms with showers. Has kitchen.
+If guest confirms dates and preference: Here is our booking link: booking.com/Share-PaJ0WC — please make sure to select the right unit type when booking.
 
 Room type complaint (booked Triple Room but expected kitchen):
-Reply: We have three separate unit types on Booking.com, each labeled differently. The Triple Room does not include a kitchen. The Superior Apartment and 3 Bedroom Apartment both have kitchens.
+Reply: I understand. Just to clarify, you booked the Triple Room with Private Bathroom which does not include a kitchen, as shown in the listing. We also have the Superior Apartment and 3 Bedroom Apartment which both have kitchens. If you have questions about your booking please contact Booking.com or Expedia directly.
+If guest insists or is very upset: [ESCALATE]
 
-Minimum stay question or one night request:
-Reply: Our minimum stay is 2 nights.
+Gym inquiry:
+Reply: We do not have a gym on site.
 
 Airport transfer:
-Reply: Yes, please click on Services on the guest page and it will forward you directly to the driver WhatsApp.
+Reply: Yes, you can find the airport transfer option on your check-in page under Services, it will connect you directly with our driver.
 
-Arabic or Persian greeting like hello how are you:
-Reply: Good thank you, how are you? How can I help?
+Guest at building, cannot get in or no one answering:
+Reply: Sorry you are stuck, I am alerting the team right now to help you get in. Please tell me your apartment or building if you can. [ESCALATE]
 
-Fully booked situation:
-Reply: Sorry, we are fully booked for those dates.
+Late checkout request:
+Reply: Let me check availability based on the next guest arrival and I will get back to you shortly. [ESCALATE]
 
-Single bed request:
-Reply: Unfortunately we do not have single beds, sorry about that.
+WiFi not working:
+Reply: Sorry about that, I am alerting the team to check the connection now. [ESCALATE]
 
-Anything outside the above topics such as complaints, maintenance issues, booking modifications, or anything complex:
-Reply: Let me check on that and get back to you shortly.
-Add [ESCALATE] on its own line after this reply.
+Smoking rules - Triple Room:
+Reply: Smoking is strictly forbidden in the Triple Room and all shared areas.
+
+Smoking rules - Apartment:
+Reply: Smoking is only allowed on the balcony.
+
+Noise complaint:
+Reply: Thank you for letting us know, we will look into this immediately. [ESCALATE]
+
+Extra guests beyond booked number:
+Reply: Thanks for letting us know, I need to check this with the team and will get back to you shortly. [ESCALATE]
+
+Dirty room complaint:
+Reply: Sorry about that, I am alerting the team now so we can sort this out right away. [ESCALATE]
+
+Voice message or audio received:
+Reply: Please type your question and I will be happy to help.
+
+Photo or video received:
+Reply: Please type your question and I will be happy to help.
+
+Returning guest (previous stay notes exist):
+Reply: Good to hear from you again. How can I help?
+
+Anything else outside the above topics:
+Reply: Let me check on that and get back to you shortly. [ESCALATE]
 
 FOR SENDING VIDEOS:
-When a scenario requires a video, start your response with [VIDEO:media_id] followed by the text message on a new line.
-Example: [VIDEO:975338858914982]
-The nearest paid parking is under Carrefour...
-The Cloud Function will parse this, send the video as a separate WhatsApp message first, then send the text.
-
-FOR ESCALATING TO THE TEAM:
-When a scenario above tells you to add [ESCALATE], or the guest's issue is complex, a complaint, a maintenance problem, or a booking modification you cannot resolve yourself, put [ESCALATE] on its own line at the very end of your reply, after the guest-facing text.
+When a scenario requires a video, start your response with [VIDEO:media_id] on its own line followed by the text message.
 Example:
-I see you had this issue before, let me escalate this to our team right away.
-[ESCALATE]
-The Cloud Function will parse this, notify the team, and strip the tag before the message is sent to the guest.`;
+[VIDEO:975338858914982]
+The nearest paid parking is under Carrefour...
+
+FOR ESCALATION:
+When you include [ESCALATE] in your response, place it at the very end after the guest-facing text. It will be stripped before sending to the guest and used internally to alert the owner.
+Example: Sorry about that, I am alerting the team now. [ESCALATE]`;
 
 const SUMMARY_SYSTEM_PROMPT = 'Summarize this guest WhatsApp conversation into 3-5 bullet points covering: issues they had, requests they made, how they communicated, anything notable. Be very brief.';
 
@@ -210,76 +252,77 @@ function toJsDate(value) {
   return isNaN(parsed.getTime()) ? null : parsed;
 }
 
-// ---- Kill switch / escalation helpers -------------------------------------
-
-async function getGlobalsConfig(db) {
-  try {
-    const snap = await db.collection('globals').doc('config').get();
-    return snap.exists ? snap.data() || {} : {};
-  } catch (err) {
-    console.error('getGlobalsConfig failed:', err);
-    return {};
-  }
-}
-
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Human-like reply delay: 2-5 seconds. */
-async function humanDelay() {
-  await sleep(2000 + Math.random() * 3000);
-}
+// ---- Bot config / mode resolution ------------------------------------------
 
-/** Mark the inbound message as read via the documented Meta Cloud API payload. Best-effort. */
-async function markMessageAsRead(msgId) {
-  if (!msgId) return;
+const CONFIG_DEFAULTS = {
+  aiBotEnabled: true,
+  botMode: 'available',
+  botResponseDelay: 20,
+  ownerPhone: '',
+  nightStart: 22,
+  nightEnd: 9,
+};
+
+async function getGlobalsConfig(db) {
   try {
-    const data = await sendWhatsAppMessage({
-      messaging_product: 'whatsapp',
-      status: 'read',
-      message_id: msgId,
-    });
-    if (data?.error) {
-      console.error('markMessageAsRead: Meta error —', JSON.stringify(data));
-    }
+    const snap = await db.collection('globals').doc('config').get();
+    return snap.exists ? { ...CONFIG_DEFAULTS, ...snap.data() } : { ...CONFIG_DEFAULTS };
   } catch (err) {
-    console.error('markMessageAsRead failed:', err);
+    console.error('getGlobalsConfig failed:', err);
+    return { ...CONFIG_DEFAULTS };
   }
 }
 
-/** Returns the current hour (0-23) in Tbilisi local time. */
-function tbilisiHour() {
+/** Current hour (0-23) in Tbilisi local time. Georgia is UTC+4 year-round, no DST. */
+function tbilisiHour(date = new Date()) {
   const formatted = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Tbilisi',
     hour: 'numeric',
     hourCycle: 'h23',
-  }).format(new Date());
+  }).format(date);
   return Number(formatted) % 24;
 }
 
-/** Night window for owner notifications: 20:00-08:59 Tbilisi time. */
-function isTbilisiNight() {
-  const h = tbilisiHour();
-  return h >= 20 || h < 9;
+function isNightHour(hour, nightStart, nightEnd) {
+  if (nightStart === nightEnd) return false; // no window configured — treat as always available
+  if (nightStart > nightEnd) return hour >= nightStart || hour < nightEnd; // wraps past midnight, e.g. 22 -> 9
+  return hour >= nightStart && hour < nightEnd;
 }
 
-// Exact guest-facing handoff phrases from SYSTEM_PROMPT that also count as an escalation signal.
-const ESCALATION_PHRASES = [
-  'let me check on that and get back to you shortly',
-  'let me escalate this to our team right away',
-];
-
-/** Strips a trailing [ESCALATE] tag and reports whether the reply should be escalated. */
-function extractEscalation(replyText) {
-  const hasTag = /\[ESCALATE\]/i.test(replyText);
-  const text = replyText.replace(/\s*\[ESCALATE\]\s*/gi, ' ').replace(/\s+$/,'').trim();
-  const lower = text.toLowerCase();
-  const matchesPhrase = ESCALATION_PHRASES.some((p) => lower.includes(p));
-  return { text, shouldEscalate: hasTag || matchesPhrase };
+/**
+ * Resolve the effective bot mode ("available" | "away" | "night") from config.botMode.
+ * Does NOT consider aiBotEnabled — callers must check that separately (hard kill switch).
+ */
+function resolveEffectiveMode(config) {
+  if (config.botMode === 'away') return 'away';
+  if (config.botMode === 'night') return 'night';
+  if (config.botMode === 'auto') {
+    const hour = tbilisiHour();
+    return isNightHour(hour, Number(config.nightStart), Number(config.nightEnd)) ? 'night' : 'available';
+  }
+  return 'available';
 }
 
-async function writeAlert(db, { reason, phone, guestName = '', room = '', message = '' }) {
+function buildModeContext(effectiveMode, ownerPhone) {
+  if (effectiveMode === 'away') {
+    return 'AWAY MODE: The owner is currently unreachable (traveling/no internet). Be helpful with everything you can. For escalations that require human action, tell the guest: I have noted this and someone from our team will follow up as soon as possible. Do not promise immediate response times.';
+  }
+  if (effectiveMode === 'night') {
+    let text = 'NIGHT MODE: It is currently nighttime in Tbilisi. For escalations that require urgent human action, tell the guest: If this is urgent please call the night contact number provided below, otherwise we will get back to you first thing in the morning.';
+    const normalizedOwner = normalizePhone(ownerPhone);
+    if (normalizedOwner) {
+      text += `\nNight contact number: +${normalizedOwner}`;
+    }
+    return text;
+  }
+  return 'AVAILABLE MODE: A human host may reply manually. If the conversation history already contains a Host: message that answered the guest, keep your reply empty of new commitments and prefer silence unless still necessary. Guest should never be told they are talking to a bot.';
+}
+
+async function writeAlert(db, { reason, phone, guestName = '', room = '', message = '', mode = '' }) {
   try {
     await db.collection('whatsapp_alerts').add({
       reason,
@@ -287,6 +330,7 @@ async function writeAlert(db, { reason, phone, guestName = '', room = '', messag
       guestName,
       room,
       message,
+      mode,
       resolved: false,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -314,6 +358,88 @@ async function notifyOwner(ownerPhone, text) {
   }
 }
 
+// ---- Inbound content classification ----------------------------------------
+
+/** Returns the text to store for an inbound message, or a bracketed placeholder for non-text types. */
+function classifyIncomingContent(msg) {
+  if (msg.text?.body) return msg.text.body;
+  const type = msg.type;
+  if (type === 'audio' || type === 'voice') return '[audio]';
+  if (type === 'image' || type === 'sticker') return '[image]';
+  if (type === 'video') return '[video]';
+  return '[unsupported]';
+}
+
+// ---- Message batching (whatsapp_pending) ------------------------------------
+
+/** Adds `text` to the guest's pending batch, rotating batchToken so any in-flight worker for the old token no-ops. */
+async function upsertPendingMessage(db, phone, text) {
+  const batchToken = crypto.randomUUID();
+  const pendingRef = db.collection('whatsapp_pending').doc(phone);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(pendingRef);
+    if (snap.exists) {
+      tx.update(pendingRef, {
+        messages: FieldValue.arrayUnion(text),
+        lastMessageAt: FieldValue.serverTimestamp(),
+        batchToken,
+        phone,
+      });
+    } else {
+      tx.set(pendingRef, {
+        messages: [text],
+        batchStartedAt: FieldValue.serverTimestamp(),
+        lastMessageAt: FieldValue.serverTimestamp(),
+        batchToken,
+        phone,
+      });
+    }
+  });
+  return batchToken;
+}
+
+/** Deletes whatsapp_pending/{phone} only if its batchToken still matches — avoids racing a newer burst. */
+async function deletePendingIfTokenMatches(db, phone, batchToken) {
+  const pendingRef = db.collection('whatsapp_pending').doc(phone);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(pendingRef);
+    if (snap.exists && snap.data().batchToken === batchToken) {
+      tx.delete(pendingRef);
+    }
+  });
+}
+
+/** Enqueues a Cloud Task that calls whatsappBotWorker after `delaySeconds`. Logs and no-ops on failure. */
+async function enqueueBotWorker({ phone, batchToken, delaySeconds }) {
+  const workerUrl = WHATSAPP_BOT_WORKER_URL.value();
+  if (!workerUrl) {
+    console.error('enqueueBotWorker: WHATSAPP_BOT_WORKER_URL is not configured — see README "Cloud Tasks setup"');
+    return;
+  }
+  const project  = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'sleepy-5c962';
+  const queuePath = tasksClient.queuePath(project, TASKS_LOCATION, TASKS_QUEUE);
+  const invokerSa = WHATSAPP_TASKS_INVOKER_SA.value();
+
+  const task = {
+    httpRequest: {
+      httpMethod: 'POST',
+      url: workerUrl,
+      headers: { 'Content-Type': 'application/json' },
+      body: Buffer.from(JSON.stringify({ phone, batchToken })).toString('base64'),
+      ...(invokerSa ? { oidcToken: { serviceAccountEmail: invokerSa } } : {}),
+    },
+    scheduleTime: { seconds: Math.floor(Date.now() / 1000) + Math.max(0, Math.round(delaySeconds)) },
+  };
+
+  try {
+    await tasksClient.createTask({ parent: queuePath, task });
+  } catch (err) {
+    console.error('enqueueBotWorker: createTask failed:', err);
+  }
+}
+
+// -----------------------------------------------------------------------------
+
 exports.whatsappWebhook = onRequest(
   { region: 'europe-west1', cors: true, secrets: ['WEBHOOK_VERIFY_TOKEN', 'META_ACCESS_TOKEN', 'META_PHONE_NUMBER_ID', 'ANTHROPIC_API_KEY'] },
   async (req, res) => {
@@ -329,190 +455,281 @@ exports.whatsappWebhook = onRequest(
       return res.status(403).send('Forbidden');
     }
 
-    // POST — incoming message
+    // POST — incoming message / echo. Architecture rule: no long waits here — accept
+    // work, hand off delayed replies to the Cloud Tasks worker, return 200 fast.
     if (req.method === 'POST') {
       try {
-        const body = req.body;
+        const body  = req.body;
+        const value = body?.entry?.[0]?.changes?.[0]?.value;
+        const db    = getFirestore();
 
-        const value    = body?.entry?.[0]?.changes?.[0]?.value;
+        // CHANGE 3 — coexistence owner echoes (owner/app replied from the WhatsApp Business app).
+        // Field name per Meta's Business Coexistence webhook; some accounts may expose it as
+        // `message_echoes` instead — check both defensively.
+        const echoes = value?.smb_message_echoes || value?.message_echoes;
+        if (Array.isArray(echoes) && echoes.length > 0) {
+          for (const echo of echoes) {
+            // An echo is a message the business (owner) sent TO the guest, so the guest's
+            // number is `to`, not `from` (which is the business number).
+            const guestPhone = normalizePhone(echo.to || echo.recipient_id || echo.from);
+            if (!guestPhone) continue;
+            const echoText = echo.text?.body || classifyIncomingContent(echo);
+            await db.collection('whatsapp_conversations').doc(guestPhone)
+              .collection('messages').add({
+                role: 'owner',
+                content: echoText,
+                timestamp: FieldValue.serverTimestamp(),
+                metaMessageId: echo.id || null,
+              });
+          }
+          // Owner echoes never enqueue a bot reply.
+          return res.sendStatus(200);
+        }
+
         const messages = value?.messages;
 
-        // Status updates have no messages array — acknowledge and exit
+        // Status updates / other non-message payloads — acknowledge and exit
         if (!messages || messages.length === 0) {
           return res.sendStatus(200);
         }
 
-        const msg     = messages[0];
-        const phone   = normalizePhone(msg.from);
-        const text    = msg.text?.body;
-        const msgId   = msg.id;
+        const msg   = messages[0];
+        const phone = normalizePhone(msg.from);
+        if (!phone) return res.sendStatus(200);
 
-        if (!text || !phone) return res.sendStatus(200);
+        const text = classifyIncomingContent(msg);
 
-        const db = getFirestore();
         const convoRef    = db.collection('whatsapp_conversations').doc(phone);
         const messagesRef = convoRef.collection('messages');
 
-        // CHANGE 1 — kill switch: check globals/config before touching Claude
-        const globalsConfig = await getGlobalsConfig(db);
-        const aiBotEnabled  = globalsConfig.aiBotEnabled !== false; // missing/undefined -> true
-        const ownerPhone    = globalsConfig.ownerPhone || '';
-
-        if (!aiBotEnabled) {
-          // Still record the inbound message so nothing is lost while paused
-          await messagesRef.add({
-            role: 'user',
-            content: text,
-            timestamp: FieldValue.serverTimestamp(),
-          });
-
-          await writeAlert(db, { reason: 'bot_paused', phone, message: text });
-
-          if (ownerPhone) {
-            await notifyOwner(ownerPhone, `AI assistant is paused. New WhatsApp message from ${phone}: "${text}"`);
-          }
-
-          return res.sendStatus(200);
-        }
-
-        // PART 1 — save incoming guest message
+        // Always persist the inbound message first, regardless of bot state
         await messagesRef.add({
           role: 'user',
           content: text,
           timestamp: FieldValue.serverTimestamp(),
+          metaMessageId: msg.id || null,
         });
 
-        // PART 1 — fetch last 15 messages (newest first), then reverse to chronological order
-        const historySnap = await messagesRef
-          .orderBy('timestamp', 'desc')
-          .limit(15)
-          .get();
+        const config = await getGlobalsConfig(db);
 
-        const history = historySnap.docs
-          .map((d) => d.data())
-          .reverse()
-          .map((m) => ({ role: m.role, content: m.content }));
-
-        // Look up guest by phone in checkin_guests (digits and +digits variants)
-        const form = await findGuestByWhatsAppPhone(db, phone);
-
-        let guestName     = 'Guest';
-        let roomCode       = '';
-        let checkinDate    = '';
-        let checkoutDate   = '';
-        let hasFilledForm  = false;
-
-        if (form) {
-          hasFilledForm = true;
-          guestName = form.name || 'Guest';
-          const matchedResId = form.matchedReservationId;
-          const resNumber = baseReservationNumber(matchedResId);
-
-          if (resNumber) {
-            const resSnap = await db.collection('reservations')
-              .where('reservationNumber', '==', resNumber)
-              .limit(1)
-              .get();
-
-            if (!resSnap.empty) {
-              const reservation = resSnap.docs[0].data();
-              roomCode     = reservation.roomCode || '';
-              checkinDate  = reservation.checkin || '';
-              checkoutDate = reservation.checkout || '';
-            }
+        // CHANGE 1 — hard kill switch
+        if (config.aiBotEnabled === false) {
+          await writeAlert(db, { reason: 'bot_paused', phone, message: text });
+          if (config.ownerPhone) {
+            await notifyOwner(config.ownerPhone, `AI assistant is paused. New WhatsApp message from ${phone}: "${text}"`);
           }
+          return res.sendStatus(200);
         }
 
-        // PART 2 — long-term guest memory
-        let memoryContext = '';
-        const guestDoc = await db.collection('whatsapp_guests').doc(phone).get();
-        if (guestDoc.exists) {
-          const summary = guestDoc.data().summary;
-          if (Array.isArray(summary) && summary.length > 0) {
-            memoryContext = `\nPrevious stay notes for this guest: ${summary.map((s) => `- ${s}`).join(' ')}`;
-          }
-        }
+        // CHANGE 2 — batch into whatsapp_pending and hand off to the Cloud Tasks worker
+        const batchToken = await upsertPendingMessage(db, phone, text);
 
-        const guestContext = [
-          `Guest name: ${guestName}`,
-          `Room/apartment type: ${roomCode || 'unknown'}`,
-          `Check-in: ${checkinDate || 'unknown'}`,
-          `Checkout: ${checkoutDate || 'unknown'}`,
-          `Filled check-in form: ${hasFilledForm ? 'yes' : 'no'}`,
-        ].join('\n') + memoryContext;
+        const effectiveMode = resolveEffectiveMode(config);
+        const configuredDelay = Number(config.botResponseDelay) || CONFIG_DEFAULTS.botResponseDelay;
+        // Away/night still debounce rapid bursts, but don't make the guest wait the full
+        // human-first delay — cap at 3s.
+        const delaySeconds = effectiveMode === 'available' ? configuredDelay : Math.min(configuredDelay, 3);
 
-        const systemWithContext = `${SYSTEM_PROMPT}\n\n${guestContext}`;
+        await enqueueBotWorker({ phone, batchToken, delaySeconds });
 
-        // PART 1/3 — call Claude with full conversation history
-        let aiReply = await callClaude({ system: systemWithContext, messages: history });
-        if (!aiReply) aiReply = 'Let me check on that and get back to you shortly.';
-
-        // Parse an optional [VIDEO:media_id] prefix
-        let videoMediaId = null;
-        const videoMatch = aiReply.match(/^\[VIDEO:(\d+)\]\s*\n?/);
-        if (videoMatch) {
-          videoMediaId = videoMatch[1];
-          aiReply = aiReply.slice(videoMatch[0].length).trim();
-        }
-
-        // CHANGE 3 — escalation: parse/strip [ESCALATE] and check handoff phrases
-        const escalation = extractEscalation(aiReply);
-        aiReply = escalation.text;
-
-        if (escalation.shouldEscalate) {
-          await writeAlert(db, {
-            reason: 'escalation',
-            phone,
-            guestName,
-            room: roomCode,
-            message: aiReply,
-          });
-
-          if (ownerPhone && isTbilisiNight()) {
-            await notifyOwner(
-              ownerPhone,
-              `Escalation from ${guestName} (${phone})${roomCode ? ` — room ${roomCode}` : ''}: ${aiReply}`
-            );
-          }
-        }
-
-        // CHANGE 2 — best-effort read receipt, then a human-like pause before replying
-        await markMessageAsRead(msgId);
-        await humanDelay();
-
-        // Send video first, if present
-        if (videoMediaId) {
-          await sendWhatsAppMessage({
-            messaging_product: 'whatsapp',
-            to: phone,
-            type: 'video',
-            video: { id: videoMediaId },
-          });
-        }
-
-        // Send text reply
-        await sendWhatsAppMessage({
-          messaging_product: 'whatsapp',
-          to: phone,
-          type: 'text',
-          text: { body: aiReply },
-        });
-
-        // PART 1 — save assistant reply
-        await messagesRef.add({
-          role: 'assistant',
-          content: aiReply,
-          timestamp: FieldValue.serverTimestamp(),
-        });
+        return res.sendStatus(200);
       } catch (err) {
         console.error('whatsappWebhook error:', err);
+        return res.sendStatus(200);
       }
-
-      // Always return 200 to Meta
-      return res.sendStatus(200);
     }
 
     return res.sendStatus(405);
+  }
+);
+
+// ---- Deferred worker: builds the reply for one debounced batch --------------
+
+exports.whatsappBotWorker = onRequest(
+  {
+    region: 'europe-west1',
+    timeoutSeconds: 120,
+    invoker: 'private', // only IAM principals granted Cloud Run Invoker (the Cloud Tasks SA) may call this
+    secrets: ['META_ACCESS_TOKEN', 'META_PHONE_NUMBER_ID', 'ANTHROPIC_API_KEY'],
+  },
+  async (req, res) => {
+    try {
+      const { phone, batchToken } = req.body || {};
+      if (!phone || !batchToken) {
+        console.error('whatsappBotWorker: missing phone or batchToken in payload');
+        return res.sendStatus(200); // malformed task — don't retry
+      }
+
+      const db = getFirestore();
+      const config = await getGlobalsConfig(db);
+
+      // Kill switch may have flipped after the task was enqueued
+      if (config.aiBotEnabled === false) return res.sendStatus(200);
+
+      const pendingRef = db.collection('whatsapp_pending').doc(phone);
+      const pendingSnap = await pendingRef.get();
+      if (!pendingSnap.exists) return res.sendStatus(200);
+
+      const pending = pendingSnap.data();
+      // A newer message arrived and rescheduled work under a fresh token — this run is stale
+      if (pending.batchToken !== batchToken) return res.sendStatus(200);
+
+      const effectiveMode = resolveEffectiveMode(config);
+      const convoRef        = db.collection('whatsapp_conversations').doc(phone);
+      const convoMessagesRef = convoRef.collection('messages');
+
+      if (effectiveMode === 'available') {
+        const batchStart = pending.batchStartedAt || pending.lastMessageAt;
+        const ownerSnap = await convoMessagesRef
+          .where('role', '==', 'owner')
+          .where('timestamp', '>=', batchStart)
+          .limit(1)
+          .get();
+        if (!ownerSnap.empty) {
+          // Owner already answered in the WhatsApp Business app — stay silent.
+          await deletePendingIfTokenMatches(db, phone, batchToken);
+          return res.sendStatus(200);
+        }
+      }
+
+      const combinedGuestText = (pending.messages || []).join('\n');
+
+      // Guest lookup (reuses the checkin_guests phone-variant + multi-room fixes)
+      const form = await findGuestByWhatsAppPhone(db, phone);
+
+      let guestName    = 'Guest';
+      let roomCode     = '';
+      let checkinDate  = '';
+      let checkoutDate = '';
+      let hasFilledForm = false;
+
+      if (form) {
+        hasFilledForm = true;
+        guestName = form.name || 'Guest';
+        const resNumber = baseReservationNumber(form.matchedReservationId);
+        if (resNumber) {
+          const resSnap = await db.collection('reservations')
+            .where('reservationNumber', '==', resNumber)
+            .limit(1)
+            .get();
+          if (!resSnap.empty) {
+            const reservation = resSnap.docs[0].data();
+            roomCode     = reservation.roomCode || '';
+            checkinDate  = reservation.checkin || '';
+            checkoutDate = reservation.checkout || '';
+          }
+        }
+      }
+
+      let memoryContext = '';
+      const guestDoc = await db.collection('whatsapp_guests').doc(phone).get();
+      if (guestDoc.exists) {
+        const summary = guestDoc.data().summary;
+        if (Array.isArray(summary) && summary.length > 0) {
+          memoryContext = `\nPrevious stay notes for this guest: ${summary.map((s) => `- ${s}`).join(' ')}`;
+        }
+      }
+
+      // Last 15 messages as conversation history. Owner echoes map to an assistant turn
+      // prefixed "Host: " so the model knows a human already responded.
+      const historySnap = await convoMessagesRef.orderBy('timestamp', 'desc').limit(15).get();
+      const history = historySnap.docs
+        .map((d) => d.data())
+        .reverse()
+        .map((m) => {
+          if (m.role === 'owner') return { role: 'assistant', content: `Host: ${m.content}` };
+          if (m.role === 'assistant') return { role: 'assistant', content: m.content };
+          return { role: 'user', content: m.content };
+        });
+
+      const guestContext = [
+        `Guest name: ${guestName}`,
+        `Room/apartment type: ${roomCode || 'unknown'}`,
+        `Check-in: ${checkinDate || 'unknown'}`,
+        `Checkout: ${checkoutDate || 'unknown'}`,
+        `Filled check-in form: ${hasFilledForm ? 'yes' : 'no'}`,
+      ].join('\n') + memoryContext;
+
+      const modeContext = buildModeContext(effectiveMode, config.ownerPhone);
+      const systemWithContext = `${SYSTEM_PROMPT}\n\n${guestContext}\n\n${modeContext}`;
+
+      let aiReply = await callClaude({ system: systemWithContext, messages: history });
+
+      let escalated = false;
+      let escalationReason = 'escalation';
+
+      if (!aiReply) {
+        aiReply = 'Let me check on that and get back to you shortly.';
+        escalated = true;
+        escalationReason = 'unhandled_message';
+      }
+
+      // Parse an optional [VIDEO:media_id] prefix
+      let videoMediaId = null;
+      const videoMatch = aiReply.match(/^\[VIDEO:(\d+)\]\s*\n?/);
+      if (videoMatch) {
+        videoMediaId = videoMatch[1];
+        aiReply = aiReply.slice(videoMatch[0].length).trim();
+      }
+
+      // Strip a trailing [ESCALATE] tag — internal only, never sent to WhatsApp
+      const hasEscalateTag = /\[ESCALATE\]/i.test(aiReply);
+      aiReply = aiReply.replace(/\s*\[ESCALATE\]\s*/gi, ' ').replace(/\s+$/, '').trim();
+      if (hasEscalateTag) {
+        escalated = true;
+        escalationReason = 'escalation';
+      }
+
+      // Small humanizer — short, after Claude, before send. Not the batching delay.
+      await sleep(1000 + Math.random() * 1000);
+
+      if (videoMediaId) {
+        await sendWhatsAppMessage({
+          messaging_product: 'whatsapp',
+          to: phone,
+          type: 'video',
+          video: { id: videoMediaId },
+        });
+      }
+
+      await sendWhatsAppMessage({
+        messaging_product: 'whatsapp',
+        to: phone,
+        type: 'text',
+        text: { body: aiReply },
+      });
+
+      await convoMessagesRef.add({
+        role: 'assistant',
+        content: aiReply,
+        timestamp: FieldValue.serverTimestamp(),
+      });
+
+      if (escalated) {
+        await writeAlert(db, {
+          reason: escalationReason,
+          phone,
+          guestName,
+          room: roomCode,
+          message: combinedGuestText,
+          mode: effectiveMode,
+        });
+
+        if (config.ownerPhone) {
+          await notifyOwner(
+            config.ownerPhone,
+            `Guest needs help — ${guestName} / ${roomCode || 'unknown room'} / mode=${effectiveMode}: ${combinedGuestText}`
+          );
+        }
+      }
+
+      await deletePendingIfTokenMatches(db, phone, batchToken);
+
+      return res.sendStatus(200);
+    } catch (err) {
+      console.error('whatsappBotWorker error:', err);
+      return res.sendStatus(200); // clean completion so Cloud Tasks does not retry indefinitely
+    }
   }
 );
 
@@ -652,7 +869,7 @@ exports.summarizeGuestConversation = onDocumentWritten(
       // Range query alone (no contactType) avoids needing a new composite index.
       const multiSnap = await db.collection('checkin_guests')
         .where('matchedReservationId', '>=', `${reservationNumber}_`)
-        .where('matchedReservationId', '<', `${reservationNumber}_\uf8ff`)
+        .where('matchedReservationId', '<', `${reservationNumber}_`)
         .limit(20)
         .get();
       const match = multiSnap.docs.find((d) => (d.data().contactType || '').toLowerCase() === 'wa');
@@ -672,7 +889,7 @@ exports.summarizeGuestConversation = onDocumentWritten(
     const conversationText = messagesSnap.docs
       .map((d) => {
         const m = d.data();
-        return `${m.role === 'assistant' ? 'Assistant' : 'Guest'}: ${m.content}`;
+        return `${m.role === 'assistant' ? 'Assistant' : m.role === 'owner' ? 'Host' : 'Guest'}: ${m.content}`;
       })
       .join('\n');
 

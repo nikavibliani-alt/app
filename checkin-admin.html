@@ -2196,27 +2196,41 @@ function pickCheckinInviteKey(roomCode){
 let waSettings=mergeWaSettings(null);
 let waLoaded=false;
 let _waInviteProp='maxela';
-let aiBotEnabled=true;
-let aiBotLoaded=false;
-async function loadAiBotEnabled(){
+const BOT_SETTINGS_DEFAULTS={aiBotEnabled:true,botMode:'available',botResponseDelay:20,ownerPhone:'',nightStart:22,nightEnd:9};
+let botSettings={...BOT_SETTINGS_DEFAULTS};
+let botSettingsLoaded=false;
+async function loadBotSettings(){
   try{
     const snap=await getDoc(doc(db,'globals','config'));
-    aiBotEnabled=!(snap.exists()&&snap.data().aiBotEnabled===false);
-  }catch(e){console.warn('[aiBotEnabled]',e);aiBotEnabled=true;}
-  aiBotLoaded=true;
+    if(snap.exists()){
+      const d=snap.data();
+      botSettings={
+        aiBotEnabled:d.aiBotEnabled!==false,
+        botMode:['available','away','night','auto'].includes(d.botMode)?d.botMode:'available',
+        botResponseDelay:Number(d.botResponseDelay)||20,
+        ownerPhone:d.ownerPhone||'',
+        nightStart:Number.isFinite(d.nightStart)?d.nightStart:22,
+        nightEnd:Number.isFinite(d.nightEnd)?d.nightEnd:9,
+      };
+    }
+  }catch(e){console.warn('[botSettings]',e);}
+  botSettingsLoaded=true;
 }
-window.waSetAiBotEnabled=async function(checked){
-  const prev=aiBotEnabled;
-  aiBotEnabled=checked;
+window.waSaveBotSettings=async function(patch){
+  const prev={...botSettings};
+  botSettings={...botSettings,...patch};
   renderWaSettings();
   try{
-    await setDoc(doc(db,'globals','config'),{aiBotEnabled:checked,updatedAt:serverTimestamp()},{merge:true});
-    toast(checked?'AI assistant resumed ✓':'AI assistant paused');
+    await setDoc(doc(db,'globals','config'),{...patch,updatedAt:serverTimestamp()},{merge:true});
   }catch(e){
-    aiBotEnabled=prev;
+    botSettings=prev;
     renderWaSettings();
     toast('Save failed: '+e.message);
   }
+};
+window.waSetAiBotEnabled=async function(checked){
+  await waSaveBotSettings({aiBotEnabled:checked});
+  toast(checked?'AI assistant resumed ✓':'AI assistant paused');
 };
 const WA_PREVIEW_SAMPLES={firstName:'Alex',inputName:'John Smith',inputDate:'2026-09-01',inputRef:', ref: BK-48291'};
 function waReadFormIntoSettings(){
@@ -2286,12 +2300,38 @@ function renderWaSettings(){
           <p class="wa-hero__text">Messages pre-fill when you tap WhatsApp on Stay cards or Failed searches. Guests who already submitted a form open a blank chat — no template.</p>
         </div>
       </div>
-      <div class="gp-row" style="margin-bottom:12px">
-        <div class="gp-row__body">
-          <div class="gp-row__title">AI Guest Assistant</div>
-          <div class="gp-row__sub" style="color:${aiBotEnabled?'var(--green)':'var(--muted)'};font-weight:600">${aiBotEnabled?'Active':'Paused'}</div>
+      <div class="wa-card">
+        <div class="wa-card__hd"><div><h3>Bot Settings</h3><p>Controls whether and how the AI assistant replies to guests.</p></div></div>
+        <div class="wa-card__bd">
+          <div class="gp-row" style="margin-bottom:12px">
+            <div class="gp-row__body">
+              <div class="gp-row__title">AI Guest Assistant</div>
+              <div class="gp-row__sub" style="color:${botSettings.aiBotEnabled?'var(--green)':'var(--muted)'};font-weight:600">${botSettings.aiBotEnabled?'Active':'Paused'}</div>
+            </div>
+            <label class="switch"><input type="checkbox" ${botSettings.aiBotEnabled?'checked':''} onchange="waSetAiBotEnabled(this.checked)"><span class="switch-track"></span></label>
+          </div>
+          <label class="apt-label">Bot mode</label>
+          <select class="apt-input" ${botSettings.aiBotEnabled?'':'disabled'} onchange="waSaveBotSettings({botMode:this.value})">
+            <option value="available" ${botSettings.botMode==='available'?'selected':''}>Available — wait, human-first</option>
+            <option value="away" ${botSettings.botMode==='away'?'selected':''}>Away — fast reply, away context</option>
+            <option value="night" ${botSettings.botMode==='night'?'selected':''}>Night — fast reply, night context</option>
+            <option value="auto" ${botSettings.botMode==='auto'?'selected':''}>Auto — night hours → night, else available</option>
+          </select>
+          ${(botSettings.botMode==='available'||botSettings.botMode==='auto')?`
+          <label class="apt-label" style="margin-top:12px">Reply delay</label>
+          <select class="apt-input" ${botSettings.aiBotEnabled?'':'disabled'} onchange="waSaveBotSettings({botResponseDelay:Number(this.value)})">
+            ${[5,10,20,30,60].map((s)=>`<option value="${s}" ${botSettings.botResponseDelay===s?'selected':''}>${s}s</option>`).join('')}
+          </select>`:''}
+          ${botSettings.botMode==='auto'?`
+          <div style="display:flex;gap:10px;margin-top:12px">
+            <div style="flex:1"><label class="apt-label">Night starts (hour)</label><input class="apt-input" type="number" min="0" max="23" step="1" value="${botSettings.nightStart}" ${botSettings.aiBotEnabled?'':'disabled'} onchange="waSaveBotSettings({nightStart:Math.max(0,Math.min(23,Math.round(Number(this.value))||0))})"></div>
+            <div style="flex:1"><label class="apt-label">Night ends (hour)</label><input class="apt-input" type="number" min="0" max="23" step="1" value="${botSettings.nightEnd}" ${botSettings.aiBotEnabled?'':'disabled'} onchange="waSaveBotSettings({nightEnd:Math.max(0,Math.min(23,Math.round(Number(this.value))||0))})"></div>
+          </div>
+          <div class="wa-template-hint">Tbilisi local time, 0-23. e.g. 22 and 9 means night from 10pm to 9am.</div>`:''}
+          <label class="apt-label" style="margin-top:12px">Your WhatsApp number for alerts</label>
+          <input class="apt-input" value="${esc(botSettings.ownerPhone)}" placeholder="9955XXXXXXXX" onchange="waSaveBotSettings({ownerPhone:this.value.trim()})">
+          <div class="wa-template-hint">Digits with country code, e.g. 9955XXXXXXXX</div>
         </div>
-        <label class="switch"><input type="checkbox" ${aiBotEnabled?'checked':''} onchange="waSetAiBotEnabled(this.checked)"><span class="switch-track"></span></label>
       </div>
       <div class="wa-rule">${featherIcon('info',16,1.8)}<span>Use placeholders exactly as shown — they are replaced with guest data when you send.</span></div>
       <div class="wa-card">
@@ -2341,7 +2381,7 @@ async function loadAndRenderWaSettings(){
   if(root)root.innerHTML='<div class="empty">Loading templates…</div>';
   try{
     if(!waLoaded)await loadGuestSettings();
-    if(!aiBotLoaded)await loadAiBotEnabled();
+    if(!botSettingsLoaded)await loadBotSettings();
     renderWaSettings();
   }catch(e){
     console.error('[loadAndRenderWaSettings]',e);
