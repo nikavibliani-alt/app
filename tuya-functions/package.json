@@ -5,7 +5,7 @@
   "engines": { "node": "22" },
   "main": "index.js",
   "scripts": {
-    "deploy": "firebase deploy --only functions",
+    "deploy": "firebase deploy --only functions:default",
     "deploy:generate": "firebase deploy --only functions:generateOfflinePasswordOnReservation",
     "deploy:regenerate": "firebase deploy --only functions:regenerateTuyaPassword",
     "deploy:delete": "firebase deploy --only functions:deleteTuyaPassword"

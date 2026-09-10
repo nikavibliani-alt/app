@@ -66,6 +66,7 @@
       "node_modules/**",
       "tuya-functions/**",
       "pipeline-functions/**",
+      "whatsapp-functions/**",
       "sandbox_rebuild/**",
       "scripts/**",
       "clear-reservations.html",
@@ -119,6 +120,17 @@
         "firebase-debug.*.log",
         "*.local",
         "tests"
+      ]
+    },
+    {
+      "source": "whatsapp-functions",
+      "codebase": "whatsapp",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
       ]
     }
   ],

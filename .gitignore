@@ -12,6 +12,10 @@ firebase-debug.log
 pipeline-functions/node_modules/
 pipeline-functions/.secret.local
 
+# whatsapp-functions — Node dependencies, not source
+whatsapp-functions/node_modules/
+whatsapp-functions/.secret.local
+
 # Catch all firebase debug logs
 firebase-debug*.log
 design-reference/

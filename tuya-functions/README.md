@@ -3,14 +3,18 @@
 **Tuya smart lock only.** This codebase (Firebase Functions codebase id `default`)
 is reserved for Tuya door-lock Cloud Functions. It must not gain elevator,
 WhatsApp, or general pipeline code going forward — that all lives in
-[`pipeline-functions/`](../pipeline-functions/README.md) now.
+[`pipeline-functions/`](../pipeline-functions/README.md) and
+[`whatsapp-functions/`](../whatsapp-functions/README.md) now.
 
 ## Current exports
 
+None. This codebase is empty pending Tuya smart-lock functionality being
+restored (see "Reserved for later" below).
+
 | Export | Status |
 |---|---|
-| `whatsappWebhook` | Active. Meta WhatsApp inbound webhook → Claude-generated auto-reply. **To migrate** to `pipeline-functions/` in a future task (kept here for now — moving it was out of scope for this change; too large to move in the same PR as the elevator work, per Nika's instruction). |
-| `roomReadyNotification` | Active. Firestore trigger on `hk_status/{docId}` — sends a WhatsApp "room ready" message via the Meta Cloud API when `done` flips to `true`. **To migrate** to `pipeline-functions/` alongside `whatsappWebhook`, or retire, once `GuestNotification` is built there (see `PIPELINE_DESIGN_CURSOR.md` Controller 6). |
+| ~~`whatsappWebhook`~~ | **Moved.** Now `whatsapp-functions/index.js`, exported from the `whatsapp` codebase. Removed from this file — do not re-add WhatsApp code here. |
+| ~~`roomReadyNotification`~~ | **Moved.** Now `whatsapp-functions/index.js`, exported from the `whatsapp` codebase. Removed from this file — do not re-add WhatsApp code here. |
 | ~~`elevatorCodeGuard`~~ | **Moved.** Now `pipeline-functions/controllers/elevatorCodeGuard.js`, exported from the `pipeline` codebase. Removed from this file — do not re-add elevator code here. |
 
 ## Reserved for later (not implemented yet, this codebase, when restored)
