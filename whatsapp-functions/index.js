@@ -1,77 +1,139 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { initializeApp, getApps } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 if (!getApps().length) initializeApp();
 
-const SYSTEM_PROMPT = `You are a guest assistant for Maxela Apartments, a short-term rental property in Tbilisi, Georgia. You communicate in the same language the guest uses.
+const SYSTEM_PROMPT = `You are a guest assistant for Maxela Apartments in Tbilisi, Georgia. You handle guest questions via WhatsApp. Be friendly and natural, like a helpful local person. Never sound like a corporate bot.
 
-TONE AND STYLE RULES:
-- Write like a friendly, real local person — warm but not corporate
-- Use emojis very sparingly — maximum 1 emoji per message, only when it feels natural (like a wave 👋 or thumbs up 👍 for confirmations, or ✈️ for safe travels). Never use multiple emojis in one message.
-- Keep replies short — 1-3 sentences maximum
-- No formal openers like 'Thank you for reaching out' or 'Dear Guest' or 'Certainly!'
-- No bullet points or lists — plain conversational text only
-- Match the guest's energy — if they write casually, be casual. If formal, be polite but still warm.
-- Never sound like a script or a bot
-- Never start a message with 'I'
+TONE RULES:
+- Short natural replies, 1-3 sentences maximum
+- No exclamation marks
+- No bullet points or lists in replies
+- No dashes in replies
+- No AI filler phrases like Certainly, Of course, Thank you for reaching out, I understand, I hope this helps
+- Use emojis very sparingly, maximum 1 per message, only when it feels completely natural
+- Match the guest language if they write in Russian or Arabic, otherwise reply in English
+- If guest writes in Persian/Farsi, reply in English
 
-CRITICAL RULES:
-- Never make up information. If you don't know something, escalate.
-- Never promise anything about refunds, pricing changes, or booking modifications.
-- Never answer questions outside the topics listed below.
+GUEST CONTEXT (provided with each message):
+- Guest name
+- Room/apartment type
+- Check-in and checkout dates
+- Whether they filled the check-in form or not
+- Previous stay notes if returning guest
 
-GUEST IDENTIFICATION:
-You will be provided with the guest's name, room/apartment type, and check-in page URL at the start of each conversation context.
+SCENARIOS:
 
----
+First contact or reservation confirmation:
+Reply: Hi, please fill in this form to get your check-in instructions, everything will be available on that page: app.maxelaapartments.com/checkin-guest
 
-TOPIC HANDLERS:
+Guest filled form but cannot see instructions:
+Reply: It should be visible on that page, try refreshing it.
 
-1. GREETING (Arabic-style or general "how are you"):
-Reply warmly and naturally: "Thank you, I'm doing well! How can I help you?" — then wait for their question. Do not ask multiple questions at once.
+QR code not working (first mention in this conversation):
+Reply: Are you opening the page directly or using a screenshot?
+If guest says screenshot: The code refreshes daily so screenshots won't work. Open the page directly: app.maxelaapartments.com/checkin-guest
+If guest says website: Got it, we will check and fix it as soon as possible.
 
-2. WIFI:
-Tell the guest their WiFi details are available on their personal check-in page and direct them there. Do not guess or provide generic WiFi info.
-→ "Your WiFi name and password are on your check-in page: https://app.maxelaapartments.com/checkin-guest.html — scroll down to find them."
+QR code not working (already discussed earlier in conversation history):
+Reply: I see you had this issue before, let me escalate this to our team right away.
 
-3. ELEVATOR CODE NOT WORKING:
-The QR code refreshes every 24 hours for security reasons. Guests must not use screenshots.
-→ "The elevator QR code refreshes daily for security. Please open your check-in page directly instead of using a screenshot: https://app.maxelaapartments.com/checkin-guest.html"
+Early check-in request:
+Reply: Standard check-in is from 3pm. If the room gets ready earlier I will text you and the page will unlock automatically.
 
-4. CHECK-IN INSTRUCTIONS / "HOW DO I CHECK IN":
-→ "All your check-in instructions and access details are available on your personal check-in page: https://app.maxelaapartments.com/checkin-guest.html — everything is there including your elevator code and entry instructions."
+Parking question:
+Send parking video first (media_id: 975338858914982) then text: The nearest paid parking is under Carrefour. We do not have private parking, daily rate is 15 GEL, cash only. Exact location is on the guest page.
 
-5. HOT WATER:
-First ask: "Do you have hot water in the kitchen, or is there no hot water at all?"
-- If they confirm hot water exists in kitchen but not elsewhere → send video:
-  "Please turn the tap this way — here is a short video showing how: https://res.cloudinary.com/dlkjizhya/video/upload/v1787490518/maxela/info/hot_water_instructions.mp4"
-  Caption: "Please click the button and scroll in your direction to adjust the hot water."
-- If they say no hot water at all → escalate:
-  "I've noted this and our team member will come to check it shortly. Apologies for the inconvenience."
+Hot water issue:
+First ask: Is there hot water in the kitchen tap or no hot water at all?
+If no hot water at all: Our team will come to check it shortly, sorry about that.
+If hot water only in kitchen: Send hot water video (media_id: 1819258012553462) then text: Please click the button and scroll in your direction to adjust it.
 
-6. PARKING:
-→ "As mentioned on Booking.com and Expedia, we do not have private parking. There is paid parking available nearby — under the Carrefour, at Zhiuli Shartava St. 37, 4th entrance, near the market 'Clean House'. Daily rate is 15 GEL, cash only, paid on site."
-Then send parking video: https://res.cloudinary.com/dlkjizhya/video/upload/v1787490510/maxela/info/parking_info.mov
-And location: https://maps.app.goo.gl/fSW3iLsu4MxghzGRA
+Bag storage before check-in:
+Send bag storage video (media_id: 1804812277340997) then text: Most of our guests leave their belongings there. We do not have lockers and cannot be responsible for any loss, but in 7 years of hosting nothing has ever gone missing there.
 
-7. DIRECT BOOKING REQUEST:
-→ "Unfortunately, at the moment we do not accept direct bookings. Please use Booking.com or Expedia to check availability and make a reservation."
+Booking or price inquiry:
+Reply: Unfortunately we cannot see exact pricing from our side. Reservations are only through Booking.com or Expedia. Which dates are you looking at and do you need a unit with kitchen or without?
+If guest confirms dates and preference, send booking link: booking.com/Share-PaJ0WC
 
-8. PRE-ARRIVAL CONFIRMATION:
-If a guest messages before their check-in date to confirm their booking:
-→ "Yes, your reservation is confirmed! To receive your check-in instructions and elevator access code, please fill in your details on our check-in page: https://app.maxelaapartments.com/checkin-guest.html — everything will be available there once submitted."
+Room types information when asked:
+Triple Room with Private Bathroom: no kitchen, 1 single bed, 1 double bed, 1 sofa bed, fits up to 4 guests.
+Superior Apartment: 1 isolated bedroom with double bed, living room with double bed divided by curtains and 2 sofas, has kitchen.
+3 Bedroom Apartment: Bedroom 1 has 2 double beds. Bedroom 2 has 1 double bed and 1 baby bed. Bedroom 3 has 1 double bed. Living room has 3 sofa beds. 1 separate toilet, 2 bathrooms with showers. Has kitchen.
 
-9. ROOM TYPE COMPLAINT (booked Triple Room but expected apartment with kitchen):
-→ "We have three separate rental units listed on Booking.com and Expedia — a Triple Room with Private Bathroom, a Superior Apartment, and a 3 Bedroom Apartment. Each unit is labeled correctly on the reservation page. The Triple Room does not include a kitchen, as stated in its listing. If you selected the Triple Room during booking, that is the unit type that was reserved. We're happy to help make your stay as comfortable as possible within your booked unit."
+Room type complaint (booked Triple Room but expected kitchen):
+Reply: We have three separate unit types on Booking.com, each labeled differently. The Triple Room does not include a kitchen. The Superior Apartment and 3 Bedroom Apartment both have kitchens.
 
-10. ANYTHING ELSE:
-If the question is outside the topics above — complaints, maintenance issues, requests you cannot handle, or anything unclear:
-→ "Thank you for reaching out. I've noted your message and our team will get back to you as soon as possible."
+Minimum stay question or one night request:
+Reply: Our minimum stay is 2 nights.
 
-LANGUAGE RULE:
-Always reply in the same language the guest writes in. If the message is in Russian, reply in Russian. If Georgian, reply in Georgian. If Arabic, reply in Arabic. Default is English.`;
+Airport transfer:
+Reply: Yes, please click on Services on the guest page and it will forward you directly to the driver WhatsApp.
+
+Arabic or Persian greeting like hello how are you:
+Reply: Good thank you, how are you? How can I help?
+
+Fully booked situation:
+Reply: Sorry, we are fully booked for those dates.
+
+Single bed request:
+Reply: Unfortunately we do not have single beds, sorry about that.
+
+Anything outside the above topics such as complaints, maintenance issues, booking modifications, or anything complex:
+Reply: Let me check on that and get back to you shortly.
+
+FOR SENDING VIDEOS:
+When a scenario requires a video, start your response with [VIDEO:media_id] followed by the text message on a new line.
+Example: [VIDEO:975338858914982]
+The nearest paid parking is under Carrefour...
+The Cloud Function will parse this, send the video as a separate WhatsApp message first, then send the text.`;
+
+const SUMMARY_SYSTEM_PROMPT = 'Summarize this guest WhatsApp conversation into 3-5 bullet points covering: issues they had, requests they made, how they communicated, anything notable. Be very brief.';
+
+async function callClaude({ system, messages, maxTokens = 500 }) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: maxTokens,
+      system,
+      messages,
+    }),
+  });
+
+  const data = await res.json();
+  return data?.content?.[0]?.text || '';
+}
+
+async function sendWhatsAppMessage(payload) {
+  const res = await fetch(
+    `https://graph.facebook.com/v19.0/${process.env.META_PHONE_NUMBER_ID}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.META_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+  return res.json();
+}
+
+function toJsDate(value) {
+  if (!value) return null;
+  if (typeof value.toDate === 'function') return value.toDate();
+  if (value instanceof Date) return value;
+  const parsed = new Date(value);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
 
 exports.whatsappWebhook = onRequest(
   { region: 'europe-west1', cors: true, secrets: ['WEBHOOK_VERIFY_TOKEN', 'META_ACCESS_TOKEN', 'META_PHONE_NUMBER_ID', 'ANTHROPIC_API_KEY'] },
@@ -104,11 +166,30 @@ exports.whatsappWebhook = onRequest(
         const msg     = messages[0];
         const phone   = msg.from;
         const text    = msg.text?.body;
-        const msgId   = msg.id;
 
         if (!text) return res.sendStatus(200);
 
         const db = getFirestore();
+        const convoRef    = db.collection('whatsapp_conversations').doc(phone);
+        const messagesRef = convoRef.collection('messages');
+
+        // PART 1 — save incoming guest message
+        await messagesRef.add({
+          role: 'user',
+          content: text,
+          timestamp: FieldValue.serverTimestamp(),
+        });
+
+        // PART 1 — fetch last 15 messages (newest first), then reverse to chronological order
+        const historySnap = await messagesRef
+          .orderBy('timestamp', 'desc')
+          .limit(15)
+          .get();
+
+        const history = historySnap.docs
+          .map((d) => d.data())
+          .reverse()
+          .map((m) => ({ role: m.role, content: m.content }));
 
         // Look up guest by phone in checkin_guests
         const formSnap = await db.collection('checkin_guests')
@@ -117,11 +198,14 @@ exports.whatsappWebhook = onRequest(
           .limit(1)
           .get();
 
-        let guestName = 'Guest';
-        let roomCode  = '';
-        const checkinUrl = 'https://app.maxelaapartments.com/checkin-guest.html';
+        let guestName     = 'Guest';
+        let roomCode       = '';
+        let checkinDate    = '';
+        let checkoutDate   = '';
+        let hasFilledForm  = false;
 
         if (!formSnap.empty) {
+          hasFilledForm = true;
           const form = formSnap.docs[0].data();
           guestName = form.name || 'Guest';
           const matchedResId = form.matchedReservationId;
@@ -133,49 +217,70 @@ exports.whatsappWebhook = onRequest(
               .get();
 
             if (!resSnap.empty) {
-              roomCode = resSnap.docs[0].data().roomCode || '';
+              const reservation = resSnap.docs[0].data();
+              roomCode     = reservation.roomCode || '';
+              checkinDate  = reservation.checkin || '';
+              checkoutDate = reservation.checkout || '';
             }
           }
         }
 
-        const context = `Guest name: ${guestName}. Room: ${roomCode || 'unknown'}. Check-in page: ${checkinUrl}.\n\nGuest message: ${text}`;
+        // PART 2 — long-term guest memory
+        let memoryContext = '';
+        const guestDoc = await db.collection('whatsapp_guests').doc(phone).get();
+        if (guestDoc.exists) {
+          const summary = guestDoc.data().summary;
+          if (Array.isArray(summary) && summary.length > 0) {
+            memoryContext = `\nPrevious stay notes for this guest: ${summary.map((s) => `- ${s}`).join(' ')}`;
+          }
+        }
 
-        // Call Claude
-        const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'x-api-key': process.env.ANTHROPIC_API_KEY,
-            'anthropic-version': '2023-06-01',
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 500,
-            system: SYSTEM_PROMPT,
-            messages: [{ role: 'user', content: context }],
-          }),
+        const guestContext = [
+          `Guest name: ${guestName}`,
+          `Room/apartment type: ${roomCode || 'unknown'}`,
+          `Check-in: ${checkinDate || 'unknown'}`,
+          `Checkout: ${checkoutDate || 'unknown'}`,
+          `Filled check-in form: ${hasFilledForm ? 'yes' : 'no'}`,
+        ].join('\n') + memoryContext;
+
+        const systemWithContext = `${SYSTEM_PROMPT}\n\n${guestContext}`;
+
+        // PART 1/3 — call Claude with full conversation history
+        let aiReply = await callClaude({ system: systemWithContext, messages: history });
+        if (!aiReply) aiReply = 'Let me check on that and get back to you shortly.';
+
+        // Parse an optional [VIDEO:media_id] prefix
+        let videoMediaId = null;
+        const videoMatch = aiReply.match(/^\[VIDEO:(\d+)\]\s*\n?/);
+        if (videoMatch) {
+          videoMediaId = videoMatch[1];
+          aiReply = aiReply.slice(videoMatch[0].length).trim();
+        }
+
+        // Send video first, if present
+        if (videoMediaId) {
+          await sendWhatsAppMessage({
+            messaging_product: 'whatsapp',
+            to: phone,
+            type: 'video',
+            video: { id: videoMediaId },
+          });
+        }
+
+        // Send text reply
+        await sendWhatsAppMessage({
+          messaging_product: 'whatsapp',
+          to: phone,
+          type: 'text',
+          text: { body: aiReply },
         });
 
-        const claudeData = await claudeRes.json();
-        const aiReply = claudeData?.content?.[0]?.text || "I'll get back to you shortly.";
-
-        // Send WhatsApp reply
-        await fetch(
-          `https://graph.facebook.com/v19.0/${process.env.META_PHONE_NUMBER_ID}/messages`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${process.env.META_ACCESS_TOKEN}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              messaging_product: 'whatsapp',
-              to: phone,
-              type: 'text',
-              text: { body: aiReply },
-            }),
-          }
-        );
+        // PART 1 — save assistant reply
+        await messagesRef.add({
+          role: 'assistant',
+          content: aiReply,
+          timestamp: FieldValue.serverTimestamp(),
+        });
       } catch (err) {
         console.error('whatsappWebhook error:', err);
       }
@@ -230,23 +335,12 @@ exports.roomReadyNotification = onDocumentWritten(
     }
 
     try {
-      const res = await fetch(
-        `https://graph.facebook.com/v19.0/${process.env.META_PHONE_NUMBER_ID}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.META_ACCESS_TOKEN}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            to: phone,
-            type: 'text',
-            text: { body: 'Your unit is ready and you can check in early. All check-in instructions are available on your check-in page. 🙌' },
-          }),
-        }
-      );
-      const data = await res.json();
+      const data = await sendWhatsAppMessage({
+        messaging_product: 'whatsapp',
+        to: phone,
+        type: 'text',
+        text: { body: 'Your unit is ready and you can check in early. All check-in instructions are available on your check-in page. 🙌' },
+      });
       if (data.messages) {
         console.log(`roomReadyNotification: sent to ${name} (${phone}) — id=${data.messages[0]?.id}`);
       } else {
@@ -255,5 +349,98 @@ exports.roomReadyNotification = onDocumentWritten(
     } catch (err) {
       console.error(`roomReadyNotification: fetch failed for ${phone}`, err);
     }
+  }
+);
+
+// PART 3 — auto-summarize a guest's WhatsApp conversation after checkout
+exports.summarizeGuestConversation = onDocumentWritten(
+  {
+    document: 'reservations/{docId}',
+    region: 'europe-west1',
+    secrets: ['ANTHROPIC_API_KEY'],
+  },
+  async (event) => {
+    const after = event.data?.after;
+    if (!after || !after.exists) return;
+
+    const reservation = after.data();
+
+    if (reservation.status === 'CANCELLED') return;
+
+    const checkoutDate = toJsDate(reservation.checkout);
+    if (!checkoutDate) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (checkoutDate >= today) return;
+
+    const reservationNumber = reservation.reservationNumber;
+    if (!reservationNumber) return;
+
+    const db = getFirestore();
+
+    // Find the matching WhatsApp check-in form for this reservation
+    const formSnap = await db.collection('checkin_forms')
+      .where('matchedReservationId', '==', reservationNumber)
+      .where('contactType', '==', 'wa')
+      .limit(1)
+      .get();
+
+    if (formSnap.empty) return;
+
+    const form  = formSnap.docs[0].data();
+    const phone = (form.contact || '').trim();
+    if (!phone) return;
+
+    const messagesRef = db.collection('whatsapp_conversations').doc(phone).collection('messages');
+    const messagesSnap = await messagesRef.orderBy('timestamp', 'asc').get();
+
+    if (messagesSnap.empty) return;
+
+    const conversationText = messagesSnap.docs
+      .map((d) => {
+        const m = d.data();
+        return `${m.role === 'assistant' ? 'Assistant' : 'Guest'}: ${m.content}`;
+      })
+      .join('\n');
+
+    let summaryText = '';
+    try {
+      summaryText = await callClaude({
+        system: SUMMARY_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: conversationText }],
+      });
+    } catch (err) {
+      console.error(`summarizeGuestConversation: Claude call failed for ${phone}`, err);
+      return;
+    }
+
+    const summaryBullets = summaryText
+      .split('\n')
+      .map((line) => line.replace(/^[-•*]\s*/, '').trim())
+      .filter((line) => line.length > 0);
+
+    if (summaryBullets.length === 0) return;
+
+    await db.collection('whatsapp_guests').doc(phone).set(
+      {
+        summary: summaryBullets,
+        lastStay: {
+          room: reservation.roomCode || '',
+          checkin: reservation.checkin || '',
+          checkout: reservation.checkout || '',
+          reservationNumber,
+        },
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    // Delete all messages from this conversation now that it's summarized
+    const batch = db.batch();
+    messagesSnap.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+
+    console.log(`summarizeGuestConversation: summarized ${phone} for reservation ${reservationNumber}`);
   }
 );
