@@ -19,3 +19,4 @@ whatsapp-functions/.secret.local
 # Catch all firebase debug logs
 firebase-debug*.log
 design-reference/
+whatsapp-functions/.env.*
