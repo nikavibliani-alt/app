@@ -1,5 +1,6 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const { onDocumentWritten, onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onInit } = require('firebase-functions/v2/core');
 const { defineString } = require('firebase-functions/params');
 const { initializeApp, getApps } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
@@ -22,7 +23,16 @@ const TASKS_QUEUE    = 'whatsapp-bot-debounce';
 const WHATSAPP_BOT_WORKER_URL   = defineString('WHATSAPP_BOT_WORKER_URL', { default: '' });
 const WHATSAPP_TASKS_INVOKER_SA = defineString('WHATSAPP_TASKS_INVOKER_SA', { default: '' });
 
-const tasksClient = new CloudTasksClient();
+// Lazy-init: constructing CloudTasksClient at module load hangs Firebase's
+// function discovery (Timeout after 10000 / cannot determine backend spec).
+let tasksClient = null;
+function getTasksClient() {
+  if (!tasksClient) tasksClient = new CloudTasksClient();
+  return tasksClient;
+}
+onInit(() => {
+  getTasksClient();
+});
 
 const SYSTEM_PROMPT = `You are a guest assistant for Maxela Apartments in Tbilisi, Georgia. You handle guest questions via WhatsApp. Be friendly and natural, like a helpful local person. Never sound like a corporate bot.
 
@@ -516,7 +526,8 @@ async function enqueueBotWorker({ phone, batchToken, delaySeconds }) {
     return;
   }
   const project  = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'sleepy-5c962';
-  const queuePath = tasksClient.queuePath(project, TASKS_LOCATION, TASKS_QUEUE);
+  const client = getTasksClient();
+  const queuePath = client.queuePath(project, TASKS_LOCATION, TASKS_QUEUE);
   const invokerSa = WHATSAPP_TASKS_INVOKER_SA.value();
 
   const task = {
@@ -531,7 +542,7 @@ async function enqueueBotWorker({ phone, batchToken, delaySeconds }) {
   };
 
   try {
-    await tasksClient.createTask({ parent: queuePath, task });
+    await client.createTask({ parent: queuePath, task });
   } catch (err) {
     console.error('enqueueBotWorker: createTask failed:', err);
   }
