@@ -334,6 +334,12 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .more-section{font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--ink-2);padding:14px 4px 8px;}
 .more-item .more-badge{background:var(--red);color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;margin-left:auto;}
 .more-item .more-hint{font-size:12px;color:var(--muted);font-weight:500;margin-left:auto;}
+.more-item--switch{cursor:default;gap:14px;}
+.more-item__text{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;}
+.more-item__title{font-size:15px;font-weight:600;color:var(--ink);}
+.more-item__sub{font-size:12px;font-weight:500;color:var(--muted);}
+.more-item__sub.is-on{color:var(--green);font-weight:600;}
+.more-item--switch .switch{margin-left:auto;}
 /* Toggle switch */
 .switch{position:relative;display:inline-block;width:48px;height:28px;flex-shrink:0;}
 .switch input{opacity:0;width:0;height:0;}
@@ -501,7 +507,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 <script>window.__STANDALONE_HK__=/[?&]app=hk(?:&|$)/.test(location.search)||/(?:^|\/)HK(?:-app)?\.html$/i.test(location.pathname);if(window.__STANDALONE_HK__){document.documentElement.classList.add('standalone-hk');document.addEventListener('dblclick',function(e){e.preventDefault();},{passive:false,capture:true});try{var role=localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role');if(role){document.documentElement.classList.add('hk-authed');if(role==='admin')document.documentElement.classList.add('hk-admin-role');}}catch(e){}}</script>
 <script>
 (function(){
-  var BUILD='20260911a';
+  var BUILD='20260911b';
   var buildRe=new RegExp('[?&]build='+BUILD+'(&|$)');
   if(!buildRe.test(location.search)){
     var p=new URLSearchParams(location.search);
@@ -725,7 +731,17 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
     <div class="more-section">Guest experience</div>
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('guestsettings')">Guest page</button>
-      <button class="more-item" type="button" onclick="switchTab('wasettings')">WhatsApp messages<span class="more-hint">Templates</span></button>
+      <div class="more-item more-item--switch" role="group" aria-label="AI Guest Assistant">
+        <div class="more-item__text">
+          <div class="more-item__title">AI Guest Assistant</div>
+          <div class="more-item__sub" id="more-bot-status">Loading…</div>
+        </div>
+        <label class="switch" title="Turn AI assistant on or off">
+          <input type="checkbox" id="more-bot-toggle" onchange="waSetAiBotEnabled(this.checked)">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <button class="more-item" type="button" onclick="switchTab('wasettings')">WhatsApp &amp; bot settings<span class="more-hint">Modes · templates</span></button>
     </div>
     <div class="more-section">Housekeeping setup</div>
     <div class="more-list">
@@ -2254,16 +2270,43 @@ window.waSaveBotSettings=async function(patch){
   const prev={...botSettings};
   botSettings={...botSettings,...patch};
   renderWaSettings();
+  syncMoreBotToggle();
   try{
     await setDoc(doc(db,'globals','config'),{...patch,updatedAt:serverTimestamp()},{merge:true});
   }catch(e){
     botSettings=prev;
     renderWaSettings();
+    syncMoreBotToggle();
     toast('Save failed: '+e.message);
   }
 };
+function syncMoreBotToggle(){
+  const toggle=document.getElementById('more-bot-toggle');
+  const status=document.getElementById('more-bot-status');
+  if(toggle)toggle.checked=!!botSettings.aiBotEnabled;
+  if(status){
+    if(!botSettingsLoaded){
+      status.textContent='Loading…';
+      status.classList.remove('is-on');
+      return;
+    }
+    if(botSettings.aiBotEnabled){
+      const mode=botModeMeta(botSettings.botMode).label;
+      status.textContent=`Active · ${mode}`;
+      status.classList.add('is-on');
+    }else{
+      status.textContent='Paused';
+      status.classList.remove('is-on');
+    }
+  }
+}
+async function ensureBotSettingsLoaded(){
+  if(!botSettingsLoaded)await loadBotSettings();
+  syncMoreBotToggle();
+}
 window.waSetAiBotEnabled=async function(checked){
   await waSaveBotSettings({aiBotEnabled:checked});
+  syncMoreBotToggle();
   toast(checked?'AI assistant resumed ✓':'AI assistant paused');
 };
 const WA_PREVIEW_SAMPLES={firstName:'Alex',inputName:'John Smith',inputDate:'2026-09-01',inputRef:', ref: BK-48291'};
@@ -2384,12 +2427,12 @@ function renderWaSettings(){
               <span class="bot-section__label">Reply mode</span>
               <div class="bot-modes">
                 <button type="button" class="bot-mode${botSettings.botMode==='available'?' is-active':''}" ${botSettings.aiBotEnabled?'':'disabled'} onclick="waSaveBotSettings({botMode:'available'})">
-                  <span class="bot-mode__icon">${featherIcon('users',15,2)}</span>
+                  <span class="bot-mode__icon">${featherIcon('message-circle',15,2)}</span>
                   <span class="bot-mode__title">Available</span>
                   <span class="bot-mode__desc">Wait for you first</span>
                 </button>
                 <button type="button" class="bot-mode${botSettings.botMode==='away'?' is-active':''}" ${botSettings.aiBotEnabled?'':'disabled'} onclick="waSaveBotSettings({botMode:'away'})">
-                  <span class="bot-mode__icon">${featherIcon('navigation',15,2)}</span>
+                  <span class="bot-mode__icon">${featherIcon('map-pin',15,2)}</span>
                   <span class="bot-mode__title">Away</span>
                   <span class="bot-mode__desc">Fast replies offline</span>
                 </button>
@@ -3155,7 +3198,7 @@ const TAB_META={
   hksettings:{title:'HK settings',sub:'Staff PINs · cleaner apps · defaults'},
   history:{title:'History',sub:'Past guests · last 3 months'},
   guestsettings:{title:'Guest page',sub:'Tiles, services, waiting tabs & location'},
-  wasettings:{title:'WhatsApp messages',sub:'Outreach templates · check-in invites & replies'},
+  wasettings:{title:'WhatsApp & bot',sub:'AI assistant · modes · templates'},
   failures:{title:'Failed searches',sub:'Guests who could not find booking'},
   navsettings:{title:'Tab bar',sub:'Add tabs · reorder · landing page'},
   more:{title:'More',sub:'All admin tools'},
@@ -3207,6 +3250,7 @@ window.switchTab=function(tab){
   if(tab==='hksettings')renderHkSettings();
   if(tab==='guestsettings')loadAndRenderGuestSettings();
   if(tab==='wasettings')loadAndRenderWaSettings();
+  if(tab==='more')ensureBotSettingsLoaded();
   if(tab==='failures')renderFailures();
   if(tab==='navsettings')renderNavSettings();
   closeDetail();closeReqDetail();closeGpEditor();
