@@ -463,11 +463,45 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .wa-url-input:focus{border-color:var(--ink);outline:none;background:var(--surface);}
 .wa-rule{display:flex;gap:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:var(--rs);margin-bottom:14px;font-size:12px;color:var(--ink-2);line-height:1.45;}
 .wa-rule svg{flex:none;width:16px;height:16px;color:var(--muted);margin-top:1px;}
+/* AI bot settings */
+.bot-status{display:flex;align-items:center;gap:12px;padding:14px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface);margin-bottom:4px;}
+.bot-status.is-on{border-color:#bbf7d0;background:linear-gradient(145deg,#f0fdf4 0%,var(--surface) 62%);}
+.bot-status.is-off{background:var(--bg);}
+.bot-status__dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--muted);box-shadow:0 0 0 4px rgba(107,107,104,.12);}
+.bot-status.is-on .bot-status__dot{background:var(--green);box-shadow:0 0 0 4px rgba(45,107,80,.15);}
+.bot-status__body{flex:1;min-width:0;}
+.bot-status__title{font-size:15px;font-weight:600;letter-spacing:-.015em;}
+.bot-status__sub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;}
+.bot-status.is-on .bot-status__sub{color:var(--green);font-weight:600;}
+.bot-section{margin-top:16px;}
+.bot-section__label{display:block;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.bot-section__hint{font-size:12px;color:var(--muted);line-height:1.45;margin-top:8px;}
+.bot-modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.bot-mode{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;padding:12px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--bg);cursor:pointer;text-align:left;font-family:var(--sans);color:inherit;-webkit-tap-highlight-color:transparent;transition:border-color .15s,background .15s,box-shadow .15s;}
+.bot-mode:disabled{opacity:.42;cursor:not-allowed;}
+.bot-mode:not(:disabled):active{transform:scale(.985);}
+.bot-mode.is-active{border-color:var(--ink);background:var(--surface);box-shadow:0 1px 2px rgba(44,44,42,.06);}
+.bot-mode__icon{width:28px;height:28px;border-radius:8px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--ink-2);margin-bottom:4px;}
+.bot-mode__icon svg{width:15px;height:15px;display:block;}
+.bot-mode.is-active .bot-mode__icon{background:var(--ink);border-color:var(--ink);color:#fff;}
+.bot-mode__title{font-size:13px;font-weight:600;color:var(--ink);}
+.bot-mode__desc{font-size:11px;line-height:1.4;color:var(--muted);}
+.bot-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.bot-chip{min-width:52px;height:36px;padding:0 12px;border:1.5px solid var(--line);border-radius:999px;background:var(--surface);font-size:13px;font-weight:600;font-family:var(--sans);color:var(--ink-2);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.bot-chip:disabled{opacity:.42;cursor:not-allowed;}
+.bot-chip.is-active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.bot-hours{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.bot-live{margin-top:14px;padding:12px 14px;border-radius:var(--rs);border:1px solid var(--line);background:var(--bg);font-size:12px;line-height:1.5;color:var(--ink-2);}
+.bot-live strong{color:var(--ink);font-weight:600;}
+.bot-live.is-paused{border-color:#fecaca;background:var(--red-bg);color:var(--red);}
+.bot-live.is-paused strong{color:var(--red);}
+.bot-panel.is-disabled .bot-section{opacity:.5;pointer-events:none;}
+.bot-panel.is-disabled .bot-status{opacity:1;pointer-events:auto;}
 </style>
 <script>window.__STANDALONE_HK__=/[?&]app=hk(?:&|$)/.test(location.search)||/(?:^|\/)HK(?:-app)?\.html$/i.test(location.pathname);if(window.__STANDALONE_HK__){document.documentElement.classList.add('standalone-hk');document.addEventListener('dblclick',function(e){e.preventDefault();},{passive:false,capture:true});try{var role=localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role');if(role){document.documentElement.classList.add('hk-authed');if(role==='admin')document.documentElement.classList.add('hk-admin-role');}}catch(e){}}</script>
 <script>
 (function(){
-  var BUILD='20260831g';
+  var BUILD='20260911a';
   var buildRe=new RegExp('[?&]build='+BUILD+'(&|$)');
   if(!buildRe.test(location.search)){
     var p=new URLSearchParams(location.search);
@@ -2278,6 +2312,40 @@ window.waInsertChip=function(targetId,token){
   ta.selectionStart=ta.selectionEnd=start+token.length;
   waUpdatePreview();
 };
+function formatBotHour(h){
+  const n=((Number(h)||0)%24+24)%24;
+  const ampm=n>=12?'PM':'AM';
+  const hr=((n+11)%12)+1;
+  return `${hr}:00 ${ampm}`;
+}
+function botModeMeta(mode){
+  return {
+    available:{label:'Available',blurb:'Waits so you can reply first'},
+    away:{label:'Away',blurb:'Answers quickly while you are offline'},
+    night:{label:'Night',blurb:'Uses night wording for guests'},
+    auto:{label:'Auto',blurb:'Night schedule, otherwise Available'},
+  }[mode]||{label:mode,blurb:''};
+}
+function botLiveSummary(){
+  if(!botSettings.aiBotEnabled){
+    return {paused:true,html:'<strong>Assistant is paused.</strong> Guests get no AI replies until you turn it back on. Owner alerts can still notify you.'};
+  }
+  const delay=botSettings.botResponseDelay||20;
+  if(botSettings.botMode==='available'){
+    return {paused:false,html:`<strong>Available · human-first.</strong> Bot waits <strong>${delay}s</strong> so you can answer. If you stay silent, it replies with normal guest help.`};
+  }
+  if(botSettings.botMode==='away'){
+    return {paused:false,html:'<strong>Away · fast replies.</strong> Bot answers quickly and tells guests the team will follow up when needed. No long wait for you.'};
+  }
+  if(botSettings.botMode==='night'){
+    return {paused:false,html:'<strong>Night · always on.</strong> Bot replies quickly with night-time wording. Urgent cases can point guests to your alert number.'};
+  }
+  // auto
+  return {paused:false,html:`<strong>Auto schedule · Tbilisi.</strong> From <strong>${formatBotHour(botSettings.nightStart)}</strong> to <strong>${formatBotHour(botSettings.nightEnd)}</strong> the bot runs in Night mode. Outside those hours it runs Available and waits <strong>${delay}s</strong> for you.`};
+}
+function botHourOptions(selected){
+  return Array.from({length:24},(_,h)=>`<option value="${h}" ${Number(selected)===h?'selected':''}>${formatBotHour(h)}</option>`).join('');
+}
 function renderWaSettings(){
   const root=document.getElementById('wasettings-root');
   if(!root)return;
@@ -2301,36 +2369,73 @@ function renderWaSettings(){
         </div>
       </div>
       <div class="wa-card">
-        <div class="wa-card__hd"><div><h3>Bot Settings</h3><p>Controls whether and how the AI assistant replies to guests.</p></div></div>
+        <div class="wa-card__hd"><div><h3>AI Guest Assistant</h3><p>Shartava WhatsApp auto-replies · Freedom Square stays manual</p></div></div>
         <div class="wa-card__bd">
-          <div class="gp-row" style="margin-bottom:12px">
-            <div class="gp-row__body">
-              <div class="gp-row__title">AI Guest Assistant</div>
-              <div class="gp-row__sub" style="color:${botSettings.aiBotEnabled?'var(--green)':'var(--muted)'};font-weight:600">${botSettings.aiBotEnabled?'Active':'Paused'}</div>
+          <div class="bot-panel${botSettings.aiBotEnabled?'':' is-disabled'}">
+            <div class="bot-status ${botSettings.aiBotEnabled?'is-on':'is-off'}">
+              <span class="bot-status__dot" aria-hidden="true"></span>
+              <div class="bot-status__body">
+                <div class="bot-status__title">AI Guest Assistant</div>
+                <div class="bot-status__sub">${botSettings.aiBotEnabled?`Active · ${botModeMeta(botSettings.botMode).label}`:'Paused · guests get no AI replies'}</div>
+              </div>
+              <label class="switch" title="Turn AI assistant on or off"><input type="checkbox" ${botSettings.aiBotEnabled?'checked':''} onchange="waSetAiBotEnabled(this.checked)"><span class="switch-track"></span></label>
             </div>
-            <label class="switch"><input type="checkbox" ${botSettings.aiBotEnabled?'checked':''} onchange="waSetAiBotEnabled(this.checked)"><span class="switch-track"></span></label>
+            <div class="bot-section">
+              <span class="bot-section__label">Reply mode</span>
+              <div class="bot-modes">
+                <button type="button" class="bot-mode${botSettings.botMode==='available'?' is-active':''}" ${botSettings.aiBotEnabled?'':'disabled'} onclick="waSaveBotSettings({botMode:'available'})">
+                  <span class="bot-mode__icon">${featherIcon('users',15,2)}</span>
+                  <span class="bot-mode__title">Available</span>
+                  <span class="bot-mode__desc">Wait for you first</span>
+                </button>
+                <button type="button" class="bot-mode${botSettings.botMode==='away'?' is-active':''}" ${botSettings.aiBotEnabled?'':'disabled'} onclick="waSaveBotSettings({botMode:'away'})">
+                  <span class="bot-mode__icon">${featherIcon('navigation',15,2)}</span>
+                  <span class="bot-mode__title">Away</span>
+                  <span class="bot-mode__desc">Fast replies offline</span>
+                </button>
+                <button type="button" class="bot-mode${botSettings.botMode==='night'?' is-active':''}" ${botSettings.aiBotEnabled?'':'disabled'} onclick="waSaveBotSettings({botMode:'night'})">
+                  <span class="bot-mode__icon">${featherIcon('moon',15,2)}</span>
+                  <span class="bot-mode__title">Night</span>
+                  <span class="bot-mode__desc">Night-time wording</span>
+                </button>
+                <button type="button" class="bot-mode${botSettings.botMode==='auto'?' is-active':''}" ${botSettings.aiBotEnabled?'':'disabled'} onclick="waSaveBotSettings({botMode:'auto'})">
+                  <span class="bot-mode__icon">${featherIcon('clock',15,2)}</span>
+                  <span class="bot-mode__title">Auto</span>
+                  <span class="bot-mode__desc">Follow night schedule</span>
+                </button>
+              </div>
+            </div>
+            ${(botSettings.botMode==='available'||botSettings.botMode==='auto')?`
+            <div class="bot-section">
+              <span class="bot-section__label">Reply delay</span>
+              <div class="bot-chips">
+                ${[5,10,20,30,60].map((s)=>`<button type="button" class="bot-chip${botSettings.botResponseDelay===s?' is-active':''}" ${botSettings.aiBotEnabled?'':'disabled'} onclick="waSaveBotSettings({botResponseDelay:${s}})">${s}s</button>`).join('')}
+              </div>
+              <div class="bot-section__hint">How long the bot waits for you before answering. 20s is a good default.</div>
+            </div>`:''}
+            ${botSettings.botMode==='auto'?`
+            <div class="bot-section">
+              <span class="bot-section__label">Night schedule</span>
+              <div class="bot-hours">
+                <div>
+                  <label class="apt-label" for="bot-night-start">Starts</label>
+                  <select class="apt-input" id="bot-night-start" ${botSettings.aiBotEnabled?'':'disabled'} onchange="waSaveBotSettings({nightStart:Number(this.value)})">${botHourOptions(botSettings.nightStart)}</select>
+                </div>
+                <div>
+                  <label class="apt-label" for="bot-night-end">Ends</label>
+                  <select class="apt-input" id="bot-night-end" ${botSettings.aiBotEnabled?'':'disabled'} onchange="waSaveBotSettings({nightEnd:Number(this.value)})">${botHourOptions(botSettings.nightEnd)}</select>
+                </div>
+              </div>
+              <div class="bot-section__hint">Tbilisi time (UTC+4). Example: 10:00 PM → 9:00 AM runs Night overnight, Available during the day.</div>
+            </div>`:''}
+            <div class="bot-section">
+              <span class="bot-section__label">Owner alerts</span>
+              <label class="apt-label" for="bot-owner-phone">Your WhatsApp number</label>
+              <input class="apt-input" id="bot-owner-phone" inputmode="tel" autocomplete="tel" value="${esc(botSettings.ownerPhone)}" placeholder="9955XXXXXXXX" ${botSettings.aiBotEnabled?'':'disabled'} onchange="waSaveBotSettings({ownerPhone:this.value.trim()})">
+              <div class="bot-section__hint">Used for escalations and pause alerts. Digits with country code, no + or spaces.</div>
+            </div>
+            ${(()=>{const live=botLiveSummary(); return `<div class="bot-live${live.paused?' is-paused':''}">${live.html}</div>`;})()}
           </div>
-          <label class="apt-label">Bot mode</label>
-          <select class="apt-input" ${botSettings.aiBotEnabled?'':'disabled'} onchange="waSaveBotSettings({botMode:this.value})">
-            <option value="available" ${botSettings.botMode==='available'?'selected':''}>Available — wait, human-first</option>
-            <option value="away" ${botSettings.botMode==='away'?'selected':''}>Away — fast reply, away context</option>
-            <option value="night" ${botSettings.botMode==='night'?'selected':''}>Night — fast reply, night context</option>
-            <option value="auto" ${botSettings.botMode==='auto'?'selected':''}>Auto — night hours → night, else available</option>
-          </select>
-          ${(botSettings.botMode==='available'||botSettings.botMode==='auto')?`
-          <label class="apt-label" style="margin-top:12px">Reply delay</label>
-          <select class="apt-input" ${botSettings.aiBotEnabled?'':'disabled'} onchange="waSaveBotSettings({botResponseDelay:Number(this.value)})">
-            ${[5,10,20,30,60].map((s)=>`<option value="${s}" ${botSettings.botResponseDelay===s?'selected':''}>${s}s</option>`).join('')}
-          </select>`:''}
-          ${botSettings.botMode==='auto'?`
-          <div style="display:flex;gap:10px;margin-top:12px">
-            <div style="flex:1"><label class="apt-label">Night starts (hour)</label><input class="apt-input" type="number" min="0" max="23" step="1" value="${botSettings.nightStart}" ${botSettings.aiBotEnabled?'':'disabled'} onchange="waSaveBotSettings({nightStart:Math.max(0,Math.min(23,Math.round(Number(this.value))||0))})"></div>
-            <div style="flex:1"><label class="apt-label">Night ends (hour)</label><input class="apt-input" type="number" min="0" max="23" step="1" value="${botSettings.nightEnd}" ${botSettings.aiBotEnabled?'':'disabled'} onchange="waSaveBotSettings({nightEnd:Math.max(0,Math.min(23,Math.round(Number(this.value))||0))})"></div>
-          </div>
-          <div class="wa-template-hint">Tbilisi local time, 0-23. e.g. 22 and 9 means night from 10pm to 9am.</div>`:''}
-          <label class="apt-label" style="margin-top:12px">Your WhatsApp number for alerts</label>
-          <input class="apt-input" value="${esc(botSettings.ownerPhone)}" placeholder="9955XXXXXXXX" onchange="waSaveBotSettings({ownerPhone:this.value.trim()})">
-          <div class="wa-template-hint">Digits with country code, e.g. 9955XXXXXXXX</div>
         </div>
       </div>
       <div class="wa-rule">${featherIcon('info',16,1.8)}<span>Use placeholders exactly as shown — they are replaced with guest data when you send.</span></div>
