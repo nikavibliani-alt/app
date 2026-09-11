@@ -3,8 +3,9 @@
  * Official exports are usually a .zip containing one .txt (and optional media).
  */
 
-const GEORGIAN_SCRIPT_RE = /\p{Script=Georgian}/u;
-const LETTER_RE = /\p{L}/gu;
+// Explicit ranges (Mkhedruli + Mtavruli) — avoid \p{Script=...} for older Node / discovery.
+const GEORGIAN_CHAR_RE = /[\u10A0-\u10FF\u1C90-\u1CBF]/;
+const LETTER_RE = /[A-Za-z\u00C0-\u024F\u0400-\u04FF\u0600-\u06FF\u10A0-\u10FF\u1C90-\u1CBF\u4E00-\u9FFF]/g;
 
 /** True when a large share of letters in the text are Georgian script. */
 function isGeorgianHeavy(text, threshold = 0.35) {
@@ -14,7 +15,7 @@ function isGeorgianHeavy(text, threshold = 0.35) {
   if (letters.length < 3) return false;
   let georgian = 0;
   for (const ch of letters) {
-    if (GEORGIAN_SCRIPT_RE.test(ch)) georgian += 1;
+    if (GEORGIAN_CHAR_RE.test(ch)) georgian += 1;
   }
   return georgian / letters.length >= threshold;
 }

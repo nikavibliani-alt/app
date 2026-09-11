@@ -1,10 +1,8 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const { onDocumentWritten, onDocumentCreated } = require('firebase-functions/v2/firestore');
-const { onInit } = require('firebase-functions/v2/core');
 const { defineString } = require('firebase-functions/params');
 const { initializeApp, getApps } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
-const { CloudTasksClient } = require('@google-cloud/tasks');
 const crypto = require('node:crypto');
 const {
   isGeorgianHeavy,
@@ -23,16 +21,17 @@ const TASKS_QUEUE    = 'whatsapp-bot-debounce';
 const WHATSAPP_BOT_WORKER_URL   = defineString('WHATSAPP_BOT_WORKER_URL', { default: '' });
 const WHATSAPP_TASKS_INVOKER_SA = defineString('WHATSAPP_TASKS_INVOKER_SA', { default: '' });
 
-// Lazy-init: constructing CloudTasksClient at module load hangs Firebase's
-// function discovery (Timeout after 10000 / cannot determine backend spec).
+// Do NOT require/@construct CloudTasksClient at module load or in onInit —
+// that hangs Firebase CLI discovery on many machines (Timeout after 10000).
 let tasksClient = null;
 function getTasksClient() {
-  if (!tasksClient) tasksClient = new CloudTasksClient();
+  if (!tasksClient) {
+    // eslint-disable-next-line global-require
+    const { CloudTasksClient } = require('@google-cloud/tasks');
+    tasksClient = new CloudTasksClient();
+  }
   return tasksClient;
 }
-onInit(() => {
-  getTasksClient();
-});
 
 const SYSTEM_PROMPT = `You are a guest assistant for Maxela Apartments in Tbilisi, Georgia. You handle guest questions via WhatsApp. Be friendly and natural, like a helpful local person. Never sound like a corporate bot.
 

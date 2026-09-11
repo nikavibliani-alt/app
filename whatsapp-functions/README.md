@@ -171,11 +171,29 @@ owner already replied.
 
 ## Deploy
 
+From the repo root (after `cd whatsapp-functions && npm install`):
+
 ```bash
-firebase deploy --only functions:whatsapp --project sleepy-5c962
-# or, from inside this folder:
-npm run deploy
+cd whatsapp-functions
+npm install
+npm run loadcheck          # must print ok + function names in <1s
+npm run deploy             # sets FUNCTIONS_DISCOVERY_TIMEOUT=60
 ```
+
+Or from repo root:
+
+```bash
+FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only functions:whatsapp --project sleepy-5c962
+```
+
+If you still see `Timeout after 10000` / cannot determine backend specification:
+
+1. Confirm Node is 20+: `node -v`
+2. Reinstall deps: `cd whatsapp-functions && rm -rf node_modules && npm install`
+3. Run `npm run loadcheck` — if this fails, fix that error first (discovery is crashing, not merely slow)
+4. Retry with debug: `FUNCTIONS_DISCOVERY_TIMEOUT=90 firebase deploy --only functions:whatsapp --project sleepy-5c962 --debug`
+
+Do not construct `@google-cloud/tasks` clients at module load — that hangs CLI discovery.
 
 ## After deploying for the first time
 
