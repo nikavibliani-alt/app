@@ -16,12 +16,42 @@ See `tuya-functions/README.md` for the prior history.
 | `whatsappBotWorker` | `onRequest` (HTTPS, Cloud Tasks target only) | The deferred worker. Runs after the debounce delay, resolves the effective bot mode, calls Claude with the batched messages + mode context, sends the reply, and writes escalation alerts. Not publicly invokable — see "Cloud Tasks setup" below. |
 | `roomReadyNotification` | `onDocumentWritten` on `hk_status/{docId}` | Sends a WhatsApp "room ready" template message via the Meta Cloud API when `done` flips to `true`, deduped via `whatsapp_messages`. |
 | `summarizeGuestConversation` | `onDocumentWritten` on `reservations/{docId}` | Once checkout has passed and the reservation isn't cancelled, summarizes the guest's WhatsApp thread into `whatsapp_guests/{phone}.summary` and clears the conversation. |
+| `processWhatsAppImport` | `onDocumentCreated` on `whatsapp_import_jobs/{jobId}` | Parses an official WhatsApp chat export (admin uploads ZIP → browser extracts `.txt` → job doc). Skips Georgian messages, asks Claude for reusable Q&A, writes `whatsapp_knowledge`, and clears matching `whatsapp_import_reminders`. |
 
 `whatsappWebhook` needs `WEBHOOK_VERIFY_TOKEN`, `META_ACCESS_TOKEN`, `META_PHONE_NUMBER_ID`,
 `ANTHROPIC_API_KEY` (the last one currently unused there but kept for parity).
 `whatsappBotWorker` needs its own copies of `META_ACCESS_TOKEN`, `META_PHONE_NUMBER_ID`,
 `ANTHROPIC_API_KEY`. `roomReadyNotification` needs `META_ACCESS_TOKEN` and
-`META_PHONE_NUMBER_ID`. `summarizeGuestConversation` needs `ANTHROPIC_API_KEY`.
+`META_PHONE_NUMBER_ID`. `summarizeGuestConversation` and `processWhatsAppImport` need
+`ANTHROPIC_API_KEY`.
+
+## Learning from exported chats
+
+When the bot escalates / cannot answer, it:
+
+1. Writes `whatsapp_alerts` (as before).
+2. Creates a pending `whatsapp_import_reminders` doc (deduped per phone / 24h).
+3. Texts the owner: reply in WhatsApp, then export that chat ZIP and import it in
+   **Admin → WhatsApp & bot → Learn from WhatsApp chats**.
+
+Admin flow:
+
+1. WhatsApp → open the chat → Export chat → **Without media** → get a ZIP.
+2. Drop the ZIP (or the `.txt` inside) on the Learn card.
+3. Browser extracts the chat text with JSZip and creates
+   `whatsapp_import_jobs/{id}` (`status: pending`, `chatText`, optional `phone`).
+4. `processWhatsAppImport` learns Q&A into `whatsapp_knowledge` (`active: true`).
+5. Active knowledge is injected into the bot system prompt on every reply.
+
+**Georgian:** inbound Georgian-heavy messages never call Claude — the owner is
+notified to reply manually. Export learning also drops Georgian lines so the bot
+does not train on them.
+
+| Collection | Role |
+|---|---|
+| `whatsapp_knowledge` | Learned `{topic, guestQuestion, hostAnswer, active}` rows |
+| `whatsapp_import_reminders` | Pending “export & import this chat” nudges |
+| `whatsapp_import_jobs` | One-shot import jobs (raw `chatText` deleted after processing) |
 
 ## Bot modes / kill switch (`globals/config`)
 
