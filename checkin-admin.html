@@ -3177,6 +3177,7 @@ function renderHistoryUI(){
     </div>`;
   }).join('');
 }
+window.renderHistoryUI = renderHistoryUI;
 window.setHistoryFilter=function(f){_historyFilter=f;renderHistoryUI();};
 window.openHistoryPassport=function(url){
   const ov=document.getElementById('history-photo-lightbox');
