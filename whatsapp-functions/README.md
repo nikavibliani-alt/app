@@ -16,12 +16,66 @@ See `tuya-functions/README.md` for the prior history.
 | `whatsappBotWorker` | `onRequest` (HTTPS, Cloud Tasks target only) | The deferred worker. Runs after the debounce delay, resolves the effective bot mode, calls Claude with the batched messages + mode context, sends the reply, and writes escalation alerts. Not publicly invokable — see "Cloud Tasks setup" below. |
 | `roomReadyNotification` | `onDocumentWritten` on `hk_status/{docId}` | Sends a WhatsApp "room ready" template message via the Meta Cloud API when `done` flips to `true`, deduped via `whatsapp_messages`. |
 | `summarizeGuestConversation` | `onDocumentWritten` on `reservations/{docId}` | Once checkout has passed and the reservation isn't cancelled, summarizes the guest's WhatsApp thread into `whatsapp_guests/{phone}.summary` and clears the conversation. |
+| `syncCheckinGuestToConversation` | `onDocumentWritten` on `checkin_guests/{docId}` | Keeps `whatsapp_conversations/{phone}` in sync with `checkin_guests` (new form submissions, room re-assignments) so brand identification never goes stale — see "Guest location identification" below. |
 
 `whatsappWebhook` needs `WEBHOOK_VERIFY_TOKEN`, `META_ACCESS_TOKEN`, `META_PHONE_NUMBER_ID`,
 `ANTHROPIC_API_KEY` (the last one currently unused there but kept for parity).
 `whatsappBotWorker` needs its own copies of `META_ACCESS_TOKEN`, `META_PHONE_NUMBER_ID`,
 `ANTHROPIC_API_KEY`. `roomReadyNotification` needs `META_ACCESS_TOKEN` and
 `META_PHONE_NUMBER_ID`. `summarizeGuestConversation` needs `ANTHROPIC_API_KEY`.
+`syncCheckinGuestToConversation` needs no secrets (Firestore-only).
+
+## Guest location identification (Shartava vs Freedom Square vs Orbeliani)
+
+Shartava (the AI bot's property), Freedom Square, and Orbeliani all share one
+WhatsApp number. Freedom Square and Orbeliani guests must **never** get a
+Shartava AI reply. `identifyGuestLocation()` in `index.js` (helpers in
+`identity.js`, unit-tested in `identity.test.js` — run with `npm test`)
+resolves this once per batch, in this exact order, minimizing Firestore reads
+and never guessing:
+
+1. **STEP 0** — decide from the cached `whatsapp_conversations/{phone}` doc alone
+   when possible (0 extra reads): a known `aptId` always wins.
+   - `tab-...` → SILENT (Freedom Square). `orb-...` → SILENT (Orbeliani).
+     `0-.../6-.../7-...` → continue as Shartava, skip Steps 1-3 entirely.
+   - No `aptId`, but `locationBrand: "freedom"` was set by a keyword match
+     and no form has been filled yet → SILENT (nothing new to learn).
+   - Otherwise (no `aptId`, or an `aptId` with an unrecognized prefix) → STEP 1.
+2. **STEP 1** — one `checkin_guests` phone lookup (reuses the existing
+   phone-variant query). A recognized `aptId` prefix here is authoritative —
+   it's merged onto the conversation doc and **overwrites** any earlier
+   keyword-derived `freedom` brand. An unrecognized prefix never gets guessed:
+   the owner is alerted (debounced) and the bot stays silent.
+3. **STEP 2** — only reached with no authoritative `aptId`: case-insensitive
+   Freedom Square keyword match on the batch's combined text (`freedom
+   square`, `tabidze`, `galaktion tabidze`, an `hi/hello/dear Nina` greeting,
+   or a message opening with `Nina,`/`Nina.`). Deliberately narrow — bare
+   `Galaktion`, `city centre/center`, mid-sentence `Nina`, and `studios` do
+   **not** match (see `identity.test.js` for the exact false-positive list
+   this was tuned against). A match sets `locationBrand: "freedom"` and stays
+   silent.
+4. **STEP 3** — genuinely unidentified guest: sends the check-in form link
+   once (`formLinkSentAt`/`formLinkStatus` track this so it isn't resent every
+   message; a Meta failure sets `formLinkStatus: "failed"` and the next batch
+   retries). No Claude call here. Once the link is confirmed sent, any further
+   message from the same unidentified number triggers a debounced (30 min via
+   `lastAlertSentAt`) owner alert instead of a reply.
+
+The webhook also does a **cheap early exit** before ever touching
+`globals/config` or enqueueing a Cloud Task, for the subset of cases already
+knowable from the conversation doc alone (known `tab-`/`orb-` `aptId`, or a
+cached Freedom keyword brand with no form yet) — this is a cost optimization
+only, never the sole source of truth: `whatsappBotWorker` always re-runs the
+full STEP 0-3 flow itself, since bot state can change between enqueue and run.
+
+**SILENT** always means: no WhatsApp reply to the guest, no Claude call, no
+further bot processing, but the inbound message is still saved and 200 is
+still returned to Meta.
+
+Conversation-doc fields this maintains on `whatsapp_conversations/{phone}`:
+`locationBrand`, `aptId`, `guestName`, `reservationNumber` (suffix-stripped via
+`baseReservationNumber()`), `formFilledAt`, `formLinkSentAt`, `formLinkStatus`,
+`lastAlertSentAt`.
 
 ## Bot modes / kill switch (`globals/config`)
 

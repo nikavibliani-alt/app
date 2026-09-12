@@ -5,6 +5,7 @@ const { initializeApp, getApps } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { CloudTasksClient } = require('@google-cloud/tasks');
 const crypto = require('node:crypto');
+const { aptIdToBrand, matchesFreedomKeywords } = require('./identity');
 
 if (!getApps().length) initializeApp();
 
@@ -358,6 +359,137 @@ async function notifyOwner(ownerPhone, text) {
   }
 }
 
+// ---- Guest location identification (Shartava vs Freedom Square vs Orbeliani) --
+
+/** Merges a patch onto whatsapp_conversations/{phone}. Best-effort; logs and swallows errors. */
+async function mergeConversation(db, phone, patch) {
+  try {
+    await db.collection('whatsapp_conversations').doc(phone).set(
+      { ...patch, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+  } catch (err) {
+    console.error(`mergeConversation failed for ${phone}:`, err);
+  }
+}
+
+const OWNER_ALERT_DEBOUNCE_MS = 30 * 60 * 1000; // 30 minutes
+
+/** Best-effort owner notify, debounced per-conversation via lastAlertSentAt (skips within 30 min). */
+async function alertOwnerDebounced(db, config, convo, phone, text) {
+  const lastAlertAt = toJsDate(convo?.lastAlertSentAt);
+  if (lastAlertAt && Date.now() - lastAlertAt.getTime() < OWNER_ALERT_DEBOUNCE_MS) {
+    console.log(`whatsappBotWorker: owner alert debounced for ${phone}`);
+    return;
+  }
+  if (config.ownerPhone) {
+    await notifyOwner(config.ownerPhone, text);
+  }
+  await mergeConversation(db, phone, { lastAlertSentAt: FieldValue.serverTimestamp() });
+}
+
+const FORM_LINK_TEXT = 'Hi, please fill in our check-in form, your access instructions will be available on that page: app.maxelaapartments.com/checkin-guest';
+
+/**
+ * Resolves whether this batch belongs to the Shartava AI bot, following the exact
+ * Step 0-3 identification order. May merge whatsapp_conversations/{phone} and, in
+ * Step 3, send the check-in form link or a debounced owner alert as a side effect —
+ * those are the only WhatsApp sends this function makes; it never calls Claude.
+ *
+ * Returns either:
+ *   { proceed: false, reason }   — stop; no Claude call, no guest reply beyond any
+ *                                  form-link/alert already sent above.
+ *   { proceed: true, aptId, guestName, reservationNumber, hasFilledForm }
+ */
+async function identifyGuestLocation(db, phone, convo, combinedGuestText, config) {
+  const aptId = convo?.aptId || '';
+
+  // STEP 0 — decide from the cached conversation doc alone when possible (0 extra reads)
+  if (aptId) {
+    const brand = aptIdToBrand(aptId);
+    if (brand === 'freedom') return { proceed: false, reason: 'aptId_tab' };
+    if (brand === 'orbeliani') return { proceed: false, reason: 'aptId_orb' };
+    if (brand === 'shartava') {
+      return {
+        proceed: true,
+        aptId,
+        guestName: convo.guestName || 'Guest',
+        reservationNumber: convo.reservationNumber || '',
+        hasFilledForm: !!convo.formFilledAt,
+      };
+    }
+    // Unrecognized prefix cached on the conversation doc — fall through to STEP 1,
+    // which re-resolves it via checkin_guests and lands on the same "unknown
+    // aptId prefix" alert-and-stay-silent branch.
+  } else if (convo?.locationBrand === 'freedom' && !convo.formFilledAt) {
+    // Keyword-only Freedom classification, no form filled yet.
+    return { proceed: false, reason: 'brand_freedom_keyword' };
+  }
+
+  // STEP 1 — checkin_guests phone lookup (authoritative; aptId always wins over
+  // a keyword-derived brand). Reuses the existing phone-variant lookup.
+  const form = await findGuestByWhatsAppPhone(db, phone);
+  if (form) {
+    const formAptId = form.aptId || '';
+    const brand = aptIdToBrand(formAptId);
+    const reservationNumber = baseReservationNumber(form.matchedReservationId);
+    const guestName = form.name || 'Guest';
+
+    if (brand === 'freedom' || brand === 'orbeliani' || brand === 'shartava') {
+      await mergeConversation(db, phone, {
+        locationBrand: brand,
+        aptId: formAptId,
+        guestName,
+        reservationNumber,
+        formFilledAt: FieldValue.serverTimestamp(),
+      });
+      if (brand === 'freedom') return { proceed: false, reason: 'aptId_tab' };
+      if (brand === 'orbeliani') return { proceed: false, reason: 'aptId_orb' };
+      return { proceed: true, aptId: formAptId, guestName, reservationNumber, hasFilledForm: true };
+    }
+
+    // Unknown aptId prefix — do not guess a brand, alert the owner (debounced), stay silent.
+    await alertOwnerDebounced(
+      db, config, convo, phone,
+      `Unknown apartment prefix "${formAptId}" for ${guestName} (${phone}) — needs manual routing.`
+    );
+    return { proceed: false, reason: 'unknown_aptId_prefix' };
+  }
+
+  // STEP 2 — Freedom Square keywords (only reached with no authoritative aptId)
+  if (matchesFreedomKeywords(combinedGuestText)) {
+    await mergeConversation(db, phone, { locationBrand: 'freedom' });
+    return { proceed: false, reason: 'brand_freedom_keyword' };
+  }
+
+  // STEP 3 — unknown guest, no Freedom keywords
+  const formLinkAlreadyConfirmed = !!convo?.formLinkSentAt && convo?.formLinkStatus === 'sent';
+  if (!formLinkAlreadyConfirmed) {
+    const sendResult = await sendWhatsAppMessage({
+      messaging_product: 'whatsapp',
+      to: phone,
+      type: 'text',
+      text: { body: FORM_LINK_TEXT },
+    });
+    if (sendResult?.messages) {
+      await mergeConversation(db, phone, { formLinkSentAt: FieldValue.serverTimestamp(), formLinkStatus: 'sent' });
+      console.log(`whatsappBotWorker: form link sent to ${phone}`);
+    } else {
+      await mergeConversation(db, phone, { formLinkStatus: 'failed' });
+      console.error(`whatsappBotWorker: form link send failed for ${phone} —`, JSON.stringify(sendResult));
+    }
+    return { proceed: false, reason: 'unknown_first_contact' };
+  }
+
+  // Form link already sent and confirmed — a repeat message from an unidentified
+  // guest. Alert the owner (debounced) instead of guessing or calling Claude.
+  await alertOwnerDebounced(
+    db, config, convo, phone,
+    `Unidentified guest ${phone} messaged again (form link already sent): "${combinedGuestText}"`
+  );
+  return { proceed: false, reason: 'unknown_repeat' };
+}
+
 // ---- Inbound content classification ----------------------------------------
 
 /** Returns the text to store for an inbound message, or a bracketed placeholder for non-text types. */
@@ -510,6 +642,23 @@ exports.whatsappWebhook = onRequest(
           metaMessageId: msg.id || null,
         });
 
+        // Early SILENT exit for guests already known to be Freedom Square / Orbeliani —
+        // saves a config read, a whatsapp_pending write, and a Cloud Task enqueue for a
+        // conversation the Shartava bot must never answer. The worker re-derives this
+        // independently (STEP 0) for any case not safely known here — this is a cost
+        // optimization only, never the sole source of truth.
+        const earlyConvoSnap = await convoRef.get();
+        const earlyConvo = earlyConvoSnap.exists ? earlyConvoSnap.data() : null;
+        const earlyAptId = earlyConvo?.aptId || '';
+        if (earlyAptId.startsWith('tab-') || earlyAptId.startsWith('orb-')) {
+          console.log(`whatsappWebhook: early SILENT (known aptId ${earlyAptId}) for ${phone}`);
+          return res.sendStatus(200);
+        }
+        if (earlyConvo?.locationBrand === 'freedom' && !earlyConvo.formFilledAt && !earlyAptId) {
+          console.log(`whatsappWebhook: early SILENT (brand_freedom_keyword, no form) for ${phone}`);
+          return res.sendStatus(200);
+        }
+
         const config = await getGlobalsConfig(db);
 
         // CHANGE 1 — hard kill switch
@@ -575,8 +724,22 @@ exports.whatsappBotWorker = onRequest(
       if (pending.batchToken !== batchToken) return res.sendStatus(200);
 
       const effectiveMode = resolveEffectiveMode(config);
-      const convoRef        = db.collection('whatsapp_conversations').doc(phone);
+      const convoRef         = db.collection('whatsapp_conversations').doc(phone);
       const convoMessagesRef = convoRef.collection('messages');
+      const combinedGuestText = (pending.messages || []).join('\n');
+
+      // Location identification: Freedom Square / Orbeliani must stay SILENT even
+      // though they share this WhatsApp number with Shartava. Re-checked here (not
+      // just in the webhook) since bot state can change between enqueue and run.
+      const convoSnap = await convoRef.get();
+      const convo = convoSnap.exists ? convoSnap.data() : null;
+
+      const identity = await identifyGuestLocation(db, phone, convo, combinedGuestText, config);
+      if (!identity.proceed) {
+        console.log(`whatsappBotWorker: SILENT (${identity.reason}) for ${phone}`);
+        await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
+      }
 
       if (effectiveMode === 'available') {
         const batchStart = pending.batchStartedAt || pending.lastMessageAt;
@@ -592,32 +755,22 @@ exports.whatsappBotWorker = onRequest(
         }
       }
 
-      const combinedGuestText = (pending.messages || []).join('\n');
-
-      // Guest lookup (reuses the checkin_guests phone-variant + multi-room fixes)
-      const form = await findGuestByWhatsAppPhone(db, phone);
-
-      let guestName    = 'Guest';
-      let roomCode     = '';
+      const guestName    = identity.guestName || 'Guest';
+      const roomCode     = identity.aptId || '';
+      const hasFilledForm = !!identity.hasFilledForm;
       let checkinDate  = '';
       let checkoutDate = '';
-      let hasFilledForm = false;
 
-      if (form) {
-        hasFilledForm = true;
-        guestName = form.name || 'Guest';
-        const resNumber = baseReservationNumber(form.matchedReservationId);
-        if (resNumber) {
-          const resSnap = await db.collection('reservations')
-            .where('reservationNumber', '==', resNumber)
-            .limit(1)
-            .get();
-          if (!resSnap.empty) {
-            const reservation = resSnap.docs[0].data();
-            roomCode     = reservation.roomCode || '';
-            checkinDate  = reservation.checkin || '';
-            checkoutDate = reservation.checkout || '';
-          }
+      const resNumber = baseReservationNumber(identity.reservationNumber);
+      if (resNumber) {
+        const resSnap = await db.collection('reservations')
+          .where('reservationNumber', '==', resNumber)
+          .limit(1)
+          .get();
+        if (!resSnap.empty) {
+          const reservation = resSnap.docs[0].data();
+          checkinDate  = reservation.checkin || '';
+          checkoutDate = reservation.checkout || '';
         }
       }
 
@@ -931,5 +1084,48 @@ exports.summarizeGuestConversation = onDocumentWritten(
     await batch.commit();
 
     console.log(`summarizeGuestConversation: summarized ${phone} for reservation ${reservationNumber}`);
+  }
+);
+
+// Consistency layer: keeps whatsapp_conversations/{phone} in sync with checkin_guests
+// (room re-assignments, new form submissions) so brand identification never goes stale.
+// A Shartava aptId here always overwrites any prior keyword-derived "freedom" brand.
+exports.syncCheckinGuestToConversation = onDocumentWritten(
+  {
+    document: 'checkin_guests/{docId}',
+    region: 'europe-west1',
+  },
+  async (event) => {
+    const after = event.data?.after;
+    if (!after || !after.exists) return; // deleted — no-op
+
+    const data = after.data();
+    if ((data.contactType || '').toLowerCase() !== 'wa') return;
+
+    const phone = normalizePhone(data.contact);
+    if (!phone) return;
+
+    const aptId = data.aptId || '';
+    const brand = aptIdToBrand(aptId);
+    if (!brand) return; // unrecognized prefix — leave conversation state as-is; the
+                         // worker's STEP 1 owner-alert path handles this case
+
+    const guestName = data.name || 'Guest';
+    const reservationNumber = baseReservationNumber(data.matchedReservationId);
+
+    const db = getFirestore();
+    await db.collection('whatsapp_conversations').doc(phone).set(
+      {
+        locationBrand: brand,
+        aptId,
+        guestName,
+        reservationNumber,
+        formFilledAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    console.log(`syncCheckinGuestToConversation: ${phone} -> ${brand} (${aptId})`);
   }
 );
