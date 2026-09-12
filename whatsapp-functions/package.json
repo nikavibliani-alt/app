@@ -7,7 +7,9 @@
   },
   "main": "index.js",
   "scripts": {
-    "deploy": "firebase deploy --only functions:whatsapp"
+    "deploy": "FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only functions:whatsapp --project sleepy-5c962",
+    "loadcheck": "node -e \"const s=Date.now(); require('./index.js'); console.log('ok', Object.keys(require('./index.js')).join(','), Date.now()-s+'ms')\"",
+    "test:import": "node test-chatImport.js"
   },
   "dependencies": {
     "@google-cloud/tasks": "^5.5.2",

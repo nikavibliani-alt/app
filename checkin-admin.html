@@ -503,11 +503,31 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .bot-live.is-paused strong{color:var(--red);}
 .bot-panel.is-disabled .bot-section{opacity:.5;pointer-events:none;}
 .bot-panel.is-disabled .bot-status{opacity:1;pointer-events:auto;}
+/* Chat import / learning */
+.wa-learn-drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:18px 14px;text-align:center;background:var(--bg);cursor:pointer;transition:border-color .15s,background .15s;}
+.wa-learn-drop:hover,.wa-learn-drop.is-drag{border-color:var(--ink);background:var(--surface);}
+.wa-learn-drop__title{font-size:13px;font-weight:600;color:var(--ink);margin:0 0 4px;}
+.wa-learn-drop__sub{font-size:12px;color:var(--muted);line-height:1.45;margin:0;}
+.wa-learn-status{margin-top:10px;font-size:12px;line-height:1.45;color:var(--ink-2);}
+.wa-learn-status.is-err{color:var(--red);}
+.wa-learn-status.is-ok{color:var(--green);}
+.wa-remind-list,.wa-know-list{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
+.wa-remind-item,.wa-know-item{padding:10px 12px;border:1px solid var(--line);border-radius:var(--rs);background:var(--surface);}
+.wa-remind-item__top,.wa-know-item__top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+.wa-remind-item__title,.wa-know-item__title{font-size:13px;font-weight:600;color:var(--ink);margin:0;}
+.wa-remind-item__meta,.wa-know-item__meta{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4;}
+.wa-remind-item__msg,.wa-know-item__q,.wa-know-item__a{font-size:12px;color:var(--ink-2);margin-top:6px;line-height:1.45;}
+.wa-know-item__a{color:var(--ink);}
+.wa-remind-actions,.wa-know-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.wa-mini-btn{height:30px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:12px;font-weight:600;font-family:var(--sans);color:var(--ink-2);cursor:pointer;}
+.wa-mini-btn.is-primary{background:var(--ink);border-color:var(--ink);color:#fff;}
+.wa-empty-soft{font-size:12px;color:var(--muted);padding:4px 0;line-height:1.45;}
+.wa-badge-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--red);color:#fff;font-size:11px;font-weight:700;}
 </style>
 <script>window.__STANDALONE_HK__=/[?&]app=hk(?:&|$)/.test(location.search)||/(?:^|\/)HK(?:-app)?\.html$/i.test(location.pathname);if(window.__STANDALONE_HK__){document.documentElement.classList.add('standalone-hk');document.addEventListener('dblclick',function(e){e.preventDefault();},{passive:false,capture:true});try{var role=localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role');if(role){document.documentElement.classList.add('hk-authed');if(role==='admin')document.documentElement.classList.add('hk-admin-role');}}catch(e){}}</script>
 <script>
 (function(){
-  var BUILD='20260911c';
+  var BUILD='20260911d';
   var buildRe=new RegExp('[?&]build='+BUILD+'(&|$)');
   if(!buildRe.test(location.search)){
     var p=new URLSearchParams(location.search);
@@ -822,7 +842,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
  */
 const _ADMIN_PWD='maxela2026';
 const _ADMIN_KEY='maxela_admin_authed';
-const ADMIN_BUILD='20260831g';
+const ADMIN_BUILD='20260911d';
 (function migrateAdminBuild(){
   try{
     if(localStorage.getItem('maxela_admin_prod_build')!==ADMIN_BUILD){
@@ -861,7 +881,7 @@ window.adminUnlock=function(){
 window.adminSignOut=function(){localStorage.removeItem(_ADMIN_KEY);location.reload();};
 
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit,runTransaction}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,collection,doc,setDoc,addDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit,runTransaction}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour,normalizeStayDate}from"./shared/guest-unlock.js";
 import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON,hkPropertyGroupForRoom}from"./shared/hk-bedding.js";
@@ -2309,6 +2329,187 @@ window.waSetAiBotEnabled=async function(checked){
   syncMoreBotToggle();
   toast(checked?'AI assistant resumed ✓':'AI assistant paused');
 };
+/* ── WhatsApp chat import / learning ── */
+let waImportReminders=[];
+let waKnowledge=[];
+let waLearnBusy=false;
+let _jszipPromise=null;
+function loadJsZip(){
+  if(window.JSZip)return Promise.resolve(window.JSZip);
+  if(_jszipPromise)return _jszipPromise;
+  _jszipPromise=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+    s.onload=()=>window.JSZip?resolve(window.JSZip):reject(new Error('JSZip failed to load'));
+    s.onerror=()=>reject(new Error('Could not load JSZip'));
+    document.head.appendChild(s);
+  });
+  return _jszipPromise;
+}
+async function loadWaLearningData(){
+  try{
+    const remSnap=await getDocs(query(collection(db,'whatsapp_import_reminders'),where('status','==','pending'),limit(40)));
+    waImportReminders=remSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>{
+      const at=a.createdAt?.toMillis?.()||0;
+      const bt=b.createdAt?.toMillis?.()||0;
+      return bt-at;
+    });
+  }catch(e){
+    console.warn('[waImportReminders]',e);
+    waImportReminders=[];
+  }
+  try{
+    const knowSnap=await getDocs(query(collection(db,'whatsapp_knowledge'),where('active','==',true),limit(40)));
+    waKnowledge=knowSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>{
+      const at=a.updatedAt?.toMillis?.()||a.createdAt?.toMillis?.()||0;
+      const bt=b.updatedAt?.toMillis?.()||b.createdAt?.toMillis?.()||0;
+      return bt-at;
+    });
+  }catch(e){
+    console.warn('[waKnowledge]',e);
+    waKnowledge=[];
+  }
+}
+function setWaLearnStatus(msg,kind){
+  const el=document.getElementById('wa-learn-status');
+  if(!el)return;
+  el.textContent=msg||'';
+  el.classList.remove('is-err','is-ok');
+  if(kind==='err')el.classList.add('is-err');
+  if(kind==='ok')el.classList.add('is-ok');
+}
+async function extractChatTextFromFile(file){
+  const name=(file?.name||'').toLowerCase();
+  if(name.endsWith('.txt')||(file.type||'').includes('text')){
+    return await file.text();
+  }
+  if(name.endsWith('.zip')||(file.type||'').includes('zip')){
+    const JSZip=await loadJsZip();
+    const zip=await JSZip.loadAsync(file);
+    const entries=Object.keys(zip.files).filter(p=>{
+      const f=zip.files[p];
+      if(!f||f.dir)return false;
+      const base=p.split('/').pop().toLowerCase();
+      return base.endsWith('.txt')&&!base.startsWith('.');
+    });
+    if(!entries.length)throw new Error('No .txt chat file found inside the ZIP');
+    // Prefer WhatsApp Chat*.txt / _chat.txt
+    entries.sort((a,b)=>{
+      const score=p=>{
+        const base=p.split('/').pop().toLowerCase();
+        if(base==='_chat.txt')return 0;
+        if(base.startsWith('whatsapp chat'))return 1;
+        return 2;
+      };
+      return score(a)-score(b)||a.length-b.length;
+    });
+    return await zip.files[entries[0]].async('string');
+  }
+  throw new Error('Use a WhatsApp export ZIP or the .txt chat file');
+}
+function guessPhoneFromChatName(fileName){
+  const m=String(fileName||'').match(/(\+?\d{8,15})/);
+  return m?normalizeWaPhone(m[1]):'';
+}
+window.waImportChatFile=async function(file,opts={}){
+  if(!file||waLearnBusy)return;
+  waLearnBusy=true;
+  setWaLearnStatus('Reading export…');
+  try{
+    const chatText=await extractChatTextFromFile(file);
+    if(!chatText||chatText.trim().length<20)throw new Error('Chat file looks empty');
+    if(chatText.length>900000)throw new Error('Chat is too large — export a shorter date range without media');
+    const phone=normalizeWaPhone(opts.phone||'')||guessPhoneFromChatName(file.name)||'';
+    setWaLearnStatus('Uploading for AI learning…');
+    const ref=await addDoc(collection(db,'whatsapp_import_jobs'),{
+      status:'pending',
+      chatText,
+      fileName:file.name||'',
+      phone,
+      reminderId:opts.reminderId||'',
+      hostHint:opts.hostHint||'Maxela',
+      createdAt:serverTimestamp(),
+    });
+    setWaLearnStatus('Import started — AI is learning (usually under a minute). Job: '+ref.id.slice(0,8), 'ok');
+    toast('Chat import started');
+    // Poll job status a few times then refresh lists
+    for(let i=0;i<12;i++){
+      await new Promise(r=>setTimeout(r,2500));
+      const snap=await getDoc(ref);
+      if(!snap.exists())break;
+      const st=snap.data().status;
+      if(st==='done'){
+        const stats=snap.data().stats||{};
+        setWaLearnStatus(`Learned ${stats.learned||0} tip(s) · skipped ${stats.skippedGeorgian||0} Georgian msg(s)`, 'ok');
+        toast(`Learned ${stats.learned||0} answers ✓`);
+        await loadWaLearningData();
+        renderWaSettings();
+        return;
+      }
+      if(st==='failed'){
+        throw new Error(snap.data().error||'Import failed');
+      }
+      setWaLearnStatus('Still learning… ('+st+')');
+    }
+    await loadWaLearningData();
+    renderWaSettings();
+    setWaLearnStatus('Import still running in the background — refresh this page in a minute.', 'ok');
+  }catch(e){
+    console.error('[waImportChatFile]',e);
+    setWaLearnStatus(e.message||String(e),'err');
+    toast('Import failed: '+(e.message||e));
+  }finally{
+    waLearnBusy=false;
+    const input=document.getElementById('wa-learn-file');
+    if(input)input.value='';
+  }
+};
+window.waOnLearnFileChange=function(input){
+  const file=input?.files?.[0];
+  if(file)waImportChatFile(file);
+};
+window.waBindLearnDrop=function(){
+  const drop=document.getElementById('wa-learn-drop');
+  const input=document.getElementById('wa-learn-file');
+  if(!drop||!input||drop.dataset.bound)return;
+  drop.dataset.bound='1';
+  drop.addEventListener('click',()=>input.click());
+  drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('is-drag');});
+  drop.addEventListener('dragleave',()=>drop.classList.remove('is-drag'));
+  drop.addEventListener('drop',e=>{
+    e.preventDefault();
+    drop.classList.remove('is-drag');
+    const file=e.dataTransfer?.files?.[0];
+    if(file)waImportChatFile(file);
+  });
+};
+window.waImportForReminder=async function(reminderId){
+  const rem=waImportReminders.find(r=>r.id===reminderId);
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='.zip,.txt,application/zip,text/plain';
+  input.onchange=()=>{
+    const file=input.files?.[0];
+    if(file)waImportChatFile(file,{phone:rem?.phone||'',reminderId});
+  };
+  input.click();
+};
+window.waDismissReminder=async function(id){
+  try{
+    await updateDoc(doc(db,'whatsapp_import_reminders',id),{status:'dismissed',resolvedAt:serverTimestamp()});
+    waImportReminders=waImportReminders.filter(r=>r.id!==id);
+    renderWaSettings();
+    toast('Reminder dismissed');
+  }catch(e){toast('Failed: '+e.message);}
+};
+window.waDeactivateKnowledge=async function(id){
+  try{
+    await updateDoc(doc(db,'whatsapp_knowledge',id),{active:false,updatedAt:serverTimestamp()});
+    waKnowledge=waKnowledge.filter(k=>k.id!==id);
+    renderWaSettings();
+    toast('Removed from bot memory');
+  }catch(e){toast('Failed: '+e.message);}
+};
 const WA_PREVIEW_SAMPLES={firstName:'Alex',inputName:'John Smith',inputDate:'2026-09-01',inputRef:', ref: BK-48291'};
 function waReadFormIntoSettings(){
   const url=document.getElementById('wa-checkin-url')?.value.trim();
@@ -2481,6 +2682,55 @@ function renderWaSettings(){
           </div>
         </div>
       </div>
+      <div class="wa-card">
+        <div class="wa-card__hd">
+          <div>
+            <h3>Learn from WhatsApp chats ${waImportReminders.length?`<span class="wa-badge-count">${waImportReminders.length}</span>`:''}</h3>
+            <p>Import an official WhatsApp export ZIP. AI learns your real answers. Georgian messages are ignored — you handle those.</p>
+          </div>
+        </div>
+        <div class="wa-card__bd">
+          <div class="wa-learn-drop" id="wa-learn-drop" role="button" tabindex="0">
+            <p class="wa-learn-drop__title">Drop WhatsApp chat ZIP here</p>
+            <p class="wa-learn-drop__sub">Or tap to choose · WhatsApp → Chat → Export chat → Without media</p>
+          </div>
+          <input type="file" id="wa-learn-file" accept=".zip,.txt,application/zip,text/plain" hidden onchange="waOnLearnFileChange(this)">
+          <div class="wa-learn-status" id="wa-learn-status"></div>
+          <div class="bot-section__hint" style="margin-top:10px">When the bot cannot answer, you get a WhatsApp reminder to export that chat and import it here so it learns next time.</div>
+          <span class="bot-section__label" style="margin-top:16px">Import reminders</span>
+          ${waImportReminders.length?`<div class="wa-remind-list">${waImportReminders.map(r=>{
+            const when=r.createdAt?.toDate?r.createdAt.toDate().toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+            return `<div class="wa-remind-item">
+              <div class="wa-remind-item__top">
+                <div>
+                  <p class="wa-remind-item__title">${esc(r.guestName||'Guest')}${r.room?' · '+esc(r.room):''}</p>
+                  <div class="wa-remind-item__meta">${esc(r.phone||'')}${when?' · '+esc(when):''} · ${esc(r.reason||'escalation')}</div>
+                </div>
+              </div>
+              ${r.message?`<div class="wa-remind-item__msg">${esc(String(r.message).slice(0,220))}</div>`:''}
+              <div class="wa-remind-actions">
+                <button type="button" class="wa-mini-btn is-primary" onclick="waImportForReminder('${r.id}')">Import this chat</button>
+                <button type="button" class="wa-mini-btn" onclick="waDismissReminder('${r.id}')">Dismiss</button>
+              </div>
+            </div>`;
+          }).join('')}</div>`:`<div class="wa-empty-soft">No pending import reminders.</div>`}
+          <span class="bot-section__label" style="margin-top:16px">Bot memory (${waKnowledge.length})</span>
+          ${waKnowledge.length?`<div class="wa-know-list">${waKnowledge.slice(0,12).map(k=>`
+            <div class="wa-know-item">
+              <div class="wa-know-item__top">
+                <div>
+                  <p class="wa-know-item__title">${esc(k.topic||'general')}</p>
+                  <div class="wa-know-item__meta">${esc(k.sourceFileName||k.source||'import')}</div>
+                </div>
+              </div>
+              <div class="wa-know-item__q">Guest: ${esc(k.guestQuestion||'')}</div>
+              <div class="wa-know-item__a">Reply: ${esc(k.hostAnswer||'')}</div>
+              <div class="wa-know-actions">
+                <button type="button" class="wa-mini-btn" onclick="waDeactivateKnowledge('${k.id}')">Remove</button>
+              </div>
+            </div>`).join('')}</div>`:`<div class="wa-empty-soft">No learned answers yet — import a chat after you reply to a tough guest question.</div>`}
+        </div>
+      </div>
       <div class="wa-rule">${featherIcon('info',16,1.8)}<span>Use placeholders exactly as shown — they are replaced with guest data when you send.</span></div>
       <div class="wa-card">
         <div class="wa-card__hd"><div><h3>Check-in link</h3><p>Shared URL inserted as {{checkinUrl}} in invite messages.</p></div></div>
@@ -2519,6 +2769,7 @@ function renderWaSettings(){
       </div>
     </div>`;
   waUpdatePreview();
+  waBindLearnDrop();
   }catch(e){
     console.error('[renderWaSettings]',e);
     root.innerHTML=`<div class="empty" style="padding:24px 16px;text-align:center;line-height:1.5">Could not open WhatsApp templates.<br><span style="font-size:12px;color:var(--muted)">${esc(String(e.message||e))}</span></div>`;
@@ -2530,6 +2781,7 @@ async function loadAndRenderWaSettings(){
   try{
     if(!waLoaded)await loadGuestSettings();
     if(!botSettingsLoaded)await loadBotSettings();
+    await loadWaLearningData();
     renderWaSettings();
   }catch(e){
     console.error('[loadAndRenderWaSettings]',e);
@@ -3199,7 +3451,7 @@ const TAB_META={
   hksettings:{title:'HK settings',sub:'Staff PINs · cleaner apps · defaults'},
   history:{title:'History',sub:'Past guests · last 3 months'},
   guestsettings:{title:'Guest page',sub:'Tiles, services, waiting tabs & location'},
-  wasettings:{title:'WhatsApp & bot',sub:'AI assistant · modes · templates'},
+  wasettings:{title:'WhatsApp & bot',sub:'AI assistant · learn from chats · templates'},
   failures:{title:'Failed searches',sub:'Guests who could not find booking'},
   navsettings:{title:'Tab bar',sub:'Add tabs · reorder · landing page'},
   more:{title:'More',sub:'All admin tools'},

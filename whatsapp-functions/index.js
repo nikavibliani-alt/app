@@ -1,10 +1,14 @@
 const { onRequest } = require('firebase-functions/v2/https');
-const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { onDocumentWritten, onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { defineString } = require('firebase-functions/params');
 const { initializeApp, getApps } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
-const { CloudTasksClient } = require('@google-cloud/tasks');
 const crypto = require('node:crypto');
+const {
+  isGeorgianHeavy,
+  learnFromWhatsAppExport,
+  buildKnowledgeContext,
+} = require('./chatImport');
 
 if (!getApps().length) initializeApp();
 
@@ -17,12 +21,23 @@ const TASKS_QUEUE    = 'whatsapp-bot-debounce';
 const WHATSAPP_BOT_WORKER_URL   = defineString('WHATSAPP_BOT_WORKER_URL', { default: '' });
 const WHATSAPP_TASKS_INVOKER_SA = defineString('WHATSAPP_TASKS_INVOKER_SA', { default: '' });
 
-const tasksClient = new CloudTasksClient();
+// Do NOT require/@construct CloudTasksClient at module load or in onInit —
+// that hangs Firebase CLI discovery on many machines (Timeout after 10000).
+let tasksClient = null;
+function getTasksClient() {
+  if (!tasksClient) {
+    // eslint-disable-next-line global-require
+    const { CloudTasksClient } = require('@google-cloud/tasks');
+    tasksClient = new CloudTasksClient();
+  }
+  return tasksClient;
+}
 
 const SYSTEM_PROMPT = `You are a guest assistant for Maxela Apartments in Tbilisi, Georgia. You handle guest questions via WhatsApp. Be friendly and natural, like a helpful local person. Never sound like a corporate bot.
 
 LANGUAGE RULE:
 Always reply in English regardless of what language the guest writes in. If they write in Arabic, Russian, Persian or any other language, respond in English only. If they seem to expect their language, you may add: We communicate in English.
+Georgian-language guests are handled by the host manually — you will not normally see those messages.
 
 TONE RULES:
 - Short natural replies, 1-3 sentences maximum
@@ -339,6 +354,99 @@ async function writeAlert(db, { reason, phone, guestName = '', room = '', messag
   }
 }
 
+/** Load active learned Q&A snippets for the system prompt. */
+async function loadActiveKnowledge(db, limit = 25) {
+  try {
+    const snap = await db.collection('whatsapp_knowledge')
+      .where('active', '==', true)
+      .orderBy('updatedAt', 'desc')
+      .limit(limit)
+      .get();
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    // Missing composite index → fall back to unordered active docs
+    console.warn('loadActiveKnowledge ordered query failed, falling back:', err.message || err);
+    try {
+      const snap = await db.collection('whatsapp_knowledge')
+        .where('active', '==', true)
+        .limit(limit)
+        .get();
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    } catch (err2) {
+      console.error('loadActiveKnowledge failed:', err2);
+      return [];
+    }
+  }
+}
+
+/**
+ * When the bot escalates / cannot answer, remind the owner to export that WhatsApp
+ * chat and import it so the assistant can learn the real host reply.
+ */
+async function writeImportReminder(db, {
+  phone,
+  guestName = '',
+  room = '',
+  message = '',
+  reason = 'escalation',
+  mode = '',
+}) {
+  try {
+    const normalized = normalizePhone(phone);
+    if (!normalized) return null;
+
+    // Dedupe open reminders for the same phone within ~24h
+    const recentCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const existing = await db.collection('whatsapp_import_reminders')
+      .where('phone', '==', normalized)
+      .where('status', '==', 'pending')
+      .limit(5)
+      .get();
+    const alreadyOpen = existing.docs.some((d) => {
+      const created = d.data().createdAt?.toDate?.();
+      return created && created >= recentCutoff;
+    });
+    if (alreadyOpen) return existing.docs[0].id;
+
+    const ref = await db.collection('whatsapp_import_reminders').add({
+      phone: normalized,
+      guestName,
+      room,
+      message: String(message || '').slice(0, 500),
+      reason,
+      mode,
+      status: 'pending',
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return ref.id;
+  } catch (err) {
+    console.error('writeImportReminder failed:', err);
+    return null;
+  }
+}
+
+async function resolveImportRemindersForPhone(db, phone, { importJobId = '', note = '' } = {}) {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return 0;
+  const snap = await db.collection('whatsapp_import_reminders')
+    .where('phone', '==', normalized)
+    .where('status', '==', 'pending')
+    .limit(20)
+    .get();
+  if (snap.empty) return 0;
+  const batch = db.batch();
+  snap.docs.forEach((d) => {
+    batch.update(d.ref, {
+      status: 'imported',
+      resolvedAt: FieldValue.serverTimestamp(),
+      importJobId: importJobId || '',
+      resolveNote: note || '',
+    });
+  });
+  await batch.commit();
+  return snap.size;
+}
+
 /** Best-effort free-form WhatsApp notification to the owner. Never throws. */
 async function notifyOwner(ownerPhone, text) {
   const to = normalizePhone(ownerPhone);
@@ -417,7 +525,8 @@ async function enqueueBotWorker({ phone, batchToken, delaySeconds }) {
     return;
   }
   const project  = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'sleepy-5c962';
-  const queuePath = tasksClient.queuePath(project, TASKS_LOCATION, TASKS_QUEUE);
+  const client = getTasksClient();
+  const queuePath = client.queuePath(project, TASKS_LOCATION, TASKS_QUEUE);
   const invokerSa = WHATSAPP_TASKS_INVOKER_SA.value();
 
   const task = {
@@ -432,7 +541,7 @@ async function enqueueBotWorker({ phone, batchToken, delaySeconds }) {
   };
 
   try {
-    await tasksClient.createTask({ parent: queuePath, task });
+    await client.createTask({ parent: queuePath, task });
   } catch (err) {
     console.error('enqueueBotWorker: createTask failed:', err);
   }
@@ -594,6 +703,24 @@ exports.whatsappBotWorker = onRequest(
 
       const combinedGuestText = (pending.messages || []).join('\n');
 
+      // Owner handles Georgian guests manually — stay silent and ping once.
+      if (isGeorgianHeavy(combinedGuestText)) {
+        await writeAlert(db, {
+          reason: 'georgian_manual',
+          phone,
+          message: combinedGuestText,
+          mode: effectiveMode,
+        });
+        if (config.ownerPhone) {
+          await notifyOwner(
+            config.ownerPhone,
+            `Georgian WhatsApp message — reply yourself (${phone}): ${combinedGuestText.slice(0, 280)}`
+          );
+        }
+        await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
+      }
+
       // Guest lookup (reuses the checkin_guests phone-variant + multi-room fixes)
       const form = await findGuestByWhatsAppPhone(db, phone);
 
@@ -650,8 +777,16 @@ exports.whatsappBotWorker = onRequest(
         `Filled check-in form: ${hasFilledForm ? 'yes' : 'no'}`,
       ].join('\n') + memoryContext;
 
+      const knowledgeDocs = await loadActiveKnowledge(db);
+      const knowledgeContext = buildKnowledgeContext(knowledgeDocs);
+
       const modeContext = buildModeContext(effectiveMode, config.ownerPhone);
-      const systemWithContext = `${SYSTEM_PROMPT}\n\n${guestContext}\n\n${modeContext}`;
+      const systemWithContext = [
+        SYSTEM_PROMPT,
+        guestContext,
+        knowledgeContext,
+        modeContext,
+      ].filter(Boolean).join('\n\n');
 
       let aiReply = await callClaude({ system: systemWithContext, messages: history });
 
@@ -715,10 +850,19 @@ exports.whatsappBotWorker = onRequest(
           mode: effectiveMode,
         });
 
+        await writeImportReminder(db, {
+          phone,
+          guestName,
+          room: roomCode,
+          message: combinedGuestText,
+          reason: escalationReason,
+          mode: effectiveMode,
+        });
+
         if (config.ownerPhone) {
           await notifyOwner(
             config.ownerPhone,
-            `Guest needs help — ${guestName} / ${roomCode || 'unknown room'} / mode=${effectiveMode}: ${combinedGuestText}`
+            `Guest needs help — ${guestName} / ${roomCode || 'unknown room'} / mode=${effectiveMode}: ${combinedGuestText}\n\nAfter you reply in WhatsApp, export that chat (ZIP) and import it in Admin → WhatsApp settings so the bot can learn.`
           );
         }
       }
@@ -931,5 +1075,124 @@ exports.summarizeGuestConversation = onDocumentWritten(
     await batch.commit();
 
     console.log(`summarizeGuestConversation: summarized ${phone} for reservation ${reservationNumber}`);
+  }
+);
+
+// ---- WhatsApp chat ZIP/text import → learn Q&A into whatsapp_knowledge --------
+// Admin drops an official WhatsApp export. The browser extracts the .txt and
+// writes whatsapp_import_jobs/{id}. This trigger parses it, skips Georgian,
+// asks Claude for reusable Q&A, and stores active knowledge docs.
+
+const MAX_IMPORT_CHAT_CHARS = 900000; // stay under Firestore's 1 MiB doc limit
+
+exports.processWhatsAppImport = onDocumentCreated(
+  {
+    document: 'whatsapp_import_jobs/{jobId}',
+    region: 'europe-west1',
+    timeoutSeconds: 300,
+    memory: '512MiB',
+    secrets: ['ANTHROPIC_API_KEY'],
+  },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const jobId = event.params.jobId;
+    const job = snap.data() || {};
+    const db = getFirestore();
+    const jobRef = snap.ref;
+
+    if (job.status && job.status !== 'pending') return;
+
+    const chatText = String(job.chatText || '');
+    if (!chatText.trim()) {
+      await jobRef.set({
+        status: 'failed',
+        error: 'Empty chat text',
+        finishedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return;
+    }
+
+    if (chatText.length > MAX_IMPORT_CHAT_CHARS) {
+      await jobRef.set({
+        status: 'failed',
+        error: `Chat text too large (${chatText.length} chars). Export without media or a shorter date range.`,
+        finishedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return;
+    }
+
+    await jobRef.set({
+      status: 'processing',
+      startedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    try {
+      const phone = normalizePhone(job.phone || '');
+      const result = await learnFromWhatsAppExport(callClaude, chatText, {
+        hostHints: ['Maxela', 'Freedom', 'Midamo', 'Orbeliani', job.hostHint].filter(Boolean),
+      });
+
+      const knowledgeIds = [];
+      for (const item of result.items) {
+        const ref = await db.collection('whatsapp_knowledge').add({
+          topic: item.topic,
+          guestQuestion: item.guestQuestion,
+          hostAnswer: item.hostAnswer,
+          notes: item.notes || '',
+          source: 'whatsapp_export',
+          sourceJobId: jobId,
+          sourcePhone: phone,
+          sourceFileName: job.fileName || '',
+          active: true,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        knowledgeIds.push(ref.id);
+      }
+
+      let remindersResolved = 0;
+      if (phone) {
+        remindersResolved = await resolveImportRemindersForPhone(db, phone, {
+          importJobId: jobId,
+          note: job.fileName || 'imported',
+        });
+      }
+      if (job.reminderId) {
+        try {
+          await db.collection('whatsapp_import_reminders').doc(String(job.reminderId)).set({
+            status: 'imported',
+            resolvedAt: FieldValue.serverTimestamp(),
+            importJobId: jobId,
+          }, { merge: true });
+        } catch (err) {
+          console.warn('processWhatsAppImport: reminder patch failed', err.message || err);
+        }
+      }
+
+      // Drop raw chat text from the job doc after processing (keep storage lean)
+      await jobRef.set({
+        status: 'done',
+        chatText: FieldValue.delete(),
+        stats: result.stats,
+        hostSender: result.hostSender || '',
+        knowledgeIds,
+        remindersResolved,
+        finishedAt: FieldValue.serverTimestamp(),
+        error: '',
+      }, { merge: true });
+
+      console.log(
+        `processWhatsAppImport: job ${jobId} learned=${result.stats.learned} skippedGeorgian=${result.stats.skippedGeorgian}`
+      );
+    } catch (err) {
+      console.error(`processWhatsAppImport: job ${jobId} failed`, err);
+      await jobRef.set({
+        status: 'failed',
+        error: String(err.message || err).slice(0, 500),
+        finishedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
   }
 );
