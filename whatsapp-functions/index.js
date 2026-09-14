@@ -9,6 +9,10 @@ const {
   learnFromWhatsAppExport,
   buildKnowledgeContext,
 } = require('./chatImport');
+const {
+  isSilentAiReply,
+  shouldStaySilentFromHistory,
+} = require('./ownerSilence');
 
 if (!getApps().length) initializeApp();
 
@@ -145,6 +149,12 @@ Reply: Good to hear from you again. How can I help?
 
 Anything else outside the above topics:
 Reply: Let me check on that and get back to you shortly. [ESCALATE]
+
+FACTUALITY RULES (never invent):
+- Only use facts from this prompt, the guest context, and any LEARNED knowledge block. Do not invent sightseeing tips, city-view spots, restaurants, apartment features, prices, policies, or local recommendations.
+- If you are unsure or the request needs a human decision (room moves, exceptions, special requests), escalate. Do not improvise helpful-sounding advice to fill the gap.
+- If the conversation history already contains a Host: message that answered the guest, reply with only [SILENT] and nothing else. Do not add follow-up suggestions after the host already handled it.
+- If the guest only sends a short acknowledgement (ok, okay, thanks, got it, sure, etc.) after a Host: or Assistant: message that already closed the topic, reply with only [SILENT].
 
 FOR SENDING VIDEOS:
 When a scenario requires a video, start your response with [VIDEO:media_id] on its own line followed by the text message.
@@ -324,7 +334,7 @@ function resolveEffectiveMode(config) {
 
 function buildModeContext(effectiveMode, ownerPhone) {
   if (effectiveMode === 'away') {
-    return 'AWAY MODE: The owner is currently unreachable (traveling/no internet). Be helpful with everything you can. For escalations that require human action, tell the guest: I have noted this and someone from our team will follow up as soon as possible. Do not promise immediate response times.';
+    return 'AWAY MODE: The owner may be unreachable (traveling/no internet). Be helpful with everything you can. For escalations that require human action, tell the guest: I have noted this and someone from our team will follow up as soon as possible. Do not promise immediate response times. If a Host: message appears in the history after the guest request, the owner has returned and already replied — respond with only [SILENT]. Do not continue the conversation or add extra tips after that.';
   }
   if (effectiveMode === 'night') {
     let text = 'NIGHT MODE: It is currently nighttime in Tbilisi. For escalations that require urgent human action, tell the guest: If this is urgent please call the night contact number provided below, otherwise we will get back to you first thing in the morning.';
@@ -332,9 +342,10 @@ function buildModeContext(effectiveMode, ownerPhone) {
     if (normalizedOwner) {
       text += `\nNight contact number: +${normalizedOwner}`;
     }
+    text += ' If a Host: message already answered the guest, reply with only [SILENT].';
     return text;
   }
-  return 'AVAILABLE MODE: A human host may reply manually. If the conversation history already contains a Host: message that answered the guest, keep your reply empty of new commitments and prefer silence unless still necessary. Guest should never be told they are talking to a bot.';
+  return 'AVAILABLE MODE: A human host may reply manually. If the conversation history already contains a Host: message that answered the guest, reply with only [SILENT]. Guest should never be told they are talking to a bot.';
 }
 
 async function writeAlert(db, { reason, phone, guestName = '', room = '', message = '', mode = '' }) {
@@ -478,6 +489,14 @@ function classifyIncomingContent(msg) {
   return '[unsupported]';
 }
 
+async function clearPendingForPhone(db, phone) {
+  try {
+    await db.collection('whatsapp_pending').doc(phone).delete();
+  } catch (err) {
+    console.warn('clearPendingForPhone failed:', err.message || err);
+  }
+}
+
 // ---- Message batching (whatsapp_pending) ------------------------------------
 
 /** Adds `text` to the guest's pending batch, rotating batchToken so any in-flight worker for the old token no-ops. */
@@ -590,6 +609,9 @@ exports.whatsappWebhook = onRequest(
                 timestamp: FieldValue.serverTimestamp(),
                 metaMessageId: echo.id || null,
               });
+            // CHANGE 5 — owner took over (any mode). Drop any debounced bot batch so we
+            // cannot talk over the host after they return from Away and reply on iPhone.
+            await clearPendingForPhone(db, guestPhone);
           }
           // Owner echoes never enqueue a bot reply.
           return res.sendStatus(200);
@@ -686,22 +708,30 @@ exports.whatsappBotWorker = onRequest(
       const effectiveMode = resolveEffectiveMode(config);
       const convoRef        = db.collection('whatsapp_conversations').doc(phone);
       const convoMessagesRef = convoRef.collection('messages');
+      const combinedGuestText = (pending.messages || []).join('\n');
 
-      if (effectiveMode === 'available') {
-        const batchStart = pending.batchStartedAt || pending.lastMessageAt;
+      // CHANGE 5 — owner replied since this batch started (ALL modes, including Away/Night).
+      // Available-only used to miss the Away incident: host returned, answered, bot still talked.
+      const batchStart = pending.batchStartedAt || pending.lastMessageAt;
+      if (batchStart) {
         const ownerSnap = await convoMessagesRef
           .where('role', '==', 'owner')
           .where('timestamp', '>=', batchStart)
           .limit(1)
           .get();
         if (!ownerSnap.empty) {
-          // Owner already answered in the WhatsApp Business app — stay silent.
           await deletePendingIfTokenMatches(db, phone, batchToken);
           return res.sendStatus(200);
         }
       }
 
-      const combinedGuestText = (pending.messages || []).join('\n');
+      // CHANGE 6 — guest only said "okay"/"thanks" after host (or bot) already closed the topic.
+      const recentSnap = await convoMessagesRef.orderBy('timestamp', 'desc').limit(12).get();
+      const recentNewestFirst = recentSnap.docs.map((d) => d.data());
+      if (shouldStaySilentFromHistory(recentNewestFirst, combinedGuestText)) {
+        await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
+      }
 
       // Owner handles Georgian guests manually — stay silent and ping once.
       if (isGeorgianHeavy(combinedGuestText)) {
@@ -793,6 +823,12 @@ exports.whatsappBotWorker = onRequest(
       let escalated = false;
       let escalationReason = 'escalation';
 
+      // CHANGE 7 — model asked to stay silent (host already handled / nothing safe to add)
+      if (isSilentAiReply(aiReply)) {
+        await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
+      }
+
       if (!aiReply) {
         aiReply = 'Let me check on that and get back to you shortly.';
         escalated = true;
@@ -807,9 +843,18 @@ exports.whatsappBotWorker = onRequest(
         aiReply = aiReply.slice(videoMatch[0].length).trim();
       }
 
-      // Strip a trailing [ESCALATE] tag — internal only, never sent to WhatsApp
+      // Strip trailing [ESCALATE] / [SILENT] tags — internal only, never sent to WhatsApp
       const hasEscalateTag = /\[ESCALATE\]/i.test(aiReply);
-      aiReply = aiReply.replace(/\s*\[ESCALATE\]\s*/gi, ' ').replace(/\s+$/, '').trim();
+      const hasSilentTag = /\[SILENT\]/i.test(aiReply);
+      aiReply = aiReply
+        .replace(/\s*\[ESCALATE\]\s*/gi, ' ')
+        .replace(/\s*\[SILENT\]\s*/gi, ' ')
+        .replace(/\s+$/, '')
+        .trim();
+      if (hasSilentTag && !aiReply) {
+        await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
+      }
       if (hasEscalateTag) {
         escalated = true;
         escalationReason = 'escalation';

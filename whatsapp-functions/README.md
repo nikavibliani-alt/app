@@ -162,12 +162,27 @@ Firestore will offer to auto-create via a link in that error.
 
 When WhatsApp Business Coexistence is enabled, messages the owner sends from
 the official WhatsApp Business app arrive on the webhook as echoes (this repo
-checks `value.smb_message_echoes`, falling back to `value.message_echoes` —
-the exact field name wasn't independently verifiable from this environment,
-so confirm against a live payload before relying on it). Echoes are saved as
-`role: "owner"` messages and never enqueue a bot reply. Without this, the
-`available` mode's "let a human answer first" behavior can't detect that the
-owner already replied.
+checks `value.smb_message_echoes`, falling back to `value.message_echoes`).
+Echoes are saved as `role: "owner"` and:
+
+1. never enqueue a bot reply, and
+2. **clear any pending debounced bot batch** for that guest (CHANGE 5), so Away /
+   Night mode cannot talk over the host after they return and reply on iPhone.
+
+### Away-mode incident fixes (Changes 5–7)
+
+Real incident: Away mode → bot escalated a room-move ask → owner replied “not
+possible” → guest said “okay” → bot invented Tbilisi viewpoint tips.
+
+| Change | Behavior |
+|---|---|
+| **5** | Owner-echo silence + pending clear runs in **all** modes (not only Available). Worker also stays silent if an owner message landed since the batch started. |
+| **6** | If the guest only sends a short acknowledgement (`okay`, `thanks`, …) after an `owner` or `assistant` message, the worker stays silent and never calls Claude. |
+| **7** | System prompt forbids inventing sightseeing / view / restaurant tips; model may return `[SILENT]`, which is treated as no send. |
+
+```bash
+cd whatsapp-functions && npm test
+```
 
 ## Deploy
 

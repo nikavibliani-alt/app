@@ -8,7 +8,8 @@
   "main": "index.js",
   "scripts": {
     "deploy": "FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only functions:whatsapp --project sleepy-5c962",
-    "loadcheck": "node -e \"const s=Date.now(); require('./index.js'); console.log('ok', Object.keys(require('./index.js')).join(','), Date.now()-s+'ms')\"",
+    "loadcheck": "node -e \"const s=Date.now(); const m=require('./index.js'); console.log('ok', Object.keys(m).join(','), Date.now()-s+'ms')\"",
+    "test": "node test-chatImport.js && node test-ownerSilence.js",
     "test:import": "node test-chatImport.js"
   },
   "dependencies": {
