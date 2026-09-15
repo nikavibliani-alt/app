@@ -7,6 +7,11 @@
 // owner-echo pending clear in all modes, owner-since-batch-start check in all
 // modes, short-acknowledgement silence, and [SILENT] tag support.
 
+// Cyrillic, Arabic, Georgian, Hebrew — non-Latin script blocks. A message
+// built from these isn't emoji/punctuation-only even after ASCII stripping
+// leaves it empty, so it must never be treated as a silent ack.
+const NON_ASCII_SCRIPT_RE = /[Ѐ-ӿ؀-ۿა-ჿ֐-׿]/u;
+
 /**
  * Short guest acknowledgements like "okay" / "thanks" after the topic was
  * already closed. Kept strict so we never invent follow-up chatter.
@@ -19,7 +24,13 @@ function isShortAcknowledgement(text) {
     .replace(/[^a-z0-9\s']/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  if (!cleaned) return true; // emoji-only / punctuation-only ack
+  if (!cleaned) {
+    // Nothing ASCII left. Only an ack if that's because the original was
+    // purely emoji/punctuation — not because it was non-English script text
+    // (e.g. Arabic "مساعدة" / help, or a frustrated "???" written in another
+    // script) that stripping simply can't see.
+    return !NON_ASCII_SCRIPT_RE.test(raw);
+  }
   return /^(ok|okay|k|kk|okey|alright|all right|got it|understood|thanks|thank you|thx|ty|cool|fine|sure|perfect|great|no problem|np|will do|noted)(\s+(ok|okay|thanks|thank you|thx|ty))?$/.test(cleaned);
 }
 

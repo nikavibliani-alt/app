@@ -27,6 +27,17 @@ test('isShortAcknowledgement', async (t) => {
     assert.equal(isShortAcknowledgement(''), false);
     assert.equal(isShortAcknowledgement('a'.repeat(60)), false);
   });
+  await t.test('non-English script text is never an ack, even when ASCII-stripping leaves nothing', () => {
+    assert.equal(isShortAcknowledgement('مساعدة'), false, 'Arabic "help" must not be silenced');
+    assert.equal(isShortAcknowledgement('помогите'), false, 'Russian "help" must not be silenced');
+    assert.equal(isShortAcknowledgement('დახმარება'), false, 'Georgian "help" must not be silenced');
+    assert.equal(isShortAcknowledgement('עזרה'), false, 'Hebrew "help" must not be silenced');
+  });
+  await t.test('pure punctuation/emoji with nothing left is still an ack', () => {
+    assert.equal(isShortAcknowledgement('???'), true);
+    assert.equal(isShortAcknowledgement('...'), true);
+    assert.equal(isShortAcknowledgement('👍👍'), true);
+  });
 });
 
 test('isSilentAiReply', async (t) => {

@@ -128,7 +128,8 @@ Late checkout request:
 Reply: Let me check availability based on the next guest arrival and I will get back to you shortly. [ESCALATE]
 
 WiFi not working:
-Reply: We will check from our side and contact the provider. We will keep you updated. Do not promise it will be fixed immediately.
+Reply: We will check from our side and contact the provider. We will keep you updated.
+Note: Do not promise it will be fixed immediately. Do not say it will be resolved soon.
 If guest follows up again saying it is still not working: We are still checking on this. [ESCALATE]
 
 Smoking rules - Triple Room:
