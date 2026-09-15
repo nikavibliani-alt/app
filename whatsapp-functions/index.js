@@ -628,7 +628,13 @@ exports.whatsappBotWorker = onRequest(
   {
     region: 'europe-west1',
     timeoutSeconds: 120,
-    invoker: 'private', // only IAM principals granted Cloud Run Invoker (the Cloud Tasks SA) may call this
+    // Pin the invoker to the Cloud Tasks service account by name, rather than
+    // 'private' + a manual `gcloud run services add-iam-policy-binding`. With
+    // 'private', Firebase doesn't manage any invoker binding at all, so the
+    // manual grant was invisible to deploy's own IAM reconciliation and got
+    // wiped on the next deploy. Declaring the principal here makes Firebase
+    // (re-)apply this exact Cloud Run Invoker binding on every deploy.
+    invoker: 'whatsapp-tasks-invoker@sleepy-5c962.iam.gserviceaccount.com',
     secrets: ['META_ACCESS_TOKEN', 'META_PHONE_NUMBER_ID', 'ANTHROPIC_API_KEY'],
   },
   async (req, res) => {

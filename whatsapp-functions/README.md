@@ -112,9 +112,11 @@ chars) so the bot never mistakes a real new question for a closed topic.
 
 ### Cloud Tasks setup (one-time, manual — not run by this repo)
 
-This repo only implements the enqueue client (`enqueueBotWorker` in
-`index.js`) and the worker function. The queue and IAM binding are
-infrastructure and need to be created once per GCP project:
+This repo implements the enqueue client (`enqueueBotWorker` in `index.js`),
+the worker function, and (via `invoker:` on `whatsappBotWorker`) the Cloud
+Run Invoker IAM binding itself — that part is now self-healing on every
+deploy. The queue and the invoker service account are still real GCP
+infrastructure that need to be created once per project, outside this repo:
 
 ```bash
 # 1. Create the queue (europe-west1, matching the functions' region)
@@ -127,16 +129,19 @@ gcloud tasks queues create whatsapp-bot-debounce \
 gcloud iam service-accounts create whatsapp-tasks-invoker \
   --project=sleepy-5c962 \
   --display-name="Cloud Tasks invoker for whatsappBotWorker"
-
-# 3. After the first `firebase deploy`, grant that service account
-#    Cloud Run Invoker on the whatsappBotWorker service (only it should be
-#    able to call the worker — the function is deployed with invoker:'private')
-gcloud run services add-iam-policy-binding whatsappbotworker \
-  --region=europe-west1 \
-  --project=sleepy-5c962 \
-  --member="serviceAccount:whatsapp-tasks-invoker@sleepy-5c962.iam.gserviceaccount.com" \
-  --role="roles/run.invoker"
 ```
+
+That's the only manual, one-time step now. The Cloud Run Invoker binding on
+`whatsappBotWorker` itself is **no longer a manual `gcloud` step** — the
+function is declared with `invoker:
+'whatsapp-tasks-invoker@sleepy-5c962.iam.gserviceaccount.com'` directly in
+`index.js`, so `firebase deploy` (re-)applies that exact IAM binding itself
+on every deploy. This is why the binding kept disappearing before: with
+`invoker: 'private'`, Firebase doesn't manage any invoker principal at all,
+so a manually-added `gcloud run services add-iam-policy-binding` grant was
+invisible to deploy's own reconciliation and got wiped on the next deploy.
+Pinning the service account by name in code fixes that permanently — no
+post-deploy `gcloud` command needed anymore.
 
 `whatsappWebhook` needs two deploy-time params so it knows the worker's URL
 and which service account to sign task tokens with — `firebase deploy` will
