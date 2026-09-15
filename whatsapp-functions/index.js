@@ -5,6 +5,12 @@ const { initializeApp, getApps } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { CloudTasksClient } = require('@google-cloud/tasks');
 const crypto = require('node:crypto');
+const {
+  isShortAcknowledgement,
+  isSilentAiReply,
+  shouldStaySilentFromHistory,
+  findMostRecentOwnerMessage,
+} = require('./ownerSilence');
 
 if (!getApps().length) initializeApp();
 
@@ -39,6 +45,7 @@ GUEST CONTEXT (injected with each message):
 - Check-in and checkout dates
 - Whether they filled the check-in form or not
 - Previous stay notes if returning guest
+- CURRENT_TBILISI_HOUR — the current hour (0-23) in Tbilisi local time
 
 UNIT TYPES (know these well):
 - Triple Room with Private Bathroom: no kitchen, no balcony, 1 single bed, 1 double bed, 1 sofa bed, fits up to 4 guests
@@ -75,8 +82,23 @@ If guest is in apartment: Reply: Is there hot water in the kitchen tap or no hot
 If no hot water anywhere: We will check this right away, sorry for the inconvenience. [ESCALATE]
 If hot water only in kitchen but not bathroom: Send hot water video (media_id: 1819258012553462) then text: Please click the button and scroll in your direction to adjust it.
 
-No water or no electricity:
-Reply: We will check this right away, sorry for the inconvenience. [ESCALATE]
+Something broken and non-urgent (TV, appliance, furniture, faucet):
+Reply: We will look into this and get back to you shortly. [ESCALATE]
+
+No electricity in the whole apartment:
+Reply: There may be an unplanned outage in the area. We will check with City Hall and keep you updated. [ESCALATE]
+
+No electricity in one room or the bathroom only:
+Reply: This might be a tripped circuit. We will check it and get back to you shortly. [ESCALATE]
+
+No water in the whole apartment:
+Reply: There may be an unplanned outage in the area. We will check with City Hall and keep you updated. [ESCALATE]
+
+Guest is locked out, or the smart lock is not working, or its battery is dead:
+Reply: I am contacting our team right now and will update you shortly. [ESCALATE] [URGENT:LOCKOUT]
+
+Flooding or a security issue:
+Reply: We are looking into this right now and will update you shortly. [ESCALATE] [URGENT:ISSUE]
 
 Bag storage before check-in:
 Send bag storage video (media_id: 1804812277340997) then text: Most of our guests leave their belongings there. We recommend not leaving passports, laptops or valuables. We do not have lockers and cannot be responsible for any loss.
@@ -88,6 +110,10 @@ If guest confirms dates and preference: Here is our booking link: booking.com/Sh
 Room type complaint (booked Triple Room but expected kitchen):
 Reply: I understand. Just to clarify, you booked the Triple Room with Private Bathroom which does not include a kitchen, as shown in the listing. We also have the Superior Apartment and 3 Bedroom Apartment which both have kitchens. If you have questions about your booking please contact Booking.com or Expedia directly.
 If guest insists or is very upset: [ESCALATE]
+
+Guest requests a different apartment, a room with a view, an upgrade, or a room change:
+Reply: Let me check on that and get back to you shortly. [ESCALATE]
+Never suggest alternative rooms, views, sightseeing spots, or Tbilisi recommendations to fill the gap while this is pending. Use [SILENT] instead of inventing anything.
 
 Gym inquiry:
 Reply: We do not have a gym on site.
@@ -102,7 +128,9 @@ Late checkout request:
 Reply: Let me check availability based on the next guest arrival and I will get back to you shortly. [ESCALATE]
 
 WiFi not working:
-Reply: Sorry about that, I am alerting the team to check the connection now. [ESCALATE]
+Reply: We will check from our side and contact the provider. We will keep you updated.
+Note: Do not promise it will be fixed immediately. Do not say it will be resolved soon.
+If guest follows up again saying it is still not working: We are still checking on this. [ESCALATE]
 
 Smoking rules - Triple Room:
 Reply: Smoking is strictly forbidden in the Triple Room and all shared areas.
@@ -116,8 +144,13 @@ Reply: Thank you for letting us know, we will look into this immediately. [ESCAL
 Extra guests beyond booked number:
 Reply: Thanks for letting us know, I need to check this with the team and will get back to you shortly. [ESCALATE]
 
-Dirty room complaint:
-Reply: Sorry about that, I am alerting the team now so we can sort this out right away. [ESCALATE]
+Guest asks for cleaning service:
+Reply: Daily cleaning is not included in your reservation price. It is available as an optional paid service. You can arrange it on the guest page: app.maxelaapartments.com/checkin-guest
+If guest asks price: Room 30 GEL, Apartment 50 GEL, 3 Bedroom Apartment 70 GEL.
+
+Guest reports the apartment was not cleaned properly:
+If CURRENT_TBILISI_HOUR is between 10 and 19: We will get this sorted and let you know when someone is on the way. [ESCALATE]
+If CURRENT_TBILISI_HOUR is outside 10-19: Our cleaning staff has finished for today. We will arrange this first thing tomorrow morning. [ESCALATE]
 
 Voice message or audio received:
 Reply: Please type your question and I will be happy to help.
@@ -128,8 +161,14 @@ Reply: Please type your question and I will be happy to help.
 Returning guest (previous stay notes exist):
 Reply: Good to hear from you again. How can I help?
 
+Restaurants, tourist attractions, sightseeing, transport unrelated to our service, or general Tbilisi questions:
+Use [SILENT] — send nothing, no reply, no escalation. Never invent recommendations to sound helpful.
+
 Anything else outside the above topics:
 Reply: Let me check on that and get back to you shortly. [ESCALATE]
+
+FACTUALITY RULE (never invent):
+Only use facts from this prompt, the guest context, and the conversation history. Never invent sightseeing tips, restaurant recommendations, city information, room availability, prices, or policies that are not explicitly covered above. If you are unsure or the request needs a human decision, escalate instead of guessing.
 
 FOR SENDING VIDEOS:
 When a scenario requires a video, start your response with [VIDEO:media_id] on its own line followed by the text message.
@@ -139,7 +178,14 @@ The nearest paid parking is under Carrefour...
 
 FOR ESCALATION:
 When you include [ESCALATE] in your response, place it at the very end after the guest-facing text. It will be stripped before sending to the guest and used internally to alert the owner.
-Example: Sorry about that, I am alerting the team now. [ESCALATE]`;
+Example: Sorry about that, I am alerting the team now. [ESCALATE]
+
+FOR STAYING SILENT:
+When a scenario says to use [SILENT], or the conversation history already shows a Host: message that answered the guest, reply with only [SILENT] and nothing else. This sends no message to the guest at all. Also use only [SILENT] if the guest's message is just a short acknowledgement (ok, okay, thanks, got it, sure, etc.) after a Host: or Assistant: message that already closed the topic.
+
+FOR URGENT ISSUES:
+For a guest lockout or smart lock failure, add [URGENT:LOCKOUT] right after [ESCALATE]. For flooding or a security issue, add [URGENT:ISSUE] right after [ESCALATE]. Both tags are stripped before sending and trigger an immediate owner alert regardless of bot mode or time of day.
+Example: I am contacting our team right now and will update you shortly. [ESCALATE] [URGENT:LOCKOUT]`;
 
 const SUMMARY_SYSTEM_PROMPT = 'Summarize this guest WhatsApp conversation into 3-5 bullet points covering: issues they had, requests they made, how they communicated, anything notable. Be very brief.';
 
@@ -265,6 +311,7 @@ const CONFIG_DEFAULTS = {
   ownerPhone: '',
   nightStart: 22,
   nightEnd: 9,
+  ownerSilenceWindowMinutes: 30,
 };
 
 async function getGlobalsConfig(db) {
@@ -309,7 +356,7 @@ function resolveEffectiveMode(config) {
 
 function buildModeContext(effectiveMode, ownerPhone) {
   if (effectiveMode === 'away') {
-    return 'AWAY MODE: The owner is currently unreachable (traveling/no internet). Be helpful with everything you can. For escalations that require human action, tell the guest: I have noted this and someone from our team will follow up as soon as possible. Do not promise immediate response times.';
+    return 'AWAY MODE: The owner may be unreachable (traveling/no internet). Be helpful with everything you can. For escalations that require human action, tell the guest: I have noted this and someone from our team will follow up as soon as possible. Do not promise immediate response times. If a Host: message appears in the history after the guest request, the owner has returned and already replied — respond with only [SILENT] and do not add extra tips after that.';
   }
   if (effectiveMode === 'night') {
     let text = 'NIGHT MODE: It is currently nighttime in Tbilisi. For escalations that require urgent human action, tell the guest: If this is urgent please call the night contact number provided below, otherwise we will get back to you first thing in the morning.';
@@ -317,12 +364,13 @@ function buildModeContext(effectiveMode, ownerPhone) {
     if (normalizedOwner) {
       text += `\nNight contact number: +${normalizedOwner}`;
     }
+    text += ' If a Host: message already answered the guest, reply with only [SILENT].';
     return text;
   }
-  return 'AVAILABLE MODE: A human host may reply manually. If the conversation history already contains a Host: message that answered the guest, keep your reply empty of new commitments and prefer silence unless still necessary. Guest should never be told they are talking to a bot.';
+  return 'AVAILABLE MODE: A human host may reply manually. If the conversation history already contains a Host: message that answered the guest, reply with only [SILENT]. Guest should never be told they are talking to a bot.';
 }
 
-async function writeAlert(db, { reason, phone, guestName = '', room = '', message = '', mode = '' }) {
+async function writeAlert(db, { reason, phone, guestName = '', room = '', message = '', mode = '', urgency = false }) {
   try {
     await db.collection('whatsapp_alerts').add({
       reason,
@@ -331,6 +379,7 @@ async function writeAlert(db, { reason, phone, guestName = '', room = '', messag
       room,
       message,
       mode,
+      urgency: !!urgency,
       resolved: false,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -368,6 +417,15 @@ function classifyIncomingContent(msg) {
   if (type === 'image' || type === 'sticker') return '[image]';
   if (type === 'video') return '[video]';
   return '[unsupported]';
+}
+
+/** Drops any in-flight debounced batch for a phone. Best-effort. */
+async function clearPendingForPhone(db, phone) {
+  try {
+    await db.collection('whatsapp_pending').doc(phone).delete();
+  } catch (err) {
+    console.warn('clearPendingForPhone failed:', err.message || err);
+  }
 }
 
 // ---- Message batching (whatsapp_pending) ------------------------------------
@@ -481,6 +539,9 @@ exports.whatsappWebhook = onRequest(
                 timestamp: FieldValue.serverTimestamp(),
                 metaMessageId: echo.id || null,
               });
+            // Owner took over (any mode) — drop any debounced bot batch so the bot
+            // cannot talk over the host after they return and reply on iPhone.
+            await clearPendingForPhone(db, guestPhone);
           }
           // Owner echoes never enqueue a bot reply.
           return res.sendStatus(200);
@@ -577,22 +638,50 @@ exports.whatsappBotWorker = onRequest(
       const effectiveMode = resolveEffectiveMode(config);
       const convoRef        = db.collection('whatsapp_conversations').doc(phone);
       const convoMessagesRef = convoRef.collection('messages');
+      const combinedGuestText = (pending.messages || []).join('\n');
 
-      if (effectiveMode === 'available') {
-        const batchStart = pending.batchStartedAt || pending.lastMessageAt;
+      // CHANGE 5 — owner replied since this batch started, in ALL modes (not just
+      // Available). Available-only used to miss the Away incident: the host
+      // returned, answered, and the bot still talked over them.
+      const batchStart = pending.batchStartedAt || pending.lastMessageAt;
+      if (batchStart) {
         const ownerSnap = await convoMessagesRef
           .where('role', '==', 'owner')
           .where('timestamp', '>=', batchStart)
           .limit(1)
           .get();
         if (!ownerSnap.empty) {
-          // Owner already answered in the WhatsApp Business app — stay silent.
           await deletePendingIfTokenMatches(db, phone, batchToken);
           return res.sendStatus(200);
         }
       }
 
-      const combinedGuestText = (pending.messages || []).join('\n');
+      // Last 15 messages, fetched once and reused both for the silence checks
+      // below (newest-first) and as Claude's conversation history (reversed).
+      const historySnap = await convoMessagesRef.orderBy('timestamp', 'desc').limit(15).get();
+      const recentNewestFirst = historySnap.docs.map((d) => d.data());
+
+      // CHANGE F — owner continuation silence: the most recent owner message (not
+      // necessarily the directly preceding one) is still fresh (within
+      // ownerSilenceWindowMinutes) and the guest's follow-up isn't a clear new
+      // topic (approximated here the same way CHANGE 6 does: a short ack).
+      const ownerSilenceWindowMinutes = Number(config.ownerSilenceWindowMinutes) || CONFIG_DEFAULTS.ownerSilenceWindowMinutes;
+      const lastOwnerMsg = findMostRecentOwnerMessage(recentNewestFirst);
+      if (lastOwnerMsg) {
+        const ownerAt = toJsDate(lastOwnerMsg.timestamp);
+        const withinWindow = ownerAt && (Date.now() - ownerAt.getTime()) < ownerSilenceWindowMinutes * 60 * 1000;
+        if (withinWindow && isShortAcknowledgement(combinedGuestText)) {
+          await deletePendingIfTokenMatches(db, phone, batchToken);
+          return res.sendStatus(200);
+        }
+      }
+
+      // CHANGE 6 — guest only said "okay"/"thanks" after the host (or the bot)
+      // already closed the topic in the immediately preceding turn.
+      if (shouldStaySilentFromHistory(recentNewestFirst, combinedGuestText)) {
+        await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
+      }
 
       // Guest lookup (reuses the checkin_guests phone-variant + multi-room fixes)
       const form = await findGuestByWhatsAppPhone(db, phone);
@@ -630,11 +719,9 @@ exports.whatsappBotWorker = onRequest(
         }
       }
 
-      // Last 15 messages as conversation history. Owner echoes map to an assistant turn
-      // prefixed "Host: " so the model knows a human already responded.
-      const historySnap = await convoMessagesRef.orderBy('timestamp', 'desc').limit(15).get();
-      const history = historySnap.docs
-        .map((d) => d.data())
+      // Owner echoes map to an assistant turn prefixed "Host: " so the model knows
+      // a human already responded.
+      const history = [...recentNewestFirst]
         .reverse()
         .map((m) => {
           if (m.role === 'owner') return { role: 'assistant', content: `Host: ${m.content}` };
@@ -642,12 +729,15 @@ exports.whatsappBotWorker = onRequest(
           return { role: 'user', content: m.content };
         });
 
+      // CHANGE G — inject the current Tbilisi hour so the model can apply
+      // hour-dependent scenarios (e.g. cleaning staff availability).
       const guestContext = [
         `Guest name: ${guestName}`,
         `Room/apartment type: ${roomCode || 'unknown'}`,
         `Check-in: ${checkinDate || 'unknown'}`,
         `Checkout: ${checkoutDate || 'unknown'}`,
         `Filled check-in form: ${hasFilledForm ? 'yes' : 'no'}`,
+        `CURRENT_TBILISI_HOUR: ${tbilisiHour()}`,
       ].join('\n') + memoryContext;
 
       const modeContext = buildModeContext(effectiveMode, config.ownerPhone);
@@ -672,12 +762,43 @@ exports.whatsappBotWorker = onRequest(
         aiReply = aiReply.slice(videoMatch[0].length).trim();
       }
 
-      // Strip a trailing [ESCALATE] tag — internal only, never sent to WhatsApp
+      // CHANGE 7 — [SILENT]: the model asked to send nothing (host already
+      // handled it, or the topic is explicitly out of scope). Checked as a
+      // presence test — any reply carrying this tag sends nothing at all,
+      // even if other text is attached.
+      if (isSilentAiReply(aiReply)) {
+        console.log(`whatsappBotWorker: SILENT ([SILENT] tag) for ${phone}`);
+        await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
+      }
+
+      // Strip trailing [ESCALATE] / [URGENT:...] tags — internal only, never sent to WhatsApp
       const hasEscalateTag = /\[ESCALATE\]/i.test(aiReply);
-      aiReply = aiReply.replace(/\s*\[ESCALATE\]\s*/gi, ' ').replace(/\s+$/, '').trim();
+      const urgentMatch = aiReply.match(/\[URGENT:(LOCKOUT|ISSUE)\]/i);
+      aiReply = aiReply
+        .replace(/\s*\[ESCALATE\]\s*/gi, ' ')
+        .replace(/\s*\[URGENT:(?:LOCKOUT|ISSUE)\]\s*/gi, ' ')
+        .replace(/\s+$/, '')
+        .trim();
       if (hasEscalateTag) {
         escalated = true;
         escalationReason = 'escalation';
+      }
+
+      // CHANGE C — urgent issues (lockout, flooding/security) page the owner
+      // immediately, regardless of bot mode or time of day — ahead of the
+      // humanizer delay and the guest-facing send.
+      let urgencyFlag = false;
+      if (urgentMatch) {
+        urgencyFlag = true;
+        escalated = true;
+        escalationReason = 'escalation';
+        const urgentMessage = urgentMatch[1].toUpperCase() === 'LOCKOUT'
+          ? `URGENT: ${guestName} ${roomCode || 'unknown room'} — guest is locked out`
+          : `URGENT: ${guestName} ${roomCode || 'unknown room'} — ${combinedGuestText.slice(0, 300)}`;
+        if (config.ownerPhone) {
+          await notifyOwner(config.ownerPhone, urgentMessage);
+        }
       }
 
       // Small humanizer — short, after Claude, before send. Not the batching delay.
@@ -713,9 +834,12 @@ exports.whatsappBotWorker = onRequest(
           room: roomCode,
           message: combinedGuestText,
           mode: effectiveMode,
+          urgency: urgencyFlag,
         });
 
-        if (config.ownerPhone) {
+        // Urgent cases already paged the owner immediately, above — avoid a
+        // second, redundant notification for the same incident.
+        if (config.ownerPhone && !urgencyFlag) {
           await notifyOwner(
             config.ownerPhone,
             `Guest needs help — ${guestName} / ${roomCode || 'unknown room'} / mode=${effectiveMode}: ${combinedGuestText}`
