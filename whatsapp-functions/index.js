@@ -480,31 +480,37 @@ async function deletePendingIfTokenMatches(db, phone, batchToken) {
 
 /** Enqueues a Cloud Task that calls whatsappBotWorker after `delaySeconds`. Logs and no-ops on failure. */
 async function enqueueBotWorker({ phone, batchToken, delaySeconds }) {
+  console.log(`enqueueBotWorker called for phone: ${phone}`);
+
   const workerUrl = WHATSAPP_BOT_WORKER_URL.value();
   if (!workerUrl) {
     console.error('enqueueBotWorker: WHATSAPP_BOT_WORKER_URL is not configured — see README "Cloud Tasks setup"');
     return;
   }
-  const project  = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'sleepy-5c962';
-  const client = getTasksClient();
-  const queuePath = client.queuePath(project, TASKS_LOCATION, TASKS_QUEUE);
-  const invokerSa = WHATSAPP_TASKS_INVOKER_SA.value();
-
-  const task = {
-    httpRequest: {
-      httpMethod: 'POST',
-      url: workerUrl,
-      headers: { 'Content-Type': 'application/json' },
-      body: Buffer.from(JSON.stringify({ phone, batchToken })).toString('base64'),
-      ...(invokerSa ? { oidcToken: { serviceAccountEmail: invokerSa } } : {}),
-    },
-    scheduleTime: { seconds: Math.floor(Date.now() / 1000) + Math.max(0, Math.round(delaySeconds)) },
-  };
 
   try {
+    const project  = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'sleepy-5c962';
+    const client = getTasksClient();
+    const queuePath = client.queuePath(project, TASKS_LOCATION, TASKS_QUEUE);
+    const invokerSa = WHATSAPP_TASKS_INVOKER_SA.value();
+
+    const task = {
+      httpRequest: {
+        httpMethod: 'POST',
+        url: workerUrl,
+        headers: { 'Content-Type': 'application/json' },
+        body: Buffer.from(JSON.stringify({ phone, batchToken })).toString('base64'),
+        ...(invokerSa ? { oidcToken: { serviceAccountEmail: invokerSa } } : {}),
+      },
+      scheduleTime: { seconds: Math.floor(Date.now() / 1000) + Math.max(0, Math.round(delaySeconds)) },
+    };
+
     await client.createTask({ parent: queuePath, task });
   } catch (err) {
-    console.error('enqueueBotWorker: createTask failed:', err);
+    // Widened to cover getTasksClient()/queuePath() too, not just createTask —
+    // a client-construction failure used to bypass this log entirely and only
+    // surface as a generic "whatsappWebhook error:" from the outer handler.
+    console.error('enqueueBotWorker: failed to enqueue task:', err);
   }
 }
 
