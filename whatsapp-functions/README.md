@@ -210,6 +210,29 @@ room/view/upgrade all end in `[SILENT]` or `[ESCALATE]` rather than an
 invented answer — see the `FACTUALITY RULE` in `SYSTEM_PROMPT`. The bot must
 never fill a silence with sightseeing tips or made-up recommendations.
 
+## Duplicate webhook delivery
+
+Meta can redeliver the same webhook payload (slow response, network retry).
+`whatsappWebhook` dedupes on the inbound message's `id` before doing any
+other work — `isDuplicateMessage()` atomically claims
+`whatsapp_messages_seen/{messageId}` via Firestore's `create()` (fails if the
+doc already exists, so there's no get-then-set race between two near-
+simultaneous redeliveries). A duplicate returns 200 immediately, before it
+can rotate `whatsapp_pending`'s `batchToken` a second time or double-log the
+conversation. No `messageId` (shouldn't happen, but defensively) or an
+unexpected Firestore error both fall through to normal processing rather
+than silently dropping a message.
+
+**One-time manual setup:** `whatsapp_messages_seen` will grow forever
+without a TTL policy. Point one at the `processedAt` field — easiest via
+Firestore Console → your database → Indexes → TTL Policies, or `gcloud
+firestore fields ttls update processedAt
+--collection-group=whatsapp_messages_seen --enable-ttl
+--project=sleepy-5c962` (check `gcloud firestore fields ttls --help` for the
+exact current flags, since this wasn't verified against a live project from
+this environment). A day or two of retention is plenty — this only needs to
+outlive Meta's redelivery window, not serve as long-term storage.
+
 ## Deploy
 
 ```bash

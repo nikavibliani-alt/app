@@ -430,6 +430,36 @@ function classifyIncomingContent(msg) {
   return '[unsupported]';
 }
 
+/**
+ * Meta can redeliver the same webhook payload (slow/ambiguous response,
+ * network retries), which would otherwise rotate whatsapp_pending's
+ * batchToken a second time and double-log the conversation. Claims
+ * `messageId` exactly once via an atomic create() — no get-then-set race
+ * window. Returns true if this is a genuine duplicate (already claimed).
+ */
+async function isDuplicateMessage(db, messageId) {
+  if (!messageId) return false; // no id to dedupe on — process normally
+  const seenRef = db.collection('whatsapp_messages_seen').doc(messageId);
+  try {
+    await seenRef.create({
+      messageId,
+      // TTL-friendly: point a Firestore TTL policy (console/gcloud, not
+      // application code) at this field to auto-expire old dedup records —
+      // see README "Duplicate webhook delivery" section.
+      processedAt: FieldValue.serverTimestamp(),
+    });
+    return false; // we just claimed it — first delivery
+  } catch (err) {
+    if (err.code === 6 || /already exists/i.test(err.message || '')) {
+      return true; // ALREADY_EXISTS — a prior delivery already claimed this id
+    }
+    // Unexpected Firestore error — log and treat as not-a-duplicate so we
+    // never silently drop a legitimate message over a transient hiccup.
+    console.error(`isDuplicateMessage: create() failed for ${messageId}, proceeding anyway:`, err);
+    return false;
+  }
+}
+
 /** Drops any in-flight debounced batch for a phone. Best-effort. */
 async function clearPendingForPhone(db, phone) {
   try {
@@ -573,6 +603,15 @@ exports.whatsappWebhook = onRequest(
         }
 
         const msg   = messages[0];
+
+        // Dedupe Meta's redelivered webhooks before any other processing —
+        // must run before whatsapp_pending's batchToken can rotate a second
+        // time for the same physical message.
+        if (await isDuplicateMessage(db, msg.id)) {
+          console.log(`whatsappWebhook: duplicate message ${msg.id} — already processed, skipping`);
+          return res.sendStatus(200);
+        }
+
         const phone = normalizePhone(msg.from);
         if (!phone) return res.sendStatus(200);
 
