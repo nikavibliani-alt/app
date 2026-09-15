@@ -662,6 +662,7 @@ exports.whatsappBotWorker = onRequest(
       // Note: Admin SDK — `exists` is a boolean property here, not a method (unlike the
       // client/Web SDK's `exists()`). Using () would throw "not a function" at runtime.
       console.log('whatsappBotWorker: looking for pending doc at path:', `whatsapp_pending/${phone}`, 'exists:', pendingSnap.exists);
+      console.log('whatsappBotWorker: task batchToken:', batchToken, 'firestore batchToken:', pendingSnap.exists ? pendingSnap.data().batchToken : 'DOC_NOT_FOUND');
       if (!pendingSnap.exists) {
         console.log('whatsappBotWorker: STOPPED — no whatsapp_pending doc for', phone);
         return res.sendStatus(200);
