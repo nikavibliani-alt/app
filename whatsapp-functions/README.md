@@ -35,6 +35,7 @@ admin "Bot Settings" panel in `checkin-admin.html` edits this doc):
 | `botResponseDelay` | number (seconds) | `20` | Debounce delay before the worker runs, in `available` mode (and in `auto` mode when not in the night window). Away/night always debounce at `min(botResponseDelay, 3)`s instead, so bursts still batch without making the guest wait. |
 | `ownerPhone` | string | `''` | Digits-only or E.164 WhatsApp number for owner alerts and the night-mode contact line. |
 | `nightStart` / `nightEnd` | number (0-23) | `22` / `9` | Tbilisi-local night window for `botMode: "auto"`. Supports wrap-around (`22 → 9` = 10pm-9am). If equal, auto-night is disabled (always resolves to `available`). |
+| `ownerSilenceWindowMinutes` | number (minutes) | `30` | How long after the owner's most recent WhatsApp message the bot treats a short guest follow-up ("okay", "thanks") as already resolved and stays silent — see "Owner silence" below. |
 
 Effective mode resolution (`resolveEffectiveMode` in `index.js`):
 1. `aiBotEnabled === false` → bot silent (checked separately, before mode resolution).
@@ -71,10 +72,43 @@ request handler:
    appended to `SYSTEM_PROMPT`, strips `[VIDEO:id]` / `[ESCALATE]`, sends the
    reply, saves it, writes escalation alerts if needed, and deletes
    `whatsapp_pending/{phone}` (only if the token still matches).
-5. In `available` mode, before replying the worker also checks whether an
-   owner echo (`role: "owner"`) landed in `whatsapp_conversations/{phone}/messages`
-   since the batch started — if so, it deletes the pending doc and stays
-   silent instead of double-answering.
+5. Before replying, in **every mode** (not only `available`), the worker checks
+   whether an owner echo (`role: "owner"`) landed in
+   `whatsapp_conversations/{phone}/messages` since the batch started — if so,
+   it deletes the pending doc and stays silent instead of double-answering.
+   This is on top of the webhook already dropping the pending batch the
+   instant an owner echo arrives (`clearPendingForPhone`) — belt and braces,
+   since the two run at different times relative to a debounced task.
+
+## Owner silence (`ownerSilence.js`)
+
+Real incident this guards against: Away mode -> guest asked to move to a
+city-view apartment -> bot correctly escalated -> the owner replied "not
+possible" from the WhatsApp Business app -> the guest said "okay" -> the bot
+invented Tbilisi viewpoint tips instead of staying quiet. `ownerSilence.js`
+(unit-tested in `ownerSilence.test.js`) implements the fix, applied in the
+worker in this order, before ever calling Claude:
+
+1. **Owner-since-batch-start** (all modes): if `role: "owner"` landed in the
+   conversation since this batch started, stay silent — the standard case,
+   covered by a dedicated Firestore query so it's reliable at any history depth.
+2. **Owner continuation silence** (`findMostRecentOwnerMessage` +
+   `ownerSilenceWindowMinutes`): scans the last 15 messages for the most
+   recent `role: "owner"` message, even if it isn't the directly preceding
+   turn. If it's within `ownerSilenceWindowMinutes` (default 30) and the
+   guest's current message is a short acknowledgement, stay silent.
+3. **Short acknowledgement after the immediately preceding turn**
+   (`shouldStaySilentFromHistory`): if the guest's message is just "okay" /
+   "thanks" / similar right after an `owner` or `assistant` turn that already
+   closed the topic, stay silent — this doesn't require the time window above.
+4. **`[SILENT]` tag** (`isSilentAiReply`): the system prompt asks Claude to
+   reply with only `[SILENT]` when the history already shows the host
+   answered, or the guest's question is explicitly out of scope (see
+   "Outside-topic questions" below). Detected before any other tag stripping —
+   a reply carrying it is never sent to WhatsApp.
+
+`isShortAcknowledgement` is intentionally strict (a fixed word list, max 48
+chars) so the bot never mistakes a real new question for a closed topic.
 
 ### Cloud Tasks setup (one-time, manual — not run by this repo)
 
@@ -135,9 +169,41 @@ the official WhatsApp Business app arrive on the webhook as echoes (this repo
 checks `value.smb_message_echoes`, falling back to `value.message_echoes` —
 the exact field name wasn't independently verifiable from this environment,
 so confirm against a live payload before relying on it). Echoes are saved as
-`role: "owner"` messages and never enqueue a bot reply. Without this, the
-`available` mode's "let a human answer first" behavior can't detect that the
-owner already replied.
+`role: "owner"` messages, never enqueue a bot reply, and — in every mode —
+immediately clear (`clearPendingForPhone`) any debounced bot batch already
+queued for that guest, so a slow Away/Night debounce can't fire after the
+owner has taken over. Without any of this, the "let a human answer first"
+behavior can't detect that the owner already replied.
+
+## Hour-dependent scenarios
+
+The worker injects `CURRENT_TBILISI_HOUR: {0-23}` (via the existing
+`tbilisiHour()` helper) into the system-prompt guest-context block on every
+call, alongside guest name/room/dates. The only scenario that currently reads
+it is "apartment was not cleaned properly" (cleaning staff availability,
+10:00-19:00 vs after hours) — add more hour-gated scenarios in
+`SYSTEM_PROMPT` the same way rather than adding new code-side branches.
+
+## Urgent issues (lockout, flooding, security)
+
+Two scenarios page the owner **immediately**, regardless of bot mode or time
+of day, instead of waiting for the normal end-of-turn escalation notify:
+a guest lockout / smart lock failure (`[URGENT:LOCKOUT]`) and flooding or a
+security issue (`[URGENT:ISSUE]`). The system prompt has Claude append one of
+these right after `[ESCALATE]`; the worker strips both tags before sending,
+sends `URGENT: {guestName} {room} — guest is locked out` (or `— {the guest's
+message}` for the issue case) to `ownerPhone` before the humanizer delay or
+the guest-facing reply, and sets `urgency: true` on the `whatsapp_alerts` doc
+(the normal end-of-turn owner notify is skipped for these to avoid a
+duplicate ping).
+
+## Outside-topic questions
+
+Restaurants, tourist attractions, sightseeing, transport unrelated to the
+property, general Tbilisi questions, and requests for a different
+room/view/upgrade all end in `[SILENT]` or `[ESCALATE]` rather than an
+invented answer — see the `FACTUALITY RULE` in `SYSTEM_PROMPT`. The bot must
+never fill a silence with sightseeing tips or made-up recommendations.
 
 ## Deploy
 
