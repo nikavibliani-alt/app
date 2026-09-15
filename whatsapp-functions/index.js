@@ -633,25 +633,38 @@ exports.whatsappBotWorker = onRequest(
   },
   async (req, res) => {
     try {
+      console.log('whatsappBotWorker: request received', JSON.stringify(req.body).substring(0, 200));
+
       const { phone, batchToken } = req.body || {};
       if (!phone || !batchToken) {
-        console.error('whatsappBotWorker: missing phone or batchToken in payload');
+        console.error('whatsappBotWorker: STOPPED — missing phone or batchToken in payload');
         return res.sendStatus(200); // malformed task — don't retry
       }
 
       const db = getFirestore();
       const config = await getGlobalsConfig(db);
+      console.log('whatsappBotWorker: config loaded, aiBotEnabled:', config.aiBotEnabled, 'botMode:', config.botMode);
 
       // Kill switch may have flipped after the task was enqueued
-      if (config.aiBotEnabled === false) return res.sendStatus(200);
+      if (config.aiBotEnabled === false) {
+        console.log('whatsappBotWorker: STOPPED — aiBotEnabled is false for', phone);
+        return res.sendStatus(200);
+      }
 
       const pendingRef = db.collection('whatsapp_pending').doc(phone);
       const pendingSnap = await pendingRef.get();
-      if (!pendingSnap.exists) return res.sendStatus(200);
+      if (!pendingSnap.exists) {
+        console.log('whatsappBotWorker: STOPPED — no whatsapp_pending doc for', phone);
+        return res.sendStatus(200);
+      }
 
       const pending = pendingSnap.data();
+      console.log('whatsappBotWorker: processing phone:', phone, 'messages count:', (pending.messages || []).length);
       // A newer message arrived and rescheduled work under a fresh token — this run is stale
-      if (pending.batchToken !== batchToken) return res.sendStatus(200);
+      if (pending.batchToken !== batchToken) {
+        console.log('whatsappBotWorker: STOPPED — stale batchToken for', phone, '(pending has a newer batch)');
+        return res.sendStatus(200);
+      }
 
       const effectiveMode = resolveEffectiveMode(config);
       const convoRef        = db.collection('whatsapp_conversations').doc(phone);
@@ -669,6 +682,7 @@ exports.whatsappBotWorker = onRequest(
           .limit(1)
           .get();
         if (!ownerSnap.empty) {
+          console.log('whatsappBotWorker: STOPPED — owner replied since batch started for', phone);
           await deletePendingIfTokenMatches(db, phone, batchToken);
           return res.sendStatus(200);
         }
@@ -689,6 +703,7 @@ exports.whatsappBotWorker = onRequest(
         const ownerAt = toJsDate(lastOwnerMsg.timestamp);
         const withinWindow = ownerAt && (Date.now() - ownerAt.getTime()) < ownerSilenceWindowMinutes * 60 * 1000;
         if (withinWindow && isShortAcknowledgement(combinedGuestText)) {
+          console.log('whatsappBotWorker: STOPPED — owner continuation silence (within window + short ack) for', phone);
           await deletePendingIfTokenMatches(db, phone, batchToken);
           return res.sendStatus(200);
         }
@@ -697,6 +712,7 @@ exports.whatsappBotWorker = onRequest(
       // CHANGE 6 — guest only said "okay"/"thanks" after the host (or the bot)
       // already closed the topic in the immediately preceding turn.
       if (shouldStaySilentFromHistory(recentNewestFirst, combinedGuestText)) {
+        console.log('whatsappBotWorker: STOPPED — short-ack-after-owner/assistant silence for', phone);
         await deletePendingIfTokenMatches(db, phone, batchToken);
         return res.sendStatus(200);
       }
@@ -761,7 +777,9 @@ exports.whatsappBotWorker = onRequest(
       const modeContext = buildModeContext(effectiveMode, config.ownerPhone);
       const systemWithContext = `${SYSTEM_PROMPT}\n\n${guestContext}\n\n${modeContext}`;
 
+      console.log('whatsappBotWorker: calling Claude for phone:', phone);
       let aiReply = await callClaude({ system: systemWithContext, messages: history });
+      console.log('whatsappBotWorker: Claude responded, length:', (aiReply || '').length);
 
       let escalated = false;
       let escalationReason = 'escalation';
@@ -785,7 +803,7 @@ exports.whatsappBotWorker = onRequest(
       // presence test — any reply carrying this tag sends nothing at all,
       // even if other text is attached.
       if (isSilentAiReply(aiReply)) {
-        console.log(`whatsappBotWorker: SILENT ([SILENT] tag) for ${phone}`);
+        console.log(`whatsappBotWorker: STOPPED — [SILENT] tag for ${phone}`);
         await deletePendingIfTokenMatches(db, phone, batchToken);
         return res.sendStatus(200);
       }
@@ -867,6 +885,7 @@ exports.whatsappBotWorker = onRequest(
 
       await deletePendingIfTokenMatches(db, phone, batchToken);
 
+      console.log('whatsappBotWorker: completed normally for', phone);
       return res.sendStatus(200);
     } catch (err) {
       console.error('whatsappBotWorker error:', err);
