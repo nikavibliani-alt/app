@@ -666,7 +666,14 @@ exports.whatsappWebhook = onRequest(
 exports.whatsappBotWorker = onRequest(
   {
     region: 'europe-west1',
-    timeoutSeconds: 120,
+    timeoutSeconds: 60,
+    // Cold start loads firebase-admin/firestore's full dependency graph
+    // (google-gax + @opentelemetry/api + large proto JSON descriptors) —
+    // measured locally as needing well over the platform's default (small)
+    // memory tier under load, sometimes contending for close to 2GB of V8
+    // heap. Underprovisioned memory here is a leading suspect for a cold
+    // start that OOM-kills the instance before the handler ever runs.
+    memory: '512MiB',
     // Pin the invoker to the Cloud Tasks service account by name, rather than
     // 'private' + a manual `gcloud run services add-iam-policy-binding`. With
     // 'private', Firebase doesn't manage any invoker binding at all, so the
