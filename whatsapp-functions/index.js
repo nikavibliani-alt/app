@@ -677,6 +677,7 @@ exports.whatsappBotWorker = onRequest(
     secrets: ['META_ACCESS_TOKEN', 'META_PHONE_NUMBER_ID', 'ANTHROPIC_API_KEY'],
   },
   async (req, res) => {
+    console.log('whatsappBotWorker: raw request received');
     try {
       console.log('whatsappBotWorker: request received', JSON.stringify(req.body).substring(0, 200));
 
