@@ -5,33 +5,105 @@
 // unit-testable without loading firebase-functions. Incorporates the narrow
 // owner-silence behaviors from PR #48 (cursor/whatsapp-away-owner-silence-c97c):
 // owner-echo pending clear in all modes, owner-since-batch-start check in all
-// modes, short-acknowledgement silence, and [SILENT] tag support.
+// modes, short-acknowledgement silence, and [SILENT] tag support. Later
+// expanded with multilingual acknowledgment detection and escalation-aware
+// "waiting for an update" follow-up detection (Category 4).
 
 // Cyrillic, Arabic, Georgian, Hebrew — non-Latin script blocks. A message
 // built from these isn't emoji/punctuation-only even after ASCII stripping
 // leaves it empty, so it must never be treated as a silent ack.
 const NON_ASCII_SCRIPT_RE = /[Ѐ-ӿ؀-ۿა-ჿ֐-׿]/u;
 
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Builds `^(?:p1|p2|...)(?:\s+(?:p1|p2|...))*$` — the whole cleaned string must be
+ * made up of nothing but known phrases, longest-first so a longer phrase always
+ * wins over a shorter prefix of it. */
+function buildWholeStringPhraseRegex(phrases, flags) {
+  const sorted = [...phrases].sort((a, b) => b.length - a.length).map(escapeRegExp);
+  const alt = sorted.join('|');
+  return new RegExp(`^(?:${alt})(?:\\s+(?:${alt}))*$`, flags);
+}
+
+// ---- CATEGORY 1 (simple acknowledgments) + 2 (thank-you) + 5 (positive
+// reactions) + 6 (confirmation of receipt) — Latin-script, matched against the
+// ASCII-cleaned text (emoji/punctuation stripped, lowercased).
+const ACK_WORDS_LATIN = [
+  // Category 1 — simple acknowledgments (English)
+  'ok', 'okay', 'k', 'kk', 'okey', 'alright', 'all right', 'sure', 'fine', 'got it',
+  'understood', 'noted', 'i see', 'i understand', 'makes sense', 'sounds good',
+  'sounds great', 'perfect', 'wonderful', 'excellent', 'great', 'good', 'nice',
+  'cool', 'awesome', 'brilliant', 'no problem', 'no worries', 'np', 'will do',
+  // Category 2 — thank you variations
+  'thanks', 'thank you', 'thx', 'ty', 'thankyou', 'thank u', 'many thanks',
+  'thanks a lot', 'thanks so much', 'merci', 'gracias', 'cheers',
+  // Category 5 — positive reactions
+  'amazing', 'fantastic', 'lovely', 'exactly', 'precisely', 'thats right',
+  "that's right", 'correct', 'yes exactly', 'yes perfect',
+  // Category 6 — confirmation of receipt
+  'received', 'seen', 'read', 'message received', 'duly noted', 'acknowledged',
+];
+const ACK_LATIN_RE = buildWholeStringPhraseRegex(ACK_WORDS_LATIN);
+
+// Non-Latin scripts (Russian, Arabic, Persian, Georgian) — matched against the
+// raw, lightly-normalized text. ASCII-stripping would erase these entirely, so
+// they can't go through the same cleaning pipeline as the Latin list above.
+const ACK_WORDS_NON_LATIN = [
+  // Russian
+  'хорошо', 'понял', 'поняла', 'понятно', 'ок', 'окей', 'спасибо', 'ладно',
+  'договорились', 'ясно', 'отлично', 'супер', 'пойдёт', 'благодарю',
+  // Arabic
+  'حسناً', 'حسنا', 'تمام', 'شكراً', 'شكرا', 'مفهوم', 'موافق', 'حسن', 'ماشي',
+  'طيب', 'اوك', 'تمام تمام',
+  // Persian
+  'باشه', 'خوب', 'ممنون', 'فهمیدم', 'باشه ممنون', 'چشم', 'حتماً', 'حتما',
+  // Georgian
+  'კარგი', 'გასაგებია', 'გმადლობ', 'ცხადია', 'კი',
+];
+const ACK_NON_LATIN_RE = buildWholeStringPhraseRegex(ACK_WORDS_NON_LATIN, 'u');
+
+function normalizeNonLatin(raw) {
+  return raw
+    .toLowerCase() // no-op for Arabic/Persian/Georgian; meaningful for Cyrillic
+    .replace(/[!.,;:()\-–—"'«»]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
- * Short guest acknowledgements like "okay" / "thanks" after the topic was
- * already closed. Kept strict so we never invent follow-up chatter.
+ * Short guest acknowledgements — Categories 1, 2, 3 (emoji/punctuation-only),
+ * 5, and 6. Kept strict so we never mistake a real message for a closed topic:
+ * - never true if it contains a "?" (looks like a real question — see
+ *   isWaitingFollowUpAfterEscalation for the one escalation-context exception,
+ *   which is intentionally a separate function, not folded in here)
+ * - never true if longer than 60 characters
+ * - never true for non-ASCII-script text longer than 15 characters (could be
+ *   a real sentence in that script) — and even under 15 chars, only true if
+ *   it actually matches a known short ack phrase in that script, not just
+ *   "short and non-Latin"
  */
 function isShortAcknowledgement(text) {
-  const raw = String(text || '').trim().toLowerCase();
-  if (!raw || raw.length > 48) return false;
+  const raw = String(text || '').trim();
+  if (!raw) return false;
+  if (raw.length > 60) return false;
+  if (raw.includes('?')) return false;
+
+  if (NON_ASCII_SCRIPT_RE.test(raw)) {
+    if (raw.length > 15) return false;
+    const normalized = normalizeNonLatin(raw);
+    return !!normalized && ACK_NON_LATIN_RE.test(normalized);
+  }
+
   const cleaned = raw
-    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+    .toLowerCase()
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '') // Category 3 — emoji
     .replace(/[^a-z0-9\s']/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  if (!cleaned) {
-    // Nothing ASCII left. Only an ack if that's because the original was
-    // purely emoji/punctuation — not because it was non-English script text
-    // (e.g. Arabic "مساعدة" / help, or a frustrated "???" written in another
-    // script) that stripping simply can't see.
-    return !NON_ASCII_SCRIPT_RE.test(raw);
-  }
-  return /^(ok|okay|k|kk|okey|alright|all right|got it|understood|thanks|thank you|thx|ty|cool|fine|sure|perfect|great|no problem|np|will do|noted)(\s+(ok|okay|thanks|thank you|thx|ty))?$/.test(cleaned);
+  if (!cleaned) return true; // emoji-only / punctuation-only (Category 3)
+  return ACK_LATIN_RE.test(cleaned);
 }
 
 /** True if the model's raw reply carries a [SILENT] tag anywhere. */
@@ -39,24 +111,70 @@ function isSilentAiReply(text) {
   return /\[SILENT\]/i.test(String(text || ''));
 }
 
+// CATEGORY 4 — a guest nudging for an update ("any update?", "hello?") is only
+// silence-worthy when the previous bot/owner message actually reads as an
+// escalation ("let me check", "alerting the team", ...). Deliberately separate
+// from isShortAcknowledgement: several of these patterns contain "?", which
+// isShortAcknowledgement treats as a hard "this is a real question" signal —
+// that's correct there (no escalation context to check against), but wrong
+// here once we know what the bot already promised.
+const WAITING_FOLLOWUP_PATTERNS = [
+  /^still waiting\b/i,
+  /^any update\b/i,
+  /^hello[?!.]*$/i,
+  /^hi[?!.]*$/i,
+  /^\?{1,3}$/,
+  /^anyone there[?!.]*$/i,
+  /^are you there[?!.]*$/i,
+  /^how long\b/i,
+  /^when will\b/i,
+  /^it'?s been .*(minute|hour|min|hr)/i,
+];
+
+// Deliberately generous — matched against SYSTEM_PROMPT's actual escalation
+// reply texts (lockout, flooding, cleaning, utilities, noise, extra guests,
+// the generic fallback, ...), not just one or two examples.
+const ESCALATION_PHRASE_RE = /\b(let me check|will get back to you|get back to you|alerting the team|i am alerting|contacting our team|looking into this|look into this|checking on this|we will check|we will look into|will look into|someone (from our team )?will follow up|noted this|will update you|keep you updated|will arrange this|someone is on the way|our team will|i need to check this|sorted)\b/i;
+
+/** True if `text` (a past bot/owner message) reads as having escalated something. */
+function isEscalationMessage(text) {
+  return ESCALATION_PHRASE_RE.test(String(text || ''));
+}
+
+/**
+ * CATEGORY 4 — should a guest's "waiting for an update" nudge stay silent?
+ * Only when the specific previous message being checked against actually
+ * escalated something; the same nudge with no escalation context should
+ * still reach Claude (it might be a genuine new question, e.g. first "hello").
+ */
+function isWaitingFollowUpAfterEscalation(guestText, previousMessageContent) {
+  const raw = String(guestText || '').trim();
+  if (!raw || raw.length > 60) return false;
+  if (!isEscalationMessage(previousMessageContent)) return false;
+  return WAITING_FOLLOWUP_PATTERNS.some((re) => re.test(raw));
+}
+
 /**
  * After skipping trailing guest messages in this batch, should the bot stay
  * silent? messages: newest-first array of { role, content }.
  *
- * - Previous speaker is owner + short ack ("okay", "thanks") -> silent (the Away incident).
- * - Previous speaker is assistant + short ack -> silent (don't invent follow-up chatter).
- * - Previous speaker is owner + a real new question -> do NOT silence here; let Claude
- *   handle it (the owner may have only answered an earlier topic).
+ * - Previous speaker is owner/assistant + short ack ("okay", "thanks") -> silent.
+ * - Previous speaker is owner/assistant + a waiting nudge ("any update?") AND
+ *   that specific previous message escalated something -> silent (Category 4).
+ * - Previous speaker is owner/assistant + a real new question -> do NOT
+ *   silence here; let Claude handle it.
+ * - No previous non-guest message at all (including: this is the first
+ *   message in the conversation) -> never silent.
  */
 function shouldStaySilentFromHistory(messagesNewestFirst, guestText) {
   const msgs = Array.isArray(messagesNewestFirst) ? messagesNewestFirst : [];
   let i = 0;
   while (i < msgs.length && (msgs[i].role === 'user' || msgs[i].role === 'guest')) i += 1;
   if (i >= msgs.length) return false;
-  const prevRole = msgs[i].role;
-  if ((prevRole === 'owner' || prevRole === 'assistant') && isShortAcknowledgement(guestText)) {
-    return true;
-  }
+  const prevMsg = msgs[i];
+  if (prevMsg.role !== 'owner' && prevMsg.role !== 'assistant') return false;
+  if (isShortAcknowledgement(guestText)) return true;
+  if (isWaitingFollowUpAfterEscalation(guestText, prevMsg.content)) return true;
   return false;
 }
 
@@ -69,6 +187,8 @@ function findMostRecentOwnerMessage(messagesNewestFirst) {
 module.exports = {
   isShortAcknowledgement,
   isSilentAiReply,
+  isEscalationMessage,
+  isWaitingFollowUpAfterEscalation,
   shouldStaySilentFromHistory,
   findMostRecentOwnerMessage,
 };

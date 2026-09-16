@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const {
   isShortAcknowledgement,
   isSilentAiReply,
+  isWaitingFollowUpAfterEscalation,
   shouldStaySilentFromHistory,
   findMostRecentOwnerMessage,
 } = require('./ownerSilence');
@@ -49,6 +50,15 @@ TONE RULES:
 - No AI filler phrases like Certainly, Of course, Thank you for reaching out, I understand, I hope this helps
 - Use emojis very sparingly, maximum 1 per message, only when it feels completely natural
 - Never sound robotic or like a template
+
+REPEAT PREVENTION:
+Check the conversation history before every reply. If you already answered this exact question earlier in this conversation, do not give the same answer again. If [VIDEO_SENT:id] already appears in history for this topic, do not send the video again — give additional clarification in text only instead. If you already said something like "let me check and get back to you" for this same topic, do not say it again for a follow-up on it — reply with only [SILENT] instead.
+
+ANGRY GUEST DETECTION:
+If the guest's message contains language like unacceptable, disgusting, terrible, awful, horrible, refund, compensation, complaint, I'm angry, very disappointed, this is a joke, ridiculous, never coming back, worst, scam, fraud, or cheated, do not attempt to handle it yourself. Reply with only [URGENT:ANGRY] and nothing else — no guest-facing text at all. This alerts the owner immediately and sends nothing to the guest.
+
+CONVERSATION TAKEOVER DETECTION:
+If the conversation history shows you or the host already escalated an issue, and the guest's message is a follow-up without a resolution yet appearing in the history, reply with only [SILENT] — the owner is already handling it.
 
 GUEST CONTEXT (injected with each message):
 - Guest name
@@ -201,7 +211,8 @@ When a scenario says to use [SILENT], or the conversation history already shows 
 
 FOR URGENT ISSUES:
 For a guest lockout or smart lock failure, add [URGENT:LOCKOUT] right after [ESCALATE]. For flooding or a security issue, add [URGENT:ISSUE] right after [ESCALATE]. Both tags are stripped before sending and trigger an immediate owner alert regardless of bot mode or time of day.
-Example: I am contacting our team right now and will update you shortly. [ESCALATE] [URGENT:LOCKOUT]`;
+Example: I am contacting our team right now and will update you shortly. [ESCALATE] [URGENT:LOCKOUT]
+[URGENT:ANGRY] is different — see ANGRY GUEST DETECTION above. Use it alone, with no guest-facing text, unlike [URGENT:LOCKOUT]/[URGENT:ISSUE] which come after a normal reply.`;
 
 const SUMMARY_SYSTEM_PROMPT = 'Summarize this guest WhatsApp conversation into 3-5 bullet points covering: issues they had, requests they made, how they communicated, anything notable. Be very brief.';
 
@@ -635,12 +646,10 @@ exports.whatsappWebhook = onRequest(
 
         const config = await getGlobalsConfig(db);
 
-        // CHANGE 1 — hard kill switch
+        // CHANGE 1 — hard kill switch. The inbound message is already saved (above,
+        // unconditionally); no alert and no Cloud Task while paused — alerts are
+        // reserved for when the bot is ON but can't handle something itself.
         if (config.aiBotEnabled === false) {
-          await writeAlert(db, { reason: 'bot_paused', phone, message: text });
-          if (config.ownerPhone) {
-            await notifyOwner(config.ownerPhone, `AI assistant is paused. New WhatsApp message from ${phone}: "${text}"`);
-          }
           return res.sendStatus(200);
         }
 
@@ -764,8 +773,11 @@ exports.whatsappBotWorker = onRequest(
       if (lastOwnerMsg) {
         const ownerAt = toJsDate(lastOwnerMsg.timestamp);
         const withinWindow = ownerAt && (Date.now() - ownerAt.getTime()) < ownerSilenceWindowMinutes * 60 * 1000;
-        if (withinWindow && isShortAcknowledgement(combinedGuestText)) {
-          console.log('whatsappBotWorker: STOPPED — owner continuation silence (within window + short ack) for', phone);
+        if (withinWindow && (
+          isShortAcknowledgement(combinedGuestText)
+          || isWaitingFollowUpAfterEscalation(combinedGuestText, lastOwnerMsg.content)
+        )) {
+          console.log('whatsappBotWorker: STOPPED — owner continuation silence (within window + short ack/waiting nudge) for', phone);
           await deletePendingIfTokenMatches(db, phone, batchToken);
           return res.sendStatus(200);
         }
@@ -858,6 +870,33 @@ exports.whatsappBotWorker = onRequest(
       if (videoMatch) {
         videoMediaId = videoMatch[1];
         aiReply = aiReply.slice(videoMatch[0].length).trim();
+      }
+
+      // ANGRY GUEST DETECTION — checked before [SILENT] since it needs its own,
+      // different combination: full silence to the guest (like [SILENT]) but
+      // still an immediate urgent owner alert (like [URGENT:...]), which
+      // [SILENT]'s own early-return doesn't do. The model is asked to output
+      // only this tag with no guest-facing text; treated as a presence test
+      // regardless, same as the other tags.
+      if (/\[URGENT:ANGRY\]/i.test(aiReply)) {
+        console.log(`whatsappBotWorker: STOPPED — angry/complaint guest, urgent silent alert for ${phone}`);
+        await writeAlert(db, {
+          reason: 'angry_guest',
+          phone,
+          guestName,
+          room: roomCode,
+          message: combinedGuestText,
+          mode: effectiveMode,
+          urgency: true,
+        });
+        if (config.ownerPhone) {
+          await notifyOwner(
+            config.ownerPhone,
+            `URGENT: ${guestName} ${roomCode || 'unknown room'} — angry/complaint guest: ${combinedGuestText.slice(0, 300)}`
+          );
+        }
+        await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
       }
 
       // CHANGE 7 — [SILENT]: the model asked to send nothing (host already
