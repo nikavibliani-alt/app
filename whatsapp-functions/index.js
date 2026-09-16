@@ -187,6 +187,11 @@ Example:
 [VIDEO:975338858914982]
 The nearest paid parking is under Carrefour...
 
+FOR FOLLOW-UP QUESTIONS:
+Before replying, check whether the guest's message is a follow-up about something you already answered earlier in this conversation history. If it is, do not repeat the same answer and do not send the same video again — acknowledge what you already told them and give additional clarification instead.
+If a past Assistant turn in the history contains [VIDEO_SENT:media_id], that video has already been sent in this conversation for that topic. Do not include [VIDEO:media_id] again for the same topic in your reply. [VIDEO_SENT:...] is a system marker only — never write it yourself.
+Example: you already sent the bag storage video and explained it. Guest asks "is it on the street?" — answer that specific question in plain text (e.g. clarify the location) instead of resending the video.
+
 FOR ESCALATION:
 When you include [ESCALATE] in your response, place it at the very end after the guest-facing text. It will be stripped before sending to the guest and used internally to alert the owner.
 Example: Sorry about that, I am alerting the team now. [ESCALATE]
@@ -865,12 +870,16 @@ exports.whatsappBotWorker = onRequest(
         return res.sendStatus(200);
       }
 
-      // Strip trailing [ESCALATE] / [URGENT:...] tags — internal only, never sent to WhatsApp
+      // Strip trailing [ESCALATE] / [URGENT:...] tags — internal only, never sent to WhatsApp.
+      // [VIDEO_SENT:id] is stripped defensively too — it's a marker WE write into stored
+      // history (see below), never something the model is asked to output, but a model can
+      // echo patterns it sees in its own context, so guard the guest-facing send anyway.
       const hasEscalateTag = /\[ESCALATE\]/i.test(aiReply);
       const urgentMatch = aiReply.match(/\[URGENT:(LOCKOUT|ISSUE)\]/i);
       aiReply = aiReply
         .replace(/\s*\[ESCALATE\]\s*/gi, ' ')
         .replace(/\s*\[URGENT:(?:LOCKOUT|ISSUE)\]\s*/gi, ' ')
+        .replace(/\s*\[VIDEO_SENT:\d+\]\s*/gi, ' ')
         .replace(/\s+$/, '')
         .trim();
       if (hasEscalateTag) {
@@ -913,9 +922,13 @@ exports.whatsappBotWorker = onRequest(
         text: { body: aiReply },
       });
 
+      // Mark in stored history (never in the guest-facing send above) that a video
+      // was sent, so a later Claude call can see it and not resend the same video
+      // for a follow-up question on the same topic — see FOR FOLLOW-UP QUESTIONS.
+      const storedAssistantContent = videoMediaId ? `${aiReply}\n[VIDEO_SENT:${videoMediaId}]` : aiReply;
       await convoMessagesRef.add({
         role: 'assistant',
-        content: aiReply,
+        content: storedAssistantContent,
         timestamp: FieldValue.serverTimestamp(),
       });
 
@@ -1107,7 +1120,9 @@ exports.summarizeGuestConversation = onDocumentWritten(
     const conversationText = messagesSnap.docs
       .map((d) => {
         const m = d.data();
-        return `${m.role === 'assistant' ? 'Assistant' : m.role === 'owner' ? 'Host' : 'Guest'}: ${m.content}`;
+        // Strip the internal [VIDEO_SENT:id] follow-up marker — noise for the summarizer.
+        const content = String(m.content || '').replace(/\s*\[VIDEO_SENT:\d+\]\s*/gi, ' ').trim();
+        return `${m.role === 'assistant' ? 'Assistant' : m.role === 'owner' ? 'Host' : 'Guest'}: ${content}`;
       })
       .join('\n');
 
