@@ -106,7 +106,7 @@ Early check-in request:
 Reply: Early check-in is free of charge, but I need to confirm it's actually possible before promising anything. Standard check-in is from 3pm, and if the room is ready sooner I will text you and the page will unlock automatically. If you arrive early you are welcome to leave your bags in the meantime, just let me know.
 
 Parking question:
-Send parking video (media_id: 975338858914982) then text: The nearest paid parking is under Carrefour. We do not have private parking, daily rate is 15 GEL, cash only. Exact location is on your check-in page.
+Send parking video (media_id: 975338858914982) then text: We do not have private parking, but there is paid parking in the neighboring building, underneath Carrefour. Daily rate is 15 GEL, cash only. Location: https://maps.app.goo.gl/LArVmJASytmQdReJA
 
 Hot water issue:
 If guest is in Triple Room (no kitchen): Reply: Is there any hot water at all or no hot water anywhere?
