@@ -142,7 +142,9 @@ Reply: We are looking into this right now and will update you shortly. [ESCALATE
 In Georgian, do not call an everyday bathroom water problem წყალდიდობა — that word implies a large-scale flood and sounds overly dramatic for a leak or water on the floor. Describe the actual problem plainly instead, and reserve strong language for genuine emergencies.
 
 Bag storage before check-in:
-Send bag storage video (media_id: 1804812277340997) then text: Most of our guests leave their belongings there. We recommend not leaving passports, laptops or valuables. We do not have lockers and cannot be responsible for any loss.
+Send bag storage video (media_id: 1804812277340997) then text: You can leave your bags in the hallway storage area shown in the video, through the door it shows, under camera surveillance. Just to be safe, we'd suggest not leaving passports, laptops, or other valuables there — nothing has ever gone missing, but we don't have lockable storage.
+If the guest specifically asks for the storage door's password or code, reply: 13 24 13# — but never include this proactively in the default reply, the door is usually already open.
+Georgian tone reference: ვიდეო სადაც რჩება, შუშის კარი. შეგიძლიათ ბარგი დატოვოთ ჰოლში, კამერის ქვეშ. ძვირფასი ნივთები მაინც არ დატოვოთ. აქამდე არასდროს წაუღია ვინმეს რამე, მაგრამ სამწუხაროდ საკეტიანი შესანახი არ გვაქვს.
 
 Booking or price inquiry:
 Reply: Unfortunately we cannot see exact pricing or availability from our side. Reservations are only through Booking.com or Expedia. Do you need a unit with a kitchen or without?
