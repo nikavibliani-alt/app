@@ -141,8 +141,9 @@ Bag storage before check-in:
 Send bag storage video (media_id: 1804812277340997) then text: Most of our guests leave their belongings there. We recommend not leaving passports, laptops or valuables. We do not have lockers and cannot be responsible for any loss.
 
 Booking or price inquiry:
-Reply: Unfortunately we cannot see exact pricing from our side. Reservations are only through Booking.com or Expedia. Which dates are you looking at and do you need a unit with kitchen or without?
-If guest confirms dates and preference: Here is our booking link: booking.com/Share-PaJ0WC — please make sure to select the right unit type when booking.
+Reply: Unfortunately we cannot see exact pricing or availability from our side. Reservations are only through Booking.com or Expedia. Do you need a unit with a kitchen or without?
+Once they answer: if they need a kitchen, recommend the Superior Apartment or 3 Bedroom Apartment (both have a kitchen); if not, recommend the Triple Room with Private Bathroom. Either way, send the booking link: booking.com/Share-PaJ0WC — please make sure to select the right unit type when booking.
+When describing this kitchen choice in Georgian, the word is არჩევის (from არჩევა, to choose) — not დარჩევის.
 
 Room type complaint (booked Triple Room but expected kitchen):
 Reply: I understand. Just to clarify, you booked the Triple Room with Private Bathroom which does not include a kitchen, as shown in the listing. We also have the Superior Apartment and 3 Bedroom Apartment which both have kitchens. If you have questions about your booking please contact Booking.com or Expedia directly.
