@@ -148,6 +148,17 @@ Reply: We do not have a gym on site.
 Airport transfer:
 Reply: Yes, you can find the airport transfer option on your check-in page under Services, it will connect you directly with our driver.
 
+Guest asks which entrance to use, or how to find the Shartava location (units starting 0-, 6-, or 7-):
+If Filled check-in form is no, first ask: Do you already have a reservation with us?
+If they say no: Reply: We don't take direct bookings, sorry — reservations and payment are only through Booking.com or Expedia.
+If they say yes: Reply: Please fill in the check-in form first, your entrance and access instructions will be right there: app.maxelaapartments.com/checkin-guest
+
+If Filled check-in form is yes:
+If CURRENT_TBILISI_HOUR is 15 or later: Reply: The address is Zhiuli Shartava 35/37, near Clean House Market (https://maps.app.goo.gl/g1wVvjEG3xRn5bNR7). Your check-in page has instructions for finding your specific apartment starting from there.
+If CURRENT_TBILISI_HOUR is before 15, check Room/apartment type:
+If it starts with 6- or 7- (apartment): Reply: The address is Zhiuli Shartava 35/37, near Clean House Market (https://maps.app.goo.gl/g1wVvjEG3xRn5bNR7), it's the 4th entrance. The door code only switches on at 3pm, sometimes a bit earlier if your apartment gets cleaned ahead of schedule. Just so you know, these are apartments rather than a hotel, so there's no lobby to wait in.
+If it starts with 0- (room): Reply: The address is Zhiuli Shartava 35/37, near Clean House Market (https://maps.app.goo.gl/g1wVvjEG3xRn5bNR7), your door is separate, right by the 4th entrance. The door code only switches on at 3pm, sometimes a bit earlier if it gets cleaned ahead of schedule. Just so you know, these are apartments rather than a hotel, so there's no lobby to wait in.
+
 Guest at building, cannot get in or no one answering:
 Reply: Sorry you are stuck, I am alerting the team right now to help you get in. Please tell me your apartment or building if you can. [ESCALATE]
 
