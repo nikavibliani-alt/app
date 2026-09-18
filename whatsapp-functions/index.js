@@ -161,6 +161,10 @@ This is a normal request, not something to apologize for — do not apologize or
 In Georgian, use exactly: შევამოწმებ და გაგაგებინებთ მალე. — no ბოდიშს გიხდით, no other preamble.
 Never suggest alternative rooms, views, sightseeing spots, or Tbilisi recommendations to fill the gap while this is pending. Use [SILENT] instead of inventing anything.
 
+Guest mentions Freedom Square, Tabidze, or Galaktion Tabidze street:
+This is not our Shartava property, and there is no scenario for it. Use [SILENT] — send nothing, no reply, no escalation. Never use Shartava-specific facts (entrance, address, door codes, etc.) for this guest.
+Note: this is enforced in code as a sticky per-conversation flag once detected — every later message in this conversation is also silenced automatically, not just the one that mentioned it.
+
 Gym inquiry:
 Reply: We do not have a gym on site.
 
@@ -529,6 +533,35 @@ function classifyIncomingContent(msg) {
   return '[unsupported]';
 }
 
+// ---- Freedom Square / Tabidze sticky silence --------------------------------
+// Freedom Square guests are not at our Shartava property and we have no
+// scenario for them — once a guest's message mentions this area, the bot must
+// never speak to that conversation again, since any of our factual scenarios
+// (Shartava entrance, bag storage, etc.) would be wrong for their location.
+// Deliberately excludes a bare "galaktion" (a common Georgian first name,
+// unrelated to the street) — only "tabidze" alone or "galaktion tabidze"
+// together are treated as unambiguous.
+// Georgian word stems (not full words) on purpose — Georgian noun declension
+// changes the ending (e.g. "ტაბიძის" = "of Tabidze's"), so matching the stem
+// catches every grammatical case, not just the nominative form.
+const FREEDOM_SQUARE_KEYWORDS = [
+  'freedom square',
+  'tabidze',
+  'galaktion tabidze',
+  'თავისუფლების მოედანი',
+  'თავისუფლების',
+  'ტაბიძ',
+  'გალაკტიონ ტაბიძ',
+  'tavisuplebis moedani',
+  'tavisuplebis',
+];
+const FREEDOM_SQUARE_RE = new RegExp(FREEDOM_SQUARE_KEYWORDS.join('|'), 'iu');
+
+/** True if `text` mentions Freedom Square / Tabidze by any known spelling. */
+function isFreedomSquareMessage(text) {
+  return FREEDOM_SQUARE_RE.test(String(text || ''));
+}
+
 /**
  * Meta can redeliver the same webhook payload (slow/ambiguous response,
  * network retries), which would otherwise rotate whatsapp_pending's
@@ -824,6 +857,22 @@ exports.whatsappBotWorker = onRequest(
       const convoRef        = db.collection('whatsapp_conversations').doc(phone);
       const convoMessagesRef = convoRef.collection('messages');
       const combinedGuestText = (pending.messages || []).join('\n');
+
+      // Freedom Square / Tabidze sticky silence — once flagged, always silent
+      // for this conversation. Checked before every other branch since it must
+      // override everything else (owner replies, escalations, etc. are moot —
+      // the bot should never speak to this conversation again).
+      const convoSnap = await convoRef.get();
+      const alreadyFreedomSquare = convoSnap.exists && convoSnap.data().isFreedomSquare === true;
+      if (alreadyFreedomSquare || isFreedomSquareMessage(combinedGuestText)) {
+        if (!alreadyFreedomSquare) {
+          await convoRef.set({ isFreedomSquare: true }, { merge: true });
+          console.log('whatsappBotWorker: Freedom Square/Tabidze keyword detected — flagging', phone, 'silent for good');
+        }
+        console.log('whatsappBotWorker: STOPPED — Freedom Square/Tabidze sticky silence for', phone);
+        await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
+      }
 
       // CHANGE 5 — owner replied since this batch started, in ALL modes (not just
       // Available). Available-only used to miss the Away incident: the host
