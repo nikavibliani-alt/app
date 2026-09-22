@@ -4460,7 +4460,7 @@ window.validateNameInput=function(value){
     return;
   }
   // Check for non-Latin characters (Arabic, Russian, Georgian etc)
-  const hasNonLatin=/[^ -À-ɏ\s\-']/.test(trimmed);
+  const hasNonLatin=/[^\u0000-\u007F\u00C0-\u024F\s\-']/.test(trimmed);
   if(hasNonLatin){
     showHint(hint,'red',t('nameHintNonLatin'));
     return;
