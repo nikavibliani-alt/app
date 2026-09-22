@@ -2215,7 +2215,7 @@ const WA_MSG_DEFAULTS={
     freedom:'Hello {{firstName}},\n\nWelcome to Freedom Square Studios!\n\nTo access your check-in instructions, door code and WiFi details, please complete your online check-in:\n\n{{checkinUrl}}\n\nIt only takes 2 minutes. Once completed, everything you need for your stay will be available instantly.\n\nLooking forward to welcoming you!\nFreedom Square Studios Team',
     orbeliani:'Hello {{firstName}},\n\nWelcome to Midamo Orbeliani!\n\nTo access your check-in instructions and WiFi details, please complete your online check-in:\n\n{{checkinUrl}}\n\nIt only takes 2 minutes.\n\nLooking forward to welcoming you!\nMidamo Orbeliani Team',
   },
-  searchFailure:"Hi, I tried to check in online but couldn't find my booking. Name: {{inputName}}, arrival: {{inputDate}}{{inputRef}}.",
+  searchFailure:"Hi! I can see you had trouble finding your booking.{{inputNameLine}}\n\nPlease reply with your full name in English (first and last name) and your check-in date — the first day of your reservation.",
 };
 const WA_INVITE_KEYS=[
   {id:'maxela',label:'Maxela / Shartava',hint:'Rooms 6-*, 7-*, 0-*, Big Apt — default template'},
@@ -2325,6 +2325,7 @@ function waPreviewVars(kind){
     inputName:WA_PREVIEW_SAMPLES.inputName,
     inputDate:WA_PREVIEW_SAMPLES.inputDate,
     inputRef:WA_PREVIEW_SAMPLES.inputRef,
+    inputNameLine:WA_PREVIEW_SAMPLES.inputName?(' I can see you searched for: '+WA_PREVIEW_SAMPLES.inputName+'.'):'',
   };
 }
 window.waUpdatePreview=function(){
@@ -2397,7 +2398,7 @@ function renderWaSettings(){
   if(!waSettings.checkinInvite[_waInviteProp])waSettings.checkinInvite[_waInviteProp]=WA_MSG_DEFAULTS.checkinInvite[_waInviteProp]||'';
   const inviteChips=['{{firstName}}','{{checkinUrl}}'].map(t=>
     `<button type="button" class="wa-chip" onclick="waInsertChip('wa-invite-editor','${t}')">${t}</button>`).join('');
-  const failChips=['{{inputName}}','{{inputDate}}','{{inputRef}}'].map(t=>
+  const failChips=['{{inputName}}','{{inputDate}}','{{inputRef}}','{{inputNameLine}}'].map(t=>
     `<button type="button" class="wa-chip" onclick="waInsertChip('wa-search-failure','${t}')">${t}</button>`).join('');
   const propPills=WA_INVITE_KEYS.map(k=>
     `<button type="button" class="wa-prop${k.id===_waInviteProp?' active':''}" data-prop="${k.id}" onclick="waSelectInviteProp('${k.id}')">${esc(k.label)}</button>`).join('');
@@ -2602,6 +2603,7 @@ function renderFailures(){
       inputName:f.input_name||'—',
       inputDate:f.input_date||'—',
       inputRef,
+      inputNameLine:f.input_name?(' I can see you searched for: '+f.input_name+'.'):'',
     });
     const wa=norm?`https://wa.me/${norm}?text=${encodeURIComponent(failMsg)}`:null;
     return`<div class="card">
