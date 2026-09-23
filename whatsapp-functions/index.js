@@ -704,14 +704,30 @@ exports.whatsappWebhook = onRequest(
     if (req.method === 'POST') {
       try {
         const body  = req.body;
-        const value = body?.entry?.[0]?.changes?.[0]?.value;
+        const change = body?.entry?.[0]?.changes?.[0];
+        const field = change?.field;
+        const value = change?.value;
         const db    = getFirestore();
+
+        // Diagnostic visibility only (no behavior change) — logs the webhook `field`
+        // whenever it's anything other than the normal inbound-message type, so we
+        // can tell from Cloud Run logs alone whether smb_message_echoes (or any
+        // other field) is actually being delivered, without needing dashboard access.
+        if (field && field !== 'messages') {
+          console.log('whatsappWebhook: received non-messages field:', field, 'value:', JSON.stringify(value)?.slice(0, 1000));
+        }
 
         // CHANGE 3 — coexistence owner echoes (owner/app replied from the WhatsApp Business app).
         // Field name per Meta's Business Coexistence webhook; some accounts may expose it as
         // `message_echoes` instead — check both defensively.
         const echoes = value?.smb_message_echoes || value?.message_echoes;
+        if ((value?.smb_message_echoes !== undefined || value?.message_echoes !== undefined) && !(Array.isArray(echoes) && echoes.length > 0)) {
+          // Echo field present on the payload but empty or not the array shape we expect —
+          // log the raw value so a mismatch in Meta's actual schema is visible, not silent.
+          console.log('whatsappWebhook: echo field present but empty/unmatched, raw value:', JSON.stringify(value)?.slice(0, 1000));
+        }
         if (Array.isArray(echoes) && echoes.length > 0) {
+          console.log('whatsappWebhook: smb_message_echoes matched, count:', echoes.length);
           for (const echo of echoes) {
             // An echo is a message the business (owner) sent TO the guest, so the guest's
             // number is `to`, not `from` (which is the business number).
