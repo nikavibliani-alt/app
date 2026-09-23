@@ -10,6 +10,7 @@ const {
   isWaitingFollowUpAfterEscalation,
   shouldStaySilentFromHistory,
   findMostRecentOwnerMessage,
+  isNonTextPlaceholderOnly,
 } = require('./ownerSilence');
 
 if (!getApps().length) initializeApp();
@@ -930,8 +931,9 @@ exports.whatsappBotWorker = onRequest(
         if (withinWindow && (
           isShortAcknowledgement(combinedGuestText)
           || isWaitingFollowUpAfterEscalation(combinedGuestText, lastOwnerMsg.content)
+          || isNonTextPlaceholderOnly(combinedGuestText)
         )) {
-          console.log('whatsappBotWorker: STOPPED — owner continuation silence (within window + short ack/waiting nudge) for', phone);
+          console.log('whatsappBotWorker: STOPPED — owner continuation silence (within window + short ack/waiting nudge/non-text) for', phone);
           await deletePendingIfTokenMatches(db, phone, batchToken);
           return res.sendStatus(200);
         }

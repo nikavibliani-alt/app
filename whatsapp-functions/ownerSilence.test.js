@@ -9,6 +9,7 @@ const {
   isWaitingFollowUpAfterEscalation,
   shouldStaySilentFromHistory,
   findMostRecentOwnerMessage,
+  isNonTextPlaceholderOnly,
 } = require('./ownerSilence');
 
 test('isShortAcknowledgement', async (t) => {
@@ -179,5 +180,29 @@ test('findMostRecentOwnerMessage', async (t) => {
   await t.test('returns null when there is no owner message', () => {
     assert.equal(findMostRecentOwnerMessage([{ role: 'user', content: 'hi' }]), null);
     assert.equal(findMostRecentOwnerMessage([]), null);
+  });
+});
+
+test('isNonTextPlaceholderOnly — the Roman Lartsev incident replay (Sep 22)', async (t) => {
+  await t.test('each classifyIncomingContent placeholder type qualifies on its own', () => {
+    assert.equal(isNonTextPlaceholderOnly('[image]'), true);
+    assert.equal(isNonTextPlaceholderOnly('[video]'), true);
+    assert.equal(isNonTextPlaceholderOnly('[audio]'), true);
+    assert.equal(isNonTextPlaceholderOnly('[unsupported]'), true, 'the exact placeholder from the incident');
+  });
+  await t.test('a batch of multiple placeholders (multi-image send) still qualifies', () => {
+    assert.equal(isNonTextPlaceholderOnly('[image]\n[image]\n[video]'), true);
+  });
+  await t.test('a placeholder mixed with real guest text does NOT qualify — real question still reaches Claude', () => {
+    assert.equal(isNonTextPlaceholderOnly('[image]\nWhere is the entrance?'), false);
+    assert.equal(isNonTextPlaceholderOnly('Here is a photo of the issue\n[image]'), false);
+  });
+  await t.test('real text alone does not qualify', () => {
+    assert.equal(isNonTextPlaceholderOnly('I have booked an apartment with you for today'), false);
+    assert.equal(isNonTextPlaceholderOnly('okay'), false, 'handled separately by isShortAcknowledgement');
+  });
+  await t.test('empty / whitespace-only text does not qualify', () => {
+    assert.equal(isNonTextPlaceholderOnly(''), false);
+    assert.equal(isNonTextPlaceholderOnly('   '), false);
   });
 });

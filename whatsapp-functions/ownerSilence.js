@@ -184,6 +184,24 @@ function findMostRecentOwnerMessage(messagesNewestFirst) {
   return msgs.find((m) => m.role === 'owner') || null;
 }
 
+// Placeholder strings classifyIncomingContent() stores for non-text messages —
+// these can never match a text-based ack/nudge pattern, so a guest sending a
+// photo/video/voice note right after an active owner reply would otherwise
+// always fall through to "let the bot answer." Treat a batch made up entirely
+// of these placeholders (no real wording at all) as ack-equivalent for the
+// owner-continuation-silence window. A batch mixing a placeholder with real
+// text is NOT covered here — that combination still carries a real question.
+const NON_TEXT_PLACEHOLDER_RE = /^\[(?:image|video|audio|unsupported)\]$/;
+
+/** True if every line of `text` is one of classifyIncomingContent()'s non-text
+ * placeholder strings — i.e. the guest sent no real wording at all, just
+ * media/unsupported content. */
+function isNonTextPlaceholderOnly(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return false;
+  return raw.split('\n').every((line) => NON_TEXT_PLACEHOLDER_RE.test(line.trim()));
+}
+
 module.exports = {
   isShortAcknowledgement,
   isSilentAiReply,
@@ -191,4 +209,5 @@ module.exports = {
   isWaitingFollowUpAfterEscalation,
   shouldStaySilentFromHistory,
   findMostRecentOwnerMessage,
+  isNonTextPlaceholderOnly,
 };
