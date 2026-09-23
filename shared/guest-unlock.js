@@ -57,6 +57,23 @@ function computeGuestUnlock(opts = {}) {
     return { state: 'blocked', unlocked: false, label: 'Blocked', cls: 'waiting', reason: 'blocked' };
   }
 
+  // Admin force-disable overrides the normal time/HK rules.
+  // accessDisabledUntil in the future -> disabled until then.
+  // accessDisabledUntil null -> indefinite, until admin re-enables.
+  // Once "until" passes, falls through below (auto-restore via normal rules).
+  if (guest.accessDisabledByAdmin === true) {
+    const until = guest.accessDisabledUntil;
+    if (until) {
+      const nowMs = opts.nowMs != null ? opts.nowMs : Date.now();
+      const untilMs = new Date(until).getTime();
+      if (Number.isFinite(untilMs) && nowMs < untilMs) {
+        return { state: 'disabled', unlocked: false, label: 'Disabled', cls: 'disabled', reason: 'admin_disabled_until' };
+      }
+    } else {
+      return { state: 'disabled', unlocked: false, label: 'Disabled', cls: 'disabled', reason: 'admin_disabled_indefinite' };
+    }
+  }
+
   const today = opts.today || tbilisiToday();
   const hour = opts.hour != null ? opts.hour : tbilisiHour();
   const checkInHour = opts.checkInHour != null ? opts.checkInHour : DEFAULT_CHECK_IN_HOUR;

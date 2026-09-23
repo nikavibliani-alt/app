@@ -64,17 +64,21 @@ async function runGuestUnlock(ctx, params) {
     const arrivalDate =
       reservationId && resCheckin ? resCheckin : normalizeStayDate(workingGuest.arrivalDate) || resCheckin || '';
 
-    const [apt, hk] = await Promise.all([
+    const yesterday = new Date(new Date(today + 'T00:00:00Z').getTime() - 86400000)
+      .toISOString().slice(0, 10);
+    const [apt, hk, hkYesterday] = await Promise.all([
       aptId ? ctx.getApartment(aptId) : Promise.resolve(null),
       aptId ? ctx.getHkStatus(aptId, today) : Promise.resolve(null),
+      aptId ? ctx.getHkStatus(aptId, yesterday) : Promise.resolve(null),
     ]);
 
     const checkInHour = parseCheckInHour(apt?.checkInTime);
+    const hkDone = hk?.done === true || hkYesterday?.done === true;
     const computed = computeGuestUnlock({
       guest: workingGuest,
       arrivalDate,
       checkInHour,
-      hkDone: hk?.done === true,
+      hkDone,
     });
 
     const nowIso = new Date().toISOString();
@@ -103,7 +107,7 @@ async function runGuestUnlock(ctx, params) {
       status: 'ok',
       message: `${action} ${guestId} → ${computed.state} (${computed.reason})`,
       input,
-      output: { guestId, ...computed, aptId, hkDone: hk?.done === true },
+      output: { guestId, ...computed, aptId, hkDone },
       correlationId,
     });
 

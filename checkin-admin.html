@@ -2716,7 +2716,9 @@ function guestArrivalDate(g,res){
 
 function guestStatus(g,res){
   const today=unlockToday();
+  const yesterday=new Date(new Date(today+'T00:00:00Z').getTime()-86400000).toISOString().slice(0,10);
   const hkKey=(g.aptId||'')+'_'+today;
+  const hkKeyYesterday=(g.aptId||'')+'_'+yesterday;
   const aptCheckIn=aptData[g.aptId]?.checkInTime||'';
   const checkInHour=aptCheckIn?parseInt(String(aptCheckIn).split(':')[0],10):CHECK_IN_HOUR;
   const arrivalDate=guestArrivalDate(g,res);
@@ -2724,7 +2726,7 @@ function guestStatus(g,res){
     guest:g,
     arrivalDate,
     checkInHour:Number.isFinite(checkInHour)?checkInHour:CHECK_IN_HOUR,
-    hkDone:hkStatusData[hkKey]?.done===true,
+    hkDone:hkStatusData[hkKey]?.done===true||hkStatusData[hkKeyYesterday]?.done===true,
     today,
     hour:tbilisiHour(),
   });
@@ -2785,7 +2787,9 @@ function getForm(r){return _formById.get(r.id)||null;}
 function cardStatus(r,form){
   if(!form)return{label:'NO FORM',cls:'pill-pending',key:'nof'};
   if(form.guestConfirmedCheckin===true)return{label:'CHECKED IN',cls:'pill-in',key:'checked'};
-  if(guestStatus(form,r).cls==='unlocked')return{label:'ACCESS GRANTED',cls:'pill-ok',key:'unlocked'};
+  const gs=guestStatus(form,r);
+  if(gs.cls==='unlocked')return{label:'ACCESS GRANTED',cls:'pill-ok',key:'unlocked'};
+  if(gs.cls==='disabled')return{label:'DISABLED',cls:'pill-pending',key:'disabled'};
   return{label:'AWAITING UNLOCK',cls:'pill-await',key:'need'};
 }
 function fmtDate(s){if(!s)return'—';return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
@@ -2970,7 +2974,7 @@ function renderCard(grp,mode){
   const manualBadge=reservationManualBadge(grp);
   const driftBadge=reservationDriftBadge(grp);
   return`<div class="card" ${open}>
-    <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${st.cls}">${st.label}</span>${manualBadge}${driftBadge}</div>
+    <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${st.cls}" ${form&&(st.key==='unlocked'||st.key==='need'||st.key==='disabled')?`onclick="event.stopPropagation();window.toggleGuestAccess('${form.id}')" style="cursor:pointer"`:''}>${st.label}</span>${manualBadge}${driftBadge}</div>
     <div class="card__name">${esc(name)}${multi}${sourceBadgeHtml(grp[0].source)}</div>
     <div class="card__guests">${esc(guestCountLabel)}</div>
     <div class="card__dates">${esc(datesStr(grp[0],mode))}</div>
@@ -3273,6 +3277,42 @@ window.unlockGuest=async function(guestId){
   }catch(e){
     console.error('[unlockGuest]',e);
     toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Failed: '+e.message);
+  }
+};
+window.toggleGuestAccess=async function(guestId){
+  const g=guestData.find(x=>x.id===guestId);
+  if(!g)return;
+  const res=reservationForGuest(g);
+  const st=cardStatus(res,g);
+  try{
+    if(st.key==='unlocked'){
+      const today=unlockToday();
+      const until=today+'T15:00:00+04:00';
+      await updateDoc(doc(db,'checkin_guests',guestId),{
+        manualUnlock:false,
+        accessDisabledUntil:until,
+        accessDisabledByAdmin:true,
+      });
+      toast('Access disabled until 15:00');
+    }else if(st.key==='disabled'&&tbilisiHourLocal()>=15){
+      await updateDoc(doc(db,'checkin_guests',guestId),{
+        accessDisabledUntil:null,
+        accessDisabledByAdmin:true,
+      });
+      toast('Access disabled indefinitely');
+    }else{
+      const r=await pipelineAdmin({password:_ADMIN_PWD,actionType:'force_unlock',payload:{guestId},actor:'admin'});
+      if(!r.ok){toast(r.message||'Failed');return;}
+      await updateDoc(doc(db,'checkin_guests',guestId),{
+        accessDisabledUntil:null,
+        accessDisabledByAdmin:false,
+      });
+      toast('Access granted');
+    }
+    render();
+  }catch(e){
+    console.error('[toggleGuestAccess]',e);
+    toast('Failed: '+e.message);
   }
 };
 window.blockGuest=async function(guestId){
@@ -4931,7 +4971,7 @@ onSnapshot(collection(db,'checkin_guests'),snap=>{
   guestData=snap.docs.map(d=>({id:d.id,...d.data()}));
   if(loaded>=2){rebuildFormMaps();render();}else checkLoaded();
 });
-onSnapshot(query(collection(db,'hk_status'),where('date','==',tbilisiToday())),snap=>{
+onSnapshot(query(collection(db,'hk_status'),where('date','>=',new Date(new Date(tbilisiToday()+'T00:00:00Z').getTime()-86400000).toISOString().slice(0,10))),snap=>{
   hkStatusData={};snap.docs.forEach(d=>{hkStatusData[d.id]=d.data();});
   if(loaded>=2){render();if(currentTab==='hk')renderHk();}
 });
