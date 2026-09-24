@@ -202,7 +202,25 @@ function isNonTextPlaceholderOnly(text) {
   return raw.split('\n').every((line) => NON_TEXT_PLACEHOLDER_RE.test(line.trim()));
 }
 
+/**
+ * Earliest timestamp (ms) such that ANY owner message at or after it means the
+ * bot must stay silent: the flat owner-mute window (now - muteMinutes) or the
+ * start of the current guest batch, whichever is earlier. The batch-start half
+ * catches an owner reply that landed while this batch was still being processed.
+ */
+function ownerMuteCutoffMs(nowMs, batchStartMs, muteMinutes) {
+  const muteCutoff = nowMs - muteMinutes * 60 * 1000;
+  return Number.isFinite(batchStartMs) ? Math.min(batchStartMs, muteCutoff) : muteCutoff;
+}
+
+/** True if the last message in the conversation (either side) is older than `staleMinutes`. */
+function isConversationStale(lastMessageMs, nowMs, staleMinutes) {
+  return Number.isFinite(lastMessageMs) && nowMs - lastMessageMs > staleMinutes * 60 * 1000;
+}
+
 module.exports = {
+  ownerMuteCutoffMs,
+  isConversationStale,
   isShortAcknowledgement,
   isSilentAiReply,
   isEscalationMessage,

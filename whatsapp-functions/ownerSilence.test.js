@@ -10,6 +10,8 @@ const {
   shouldStaySilentFromHistory,
   findMostRecentOwnerMessage,
   isNonTextPlaceholderOnly,
+  ownerMuteCutoffMs,
+  isConversationStale,
 } = require('./ownerSilence');
 
 test('isShortAcknowledgement', async (t) => {
@@ -204,5 +206,32 @@ test('isNonTextPlaceholderOnly — the Roman Lartsev incident replay (Sep 22)', 
   await t.test('empty / whitespace-only text does not qualify', () => {
     assert.equal(isNonTextPlaceholderOnly(''), false);
     assert.equal(isNonTextPlaceholderOnly('   '), false);
+  });
+});
+
+test('ownerMuteCutoffMs — flat 5-minute mute plus batch-start coverage', async (t) => {
+  const now = 10 * 60 * 1000;
+  await t.test('no batch start: cutoff is exactly now minus the mute window', () => {
+    assert.equal(ownerMuteCutoffMs(now, undefined, 5), now - 5 * 60 * 1000);
+  });
+  await t.test('recent batch start: the 5-minute window is the earlier (wider) bound', () => {
+    assert.equal(ownerMuteCutoffMs(now, now - 1000, 5), now - 5 * 60 * 1000);
+  });
+  await t.test('old batch start: an owner reply since the batch began still counts', () => {
+    assert.equal(ownerMuteCutoffMs(now, now - 8 * 60 * 1000, 5), now - 8 * 60 * 1000);
+  });
+});
+
+test('isConversationStale — 1 hour threshold', async (t) => {
+  const now = 5 * 60 * 60 * 1000;
+  await t.test('just over an hour is stale', () => {
+    assert.equal(isConversationStale(now - 61 * 60 * 1000, now, 60), true);
+  });
+  await t.test('under an hour is not stale', () => {
+    assert.equal(isConversationStale(now - 59 * 60 * 1000, now, 60), false);
+  });
+  await t.test('no previous message (first contact) is not stale', () => {
+    assert.equal(isConversationStale(undefined, now, 60), false);
+    assert.equal(isConversationStale(NaN, now, 60), false);
   });
 });

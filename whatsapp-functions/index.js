@@ -11,6 +11,8 @@ const {
   shouldStaySilentFromHistory,
   findMostRecentOwnerMessage,
   isNonTextPlaceholderOnly,
+  ownerMuteCutoffMs,
+  isConversationStale,
 } = require('./ownerSilence');
 
 if (!getApps().length) initializeApp();
@@ -440,6 +442,14 @@ const CONFIG_DEFAULTS = {
   nightStart: 22,
   nightEnd: 9,
   ownerSilenceWindowMinutes: 30,
+  // Flat mute after any manual owner message: the bot stays silent for this long.
+  ownerMuteMinutes: 5,
+  // If the conversation's last message (either side) is older than this, a new
+  // guest message waits staleGraceSeconds (floor 10) before the bot replies, so
+  // the owner can answer first. All three live in globals/config, editable
+  // without a redeploy.
+  staleConversationMinutes: 60,
+  staleGraceSeconds: 60,
 };
 
 async function getGlobalsConfig(db) {
@@ -618,12 +628,16 @@ async function clearPendingForPhone(db, phone) {
 // ---- Message batching (whatsapp_pending) ------------------------------------
 
 /** Adds `text` to the guest's pending batch, rotating batchToken so any in-flight worker for the old token no-ops. */
-async function upsertPendingMessage(db, phone, text) {
+async function upsertPendingMessage(db, phone, text, graceSeconds = 0) {
   const batchToken = crypto.randomUUID();
   const pendingRef = db.collection('whatsapp_pending').doc(phone);
+  // Stale-conversation grace deadline (ms epoch), set once when the batch starts
+  // so later messages in the same burst can't shorten the wait.
+  let graceUntilMs = 0;
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(pendingRef);
     if (snap.exists) {
+      graceUntilMs = Number(snap.data().graceUntilMs) || 0;
       tx.update(pendingRef, {
         messages: FieldValue.arrayUnion(text),
         lastMessageAt: FieldValue.serverTimestamp(),
@@ -631,16 +645,18 @@ async function upsertPendingMessage(db, phone, text) {
         phone,
       });
     } else {
+      graceUntilMs = graceSeconds > 0 ? Date.now() + graceSeconds * 1000 : 0;
       tx.set(pendingRef, {
         messages: [text],
         batchStartedAt: FieldValue.serverTimestamp(),
         lastMessageAt: FieldValue.serverTimestamp(),
         batchToken,
         phone,
+        ...(graceUntilMs ? { graceUntilMs } : {}),
       });
     }
   });
-  return batchToken;
+  return { batchToken, graceUntilMs };
 }
 
 /** Deletes whatsapp_pending/{phone} only if its batchToken still matches — avoids racing a newer burst. */
@@ -782,6 +798,11 @@ exports.whatsappWebhook = onRequest(
         const convoRef    = db.collection('whatsapp_conversations').doc(phone);
         const messagesRef = convoRef.collection('messages');
 
+        // Last message in the conversation (either side) BEFORE this one, for the
+        // stale-conversation grace delay below. Must be read before the add.
+        const prevSnap = await messagesRef.orderBy('timestamp', 'desc').limit(1).get();
+        const prevAt = prevSnap.empty ? null : toJsDate(prevSnap.docs[0].data().timestamp);
+
         // Always persist the inbound message first, regardless of bot state
         await messagesRef.add({
           role: 'user',
@@ -800,13 +821,24 @@ exports.whatsappWebhook = onRequest(
         }
 
         // CHANGE 2 — batch into whatsapp_pending and hand off to the Cloud Tasks worker
-        const batchToken = await upsertPendingMessage(db, phone, text);
-
         const effectiveMode = resolveEffectiveMode(config);
         const configuredDelay = Number(config.botResponseDelay) || CONFIG_DEFAULTS.botResponseDelay;
+
+        // Stale-conversation grace: after a long silence, give the owner a chance to
+        // answer first. Available mode only (in Away/night the owner isn't expected).
+        const staleMinutes = Number(config.staleConversationMinutes) || CONFIG_DEFAULTS.staleConversationMinutes;
+        const graceSeconds = Math.max(10, Number(config.staleGraceSeconds) || CONFIG_DEFAULTS.staleGraceSeconds);
+        const stale = effectiveMode === 'available'
+          && isConversationStale(prevAt ? prevAt.getTime() : NaN, Date.now(), staleMinutes);
+
+        const { batchToken, graceUntilMs } = await upsertPendingMessage(db, phone, text, stale ? graceSeconds : 0);
+
         // Away/night still debounce rapid bursts, but don't make the guest wait the full
         // human-first delay — cap at 3s.
-        const delaySeconds = effectiveMode === 'available' ? configuredDelay : Math.min(configuredDelay, 3);
+        let delaySeconds = effectiveMode === 'available' ? configuredDelay : Math.min(configuredDelay, 3);
+        if (graceUntilMs) {
+          delaySeconds = Math.max(delaySeconds, Math.ceil((graceUntilMs - Date.now()) / 1000));
+        }
 
         await enqueueBotWorker({ phone, batchToken, delaySeconds });
 
@@ -904,21 +936,30 @@ exports.whatsappBotWorker = onRequest(
         return res.sendStatus(200);
       }
 
-      // CHANGE 5 — owner replied since this batch started, in ALL modes (not just
-      // Available). Available-only used to miss the Away incident: the host
-      // returned, answered, and the bot still talked over them.
-      const batchStart = pending.batchStartedAt || pending.lastMessageAt;
-      if (batchStart) {
-        const ownerSnap = await convoMessagesRef
+      // CHANGE 5 — owner mute, in ALL modes. The bot stays silent if the owner sent
+      // any manual message within the last ownerMuteMinutes (flat timer from that
+      // message, independent of guest activity), OR at any point since this batch
+      // started. Available-only used to miss the Away incident: the host returned,
+      // answered, and the bot still talked over them.
+      const ownerMuteMinutes = Number(config.ownerMuteMinutes) || CONFIG_DEFAULTS.ownerMuteMinutes;
+      const batchStartDate = toJsDate(pending.batchStartedAt || pending.lastMessageAt);
+      const ownerMuteCutoff = () => new Date(ownerMuteCutoffMs(
+        Date.now(),
+        batchStartDate ? batchStartDate.getTime() : NaN,
+        ownerMuteMinutes
+      ));
+      const ownerMuted = async () => {
+        const snap = await convoMessagesRef
           .where('role', '==', 'owner')
-          .where('timestamp', '>=', batchStart)
+          .where('timestamp', '>=', ownerMuteCutoff())
           .limit(1)
           .get();
-        if (!ownerSnap.empty) {
-          console.log('whatsappBotWorker: STOPPED — owner replied since batch started for', phone);
-          await deletePendingIfTokenMatches(db, phone, batchToken);
-          return res.sendStatus(200);
-        }
+        return !snap.empty;
+      };
+      if (await ownerMuted()) {
+        console.log('whatsappBotWorker: STOPPED — owner mute (manual reply within', ownerMuteMinutes, 'min or since batch started) for', phone);
+        await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
       }
 
       // Last 15 messages, fetched once and reused both for the silence checks
@@ -1107,6 +1148,18 @@ exports.whatsappBotWorker = onRequest(
 
       // Small humanizer — short, after Claude, before send. Not the batching delay.
       await sleep(1000 + Math.random() * 1000);
+
+      // Final re-check, immediately before anything is sent. The checks above ran
+      // before the Claude call (seconds ago); an owner echo that landed during
+      // Claude or the sleep above would otherwise be missed and the bot would talk
+      // over the host. The echo handler also deletes whatsapp_pending, so a missing
+      // pending doc is a second signal.
+      const pendingNow = await pendingRef.get();
+      if (!pendingNow.exists || await ownerMuted()) {
+        console.log('whatsappBotWorker: STOPPED — owner replied while reply was being generated (pre-send check) for', phone);
+        await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
+      }
 
       if (videoMediaId) {
         await sendWhatsAppMessage({
