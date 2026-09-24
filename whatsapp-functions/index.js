@@ -12,6 +12,7 @@ const {
   findMostRecentOwnerMessage,
   isNonTextPlaceholderOnly,
   ownerMuteCutoffMs,
+  ownerMuteDecision,
   isConversationStale,
 } = require('./ownerSilence');
 
@@ -936,11 +937,13 @@ exports.whatsappBotWorker = onRequest(
         return res.sendStatus(200);
       }
 
-      // CHANGE 5 — owner mute, in ALL modes. The bot stays silent if the owner sent
-      // any manual message within the last ownerMuteMinutes (flat timer from that
-      // message, independent of guest activity), OR at any point since this batch
-      // started. Available-only used to miss the Away incident: the host returned,
-      // answered, and the bot still talked over them.
+      // CHANGE 5 — owner mute, in ALL modes. The bot stays silent for
+      // ownerMuteMinutes after any manual owner message (flat timer from that
+      // message, independent of guest activity). A guest message that arrives
+      // DURING the mute is deferred and answered when it expires (see
+      // ownerMuteDecision); an owner reply at or after this batch started means
+      // the owner addressed it, so it is dropped. Available-only used to miss the
+      // Away incident: the host returned, answered, and the bot still talked over them.
       const ownerMuteMinutes = Number(config.ownerMuteMinutes) || CONFIG_DEFAULTS.ownerMuteMinutes;
       const batchStartDate = toJsDate(pending.batchStartedAt || pending.lastMessageAt);
       const ownerMuteCutoff = () => new Date(ownerMuteCutoffMs(
@@ -948,17 +951,38 @@ exports.whatsappBotWorker = onRequest(
         batchStartDate ? batchStartDate.getTime() : NaN,
         ownerMuteMinutes
       ));
-      const ownerMuted = async () => {
+      // Newest owner message inside the mute/batch window (NaN if none). Fetched
+      // without orderBy/limit (same query shape as before) and reduced in JS.
+      const latestOwnerMs = async () => {
         const snap = await convoMessagesRef
           .where('role', '==', 'owner')
           .where('timestamp', '>=', ownerMuteCutoff())
-          .limit(1)
           .get();
-        return !snap.empty;
+        const times = snap.docs
+          .map((d) => toJsDate(d.data().timestamp))
+          .filter(Boolean)
+          .map((d) => d.getTime());
+        return times.length ? Math.max(...times) : NaN;
       };
-      if (await ownerMuted()) {
-        console.log('whatsappBotWorker: STOPPED — owner mute (manual reply within', ownerMuteMinutes, 'min or since batch started) for', phone);
+      const muteDecision = async () => ownerMuteDecision({
+        nowMs: Date.now(),
+        batchStartMs: batchStartDate ? batchStartDate.getTime() : NaN,
+        latestOwnerMs: await latestOwnerMs(),
+        muteMinutes: ownerMuteMinutes,
+      });
+      const decision = await muteDecision();
+      if (decision.action === 'drop') {
+        console.log('whatsappBotWorker: STOPPED — owner replied since this batch started for', phone);
         await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
+      }
+      if (decision.action === 'defer') {
+        // Guest wrote during the owner's mute: keep the batch and answer when the
+        // mute expires, unless the owner replies again first (their echo clears
+        // whatsapp_pending, so the deferred run then finds nothing and stays silent).
+        const deferSeconds = Math.ceil((decision.deferUntilMs - Date.now()) / 1000) + 2;
+        console.log('whatsappBotWorker: DEFERRED — owner mute active, re-enqueueing in', deferSeconds, 's for', phone);
+        await enqueueBotWorker({ phone, batchToken, delaySeconds: deferSeconds });
         return res.sendStatus(200);
       }
 
@@ -1155,7 +1179,7 @@ exports.whatsappBotWorker = onRequest(
       // over the host. The echo handler also deletes whatsapp_pending, so a missing
       // pending doc is a second signal.
       const pendingNow = await pendingRef.get();
-      if (!pendingNow.exists || await ownerMuted()) {
+      if (!pendingNow.exists || (await muteDecision()).action === 'drop') {
         console.log('whatsappBotWorker: STOPPED — owner replied while reply was being generated (pre-send check) for', phone);
         await deletePendingIfTokenMatches(db, phone, batchToken);
         return res.sendStatus(200);

@@ -11,6 +11,7 @@ const {
   findMostRecentOwnerMessage,
   isNonTextPlaceholderOnly,
   ownerMuteCutoffMs,
+  ownerMuteDecision,
   isConversationStale,
 } = require('./ownerSilence');
 
@@ -233,5 +234,32 @@ test('isConversationStale — 1 hour threshold', async (t) => {
   await t.test('no previous message (first contact) is not stale', () => {
     assert.equal(isConversationStale(undefined, now, 60), false);
     assert.equal(isConversationStale(NaN, now, 60), false);
+  });
+});
+
+test('ownerMuteDecision — guest message during the mute is answered late, not dropped', async (t) => {
+  const MIN = 60 * 1000;
+  const ownerAt = 100 * MIN;
+  const guestAt = ownerAt + 2 * MIN; // guest writes 2 min into the 5-min mute
+  const base = { batchStartMs: guestAt, latestOwnerMs: ownerAt, muteMinutes: 5 };
+
+  await t.test('during the mute the batch is deferred to the mute end, not dropped', () => {
+    const d = ownerMuteDecision({ ...base, nowMs: guestAt + 20 * 1000 });
+    assert.deepEqual(d, { action: 'defer', deferUntilMs: ownerAt + 5 * MIN });
+  });
+  await t.test('mute expires with no further owner reply -> bot answers the queued message', () => {
+    const d = ownerMuteDecision({ ...base, nowMs: ownerAt + 5 * MIN + 2000 });
+    assert.deepEqual(d, { action: 'proceed' });
+  });
+  await t.test('owner replies again before expiry -> newest owner message is after the batch start -> drop', () => {
+    const d = ownerMuteDecision({ ...base, latestOwnerMs: guestAt + MIN, nowMs: ownerAt + 5 * MIN + 2000 });
+    assert.deepEqual(d, { action: 'drop' });
+  });
+  await t.test('no owner message at all -> proceed', () => {
+    assert.deepEqual(ownerMuteDecision({ ...base, latestOwnerMs: NaN, nowMs: guestAt }), { action: 'proceed' });
+  });
+  await t.test('owner replied long before the batch and its mute already expired -> proceed', () => {
+    const d = ownerMuteDecision({ nowMs: 200 * MIN, batchStartMs: 199 * MIN, latestOwnerMs: 100 * MIN, muteMinutes: 5 });
+    assert.deepEqual(d, { action: 'proceed' });
   });
 });

@@ -213,6 +213,23 @@ function ownerMuteCutoffMs(nowMs, batchStartMs, muteMinutes) {
   return Number.isFinite(batchStartMs) ? Math.min(batchStartMs, muteCutoff) : muteCutoff;
 }
 
+/**
+ * What the worker should do given the newest owner message (latestOwnerMs, NaN if
+ * none in range) relative to this guest batch:
+ * - 'drop': the owner replied at or after the batch started, so they addressed it.
+ * - 'defer': the owner replied before the batch started and the mute window is
+ *   still open, so the guest wrote DURING the mute. Keep the batch and answer at
+ *   deferUntilMs (mute end) if the owner hasn't replied again by then.
+ * - 'proceed': no owner reply, or its mute already expired.
+ */
+function ownerMuteDecision({ nowMs, batchStartMs, latestOwnerMs, muteMinutes }) {
+  if (!Number.isFinite(latestOwnerMs)) return { action: 'proceed' };
+  if (Number.isFinite(batchStartMs) && latestOwnerMs >= batchStartMs) return { action: 'drop' };
+  const muteEndsMs = latestOwnerMs + muteMinutes * 60 * 1000;
+  if (muteEndsMs > nowMs) return { action: 'defer', deferUntilMs: muteEndsMs };
+  return { action: 'proceed' };
+}
+
 /** True if the last message in the conversation (either side) is older than `staleMinutes`. */
 function isConversationStale(lastMessageMs, nowMs, staleMinutes) {
   return Number.isFinite(lastMessageMs) && nowMs - lastMessageMs > staleMinutes * 60 * 1000;
@@ -220,6 +237,7 @@ function isConversationStale(lastMessageMs, nowMs, staleMinutes) {
 
 module.exports = {
   ownerMuteCutoffMs,
+  ownerMuteDecision,
   isConversationStale,
   isShortAcknowledgement,
   isSilentAiReply,
