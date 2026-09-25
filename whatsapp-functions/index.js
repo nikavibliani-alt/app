@@ -20,6 +20,7 @@ const {
   runPostCheckoutSummary,
   createFirestoreSummaryStore,
 } = require('./summarizer');
+const { loadCurrentStayHistory, toClaudeHistory } = require('./stayContext');
 
 if (!getApps().length) initializeApp();
 
@@ -989,10 +990,17 @@ exports.whatsappBotWorker = onRequest(
         return res.sendStatus(200);
       }
 
-      // Last 15 messages, fetched once and reused both for the silence checks
-      // below (newest-first) and as Claude's conversation history (reversed).
-      const historySnap = await convoMessagesRef.orderBy('timestamp', 'desc').limit(15).get();
-      const recentNewestFirst = historySnap.docs.map((d) => d.data());
+      // Last 15 messages of the CURRENT stay (after the phone's most recent
+      // completed checkout, see stayContext.js), fetched once and reused for
+      // every history-based check below: owner continuation silence (CHANGE F),
+      // short-ack / escalation-nudge silence (CHANGE 6), and Claude's history,
+      // which carries the Host: lines and [VIDEO_SENT:id] markers the prompt's
+      // already-answered and video-already-sent rules read. A previous stay's
+      // messages must never count as the current conversation.
+      const { recentNewestFirst, stayStartMs } = await loadCurrentStayHistory(db, phone, Date.now());
+      if (Number.isFinite(stayStartMs)) {
+        console.log('whatsappBotWorker: history scoped to current stay, after', new Date(stayStartMs).toISOString(), 'for', phone);
+      }
 
       // CHANGE F — owner continuation silence: the most recent owner message (not
       // necessarily the directly preceding one) is still fresh (within
@@ -1059,14 +1067,8 @@ exports.whatsappBotWorker = onRequest(
       }
 
       // Owner echoes map to an assistant turn prefixed "Host: " so the model knows
-      // a human already responded.
-      const history = [...recentNewestFirst]
-        .reverse()
-        .map((m) => {
-          if (m.role === 'owner') return { role: 'assistant', content: `Host: ${m.content}` };
-          if (m.role === 'assistant') return { role: 'assistant', content: m.content };
-          return { role: 'user', content: m.content };
-        });
+      // a human already responded (current stay only — see above).
+      const history = toClaudeHistory(recentNewestFirst);
 
       // CHANGE G — inject the current Tbilisi hour so the model can apply
       // hour-dependent scenarios (e.g. cleaning staff availability).

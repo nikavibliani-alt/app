@@ -254,6 +254,19 @@ seen after the checkout day ended. `runPostCheckoutSummary` (unit-tested in
   writes the newest stay's summary to `whatsapp_guests/{phone}.summary` /
   `lastStay` (a late-processed older checkout never overwrites a newer one).
 
+## Current-stay history (`stayContext.js`)
+
+Messages are never deleted, so a returning guest's conversation still holds
+their previous stays. The worker's 15-message history is scoped to the
+**current stay**: only messages after the phone's most recent completed
+checkout (the newest `cutoffMs` among its `whatsapp_checkout_summaries`
+markers). Pre-arrival messages for the upcoming stay count as current. That
+one scoped read feeds every history-based check: owner continuation silence,
+short-ack / escalation-nudge silence, and Claude's history (its `Host:` lines
+and `[VIDEO_SENT:id]` markers). No completed checkout means history is
+unchanged, and so does a failed marker lookup. The owner mute and pre-send
+re-check are time-windowed queries and aren't affected.
+
 ## Deploy
 
 ```bash
