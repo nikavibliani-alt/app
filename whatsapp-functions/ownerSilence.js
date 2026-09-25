@@ -230,6 +230,22 @@ function ownerMuteDecision({ nowMs, batchStartMs, latestOwnerMs, muteMinutes }) 
   return { action: 'proceed' };
 }
 
+/**
+ * Final check right before a generated reply is sent:
+ * - 'owner_replied': the pending batch is gone (an owner echo clears it) or
+ *   the owner replied since the batch started, so the owner handled it.
+ * - 'newer_message': the pending batchToken changed while the reply was being
+ *   generated, i.e. the guest wrote again. This reply is outdated; the newer
+ *   run (already queued) answers everything in one reply.
+ * - 'send': nothing changed.
+ */
+function preSendDecision({ pendingExists, pendingToken, batchToken, muteAction }) {
+  if (!pendingExists) return 'owner_replied';
+  if (pendingToken !== batchToken) return 'newer_message';
+  if (muteAction === 'drop') return 'owner_replied';
+  return 'send';
+}
+
 /** True if the last message in the conversation (either side) is older than `staleMinutes`. */
 function isConversationStale(lastMessageMs, nowMs, staleMinutes) {
   return Number.isFinite(lastMessageMs) && nowMs - lastMessageMs > staleMinutes * 60 * 1000;
@@ -238,6 +254,7 @@ function isConversationStale(lastMessageMs, nowMs, staleMinutes) {
 module.exports = {
   ownerMuteCutoffMs,
   ownerMuteDecision,
+  preSendDecision,
   isConversationStale,
   isShortAcknowledgement,
   isSilentAiReply,

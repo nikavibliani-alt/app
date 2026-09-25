@@ -12,8 +12,28 @@ const {
   isNonTextPlaceholderOnly,
   ownerMuteCutoffMs,
   ownerMuteDecision,
+  preSendDecision,
   isConversationStale,
 } = require('./ownerSilence');
+
+test('preSendDecision — final check before sending a generated reply', async (t) => {
+  const base = { pendingExists: true, pendingToken: 'T1', batchToken: 'T1', muteAction: 'proceed' };
+  await t.test('nothing changed -> send', () => {
+    assert.equal(preSendDecision(base), 'send');
+  });
+  await t.test('guest wrote again while the reply was generated (token rotated) -> do not send, newer run answers', () => {
+    assert.equal(preSendDecision({ ...base, pendingToken: 'T2' }), 'newer_message');
+  });
+  await t.test('owner echo cleared the pending batch -> owner handled it', () => {
+    assert.equal(preSendDecision({ ...base, pendingExists: false, pendingToken: undefined }), 'owner_replied');
+  });
+  await t.test('owner replied since the batch started -> owner handled it', () => {
+    assert.equal(preSendDecision({ ...base, muteAction: 'drop' }), 'owner_replied');
+  });
+  await t.test('newer guest message wins over a mute drop (the newer run re-checks the owner anyway)', () => {
+    assert.equal(preSendDecision({ ...base, pendingToken: 'T2', muteAction: 'drop' }), 'newer_message');
+  });
+});
 
 test('isShortAcknowledgement', async (t) => {
   await t.test('common short acks', () => {

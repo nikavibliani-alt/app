@@ -8,6 +8,7 @@ const {
   relativeTimeLabel,
   stripTimeLabels,
   toClaudeHistory,
+  prepareClaudeHistory,
   loadCurrentStayHistory,
 } = require('./stayContext');
 const {
@@ -167,6 +168,79 @@ test('stripTimeLabels removes copied labels from a reply, and nothing else', () 
   assert.equal(stripTimeLabels('Check-in is from 15:00 [see your check-in page]'), 'Check-in is from 15:00 [see your check-in page]');
   assert.equal(stripTimeLabels('The code refreshes every 5 min ago-style'), 'The code refreshes every 5 min ago-style', 'only bracketed labels');
   assert.equal(stripTimeLabels(''), '');
+});
+
+test('prepareClaudeHistory: Claude\'s history always ends with the guest\'s unanswered message(s)', async (t) => {
+  const now = NOW;
+  const MIN = 60 * 1000;
+  const lastRole = (r) => r.messages[r.messages.length - 1].role;
+
+  await t.test('normal case: identical to the plain labelled history', () => {
+    const newestFirst = [
+      m('user', 'And the wifi password?', now - 1 * MIN),
+      { ...m('assistant', 'Paid parking under Carrefour.', now - 10 * MIN), repliesToMs: now - 11 * MIN },
+      m('user', 'Where can I park?', now - 11 * MIN),
+    ];
+    const r = prepareClaudeHistory(newestFirst, now);
+    assert.deepEqual(r.messages, toClaudeHistory(newestFirst, now));
+    assert.equal(r.unansweredCount, 1);
+    assert.equal(r.newestUnansweredMs, now - 1 * MIN);
+  });
+
+  await t.test('burst of guest messages: all unanswered, in order, at the end', () => {
+    const newestFirst = [m('user', 'second', now - 1 * MIN), m('user', 'first', now - 2 * MIN), m('owner', 'Welcome', now - 60 * MIN)];
+    const r = prepareClaudeHistory(newestFirst, now);
+    assert.deepEqual(r.messages, toClaudeHistory(newestFirst, now));
+    assert.equal(r.unansweredCount, 2);
+  });
+
+  await t.test('race: guest wrote while the reply was generated; history no longer ends with the bot reply', () => {
+    // msg1 answered by the bot; msg2 was stored before the reply but the reply never saw it
+    const newestFirst = [
+      { ...m('assistant', 'Paid parking under Carrefour.', now - 1 * MIN), repliesToMs: now - 3 * MIN },
+      m('user', 'Also what is the wifi password?', now - 2 * MIN),
+      m('user', 'Where can I park?', now - 3 * MIN),
+    ];
+    assert.equal(toClaudeHistory(newestFirst, now).at(-1).role, 'assistant', 'the old history would end with the bot (API 400)');
+    const r = prepareClaudeHistory(newestFirst, now);
+    assert.equal(lastRole(r), 'user');
+    assert.deepEqual(r.messages, [
+      { role: 'user', content: '[3 min ago] Where can I park?' },
+      { role: 'assistant', content: '[1 min ago] Paid parking under Carrefour.' },
+      { role: 'user', content: '[2 min ago] Also what is the wifi password?' },
+    ]);
+    assert.equal(r.unansweredCount, 1);
+    assert.equal(r.newestUnansweredMs, now - 2 * MIN);
+  });
+
+  await t.test('history ends with a Host message and nothing new from the guest: silent', () => {
+    const newestFirst = [m('owner', 'Yes, 2pm checkout is fine', now - 1 * MIN), m('user', 'Can I get a late checkout?', now - 3 * MIN)];
+    assert.deepEqual(prepareClaudeHistory(newestFirst, now), { silent: true });
+  });
+
+  await t.test('history ends with a bot reply that covered everything: silent', () => {
+    const newestFirst = [{ ...m('assistant', 'Paid parking under Carrefour.', now - 1 * MIN), repliesToMs: now - 3 * MIN }, m('user', 'Where can I park?', now - 3 * MIN)];
+    assert.deepEqual(prepareClaudeHistory(newestFirst, now), { silent: true });
+  });
+
+  await t.test('older bot replies without repliesToMs cover everything before them (unchanged behavior)', () => {
+    const legacy = [m('user', 'Thanks, one more question', now - 1 * MIN), m('assistant', 'Sure.', now - 5 * MIN), m('user', 'Hi', now - 6 * MIN)];
+    const r = prepareClaudeHistory(legacy, now);
+    assert.deepEqual(r.messages, toClaudeHistory(legacy, now));
+    assert.deepEqual(prepareClaudeHistory(legacy.slice(1), now), { silent: true }, 'legacy reply last: nothing unanswered');
+  });
+
+  await t.test('a guest message after a Host reply is unanswered; the ones before it are not', () => {
+    const newestFirst = [m('user', 'ok but what about towels?', now - 1 * MIN), m('owner', 'Cleaner comes at 11', now - 5 * MIN), m('user', 'When is cleaning?', now - 6 * MIN)];
+    const r = prepareClaudeHistory(newestFirst, now);
+    assert.equal(r.unansweredCount, 1);
+    assert.equal(lastRole(r), 'user');
+    assert.deepEqual(r.messages, toClaudeHistory(newestFirst, now));
+  });
+
+  await t.test('no messages at all: silent', () => {
+    assert.deepEqual(prepareClaudeHistory([], now), { silent: true });
+  });
 });
 
 // Minimal fake Firestore for loadCurrentStayHistory's two queries.

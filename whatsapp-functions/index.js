@@ -13,6 +13,7 @@ const {
   isNonTextPlaceholderOnly,
   ownerMuteCutoffMs,
   ownerMuteDecision,
+  preSendDecision,
   isConversationStale,
 } = require('./ownerSilence');
 const {
@@ -20,7 +21,7 @@ const {
   runPostCheckoutSummary,
   createFirestoreSummaryStore,
 } = require('./summarizer');
-const { loadCurrentStayHistory, toClaudeHistory, stripTimeLabels } = require('./stayContext');
+const { loadCurrentStayHistory, prepareClaudeHistory, stripTimeLabels } = require('./stayContext');
 const { findCurrentGuestForm } = require('./guestLookup');
 const { applyToneGuard } = require('./toneGuard');
 
@@ -1050,7 +1051,16 @@ exports.whatsappBotWorker = onRequest(
       // a human already responded (current stay only — see above).
       // Each line is labelled with how long ago it was sent (e.g. "[2 days ago]")
       // so the model can tell old messages from new ones — see MESSAGE TIMES.
-      const history = toClaudeHistory(recentNewestFirst, Date.now());
+      // The history always ends with the guest's unanswered message(s): the API
+      // rejects one that ends with a bot reply or Host line (400 -> generic
+      // fallback reply). Nothing unanswered -> nothing to reply to.
+      const prepared = prepareClaudeHistory(recentNewestFirst, Date.now());
+      if (prepared.silent) {
+        console.log('whatsappBotWorker: STOPPED — no unanswered guest message (history ends with a bot/Host reply), Claude not called, for', phone);
+        await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
+      }
+      const history = prepared.messages;
 
       // CHANGE G — inject the current Tbilisi hour so the model can apply
       // hour-dependent scenarios (e.g. cleaning staff availability).
@@ -1169,9 +1179,21 @@ exports.whatsappBotWorker = onRequest(
       // before the Claude call (seconds ago); an owner echo that landed during
       // Claude or the sleep above would otherwise be missed and the bot would talk
       // over the host. The echo handler also deletes whatsapp_pending, so a missing
-      // pending doc is a second signal.
+      // pending doc is a second signal. A changed batchToken means the guest wrote
+      // again while this reply was being generated: don't send an outdated reply,
+      // the newer run (already queued) answers everything in one reply.
       const pendingNow = await pendingRef.get();
-      if (!pendingNow.exists || (await muteDecision()).action === 'drop') {
+      const preSend = preSendDecision({
+        pendingExists: pendingNow.exists,
+        pendingToken: pendingNow.exists ? pendingNow.data().batchToken : undefined,
+        batchToken,
+        muteAction: pendingNow.exists ? (await muteDecision()).action : undefined,
+      });
+      if (preSend === 'newer_message') {
+        console.log('whatsappBotWorker: STOPPED — newer guest message arrived while the reply was being generated; not sending, the newer run will answer everything, for', phone);
+        return res.sendStatus(200); // the pending batch now belongs to the newer run — leave it
+      }
+      if (preSend === 'owner_replied') {
         console.log('whatsappBotWorker: STOPPED — owner replied while reply was being generated (pre-send check) for', phone);
         await deletePendingIfTokenMatches(db, phone, batchToken);
         return res.sendStatus(200);
@@ -1201,6 +1223,10 @@ exports.whatsappBotWorker = onRequest(
         role: 'assistant',
         content: storedAssistantContent,
         timestamp: FieldValue.serverTimestamp(),
+        // Newest guest message this reply actually answered — a guest message
+        // stored after this point but before the reply is still unanswered
+        // (see prepareClaudeHistory).
+        repliesToMs: prepared.newestUnansweredMs,
       });
 
       if (escalated) {

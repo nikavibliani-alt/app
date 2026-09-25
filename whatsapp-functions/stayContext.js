@@ -89,6 +89,45 @@ function toClaudeHistory(recentNewestFirst, nowMs) {
 }
 
 /**
+ * Claude's messages for this run, guaranteed to end with the guest's
+ * unanswered message(s) — the API rejects a conversation that ends with an
+ * assistant turn (a bot reply or a "Host:" line).
+ *
+ * A guest message counts as answered if a Host message came after it, or if
+ * a bot reply covered it: stored bot replies record `repliesToMs`, the time
+ * of the newest guest message that was in that reply's history (older replies
+ * without it are treated as covering everything before them). This matters
+ * in the race where the guest writes again while a reply is being generated:
+ * the new message is stored before the reply, yet the reply never saw it.
+ *
+ * Answered messages keep their order; the unanswered guest messages go last
+ * as the final user turn(s), with their time labels. Returns
+ * `{ messages, unansweredCount, newestUnansweredMs }`, or `{ silent: true }`
+ * when there is no unanswered guest message (nothing to reply to).
+ */
+function prepareClaudeHistory(recentNewestFirst, nowMs) {
+  const chronological = [...recentNewestFirst].reverse();
+  let answeredUntilMs = -Infinity;
+  for (const m of chronological) {
+    if (m.role === 'owner') answeredUntilMs = Math.max(answeredUntilMs, toMillis(m.timestamp));
+    if (m.role === 'assistant') {
+      const covered = Number.isFinite(m.repliesToMs) ? m.repliesToMs : toMillis(m.timestamp);
+      answeredUntilMs = Math.max(answeredUntilMs, covered);
+    }
+  }
+  const isUnanswered = (m) => (m.role === 'user' || m.role === 'guest') && !(toMillis(m.timestamp) <= answeredUntilMs);
+  const unanswered = chronological.filter(isUnanswered);
+  if (unanswered.length === 0) return { silent: true };
+  const answered = chronological.filter((m) => !isUnanswered(m));
+  const ordered = [...answered, ...unanswered];
+  return {
+    messages: toClaudeHistory([...ordered].reverse(), nowMs),
+    unansweredCount: unanswered.length,
+    newestUnansweredMs: Math.max(...unanswered.map((m) => toMillis(m.timestamp)).filter(Number.isFinite)),
+  };
+}
+
+/**
  * The last `limit` messages of the phone's CURRENT stay, newest first. The
  * boundary is applied in the query, so the limit counts current-stay messages
  * only, and again in JS as a guard. If the marker lookup fails, falls back to
@@ -116,5 +155,6 @@ module.exports = {
   relativeTimeLabel,
   stripTimeLabels,
   toClaudeHistory,
+  prepareClaudeHistory,
   loadCurrentStayHistory,
 };
