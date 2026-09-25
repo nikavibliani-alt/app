@@ -21,6 +21,7 @@ const {
   createFirestoreSummaryStore,
 } = require('./summarizer');
 const { loadCurrentStayHistory, toClaudeHistory } = require('./stayContext');
+const { findCurrentGuestForm } = require('./guestLookup');
 
 if (!getApps().length) initializeApp();
 
@@ -327,31 +328,6 @@ Bot: "დიახ, რა თქმა უნდა, როგორ ხარ�
 /** Strip spaces/dashes/parens/+ so Meta and form phones compare as digits-only. */
 function normalizePhone(phone) {
   return String(phone || '').replace(/[\s\-().]/g, '').replace(/^\+/, '').replace(/\D/g, '');
-}
-
-/** Contact values commonly stored in checkin_guests for the same WhatsApp number. */
-function phoneQueryVariants(phone) {
-  const normalized = normalizePhone(phone);
-  if (!normalized) return [];
-  const variants = new Set([normalized, `+${normalized}`]);
-  return [...variants];
-}
-
-/**
- * Look up a WA check-in guest by contact, trying both digits-only and +digits forms.
- * Returns the first matching document data, or null.
- */
-async function findGuestByWhatsAppPhone(db, phone) {
-  const variants = phoneQueryVariants(phone);
-  for (const contact of variants) {
-    const snap = await db.collection('checkin_guests')
-      .where('contact', '==', contact)
-      .where('contactType', '==', 'wa')
-      .limit(1)
-      .get();
-    if (!snap.empty) return snap.docs[0].data();
-  }
-  return null;
 }
 
 /** matchedReservationId may be "007004653_001" — base reservation number is before first _. */
@@ -1030,8 +1006,10 @@ exports.whatsappBotWorker = onRequest(
         return res.sendStatus(200);
       }
 
-      // Guest lookup (reuses the checkin_guests phone-variant + multi-room fixes)
-      const form = await findGuestByWhatsAppPhone(db, phone);
+      // Guest lookup: the WhatsApp check-in form for the current or upcoming
+      // stay, phones compared by digits (see guestLookup.js). Only past or
+      // cancelled forms -> returning guest with no current form.
+      const guestMatch = await findCurrentGuestForm(db, phone, Date.now());
 
       let guestName    = 'Guest';
       let roomCode     = '';
@@ -1039,21 +1017,13 @@ exports.whatsappBotWorker = onRequest(
       let checkoutDate = '';
       let hasFilledForm = false;
 
-      if (form) {
+      if (guestMatch) {
         hasFilledForm = true;
-        guestName = form.name || 'Guest';
-        const resNumber = baseReservationNumber(form.matchedReservationId);
-        if (resNumber) {
-          const resSnap = await db.collection('reservations')
-            .where('reservationNumber', '==', resNumber)
-            .limit(1)
-            .get();
-          if (!resSnap.empty) {
-            const reservation = resSnap.docs[0].data();
-            roomCode     = reservation.roomCode || '';
-            checkinDate  = reservation.checkin || '';
-            checkoutDate = reservation.checkout || '';
-          }
+        guestName = guestMatch.form.name || 'Guest';
+        if (guestMatch.reservation) {
+          roomCode     = guestMatch.reservation.roomCode || '';
+          checkinDate  = guestMatch.reservation.checkin || '';
+          checkoutDate = guestMatch.reservation.checkout || '';
         }
       }
 

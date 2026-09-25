@@ -254,6 +254,17 @@ seen after the checkout day ended. `runPostCheckoutSummary` (unit-tested in
   writes the newest stay's summary to `whatsapp_guests/{phone}.summary` /
   `lastStay` (a late-processed older checkout never overwrites a newer one).
 
+## Guest check-in form lookup (`guestLookup.js`)
+
+The worker finds the guest's WhatsApp check-in form (`contactType: 'wa'`)
+by comparing phone numbers as digits. It treats `+`, a leading `00`, spaces,
+dashes and a Georgian local mobile (9 digits starting with 5, with or without
+995) as the same number, because the check-in page stores the phone exactly
+as typed. It reads forms with an arrival date in the last 60 days and matches
+them in code. When several match, it picks the current stay (the latest
+check-in), else the nearest upcoming one. Cancelled reservations never count,
+and only past matches mean "Filled check-in form: no" (a returning guest).
+
 ## Current-stay history (`stayContext.js`)
 
 Messages are never deleted, so a returning guest's conversation still holds
