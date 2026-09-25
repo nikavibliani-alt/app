@@ -20,8 +20,9 @@ const {
   runPostCheckoutSummary,
   createFirestoreSummaryStore,
 } = require('./summarizer');
-const { loadCurrentStayHistory, toClaudeHistory } = require('./stayContext');
+const { loadCurrentStayHistory, toClaudeHistory, stripTimeLabels } = require('./stayContext');
 const { findCurrentGuestForm } = require('./guestLookup');
+const { applyToneGuard } = require('./toneGuard');
 
 if (!getApps().length) initializeApp();
 
@@ -79,6 +80,9 @@ Answer only what the guest actually asked — do not add extra facts, context, o
 
 OUTPUT PURITY:
 Your response is sent directly to the guest exactly as written, except for the recognized tags ([VIDEO:media_id], [ESCALATE], [URGENT:LOCKOUT], [URGENT:ISSUE], [URGENT:ANGRY], [SILENT], [VIDEO_SENT:media_id]), which are stripped before sending. Never include your reasoning, analysis of context clues, notes about ambiguous or unknown fields, or any explanation of how you arrived at the answer — work that out silently and output only the final guest-facing message. If you are inferring something from the conversation history (e.g. which room the guest is in), do the inference internally and just state the answer; never write out the inference itself.
+
+MESSAGE TIMES:
+Every message in the conversation history starts with a label showing how long ago it was sent, e.g. [5 min ago], [3 hours ago], [2 days ago]. Reply only to the guest's newest message(s), the ones at the end of the history. Older messages are background context: never answer them again as if they were new. A Host: reply, an escalation, or an answer from hours or days earlier about a different topic does not mean the guest's newest message is handled. Never write these time labels in your reply.
 
 REPEAT PREVENTION:
 Check the conversation history before every reply. If you already answered this exact question earlier in this conversation, do not give the same answer again. If [VIDEO_SENT:id] already appears in history for this topic, do not send the video again — give additional clarification in text only instead. If you already said something like "let me check and get back to you" for this same topic, do not say it again for a follow-up on it — reply with only [SILENT] instead.
@@ -277,7 +281,7 @@ When you include [ESCALATE] in your response, place it at the very end after the
 Example: Sorry about that, I am alerting the team now. [ESCALATE]
 
 FOR STAYING SILENT:
-When a scenario says to use [SILENT], or the conversation history already shows a Host: message that answered the guest, reply with only [SILENT] and nothing else. This sends no message to the guest at all. Also use only [SILENT] if the guest's message is just a short acknowledgement (ok, okay, thanks, got it, sure, etc.) after a Host: or Assistant: message that already closed the topic.
+When a scenario says to use [SILENT], or a Host: message appears in the history AFTER the guest's latest message (the host has already answered it), reply with only [SILENT] and nothing else. A Host: message that came before the guest's latest message does not answer it: the guest has written something new since, so reply to it normally. This sends no message to the guest at all. Also use only [SILENT] if the guest's message is just a short acknowledgement (ok, okay, thanks, got it, sure, etc.) after a Host: or Assistant: message that already closed the topic.
 
 FOR URGENT ISSUES:
 For a guest lockout or smart lock failure, add [URGENT:LOCKOUT] right after [ESCALATE]. For flooding or a security issue, add [URGENT:ISSUE] right after [ESCALATE]. Both tags are stripped before sending and trigger an immediate owner alert regardless of bot mode or time of day.
@@ -475,7 +479,7 @@ function resolveEffectiveMode(config) {
 
 function buildModeContext(effectiveMode, ownerPhone) {
   if (effectiveMode === 'away') {
-    return 'AWAY MODE: The owner may be unreachable (traveling/no internet). Be helpful with everything you can. For escalations that require human action, tell the guest: I have noted this and someone from our team will follow up as soon as possible. Do not promise immediate response times. If a Host: message appears in the history after the guest request, the owner has returned and already replied — respond with only [SILENT] and do not add extra tips after that.';
+    return 'AWAY MODE: The owner may be unreachable (traveling/no internet). Be helpful with everything you can. For escalations that require human action, tell the guest: I have noted this and someone from our team will follow up as soon as possible. Do not promise immediate response times. If a Host: message appears in the history after the guest\'s latest message, the owner has returned and already replied — respond with only [SILENT] and do not add extra tips after that. A Host: message that came before the guest\'s latest message does not answer it — reply normally.';
   }
   if (effectiveMode === 'night') {
     let text = 'NIGHT MODE: It is currently nighttime in Tbilisi. For escalations that require urgent human action, tell the guest: If this is urgent please call the night contact number provided below, otherwise we will get back to you first thing in the morning.';
@@ -483,10 +487,10 @@ function buildModeContext(effectiveMode, ownerPhone) {
     if (normalizedOwner) {
       text += `\nNight contact number: +${normalizedOwner}`;
     }
-    text += ' If a Host: message already answered the guest, reply with only [SILENT].';
+    text += ' If a Host: message appears after the guest\'s latest message, the host already answered it — reply with only [SILENT]. A Host: message that came before the guest\'s latest message does not answer it — reply normally.';
     return text;
   }
-  return 'AVAILABLE MODE: A human host may reply manually. If the conversation history already contains a Host: message that answered the guest, reply with only [SILENT]. Guest should never be told they are talking to a bot.';
+  return 'AVAILABLE MODE: A human host may reply manually. If a Host: message appears after the guest\'s latest message, the host already answered it — reply with only [SILENT]. A Host: message that came before the guest\'s latest message does not answer it — reply normally. Guest should never be told they are talking to a bot.';
 }
 
 async function writeAlert(db, { reason, phone, guestName = '', room = '', message = '', mode = '', urgency = false }) {
@@ -1038,7 +1042,9 @@ exports.whatsappBotWorker = onRequest(
 
       // Owner echoes map to an assistant turn prefixed "Host: " so the model knows
       // a human already responded (current stay only — see above).
-      const history = toClaudeHistory(recentNewestFirst);
+      // Each line is labelled with how long ago it was sent (e.g. "[2 days ago]")
+      // so the model can tell old messages from new ones — see MESSAGE TIMES.
+      const history = toClaudeHistory(recentNewestFirst, Date.now());
 
       // CHANGE G — inject the current Tbilisi hour so the model can apply
       // hour-dependent scenarios (e.g. cleaning staff availability).
@@ -1055,7 +1061,9 @@ exports.whatsappBotWorker = onRequest(
       const systemWithContext = `${SYSTEM_PROMPT}\n\n${guestContext}\n\n${modeContext}`;
 
       console.log('whatsappBotWorker: calling Claude for phone:', phone);
-      let aiReply = await callClaude({ system: systemWithContext, messages: history });
+      // Strip any history time label the model copied into its reply, before any
+      // tag parsing ([VIDEO:id] is only recognized at the very start).
+      let aiReply = stripTimeLabels(await callClaude({ system: systemWithContext, messages: history }));
       console.log('whatsappBotWorker: Claude responded, length:', (aiReply || '').length);
 
       let escalated = false;
@@ -1124,6 +1132,9 @@ exports.whatsappBotWorker = onRequest(
         .replace(/\s*\[VIDEO_SENT:\d+\]\s*/gi, ' ')
         .replace(/\s+$/, '')
         .trim();
+      // Tone guard on the exact guest-facing text: "!" -> ".", em dash -> ", ",
+      // links untouched. The stored copy below is the same guarded text.
+      aiReply = applyToneGuard(aiReply);
       if (hasEscalateTag) {
         escalated = true;
         escalationReason = 'escalation';

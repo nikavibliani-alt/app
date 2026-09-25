@@ -278,6 +278,20 @@ and `[VIDEO_SENT:id]` markers). No completed checkout means history is
 unchanged, and so does a failed marker lookup. The owner mute and pre-send
 re-check are time-windowed queries and aren't affected.
 
+## Time labels and tone guard
+
+Every history line sent to Claude starts with how long ago it was sent
+(`[5 min ago]`, `[3 hours ago]`, `[2 days ago]`, Tbilisi calendar days after
+24 hours; `relativeTimeLabel` in `stayContext.js`). The prompt's MESSAGE TIMES
+section tells the model to reply only to the guest's newest message(s), so an
+old Host reply, escalation or answer can't make the bot stay silent or answer
+a stale message. A Host reply only counts as "already answered" if it came
+after the guest's latest message. Any label the model copies into its reply
+is stripped (`stripTimeLabels`) before tag parsing.
+
+`toneGuard.js` runs on the final guest-facing text of every reply. It turns
+`!` into `.` and `—` into `, `, and never changes anything inside a link.
+
 ## Deploy
 
 ```bash
