@@ -5,41 +5,27 @@
 // it's unit-testable; Firestore access goes through a small `store` object
 // (createFirestoreSummaryStore below, or a fake in summarizer.test.js).
 //
-// Why this exists: the trigger is onDocumentWritten on reservations/{docId},
-// and the MiniHotel sync rewrites every reservation in [now-7d, now+60d]
-// (fresh syncedAt) every ~10 minutes. Those rewrites are not checkout events.
-// MiniHotel has no "checked out" status (only OK/OK2/CL/WL), so the real event
-// is time-based: the first write seen after the checkout day ended. Each
-// checkout is therefore claimed exactly once via a marker doc, and a repeat
-// sync write exits on that marker without touching anything.
+// The trigger is onDocumentWritten on reservations/{docId}, and the MiniHotel
+// sync rewrites every reservation in [now-7d, now+60d] (fresh syncedAt) every
+// ~10 minutes. Those rewrites are not checkout events. MiniHotel has no
+// "checked out" status (only OK/OK2/CL/WL), so the real event is time-based:
+// the first write seen after the checkout day ended. Each checkout is claimed
+// exactly once via whatsapp_checkout_summaries/{reservationNumber}, and a
+// repeat sync write exits on that marker.
 //
-// Deletion rules:
-// - never while the same phone has another active or future reservation
-// - only messages timestamped before the end of this stay's checkout day
-// - never role "owner" messages (the host's own replies), under any condition
+// This path NEVER deletes messages: the full raw conversation in
+// whatsapp_conversations/{phone}/messages is kept forever. It only reads the
+// stay's messages and writes a summary (on the marker, and as the latest
+// summary in whatsapp_guests/{phone}).
 
 const TBILISI_OFFSET_MS = 4 * 60 * 60 * 1000; // UTC+4 year-round, no DST
 const MARKER_COLLECTION = 'whatsapp_checkout_summaries';
-const DELETE_CHUNK = 400; // below Firestore's 500-writes-per-batch limit
 
 const SUMMARY_SYSTEM_PROMPT = 'Summarize this guest WhatsApp conversation into 3-5 bullet points covering: issues they had, requests they made, how they communicated, anything notable. Be very brief.';
 
-/** Strip spaces/dashes/parens/+ so Meta and form phones compare as digits-only. */
+/** Digits-only phone, matching how whatsapp_conversations/{phone} is keyed. */
 function normalizePhone(phone) {
   return String(phone || '').replace(/\D/g, '');
-}
-
-/** Exact strings a contact may be stored as: as typed, digits-only, +digits. */
-function contactVariants(rawContact) {
-  const raw = String(rawContact || '').trim();
-  const digits = normalizePhone(raw);
-  return [...new Set([raw, digits, digits ? `+${digits}` : ''].filter(Boolean))];
-}
-
-/** matchedReservationId may be "007004653_001" — base reservation number is before first _. */
-function baseReservationNumber(matchedReservationId) {
-  const raw = String(matchedReservationId || '').trim();
-  return raw ? raw.split('_')[0] : '';
 }
 
 function isCancelledStatus(status) {
@@ -62,29 +48,12 @@ function tbilisiDateString(value) {
   return new Date(date.getTime() + TBILISI_OFFSET_MS).toISOString().slice(0, 10);
 }
 
-/** Epoch ms at which this stay's checkout day ends in Tbilisi (NaN if unknown). */
+/** Epoch ms at which a stay's checkout day ends in Tbilisi (NaN if unknown). */
 function checkoutCutoffMs(checkout) {
   const day = tbilisiDateString(checkout);
   if (!day) return NaN;
   const [y, m, d] = day.split('-').map(Number);
   return Date.UTC(y, m - 1, d + 1) - TBILISI_OFFSET_MS;
-}
-
-/** A non-cancelled reservation whose checkout day hasn't ended yet (current or upcoming stay). */
-function isActiveOrFutureReservation(reservation, nowMs) {
-  if (!reservation || isCancelledStatus(reservation.status)) return false;
-  const cutoff = checkoutCutoffMs(reservation.checkout);
-  return Number.isFinite(cutoff) && cutoff > nowMs;
-}
-
-/** Messages that belong to the finished stay: timestamped before its checkout cutoff. */
-function messagesInStayWindow(messages, cutoffMs) {
-  return (messages || []).filter((m) => Number.isFinite(m.timestampMs) && m.timestampMs < cutoffMs);
-}
-
-/** Ids safe to delete from a stay window — never owner messages. */
-function deletableMessageIds(windowMessages) {
-  return windowMessages.filter((m) => m.role !== 'owner').map((m) => m.id);
 }
 
 function conversationTextFor(messages) {
@@ -106,8 +75,7 @@ function summaryBulletsFrom(text) {
 }
 
 /**
- * Handles one reservations/{docId} write. Returns { outcome, ... } describing
- * what happened; only outcome 'summarized' deletes anything.
+ * Handles one reservations/{docId} write. Returns { outcome, ... }.
  *
  * store:     see createFirestoreSummaryStore for the interface
  * summarize: async (conversationText) => summary text ('' on failure)
@@ -129,69 +97,60 @@ async function runPostCheckoutSummary({ reservation, nowMs, store, summarize }) 
   const phone = normalizePhone(form.contact);
   if (!phone) return { outcome: 'no_phone' };
 
-  // Another current/upcoming stay on this phone: leave the conversation alone.
-  // Not marked, so a later write re-checks (e.g. if that stay gets cancelled);
-  // otherwise the later stay's own checkout summarizes these messages too.
-  const linked = await store.findReservationsForPhone({ phone, rawContact: form.contact });
-  const otherStay = linked.find((r) => String(r.reservationNumber || '') !== reservationNumber
-    && isActiveOrFutureReservation(r, nowMs));
-  if (otherStay) {
-    return { outcome: 'deferred_active_stay', phone, otherReservationNumber: String(otherStay.reservationNumber) };
-  }
-
   // Atomic claim — two near-simultaneous writes can't both proceed.
   if (!(await store.claimMarker(reservationNumber, { phone, cutoffMs }))) {
     return { outcome: 'already_processed' };
   }
 
-  let summaryWritten = false;
+  let markerFinished = false;
   try {
-    const windowMessages = messagesInStayWindow(await store.listMessages(phone), cutoffMs);
-    if (windowMessages.length === 0) {
-      await store.finishMarker(reservationNumber, { outcome: 'no_messages', deletedCount: 0 });
+    // The stay's messages: after the previous summarized stay's checkout day
+    // (so a returning guest's older stays aren't re-summarized) and before
+    // this one's ended.
+    const previousStay = (await store.getLatestSummary(phone))?.lastStay;
+    const previousCutoffMs = checkoutCutoffMs(previousStay?.checkout);
+    const fromMs = previousCutoffMs < cutoffMs ? previousCutoffMs : null;
+    const messages = await store.listMessages(phone, { fromMs, toMs: cutoffMs });
+
+    if (messages.length === 0) {
+      await store.finishMarker(reservationNumber, { outcome: 'no_messages', messageCount: 0 });
       return { outcome: 'no_messages', phone };
     }
 
     let summaryText = '';
     try {
-      summaryText = await summarize(conversationTextFor(windowMessages));
+      summaryText = await summarize(conversationTextFor(messages));
     } catch (err) {
       summaryText = '';
     }
     const summary = summaryBulletsFrom(summaryText);
     if (summary.length === 0) {
-      // Keep everything and release the claim so a later write retries.
+      // Release the claim so a later write retries.
       await store.releaseMarker(reservationNumber);
       return { outcome: 'summary_failed', phone };
     }
 
-    await store.writeSummary(phone, {
-      summary,
-      lastStay: {
-        room: reservation.roomCode || '',
-        checkin: reservation.checkin || '',
-        checkout: reservation.checkout || '',
-        reservationNumber,
-      },
+    const stay = {
+      room: reservation.roomCode || '',
+      checkin: reservation.checkin || '',
+      checkout: reservation.checkout || '',
+      reservationNumber,
+    };
+    // Every stay's summary is kept on its marker doc.
+    await store.finishMarker(reservationNumber, {
+      outcome: 'summarized', messageCount: messages.length, summary, stay,
     });
-    summaryWritten = true;
-
-    const ids = deletableMessageIds(windowMessages);
-    await store.deleteMessages(phone, ids);
-    const keptOwnerCount = windowMessages.length - ids.length;
-    await store.finishMarker(reservationNumber, { outcome: 'summarized', deletedCount: ids.length, keptOwnerCount });
-    return { outcome: 'summarized', phone, deletedCount: ids.length, keptOwnerCount };
-  } catch (err) {
-    if (summaryWritten) {
-      // Summary saved but deletion failed part-way: keep the claim, so a retry
-      // can't re-summarize the leftover subset and overwrite the good summary.
-      // Leftover messages are kept, never lost.
-      await store.finishMarker(reservationNumber, { outcome: 'delete_failed', error: String(err.message || err) })
-        .catch(() => {});
-    } else {
-      // Nothing was deleted; release so a later write can retry cleanly.
-      await store.releaseMarker(reservationNumber).catch(() => {});
+    markerFinished = true;
+    // whatsapp_guests holds the latest stay only — don't let a late-processed
+    // older checkout overwrite a newer stay's summary.
+    if (!(previousCutoffMs > cutoffMs)) {
+      await store.writeLatestSummary(phone, { summary, lastStay: stay });
     }
+    return { outcome: 'summarized', phone, messageCount: messages.length };
+  } catch (err) {
+    // Release the claim for a retry unless the summary is already saved on
+    // the marker (then this checkout counts as done).
+    if (!markerFinished) await store.releaseMarker(reservationNumber).catch(() => {});
     throw err;
   }
 }
@@ -204,10 +163,9 @@ function toMillis(value) {
   return Number.isFinite(t) ? t : NaN;
 }
 
-/** Firestore-backed store for runPostCheckoutSummary. */
+/** Firestore-backed store for runPostCheckoutSummary. Reads messages; never deletes them. */
 function createFirestoreSummaryStore(db, FieldValue) {
   const markerRef = (rn) => db.collection(MARKER_COLLECTION).doc(rn);
-  const messagesRef = (phone) => db.collection('whatsapp_conversations').doc(phone).collection('messages');
 
   return {
     async getMarker(rn) {
@@ -235,13 +193,13 @@ function createFirestoreSummaryStore(db, FieldValue) {
       await markerRef(rn).set({ ...data, status: 'done', finishedAt: FieldValue.serverTimestamp() }, { merge: true });
     },
 
+    // Deletes only the claim marker itself (so a failed summary can retry).
     async releaseMarker(rn) {
       await markerRef(rn).delete();
     },
 
     // Exact match only. Multi-room forms ("123_001") were never matched here
-    // before either (the old range fallback was an empty range), so they stay
-    // unsummarized — unchanged behavior.
+    // before either (the old range fallback was an empty range) — unchanged.
     async findWaFormForReservation(rn) {
       const snap = await db.collection('checkin_guests')
         .where('matchedReservationId', '==', rn)
@@ -251,51 +209,23 @@ function createFirestoreSummaryStore(db, FieldValue) {
       return snap.empty ? null : snap.docs[0].data();
     },
 
-    // Every reservation linked to this phone: via its WA check-in forms, and
-    // via reservations.phone (catches upcoming stays with no form filled yet).
-    async findReservationsForPhone({ rawContact }) {
-      const variants = contactVariants(rawContact);
-      const reservationNumbers = new Set();
-      for (const contact of variants) {
-        const forms = await db.collection('checkin_guests')
-          .where('contact', '==', contact)
-          .where('contactType', '==', 'wa')
-          .limit(50)
-          .get();
-        forms.docs.forEach((d) => {
-          const base = baseReservationNumber(d.data().matchedReservationId);
-          if (base) reservationNumbers.add(base);
-        });
-      }
-      const results = [];
-      for (const rn of reservationNumbers) {
-        const snap = await db.collection('reservations').where('reservationNumber', '==', rn).limit(5).get();
-        snap.docs.forEach((d) => results.push(d.data()));
-      }
-      for (const phone of variants) {
-        const snap = await db.collection('reservations').where('phone', '==', phone).limit(20).get();
-        snap.docs.forEach((d) => results.push(d.data()));
-      }
-      return results;
+    async getLatestSummary(phone) {
+      const snap = await db.collection('whatsapp_guests').doc(phone).get();
+      return snap.exists ? snap.data() : null;
     },
 
-    async listMessages(phone) {
-      const snap = await messagesRef(phone).orderBy('timestamp', 'asc').get();
+    async listMessages(phone, { fromMs, toMs }) {
+      let q = db.collection('whatsapp_conversations').doc(phone).collection('messages')
+        .where('timestamp', '<', new Date(toMs));
+      if (Number.isFinite(fromMs)) q = q.where('timestamp', '>=', new Date(fromMs));
+      const snap = await q.orderBy('timestamp', 'asc').get();
       return snap.docs.map((d) => {
         const m = d.data();
         return { id: d.id, role: m.role, content: m.content, timestampMs: toMillis(m.timestamp) };
       });
     },
 
-    async deleteMessages(phone, ids) {
-      for (let i = 0; i < ids.length; i += DELETE_CHUNK) {
-        const batch = db.batch();
-        ids.slice(i, i + DELETE_CHUNK).forEach((id) => batch.delete(messagesRef(phone).doc(id)));
-        await batch.commit();
-      }
-    },
-
-    async writeSummary(phone, { summary, lastStay }) {
+    async writeLatestSummary(phone, { summary, lastStay }) {
       await db.collection('whatsapp_guests').doc(phone).set(
         { summary, lastStay, updatedAt: FieldValue.serverTimestamp() },
         { merge: true }
@@ -307,12 +237,8 @@ function createFirestoreSummaryStore(db, FieldValue) {
 module.exports = {
   SUMMARY_SYSTEM_PROMPT,
   MARKER_COLLECTION,
-  contactVariants,
   checkoutCutoffMs,
   tbilisiDateString,
-  isActiveOrFutureReservation,
-  messagesInStayWindow,
-  deletableMessageIds,
   runPostCheckoutSummary,
   createFirestoreSummaryStore,
 };

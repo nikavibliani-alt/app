@@ -1342,10 +1342,8 @@ exports.roomReadyNotification = onDocumentWritten(
 
 // PART 3 — auto-summarize a guest's WhatsApp conversation after checkout.
 // Fires on every reservations/{docId} write, including the MiniHotel sync's
-// routine ~10-minute rewrites; runPostCheckoutSummary (summarizer.js) acts only
-// once per checkout, never while the phone has another active/future stay,
-// only on messages from before this stay's checkout cutoff, and never deletes
-// owner messages.
+// routine ~10-minute rewrites; runPostCheckoutSummary (summarizer.js) summarizes
+// each checkout exactly once and never deletes any message.
 exports.summarizeGuestConversation = onDocumentWritten(
   {
     document: 'reservations/{docId}',
@@ -1370,7 +1368,7 @@ exports.summarizeGuestConversation = onDocumentWritten(
         }),
       });
       // Routine outcomes fire on every sync pass — only log the ones that did,
-      // or deliberately skipped, real work.
+      // or tried to do, real work.
       if (!['not_checked_out', 'already_processed', 'no_wa_form', 'cancelled', 'no_reservation_number'].includes(result.outcome)) {
         console.log(`summarizeGuestConversation: reservation ${reservation.reservationNumber} ->`, JSON.stringify(result));
       }
