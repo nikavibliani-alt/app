@@ -6,7 +6,6 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const crypto = require('node:crypto');
 const {
   isShortAcknowledgement,
-  isSilentAiReply,
   isWaitingFollowUpAfterEscalation,
   shouldStaySilentFromHistory,
   findMostRecentOwnerMessage,
@@ -23,7 +22,8 @@ const {
 } = require('./summarizer');
 const { loadCurrentStayHistory, prepareClaudeHistory, stripTimeLabels } = require('./stayContext');
 const { findCurrentGuestForm } = require('./guestLookup');
-const { applyToneGuard } = require('./toneGuard');
+const { callClaudeWithRetry, describeClaudeError } = require('./claudeClient');
+const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
 
 if (!getApps().length) initializeApp();
 
@@ -377,24 +377,10 @@ async function writeRoomReadyRecord(db, { reservationNumber, guestName, phone, s
   });
 }
 
+/** Reply text, or '' on failure (used by the summarizer; the worker uses callClaudeWithRetry directly). */
 async function callClaude({ system, messages, maxTokens = 500 }) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: maxTokens,
-      system,
-      messages,
-    }),
-  });
-
-  const data = await res.json();
-  return data?.content?.[0]?.text || '';
+  const result = await callClaudeWithRetry({ apiKey: process.env.ANTHROPIC_API_KEY, system, messages, maxTokens });
+  return result.ok ? result.text : '';
 }
 
 async function sendWhatsAppMessage(payload) {
@@ -410,6 +396,15 @@ async function sendWhatsAppMessage(payload) {
     }
   );
   return res.json();
+}
+
+/** Sends and checks Meta's response: { ok, id } or { ok: false, code, reason }. Never throws. */
+async function sendWhatsAppChecked(payload) {
+  try {
+    return interpretMetaResponse(await sendWhatsAppMessage(payload));
+  } catch (err) {
+    return { ok: false, code: 'network', reason: `could not reach Meta: ${err.message || err}` };
+  }
 }
 
 function toJsDate(value) {
@@ -500,7 +495,7 @@ function buildModeContext(effectiveMode, ownerPhone) {
   return 'AVAILABLE MODE: A human host may reply manually. If a Host: message appears after the guest\'s latest message, the host already answered it — reply with only [SILENT]. A Host: message that came before the guest\'s latest message does not answer it — reply normally. Guest should never be told they are talking to a bot.';
 }
 
-async function writeAlert(db, { reason, phone, guestName = '', room = '', message = '', mode = '', urgency = false }) {
+async function writeAlert(db, { reason, phone, guestName = '', room = '', message = '', mode = '', urgency = false, errorType, errorMessage }) {
   try {
     await db.collection('whatsapp_alerts').add({
       reason,
@@ -510,6 +505,8 @@ async function writeAlert(db, { reason, phone, guestName = '', room = '', messag
       message,
       mode,
       urgency: !!urgency,
+      // bot_error alerts only: what failed (e.g. credit, overloaded, meta_send_failed)
+      ...(errorType ? { errorType, errorMessage: String(errorMessage || '').slice(0, 300) } : {}),
       resolved: false,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -535,6 +532,35 @@ async function notifyOwner(ownerPhone, text) {
   } catch (err) {
     console.error('notifyOwner: fetch failed:', err);
   }
+}
+
+const OWNER_NOTIFY_WINDOW_MS = 30 * 60 * 1000;
+
+/**
+ * Error notifications to the owner: at most one per `key` (error type) per
+ * 30 minutes, tracked in whatsapp_alert_throttle/{key} so it holds across
+ * worker instances. Callers always write the whatsapp_alerts doc themselves.
+ */
+async function notifyOwnerThrottled(db, ownerPhone, key, text) {
+  if (!ownerPhone) return;
+  const ref = db.collection('whatsapp_alert_throttle').doc(String(key).replace(/[^\w-]/g, '_'));
+  let send = true;
+  try {
+    send = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const now = Date.now();
+      if (!shouldNotifyNow(snap.exists ? Number(snap.data().lastNotifiedMs) : NaN, now, OWNER_NOTIFY_WINDOW_MS)) return false;
+      tx.set(ref, { lastNotifiedMs: now, lastText: String(text).slice(0, 300) });
+      return true;
+    });
+  } catch (err) {
+    console.warn('notifyOwnerThrottled: throttle check failed, notifying anyway:', err.message || err);
+  }
+  if (!send) {
+    console.log(`notifyOwnerThrottled: owner already notified about "${key}" in the last 30 min — alert doc written, WhatsApp notification skipped`);
+    return;
+  }
+  await notifyOwner(ownerPhone, text);
 }
 
 // ---- Inbound content classification ----------------------------------------
@@ -850,7 +876,9 @@ exports.whatsappWebhook = onRequest(
 exports.whatsappBotWorker = onRequest(
   {
     region: 'europe-west1',
-    timeoutSeconds: 60,
+    // Room for two ~25 s Claude attempts (timeout + one retry) plus Firestore
+    // reads and the sends; at 60 s a slow retry could be cut off mid-send.
+    timeoutSeconds: 120,
     // Cold start loads firebase-admin/firestore's full dependency graph
     // (google-gax + @opentelemetry/api + large proto JSON descriptors) —
     // measured locally as needing well over the platform's default (small)
@@ -1077,182 +1105,108 @@ exports.whatsappBotWorker = onRequest(
       const systemWithContext = `${SYSTEM_PROMPT}\n\n${guestContext}\n\n${modeContext}`;
 
       console.log('whatsappBotWorker: calling Claude for phone:', phone);
-      // Strip any history time label the model copied into its reply, before any
-      // tag parsing ([VIDEO:id] is only recognized at the very start).
-      let aiReply = stripTimeLabels(await callClaude({ system: systemWithContext, messages: history }));
-      console.log('whatsappBotWorker: Claude responded, length:', (aiReply || '').length);
+      const claude = await callClaudeWithRetry({
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        system: systemWithContext,
+        messages: history,
+      });
 
-      let escalated = false;
-      let escalationReason = 'escalation';
-
-      if (!aiReply) {
-        aiReply = 'Let me check on that and get back to you shortly.';
-        escalated = true;
-        escalationReason = 'unhandled_message';
-      }
-
-      // Parse an optional [VIDEO:media_id] prefix
-      let videoMediaId = null;
-      const videoMatch = aiReply.match(/^\[VIDEO:(\d+)\]\s*\n?/);
-      if (videoMatch) {
-        videoMediaId = videoMatch[1];
-        aiReply = aiReply.slice(videoMatch[0].length).trim();
-      }
-
-      // ANGRY GUEST DETECTION — checked before [SILENT] since it needs its own,
-      // different combination: full silence to the guest (like [SILENT]) but
-      // still an immediate urgent owner alert (like [URGENT:...]), which
-      // [SILENT]'s own early-return doesn't do. The model is asked to output
-      // only this tag with no guest-facing text; treated as a presence test
-      // regardless, same as the other tags.
-      if (/\[URGENT:ANGRY\]/i.test(aiReply)) {
-        console.log(`whatsappBotWorker: STOPPED — angry/complaint guest, urgent silent alert for ${phone}`);
+      const label = `${guestName} / ${roomCode || 'unknown room'}`;
+      if (!claude.ok) {
+        // Nothing is sent to the guest (no generic fallback). The pending batch is
+        // kept, so the guest's message is answered together with their next one.
+        // The alert doc is always written; the owner's WhatsApp notification is
+        // limited to one per error type per 30 minutes.
+        console.error(`whatsappBotWorker: STOPPED — Claude failed after ${claude.attempts} attempt(s): ${claude.errorType}${claude.status ? ` (HTTP ${claude.status})` : ''}: ${claude.message} — nothing sent to the guest, pending batch kept, for`, phone);
         await writeAlert(db, {
-          reason: 'angry_guest',
+          reason: 'bot_error',
           phone,
           guestName,
           room: roomCode,
           message: combinedGuestText,
           mode: effectiveMode,
-          urgency: true,
+          errorType: claude.errorType,
+          errorMessage: claude.message,
         });
-        if (config.ownerPhone) {
-          await notifyOwner(
-            config.ownerPhone,
-            `URGENT: ${guestName} ${roomCode || 'unknown room'} — angry/complaint guest: ${combinedGuestText.slice(0, 300)}`
-          );
-        }
-        await deletePendingIfTokenMatches(db, phone, batchToken);
+        await notifyOwnerThrottled(db, config.ownerPhone, `claude_${claude.errorType}`, `Bot could not reply to ${label}: ${describeClaudeError(claude)}`);
         return res.sendStatus(200);
       }
 
+      // Strip any history time label the model copied into its reply, before any
+      // tag parsing ([VIDEO:id] is only recognized at the very start).
+      const aiReply = stripTimeLabels(claude.text);
+      console.log('whatsappBotWorker: Claude responded, length:', aiReply.length, 'attempts:', claude.attempts);
+      const plan = parseAiReply(aiReply);
+
       // CHANGE 7 — [SILENT]: the model asked to send nothing (host already
-      // handled it, or the topic is explicitly out of scope). Checked as a
-      // presence test — any reply carrying this tag sends nothing at all,
-      // even if other text is attached.
-      if (isSilentAiReply(aiReply)) {
+      // handled it, or the topic is explicitly out of scope). An angry-guest tag
+      // still wins: it sends nothing either, but alerts the owner.
+      if (plan.silent && !plan.angry) {
         console.log(`whatsappBotWorker: STOPPED — [SILENT] tag for ${phone}`);
         await deletePendingIfTokenMatches(db, phone, batchToken);
         return res.sendStatus(200);
       }
 
-      // Strip trailing [ESCALATE] / [URGENT:...] tags — internal only, never sent to WhatsApp.
-      // [VIDEO_SENT:id] is stripped defensively too — it's a marker WE write into stored
-      // history (see below), never something the model is asked to output, but a model can
-      // echo patterns it sees in its own context, so guard the guest-facing send anyway.
-      const hasEscalateTag = /\[ESCALATE\]/i.test(aiReply);
-      const urgentMatch = aiReply.match(/\[URGENT:(LOCKOUT|ISSUE)\]/i);
-      aiReply = aiReply
-        .replace(/\s*\[ESCALATE\]\s*/gi, ' ')
-        .replace(/\s*\[URGENT:(?:LOCKOUT|ISSUE)\]\s*/gi, ' ')
-        .replace(/\s*\[VIDEO_SENT:\d+\]\s*/gi, ' ')
-        .replace(/\s+$/, '')
-        .trim();
-      // Tone guard on the exact guest-facing text: "!" -> ".", em dash -> ", ",
-      // links untouched. The stored copy below is the same guarded text.
-      aiReply = applyToneGuard(aiReply);
-      if (hasEscalateTag) {
-        escalated = true;
-        escalationReason = 'escalation';
-      }
-
-      // CHANGE C — urgent issues (lockout, flooding/security) page the owner
-      // immediately, regardless of bot mode or time of day — ahead of the
-      // humanizer delay and the guest-facing send.
-      let urgencyFlag = false;
-      if (urgentMatch) {
-        urgencyFlag = true;
-        escalated = true;
-        escalationReason = 'escalation';
-        const urgentMessage = urgentMatch[1].toUpperCase() === 'LOCKOUT'
-          ? `URGENT: ${guestName} ${roomCode || 'unknown room'} — guest is locked out`
-          : `URGENT: ${guestName} ${roomCode || 'unknown room'} — ${combinedGuestText.slice(0, 300)}`;
-        if (config.ownerPhone) {
-          await notifyOwner(config.ownerPhone, urgentMessage);
-        }
-      }
-
-      // Small humanizer — short, after Claude, before send. Not the batching delay.
-      await sleep(1000 + Math.random() * 1000);
-
-      // Final re-check, immediately before anything is sent. The checks above ran
-      // before the Claude call (seconds ago); an owner echo that landed during
-      // Claude or the sleep above would otherwise be missed and the bot would talk
-      // over the host. The echo handler also deletes whatsapp_pending, so a missing
-      // pending doc is a second signal. A changed batchToken means the guest wrote
-      // again while this reply was being generated: don't send an outdated reply,
-      // the newer run (already queued) answers everything in one reply.
-      const pendingNow = await pendingRef.get();
-      const preSend = preSendDecision({
-        pendingExists: pendingNow.exists,
-        pendingToken: pendingNow.exists ? pendingNow.data().batchToken : undefined,
-        batchToken,
-        muteAction: pendingNow.exists ? (await muteDecision()).action : undefined,
-      });
-      if (preSend === 'newer_message') {
-        console.log('whatsappBotWorker: STOPPED — newer guest message arrived while the reply was being generated; not sending, the newer run will answer everything, for', phone);
-        return res.sendStatus(200); // the pending batch now belongs to the newer run — leave it
-      }
-      if (preSend === 'owner_replied') {
-        console.log('whatsappBotWorker: STOPPED — owner replied while reply was being generated (pre-send check) for', phone);
-        await deletePendingIfTokenMatches(db, phone, batchToken);
-        return res.sendStatus(200);
-      }
-
-      if (videoMediaId) {
-        await sendWhatsAppMessage({
-          messaging_product: 'whatsapp',
-          to: phone,
-          type: 'video',
-          video: { id: videoMediaId },
-        });
-      }
-
-      await sendWhatsAppMessage({
-        messaging_product: 'whatsapp',
-        to: phone,
-        type: 'text',
-        text: { body: aiReply },
-      });
-
-      // Mark in stored history (never in the guest-facing send above) that a video
-      // was sent, so a later Claude call can see it and not resend the same video
-      // for a follow-up question on the same topic — see FOR FOLLOW-UP QUESTIONS.
-      const storedAssistantContent = videoMediaId ? `${aiReply}\n[VIDEO_SENT:${videoMediaId}]` : aiReply;
-      await convoMessagesRef.add({
-        role: 'assistant',
-        content: storedAssistantContent,
-        timestamp: FieldValue.serverTimestamp(),
-        // Newest guest message this reply actually answered — a guest message
-        // stored after this point but before the reply is still unanswered
-        // (see prepareClaudeHistory).
-        repliesToMs: prepared.newestUnansweredMs,
-      });
-
-      if (escalated) {
-        await writeAlert(db, {
-          reason: escalationReason,
+      // Send phase (replyDelivery.js). The final pre-send check runs before any
+      // send AND before any owner alert, so a run replaced by a newer guest
+      // message (or overtaken by the owner) never sends and never alerts twice.
+      const { outcome } = await deliverReply(plan, {
+        name: guestName,
+        room: roomCode,
+        guestText: combinedGuestText,
+        mode: effectiveMode,
+      }, {
+        log: console,
+        // Small humanizer — short, after Claude, before send. Not the batching delay.
+        humanize: () => sleep(1000 + Math.random() * 1000),
+        // Final re-check, immediately before anything is sent. An owner echo that
+        // landed during Claude would otherwise be missed (the echo handler also
+        // deletes whatsapp_pending, a second signal). A changed batchToken means
+        // the guest wrote again: the newer run answers everything in one reply.
+        preSendCheck: async () => {
+          const pendingNow = await pendingRef.get();
+          return preSendDecision({
+            pendingExists: pendingNow.exists,
+            pendingToken: pendingNow.exists ? pendingNow.data().batchToken : undefined,
+            batchToken,
+            muteAction: pendingNow.exists ? (await muteDecision()).action : undefined,
+          });
+        },
+        sendVideo: (id) => sendWhatsAppChecked({ messaging_product: 'whatsapp', to: phone, type: 'video', video: { id } }),
+        sendText: (body) => sendWhatsAppChecked({ messaging_product: 'whatsapp', to: phone, type: 'text', text: { body } }),
+        // Stored only after a successful send. [VIDEO_SENT:id] (added by
+        // deliverReply only if the video went out) lets a later call avoid
+        // resending it. repliesToMs: newest guest message this reply answered —
+        // see prepareClaudeHistory.
+        storeAssistant: (content) => convoMessagesRef.add({
+          role: 'assistant',
+          content,
+          timestamp: FieldValue.serverTimestamp(),
+          repliesToMs: prepared.newestUnansweredMs,
+        }),
+        writeAlert: (fields) => writeAlert(db, {
           phone,
           guestName,
           room: roomCode,
           message: combinedGuestText,
           mode: effectiveMode,
-          urgency: urgencyFlag,
-        });
+          ...fields,
+        }),
+        notifyOwner: async (text) => { if (config.ownerPhone) await notifyOwner(config.ownerPhone, text); },
+        notifyOwnerThrottled: (key, text) => notifyOwnerThrottled(db, config.ownerPhone, key, text),
+        finishPending: () => deletePendingIfTokenMatches(db, phone, batchToken),
+      });
 
-        // Urgent cases already paged the owner immediately, above — avoid a
-        // second, redundant notification for the same incident.
-        if (config.ownerPhone && !urgencyFlag) {
-          await notifyOwner(
-            config.ownerPhone,
-            `Guest needs help — ${guestName} / ${roomCode || 'unknown room'} / mode=${effectiveMode}: ${combinedGuestText}`
-          );
-        }
-      }
-
-      await deletePendingIfTokenMatches(db, phone, batchToken);
-
-      console.log('whatsappBotWorker: completed normally for', phone);
+      const OUTCOME_LOG = {
+        stopped_newer: 'STOPPED — newer guest message arrived while the reply was being generated; not sending, no alerts, the newer run will answer everything',
+        stopped_owner: 'STOPPED — owner replied while reply was being generated (pre-send check)',
+        angry_alerted: 'STOPPED — angry/complaint guest, urgent silent alert',
+        escalated_only: 'STOPPED — reply had only internal tags; nothing sent, escalated to the owner',
+        empty_reply: 'STOPPED — reply was empty after removing tags; nothing sent, owner alerted, pending batch kept',
+        send_failed: 'STOPPED — Meta did not accept the reply; not stored, owner alerted, pending batch kept',
+        sent: 'completed normally',
+      };
+      console.log(`whatsappBotWorker: ${OUTCOME_LOG[outcome] || outcome} for`, phone);
       return res.sendStatus(200);
     } catch (err) {
       console.error('whatsappBotWorker error:', err);

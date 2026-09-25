@@ -292,6 +292,20 @@ is stripped (`stripTimeLabels`) before tag parsing.
 `toneGuard.js` runs on the final guest-facing text of every reply. It turns
 `!` into `.` and `—` into `, `, and never changes anything inside a link.
 
+## When something fails (`claudeClient.js`, `replyDelivery.js`)
+
+- **Claude call:**
+  - It has a 25 s timeout.
+  - It retries once, after 2 s, for temporary errors: 429, 5xx/529, timeout, network.
+  - It never retries 400/401/403 or an empty credit balance.
+  - If it still fails, the guest gets nothing. A `whatsapp_alerts` doc with `reason: "bot_error"` (plus `errorType`, `errorMessage`) is written every time. The owner gets a WhatsApp note like "Bot could not reply to Anna / 6-2: Claude credit is empty", at most once per error type per 30 minutes (`whatsapp_alert_throttle/{key}`).
+  - The pending batch is kept, so the guest's message is answered together with their next one.
+- **Tag-only reply** (e.g. just `[ESCALATE]`): no empty WhatsApp message is sent. An escalation still alerts the owner.
+- **Meta send:** every send's response is checked.
+  - A failed text is not stored as a bot message. It's logged, alerted (`errorType: meta_send_failed`) and throttled like the above, and the pending batch is kept.
+  - A failed video is alerted, and the text still goes out, stored without the `[VIDEO_SENT]` marker.
+- **Order of the send phase:** the final pre-send check runs before any send and before any urgent or angry owner alert. A run that is replaced by a newer guest message, or overtaken by the owner, never sends and never alerts.
+
 ## Deploy
 
 ```bash
