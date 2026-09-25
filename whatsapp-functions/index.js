@@ -22,6 +22,7 @@ const {
 } = require('./summarizer');
 const { loadCurrentStayHistory, prepareClaudeHistory, stripTimeLabels } = require('./stayContext');
 const { findCurrentGuestForm } = require('./guestLookup');
+const { otherPropertyForRoom, stayTiming, stayTimingContextLines } = require('./stayRules');
 const { callClaudeWithRetry, describeClaudeError } = require('./claudeClient');
 const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
 
@@ -107,12 +108,16 @@ GUEST CONTEXT (injected with each message):
 - Whether they filled the check-in form or not
 - Previous stay notes if returning guest
 - CURRENT_TBILISI_HOUR — the current hour (0-23) in Tbilisi local time
+- Today's date in Tbilisi, whether today is the guest's arrival day, whether 15:00 has passed today, and "Check-in is already open for this guest" (yes / no / unknown). These are computed exactly in code: always rely on them for anything about check-in time or door codes, never work the time out yourself.
 
 UNIT TYPES (know these well):
 - Triple Room with Private Bathroom: no kitchen, no balcony, 1 single bed, 1 double bed, 1 sofa bed, fits up to 4 guests
 - Superior Apartment: 1 isolated bedroom with double bed, living room with double bed divided by curtains and 2 sofas, has kitchen, fits up to 6 guests
 - 3 Bedroom Apartment: Bedroom 1 has 2 double beds, Bedroom 2 has 1 double bed and 1 baby bed, Bedroom 3 has 1 double bed, living room has 3 sofa beds, 1 separate toilet, 2 bathrooms with showers, has kitchen, fits up to 12 guests
 In Georgian, always call the baby bed ბავშვის საწოლი — never სავარძელი (that means armchair).
+
+ACCESS FACTS (never contradict or add to these):
+There is no key box or lock box at any of our properties. Keys are inside the apartment. Never invent how access works (codes, boxes, doors, entrances, where keys are). If you are not sure, point the guest to their check-in page (app.maxelaapartments.com/checkin-guest), which has the step-by-step instructions and codes, or escalate.
 
 SCENARIOS:
 
@@ -176,8 +181,8 @@ Georgian tone reference: ვიდეო სადაც რჩება, შუ
 
 Booking or price inquiry:
 Reply: Unfortunately we cannot see exact pricing or availability from our side. Reservations are only through Booking.com or Expedia. Do you need a unit with a kitchen or without?
-Once they answer: if they need a kitchen, recommend the Superior Apartment or 3 Bedroom Apartment (both have a kitchen); if not, recommend the Triple Room with Private Bathroom. Either way, send the booking link: booking.com/Share-PaJ0WC. Please make sure to select the right unit type when booking.
-When describing this kitchen choice in Georgian, the word is არჩევის (from არჩევა, to choose) — not დარჩევის.
+When replying in Georgian, ask exactly: სამზარეულოთი გსურთ ბინა თუ მის გარეშე?
+Once they answer: if they need a kitchen, recommend the Superior Apartment or 3 Bedroom Apartment (both have a kitchen); if not, recommend the Triple Room with Private Bathroom. Either way, send the booking link: https://www.booking.com/Share-4xInYf. Please make sure to select the right unit type when booking.
 
 Room type complaint (booked Triple Room but expected kitchen):
 Reply: I understand. Just to clarify, you booked the Triple Room with Private Bathroom which does not include a kitchen, as shown in the listing. We also have the Superior Apartment and 3 Bedroom Apartment which both have kitchens. If you have questions about your booking please contact Booking.com or Expedia directly.
@@ -189,9 +194,9 @@ This is a normal request, not something to apologize for — do not apologize or
 Only when replying in Georgian, use exactly: შევამოწმებ და გაგაგებინებთ მალე. — no ბოდიშს გიხდით, no other preamble.
 Never suggest alternative rooms, views, sightseeing spots, or Tbilisi recommendations to fill the gap while this is pending. Use [SILENT] instead of inventing anything.
 
-Guest mentions Freedom Square, Tabidze, or Galaktion Tabidze street:
-This is not our Shartava property, and there is no scenario for it. Use [SILENT] — send nothing, no reply, no escalation. Never use Shartava-specific facts (entrance, address, door codes, etc.) for this guest.
-Note: this is enforced in code as a sticky per-conversation flag once detected — every later message in this conversation is also silenced automatically, not just the one that mentioned it.
+Freedom Square (Tabidze) and Orbeliani:
+Guests whose booking is at Freedom Square (rooms starting tab-) or Orbeliani (rooms starting orb-) never reach you: the code stays silent and alerts the owner. A guest who only mentions Freedom Square, Tabidze street or Orbeliani as a landmark or a place in the city is answered normally.
+If the Room/apartment type is unknown and the guest says they are staying at our Freedom Square / Tabidze or Orbeliani location (not Shartava), never give Shartava facts (address, entrance, door code timing, bag storage): reply "Let me check on that and get back to you shortly." [ESCALATE]
 
 Gym inquiry:
 Reply: We do not have a gym on site.
@@ -204,12 +209,18 @@ If Filled check-in form is no, first ask: Do you already have a reservation with
 If they say no: Reply: We don't take direct bookings, sorry, reservations and payment are only through Booking.com or Expedia.
 If they say yes: Reply: Please fill in the check-in form first, your entrance and access instructions will be right there: app.maxelaapartments.com/checkin-guest
 
-If Filled check-in form is yes:
-If CURRENT_TBILISI_HOUR is 15 or later: Reply: The address is Zhiuli Shartava 35/37, near Clean House Market (https://maps.app.goo.gl/g1wVvjEG3xRn5bNR7). Your check-in page has instructions for finding your specific apartment starting from there.
-If CURRENT_TBILISI_HOUR is before 15, check Room/apartment type:
+If Filled check-in form is yes, use the "Check-in is already open for this guest" line from the guest context:
+If it is yes, or unknown: Reply: The address is Zhiuli Shartava 35/37, near Clean House Market (https://maps.app.goo.gl/g1wVvjEG3xRn5bNR7). Your check-in page has instructions for finding your specific apartment starting from there. Never say the door code switches on at 3pm when it is yes: check-in is already open.
+If it is no (before 15:00 on the arrival day), check Room/apartment type:
 If it starts with 6- or 7- (apartment): Reply: The address is Zhiuli Shartava 35/37, near Clean House Market (https://maps.app.goo.gl/g1wVvjEG3xRn5bNR7), it's the 4th entrance. The door code only switches on at 3pm, sometimes a bit earlier if your apartment gets cleaned ahead of schedule. Just so you know, these are apartments rather than a hotel, so there's no lobby to wait in.
 If it starts with 0- (room): Reply: The address is Zhiuli Shartava 35/37, near Clean House Market (https://maps.app.goo.gl/g1wVvjEG3xRn5bNR7), your door is separate, right by the 4th entrance. The door code only switches on at 3pm, sometimes a bit earlier if it gets cleaned ahead of schedule. Just so you know, these are apartments rather than a hotel, so there's no lobby to wait in.
 (When replying in Georgian for this scenario, use this exact sentence for the door-code timing, word for word — do not paraphrase it, and never say საღამოს since 3pm is afternoon, not evening: "ინსტრუქციები 3 საათიდან იქნება ხელმისაწვდომი. თუ უფრო მალე დალაგდება ნომერი, 3 საათამდე შეგეძლებათ შესვლა.")
+
+Guest asks for the door code, smart lock code, or entrance code:
+If Filled check-in form is no: Reply: Please fill in the check-in form first, your door code and access instructions will be right there: app.maxelaapartments.com/checkin-guest
+If Filled check-in form is yes and "Check-in is already open for this guest" is yes or unknown: Reply: Your door code and step-by-step instructions are on your check-in page, just scroll down through the steps: app.maxelaapartments.com/checkin-guest. Never say the code switches on at 3pm in this case.
+If Filled check-in form is yes and it is no: Reply: Your door code will appear on your check-in page from 3pm, sometimes a bit earlier if your apartment gets cleaned ahead of schedule: app.maxelaapartments.com/checkin-guest
+If the guest says the code does not work or the smart lock does not react, use the locked out scenario above instead.
 
 Guest is at or outside the building and says they are stuck, cannot get in, or asks how to get there or where to go:
 Check Filled check-in form first. Never reply with "alerting the team" to a generic "I'm stuck" or "how do I get in" message, that wording is only for a genuine smart lock hardware failure (see the locked out scenario above).
@@ -563,6 +574,23 @@ async function notifyOwnerThrottled(db, ownerPhone, key, text) {
   await notifyOwner(ownerPhone, text);
 }
 
+/**
+ * True the first time `key` is claimed, false afterwards (atomic create() in
+ * whatsapp_alert_throttle). Used for "alert the owner once per stay". A
+ * Firestore error counts as a first claim, so an alert is never lost.
+ */
+async function claimOncePerStay(db, key) {
+  const ref = db.collection('whatsapp_alert_throttle').doc(String(key).replace(/[^\w-]/g, '_'));
+  try {
+    await ref.create({ key, claimedAt: FieldValue.serverTimestamp() });
+    return true;
+  } catch (err) {
+    if (err.code === 6 || /already exists/i.test(err.message || '')) return false;
+    console.warn('claimOncePerStay: claim failed, alerting anyway:', err.message || err);
+    return true;
+  }
+}
+
 // ---- Inbound content classification ----------------------------------------
 
 /** Returns the text to store for an inbound message, or a bracketed placeholder for non-text types. */
@@ -573,35 +601,6 @@ function classifyIncomingContent(msg) {
   if (type === 'image' || type === 'sticker') return '[image]';
   if (type === 'video') return '[video]';
   return '[unsupported]';
-}
-
-// ---- Freedom Square / Tabidze sticky silence --------------------------------
-// Freedom Square guests are not at our Shartava property and we have no
-// scenario for them — once a guest's message mentions this area, the bot must
-// never speak to that conversation again, since any of our factual scenarios
-// (Shartava entrance, bag storage, etc.) would be wrong for their location.
-// Deliberately excludes a bare "galaktion" (a common Georgian first name,
-// unrelated to the street) — only "tabidze" alone or "galaktion tabidze"
-// together are treated as unambiguous.
-// Georgian word stems (not full words) on purpose — Georgian noun declension
-// changes the ending (e.g. "ტაბიძის" = "of Tabidze's"), so matching the stem
-// catches every grammatical case, not just the nominative form.
-const FREEDOM_SQUARE_KEYWORDS = [
-  'freedom square',
-  'tabidze',
-  'galaktion tabidze',
-  'თავისუფლების მოედანი',
-  'თავისუფლების',
-  'ტაბიძ',
-  'გალაკტიონ ტაბიძ',
-  'tavisuplebis moedani',
-  'tavisuplebis',
-];
-const FREEDOM_SQUARE_RE = new RegExp(FREEDOM_SQUARE_KEYWORDS.join('|'), 'iu');
-
-/** True if `text` mentions Freedom Square / Tabidze by any known spelling. */
-function isFreedomSquareMessage(text) {
-  return FREEDOM_SQUARE_RE.test(String(text || ''));
 }
 
 /**
@@ -940,22 +939,6 @@ exports.whatsappBotWorker = onRequest(
       const convoMessagesRef = convoRef.collection('messages');
       const combinedGuestText = (pending.messages || []).join('\n');
 
-      // Freedom Square / Tabidze sticky silence — once flagged, always silent
-      // for this conversation. Checked before every other branch since it must
-      // override everything else (owner replies, escalations, etc. are moot —
-      // the bot should never speak to this conversation again).
-      const convoSnap = await convoRef.get();
-      const alreadyFreedomSquare = convoSnap.exists && convoSnap.data().isFreedomSquare === true;
-      if (alreadyFreedomSquare || isFreedomSquareMessage(combinedGuestText)) {
-        if (!alreadyFreedomSquare) {
-          await convoRef.set({ isFreedomSquare: true }, { merge: true });
-          console.log('whatsappBotWorker: Freedom Square/Tabidze keyword detected — flagging', phone, 'silent for good');
-        }
-        console.log('whatsappBotWorker: STOPPED — Freedom Square/Tabidze sticky silence for', phone);
-        await deletePendingIfTokenMatches(db, phone, batchToken);
-        return res.sendStatus(200);
-      }
-
       // CHANGE 5 — owner mute, in ALL modes. The bot stays silent for
       // ownerMuteMinutes after any manual owner message (flat timer from that
       // message, independent of guest activity). A guest message that arrives
@@ -1066,6 +1049,38 @@ exports.whatsappBotWorker = onRequest(
         }
       }
 
+      // Freedom Square (tab-*) / Orbeliani (orb-*) bookings: every scenario in
+      // the prompt is Shartava-specific, so the bot sends nothing and the owner
+      // is alerted, once per conversation per stay. Decided by the booking's room
+      // code in code, before Claude is called (replaces the old keyword-based
+      // sticky silence, which also silenced Shartava guests who only mentioned
+      // Freedom Square as a landmark).
+      const bookingRoom = roomCode || guestMatch?.form?.aptId || '';
+      const otherProperty = otherPropertyForRoom(bookingRoom);
+      if (otherProperty) {
+        const stayKey = guestMatch.reservation?.reservationNumber
+          || String(guestMatch.form.matchedReservationId || '').split('_')[0]
+          || guestMatch.form.arrivalDate || bookingRoom;
+        if (await claimOncePerStay(db, `other_property_${phone}_${stayKey}`)) {
+          await writeAlert(db, {
+            reason: 'other_property',
+            phone,
+            guestName,
+            room: bookingRoom,
+            message: combinedGuestText,
+            mode: effectiveMode,
+          });
+          if (config.ownerPhone) {
+            await notifyOwner(config.ownerPhone, `${otherProperty} guest ${guestName} / ${bookingRoom} wrote: ${combinedGuestText.slice(0, 300)}`);
+          }
+          console.log(`whatsappBotWorker: STOPPED — ${otherProperty} booking (${bookingRoom}); nothing sent, owner alerted (first message this stay), for`, phone);
+        } else {
+          console.log(`whatsappBotWorker: STOPPED — ${otherProperty} booking (${bookingRoom}); nothing sent, owner already alerted this stay, for`, phone);
+        }
+        await deletePendingIfTokenMatches(db, phone, batchToken);
+        return res.sendStatus(200);
+      }
+
       let memoryContext = '';
       const guestDoc = await db.collection('whatsapp_guests').doc(phone).get();
       if (guestDoc.exists) {
@@ -1099,6 +1114,9 @@ exports.whatsappBotWorker = onRequest(
         `Checkout: ${checkoutDate || 'unknown'}`,
         `Filled check-in form: ${hasFilledForm ? 'yes' : 'no'}`,
         `CURRENT_TBILISI_HOUR: ${tbilisiHour()}`,
+        // Check-in timing computed here in Tbilisi time, so the entrance and
+        // door-code scenarios never have to work it out from the hour.
+        ...stayTimingContextLines(stayTiming({ checkin: checkinDate || guestMatch?.form?.arrivalDate, checkout: checkoutDate }, Date.now())),
       ].join('\n') + memoryContext;
 
       const modeContext = buildModeContext(effectiveMode, config.ownerPhone);

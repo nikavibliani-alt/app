@@ -65,8 +65,8 @@ test('links are never changed', async (t) => {
   });
   await t.test('booking link followed by a dash keeps its space', () => {
     assert.equal(
-      applyToneGuard('Book here booking.com/Share-PaJ0WC — select the right unit type!'),
-      'Book here booking.com/Share-PaJ0WC, select the right unit type.',
+      applyToneGuard('Book here https://www.booking.com/Share-4xInYf — select the right unit type!'),
+      'Book here https://www.booking.com/Share-4xInYf, select the right unit type.',
     );
   });
 });

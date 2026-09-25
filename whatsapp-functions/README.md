@@ -184,10 +184,25 @@ behavior can't detect that the owner already replied.
 
 The worker injects `CURRENT_TBILISI_HOUR: {0-23}` (via the existing
 `tbilisiHour()` helper) into the system-prompt guest-context block on every
-call, alongside guest name/room/dates. The only scenario that currently reads
-it is "apartment was not cleaned properly" (cleaning staff availability,
-10:00-19:00 vs after hours) — add more hour-gated scenarios in
-`SYSTEM_PROMPT` the same way rather than adding new code-side branches.
+call, alongside guest name/room/dates. It's used by "apartment was not
+cleaned properly" (cleaning staff availability, 10:00-19:00 vs after hours).
+
+Check-in timing is computed in code, not left to the model (`stayRules.js`):
+today's Tbilisi date, whether it's the guest's arrival day, whether 15:00 has
+passed, and "Check-in is already open for this guest" (yes on the arrival day
+from 15:00 and on every later day of the stay). The entrance and door-code
+scenarios use that line, so a guest who arrives after 15:00 is never told the
+code "switches on at 3pm".
+
+## Freedom Square / Orbeliani bookings
+
+If the guest's current booking room starts with `tab-` (Freedom Square) or
+`orb-` (Orbeliani), the worker sends nothing and never calls Claude. The owner
+gets one alert per conversation per stay (`reason: "other_property"`,
+claimed once in `whatsapp_alert_throttle`). This replaced the old
+keyword-based sticky `isFreedomSquare` flag, which is no longer read or
+written. Guests who only mention Freedom Square as a landmark are answered
+normally.
 
 ## Urgent issues (lockout, flooding, security)
 
