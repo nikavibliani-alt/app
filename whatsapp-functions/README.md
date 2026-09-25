@@ -15,7 +15,7 @@ See `tuya-functions/README.md` for the prior history.
 | `whatsappWebhook` | `onRequest` (HTTPS) | Meta WhatsApp inbound webhook — GET for Meta's verification handshake. POST: persists the inbound message, handles coexistence owner echoes, and — unless the kill switch is off — batches the message into `whatsapp_pending/{phone}` and enqueues a debounced Cloud Task. Returns 200 immediately; it never calls Claude or waits on a timer itself. |
 | `whatsappBotWorker` | `onRequest` (HTTPS, Cloud Tasks target only) | The deferred worker. Runs after the debounce delay, resolves the effective bot mode, calls Claude with the batched messages + mode context, sends the reply, and writes escalation alerts. Not publicly invokable — see "Cloud Tasks setup" below. |
 | `roomReadyNotification` | `onDocumentWritten` on `hk_status/{docId}` | Sends a WhatsApp "room ready" template message via the Meta Cloud API when `done` flips to `true`, deduped via `whatsapp_messages`. |
-| `summarizeGuestConversation` | `onDocumentWritten` on `reservations/{docId}` | Once checkout has passed and the reservation isn't cancelled, summarizes the guest's WhatsApp thread into `whatsapp_guests/{phone}.summary` and clears the conversation. |
+| `summarizeGuestConversation` | `onDocumentWritten` on `reservations/{docId}` | Once the checkout day has ended (Tbilisi) and the reservation isn't cancelled, summarizes that stay into `whatsapp_guests/{phone}.summary` and deletes that stay's guest/bot messages. See "Post-checkout summary" below. |
 
 `whatsappWebhook` needs `WEBHOOK_VERIFY_TOKEN`, `META_ACCESS_TOKEN`, `META_PHONE_NUMBER_ID`,
 `ANTHROPIC_API_KEY` (the last one currently unused there but kept for parity).
@@ -232,6 +232,30 @@ firestore fields ttls update processedAt
 exact current flags, since this wasn't verified against a live project from
 this environment). A day or two of retention is plenty — this only needs to
 outlive Meta's redelivery window, not serve as long-term storage.
+
+## Post-checkout summary (`summarizer.js`)
+
+`summarizeGuestConversation` fires on every `reservations/{docId}` write, and
+the MiniHotel sync rewrites every reservation in `[now-7d, now+60d]` roughly
+every 10 minutes (fresh `syncedAt`). Those rewrites are not checkout events:
+MiniHotel has no "checked out" status, so the real event is the first write
+seen after the checkout day ended. `runPostCheckoutSummary` (unit-tested in
+`summarizer.test.js`) therefore:
+
+- **Runs once per checkout.** It atomically claims
+  `whatsapp_checkout_summaries/{reservationNumber}` (`create()`). Any later
+  sync rewrite finds the marker and exits before reading the conversation. A
+  failed summary releases the claim so a later write retries. A failure after
+  the summary is written keeps it (`outcome: delete_failed`) so leftovers are
+  never re-summarized over the good summary.
+- **Never touches a phone with another active or future stay.** Other stays
+  are found via that phone's WA check-in forms and `reservations.phone`. That
+  stay's own checkout later summarizes everything.
+- **Deletes narrowly.** It only deletes messages timestamped before the end of
+  this stay's checkout day (Tbilisi), so later messages always survive, and
+  **never deletes `role: "owner"` messages** (they're still included in the
+  summary text). The parent `whatsapp_conversations/{phone}` doc is never
+  deleted.
 
 ## Deploy
 

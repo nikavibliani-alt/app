@@ -15,6 +15,11 @@ const {
   ownerMuteDecision,
   isConversationStale,
 } = require('./ownerSilence');
+const {
+  SUMMARY_SYSTEM_PROMPT,
+  runPostCheckoutSummary,
+  createFirestoreSummaryStore,
+} = require('./summarizer');
 
 if (!getApps().length) initializeApp();
 
@@ -317,8 +322,6 @@ Bot: "დიახ, რა თქმა უნდა, როგორ ხარ�
 33. Nearest shop: მაღაზიები არის მარჯვნივ ქუჩაზე.
 34. Nearby restaurant recommendations: სამწუხაროდ ამაზე რეკომენდაციას ვერ გაგიწევთ, გირჩევთ Google Maps-ზე გადახედოთ.
 35. Guest is very happy, thanks the host: დიდი მადლობა თქვენ, სასიამოვნო იყო თქვენი მასპინძლობა.`;
-
-const SUMMARY_SYSTEM_PROMPT = 'Summarize this guest WhatsApp conversation into 3-5 bullet points covering: issues they had, requests they made, how they communicated, anything notable. Be very brief.';
 
 /** Strip spaces/dashes/parens/+ so Meta and form phones compare as digits-only. */
 function normalizePhone(phone) {
@@ -1337,7 +1340,12 @@ exports.roomReadyNotification = onDocumentWritten(
   }
 );
 
-// PART 3 — auto-summarize a guest's WhatsApp conversation after checkout
+// PART 3 — auto-summarize a guest's WhatsApp conversation after checkout.
+// Fires on every reservations/{docId} write, including the MiniHotel sync's
+// routine ~10-minute rewrites; runPostCheckoutSummary (summarizer.js) acts only
+// once per checkout, never while the phone has another active/future stay,
+// only on messages from before this stay's checkout cutoff, and never deletes
+// owner messages.
 exports.summarizeGuestConversation = onDocumentWritten(
   {
     document: 'reservations/{docId}',
@@ -1349,99 +1357,25 @@ exports.summarizeGuestConversation = onDocumentWritten(
     if (!after || !after.exists) return;
 
     const reservation = after.data();
-
-    if (reservation.status === 'CANCELLED') return;
-
-    const checkoutDate = toJsDate(reservation.checkout);
-    if (!checkoutDate) return;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (checkoutDate >= today) return;
-
-    const reservationNumber = reservation.reservationNumber;
-    if (!reservationNumber) return;
-
     const db = getFirestore();
 
-    // Find the matching WhatsApp check-in form for this reservation.
-    // matchedReservationId may be the bare number or a multi-room id like "007004653_001".
-    let form = null;
-    const exactSnap = await db.collection('checkin_guests')
-      .where('matchedReservationId', '==', reservationNumber)
-      .where('contactType', '==', 'wa')
-      .limit(1)
-      .get();
-
-    if (!exactSnap.empty) {
-      form = exactSnap.docs[0].data();
-    } else {
-      // Range query alone (no contactType) avoids needing a new composite index.
-      const multiSnap = await db.collection('checkin_guests')
-        .where('matchedReservationId', '>=', `${reservationNumber}_`)
-        .where('matchedReservationId', '<', `${reservationNumber}_`)
-        .limit(20)
-        .get();
-      const match = multiSnap.docs.find((d) => (d.data().contactType || '').toLowerCase() === 'wa');
-      if (match) form = match.data();
-    }
-
-    if (!form) return;
-
-    const phone = normalizePhone(form.contact);
-    if (!phone) return;
-
-    const messagesRef = db.collection('whatsapp_conversations').doc(phone).collection('messages');
-    const messagesSnap = await messagesRef.orderBy('timestamp', 'asc').get();
-
-    if (messagesSnap.empty) return;
-
-    const conversationText = messagesSnap.docs
-      .map((d) => {
-        const m = d.data();
-        // Strip the internal [VIDEO_SENT:id] follow-up marker — noise for the summarizer.
-        const content = String(m.content || '').replace(/\s*\[VIDEO_SENT:\d+\]\s*/gi, ' ').trim();
-        return `${m.role === 'assistant' ? 'Assistant' : m.role === 'owner' ? 'Host' : 'Guest'}: ${content}`;
-      })
-      .join('\n');
-
-    let summaryText = '';
     try {
-      summaryText = await callClaude({
-        system: SUMMARY_SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: conversationText }],
+      const result = await runPostCheckoutSummary({
+        reservation,
+        nowMs: Date.now(),
+        store: createFirestoreSummaryStore(db, FieldValue),
+        summarize: (conversationText) => callClaude({
+          system: SUMMARY_SYSTEM_PROMPT,
+          messages: [{ role: 'user', content: conversationText }],
+        }),
       });
+      // Routine outcomes fire on every sync pass — only log the ones that did,
+      // or deliberately skipped, real work.
+      if (!['not_checked_out', 'already_processed', 'no_wa_form', 'cancelled', 'no_reservation_number'].includes(result.outcome)) {
+        console.log(`summarizeGuestConversation: reservation ${reservation.reservationNumber} ->`, JSON.stringify(result));
+      }
     } catch (err) {
-      console.error(`summarizeGuestConversation: Claude call failed for ${phone}`, err);
-      return;
+      console.error(`summarizeGuestConversation: failed for reservation ${reservation.reservationNumber}`, err);
     }
-
-    const summaryBullets = summaryText
-      .split('\n')
-      .map((line) => line.replace(/^[-•*]\s*/, '').trim())
-      .filter((line) => line.length > 0);
-
-    if (summaryBullets.length === 0) return;
-
-    await db.collection('whatsapp_guests').doc(phone).set(
-      {
-        summary: summaryBullets,
-        lastStay: {
-          room: reservation.roomCode || '',
-          checkin: reservation.checkin || '',
-          checkout: reservation.checkout || '',
-          reservationNumber,
-        },
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-
-    // Delete all messages from this conversation now that it's summarized
-    const batch = db.batch();
-    messagesSnap.docs.forEach((doc) => batch.delete(doc.ref));
-    await batch.commit();
-
-    console.log(`summarizeGuestConversation: summarized ${phone} for reservation ${reservationNumber}`);
   }
 );
