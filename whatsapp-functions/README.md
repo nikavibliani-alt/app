@@ -307,6 +307,13 @@ is stripped (`stripTimeLabels`) before tag parsing.
 `toneGuard.js` runs on the final guest-facing text of every reply. It turns
 `!` into `.` and `—` into `, `, and never changes anything inside a link.
 
+## Model and prompt caching (`claudeClient.js`)
+
+- **Model:** `MODEL` in `claudeClient.js` is the only place the model is set, for guest replies and post-checkout summaries alike. It's currently `claude-sonnet-5`; set it to `'claude-sonnet-4-6'` to switch back.
+- **Thinking:** it's sent explicitly as `{ type: 'disabled' }`. Sonnet 5 would otherwise run adaptive thinking inside the 500-token reply budget.
+- **Caching:** guest replies send the system prompt as two blocks. The fixed `SYSTEM_PROMPT` comes first with `cache_control: ephemeral` (5-minute cache, refreshed on every hit). The per-guest part (guest context, mode, times) comes after it, uncached.
+- **Logging:** every reply logs `Claude usage (model, attempts): in … · cache write … · cache read … · out …`.
+
 ## When something fails (`claudeClient.js`, `replyDelivery.js`)
 
 - **Claude call:**

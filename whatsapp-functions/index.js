@@ -23,7 +23,7 @@ const {
 const { loadCurrentStayHistory, prepareClaudeHistory, stripTimeLabels } = require('./stayContext');
 const { findCurrentGuestForm } = require('./guestLookup');
 const { otherPropertyForRoom, stayTiming, stayTimingContextLines } = require('./stayRules');
-const { callClaudeWithRetry, describeClaudeError } = require('./claudeClient');
+const { callClaudeWithRetry, describeClaudeError, buildCachedSystem, formatUsage } = require('./claudeClient');
 const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
 
 if (!getApps().length) initializeApp();
@@ -1120,14 +1120,17 @@ exports.whatsappBotWorker = onRequest(
       ].join('\n') + memoryContext;
 
       const modeContext = buildModeContext(effectiveMode, config.ownerPhone);
-      const systemWithContext = `${SYSTEM_PROMPT}\n\n${guestContext}\n\n${modeContext}`;
+      // Prompt caching: the long fixed SYSTEM_PROMPT is the cached prefix; the
+      // per-guest part (guest context, mode, times) comes after the breakpoint.
+      const system = buildCachedSystem(SYSTEM_PROMPT, `${guestContext}\n\n${modeContext}`);
 
       console.log('whatsappBotWorker: calling Claude for phone:', phone);
       const claude = await callClaudeWithRetry({
         apiKey: process.env.ANTHROPIC_API_KEY,
-        system: systemWithContext,
+        system,
         messages: history,
       });
+      console.log(`whatsappBotWorker: Claude usage (${claude.model}, ${claude.attempts} attempt(s)): ${formatUsage(claude.usage)}`);
 
       const label = `${guestName} / ${roomCode || 'unknown room'}`;
       if (!claude.ok) {

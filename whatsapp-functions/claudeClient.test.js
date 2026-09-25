@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { callClaudeWithRetry, describeClaudeError, classifyError } = require('./claudeClient');
+const { callClaudeWithRetry, describeClaudeError, classifyError, buildCachedSystem, formatUsage, MODEL } = require('./claudeClient');
 
 const KEY = 'sk-ant-test-SECRET-KEY';
 const ok = (text) => ({ ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text }], stop_reason: 'end_turn' }) });
@@ -126,4 +126,52 @@ test('classifyError', () => {
   assert.equal(classifyError(400, 'messages: roles must alternate'), 'bad_request');
   assert.equal(classifyError(403, ''), 'auth');
   assert.equal(classifyError(503, ''), 'server');
+});
+
+test('request body: one model constant (Sonnet 5), thinking off, no sampling params', async () => {
+  assert.equal(MODEL, 'claude-sonnet-5');
+  const f = scripted(ok('Hi'));
+  await callClaudeWithRetry(base({ fetchImpl: f.fetchImpl }));
+  const body = JSON.parse(f.calls[0].body);
+  assert.equal(body.model, 'claude-sonnet-5');
+  assert.equal(body.max_tokens, 500);
+  assert.deepEqual(body.thinking, { type: 'disabled' });
+  for (const p of ['temperature', 'top_p', 'top_k']) assert.ok(!(p in body), `${p} never sent`);
+  assert.equal(f.calls[0].headers['anthropic-version'], '2023-06-01');
+});
+
+test('model can be overridden per call (used by the old-vs-new replay)', async () => {
+  const f = scripted(ok('Hi'));
+  const r = await callClaudeWithRetry(base({ fetchImpl: f.fetchImpl, model: 'claude-sonnet-4-6' }));
+  assert.equal(JSON.parse(f.calls[0].body).model, 'claude-sonnet-4-6');
+  assert.equal(r.model, 'claude-sonnet-4-6');
+});
+
+test('reads the first text block, even if a thinking block comes first; returns usage', async () => {
+  const usage = { input_tokens: 212, cache_creation_input_tokens: 0, cache_read_input_tokens: 8150, output_tokens: 41 };
+  const f = scripted({ ok: true, status: 200, json: async () => ({
+    content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: 'We do not have a gym on site.' }],
+    stop_reason: 'end_turn', usage,
+  }) });
+  const r = await callClaudeWithRetry(base({ fetchImpl: f.fetchImpl }));
+  assert.equal(r.text, 'We do not have a gym on site.');
+  assert.deepEqual(r.usage, usage);
+  assert.equal(formatUsage(r.usage), 'in 212 · cache write 0 · cache read 8150 · out 41');
+});
+
+test('a reply cut off at max_tokens is returned but logged', async () => {
+  const f = scripted({ ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text: 'Partial' }], stop_reason: 'max_tokens' }) });
+  const rec = recorder();
+  const r = await callClaudeWithRetry(base({ fetchImpl: f.fetchImpl, log: rec.log }));
+  assert.equal(r.ok, true);
+  assert.match(rec.lines.join('\n'), /hit max_tokens \(500\)/);
+});
+
+test('buildCachedSystem: fixed prompt cached first, per-guest part after the breakpoint', () => {
+  assert.deepEqual(buildCachedSystem('FIXED PROMPT', 'Guest name: Anna\nCURRENT_TBILISI_HOUR: 22'), [
+    { type: 'text', text: 'FIXED PROMPT', cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: 'Guest name: Anna\nCURRENT_TBILISI_HOUR: 22' },
+  ]);
+  assert.equal(buildCachedSystem('FIXED', '').length, 1);
+  assert.equal(formatUsage(undefined), 'usage unavailable');
 });

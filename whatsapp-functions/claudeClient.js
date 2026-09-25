@@ -5,7 +5,13 @@
 // unit-testable. Never logs or returns the API key.
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-6';
+// The one place the model is set, for both guest replies and post-checkout
+// summaries. To switch back, set it to 'claude-sonnet-4-6'.
+const MODEL = 'claude-sonnet-5';
+// Thinking explicitly off: Sonnet 5 runs adaptive thinking when the field is
+// omitted (Sonnet 4.6 did not), and thinking tokens count against the small
+// max_tokens used for 1-3 sentence replies. Valid on both models.
+const THINKING = { type: 'disabled' };
 const DEFAULT_TIMEOUT_MS = 25000;
 const DEFAULT_RETRY_DELAY_MS = 2000;
 
@@ -55,9 +61,10 @@ async function attempt({ fetchImpl, apiKey, body, timeoutMs }) {
       const message = data?.error?.message || `HTTP ${res.status}`;
       return { ok: false, status: res.status, errorType: classifyError(res.status, message), message };
     }
-    const text = data?.content?.[0]?.text || '';
-    if (!text) return { ok: false, status: res.status, errorType: 'empty_response', message: `stop_reason=${data?.stop_reason || 'unknown'}` };
-    return { ok: true, text, stopReason: data?.stop_reason };
+    // First text block, not content[0]: a thinking block could come first.
+    const text = (data?.content || []).find((b) => b?.type === 'text')?.text || '';
+    if (!text) return { ok: false, status: res.status, errorType: 'empty_response', message: `stop_reason=${data?.stop_reason || 'unknown'}`, usage: data?.usage };
+    return { ok: true, text, stopReason: data?.stop_reason, usage: data?.usage };
   } catch (err) {
     if (err?.name === 'AbortError') return { ok: false, errorType: 'timeout', message: `no response within ${timeoutMs} ms` };
     return { ok: false, errorType: 'network', message: String(err?.message || err) };
@@ -71,11 +78,11 @@ async function attempt({ fetchImpl, apiKey, body, timeoutMs }) {
  * Returns { ok: true, text, attempts } or { ok: false, errorType, status, message, attempts }.
  */
 async function callClaudeWithRetry({
-  apiKey, system, messages, maxTokens = 500,
+  apiKey, system, messages, maxTokens = 500, model = MODEL,
   fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
   timeoutMs = DEFAULT_TIMEOUT_MS, retryDelayMs = DEFAULT_RETRY_DELAY_MS, log = console,
 }) {
-  const body = { model: MODEL, max_tokens: maxTokens, system, messages };
+  const body = { model, max_tokens: maxTokens, system, messages, thinking: THINKING };
   let result = await attempt({ fetchImpl, apiKey, body, timeoutMs });
   let attempts = 1;
   if (!result.ok) {
@@ -87,7 +94,29 @@ async function callClaudeWithRetry({
       if (!result.ok) log.error(`callClaude: attempt 2 failed — ${result.errorType}${result.status ? ` (HTTP ${result.status})` : ''}: ${result.message}`);
     }
   }
-  return { ...result, attempts };
+  if (result.ok && result.stopReason === 'max_tokens') {
+    log.warn(`callClaude: reply hit max_tokens (${maxTokens}) and may be cut off`);
+  }
+  return { ...result, model, attempts };
+}
+
+/**
+ * System prompt as two blocks for prompt caching: the long fixed prompt first,
+ * marked cache_control (cached for 5 minutes, refreshed on every hit), then
+ * the per-guest part (guest context, mode, times) after the breakpoint so it
+ * never invalidates the cache. Anything that changes per request must stay in
+ * `dynamicText`.
+ */
+function buildCachedSystem(fixedText, dynamicText) {
+  const blocks = [{ type: 'text', text: fixedText, cache_control: { type: 'ephemeral' } }];
+  if (dynamicText) blocks.push({ type: 'text', text: dynamicText });
+  return blocks;
+}
+
+/** One-line token usage for the logs, e.g. "in 212 · cache write 0 · cache read 8150 · out 41". */
+function formatUsage(usage) {
+  if (!usage) return 'usage unavailable';
+  return `in ${usage.input_tokens ?? '?'} · cache write ${usage.cache_creation_input_tokens ?? 0} · cache read ${usage.cache_read_input_tokens ?? 0} · out ${usage.output_tokens ?? '?'}`;
 }
 
 module.exports = {
@@ -96,4 +125,6 @@ module.exports = {
   isRetryable,
   describeClaudeError,
   callClaudeWithRetry,
+  buildCachedSystem,
+  formatUsage,
 };
