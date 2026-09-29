@@ -3662,6 +3662,13 @@ window.openDetail=function(guestId){
         ?`<button class="btn btn-primary" style="flex:1" onclick="window.unblockGuest('${g.id}')">Unblock guest</button>`
         :`<button class="btn" style="flex:1;border-color:var(--red);color:var(--red)" onclick="window.blockGuest('${g.id}')">Block guest</button>`}
     </div>
+    <div style="margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs)">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px">Documents</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" style="flex:1" onclick="window.openGenDocModal('${g.id}','proof')">📄 Proof of Stay</button>
+        <button class="btn" style="flex:1" onclick="window.openGenDocModal('${g.id}','chargeback')">⚖️ Chargeback Dispute</button>
+      </div>
+    </div>
     <button class="btn" style="width:100%;margin-top:12px" onclick="window.openAptEditor('${g.aptId||''}')">Edit apartment instructions</button>
   `;
   document.getElementById('detail').classList.add('open');
@@ -3682,6 +3689,199 @@ window.rejectPassport=async function(guestId){
   if(!confirm('Reject this ID?'))return;
   try{await updateDoc(doc(db,'checkin_guests',guestId),{'passportScanResult.overrideByAdmin':false,'passportScanResult.valid':false});toast('ID rejected');openDetail(guestId);}
   catch(e){toast('Failed: '+e.message);}
+};
+// Pre-generation modal: collects property name / signatory name+title / optional
+// passport-photo inclusion before window.generateGuestDoc builds the document.
+// Pure DOM overlay appended to <body>; never touches Firestore.
+window.openGenDocModal=function(guestId,type){
+  const g=guestData.find(x=>x.id===guestId);
+  if(!g){toast('Guest not found');return;}
+  const hasPassport=!!g.passportUrl;
+  document.getElementById('gendoc-modal-overlay')?.remove();
+  const overlay=document.createElement('div');
+  overlay.id='gendoc-modal-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML=`
+    <div style="background:#fff;border-radius:10px;max-width:420px;width:100%;padding:24px;box-sizing:border-box;">
+      <div style="font-size:15px;font-weight:700;margin-bottom:16px;">Generate ${type==='chargeback'?'Chargeback Dispute':'Proof of Stay'} document</div>
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Property name *</label>
+      <input id="gendoc-property" type="text" placeholder="e.g. Freedom Square Studio 6-1" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;margin-bottom:12px;font-size:13px;box-sizing:border-box;">
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Signatory name *</label>
+      <input id="gendoc-signame" type="text" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;margin-bottom:12px;font-size:13px;box-sizing:border-box;">
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Signatory title *</label>
+      <input id="gendoc-sigtitle" type="text" placeholder="Property Manager" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;margin-bottom:12px;font-size:13px;box-sizing:border-box;">
+      ${hasPassport?`<label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;margin-bottom:16px;cursor:pointer;"><input id="gendoc-passport" type="checkbox" style="width:16px;height:16px;">Include passport photo</label>`:''}
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <button class="btn" style="flex:1" onclick="document.getElementById('gendoc-modal-overlay').remove()">Cancel</button>
+        <button class="btn btn-primary" style="flex:1" onclick="window.generateGuestDoc('${guestId}','${type}')">Generate</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+};
+
+// Generates a standalone, printable HTML document (Proof of Stay or Chargeback
+// Dispute Evidence) for one guest, opened in a new tab via a blob: URL —
+// never touches Firestore, purely derived from already-loaded guestData/_resCache
+// plus the property/signatory fields collected by window.openGenDocModal.
+window.generateGuestDoc=function(guestId,type){
+  const g=guestData.find(x=>x.id===guestId);
+  if(!g){toast('Guest not found');return;}
+
+  const propertyName=(document.getElementById('gendoc-property')?.value||'').trim();
+  const sigName=(document.getElementById('gendoc-signame')?.value||'').trim();
+  const sigTitle=(document.getElementById('gendoc-sigtitle')?.value||'').trim();
+  const includePassport=!!document.getElementById('gendoc-passport')?.checked;
+  if(!propertyName||!sigName||!sigTitle){toast('Please fill in property name, signatory name, and signatory title');return;}
+
+  let res=reservationForGuest(g);
+  if(!res){
+    res=(_resCache||[]).find(r=>(r.roomCode||r.room||'')===g.aptId&&(r.checkin||r.checkIn||'')===g.arrivalDate)||null;
+  }
+  const name=_stripRoomNum(g.nameRoman||g.name||'Guest')||'Guest';
+  const room=res?.roomCode||res?.room||g.aptId||'—';
+  const arrival=g.arrivalDate||res?.checkin||res?.checkIn||'';
+  const checkout=g.checkoutDate||res?.checkout||res?.checkOut||'';
+  const channel=SOURCE_BADGES[(res?.source||'').toLowerCase()]?.label||'Direct';
+  const resNumber=res?.reservationNumber||g.matchedReservationId||'—';
+  const nightsCount=arrival&&checkout?nights({checkin:arrival,checkout:checkout}):null;
+
+  const toDate=(ts)=>{
+    if(!ts)return null;
+    const d=ts?.toDate?ts.toDate():(ts?.seconds!=null?new Date(ts.seconds*1000):(typeof ts==='string'?new Date(ts):null));
+    return(d&&!isNaN(d.getTime()))?d:null;
+  };
+  const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const pad=(n)=>String(n).padStart(2,'0');
+  // Dual-timezone timestamp, e.g. "21 Sep 2026, 12:29:04 UTC (16:29:04 Tbilisi time)".
+  // Tbilisi = UTC+4, same convention (offset + UTC getters) used elsewhere in this file.
+  const fmtDual=(d)=>{
+    if(!d)return null;
+    const utcStr=`${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+    const t=new Date(d.getTime()+4*3600*1000);
+    const tbStr=`${pad(t.getUTCHours())}:${pad(t.getUTCMinutes())}:${pad(t.getUTCSeconds())} Tbilisi time`;
+    return `${utcStr} (${tbStr})`;
+  };
+
+  const submittedDate=toDate(g.submittedAt);
+  const checkinDate=toDate(g.guestConfirmedCheckinAt||g.checkinConfirmedAt);
+  const checkoutDate=toDate(g.guestConfirmedCheckoutAt||g.checkoutConfirmedAt);
+  const checkinConfirmed=!!(g.guestConfirmedCheckin||g.checkinConfirmed);
+  const checkoutConfirmed=!!(g.guestConfirmedCheckout||g.checkoutConfirmed);
+
+  const events=[
+    submittedDate?{label:'Guest self-submitted online check-in form — recorded automatically by SleepyPMS at time of submission',date:submittedDate}:null,
+    checkinDate?{label:'Guest confirmed check-in via the guest portal — recorded automatically by SleepyPMS at time of confirmation',date:checkinDate}:null,
+    checkoutDate?{label:'Guest confirmed checkout via the guest portal — recorded automatically by SleepyPMS at time of confirmation',date:checkoutDate}:null,
+  ].filter(Boolean).sort((a,b)=>a.date-b.date);
+
+  const isChargeback=type==='chargeback';
+  const docTitle=isChargeback?'Chargeback Dispute Evidence':'Proof of Stay';
+  const stampLabel=isChargeback?'DISPUTE EVIDENCE':'VERIFIED STAY';
+
+  const statement=isChargeback
+    ?`This document is submitted as evidence in response to a payment dispute or chargeback claim regarding the reservation detailed above. The timestamped records below were generated automatically by SleepyPMS at the moment each event occurred and have not been altered. They demonstrate that the guest registered for online check-in, was granted access to door codes, WiFi details, and arrival instructions, and engaged with the property's check-in system as described. ${esc(propertyName)} disputes any claim that accommodation or access was not provided to the guest for the reserved stay.`
+    :`This document certifies that the above-named guest completed online check-in registration and was granted access to their door code, WiFi details, and arrival instructions through the SleepyPMS guest portal for ${esc(propertyName)}. The timestamped records below were generated automatically by SleepyPMS at the moment each event occurred and reflect the guest's own recorded activity.`;
+
+  const warningBox=isChargeback?`<div class="doc-warning">This document is being submitted as evidence in an active payment dispute. All timestamps are system-generated at the time of guest interaction and have not been edited or altered.</div>`:'';
+
+  const infoRows=[
+    ['Guest name',name],
+    ['Room / Apartment',room],
+    ['Arrival date',fmtDate(arrival)],
+    ['Checkout date',fmtDate(checkout)],
+    ['Length of stay',nightsCount!=null?(nightsCount+' night'+(nightsCount!==1?'s':'')):'—'],
+    ['Booking channel',channel],
+    ['Reservation number',resNumber],
+    ['Contact',g.contact||'—'],
+  ].map(([k,v])=>`<div class="doc-row"><div class="doc-k">${esc(k)}</div><div class="doc-v">${esc(String(v))}</div></div>`).join('');
+
+  const timelineHtml=events.length?events.map(e=>`<div class="doc-tl-item"><div class="doc-tl-label">${esc(e.label)}</div><div class="doc-tl-time">${esc(fmtDual(e.date))}</div></div>`).join(''):'<p class="doc-muted">No timestamped events recorded for this guest.</p>';
+
+  const statusBox=`<div class="doc-status">
+      <div class="doc-status-item">Check-in confirmed by guest: <b>${checkinConfirmed?'YES':'NO'}</b></div>
+      <div class="doc-status-item">Checkout confirmed by guest: <b>${checkoutConfirmed?'YES':'NO'}</b></div>
+    </div>`;
+
+  const passportSection=(includePassport&&g.passportUrl)?`
+  <div class="doc-section-title">Identity Verification</div>
+  <img src="${esc(g.passportUrl)}" alt="Passport photo on file" class="doc-passport-img">`:'';
+
+  const now=new Date();
+  const docId=`DOC-${now.getFullYear()}-${Array.from({length:6},()=>'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random()*36)]).join('')}`;
+  const issuedAt=fmtDual(now);
+  const generatedAt=issuedAt;
+
+  const docHtml=`<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>${esc(docTitle)} — ${esc(name)}</title>
+<style>
+  body{font-family:Georgia,'Times New Roman',serif;max-width:720px;margin:40px auto;padding:0 24px;color:#000;background:#fff;line-height:1.6;}
+  .doc-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:16px;margin-bottom:8px;}
+  .doc-issuer{font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#000;margin:0 0 6px;}
+  .doc-header h1{font-size:20px;margin:0;font-weight:700;}
+  .doc-idbox{text-align:right;font-size:11px;line-height:1.7;}
+  .doc-idbox .doc-docid{font-size:13px;font-weight:700;letter-spacing:0.03em;}
+  .doc-meta{font-size:11px;color:#000;margin:10px 0 24px;border-bottom:1px solid #000;padding-bottom:16px;}
+  .doc-stamp{display:inline-block;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1px solid #000;padding:4px 12px;margin-bottom:20px;}
+  h2.doc-title{font-size:22px;margin:0 0 4px;font-weight:700;}
+  .doc-warning{border:1px solid #000;padding:12px 16px;margin:0 0 24px;font-size:13px;line-height:1.5;}
+  .doc-section-title{font-size:12px;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;border-bottom:1px solid #000;padding-bottom:4px;margin:28px 0 14px;}
+  .doc-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 24px;}
+  .doc-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dotted #999;font-size:13px;}
+  .doc-k{color:#333;}
+  .doc-v{font-weight:700;text-align:right;}
+  .doc-tl-item{padding:10px 0;border-bottom:1px dotted #999;}
+  .doc-tl-label{font-size:13px;font-weight:700;}
+  .doc-tl-time{font-size:12px;margin-top:2px;}
+  .doc-status{display:flex;flex-direction:column;gap:6px;}
+  .doc-status-item{font-size:13px;}
+  .doc-statement{font-size:13px;line-height:1.7;margin-bottom:32px;}
+  .doc-muted{color:#555;font-size:13px;}
+  .doc-passport-img{max-width:320px;width:100%;border:1px solid #000;display:block;margin-top:8px;}
+  .doc-footer{border-top:2px solid #000;padding-top:20px;margin-top:32px;font-size:11px;}
+  .doc-sig-block{margin-bottom:24px;}
+  .doc-sig-name{font-size:14px;font-weight:700;}
+  @media print{body{margin:0;padding:24px;}}
+</style>
+</head><body>
+  <div class="doc-header">
+    <div>
+      <p class="doc-issuer">SleepyPMS Guest Record</p>
+      <h1>${esc(propertyName)}</h1>
+    </div>
+    <div class="doc-idbox">
+      <div class="doc-docid">${esc(docId)}</div>
+      <div>System Record ID: ${esc(g.id)}</div>
+    </div>
+  </div>
+  <div class="doc-meta">Issued: ${esc(issuedAt)}</div>
+  <div class="doc-stamp">${esc(stampLabel)}</div>
+  <h2 class="doc-title">${esc(docTitle)}</h2>
+  ${warningBox}
+  <div class="doc-section-title">Guest &amp; Reservation Details</div>
+  <div class="doc-grid">${infoRows}</div>
+  ${passportSection}
+  <div class="doc-section-title">Timeline</div>
+  ${timelineHtml}
+  <div class="doc-section-title">Confirmation Status</div>
+  ${statusBox}
+  <div class="doc-section-title">Statement</div>
+  <p class="doc-statement">${statement}</p>
+  <div class="doc-footer">
+    <div class="doc-sig-block">
+      <div class="doc-sig-name">${esc(sigName)}</div>
+      <div>${esc(sigTitle)}</div>
+      <div>Date: ${esc(issuedAt)}</div>
+    </div>
+    <div>Generated by SleepyPMS Property Management System at ${esc(generatedAt)}.</div>
+  </div>
+</body></html>`;
+
+  document.getElementById('gendoc-modal-overlay')?.remove();
+  const blob=new Blob([docHtml],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
 };
 
 /* ── Requests ── */
