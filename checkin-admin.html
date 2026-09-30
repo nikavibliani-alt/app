@@ -373,6 +373,14 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .hk-team-card__title{font-size:14px;font-weight:700;}
 .hk-team-card__sub{font-size:12px;color:var(--muted);margin-top:2px;}
 .hk-team-card__actions{display:flex;gap:6px;flex-shrink:0;}
+.hk-link-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;}
+.hk-link-card.revoked{opacity:.5;background:var(--bg);}
+.hk-link-card__top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.hk-link-card__name{font-size:14px;font-weight:700;}
+.hk-link-card__sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.hk-link-card__url{font-family:var(--mono);font-size:11px;color:var(--muted);word-break:break-all;margin-top:6px;}
+.hk-link-card__actions{display:flex;gap:6px;margin-top:10px;}
+.hk-link-card__actions .btn{min-height:40px;font-size:13px;}
 .hk-team-edit{margin-top:10px;padding:14px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);}
 .hk-team-rooms{max-height:280px;overflow-y:auto;margin-top:10px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);}
 .hk-team-room-chk{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);}
@@ -2147,12 +2155,10 @@ function renderHkSettings(){
       ${abash.length?siteBlock('Abashidze · per room',abash):''}
     </div>`:'';
   wrap.innerHTML=`
-    <div class="more-section" style="margin-top:0">Cleaner apps</div>
-    <div class="more-list" style="margin-bottom:16px">
-      <a class="more-item" href="HK.html" target="_blank" rel="noopener">All properties HK</a>
-      <a class="more-item" href="HK-Shartava.html" target="_blank" rel="noopener">Shartava HK (legacy)</a>
-      <a class="more-item" href="HK-Centre.html" target="_blank" rel="noopener">Centre HK (legacy)</a>
-    </div>
+    <div class="more-section" style="margin-top:0">Staff links</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Each cleaner gets a personal link (no PIN). It opens only their team's apartments. Revoke a link to cut access.</p>
+    <div id="hk-link-form"></div>
+    <div id="hk-link-list"></div>
     <div class="section-hd"><h2>Teams &amp; apartments</h2></div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Create teams and assign apartments. Each team sees only their apartments on the cleaner app after entering their PIN.</p>
     ${hkGetTeams().map(t=>`<div class="hk-team-card">
@@ -2187,6 +2193,9 @@ function renderHkSettings(){
     <div class="more-section" style="margin-top:16px">Staff PINs</div>
     <div id="hkpins-list"></div>`;
   renderHkPins();
+  hkSubscribeStaffLinks();
+  hkRenderLinkForm();
+  hkRenderLinkList();
 }
 window.saveHkSettings=async function(){
   if(!hkSettings.cleanMinutesByType)hkSettings.cleanMinutesByType={...HK_CLEAN_TYPE_DEFAULTS};
@@ -2575,6 +2584,114 @@ window.saveHkPin=async function(roleId){
   try{
     await setDoc(doc(db,'hk_pins',roleId),{pin,updatedAt:serverTimestamp()});
     hkPinsData[roleId]=pin;toast('PIN saved ✓');
+  }catch(e){toast('Failed: '+e.message);}
+};
+
+/* ── HK staff links (cleaner access, no PIN) ── */
+let hkStaffLinks={};
+let _hkStaffLinksSub=false;
+let _hkLinkFormOpen=false;
+let _hkLinkJustCreated=null;
+function hkSubscribeStaffLinks(){
+  if(_hkStaffLinksSub)return;
+  _hkStaffLinksSub=true;
+  onSnapshot(collection(db,'hk_staff_links'),snap=>{
+    hkStaffLinks={};
+    snap.docs.forEach(d=>{hkStaffLinks[d.id]={token:d.id,...d.data()};});
+    hkRenderLinkList();
+  },err=>{console.warn('[HK] staff links',err);_hkStaffLinksSub=false;});
+}
+function hkNewLinkToken(){
+  const b=crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');
+}
+function hkStaffLinkUrl(token){return 'https://app.maxelaapartments.com/cleaner?s='+token;}
+function hkLinkAgo(ts){
+  const ms=ts?.toMillis?ts.toMillis():(ts?.seconds?ts.seconds*1000:0);
+  if(!ms)return 'never';
+  const m=Math.floor((Date.now()-ms)/60000);
+  if(m<1)return 'just now';
+  if(m<60)return m+' min ago';
+  if(m<1440)return Math.floor(m/60)+'h ago';
+  return Math.floor(m/1440)+'d ago';
+}
+function hkRenderLinkForm(){
+  const el=document.getElementById('hk-link-form');if(!el)return;
+  if(_hkLinkJustCreated){
+    const l=_hkLinkJustCreated;
+    el.innerHTML=`<div class="hk-link-card"><div class="hk-link-card__name">Link created: ${esc(l.name)}</div>
+      <div class="hk-link-card__url">${esc(hkStaffLinkUrl(l.token))}</div>
+      <div class="hk-link-card__actions">
+        <button type="button" class="btn" onclick="hkCopyLink('${l.token}')">Copy</button>
+        <button type="button" class="btn" onclick="hkWaLink('${l.token}')">WhatsApp</button>
+        <button type="button" class="btn btn-primary" onclick="hkCloseNewLink()">Done</button>
+      </div></div>`;
+    return;
+  }
+  if(!_hkLinkFormOpen){
+    el.innerHTML='<button type="button" class="btn" style="width:100%;margin-bottom:10px" onclick="hkOpenNewLink()">+ New link</button>';
+    return;
+  }
+  el.innerHTML=`<div class="hk-link-card">
+    <label class="apt-label">Name</label>
+    <input class="apt-input" id="hk-link-name" type="text" placeholder="e.g. Nino" maxlength="40">
+    <label class="apt-label" style="margin-top:10px">Team</label>
+    <select class="apt-input" id="hk-link-team">${hkGetTeams().map(t=>`<option value="${esc(t.id)}">${esc(t.label)}</option>`).join('')}</select>
+    <div class="hk-link-card__actions">
+      <button type="button" class="btn" onclick="hkCloseNewLink()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="hkCreateLink()">Create link</button>
+    </div></div>`;
+}
+function hkRenderLinkList(){
+  const el=document.getElementById('hk-link-list');if(!el)return;
+  const ms=l=>l.createdAt?.toMillis?l.createdAt.toMillis():(l.createdAt?.seconds?l.createdAt.seconds*1000:Date.now());
+  const all=Object.values(hkStaffLinks).sort((a,b)=>(b.active===true)-(a.active===true)||ms(b)-ms(a));
+  if(!all.length){el.innerHTML='<div class="empty" style="padding:16px">No links yet</div>';return;}
+  el.innerHTML=all.map(l=>{
+    const team=hkGetTeams().find(t=>t.id===l.teamId);
+    const active=l.active===true;
+    return`<div class="hk-link-card${active?'':' revoked'}">
+      <div class="hk-link-card__top"><div class="hk-link-card__name">${esc(l.name||'—')}</div>
+        <span class="pill ${active?'pill-ok':'pill-pending'}">${active?'Active':'Revoked'}</span></div>
+      <div class="hk-link-card__sub">${esc(team?.label||l.teamId||'—')} · last opened ${esc(hkLinkAgo(l.lastSeenAt))}</div>
+      ${active?`<div class="hk-link-card__actions">
+        <button type="button" class="btn" onclick="hkCopyLink('${esc(l.token)}')">Copy</button>
+        <button type="button" class="btn" onclick="hkWaLink('${esc(l.token)}')">WhatsApp</button>
+        <button type="button" class="btn btn-danger" onclick="hkRevokeLink('${esc(l.token)}')">Revoke</button>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+window.hkOpenNewLink=function(){_hkLinkFormOpen=true;_hkLinkJustCreated=null;hkRenderLinkForm();};
+window.hkCloseNewLink=function(){_hkLinkFormOpen=false;_hkLinkJustCreated=null;hkRenderLinkForm();};
+window.hkCreateLink=async function(){
+  const name=(document.getElementById('hk-link-name')?.value||'').trim();
+  const teamId=document.getElementById('hk-link-team')?.value||'';
+  if(!name){toast('Enter a name');return;}
+  if(!teamId){toast('Pick a team');return;}
+  const token=hkNewLinkToken();
+  try{
+    await setDoc(doc(db,'hk_staff_links',token),{name,teamId,active:true,createdAt:serverTimestamp(),lastSeenAt:null,revokedAt:null});
+    _hkLinkFormOpen=false;_hkLinkJustCreated={token,name};
+    hkRenderLinkForm();
+  }catch(e){toast('Failed: '+e.message);}
+};
+window.hkCopyLink=async function(token){
+  const url=hkStaffLinkUrl(token);
+  try{await navigator.clipboard.writeText(url);toast('Link copied ✓');}
+  catch(e){window.prompt('Copy this link:',url);}
+};
+window.hkWaLink=function(token){
+  const name=(hkStaffLinks[token]||_hkLinkJustCreated||{}).name||'';
+  const msg=`გამარჯობა${name?' '+name:''}! აი შენი ბმული დასუფთავების სიისთვის: ${hkStaffLinkUrl(token)}`;
+  window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank','noopener');
+};
+window.hkRevokeLink=async function(token){
+  const l=hkStaffLinks[token];
+  if(!confirm(`Revoke the link for ${l?.name||'this cleaner'}? They will lose access immediately.`))return;
+  try{
+    await updateDoc(doc(db,'hk_staff_links',token),{active:false,revokedAt:serverTimestamp()});
+    toast('Link revoked');
   }catch(e){toast('Failed: '+e.message);}
 };
 
