@@ -26,7 +26,6 @@ const EXPECTED_ROOM_CODES = [
   'abashidze',
 ];
 
-const REQUIRED_HK_PIN_KEYS = ['shartava', 'centre', 'vgl', 'admin'];
 const RESERVATION_STALE_MS = 36 * 60 * 60 * 1000; // warn if no sync in 36h
 
 function initFirestore() {
@@ -118,23 +117,6 @@ async function checkRoomRegistry(db) {
   return { name: 'Room registry (checkin_rooms)', ok: true, detail: `${EXPECTED_ROOM_CODES.length} rooms present` };
 }
 
-async function checkHkPins(db) {
-  const empty = [];
-  for (const role of REQUIRED_HK_PIN_KEYS) {
-    const doc = await db.collection('hk_pins').doc(role).get();
-    const pin = doc.exists ? String(doc.data()?.pin || '') : '';
-    if (pin.length < 4) empty.push(role);
-  }
-  if (empty.length) {
-    return {
-      name: 'HK staff PINs',
-      ok: false,
-      detail: `Missing PIN doc or empty: ${empty.join(', ')} — set in admin HK settings`,
-    };
-  }
-  return { name: 'HK staff PINs', ok: true, detail: 'shartava, centre, vgl, admin configured' };
-}
-
 async function checkGuestPageReachable() {
   const url = 'https://app.maxelaapartments.com/checkin-guest.html';
   try {
@@ -183,7 +165,6 @@ async function main() {
   const db = initFirestore();
   results.push(await checkReservationSync(db));
   results.push(await checkRoomRegistry(db));
-  results.push(await checkHkPins(db));
   results.push(await checkGuestPageReachable());
 
   const { failed, lines, html } = buildReport(results);

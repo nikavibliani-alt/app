@@ -517,7 +517,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .bot-panel.is-disabled .bot-section{opacity:.5;pointer-events:none;}
 .bot-panel.is-disabled .bot-status{opacity:1;pointer-events:auto;}
 </style>
-<script>window.__STANDALONE_HK__=/[?&]app=hk(?:&|$)/.test(location.search)||/(?:^|\/)HK(?:-app)?\.html$/i.test(location.pathname);if(window.__STANDALONE_HK__){document.documentElement.classList.add('standalone-hk');document.addEventListener('dblclick',function(e){e.preventDefault();},{passive:false,capture:true});try{var role=localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role');if(role){document.documentElement.classList.add('hk-authed');if(role==='admin')document.documentElement.classList.add('hk-admin-role');}}catch(e){}}</script>
+<script>if(/[?&]app=hk(?:&|$)/.test(location.search)||/(?:^|\/)HK(?:-app)?\.html$/i.test(location.pathname)){location.replace('/cleaner');}else{window.__STANDALONE_HK__=/[?&]app=hk(?:&|$)/.test(location.search)||/(?:^|\/)HK(?:-app)?\.html$/i.test(location.pathname);if(window.__STANDALONE_HK__){document.documentElement.classList.add('standalone-hk');document.addEventListener('dblclick',function(e){e.preventDefault();},{passive:false,capture:true});try{var role=localStorage.getItem('hk_role')||localStorage.getItem('hk_shartava_role');if(role){document.documentElement.classList.add('hk-authed');if(role==='admin')document.documentElement.classList.add('hk-admin-role');}}catch(e){}}}</script>
 <script>
 (function(){
   var BUILD='20260911c';
@@ -2190,9 +2190,7 @@ function renderHkSettings(){
     <p style="font-size:12px;color:var(--muted);margin-bottom:4px">HK shows an extra-sheets alert when a booking's guest count exceeds a room's normal capacity.</p>
     ${renderBeddingCapacitySection()}
     <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveHkSettings()">Save HK settings</button>
-    <div class="more-section" style="margin-top:16px">Staff PINs</div>
-    <div id="hkpins-list"></div>`;
-  renderHkPins();
+`;
   hkSubscribeStaffLinks();
   hkRenderLinkForm();
   hkRenderLinkList();
@@ -2566,25 +2564,6 @@ window.resetWaSettings=function(){
   waSettings=mergeWaSettings(null);
   _waInviteProp='maxela';
   renderWaSettings();
-};
-
-function renderHkPins(){
-  const el=document.getElementById('hkpins-list');if(!el)return;
-  el.innerHTML=hkTeamPinRoles().map(r=>`
-    <div class="hk-pin-card">
-      <h3>${esc(r.label)}</h3>
-      <p>${esc(r.desc)}</p>
-      <input class="hk-pin-input" type="text" inputmode="numeric" maxlength="4" placeholder="••••" value="${esc(hkPinsData[r.id]||'')}" id="pin-inp-${r.id}">
-      <button class="btn btn-primary" style="width:100%" onclick="saveHkPin('${r.id}')">Save PIN</button>
-    </div>`).join('');
-}
-window.saveHkPin=async function(roleId){
-  const pin=(document.getElementById('pin-inp-'+roleId)?.value||'').trim();
-  if(!/^\d{4}$/.test(pin)){toast('PIN must be 4 digits');return;}
-  try{
-    await setDoc(doc(db,'hk_pins',roleId),{pin,updatedAt:serverTimestamp()});
-    hkPinsData[roleId]=pin;toast('PIN saved ✓');
-  }catch(e){toast('Failed: '+e.message);}
 };
 
 /* ── HK staff links (cleaner access, no PIN) ── */
@@ -3329,7 +3308,7 @@ const TAB_META={
   requests:{title:'Requests',sub:'Guest service requests'},
   apts:{title:'Apartments',sub:'WiFi, instructions, photo steps'},
   hk:{title:'Housekeeping',sub:'Daily task board · checkouts & done'},
-  hksettings:{title:'HK settings',sub:'Staff PINs · cleaner apps · defaults'},
+  hksettings:{title:'HK settings',sub:'Staff links · teams · defaults'},
   history:{title:'History',sub:'Past guests · last 3 months'},
   guestsettings:{title:'Guest page',sub:'Tiles, services, waiting tabs & location'},
   wasettings:{title:'WhatsApp & bot',sub:'AI assistant · modes · templates'},

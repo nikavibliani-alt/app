@@ -148,6 +148,14 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
 - Done button follows the Done contract exactly, plus `doneBy`, `doneByLinkId`, `doneAt` on the checkout-day doc. Undo sets those three to null.
 - Safety check: `node scripts/check-cleaner-page.js` fails if cleaner.html contains admin-only code or writes outside `hk_status`, `checkin_guests`, `hk_staff_links`. **Step 3 must extend `ALLOWED_WRITE_COLLECTIONS` in that script for damage reports (`hk_damage_reports`, and Storage uploads).** Run it before every cleaner.html commit.
 
+### Step 4 (done, ran BEFORE Step 3)
+- Order changed: Step 4 was done before Step 3 because every cleaner already had a staff link and old access had to be cut.
+- firebase.json: 301 redirects to `/cleaner` for /hk-app, /HK, /HK-Shartava, /HK-Centre, /HK-legacy, /hk-manage (with and without `.html`). The /hk-app rewrite was removed.
+- Deleted: hk-app.html, HK.html, HK-Shartava.html, HK-Centre.html, HK-legacy.html, hk-manage.html.
+- checkin-admin.html: `?app=hk` or an HK*.html path now redirects to `/cleaner` (first inline script). The rest of the old HK-mode/PIN code is dead and unreachable; remove it in a later cleanup. "Staff PINs" section and renderHkPins / saveHkPin removed. `hk_pins` docs remain in Firestore, unused.
+- scripts/health-monitor.js no longer checks hk_pins.
+- CODEBASE.md and docs/AGENT_HANDOFF.md HK entries updated.
+
 ### Step 3: Damage reports (+ optional ready photos)
 **Cleaner page**
 - Put a large "Report damage" button on every card, including done and yesterday cards.

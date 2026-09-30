@@ -10,6 +10,66 @@
         "source": "/",
         "destination": "/checkin-guest",
         "type": 301
+      },
+      {
+        "source": "/hk-app",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/hk-app.html",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK.html",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK-Shartava",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK-Shartava.html",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK-Centre",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK-Centre.html",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK-legacy",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK-legacy.html",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/hk-manage",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/hk-manage.html",
+        "destination": "/cleaner",
+        "type": 301
       }
     ],
     "rewrites": [
@@ -32,10 +92,6 @@
       {
         "source": "/checkin-admin",
         "destination": "/checkin-admin.html"
-      },
-      {
-        "source": "/hk-app",
-        "destination": "/hk-app.html"
       }
     ],
     "headers": [

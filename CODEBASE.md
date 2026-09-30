@@ -10,12 +10,10 @@
 |------|-------------|
 | `checkin-guest-v2.html` | Main guest check-in web app — registration, passport upload, door codes, services, home dashboard |
 | `checkin-guest.html` | Redirect to v2 |
-| `checkin-admin.html` | Admin panel — guests, apartments, requests, housekeeping pins, guest page settings |
+| `checkin-admin.html` | Admin panel — guests, apartments, requests, housekeeping (board, staff links), guest page settings |
 | `checkin-details.html` | Check-in instructions separate page — door code, photos, elevator code |
 | `admin-search-test.html` | Search scoring debugger — runs real scoring logic against all reservations, password-protected |
-| `HK-Shartava.html` | Housekeeping app for Shartava building |
-| `HK-Centre.html` | Housekeeping app for Freedom/Orbeliani buildings |
-| `HK.html` | Legacy housekeeping page |
+| `cleaner.html` | Cleaner page at `/cleaner` — opened with a personal staff link (`?s=TOKEN`, collection `hk_staff_links`), no PIN. Old HK pages (hk-app, HK, HK-Shartava, HK-Centre, HK-legacy, hk-manage) were deleted and their URLs 301-redirect to `/cleaner` (firebase.json). See docs/HK_UPGRADE_PLAN.md |
 | `pricing.html` | Pricing admin dashboard — manual overrides, proposal review, price history |
 | `price-history.html` | Price history viewer |
 | `clear-reservations.html` | Admin utility — clear test reservations |
@@ -167,8 +165,8 @@ Housekeeping status per room per day.
 
 ---
 
-### `hk_pins/{role}`
-Housekeeping PIN codes for app login.
+### `hk_pins/{role}` (legacy, unused)
+Old housekeeping PIN codes. PIN login was removed; nothing reads these any more (docs left in Firestore). Cleaner access is now `hk_staff_links/{token}`: `{name, teamId, active, createdAt, lastSeenAt, revokedAt}`.
 
 | Field | Type | Notes |
 |-------|------|-------|

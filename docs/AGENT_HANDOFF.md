@@ -42,7 +42,7 @@ If health monitor reports stale `syncedAt`, **check cron-job.org first** — do 
 |-----|-----|-------|
 | **Guest** | https://app.maxelaapartments.com/checkin-guest.html | New design v1.1.0 |
 | **Admin** | https://app.maxelaapartments.com/checkin-admin.html | New mobile admin + pipeline |
-| **HK** | https://app.maxelaapartments.com/HK.html | All sites incl. VGL |
+| **HK (cleaners)** | https://app.maxelaapartments.com/cleaner?s=TOKEN | Personal staff link per cleaner (admin → Housekeeping setup → Staff links). Old HK URLs redirect to /cleaner |
 | **Hub** | https://app.maxelaapartments.com/sandbox-index.html | Live + dev sandbox links |
 
 Admin/guest **dev sandboxes** (edit here, then promote):
