@@ -2652,6 +2652,21 @@ let hkStaffLinks={};
 let _hkStaffLinksSub=false;
 let _hkLinkFormOpen=false;
 let _hkLinkJustCreated=null;
+let _hkLinkEdit=null;   // token of the link being edited
+/** A link covers one or more teams: teamIds[] (old links only have teamId). */
+function hkLinkTeamIds(l){
+  if(Array.isArray(l?.teamIds)&&l.teamIds.length)return l.teamIds.map(String);
+  return l?.teamId?[String(l.teamId)]:[];
+}
+function hkLinkTeamLabels(l){
+  const teams=hkGetTeams();
+  const names=hkLinkTeamIds(l).map(id=>teams.find(t=>t.id===id)?.label).filter(Boolean);   // deleted teams are skipped
+  return names.length?names.join(' + '):'—';
+}
+function hkTeamCheckboxes(selected){
+  return hkGetTeams().map(t=>`<label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;margin:6px 0;cursor:pointer"><input type="checkbox" id="hk-link-team-${esc(t.id)}" style="width:20px;height:20px"${selected.includes(t.id)?' checked':''}>${esc(t.label)}</label>`).join('');
+}
+function hkPickedTeamIds(){return hkGetTeams().filter(t=>document.getElementById('hk-link-team-'+t.id)?.checked).map(t=>t.id);}
 function hkSubscribeStaffLinks(){
   if(_hkStaffLinksSub)return;
   _hkStaffLinksSub=true;
@@ -2689,6 +2704,24 @@ function hkRenderLinkForm(){
       </div></div>`;
     return;
   }
+  if(_hkLinkEdit){
+    const l=hkStaffLinks[_hkLinkEdit];
+    if(l){
+      el.innerHTML=`<div class="hk-link-card">
+        <div class="hk-link-card__name" style="margin-bottom:8px">Edit link</div>
+        <label class="apt-label">Name</label>
+        <input class="apt-input" id="hk-link-name" type="text" maxlength="40" value="${esc(l.name||'')}">
+        <label class="apt-label" style="margin-top:4px">Teams (at least one)</label>
+        ${hkTeamCheckboxes(hkLinkTeamIds(l))}
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">The link stays the same. The cleaner does not need a new one.</div>
+        <div class="hk-link-card__actions">
+          <button type="button" class="btn" onclick="hkCloseNewLink()">Cancel</button>
+          <button type="button" class="btn btn-primary" onclick="hkSaveEditLink()">Save</button>
+        </div></div>`;
+      return;
+    }
+    _hkLinkEdit=null;
+  }
   if(!_hkLinkFormOpen){
     el.innerHTML='<button type="button" class="btn" style="width:100%;margin-bottom:10px" onclick="hkOpenNewLink()">+ New link</button>';
     return;
@@ -2696,8 +2729,8 @@ function hkRenderLinkForm(){
   el.innerHTML=`<div class="hk-link-card">
     <label class="apt-label">Name</label>
     <input class="apt-input" id="hk-link-name" type="text" placeholder="e.g. Nino" maxlength="40">
-    <label class="apt-label" style="margin-top:10px">Team</label>
-    <select class="apt-input" id="hk-link-team">${hkGetTeams().map(t=>`<option value="${esc(t.id)}">${esc(t.label)}</option>`).join('')}</select>
+    <label class="apt-label" style="margin-top:4px">Teams (at least one)</label>
+    ${hkTeamCheckboxes([])}
     ${HK_DAMAGE_ENABLED?`<label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;margin:4px 0 6px;cursor:pointer"><input type="checkbox" id="hk-link-dmg" checked style="width:20px;height:20px">Can report damage</label>`:''}
     <div class="hk-link-card__actions">
       <button type="button" class="btn" onclick="hkCloseNewLink()">Cancel</button>
@@ -2710,31 +2743,44 @@ function hkRenderLinkList(){
   const all=Object.values(hkStaffLinks).sort((a,b)=>(b.active===true)-(a.active===true)||ms(b)-ms(a));
   if(!all.length){el.innerHTML='<div class="empty" style="padding:16px">No links yet</div>';return;}
   el.innerHTML=all.map(l=>{
-    const team=hkGetTeams().find(t=>t.id===l.teamId);
     const active=l.active===true;
     return`<div class="hk-link-card${active?'':' revoked'}">
       <div class="hk-link-card__top"><div class="hk-link-card__name">${esc(l.name||'—')}</div>
         <span class="pill ${active?'pill-ok':'pill-pending'}">${active?'Active':'Revoked'}</span></div>
-      <div class="hk-link-card__sub">${esc(team?.label||l.teamId||'—')} · last opened ${esc(hkLinkAgo(l.lastSeenAt))}</div>
+      <div class="hk-link-card__sub">${esc(hkLinkTeamLabels(l))} · last opened ${esc(hkLinkAgo(l.lastSeenAt))}</div>
       ${active?`${HK_DAMAGE_ENABLED?`<label style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;margin-top:8px;cursor:pointer"><input type="checkbox" style="width:20px;height:20px"${l.canReportDamage!==false?' checked':''} onchange="hkSetLinkDamage('${esc(l.token)}',this.checked)">Damage reports</label>`:''}
       <div class="hk-link-card__actions">
         <button type="button" class="btn" onclick="hkCopyLink('${esc(l.token)}')">Copy</button>
         <button type="button" class="btn" onclick="hkWaLink('${esc(l.token)}')">WhatsApp</button>
+        <button type="button" class="btn" onclick="hkOpenEditLink('${esc(l.token)}')">Edit</button>
         <button type="button" class="btn btn-danger" onclick="hkRevokeLink('${esc(l.token)}')">Revoke</button>
       </div>`:''}
     </div>`;
   }).join('');
 }
-window.hkOpenNewLink=function(){_hkLinkFormOpen=true;_hkLinkJustCreated=null;hkRenderLinkForm();};
-window.hkCloseNewLink=function(){_hkLinkFormOpen=false;_hkLinkJustCreated=null;hkRenderLinkForm();};
+window.hkOpenNewLink=function(){_hkLinkFormOpen=true;_hkLinkJustCreated=null;_hkLinkEdit=null;hkRenderLinkForm();};
+window.hkCloseNewLink=function(){_hkLinkFormOpen=false;_hkLinkJustCreated=null;_hkLinkEdit=null;hkRenderLinkForm();};
+window.hkOpenEditLink=function(token){_hkLinkEdit=token;_hkLinkFormOpen=false;_hkLinkJustCreated=null;hkRenderLinkForm();window.scrollTo(0,0);};
+window.hkSaveEditLink=async function(){
+  const token=_hkLinkEdit;if(!token)return;
+  const name=(document.getElementById('hk-link-name')?.value||'').trim();
+  const ids=hkPickedTeamIds();
+  if(!name){toast('Enter a name');return;}
+  if(!ids.length){toast('Pick at least one team');return;}
+  try{
+    // same token, same link: only name + teams change (teamId kept = first team for old readers)
+    await updateDoc(doc(db,'hk_staff_links',token),{name,teamId:ids[0],teamIds:ids});
+    _hkLinkEdit=null;toast('Link updated ✓');hkRenderLinkForm();
+  }catch(e){toast('Failed: '+e.message);}
+};
 window.hkCreateLink=async function(){
   const name=(document.getElementById('hk-link-name')?.value||'').trim();
-  const teamId=document.getElementById('hk-link-team')?.value||'';
+  const ids=hkPickedTeamIds();
   if(!name){toast('Enter a name');return;}
-  if(!teamId){toast('Pick a team');return;}
+  if(!ids.length){toast('Pick at least one team');return;}
   const token=hkNewLinkToken();
   try{
-    await setDoc(doc(db,'hk_staff_links',token),{name,teamId,active:true,canReportDamage:document.getElementById('hk-link-dmg')?.checked!==false,createdAt:serverTimestamp(),lastSeenAt:null,revokedAt:null});
+    await setDoc(doc(db,'hk_staff_links',token),{name,teamId:ids[0],teamIds:ids,active:true,canReportDamage:document.getElementById('hk-link-dmg')?.checked!==false,createdAt:serverTimestamp(),lastSeenAt:null,revokedAt:null});
     _hkLinkFormOpen=false;_hkLinkJustCreated={token,name};
     hkRenderLinkForm();
   }catch(e){toast('Failed: '+e.message);}

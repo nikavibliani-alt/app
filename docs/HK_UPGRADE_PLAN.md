@@ -223,6 +223,11 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
   - no update or delete
   - keep the existing passport_uploads rule unchanged
 
+### Staff links can cover several teams (done)
+- `hk_staff_links/{token}` now has `teamIds: [teamId, ...]`. Old links with only `teamId` are read as `[teamId]`; whenever a link is saved or edited, `teamIds` is written and `teamId` is kept as `teamIds[0]`. Teams themselves and the "one team per apartment" rule are unchanged.
+- Admin → HK settings → Staff links: the new-link form has team checkboxes (at least one required); each active link has an **Edit** button (name + ticked teams, same token, so the cleaner keeps the same link); the list shows all team names, e.g. "Centre Team + Abashidze Team".
+- cleaner.html: rooms = union of the rooms of all the link's teams, de-duplicated; a team id that no longer exists is ignored; "no apartments assigned" only when the union is empty. On every open / visibilitychange the link doc and the team settings are re-read and the board is rebuilt if the room set changed. Done contract untouched.
+
 ### Housekeeping setup menu (done)
 - checkin-admin.html → More → HK settings is now a short menu with 4 rows and live one-line summaries: Staff links ("N active"), Teams & apartments ("N teams"), Times & cleaning ("Checkout hh:mm · Check-in hh:mm"), Bedding capacity ("N groups set"). Each row opens its own sub-screen with "‹ Back".
 - Times & cleaning = standard times + cleaning duration + per-room overrides, with the existing "Save HK settings" button (`saveHkSettings`). Teams keep their own Create/Save team. Bedding capacity still saves automatically as you type (no Save button, noted on screen). Staff links act immediately.

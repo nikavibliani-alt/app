@@ -564,8 +564,8 @@ function render(){
 function renderNow(){
   if(!link||_resCache===null)return;
   $('hdr-title').textContent=t('title');
-  const team=(hkSettings.teams||[]).find(x=>x.id===link.teamId);
-  $('hdr-sub').textContent=link.name+(team?' · '+team.label:'');
+  const labels=(link.teamIds||[]).map(id=>(hkSettings.teams||[]).find(x=>x.id===id)?.label).filter(Boolean);
+  $('hdr-sub').textContent=link.name+(labels.length?' · '+labels.join(' + '):'');
   $('lang-btn').textContent=t('langBtn');
   document.documentElement.lang=lang;
   let tabs='';
@@ -794,7 +794,7 @@ async function validate(){
     return false;
   }
   linkOk=true;
-  link={name:d.name||'',teamId:d.teamId||'',canReportDamage:d.canReportDamage!==false};
+  link={name:d.name||'',teamId:d.teamId||'',teamIds:(Array.isArray(d.teamIds)&&d.teamIds.length?d.teamIds:(d.teamId?[d.teamId]:[])).map(String),canReportDamage:d.canReportDamage!==false};
   try{localStorage.setItem('hk_staff_token',token);}catch(e){}
   const last=d.lastSeenAt?.toMillis?d.lastSeenAt.toMillis():0;
   if(Date.now()-Math.max(last,lastTouch)>10*60*1000){
@@ -802,6 +802,13 @@ async function validate(){
     updateDoc(doc(db,'hk_staff_links',token),{lastSeenAt:serverTimestamp()}).catch(()=>{});
   }
   return true;
+}
+/** Rooms of all the link's teams, de-duplicated (teams that no longer exist are ignored). */
+function roomsForTeams(teamIds){
+  const want=new Set();
+  (teamIds||[]).forEach(id=>{const team=(hkSettings.teams||[]).find(x=>x.id===id);(team?.roomCodes||[]).forEach(x=>want.add(String(x).toLowerCase()));});
+  return roomsSorted(roomsData,true).filter(r=>r.showInHk!==false&&want.has(String(r.roomCode).toLowerCase()))
+    .map(r=>({code:r.roomCode,name:r.displayName||r.roomCode,site:r.site||'shartava'}));
 }
 function defaultTeams(){
   const bySite={};
@@ -824,10 +831,7 @@ async function startBoard(){
     roomsSnap.docs.forEach(d=>{const x=d.data();roomsData[d.id]={roomCode:d.id,site:x.site,displayName:x.displayName,showInHk:x.showInHk,active:x.active,sortOrder:x.sortOrder};});
     const teams=hkSettings.teams.length?hkSettings.teams:defaultTeams();
     hkSettings.teams=teams;
-    const team=teams.find(x=>x.id===link.teamId);
-    const want=new Set((team?.roomCodes||[]).map(x=>String(x).toLowerCase()));
-    teamRooms=roomsSorted(roomsData,true).filter(r=>r.showInHk!==false&&want.has(String(r.roomCode).toLowerCase()))
-      .map(r=>({code:r.roomCode,name:r.displayName||r.roomCode,site:r.site||'shartava'}));
+    teamRooms=roomsForTeams(link.teamIds);
     teamCodeSet=new Set(teamRooms.map(r=>r.code));
     if(!teamRooms.length){showScreen('noRooms');boardStarted=false;return;}
     await Promise.all(teamRooms.map(async r=>{
@@ -881,10 +885,21 @@ function subscribeData(){
     hkStatusData=m;render();
   },onErr('hk_status')));
 }
+/** Re-read the team settings; true when this link's room set is different from the running board. */
+async function teamsChanged(){
+  try{
+    const cfg=await getDoc(doc(db,'checkin_admin','config'));
+    const h=cfg.exists()?cfg.data().hkSettings:null;
+    if(h&&Array.isArray(h.teams)&&h.teams.length)hkSettings={...hkSettings,teams:h.teams};
+    const next=roomsForTeams(link.teamIds).map(r=>r.code).sort().join(',');
+    return next!==[...teamCodeSet].sort().join(',');
+  }catch(e){return false;}
+}
 async function refresh(){
   const ok=await validate();
   if(!ok)return;
   if(boardStarted&&boardDay&&boardDay!==tbilisiToday()){stopListeners();}  // new day: re-subscribe with fresh date window
+  if(boardStarted&&await teamsChanged())stopListeners();                    // team/link change: rebuild the board
   if(!boardStarted){showScreen('loading');await startBoard();}
   else render();
 }
