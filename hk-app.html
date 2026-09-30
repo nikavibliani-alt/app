@@ -3850,13 +3850,14 @@ function hkDayTabLabel(offset,dateStr){
   return new Date(dateStr+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric'});
 }
 function hkTaskRooms(dateStr){
-  const coRooms=hkRoomsForRole().filter(r=>hkGetCheckout(r.code,dateStr));
+  const movedAway=code=>!!hkStatusData[code+'_'+dateStr]?.movedTo;
+  const coRooms=hkRoomsForRole().filter(r=>hkGetCheckout(r.code,dateStr)&&!movedAway(r.code));
   const seen=new Set(coRooms.map(r=>r.code));
   const manual=[];
   for(const key of Object.keys(hkStatusData)){
     if(!key.endsWith('_'+dateStr))continue;
     const roomCode=key.slice(0,-(dateStr.length+1));
-    if(seen.has(roomCode))continue;
+    if(seen.has(roomCode)||movedAway(roomCode))continue;
     const room=hkRoomsForRole().find(r=>r.code===roomCode);
     if(room){manual.push(room);seen.add(roomCode);}
   }

@@ -861,7 +861,7 @@ window.adminUnlock=function(){
 window.adminSignOut=function(){localStorage.removeItem(_ADMIN_KEY);location.reload();};
 
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit,runTransaction}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,deleteField,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit,runTransaction}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour,normalizeStayDate}from"./shared/guest-unlock.js";
 import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON,hkPropertyGroupForRoom}from"./shared/hk-bedding.js";
@@ -4746,13 +4746,14 @@ function hkDayTabLabel(offset,dateStr){
   return new Date(dateStr+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric'});
 }
 function hkTaskRooms(dateStr){
-  const coRooms=hkRoomsForRole().filter(r=>hkGetCheckout(r.code,dateStr));
+  const movedAway=code=>!!hkStatusData[code+'_'+dateStr]?.movedTo;
+  const coRooms=hkRoomsForRole().filter(r=>hkGetCheckout(r.code,dateStr)&&!movedAway(r.code));
   const seen=new Set(coRooms.map(r=>r.code));
   const manual=[];
   for(const key of Object.keys(hkStatusData)){
     if(!key.endsWith('_'+dateStr))continue;
     const roomCode=key.slice(0,-(dateStr.length+1));
-    if(seen.has(roomCode))continue;
+    if(seen.has(roomCode)||movedAway(roomCode))continue;
     const room=hkRoomsForRole().find(r=>r.code===roomCode);
     if(room){manual.push(room);seen.add(roomCode);}
   }
@@ -4893,12 +4894,26 @@ window.hkOpenMoveRoom=function(roomCode,dateStr){
 window.hkMoveRoom=async function(roomCode,fromDate,toDate){
   if(fromDate===toDate)return;
   const key=roomCode+'_'+fromDate;
-  const st={...(hkStatusData[key]||{}),roomCode,date:fromDate};
+  const toKey=roomCode+'_'+toDate;
+  const {movedTo:_mt,movedAt:_ma,movedFrom:_mf,...base}=hkStatusData[key]||{};
+  const st={...base,roomCode,date:fromDate};
+  const hasRealCheckout=!!hkGetCheckout(roomCode,fromDate);
   try{
-    await setDoc(doc(db,'hk_status',roomCode+'_'+toDate),{
-      ...st,roomCode,date:toDate,manuallyAdded:true,updatedAt:serverTimestamp(),
-    },{merge:true});
-    if(!hkGetCheckout(roomCode,fromDate))await deleteDoc(doc(db,'hk_status',key));
+    const newDoc={
+      ...st,roomCode,date:toDate,manuallyAdded:true,movedFrom:fromDate,updatedAt:serverTimestamp(),
+    };
+    // Moving back to a day it was moved away from: clear the marker there
+    if(hkStatusData[toKey]?.movedTo){newDoc.movedTo=deleteField();newDoc.movedAt=deleteField();}
+    await setDoc(doc(db,'hk_status',toKey),newDoc,{merge:true});
+    const {movedTo:_x,movedAt:_y,...toLocal}=hkStatusData[toKey]||{};
+    hkStatusData[toKey]={...toLocal,...st,date:toDate,manuallyAdded:true,movedFrom:fromDate};
+    if(hasRealCheckout){
+      await setDoc(doc(db,'hk_status',key),{movedTo:toDate,movedAt:serverTimestamp()},{merge:true});
+      hkStatusData[key]={...(hkStatusData[key]||{}),movedTo:toDate};
+    }else{
+      await deleteDoc(doc(db,'hk_status',key));
+      delete hkStatusData[key];
+    }
     toast('Moved to '+toDate);
     hkCloseAdminModal();
     renderHk();
