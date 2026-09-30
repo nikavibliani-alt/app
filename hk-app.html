@@ -3850,7 +3850,7 @@ function hkDayTabLabel(offset,dateStr){
   return new Date(dateStr+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric'});
 }
 function hkTaskRooms(dateStr){
-  const movedAway=code=>!!hkStatusData[code+'_'+dateStr]?.movedTo;
+  const movedAway=code=>{const d=hkStatusData[code+'_'+dateStr];return !!d?.movedTo||d?.removed===true;};
   const coRooms=hkRoomsForRole().filter(r=>hkGetCheckout(r.code,dateStr)&&!movedAway(r.code));
   const seen=new Set(coRooms.map(r=>r.code));
   const manual=[];
@@ -3908,7 +3908,7 @@ async function renderHk(){
     const departing=hkDepartingGuestForm(room.code,dateStr,co);
     const guestCheckedOut=departing?.guestConfirmedCheckout===true;
     const outGuests=hkGuestCount(co,departing,st.guestCount);
-    const inGuests=hkGuestCount(nextRes,form,st.guestCount);
+    const inGuests=hkGuestCount(nextRes,form,st.arrivingGuestCount);
     const beddingHtml=nextRes?hkBeddingAlertHtml(room.code,inGuests):'';
     const coTime=st.checkOutTime||co?.checkoutTime||hkSettings.defaultCheckOut||'12:00';
     const ciTime=st.checkInTime||formatGuestArrival(form,nextRes);

@@ -428,6 +428,11 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .hk-admin-modal__title{font-size:16px;font-weight:700;margin-bottom:12px;}
 .hk-admin-modal__actions{display:flex;gap:8px;margin-top:14px;}
 .hk-admin-modal__actions .btn{flex:1;}
+.hk-stepper{display:flex;align-items:center;gap:14px;margin-top:4px;}
+.hk-stepper button{width:48px;height:48px;border:1.5px solid var(--line);border-radius:12px;background:var(--bg);font-size:24px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+.hk-stepper span{min-width:32px;text-align:center;font-size:22px;font-weight:700;}
+.hk-reset-link{font-size:12px;color:var(--muted);text-decoration:underline;}
+.hk-remove-btn{width:100%;margin-top:18px;color:var(--red);border-color:#fca5a5;background:var(--red-bg);}
 .hk-move-days{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
 .hk-move-day{padding:8px 12px;border:1.5px solid var(--line);border-radius:999px;background:var(--bg);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);}
 .hk-move-day:active{background:var(--bg);border-color:var(--ink);color:var(--ink);}
@@ -4746,7 +4751,7 @@ function hkDayTabLabel(offset,dateStr){
   return new Date(dateStr+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric'});
 }
 function hkTaskRooms(dateStr){
-  const movedAway=code=>!!hkStatusData[code+'_'+dateStr]?.movedTo;
+  const movedAway=code=>{const d=hkStatusData[code+'_'+dateStr];return !!d?.movedTo||d?.removed===true;};
   const coRooms=hkRoomsForRole().filter(r=>hkGetCheckout(r.code,dateStr)&&!movedAway(r.code));
   const seen=new Set(coRooms.map(r=>r.code));
   const manual=[];
@@ -4804,7 +4809,7 @@ async function renderHk(){
     const departing=hkDepartingGuestForm(room.code,dateStr,co);
     const guestCheckedOut=departing?.guestConfirmedCheckout===true;
     const outGuests=hkGuestCount(co,departing,st.guestCount);
-    const inGuests=hkGuestCount(nextRes,form,st.guestCount);
+    const inGuests=hkGuestCount(nextRes,form,st.arrivingGuestCount);
     const beddingHtml=nextRes?hkBeddingAlertHtml(room.code,inGuests):'';
     const coTime=st.checkOutTime||co?.checkoutTime||hkSettings.defaultCheckOut||'12:00';
     const ciTime=st.checkInTime||formatGuestArrival(form,nextRes);
@@ -4814,11 +4819,8 @@ async function renderHk(){
     const priorityCls={red:'hk-priority-red',yellow:'hk-priority-yellow',green:'hk-priority-green'}[priority];
     const inBoxCls=nextSameDay?' tb-urgent':nextTomorrow?' tb-yellow':'';
     const whenLabel=nextRes?(nextSameDay?'Today':nextTomorrow?'Tomorrow':nextRes.checkin):'';
-    const hasRealCo=!!co;
     const adminBtns=admin?`<div class="hk-card__admin">
-      <button type="button" class="hk-card__admin-btn" onclick="hkOpenEditRoom('${esc(room.code)}','${dateStr}')">Edit times</button>
-      <button type="button" class="hk-card__admin-btn" onclick="hkOpenMoveRoom('${esc(room.code)}','${dateStr}')">Move day</button>
-      ${hasRealCo?'':`<button type="button" class="hk-card__admin-btn danger" onclick="hkRemoveRoom('${esc(room.code)}','${dateStr}')">Remove</button>`}
+      <button type="button" class="hk-card__admin-btn" onclick="hkOpenEditRoom('${esc(room.code)}','${dateStr}')">Edit</button>
     </div>`:'';
     return`<div class="hk-card ${priorityCls}${done?' done':''}">
       <div class="hk-card__top"><div><div class="hk-card__room">${esc(room.code)}</div><div class="hk-card__name">${esc(room.name)}</div></div>
@@ -4868,28 +4870,57 @@ window.hkOpenEditRoom=function(roomCode,dateStr){
   const key=roomCode+'_'+dateStr;
   const st=hkStatusData[key]||{};
   const co=hkGetCheckout(roomCode,dateStr);
-  _hkAdminModal={mode:'edit',roomCode,dateStr};
-  document.getElementById('hk-admin-modal-title').textContent=roomCode+' · '+dateStr;
-  document.getElementById('hk-admin-modal-body').innerHTML=`
-    <label class="apt-label">Checkout time</label>
-    <input class="apt-input" type="time" id="hk-admin-co" value="${esc(st.checkOutTime||co?.checkoutTime||hkSettings.defaultCheckOut||'12:00')}">
-    <label class="apt-label" style="margin-top:10px">Check-in time</label>
-    <input class="apt-input" type="time" id="hk-admin-ci" value="${esc(st.checkInTime||hkSettings.defaultCheckIn||'15:00')}">`;
-  document.getElementById('hk-admin-modal-save').style.display='';
-  document.getElementById('hk-admin-modal').hidden=false;
-};
-window.hkOpenMoveRoom=function(roomCode,dateStr){
-  _hkAdminModal={mode:'move',roomCode,dateStr};
-  document.getElementById('hk-admin-modal-title').textContent='Move '+roomCode+' to…';
+  const nextRes=hkGetNextCheckin(roomCode,dateStr);
+  const form=nextRes?hkGuestFormForRoom(roomCode,dateStr,nextRes):null;
+  const guests=Math.min(12,Math.max(1,hkGuestCount(nextRes,form,st.arrivingGuestCount)||1));
+  const arr=formatGuestArrival(form,nextRes);
+  const ciVal=st.checkInTime||(/^\d{2}:\d{2}$/.test(arr)?arr:(hkSettings.defaultCheckIn||'15:00'));
+  _hkAdminModal={mode:'edit',roomCode,dateStr,hasNext:!!nextRes,guests};
+  let label=dateStr;
+  for(let i=HK_DAY_START;i<=HK_DAY_END;i++){if(hkAddDays(i)===dateStr){label=hkDayTabLabel(i,dateStr);break;}}
+  document.getElementById('hk-admin-modal-title').textContent=roomCode+' · '+label;
   const chips=[];
   for(let i=HK_DAY_START;i<=HK_DAY_END;i++){
     const ds=hkAddDays(i);
     if(ds===dateStr)continue;
     chips.push(`<button type="button" class="hk-move-day" onclick="hkMoveRoom('${esc(roomCode)}','${dateStr}','${ds}')">${esc(hkDayTabLabel(i,ds))}</button>`);
   }
-  document.getElementById('hk-admin-modal-body').innerHTML=`<div class="hk-move-days">${chips.join('')}</div>`;
-  document.getElementById('hk-admin-modal-save').style.display='none';
+  const nextHtml=nextRes?`
+    <div class="apt-label" style="font-weight:700">Next guest</div>
+    <label class="apt-label">Guests</label>
+    <div class="hk-stepper"><button type="button" onclick="hkStepGuests(-1)">−</button><span id="hk-admin-guests">${guests}</span><button type="button" onclick="hkStepGuests(1)">+</button></div>
+    <label class="apt-label" style="margin-top:10px">Check-in time</label>
+    <input class="apt-input" type="time" id="hk-admin-ci" value="${esc(ciVal)}">
+    <div style="height:10px"></div>`:'';
+  document.getElementById('hk-admin-modal-body').innerHTML=`${nextHtml}
+    <label class="apt-label">Checkout time</label>
+    <input class="apt-input" type="time" id="hk-admin-co" value="${esc(st.checkOutTime||co?.checkoutTime||hkSettings.defaultCheckOut||'12:00')}">
+    <div style="margin-top:8px"><a href="#" class="hk-reset-link" onclick="hkResetOverrides();return false">Reset to automatic</a></div>
+    <div class="apt-label" style="margin-top:16px;font-weight:700">Move to another day</div>
+    <div class="hk-move-days">${chips.join('')}</div>
+    <button type="button" class="btn hk-remove-btn" onclick="hkRemoveRoom('${esc(roomCode)}','${dateStr}')">Remove from schedule</button>`;
+  document.getElementById('hk-admin-modal-save').style.display='';
   document.getElementById('hk-admin-modal').hidden=false;
+};
+window.hkStepGuests=function(d){
+  if(!_hkAdminModal||_hkAdminModal.mode!=='edit')return;
+  _hkAdminModal.guests=Math.min(12,Math.max(1,(_hkAdminModal.guests||1)+d));
+  const el=document.getElementById('hk-admin-guests');if(el)el.textContent=_hkAdminModal.guests;
+};
+window.hkResetOverrides=async function(){
+  if(!_hkAdminModal||_hkAdminModal.mode!=='edit')return;
+  const {roomCode,dateStr}=_hkAdminModal;
+  const key=roomCode+'_'+dateStr;
+  try{
+    await setDoc(doc(db,'hk_status',key),{
+      roomCode,date:dateStr,checkInTime:deleteField(),checkOutTime:deleteField(),arrivingGuestCount:deleteField(),updatedAt:serverTimestamp(),
+    },{merge:true});
+    const {checkInTime:_a,checkOutTime:_b,arrivingGuestCount:_c,...rest}=hkStatusData[key]||{};
+    hkStatusData[key]=rest;
+    toast('Reset to automatic');
+    hkCloseAdminModal();
+    renderHk();
+  }catch(e){toast('Reset failed: '+e.message);}
 };
 window.hkMoveRoom=async function(roomCode,fromDate,toDate){
   if(fromDate===toDate)return;
@@ -4920,12 +4951,18 @@ window.hkMoveRoom=async function(roomCode,fromDate,toDate){
   }catch(e){toast('Move failed: '+e.message);}
 };
 window.hkRemoveRoom=async function(roomCode,dateStr){
-  if(hkGetCheckout(roomCode,dateStr)){toast('Cannot remove — real checkout on this day');return;}
-  if(!confirm(`Remove ${roomCode} from ${dateStr}?`))return;
+  if(!confirm(`Remove ${roomCode} from ${dateStr}? Cleaners will not see it. If it is not marked Done, the guest will not get the 'room ready' WhatsApp.`))return;
+  const key=roomCode+'_'+dateStr;
   try{
-    await deleteDoc(doc(db,'hk_status',roomCode+'_'+dateStr));
-    delete hkStatusData[roomCode+'_'+dateStr];
+    if(hkGetCheckout(roomCode,dateStr)){
+      await setDoc(doc(db,'hk_status',key),{roomCode,date:dateStr,removed:true,removedAt:serverTimestamp()},{merge:true});
+      hkStatusData[key]={...(hkStatusData[key]||{}),removed:true};
+    }else{
+      await deleteDoc(doc(db,'hk_status',key));
+      delete hkStatusData[key];
+    }
     toast('Removed from schedule');
+    hkCloseAdminModal();
     renderHk();
   }catch(e){toast('Remove failed: '+e.message);}
 };
@@ -4936,19 +4973,31 @@ window.hkSaveAdminModal=async function(){
       const roomCode=document.getElementById('hk-admin-room')?.value;
       if(!roomCode)return;
       const dateStr=_hkAdminModal.dateStr;
-      await setDoc(doc(db,'hk_status',roomCode+'_'+dateStr),{
-        roomCode,date:dateStr,done:false,manuallyAdded:true,updatedAt:serverTimestamp(),
-      },{merge:true});
+      const addKey=roomCode+'_'+dateStr;
+      const addDoc={roomCode,date:dateStr,done:false,manuallyAdded:true,updatedAt:serverTimestamp()};
+      if(hkStatusData[addKey]?.removed||hkStatusData[addKey]?.movedTo){
+        addDoc.removed=deleteField();addDoc.removedAt=deleteField();addDoc.movedTo=deleteField();addDoc.movedAt=deleteField();
+      }
+      await setDoc(doc(db,'hk_status',addKey),addDoc,{merge:true});
+      const {removed:_r,removedAt:_ra,movedTo:_mt,movedAt:_ma,...addLocal}=hkStatusData[addKey]||{};
+      hkStatusData[addKey]={...addLocal,roomCode,date:dateStr,done:false,manuallyAdded:true};
       toast('Room added');
     }else if(_hkAdminModal.mode==='edit'){
       const {roomCode,dateStr}=_hkAdminModal;
-      await setDoc(doc(db,'hk_status',roomCode+'_'+dateStr),{
+      const editKey=roomCode+'_'+dateStr;
+      const upd={
         roomCode,date:dateStr,
         checkOutTime:document.getElementById('hk-admin-co')?.value||'12:00',
-        checkInTime:document.getElementById('hk-admin-ci')?.value||'15:00',
         updatedAt:serverTimestamp(),
-      },{merge:true});
-      toast('Times saved');
+      };
+      if(_hkAdminModal.hasNext){
+        upd.checkInTime=document.getElementById('hk-admin-ci')?.value||'15:00';
+        upd.arrivingGuestCount=Number(_hkAdminModal.guests)||1;
+      }
+      await setDoc(doc(db,'hk_status',editKey),upd,{merge:true});
+      const {updatedAt:_u,...updLocal}=upd;
+      hkStatusData[editKey]={...(hkStatusData[editKey]||{}),...updLocal};
+      toast('Saved');
     }
     hkCloseAdminModal();
     renderHk();

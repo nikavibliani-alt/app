@@ -95,6 +95,16 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
 - Do NOT change toggleHkDone or anything done/WhatsApp related.
 - In hk-app.html, change only hkTaskRooms (the same skip rule).
 
+### Step 1b (done)
+- The admin HK card now has ONE "Edit" button (was Edit times / Move day / Remove). It opens the bottom sheet `#hk-admin-modal`, titled "<room> · <day>".
+- Sheet contents: Next guest (guests − / +, check-in time; only if the card has a next reservation), Checkout time, "Reset to automatic", Save, "Move to another day" chips (calls `hkMoveRoom` unchanged), and "Remove from schedule".
+- Remove: a manually added room (no real checkout) has its hk_status doc deleted. A room with a real checkout gets `removed:true, removedAt` merged onto its doc.
+- "+ Add room to this day" clears `removed` / `movedTo` (deleteField) so a removed room can be brought back.
+- New hk_status fields: `removed` (bool), `removedAt` (timestamp), `arrivingGuestCount` (number, overrides the arriving-guest count only; the leaving count still uses `guestCount`). Existing Step 1 fields: `movedTo`, `movedAt`, `movedFrom`.
+- Reset to automatic removes `checkInTime`, `checkOutTime` and `arrivingGuestCount`.
+- Board rules: `hkTaskRooms` skips a room whose doc for that day has `movedTo` or `removed === true`. Arriving guests = `hkGuestCount(nextRes, form, st.arrivingGuestCount)`.
+- hk-app.html got only the same two changes (the skip rule and the arriving count).
+
 ### Step 2: Staff links + new cleaner page (cleaner.html → /cleaner)
 - **Admin side** (checkin-admin.html, Housekeeping setup):
   - Replace the "Cleaner apps" section with a "Staff links" section.
@@ -108,6 +118,7 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
   - Validate with getDoc(hk_staff_links/{token}) on every open and on visibilitychange. If the doc is missing or inactive, show a full-screen "This link is no longer active. Ask your manager for a new link." and clear the saved token.
   - Update lastSeenAt at most once every 10 minutes.
   - Show the same board as the admin HK tab, limited to the link's team rooms: day tabs, card colours, times, guest counts, bedding alert, sort order and the movedTo rule.
+  - The board must honour `movedTo`, `removed` and `arrivingGuestCount` (see Step 1 and Step 1b).
   - No admin buttons and no source badges.
 - **Loads only what the board needs:**
   - checkin_admin/config (hkSettings, categoryCapacity)
