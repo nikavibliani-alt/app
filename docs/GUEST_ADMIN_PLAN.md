@@ -25,3 +25,13 @@ Restore point: git tag `before-guest-redesign`.
 | 3 | 59785d1 | live, checked |
 | 4 | 3222d65 | live, checked |
 | 5 | fdde605 | live, checked |
+| 6 | 33d59a1 | live, checked |
+
+All six steps are live. Final check: `npm run check:unlock` passes.
+
+Notes:
+- Step 5: "Waiting for unlock" sits on its own wide line above the four other counts (one grouped block), not literally one row, so the label stays readable on a phone.
+- Step 5: the Preview button moved off the card; it is still in the guest Details screen ("Preview guest page"). MULTI / MANUAL badges, phone and booking number are also in Details.
+- Step 5: status colors — waiting = amber, has access = green, checked in = blue, access off = red, not registered = grey.
+- Step 6: Tab-bar ids 'apts' and 'guestsettings' are unchanged, so saved layouts still work.
+- Step 1/2/3/4 test notes: on localhost the app talks to the real database but the admin functions emulator is not running, so writes could not happen; step 2 was tested on a copy with writes stubbed.
