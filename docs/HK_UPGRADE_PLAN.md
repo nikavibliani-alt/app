@@ -148,6 +148,14 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
 - Done button follows the Done contract exactly, plus `doneBy`, `doneByLinkId`, `doneAt` on the checkout-day doc. Undo sets those three to null.
 - Safety check: `node scripts/check-cleaner-page.js` fails if cleaner.html contains admin-only code or writes outside `hk_status`, `checkin_guests`, `hk_staff_links`. **Step 3 must extend `ALLOWED_WRITE_COLLECTIONS` in that script for damage reports (`hk_damage_reports`, and Storage uploads).** Run it before every cleaner.html commit.
 
+### Step 3c (done): evidence document fixes after the real test
+- Finding: iPhone gallery photos reach the browser as `image.jpg` with no EXIF date, so the camera time is often missing. The trustworthy times are Google's server times. They are public: `GET https://firebasestorage.googleapis.com/v0/b/sleepy-5c962.firebasestorage.app/o/<URL-encoded path>` returns Google's JSON (timeCreated, md5Hash, generation, size) with no login (works because the Storage rule allows read).
+- Evidence document now: asks for Property name / Signatory name / Signatory title (property name remembered per group from `hkPropertyGroupForRoom` in `checkin_admin/config.docPropertyNames {GROUP: name}`; signatory in `docSignatory {name, title}`; all required). Header, statements and the "Issued by <name>, <title>, <property>" block use them.
+- "Reported by" is "Housekeeping staff" (cleaner name stays in the admin detail sheet only). fileLastModified and the phone time are never shown in the document.
+- Per photo (report photos and ready photos): Google server upload time (Tbilisi + UTC), MD5 fingerprint computed by Google, size, a "Verify on Google" link and a QR code of that same URL (local `shared/qrcode.min.js`). "Photo taken (camera time)" only when EXIF exists. If `getMetadata()` fails the stored `storageTimeCreated` is shown marked "(stored at upload)"; nothing is invented.
+- A "How to verify" box sits near the top. "Before this stay" appears only when ready photos exist.
+- Admin detail sheet: under each photo "Uploaded (server): …" and "Verify on Google"; "Taken" only with EXIF; no "unknown" text.
+
 ### Step 4 (done, ran BEFORE Step 3)
 - Order changed: Step 4 was done before Step 3 because every cleaner already had a staff link and old access had to be cut.
 - firebase.json: 301 redirects to `/cleaner` for /hk-app, /HK, /HK-Shartava, /HK-Centre, /HK-legacy, /hk-manage (with and without `.html`). The /hk-app rewrite was removed.

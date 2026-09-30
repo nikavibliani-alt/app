@@ -2739,7 +2739,7 @@ function dmgUpdateCounts(){
 }
 function dmgDeadline(r){
   const g=r.guest||null;
-  if(!g||!g.checkout)return{text:'Guest unknown',cls:''};
+  if(!g||!g.checkout)return{text:'No reservation linked',cls:''};
   const isAirbnb=String(g.source||'').toLowerCase()==='airbnb';
   if(!isAirbnb)return{text:'Checkout '+g.checkout,cls:''};
   const dl=claimDeadline(g.checkout),left=daysLeft(dl,tbilisiToday());
@@ -2759,7 +2759,7 @@ function dmgRender(){
     return`<div class="dmg-row" onclick="dmgOpen('${esc(r.id)}')">
       <div class="dmg-row__top"><span class="dmg-row__room">${esc(r.roomCode)}${r.urgent?'<span class="dmg-tag">URGENT</span>':''}</span><span class="dmg-tag st">${esc(DMG_STATUS[r.status||'open']||r.status)}</span></div>
       <div class="dmg-row__sub">${esc(r.reportDate)} · ${esc(r.reportedBy?.name||'—')} · ${(r.photos||[]).length} photo${(r.photos||[]).length===1?'':'s'}${cats?' · '+esc(cats):''}</div>
-      <div class="dmg-row__sub">${g?esc(g.guestName||'Guest')+' · '+esc(dmgPlatform(g))+' · '+esc(g.checkin||'?')+' → '+esc(g.checkout||'?'):'Guest unknown'}</div>
+      <div class="dmg-row__sub">${g?esc(g.guestName||'Guest')+' · '+esc(dmgPlatform(g))+' · '+esc(g.checkin||'?')+' → '+esc(g.checkout||'?'):'No reservation linked'}</div>
       <div class="dmg-row__dl ${dl.cls}">${esc(dl.text)}</div>
     </div>`;}).join(''):'<div class="empty">No damage reports</div>');
 }
@@ -2773,19 +2773,34 @@ function dmgToDate(v){
   return isNaN(d.getTime())?null:d;
 }
 function dmgDual(v){
-  const d=dmgToDate(v);if(!d)return 'unknown';
+  const d=dmgToDate(v);if(!d)return '—';
   const p=n=>String(n).padStart(2,'0');
   const t=new Date(d.getTime()+4*3600*1000);
   return `${d.getUTCDate()} ${DMG_MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())} UTC (${p(t.getUTCHours())}:${p(t.getUTCMinutes())}:${p(t.getUTCSeconds())} Tbilisi)`;
 }
 function dmgExifText(p){
-  if(!p.exifTakenAt)return 'unknown';
+  if(!p.exifTakenAt)return '';
   const m=String(p.exifTakenAt).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})([+-]\d{2}:\d{2})?$/);
   if(!m)return String(p.exifTakenAt);
-  return `${m[1]} ${m[2]}${m[3]?' '+m[3]:' (phone clock, time zone not recorded)'}`;
+  return `${m[1]} ${m[2]}${m[3]?' '+m[3]:' (camera clock, time zone not recorded)'}`;
 }
+const DMG_BUCKET='sleepy-5c962.firebasestorage.app';
+/** Google's public metadata record for an uploaded file (no login needed). */
+function dmgVerifyUrl(path){return `https://firebasestorage.googleapis.com/v0/b/${DMG_BUCKET}/o/${encodeURIComponent(path)}`;}
+/** "30 Sep 2026, 14:40:00 Tbilisi time (UTC 30 Sep 2026, 10:40:00)" */
+function dmgTb(v,withUtc=true){
+  const d=dmgToDate(v);if(!d)return '';
+  const p=n=>String(n).padStart(2,'0');
+  const f=x=>`${x.getUTCDate()} ${DMG_MONTHS[x.getUTCMonth()]} ${x.getUTCFullYear()}, ${p(x.getUTCHours())}:${p(x.getUTCMinutes())}:${p(x.getUTCSeconds())}`;
+  const t=new Date(d.getTime()+4*3600*1000);
+  return `${f(t)} Tbilisi time`+(withUtc?` (UTC ${f(d)})`:'');
+}
+/** Admin caption: only facts we have. */
 function dmgPhotoCaption(p){
-  return `Taken ${dmgExifText(p)} · Uploaded ${p.storageTimeCreated?dmgDual(p.storageTimeCreated):'unknown'}`;
+  const parts=[];
+  if(p.storageTimeCreated)parts.push('Uploaded (server): '+dmgTb(p.storageTimeCreated,false));
+  const ex=dmgExifText(p);if(ex)parts.push('Taken '+ex);
+  return parts.join(' · ');
 }
 
 window.dmgOpen=function(id){
@@ -2820,15 +2835,15 @@ function dmgRenderDetail(){
     ${kv('Report day',esc(r.reportDate))}
     ${kv('Reported by',esc(r.reportedBy?.name||'—'))}
     ${kv('Server time',esc(dmgDual(r.createdAt)))}
-    ${kv('Phone time',esc(r.clientCreatedAt||'unknown'))}
+    ${r.clientCreatedAt?kv('Phone time',esc(r.clientCreatedAt)):''}
     ${kv('Room marked Done',r.doneBeforeReport?esc(r.roomDoneAt?dmgDual(r.roomDoneAt):'yes (time not recorded)'):'not done at report time')}
     ${kv('Types',esc((r.categories||[]).map(c=>DMG_CATS[c]||c).join(', ')||'—'))}
     ${r.description?kv('Description',esc(r.description)):''}
-    ${g?kv('Guest',esc(g.guestName||'—'))+kv('Platform',esc(dmgPlatform(g)))+kv('Reservation',esc(g.reservationNumber||g.reservationDocId||'—'))+kv('Stay',esc((g.checkin||'?')+' → '+(g.checkout||'?')))+kv('Guests',esc(g.guestCount||'—')):kv('Guest','unknown')}
+    ${g?kv('Guest',esc(g.guestName||'—'))+kv('Platform',esc(dmgPlatform(g)))+kv('Reservation',esc(g.reservationNumber||g.reservationDocId||'—'))+kv('Stay',esc((g.checkin||'?')+' → '+(g.checkout||'?')))+kv('Guests',esc(g.guestCount||'—')):kv('Guest','No reservation linked')}
     ${kv('Deadline',`<span class="dmg-row__dl ${dl.cls}" style="margin:0">${esc(dl.text)}</span>`)}
     ${r.claim?kv('Claim',esc(`${r.claim.platform||''} · filed ${r.claim.filedAt||'?'}${r.claim.caseNumber?' · #'+r.claim.caseNumber:''}`)):''}
     ${r.resolution?kv('Resolved',esc(`${r.resolution.resolvedAt||''}${r.resolution.amount!=null?' · '+r.resolution.amount:''}`)):''}
-    <div class="dmg-grid">${photos.map((p,i)=>`<div class="dmg-ph"><img src="${esc(p.url)}" loading="lazy" alt="" onclick="dmgLightbox(${i})"><div class="dmg-cap">${esc(dmgPhotoCaption(p))}${p.addedBy==='admin'?' · added by admin':''}</div></div>`).join('')||'<div class="empty" style="grid-column:1/-1;padding:12px">No photos</div>'}</div>
+    <div class="dmg-grid">${photos.map((p,i)=>`<div class="dmg-ph"><img src="${esc(p.url)}" loading="lazy" alt="" onclick="dmgLightbox(${i})"><div class="dmg-cap">${esc(dmgPhotoCaption(p))}${p.addedBy==='admin'?' · added by admin':''}${p.path?`<br><a href="${esc(dmgVerifyUrl(p.path))}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Verify on Google</a>`:''}</div></div>`).join('')||'<div class="empty" style="grid-column:1/-1;padding:12px">No photos</div>'}</div>
     ${f?forms[f.kind]||'':''}
     <div class="dmg-actions">
       ${(r.status||'open')==='open'?'':`<button type="button" class="btn" onclick="dmgSetStatus('open')">Reopen</button>`}
@@ -2894,18 +2909,66 @@ document.getElementById('dmg-file')?.addEventListener('change',async ev=>{
 window.dmgLightbox=function(i){
   const r=dmgReports.find(x=>x.id===_dmgOpenId);const p=r?.photos?.[i];if(!p)return;
   const lb=document.getElementById('dmg-lightbox');lb.hidden=false;
-  lb.innerHTML=`<img src="${esc(p.url)}" alt=""><div class="cap">${esc(dmgPhotoCaption(p))}<br>${esc(p.name||'')}<br><a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:#9cf" onclick="event.stopPropagation()">Open original</a></div>`;
+  lb.innerHTML=`<img src="${esc(p.url)}" alt=""><div class="cap">${esc(dmgPhotoCaption(p))}${p.name?'<br>'+esc(p.name):''}<br><a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:#9cf" onclick="event.stopPropagation()">Open original</a>${p.path?` · <a href="${esc(dmgVerifyUrl(p.path))}" target="_blank" rel="noopener" style="color:#9cf" onclick="event.stopPropagation()">Verify on Google</a>`:''}</div>`;
 };
 window.dmgCloseLightbox=function(){const lb=document.getElementById('dmg-lightbox');lb.hidden=true;lb.innerHTML='';};
 
 /* Evidence document — printable, save as PDF from the print dialog. Plain and factual. */
+let _dmgDocCfg={names:{},sig:{}};
+function dmgGroupOf(roomCode){return hkPropertyGroupForRoom(roomCode)||'OTHER';}
+function dmgGroupLabel(g){return (HK_CAPACITY_GROUPS.find(x=>x.id===g)||{}).label||'Other';}
+function dmgQrDataUrl(text){
+  try{
+    if(typeof QRCode==='undefined')return null;
+    const box=document.createElement('div');
+    new QRCode(box,{text,width:132,height:132,correctLevel:QRCode.CorrectLevel.M});
+    const c=box.querySelector('canvas');
+    if(c)return c.toDataURL('image/png');
+    return box.querySelector('img')?.src||null;
+  }catch(e){return null;}
+}
 window.generateDamageEvidence=async function(id){
   const r=dmgReports.find(x=>x.id===id);if(!r)return;
-  const w=window.open('about:blank','_blank');
+  const group=dmgGroupOf(r.roomCode);
+  try{
+    const c=await getDoc(doc(db,'checkin_admin','config'));
+    const d=c.exists()?c.data():{};
+    _dmgDocCfg={names:d.docPropertyNames||{},sig:d.docSignatory||{}};
+  }catch(e){console.warn('[doc cfg]',e);}
+  document.getElementById('dmgdoc-overlay')?.remove();
+  const ov=document.createElement('div');ov.id='dmgdoc-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  const inp='width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;margin-bottom:12px;font-size:13px;box-sizing:border-box;';
+  const lab='display:block;font-size:12px;font-weight:600;margin-bottom:4px;';
+  ov.innerHTML=`<div style="background:#fff;border-radius:10px;max-width:420px;width:100%;padding:24px;box-sizing:border-box;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px;">Evidence document</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Room ${esc(r.roomCode)} · ${esc(dmgGroupLabel(group))}</div>
+    <label style="${lab}">Property name *</label><input id="dmgdoc-property" type="text" value="${esc(_dmgDocCfg.names[group]||'')}" placeholder="e.g. Orbeliani Suite" style="${inp}">
+    <label style="${lab}">Signatory name *</label><input id="dmgdoc-signame" type="text" value="${esc(_dmgDocCfg.sig.name||'')}" style="${inp}">
+    <label style="${lab}">Signatory title *</label><input id="dmgdoc-sigtitle" type="text" value="${esc(_dmgDocCfg.sig.title||'')}" placeholder="Property Manager" style="${inp}">
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn" style="flex:1" onclick="document.getElementById('dmgdoc-overlay').remove()">Cancel</button>
+      <button class="btn btn-primary" style="flex:1" onclick="dmgRunEvidence('${esc(id)}')">Generate</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+};
+window.dmgRunEvidence=async function(id){
+  const r=dmgReports.find(x=>x.id===id);if(!r)return;
+  const propertyName=(document.getElementById('dmgdoc-property')?.value||'').trim();
+  const sigName=(document.getElementById('dmgdoc-signame')?.value||'').trim();
+  const sigTitle=(document.getElementById('dmgdoc-sigtitle')?.value||'').trim();
+  if(!propertyName||!sigName||!sigTitle){toast('Fill in property name, signatory name and title');return;}
+  const w=window.open('about:blank','_blank');   // open inside the click so pop-up blockers allow it
+  document.getElementById('dmgdoc-overlay')?.remove();
   if(!w){toast('Allow pop-ups to open the document');return;}
   w.document.write('<p style="font-family:sans-serif;padding:24px">Preparing document…</p>');
+  const group=dmgGroupOf(r.roomCode);
+  try{ // remember per property group + signatory
+    await setDoc(doc(db,'checkin_admin','config'),{docPropertyNames:{[group]:propertyName},docSignatory:{name:sigName,title:sigTitle},updatedAt:serverTimestamp()},{merge:true});
+    _dmgDocCfg.names[group]=propertyName;_dmgDocCfg.sig={name:sigName,title:sigTitle};
+  }catch(e){console.warn('[doc cfg save]',e);}
   const g=r.guest||null;
-  // "Before this stay": ready photos / done time for THIS guest's stay
+  // "Before this stay": only ready photos recorded before/at this guest's check-in
   let prep=null;
   try{
     if(g?.checkin){
@@ -2914,59 +2977,93 @@ window.generateDamageEvidence=async function(id){
       if(exact.exists())cands.push({id:exact.id,...exact.data()});
       const snap=await getDocs(query(collection(db,'hk_status'),where('roomCode','==',r.roomCode)));
       snap.docs.forEach(d=>{if(!cands.some(c=>c.id===d.id))cands.push({id:d.id,...d.data()});});
-      const has=c=>c.date&&c.date<=g.checkin&&((c.readyPhotos||[]).length||c.doneAt);
-      const good=cands.filter(has);
+      const good=cands.filter(c=>c.date&&c.date<=g.checkin&&(c.readyPhotos||[]).length);
       prep=good.find(c=>c.date===g.checkin)||good.sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]||null;
     }
   }catch(e){console.warn('[evidence prep]',e);}
-  const now=new Date();
-  const propertyName='Maxela Apartments';
+  // Google's own record for every photo (server time, MD5, size)
+  const metaFor=async p=>{
+    if(!p?.path)return null;
+    try{const m=await getMetadata(stRef(_dmgStorage,p.path));return{timeCreated:m.timeCreated||null,md5Hash:m.md5Hash||null,size:m.size!=null?Number(m.size):null};}
+    catch(e){console.warn('[metadata]',p.path,e);return null;}
+  };
+  const metas=new Map();
+  await Promise.all([...(r.photos||[]),...((prep&&prep.readyPhotos)||[])].map(async p=>{metas.set(p.path||p.url,await metaFor(p));}));
+  const html=dmgEvidenceHtml({r,prep,metas,propertyName,sigName,sigTitle,now:new Date(),qr:dmgQrDataUrl});
+  w.document.open();w.document.write(html);w.document.close();
+};
+/** Pure: builds the evidence HTML. metas = Map(path -> {timeCreated, md5Hash, size} | null). */
+function dmgEvidenceHtml({r,prep,metas,propertyName,sigName,sigTitle,now,qr}){
+  const g=r.guest||null;
   const row=(k,v)=>`<div class="doc-row"><div class="doc-k">${esc(k)}</div><div class="doc-v">${esc(String(v))}</div></div>`;
-  const photoBlock=(p,i,label='Photo')=>`<div class="ph"><img src="${esc(p.url)}" alt="${label} ${i+1}">
-    <div class="cap"><b>${label} ${i+1}</b> · file ${esc(p.name||'—')}<br>Taken: ${esc(dmgExifText(p))}<br>Uploaded to server: ${esc(p.storageTimeCreated?dmgDual(p.storageTimeCreated):'unknown')}<br>File last modified (phone): ${esc(p.fileLastModified?dmgDual(p.fileLastModified):'unknown')}${p.addedBy==='admin'?'<br>Added by admin':''}</div></div>`;
-  const prepHtml=prep?`
+  const mb=n=>(n/1048576).toFixed(2)+' MB';
+  const photoBlock=(p,i,label='Photo')=>{
+    const m=metas.get(p.path||p.url)||null;
+    const verify=p.path?dmgVerifyUrl(p.path):null;
+    const qrImg=verify?qr(verify):null;
+    const lines=[`<b>${esc(label)} ${i+1}</b>${p.name?' · file '+esc(p.name):''}`];
+    const ex=dmgExifText(p);
+    if(ex)lines.push('Photo taken (camera time): '+esc(ex));
+    if(m&&m.timeCreated)lines.push('Uploaded to Google Cloud Storage (server time): '+esc(dmgTb(m.timeCreated)));
+    else if(p.storageTimeCreated)lines.push('Uploaded (server time): '+esc(dmgTb(p.storageTimeCreated))+' (stored at upload)');
+    if(m&&m.md5Hash)lines.push('File fingerprint (MD5, computed by Google): <span class="mono">'+esc(m.md5Hash)+'</span>');
+    const size=m&&m.size!=null?m.size:(p.size!=null?p.size:null);
+    if(size!=null)lines.push('Size: '+mb(size));
+    if(verify)lines.push(`<a href="${esc(verify)}">Verify on Google</a>`);
+    return `<div class="ph"><img src="${esc(p.url)}" alt="${esc(label)} ${i+1}">
+      <div class="phrow"><div class="cap">${lines.join('<br>')}</div>${qrImg?`<div class="qr"><img src="${qrImg}" alt="QR: Google record"><div>Scan to verify</div></div>`:''}</div></div>`;
+  };
+  const ready=(prep&&prep.readyPhotos)||[];
+  const prepHtml=ready.length?`<h2>Before this stay — room prepared for this guest</h2>
     ${row('Record date',prep.date)}
-    ${row('Room marked Done',prep.doneAt?dmgDual(prep.doneAt)+(prep.doneBy?' by '+prep.doneBy:''):'time not recorded')}
-    ${(prep.readyPhotos||[]).length?(prep.readyPhotos||[]).map((p,i)=>photoBlock(p,i,'Ready photo')).join(''):'<p class="muted">No ready-room photos recorded.</p>'}`
-    :'<p class="muted">No ready-room photos or completion record found before this stay.</p>';
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Damage evidence ${esc(r.id)}</title>
+    ${prep.doneAt?row('Room marked Done',dmgTb(prep.doneAt)):''}
+    ${ready.map((p,i)=>photoBlock(p,i,'Ready photo')).join('')}`:'';
+  const doneRow=r.doneBeforeReport?row('Room marked Done',r.roomDoneAt?dmgTb(r.roomDoneAt):'yes'):row('Room marked Done','not done at time of report');
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Damage evidence ${esc(r.id)}</title>
 <style>
   body{font-family:Georgia,'Times New Roman',serif;max-width:760px;margin:32px auto;padding:0 24px;color:#000;background:#fff;line-height:1.5;}
   .hd{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:6px;}
   .hd h1{font-size:20px;margin:0;}
   .id{text-align:right;font-size:12px;line-height:1.6;}
   h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #000;padding-bottom:4px;margin:26px 0 12px;}
+  .how{border:1px solid #000;padding:10px 14px;margin:14px 0;font-size:12px;line-height:1.55;}
   .doc-row{display:flex;justify-content:space-between;gap:16px;padding:6px 0;border-bottom:1px dotted #999;font-size:13px;}
   .doc-k{color:#333;}.doc-v{font-weight:700;text-align:right;}
   .ph{margin:16px 0;page-break-inside:avoid;}
-  .ph img{width:100%;max-height:640px;object-fit:contain;border:1px solid #000;display:block;}
-  .cap{font-size:11px;margin-top:4px;}
+  .ph>img{width:100%;max-height:620px;object-fit:contain;border:1px solid #000;display:block;}
+  .phrow{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-top:6px;}
+  .cap{font-size:11px;line-height:1.5;word-break:break-all;}
+  .mono{font-family:ui-monospace,Menlo,monospace;}
+  .qr{flex:none;text-align:center;font-size:9px;}
+  .qr img{width:96px;height:96px;display:block;border:none;}
   .muted{font-size:13px;color:#444;}
   .desc{font-size:13px;white-space:pre-wrap;}
-  .ft{border-top:2px solid #000;margin-top:28px;padding-top:12px;font-size:11px;}
+  .sig{border-top:2px solid #000;margin-top:28px;padding-top:14px;font-size:13px;}
+  .ft{margin-top:10px;font-size:11px;}
+  a{color:#000;}
   @media print{body{margin:0;padding:16px;}}
 </style></head><body>
   <div class="hd"><div><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase">Damage Report — Evidence</div><h1>${esc(propertyName)}</h1></div>
-    <div class="id"><b>${esc(r.id)}</b><br>Generated: ${esc(dmgDual(now))}</div></div>
+    <div class="id"><b>${esc(r.id)}</b><br>Generated: ${esc(dmgTb(now))}</div></div>
+  <div class="how"><b>How to verify.</b> Each photo's upload time and fingerprint are recorded by Google Cloud servers at the moment of upload, independent of the device clock and of this document. Open the Verify link or scan the QR code to see Google's own record. A file that was edited would not match the fingerprint, and a re-uploaded file would show a later time.</div>
   <h2>Property &amp; Room</h2>
-  ${row('Property / site',r.site||'—')}${row('Room',r.roomCode+(r.roomName?' · '+r.roomName:''))}
+  ${row('Property',propertyName)}${row('Room',r.roomCode+(r.roomName?' · '+r.roomName:''))}
   <h2>Reservation &amp; Guest</h2>
   ${g?row('Reservation number',g.reservationNumber||g.reservationDocId||'—')+row('Guest name',g.guestName||'—')+row('Booking platform',dmgPlatform(g))+row('Check-in',g.checkin||'—')+row('Check-out',g.checkout||'—')+row('Number of guests',g.guestCount||'—'):'<p class="muted">No reservation was linked to this report.</p>'}
   <h2>Report</h2>
-  ${row('Reported by',r.reportedBy?.name||'—')}${row('Report day',r.reportDate)}
-  ${row('Time recorded by server',dmgDual(r.createdAt))}${row('Time on reporter’s phone',r.clientCreatedAt||'unknown')}
-  ${row('Room marked Done',r.doneBeforeReport?(r.roomDoneAt?dmgDual(r.roomDoneAt):'yes (time not recorded)'):'not done at time of report')}
+  ${row('Reported by','Housekeeping staff')}${row('Report day',r.reportDate)}
+  ${row('Report recorded (server time)',dmgTb(r.createdAt))}
+  ${doneRow}
   ${row('Damage types',(r.categories||[]).map(c=>DMG_CATS[c]||c).join(', ')||'—')}${r.urgent?row('Urgent','yes'):''}
   <h2>Description</h2><p class="desc">${esc(r.description||'(no description)')}</p>
   <h2>Photos at report (${(r.photos||[]).length})</h2>
-  ${(r.photos||[]).map(photoBlock).join('')||'<p class="muted">No photos.</p>'}
-  <h2>Before this stay — room prepared for this guest</h2>
+  ${(r.photos||[]).map((p,i)=>photoBlock(p,i)).join('')||'<p class="muted">No photos.</p>'}
   ${prepHtml}
   ${(r.adminNotes||[]).length?`<h2>Notes</h2>${(r.adminNotes||[]).map(n=>`<div class="doc-row"><div class="doc-k">${esc(String(n.at||'').replace('T',' ').slice(0,16))}</div><div class="doc-v">${esc(n.text)}</div></div>`).join('')}`:''}
-  <div class="ft">Generated by SleepyPMS at ${esc(dmgDual(now))}. Photos are original files uploaded without editing; “Uploaded to server” is the time recorded by the storage server.</div>
+  <div class="sig"><b>Issued by ${esc(sigName)}, ${esc(sigTitle)}, ${esc(propertyName)}</b><br>Date: ${esc(dmgTb(now))}</div>
+  <div class="ft">This document records a damage report for ${esc(propertyName)}, room ${esc(r.roomCode)}. Photos are original files uploaded without editing.</div>
 </body></html>`;
-  w.document.open();w.document.write(html);w.document.close();
-};
+}
 
 /* ── Search failures ── */
 function updateSfBadge(){
