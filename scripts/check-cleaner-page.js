@@ -3,7 +3,7 @@
 /**
  * Safety check for cleaner.html: the cleaner page must never contain admin-only code
  * or write to anything except the collections below.
- * Step 3 (damage reports) must extend ALLOWED_WRITE_COLLECTIONS.
+ * New cleaner-page write targets must be added to ALLOWED_WRITES on purpose.
  */
 const fs = require('fs');
 const path = require('path');
@@ -12,8 +12,16 @@ const FILE = path.join(__dirname, '..', 'cleaner.html');
 const FORBIDDEN = [
   'hkOpenEditRoom', 'hkOpenMoveRoom', 'hkMoveRoom', 'hkRemoveRoom', 'hkSaveAdminModal',
   'hk-admin-modal', 'deleteDoc', 'deleteField', 'hk_pins', '_ADMIN_PWD', 'adminAction', 'Add room',
+  'passport_uploads', 'deleteObject', 'uploadBytes(',
 ];
-const ALLOWED_WRITE_COLLECTIONS = ['hk_status', 'checkin_guests', 'hk_staff_links'];
+// collection -> allowed write functions. Step 3 added hk_damage_reports (create + add photos only; no addDoc).
+const ALLOWED_WRITES = {
+  hk_status: ['setDoc', 'updateDoc'],
+  checkin_guests: ['updateDoc', 'setDoc'],
+  hk_staff_links: ['updateDoc', 'setDoc'],
+  hk_damage_reports: ['setDoc', 'updateDoc'],
+};
+const ALLOWED_WRITE_COLLECTIONS = Object.keys(ALLOWED_WRITES);
 
 const src = fs.readFileSync(FILE, 'utf8');
 const errors = [];
@@ -28,6 +36,7 @@ let m;
 while ((m = writeRe.exec(src))) {
   parsed.add(m.index);
   if (!ALLOWED_WRITE_COLLECTIONS.includes(m[4])) errors.push(`${m[1]} writes to disallowed collection: ${m[4]}`);
+  else if (!ALLOWED_WRITES[m[4]].includes(m[1])) errors.push(`${m[1]} not allowed on ${m[4]}`);
 }
 // every write call must be one we could read the target of (the import line is not a call)
 const anyRe = /\b(setDoc|updateDoc|addDoc)\s*\(/g;
