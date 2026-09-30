@@ -166,6 +166,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .hk-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);}
 .hk-cleaner-link{font-size:13px;font-weight:700;color:var(--blue);text-decoration:none;white-space:nowrap;}
 .hk-cleaner-link:active{opacity:.7}
+.more-item[hidden]{display:none;}
 .hk-role-badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--blue-bg);color:var(--blue);white-space:nowrap;}
 .hk-logout-btn{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;font-family:var(--sans);-webkit-tap-highlight-color:transparent;margin-left:auto;flex-shrink:0;}
 .hk-logout-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;pointer-events:none;}
@@ -709,7 +710,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
   <div class="pane" id="pane-hk">
     <div class="hk-toolbar">
       <a class="hk-cleaner-link" href="#" onclick="switchTab('hksettings');return false;">HK settings</a>
-      <a class="hk-cleaner-link" id="hk-damage-btn" href="#" onclick="window._dmgFromHk=true;switchTab('damage');return false;">Damage (0)</a>
+      <a class="hk-cleaner-link" id="hk-damage-btn" hidden href="#" onclick="window._dmgFromHk=true;switchTab('damage');return false;">Damage (0)</a>
       <span class="hk-role-badge" id="hk-role-badge" hidden></span>
       <button type="button" class="hk-logout-btn" onclick="hkCleanerLogout()" aria-label="Log out of HK cleaner app">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
@@ -772,7 +773,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
     <div class="more-section">Operations</div>
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('hk')">Housekeeping</button>
-      <button class="more-item" type="button" onclick="window._dmgFromHk=false;switchTab('damage')">Damage reports<span class="more-hint" id="more-damage-hint">Airbnb claim evidence</span></button>
+      <button class="more-item" id="more-damage-item" hidden type="button" onclick="window._dmgFromHk=false;switchTab('damage')">Damage reports<span class="more-hint" id="more-damage-hint">Airbnb claim evidence</span></button>
       <button class="more-item" type="button" onclick="switchTab('apts')">Apartments</button>
       <button class="more-item" type="button" onclick="switchTab('history')">Guest history</button>
       <button class="more-item" type="button" onclick="switchTab('failures')" id="more-failures-btn">Failed searches<span class="more-badge" id="sf-more-badge" style="display:none">0</span></button>
@@ -1240,7 +1241,9 @@ async function syncRoomsFromSeed(){
 let aptData={},guestData=[],hkStatusData={},_resCache=null,_resLoading=false;
 let elevData=null,stayFilter='overview',upcomingDay=null,_currentAptId=null;
 const _TAB_KEY='maxela_admin_tab';
-const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','guestsettings','wasettings','failures','navsettings','hksettings','damage','history','more']);
+// Damage reporting is hidden for now (cleaners send photos via WhatsApp). Code and data are kept; set true to bring it back.
+const HK_DAMAGE_ENABLED=false;
+const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','guestsettings','wasettings','failures','navsettings','hksettings',...(HK_DAMAGE_ENABLED?['damage']:[]),'history','more']);
 
 const _NAV_KEY='maxela_admin_nav_v5';
 const NAV_MIN=2;
@@ -1252,7 +1255,7 @@ const NAV_POOL={
   requests:{label:'Requests',pane:'requests',icon:'message-square',extra:'<span class="badge" id="req-badge">0</span>',navId:'nav-req'},
   apts:{label:'Apts',pane:'apts',icon:'home',extra:''},
   history:{label:'History',pane:'history',icon:'clock',extra:''},
-  damage:{label:'Damage',pane:'damage',icon:'alert-triangle',extra:''},
+  ...(HK_DAMAGE_ENABLED?{damage:{label:'Damage',pane:'damage',icon:'alert-triangle',extra:''}}:{}),
 };
 function navTabSvg(id,size=22){return featherIcon(NAV_POOL[id]?.icon||'circle',size,1.8);}
 const DEFAULT_NAV_CONFIG={slots:['stay','requests','elevator'],landingTab:'stay'};
@@ -1290,6 +1293,7 @@ function loadSavedTab(){
   if(STANDALONE_HK)return 'hk';
   try{
     const qt=new URLSearchParams(location.search).get('tab');   // e.g. /checkin-admin?tab=damage (push notification tap)
+    if(qt==='damage'&&!HK_DAMAGE_ENABLED)return 'hk';   // deep link while damage reporting is hidden
     if(qt&&VALID_TABS.has(qt))return qt;
   }catch(e){}
   try{
@@ -2659,7 +2663,7 @@ function hkRenderLinkForm(){
     <input class="apt-input" id="hk-link-name" type="text" placeholder="e.g. Nino" maxlength="40">
     <label class="apt-label" style="margin-top:10px">Team</label>
     <select class="apt-input" id="hk-link-team">${hkGetTeams().map(t=>`<option value="${esc(t.id)}">${esc(t.label)}</option>`).join('')}</select>
-    <label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;margin:4px 0 6px;cursor:pointer"><input type="checkbox" id="hk-link-dmg" checked style="width:20px;height:20px">Can report damage</label>
+    ${HK_DAMAGE_ENABLED?`<label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;margin:4px 0 6px;cursor:pointer"><input type="checkbox" id="hk-link-dmg" checked style="width:20px;height:20px">Can report damage</label>`:''}
     <div class="hk-link-card__actions">
       <button type="button" class="btn" onclick="hkCloseNewLink()">Cancel</button>
       <button type="button" class="btn btn-primary" onclick="hkCreateLink()">Create link</button>
@@ -2677,7 +2681,7 @@ function hkRenderLinkList(){
       <div class="hk-link-card__top"><div class="hk-link-card__name">${esc(l.name||'—')}</div>
         <span class="pill ${active?'pill-ok':'pill-pending'}">${active?'Active':'Revoked'}</span></div>
       <div class="hk-link-card__sub">${esc(team?.label||l.teamId||'—')} · last opened ${esc(hkLinkAgo(l.lastSeenAt))}</div>
-      ${active?`<label style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;margin-top:8px;cursor:pointer"><input type="checkbox" style="width:20px;height:20px"${l.canReportDamage!==false?' checked':''} onchange="hkSetLinkDamage('${esc(l.token)}',this.checked)">Damage reports</label>
+      ${active?`${HK_DAMAGE_ENABLED?`<label style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;margin-top:8px;cursor:pointer"><input type="checkbox" style="width:20px;height:20px"${l.canReportDamage!==false?' checked':''} onchange="hkSetLinkDamage('${esc(l.token)}',this.checked)">Damage reports</label>`:''}
       <div class="hk-link-card__actions">
         <button type="button" class="btn" onclick="hkCopyLink('${esc(l.token)}')">Copy</button>
         <button type="button" class="btn" onclick="hkWaLink('${esc(l.token)}')">WhatsApp</button>
@@ -2727,7 +2731,7 @@ window.hkRevokeLink=async function(token){
 let dmgReports=[];
 let _dmgSub=false,_dmgFilter='open',_dmgOpenId=null,_dmgForm=null;
 function dmgSubscribe(){
-  if(_dmgSub)return;
+  if(!HK_DAMAGE_ENABLED||_dmgSub)return;
   _dmgSub=true;
   onSnapshot(collection(db,'hk_damage_reports'),snap=>{
     dmgReports=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -2744,8 +2748,10 @@ function dmgMs(r){
 }
 function dmgOpenCount(){return dmgReports.filter(r=>(r.status||'open')==='open').length;}
 function dmgUpdateCounts(){
+  if(!HK_DAMAGE_ENABLED)return;
   const n=dmgOpenCount();
-  const b=document.getElementById('hk-damage-btn');if(b)b.textContent='Damage ('+n+')';
+  const b=document.getElementById('hk-damage-btn');if(b){b.hidden=false;b.textContent='Damage ('+n+')';}
+  const mi=document.getElementById('more-damage-item');if(mi)mi.hidden=false;
   const h=document.getElementById('more-damage-hint');if(h)h.textContent=n?n+' open':'Airbnb claim evidence';
 }
 function dmgDeadline(r){

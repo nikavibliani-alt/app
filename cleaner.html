@@ -238,6 +238,8 @@ const fb=initializeApp({
 });
 const db=getFirestore(fb);
 
+// Damage reporting + ready photos are hidden for now (cleaners send photos via WhatsApp). Code and data are kept; set true to bring it back.
+const HK_DAMAGE_ENABLED = false;
 const HK_DAY_START=-1,HK_DAY_END=6;
 const HK_CLEAN_TYPE_DEFAULTS={'0-':45,'6-7':90,'6-3':120,'orb-tab':50,'vgl':90,'abashidze':90,default:75};
 const HK_CLEAN_TYPES=[
@@ -548,9 +550,9 @@ function buildCard(room,dateStr,tomorrowStr){
     ${guestCheckedOut?`<div class="out">${esc(t('guestOut'))}</div>`:''}
     ${nextRes?beddingHtml(room.code,inGuests):''}
     <button type="button" class="donebtn${done?' undo':''}" data-act="done" data-room="${esc(room.code)}" data-date="${dateStr}"${busy.has(key)?' disabled':''}>${esc(done?t('undo'):t('done'))}</button>
-    ${link.canReportDamage?`<button type="button" class="dmgbtn" data-act="damage" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('reportDamage'))}</button>`:''}
-    ${reportsFor(room.code,dateStr).length?`<button type="button" class="dmgbadge" data-act="viewdmg" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('badge'))}</button>`:''}
-    ${done?`<button type="button" class="readylink" data-act="ready" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('readyPhotos'))}</button>`:''}
+    ${HK_DAMAGE_ENABLED&&link.canReportDamage?`<button type="button" class="dmgbtn" data-act="damage" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('reportDamage'))}</button>`:''}
+    ${HK_DAMAGE_ENABLED&&reportsFor(room.code,dateStr).length?`<button type="button" class="dmgbadge" data-act="viewdmg" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('badge'))}</button>`:''}
+    ${HK_DAMAGE_ENABLED&&done?`<button type="button" class="readylink" data-act="ready" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('readyPhotos'))}</button>`:''}
   </div>`;
 }
 let _renderQueued=false;
@@ -865,7 +867,7 @@ function subscribeData(){
   unsubs.push(onSnapshot(query(collection(db,'checkin_guests'),where('checkoutDate','>=',y),where('checkoutDate','<=',plus7)),snap=>{
     formsB=snap.docs.map(pickForm);rebuildForms();
   },onErr('guestsB')));
-  unsubs.push(onSnapshot(query(collection(db,'hk_damage_reports'),where('reportDate','>=',y)),snap=>{
+  if(HK_DAMAGE_ENABLED)unsubs.push(onSnapshot(query(collection(db,'hk_damage_reports'),where('reportDate','>=',y)),snap=>{
     const m={};
     snap.docs.forEach(d=>{const x=d.data();if(!teamCodeSet.has(x.roomCode))return;
       m[d.id]={id:d.id,roomCode:x.roomCode,reportDate:x.reportDate,clientCreatedAt:x.clientCreatedAt,categories:x.categories||[],

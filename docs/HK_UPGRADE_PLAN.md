@@ -223,6 +223,11 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
   - no update or delete
   - keep the existing passport_uploads rule unchanged
 
+### STATUS: Damage reporting hidden (HK_DAMAGE_ENABLED=false in cleaner.html and checkin-admin.html). Cleaners send photos via WhatsApp for now.
+- Hidden when false: cleaner damage button, "damage reported" badges, the ready-photos link and the `hk_damage_reports` listener (cleaner page); the HK toolbar "Damage (N)" button, the More menu item, the tab-bar pool entry, the Staff links "Damage reports" switches, the `?tab=damage` deep link (falls back to the HK tab) and the listener (admin).
+- Kept untouched: all the code, `hk_damage_reports` documents, Storage files and rules, and the `pushOnDamageReport` function (it only fires on new reports). To bring it back, set the constant to `true` in both files.
+- **Future ideas:** damage reports in the app, evidence document, independent (Google) timestamps, before/after timeline, share link, ready photos.
+
 ### Step 3 (done; ran AFTER Step 4)
 - **Cleaner page (cleaner.html):** "Report damage" button on every card, full-screen sheet (photo / gallery, type chips, optional text, Urgent). After Done, an optional "Add photos of ready room" link. Photos are uploaded as the ORIGINAL file (no canvas, no resize). Cleaners can only create a report and add photos; they cannot edit text or delete anything.
 - **Admin (checkin-admin.html):** "Damage (N)" button in the HK tab toolbar + More → Housekeeping setup → Damage reports. List with Open / Claim filed / All, detail sheet, actions (Claim filed, Resolved, Closed – no claim, Add note, Add photos, Reopen) and an "Evidence document" (printable, save as PDF).
