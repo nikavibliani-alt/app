@@ -11,6 +11,7 @@
  *   2. checkin_guests/{id}       guestConfirmedCheckout false→true → "Guest Checked Out"
  *   3. service_requests/{id}     created        → "New Request"
  *   4. hk_status/{id}            done false→true (or created already-done) → "Room Ready"
+ *   5. hk_damage_reports/{id}    created        → "⚠ Damage: <room>" (tap opens /checkin-admin?tab=damage)
  *
  * Trigger 4 deliberately does NOT use onDocumentCreated the way the other
  * "something happened" triggers do. In practice, hk_status/{roomCode_date}
@@ -140,7 +141,26 @@ function registerCloudFunctions() {
     }
   );
 
-  return { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone };
+  const DAMAGE_LABELS = {
+    cigarette: 'Cigarette smell', broken: 'Broken', stain: 'Stain', missing: 'Missing item',
+    notworking: 'Not working', dirty: 'Dirty / smell', other: 'Other',
+  };
+  const pushOnDamageReport = onDocumentCreated(
+    { document: 'hk_damage_reports/{id}', ...opts },
+    async (event) => {
+      const data = event.data.data();
+      const cats = (data.categories || []).map((c) => DAMAGE_LABELS[c] || c).join(', ') || 'no tags';
+      const n = Number(data.photoCount) || (data.photos || []).length || 0;
+      await sendPushToAll({
+        title: `${data.urgent ? 'URGENT · ' : ''}⚠ Damage: ${data.roomCode || ''}`,
+        body: `${data.reportedBy?.name || 'Housekeeping'} · ${n} photo${n === 1 ? '' : 's'} · ${cats}`,
+        tag: 'damage-' + event.params.id,
+        url: '/checkin-admin?tab=damage',
+      });
+    }
+  );
+
+  return { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone, pushOnDamageReport };
 }
 
 module.exports = { sendPushToAll, registerCloudFunctions };

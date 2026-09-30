@@ -31,8 +31,9 @@ exports.elevatorCodeSyncManual = elevatorCodeSyncManual;
 exports.adminAction = registerAdminAction();
 exports.guestRegister = registerGuestRegister();
 
-const { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone } = registerPushNotifications();
+const { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone, pushOnDamageReport } = registerPushNotifications();
 exports.pushOnFailedSearch = pushOnFailedSearch;
 exports.pushOnGuestCheckout = pushOnGuestCheckout;
 exports.pushOnServiceRequest = pushOnServiceRequest;
 exports.pushOnHkDone = pushOnHkDone;
+exports.pushOnDamageReport = pushOnDamageReport;
