@@ -94,7 +94,7 @@ export async function readPhotoMeta(file) {
     exifHasOffset: !!(exif && exif.offset),
     fileLastModified: file.lastModified ? new Date(file.lastModified).toISOString() : null,
     size: file.size,
-    contentType: file.type || 'application/octet-stream',
+    contentType: file.type || 'image/jpeg', // pickers only offer images; Storage rules require image/*
     name: file.name || '',
   };
 }
@@ -119,7 +119,7 @@ export function uploadOriginal(storageApi, storage, file, path, meta, addedBy, o
   const { ref, uploadBytesResumable, getDownloadURL, getMetadata } = storageApi;
   return new Promise((resolve, reject) => {
     const r = ref(storage, path);
-    const task = uploadBytesResumable(r, file, { contentType: file.type || 'application/octet-stream' });
+    const task = uploadBytesResumable(r, file, { contentType: meta.contentType });
     task.on('state_changed',
       (s) => { if (onProgress && s.totalBytes) onProgress(s.bytesTransferred / s.totalBytes); },
       reject,

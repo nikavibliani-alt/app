@@ -373,6 +373,33 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .hk-team-card__title{font-size:14px;font-weight:700;}
 .hk-team-card__sub{font-size:12px;color:var(--muted);margin-top:2px;}
 .hk-team-card__actions{display:flex;gap:6px;flex-shrink:0;}
+.dmg-row{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;cursor:pointer;}
+.dmg-row__top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.dmg-row__room{font-family:var(--mono);font-weight:700;font-size:16px;}
+.dmg-row__sub{font-size:12px;color:var(--muted);margin-top:3px;}
+.dmg-row__dl{font-size:12px;font-weight:700;margin-top:6px;color:var(--ink-2);}
+.dmg-row__dl.red{color:var(--red);}
+.dmg-row__dl.expired{color:var(--muted);}
+.dmg-tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#b91c1c;color:#fff;margin-left:6px;vertical-align:middle;}
+.dmg-tag.st{background:var(--bg);color:var(--ink-2);border:1px solid var(--line);}
+#dmg-detail{position:fixed;inset:0;background:var(--bg);z-index:215;display:flex;flex-direction:column;max-width:480px;margin:0 auto;overflow-y:auto;}
+#dmg-detail[hidden]{display:none;}
+.dmg-bar{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;}
+.dmg-body{padding:14px;}
+.dmg-kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dotted var(--line);font-size:13px;}
+.dmg-kv span:first-child{color:var(--muted);}
+.dmg-kv span:last-child{font-weight:600;text-align:right;}
+.dmg-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0;}
+.dmg-ph img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block;cursor:pointer;background:var(--line);}
+.dmg-cap{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.3;}
+.dmg-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0;}
+.dmg-actions .btn{flex:1 1 45%;min-height:44px;font-size:13px;}
+.dmg-form{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:12px;}
+.dmg-note{font-size:12px;padding:6px 0;border-bottom:1px dotted var(--line);}
+#dmg-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;}
+#dmg-lightbox[hidden]{display:none;}
+#dmg-lightbox img{max-width:100%;max-height:78vh;object-fit:contain;}
+#dmg-lightbox .cap{color:#fff;font-size:12px;margin-top:10px;text-align:center;line-height:1.5;}
 .hk-link-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;}
 .hk-link-card.revoked{opacity:.5;background:var(--bg);}
 .hk-link-card__top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
@@ -682,6 +709,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
   <div class="pane" id="pane-hk">
     <div class="hk-toolbar">
       <a class="hk-cleaner-link" href="#" onclick="switchTab('hksettings');return false;">HK settings</a>
+      <a class="hk-cleaner-link" id="hk-damage-btn" href="#" onclick="window._dmgFromHk=true;switchTab('damage');return false;">Damage (0)</a>
       <span class="hk-role-badge" id="hk-role-badge" hidden></span>
       <button type="button" class="hk-logout-btn" onclick="hkCleanerLogout()" aria-label="Log out of HK cleaner app">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
@@ -709,6 +737,13 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 
   <div class="pane" id="pane-hksettings">
     <div id="hksettings-root"></div>
+  </div>
+
+  <div class="pane" id="pane-damage">
+    <div id="damage-root"></div>
+    <div id="dmg-detail" hidden></div>
+    <div id="dmg-lightbox" hidden onclick="dmgCloseLightbox()"></div>
+    <input type="file" id="dmg-file" accept="image/*" multiple hidden>
   </div>
 
   <div class="pane" id="pane-guestsettings">
@@ -759,6 +794,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
     <div class="more-section">Housekeeping setup</div>
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('hksettings')">HK settings</button>
+      <button class="more-item" type="button" onclick="window._dmgFromHk=false;switchTab('damage')">Damage reports<span class="more-hint" id="more-damage-hint">Airbnb claim evidence</span></button>
     </div>
     <div class="more-section">App</div>
     <div class="more-list">
@@ -874,7 +910,7 @@ window.adminUnlock=function(){
 window.adminSignOut=function(){localStorage.removeItem(_ADMIN_KEY);location.reload();};
 
 import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,deleteField,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit,runTransaction}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,deleteField,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit,runTransaction,arrayUnion,increment}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour,normalizeStayDate}from"./shared/guest-unlock.js";
 import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON,hkPropertyGroupForRoom}from"./shared/hk-bedding.js";
@@ -882,6 +918,8 @@ import{DEFAULT_ROOMS_SEED,ROOM_SITES}from"./shared/room-registry.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 import{featherIcon}from"./shared/feather-icons.js";
+import{getStorage,ref as stRef,uploadBytesResumable,getDownloadURL,getMetadata}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
+import{MAX_PHOTOS,tbilisiIsoNow,readPhotoMeta,fileExt,uploadOriginal,claimDeadline,daysLeft}from"./shared/hk-damage.js";
 
 const STANDALONE_HK=typeof window!=='undefined'&&(window.__STANDALONE_HK__===true||/(?:^|\/)HK\.html$/i.test(location.pathname)||/[?&]app=hk(?:&|$)/.test(location.search));
 let _hkPinBuf='';
@@ -1202,7 +1240,7 @@ async function syncRoomsFromSeed(){
 let aptData={},guestData=[],hkStatusData={},_resCache=null,_resLoading=false;
 let elevData=null,stayFilter='overview',upcomingDay=null,_currentAptId=null;
 const _TAB_KEY='maxela_admin_tab';
-const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','guestsettings','wasettings','failures','navsettings','hksettings','history','more']);
+const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','guestsettings','wasettings','failures','navsettings','hksettings','damage','history','more']);
 
 const _NAV_KEY='maxela_admin_nav_v5';
 const NAV_MIN=2;
@@ -1286,7 +1324,7 @@ function renderNavBar(){
     if(!d)continue;
     html+=`<button class="nav__btn${currentTab===d.pane?' active':''}" data-tab="${d.pane}" onclick="switchTab('${d.pane}')" ${d.navId?`id="${d.navId}"`:''}>${navTabSvg(id)}${d.label}${d.extra||''}</button>`;
   }
-  html+=`<button class="nav__btn${currentTab==='more'||['apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','hk','history'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')">${featherIcon('more-horizontal',22,1.8)}More</button>`;
+  html+=`<button class="nav__btn${currentTab==='more'||['apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','damage','hk','history'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')">${featherIcon('more-horizontal',22,1.8)}More</button>`;
   nav.innerHTML=html;
   updateRequestsBadge();
   if(elevData)document.getElementById('nav-elev')?.classList.toggle('has-alert',elevFreshness().cls==='old');
@@ -2674,6 +2712,262 @@ window.hkRevokeLink=async function(token){
   }catch(e){toast('Failed: '+e.message);}
 };
 
+/* ── Damage reports (evidence for Airbnb claims) ── */
+let dmgReports=[];
+let _dmgSub=false,_dmgFilter='open',_dmgOpenId=null,_dmgForm=null;
+function dmgSubscribe(){
+  if(_dmgSub)return;
+  _dmgSub=true;
+  onSnapshot(collection(db,'hk_damage_reports'),snap=>{
+    dmgReports=snap.docs.map(d=>({id:d.id,...d.data()}));
+    dmgReports.sort((a,b)=>dmgMs(b)-dmgMs(a));
+    dmgUpdateCounts();
+    if(currentTab==='damage')dmgRender();
+  },err=>{console.warn('[damage]',err);_dmgSub=false;});
+}
+function dmgMs(r){
+  const ts=r.createdAt;
+  if(ts?.toMillis)return ts.toMillis();
+  if(ts?.seconds)return ts.seconds*1000;
+  const c=Date.parse(r.clientCreatedAt||'');return Number.isFinite(c)?c:0;
+}
+function dmgOpenCount(){return dmgReports.filter(r=>(r.status||'open')==='open').length;}
+function dmgUpdateCounts(){
+  const n=dmgOpenCount();
+  const b=document.getElementById('hk-damage-btn');if(b)b.textContent='Damage ('+n+')';
+  const h=document.getElementById('more-damage-hint');if(h)h.textContent=n?n+' open':'Airbnb claim evidence';
+}
+function dmgDeadline(r){
+  const g=r.guest||null;
+  if(!g||!g.checkout)return{text:'Guest unknown',cls:''};
+  const isAirbnb=String(g.source||'').toLowerCase()==='airbnb';
+  if(!isAirbnb)return{text:'Checkout '+g.checkout,cls:''};
+  const dl=claimDeadline(g.checkout),left=daysLeft(dl,tbilisiToday());
+  if(left<0)return{text:'Claim window expired ('+dl+')',cls:'expired'};
+  return{text:`Claim by ${dl} · ${left===0?'last day':left+' day'+(left===1?'':'s')+' left'}`,cls:left<=3?'red':''};
+}
+const DMG_STATUS={open:'Open',claim_filed:'Claim filed',resolved:'Resolved',closed:'Closed'};
+const DMG_CATS={broken:'Broken',stain:'Stain',missing:'Missing item',notworking:'Not working',dirty:'Dirty / smell',other:'Other'};
+function dmgPlatform(g){return SOURCE_BADGES[String(g?.source||'').toLowerCase()]?.label||(g?.source?g.source:'Direct');}
+function dmgRender(){
+  const root=document.getElementById('damage-root');if(!root)return;
+  const chips=[['open','Open'],['claim_filed','Claim filed'],['all','All']].map(([id,l])=>`<button type="button" class="filter-chip${_dmgFilter===id?' active':''}" onclick="dmgSetFilter('${id}')">${l}</button>`).join('');
+  const list=dmgReports.filter(r=>_dmgFilter==='all'||(r.status||'open')===_dmgFilter);
+  root.innerHTML=`<div class="filter-row">${chips}</div>`+(list.length?list.map(r=>{
+    const g=r.guest,dl=dmgDeadline(r);
+    const cats=(r.categories||[]).map(c=>DMG_CATS[c]||c).join(', ');
+    return`<div class="dmg-row" onclick="dmgOpen('${esc(r.id)}')">
+      <div class="dmg-row__top"><span class="dmg-row__room">${esc(r.roomCode)}${r.urgent?'<span class="dmg-tag">URGENT</span>':''}</span><span class="dmg-tag st">${esc(DMG_STATUS[r.status||'open']||r.status)}</span></div>
+      <div class="dmg-row__sub">${esc(r.reportDate)} · ${esc(r.reportedBy?.name||'—')} · ${(r.photos||[]).length} photo${(r.photos||[]).length===1?'':'s'}${cats?' · '+esc(cats):''}</div>
+      <div class="dmg-row__sub">${g?esc(g.guestName||'Guest')+' · '+esc(dmgPlatform(g))+' · '+esc(g.checkin||'?')+' → '+esc(g.checkout||'?'):'Guest unknown'}</div>
+      <div class="dmg-row__dl ${dl.cls}">${esc(dl.text)}</div>
+    </div>`;}).join(''):'<div class="empty">No damage reports</div>');
+}
+window.dmgSetFilter=function(f){_dmgFilter=f;dmgRender();};
+
+/* time formatting (Tbilisi = UTC+4) */
+const DMG_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function dmgToDate(v){
+  if(!v)return null;
+  const d=v?.toDate?v.toDate():(v?.seconds!=null?new Date(v.seconds*1000):new Date(v));
+  return isNaN(d.getTime())?null:d;
+}
+function dmgDual(v){
+  const d=dmgToDate(v);if(!d)return 'unknown';
+  const p=n=>String(n).padStart(2,'0');
+  const t=new Date(d.getTime()+4*3600*1000);
+  return `${d.getUTCDate()} ${DMG_MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())} UTC (${p(t.getUTCHours())}:${p(t.getUTCMinutes())}:${p(t.getUTCSeconds())} Tbilisi)`;
+}
+function dmgExifText(p){
+  if(!p.exifTakenAt)return 'unknown';
+  const m=String(p.exifTakenAt).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})([+-]\d{2}:\d{2})?$/);
+  if(!m)return String(p.exifTakenAt);
+  return `${m[1]} ${m[2]}${m[3]?' '+m[3]:' (phone clock, time zone not recorded)'}`;
+}
+function dmgPhotoCaption(p){
+  return `Taken ${dmgExifText(p)} · Uploaded ${p.storageTimeCreated?dmgDual(p.storageTimeCreated):'unknown'}`;
+}
+
+window.dmgOpen=function(id){
+  _dmgOpenId=id;_dmgForm=null;dmgRenderDetail();
+};
+window.dmgClose=function(){_dmgOpenId=null;_dmgForm=null;const el=document.getElementById('dmg-detail');el.hidden=true;el.innerHTML='';};
+function dmgRenderDetail(){
+  const r=dmgReports.find(x=>x.id===_dmgOpenId);
+  const el=document.getElementById('dmg-detail');
+  if(!r){el.hidden=true;return;}
+  const g=r.guest,dl=dmgDeadline(r);
+  const kv=(k,v)=>`<div class="dmg-kv"><span>${esc(k)}</span><span>${v}</span></div>`;
+  const photos=(r.photos||[]);
+  const f=_dmgForm;
+  const today=tbilisiToday();
+  const platOpts=['Airbnb','Booking','Expedia','Other'].map(p=>`<option${(f?.platform||dmgPlatform(g))===p?' selected':''}>${p}</option>`).join('');
+  const forms={
+    claim:`<div class="dmg-form"><label class="apt-label">Platform</label><select class="apt-input" id="dmg-f-platform">${platOpts}</select>
+      <label class="apt-label">Date filed</label><input class="apt-input" type="date" id="dmg-f-date" value="${today}">
+      <label class="apt-label">Claim / case number</label><input class="apt-input" type="text" id="dmg-f-case">
+      <div class="dmg-actions"><button type="button" class="btn" onclick="dmgCancelForm()">Cancel</button><button type="button" class="btn btn-primary" onclick="dmgSaveClaim()">Save</button></div></div>`,
+    resolved:`<div class="dmg-form"><label class="apt-label">Amount received (optional)</label><input class="apt-input" type="number" step="0.01" id="dmg-f-amount">
+      <div class="dmg-actions"><button type="button" class="btn" onclick="dmgCancelForm()">Cancel</button><button type="button" class="btn btn-primary" onclick="dmgSaveResolved()">Save</button></div></div>`,
+    note:`<div class="dmg-form"><label class="apt-label">Note</label><textarea class="apt-textarea" id="dmg-f-note" rows="3"></textarea>
+      <div class="dmg-actions"><button type="button" class="btn" onclick="dmgCancelForm()">Cancel</button><button type="button" class="btn btn-primary" onclick="dmgSaveNote()">Add note</button></div></div>`,
+  };
+  el.hidden=false;
+  el.innerHTML=`<div class="dmg-bar"><button class="detail-back" type="button" onclick="dmgClose()">← Back</button><b>${esc(r.id)}</b></div>
+  <div class="dmg-body">
+    ${kv('Status',esc(DMG_STATUS[r.status||'open']||r.status)+(r.urgent?' <span class="dmg-tag">URGENT</span>':''))}
+    ${kv('Room',esc(r.roomCode)+' · '+esc(r.roomName||''))}
+    ${kv('Report day',esc(r.reportDate))}
+    ${kv('Reported by',esc(r.reportedBy?.name||'—'))}
+    ${kv('Server time',esc(dmgDual(r.createdAt)))}
+    ${kv('Phone time',esc(r.clientCreatedAt||'unknown'))}
+    ${kv('Room marked Done',r.doneBeforeReport?esc(r.roomDoneAt?dmgDual(r.roomDoneAt):'yes (time not recorded)'):'not done at report time')}
+    ${kv('Types',esc((r.categories||[]).map(c=>DMG_CATS[c]||c).join(', ')||'—'))}
+    ${r.description?kv('Description',esc(r.description)):''}
+    ${g?kv('Guest',esc(g.guestName||'—'))+kv('Platform',esc(dmgPlatform(g)))+kv('Reservation',esc(g.reservationNumber||g.reservationDocId||'—'))+kv('Stay',esc((g.checkin||'?')+' → '+(g.checkout||'?')))+kv('Guests',esc(g.guestCount||'—')):kv('Guest','unknown')}
+    ${kv('Deadline',`<span class="dmg-row__dl ${dl.cls}" style="margin:0">${esc(dl.text)}</span>`)}
+    ${r.claim?kv('Claim',esc(`${r.claim.platform||''} · filed ${r.claim.filedAt||'?'}${r.claim.caseNumber?' · #'+r.claim.caseNumber:''}`)):''}
+    ${r.resolution?kv('Resolved',esc(`${r.resolution.resolvedAt||''}${r.resolution.amount!=null?' · '+r.resolution.amount:''}`)):''}
+    <div class="dmg-grid">${photos.map((p,i)=>`<div class="dmg-ph"><img src="${esc(p.url)}" loading="lazy" alt="" onclick="dmgLightbox(${i})"><div class="dmg-cap">${esc(dmgPhotoCaption(p))}${p.addedBy==='admin'?' · added by admin':''}</div></div>`).join('')||'<div class="empty" style="grid-column:1/-1;padding:12px">No photos</div>'}</div>
+    ${f?forms[f.kind]||'':''}
+    <div class="dmg-actions">
+      ${(r.status||'open')==='open'?'':`<button type="button" class="btn" onclick="dmgSetStatus('open')">Reopen</button>`}
+      <button type="button" class="btn" onclick="dmgShowForm('claim')">Claim filed</button>
+      <button type="button" class="btn" onclick="dmgShowForm('resolved')">Resolved</button>
+      <button type="button" class="btn" onclick="dmgCloseNoClaim()">Closed – no claim</button>
+      <button type="button" class="btn" onclick="dmgShowForm('note')">Add note</button>
+      <button type="button" class="btn" onclick="dmgAddPhotos()">Add photos</button>
+      ${g?.guestFormId?`<button type="button" class="btn" onclick="dmgOpenGuest('${esc(g.guestFormId)}')">Guest record</button>`:''}
+      <button type="button" class="btn btn-primary" style="flex:1 1 100%" onclick="generateDamageEvidence('${esc(r.id)}')">Evidence document</button>
+    </div>
+    ${(r.adminNotes||[]).length?`<div class="section-hd"><h2>Notes</h2></div>`+(r.adminNotes||[]).map(n=>`<div class="dmg-note"><b>${esc(String(n.at||'').replace('T',' ').slice(0,16))}</b> · ${esc(n.text)}</div>`).join(''):''}
+  </div>`;
+}
+window.dmgShowForm=function(kind){_dmgForm={kind};dmgRenderDetail();};
+window.dmgCancelForm=function(){_dmgForm=null;dmgRenderDetail();};
+window.dmgOpenGuest=function(id){dmgClose();window.openDetail(id);};
+async function dmgUpdate(patch,msg){
+  try{
+    await updateDoc(doc(db,'hk_damage_reports',_dmgOpenId),{...patch,updatedAt:serverTimestamp()});
+    _dmgForm=null;toast(msg||'Saved ✓');
+  }catch(e){toast('Failed: '+e.message);}
+}
+window.dmgSaveClaim=function(){
+  const r=dmgReports.find(x=>x.id===_dmgOpenId);
+  dmgUpdate({status:'claim_filed',claim:{
+    platform:document.getElementById('dmg-f-platform')?.value||null,
+    filedAt:document.getElementById('dmg-f-date')?.value||tbilisiToday(),
+    caseNumber:(document.getElementById('dmg-f-case')?.value||'').trim()||null,
+    deadline:claimDeadline(r?.guest?.checkout)||null,
+  }},'Marked as claim filed');
+};
+window.dmgSaveResolved=function(){
+  const a=parseFloat(document.getElementById('dmg-f-amount')?.value);
+  dmgUpdate({status:'resolved',resolution:{amount:Number.isFinite(a)?a:null,resolvedAt:tbilisiToday()}},'Marked resolved');
+};
+window.dmgCloseNoClaim=function(){if(confirm('Close this report without filing a claim?'))dmgUpdate({status:'closed',closedAt:tbilisiIsoNow()},'Closed');};
+window.dmgSetStatus=function(st){dmgUpdate({status:st},'Reopened');};
+window.dmgSaveNote=function(){
+  const text=(document.getElementById('dmg-f-note')?.value||'').trim();
+  if(!text){toast('Write a note first');return;}
+  dmgUpdate({adminNotes:arrayUnion({text,at:tbilisiIsoNow(),by:'admin'})},'Note added');
+};
+const _dmgStorage=getStorage(fb);
+const _dmgStorageApi={ref:stRef,uploadBytesResumable,getDownloadURL,getMetadata};
+window.dmgAddPhotos=function(){document.getElementById('dmg-file').click();};
+document.getElementById('dmg-file')?.addEventListener('change',async ev=>{
+  const files=[...ev.target.files].slice(0,MAX_PHOTOS);ev.target.value='';
+  const r=dmgReports.find(x=>x.id===_dmgOpenId);
+  if(!r||!files.length)return;
+  const recs=[];
+  try{
+    for(let i=0;i<files.length;i++){
+      toast(`Uploading ${i+1}/${files.length}…`,60000);
+      const f=files[i],meta=await readPhotoMeta(f);
+      const n=(r.photos||[]).length+i+1,rand=Math.random().toString(36).slice(2,6);
+      recs.push(await uploadOriginal(_dmgStorageApi,_dmgStorage,f,`hk_damage/${r.id}/${n}-${rand}.${fileExt(f)}`,meta,'admin',null));
+    }
+    await updateDoc(doc(db,'hk_damage_reports',r.id),{photos:arrayUnion(...recs),photoCount:increment(recs.length),updatedAt:serverTimestamp()});
+    toast('Photos added ✓');
+  }catch(e){console.warn(e);toast('Upload failed: '+(e.message||e),5000);}
+});
+window.dmgLightbox=function(i){
+  const r=dmgReports.find(x=>x.id===_dmgOpenId);const p=r?.photos?.[i];if(!p)return;
+  const lb=document.getElementById('dmg-lightbox');lb.hidden=false;
+  lb.innerHTML=`<img src="${esc(p.url)}" alt=""><div class="cap">${esc(dmgPhotoCaption(p))}<br>${esc(p.name||'')}<br><a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:#9cf" onclick="event.stopPropagation()">Open original</a></div>`;
+};
+window.dmgCloseLightbox=function(){const lb=document.getElementById('dmg-lightbox');lb.hidden=true;lb.innerHTML='';};
+
+/* Evidence document — printable, save as PDF from the print dialog. Plain and factual. */
+window.generateDamageEvidence=async function(id){
+  const r=dmgReports.find(x=>x.id===id);if(!r)return;
+  const w=window.open('about:blank','_blank');
+  if(!w){toast('Allow pop-ups to open the document');return;}
+  w.document.write('<p style="font-family:sans-serif;padding:24px">Preparing document…</p>');
+  const g=r.guest||null;
+  // "Before this stay": ready photos / done time for THIS guest's stay
+  let prep=null;
+  try{
+    if(g?.checkin){
+      const cands=[];
+      const exact=await getDoc(doc(db,'hk_status',r.roomCode+'_'+g.checkin));
+      if(exact.exists())cands.push({id:exact.id,...exact.data()});
+      const snap=await getDocs(query(collection(db,'hk_status'),where('roomCode','==',r.roomCode)));
+      snap.docs.forEach(d=>{if(!cands.some(c=>c.id===d.id))cands.push({id:d.id,...d.data()});});
+      const has=c=>c.date&&c.date<=g.checkin&&((c.readyPhotos||[]).length||c.doneAt);
+      const good=cands.filter(has);
+      prep=good.find(c=>c.date===g.checkin)||good.sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]||null;
+    }
+  }catch(e){console.warn('[evidence prep]',e);}
+  const now=new Date();
+  const propertyName='Maxela Apartments';
+  const row=(k,v)=>`<div class="doc-row"><div class="doc-k">${esc(k)}</div><div class="doc-v">${esc(String(v))}</div></div>`;
+  const photoBlock=(p,i,label='Photo')=>`<div class="ph"><img src="${esc(p.url)}" alt="${label} ${i+1}">
+    <div class="cap"><b>${label} ${i+1}</b> · file ${esc(p.name||'—')}<br>Taken: ${esc(dmgExifText(p))}<br>Uploaded to server: ${esc(p.storageTimeCreated?dmgDual(p.storageTimeCreated):'unknown')}<br>File last modified (phone): ${esc(p.fileLastModified?dmgDual(p.fileLastModified):'unknown')}${p.addedBy==='admin'?'<br>Added by admin':''}</div></div>`;
+  const prepHtml=prep?`
+    ${row('Record date',prep.date)}
+    ${row('Room marked Done',prep.doneAt?dmgDual(prep.doneAt)+(prep.doneBy?' by '+prep.doneBy:''):'time not recorded')}
+    ${(prep.readyPhotos||[]).length?(prep.readyPhotos||[]).map((p,i)=>photoBlock(p,i,'Ready photo')).join(''):'<p class="muted">No ready-room photos recorded.</p>'}`
+    :'<p class="muted">No ready-room photos or completion record found before this stay.</p>';
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Damage evidence ${esc(r.id)}</title>
+<style>
+  body{font-family:Georgia,'Times New Roman',serif;max-width:760px;margin:32px auto;padding:0 24px;color:#000;background:#fff;line-height:1.5;}
+  .hd{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:6px;}
+  .hd h1{font-size:20px;margin:0;}
+  .id{text-align:right;font-size:12px;line-height:1.6;}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #000;padding-bottom:4px;margin:26px 0 12px;}
+  .doc-row{display:flex;justify-content:space-between;gap:16px;padding:6px 0;border-bottom:1px dotted #999;font-size:13px;}
+  .doc-k{color:#333;}.doc-v{font-weight:700;text-align:right;}
+  .ph{margin:16px 0;page-break-inside:avoid;}
+  .ph img{width:100%;max-height:640px;object-fit:contain;border:1px solid #000;display:block;}
+  .cap{font-size:11px;margin-top:4px;}
+  .muted{font-size:13px;color:#444;}
+  .desc{font-size:13px;white-space:pre-wrap;}
+  .ft{border-top:2px solid #000;margin-top:28px;padding-top:12px;font-size:11px;}
+  @media print{body{margin:0;padding:16px;}}
+</style></head><body>
+  <div class="hd"><div><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase">Damage Report — Evidence</div><h1>${esc(propertyName)}</h1></div>
+    <div class="id"><b>${esc(r.id)}</b><br>Generated: ${esc(dmgDual(now))}</div></div>
+  <h2>Property &amp; Room</h2>
+  ${row('Property / site',r.site||'—')}${row('Room',r.roomCode+(r.roomName?' · '+r.roomName:''))}
+  <h2>Reservation &amp; Guest</h2>
+  ${g?row('Reservation number',g.reservationNumber||g.reservationDocId||'—')+row('Guest name',g.guestName||'—')+row('Booking platform',dmgPlatform(g))+row('Check-in',g.checkin||'—')+row('Check-out',g.checkout||'—')+row('Number of guests',g.guestCount||'—'):'<p class="muted">No reservation was linked to this report.</p>'}
+  <h2>Report</h2>
+  ${row('Reported by',r.reportedBy?.name||'—')}${row('Report day',r.reportDate)}
+  ${row('Time recorded by server',dmgDual(r.createdAt))}${row('Time on reporter’s phone',r.clientCreatedAt||'unknown')}
+  ${row('Room marked Done',r.doneBeforeReport?(r.roomDoneAt?dmgDual(r.roomDoneAt):'yes (time not recorded)'):'not done at time of report')}
+  ${row('Damage types',(r.categories||[]).map(c=>DMG_CATS[c]||c).join(', ')||'—')}${r.urgent?row('Urgent','yes'):''}
+  <h2>Description</h2><p class="desc">${esc(r.description||'(no description)')}</p>
+  <h2>Photos at report (${(r.photos||[]).length})</h2>
+  ${(r.photos||[]).map(photoBlock).join('')||'<p class="muted">No photos.</p>'}
+  <h2>Before this stay — room prepared for this guest</h2>
+  ${prepHtml}
+  ${(r.adminNotes||[]).length?`<h2>Notes</h2>${(r.adminNotes||[]).map(n=>`<div class="doc-row"><div class="doc-k">${esc(String(n.at||'').replace('T',' ').slice(0,16))}</div><div class="doc-v">${esc(n.text)}</div></div>`).join('')}`:''}
+  <div class="ft">Generated by SleepyPMS at ${esc(dmgDual(now))}. Photos are original files uploaded without editing; “Uploaded to server” is the time recorded by the storage server.</div>
+</body></html>`;
+  w.document.open();w.document.write(html);w.document.close();
+};
+
 /* ── Search failures ── */
 function updateSfBadge(){
   const n=searchFailures.length;
@@ -3309,6 +3603,7 @@ const TAB_META={
   apts:{title:'Apartments',sub:'WiFi, instructions, photo steps'},
   hk:{title:'Housekeeping',sub:'Daily task board · checkouts & done'},
   hksettings:{title:'HK settings',sub:'Staff links · teams · defaults'},
+  damage:{title:'Damage reports',sub:'Evidence for Airbnb claims'},
   history:{title:'History',sub:'Past guests · last 3 months'},
   guestsettings:{title:'Guest page',sub:'Tiles, services, waiting tabs & location'},
   wasettings:{title:'WhatsApp & bot',sub:'AI assistant · modes · templates'},
@@ -3316,8 +3611,8 @@ const TAB_META={
   navsettings:{title:'Tab bar',sub:'Add tabs · reorder · landing page'},
   more:{title:'More',sub:'All admin tools'},
 };
-const MORE_TABS=new Set(['more','apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','hk','history']);
-const MORE_SUB_PAGES=new Set(['apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','hk','history']);
+const MORE_TABS=new Set(['more','apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','damage','hk','history']);
+const MORE_SUB_PAGES=new Set(['apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','damage','hk','history']);
 
 function updateHeaderBack(){
   const btn=document.getElementById('header-back');
@@ -3331,6 +3626,7 @@ window.goBack=function(){
   if(document.getElementById('detail')?.classList.contains('open')){closeDetail();return;}
   if(MORE_SUB_PAGES.has(currentTab)){
     if(STANDALONE_HK&&currentTab==='hksettings')switchTab('hk');
+    else if(currentTab==='damage'&&window._dmgFromHk)switchTab('hk');
     else switchTab('more');
   }
 };
@@ -3361,6 +3657,7 @@ window.switchTab=function(tab){
   if(tab==='history')loadAndRenderHistory();
   if(tab==='hk')renderHk();
   if(tab==='hksettings')renderHkSettings();
+  if(tab==='damage')dmgRender();
   if(tab==='guestsettings')loadAndRenderGuestSettings();
   if(tab==='wasettings')loadAndRenderWaSettings();
   if(tab==='more')ensureBotSettingsLoaded();
@@ -5289,6 +5586,7 @@ function checkLoaded(){
     }else{
       switchTab(currentTab);
       _subscribeResCache();
+      dmgSubscribe();
       loadElevatorOnce();
       loadRequests(true);
       loadGuestSettings();
