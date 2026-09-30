@@ -374,6 +374,10 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .hk-team-card__title{font-size:14px;font-weight:700;}
 .hk-team-card__sub{font-size:12px;color:var(--muted);margin-top:2px;}
 .hk-team-card__actions{display:flex;gap:6px;flex-shrink:0;}
+.hk-set-bar{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.hk-set-back{flex:none;min-height:44px;padding:0 16px;border:1.5px solid var(--line);border-radius:999px;background:var(--surface);font-size:15px;font-weight:600;color:var(--ink);cursor:pointer;font-family:var(--sans);}
+.hk-set-title{font-size:17px;font-weight:700;}
+.hk-set-row{min-height:64px;}
 .dmg-row{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;cursor:pointer;}
 .dmg-row__top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .dmg-row__room{font-family:var(--mono);font-weight:700;font-size:16px;}
@@ -2201,17 +2205,18 @@ function renderHkSettings(){
       ${vgl.length?siteBlock('VGL · per room',vgl):''}
       ${abash.length?siteBlock('Abashidze · per room',abash):''}
     </div>`:'';
-  wrap.innerHTML=`
-    <div class="more-section" style="margin-top:0">Staff links</div>
+  const sec=_hkSetSection;
+  const backBar=(title)=>`<div class="hk-set-bar"><button type="button" class="hk-set-back" onclick="hkSetBack()">‹ Back</button><div class="hk-set-title">${esc(title)}</div></div>`;
+  const linksHtml=`${backBar('Staff links')}
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Each cleaner gets a personal link (no PIN). It opens only their team's apartments. Revoke a link to cut access.</p>
     <div id="hk-link-form"></div>
-    <div id="hk-link-list"></div>
-    <div class="section-hd"><h2>Teams &amp; apartments</h2></div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Create teams and assign apartments. Each team sees only their apartments on the cleaner app after entering their PIN.</p>
+    <div id="hk-link-list"></div>`;
+  const teamsHtml=`${backBar('Teams & apartments')}
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Create teams and assign apartments. A staff link opens only the apartments of its team.</p>
     ${hkGetTeams().map(t=>`<div class="hk-team-card">
       <div class="hk-team-card__body">
         <div class="hk-team-card__title">${esc(t.label)}</div>
-        <div class="hk-team-card__sub">${(t.roomCodes||[]).length} apartments · PIN below</div>
+        <div class="hk-team-card__sub">${(t.roomCodes||[]).length} apartments</div>
       </div>
       <div class="hk-team-card__actions">
         <button type="button" class="btn" onclick="hkOpenTeamEdit('${esc(t.id)}')">Edit</button>
@@ -2219,7 +2224,8 @@ function renderHkSettings(){
       </div>
     </div>`).join('')}
     ${!_hkTeamEdit?`<button type="button" class="btn" style="width:100%;margin-bottom:12px" onclick="hkOpenTeamEdit(null)">+ Add team</button>`:''}
-    ${renderHkTeamEdit()}
+    ${renderHkTeamEdit()}`;
+  const timesHtml=`${backBar('Times & cleaning')}
     <div class="section-hd" style="margin-top:8px"><h2>Standard times</h2></div>
     <div class="card">
       <div class="field"><label>Checkout time</label>
@@ -2233,15 +2239,43 @@ function renderHkSettings(){
     <div class="hk-clean-grid">${typeRows}</div>
     <button type="button" class="btn hk-clean-expand" onclick="window.hkToggleCleanDetail()">${_hkCleanDetailOpen?'Hide per-room settings':'Per-room cleaning overrides…'}</button>
     ${detailBlock}
-    <div class="section-hd" style="margin-top:12px"><h2>Bedding capacity</h2></div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:4px">HK shows an extra-sheets alert when a booking's guest count exceeds a room's normal capacity.</p>
-    ${renderBeddingCapacitySection()}
-    <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveHkSettings()">Save HK settings</button>
-`;
+    <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="saveHkSettings()">Save HK settings</button>`;
+  const beddingHtml=`${backBar('Bedding capacity')}
+    <p style="font-size:12px;color:var(--muted);margin-bottom:4px">HK shows an extra-sheets alert when a booking's guest count exceeds a room's normal capacity. Changes here save automatically.</p>
+    ${renderBeddingCapacitySection()}`;
+  if(sec==='menu'){
+    const nLinks=Object.values(hkStaffLinks).filter(l=>l.active===true).length;
+    const nTeams=hkGetTeams().length;
+    const nCap=HK_CAPACITY_GROUPS.filter(g=>getHkRooms().some(r=>hkPropertyGroupForRoom(r.code)===g.id)&&(Number(hkCategoryCapacity[g.id]?.default)||0)>0).length;
+    wrap.innerHTML=`<div class="more-list">
+      <button class="more-item hk-set-row" type="button" onclick="hkSetOpen('links')">Staff links<span class="more-hint">${nLinks} active</span></button>
+      <button class="more-item hk-set-row" type="button" onclick="hkSetOpen('teams')">Teams &amp; apartments<span class="more-hint">${nTeams} team${nTeams===1?'':'s'}</span></button>
+      <button class="more-item hk-set-row" type="button" onclick="hkSetOpen('times')">Times &amp; cleaning<span class="more-hint">Checkout ${esc(hkSettings.defaultCheckOut||'12:00')} · Check-in ${esc(hkSettings.defaultCheckIn||'15:00')}</span></button>
+      <button class="more-item hk-set-row" type="button" onclick="hkSetOpen('bedding')">Bedding capacity<span class="more-hint">${nCap} group${nCap===1?'':'s'} set</span></button>
+    </div>`;
+  }else{
+    wrap.innerHTML={links:linksHtml,teams:teamsHtml,times:timesHtml,bedding:beddingHtml}[sec]||'';
+  }
   hkSubscribeStaffLinks();
-  hkRenderLinkForm();
-  hkRenderLinkList();
+  if(sec==='links'){hkRenderLinkForm();hkRenderLinkList();}
 }
+/* ── HK setup menu state (menu → sub-screen), remembered across reload; phone Back returns to the menu ── */
+const _HK_SET_KEY='maxela_hk_settings_section';
+const HK_SET_SECTIONS=['links','teams','times','bedding'];
+let _hkSetSection=(()=>{try{const v=localStorage.getItem(_HK_SET_KEY);return HK_SET_SECTIONS.includes(v)?v:'menu';}catch(e){return 'menu';}})();
+function hkSetSectionStore(sec){_hkSetSection=sec;try{localStorage.setItem(_HK_SET_KEY,sec);}catch(e){}}
+window.hkSetOpen=function(sec){
+  hkSetSectionStore(sec);
+  try{history.pushState({hkSet:sec},'',location.href);}catch(e){}
+  renderHkSettings();window.scrollTo(0,0);
+};
+window.hkSetBack=function(){
+  if(history.state&&history.state.hkSet){history.back();return;}   // popstate handler shows the menu
+  hkSetSectionStore('menu');renderHkSettings();window.scrollTo(0,0);
+};
+window.addEventListener('popstate',()=>{
+  if(currentTab==='hksettings'&&_hkSetSection!=='menu'){hkSetSectionStore('menu');_hkTeamEdit=null;renderHkSettings();window.scrollTo(0,0);}
+});
 window.saveHkSettings=async function(){
   if(!hkSettings.cleanMinutesByType)hkSettings.cleanMinutesByType={...HK_CLEAN_TYPE_DEFAULTS};
   if(!hkSettings.cleanMinutesByRoom)hkSettings.cleanMinutesByRoom={};
@@ -2625,6 +2659,7 @@ function hkSubscribeStaffLinks(){
     hkStaffLinks={};
     snap.docs.forEach(d=>{hkStaffLinks[d.id]={token:d.id,...d.data()};});
     hkRenderLinkList();
+    if(currentTab==='hksettings'&&_hkSetSection==='menu')renderHkSettings();
   },err=>{console.warn('[HK] staff links',err);_hkStaffLinksSub=false;});
 }
 function hkNewLinkToken(){
@@ -3769,12 +3804,14 @@ window.goBack=function(){
   if(document.getElementById('detail')?.classList.contains('open')){closeDetail();return;}
   if(MORE_SUB_PAGES.has(currentTab)){
     if(STANDALONE_HK&&currentTab==='hksettings')switchTab('hk');
+    else if(currentTab==='hksettings'&&_hkSetSection!=='menu')window.hkSetBack();
     else if(currentTab==='damage'&&window._dmgFromHk)switchTab('hk');
     else switchTab('more');
   }
 };
 
 window.switchTab=function(tab){
+  if(tab==='hksettings'&&currentTab!=='hksettings')hkSetSectionStore('menu');   // coming from another tab: start at the menu
   if(STANDALONE_HK){
     if(tab==='hksettings'&&!isHkAdmin())tab='hk';
     if(tab!=='hk'&&tab!=='hksettings')tab='hk';

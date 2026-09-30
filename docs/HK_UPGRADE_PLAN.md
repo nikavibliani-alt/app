@@ -223,6 +223,12 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
   - no update or delete
   - keep the existing passport_uploads rule unchanged
 
+### Housekeeping setup menu (done)
+- checkin-admin.html → More → HK settings is now a short menu with 4 rows and live one-line summaries: Staff links ("N active"), Teams & apartments ("N teams"), Times & cleaning ("Checkout hh:mm · Check-in hh:mm"), Bedding capacity ("N groups set"). Each row opens its own sub-screen with "‹ Back".
+- Times & cleaning = standard times + cleaning duration + per-room overrides, with the existing "Save HK settings" button (`saveHkSettings`). Teams keep their own Create/Save team. Bedding capacity still saves automatically as you type (no Save button, noted on screen). Staff links act immediately.
+- The open sub-screen is remembered (`localStorage.maxela_hk_settings_section`); the phone Back gesture/button and the header back arrow return to the menu first. Coming from another tab always starts at the menu.
+- Layout only: no data or behaviour changed. Stale wording about PINs removed from the Teams screen.
+
 ### STATUS: Damage reporting hidden (HK_DAMAGE_ENABLED=false in cleaner.html and checkin-admin.html). Cleaners send photos via WhatsApp for now.
 - Hidden when false: cleaner damage button, "damage reported" badges, the ready-photos link and the `hk_damage_reports` listener (cleaner page); the HK toolbar "Damage (N)" button, the More menu item, the tab-bar pool entry, the Staff links "Damage reports" switches, the `?tab=damage` deep link (falls back to the HK tab) and the listener (admin).
 - Kept untouched: all the code, `hk_damage_reports` documents, Storage files and rules, and the `pushOnDamageReport` function (it only fires on new reports). To bring it back, set the constant to `true` in both files.
