@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 'use strict';
+console.error('DISABLED: live pages are edited directly. This script would overwrite them with stale sandbox code.');
+process.exit(1);
 /**
  * Promote checkin-admin-sandbox.html → checkin-admin.html (production).
  * Strips sandbox banner/labels; keeps pipeline backend wiring.

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 'use strict';
+console.error('DISABLED: live pages are edited directly. This script would overwrite them with stale sandbox code.');
+process.exit(1);
 /**
  * Promote checkin-admin-sandbox.html → hk-app.html (full HK board).
  * HK.html is a tiny loader (no cache-buster loops) that opens hk-app.html.

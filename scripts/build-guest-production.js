@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 'use strict';
+console.error('DISABLED: live pages are edited directly. This script would overwrite them with stale sandbox code.');
+process.exit(1);
 /**
  * Promote checkin-guest-sandbox-2.html → checkin-guest.html (production).
  * Strips sandbox dev toolbar CSS/JS/HTML and mock-guest shortcuts.
