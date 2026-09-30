@@ -207,6 +207,33 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
   - no update or delete
   - keep the existing passport_uploads rule unchanged
 
+### Step 3 (done; ran AFTER Step 4)
+- **Cleaner page (cleaner.html):** "Report damage" button on every card, full-screen sheet (photo / gallery, type chips, optional text, Urgent). After Done, an optional "Add photos of ready room" link. Photos are uploaded as the ORIGINAL file (no canvas, no resize). Cleaners can only create a report and add photos; they cannot edit text or delete anything.
+- **Admin (checkin-admin.html):** "Damage (N)" button in the HK tab toolbar + More → Housekeeping setup → Damage reports. List with Open / Claim filed / All, detail sheet, actions (Claim filed, Resolved, Closed – no claim, Add note, Add photos, Reopen) and an "Evidence document" (printable, save as PDF).
+- **Shared code:** `shared/hk-damage.js` (EXIF reader, upload helper, report id, guest pick, deadline math).
+- **Firestore `hk_damage_reports/{reportId}`** (id = `DMG-YYYYMMDD-room-XXXX`): roomCode, roomName, site, reportDate, createdAt (server), clientCreatedAt (ISO +04:00), reportedBy {name, linkId}, categories[], description, urgent, photos[], photoCount, guest {reservationDocId, reservationNumber, guestName, source, checkin, checkout, guestCount, guestFormId} or null, roomDoneAt, doneBeforeReport, status ('open' | 'claim_filed' | 'resolved' | 'closed'), plus admin-written claim {platform, filedAt, caseNumber, deadline}, resolution {amount, resolvedAt}, closedAt, adminNotes[] {text, at, by}, updatedAt.
+- **Photo record:** {url, path, contentType, size, name, exifTakenAt, fileLastModified, storageTimeCreated, addedBy ('cleaner' | 'admin'), addedAtClient, addedByName?}. `exifTakenAt` is the camera's clock (has a +04:00 style offset only if the phone recorded one).
+- **Storage paths:** `hk_damage/{reportId}/{n}.{ext}` (initial photos; later additions `{n}-{rand}.{ext}`), `hk_ready/{room}_{date}/{n}-{rand}.{ext}`. Ready photos are also listed in `hk_status/{room}_{date}.readyPhotos` via arrayUnion (the `done` field is never touched).
+- **Airbnb deadline:** guest checkout + 14 days, shown only for Airbnb bookings.
+- **`scripts/check-cleaner-page.js`** now also allows `hk_damage_reports` (setDoc + updateDoc only) and forbids `passport_uploads`, `deleteObject`, `uploadBytes(`.
+- **Storage rules: add this block INSIDE the existing `match /b/{bucket}/o { ... }`, next to the passport_uploads rule (paste in the Firebase Console; do NOT run `firebase deploy --only storage`):**
+
+```
+    match /hk_damage/{reportId}/{file} {
+      allow read: if true;
+      allow create: if request.resource.size < 25 * 1024 * 1024
+                    && request.resource.contentType.matches('image/.*');
+      allow update, delete: if false;
+    }
+    match /hk_ready/{folder}/{file} {
+      allow read: if true;
+      allow create: if request.resource.size < 25 * 1024 * 1024
+                    && request.resource.contentType.matches('image/.*');
+      allow update, delete: if false;
+    }
+```
+- Console steps: Firebase Console → project sleepy-5c962 → Build → Storage → **Rules** tab → paste the block inside `match /b/{bucket}/o { ... }` (leave the passport_uploads rule as is) → **Publish**.
+
 ### Step 4: Switch-over and cleanup (only after all cleaners use links)
 - /hk-app, /HK and HK.html redirect to /cleaner. With no token it shows "ask your manager for your link".
 - Delete hk-app.html, HK-Shartava.html, HK-Centre.html, HK-legacy.html and hk-manage.html.
