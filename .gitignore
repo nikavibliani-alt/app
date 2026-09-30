@@ -20,3 +20,4 @@ whatsapp-functions/.secret.local
 firebase-debug*.log
 design-reference/
 whatsapp-functions/.env.*
+serviceAccountKey.json
