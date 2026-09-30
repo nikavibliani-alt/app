@@ -312,6 +312,9 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .apt-fold__bd{padding:0 14px 14px;border-top:1px solid var(--line);}
 .apt-hint{font-size:11px;color:var(--muted);margin:-4px 0 8px;line-height:1.4;}
 .apt-sync-note{font-size:12px;color:var(--muted);background:var(--blue-bg);border:1px solid #c7d9ef;border-radius:var(--r);padding:10px 12px;margin-bottom:12px;line-height:1.45;}
+.aptsguest-switch{display:flex;gap:4px;padding:4px;margin-bottom:12px;background:var(--surface);border:1px solid var(--line);border-radius:999px;}
+.aptsguest-switch button{flex:1;min-height:44px;border:0;border-radius:999px;background:transparent;font-family:var(--sans);font-size:14px;font-weight:600;color:var(--ink-2);cursor:pointer;}
+.aptsguest-switch button.active{background:var(--ink);color:#fff;}
 .apt-toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .apt-toolbar .btn{flex:none;min-height:40px;padding:0 14px;font-size:13px;}
 .apt-pill-row{display:flex;align-items:stretch;gap:4px;margin-bottom:6px;}
@@ -669,7 +672,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1001e · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1001f · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -708,6 +711,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
   </div>
 
   <div class="pane" id="pane-apts">
+    <div class="aptsguest-switch"></div>
     <div class="apt-sync-note">MiniHotel sync updates reservations only — your room list and apartment content stay as you set them here.</div>
     <div class="apt-toolbar">
       <button type="button" class="btn btn-primary" onclick="toggleAddRoomForm()">+ Add room</button>
@@ -761,6 +765,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
   </div>
 
   <div class="pane" id="pane-guestsettings">
+    <div class="aptsguest-switch"></div>
     <div id="guestsettings-root"></div>
   </div>
 
@@ -787,13 +792,12 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('hk')">Housekeeping</button>
       <button class="more-item" id="more-damage-item" hidden type="button" onclick="window._dmgFromHk=false;switchTab('damage')">Damage reports<span class="more-hint" id="more-damage-hint">Airbnb claim evidence</span></button>
-      <button class="more-item" type="button" onclick="switchTab('apts')">Apartments</button>
+      <button class="more-item" type="button" onclick="openAptsGuest()">Apartments &amp; guest page</button>
       <button class="more-item" type="button" onclick="switchTab('history')">Guest history</button>
       <button class="more-item" type="button" onclick="switchTab('failures')" id="more-failures-btn">Failed searches<span class="more-badge" id="sf-more-badge" style="display:none">0</span></button>
     </div>
     <div class="more-section">Guest experience</div>
     <div class="more-list">
-      <button class="more-item" type="button" onclick="switchTab('guestsettings')">Guest page</button>
       <div class="more-item more-item--switch" role="group" aria-label="AI Guest Assistant">
         <div class="more-item__text">
           <div class="more-item__title">AI Guest Assistant</div>
@@ -3867,6 +3871,12 @@ window.goBack=function(){
   }
 };
 
+let _aptsGuestLast='apts';
+function renderAptsGuestSwitch(){
+  const html=[['apts','Apartments'],['guestsettings','Guest page']].map(([t,l])=>`<button type="button" class="${currentTab===t?'active':''}" aria-pressed="${currentTab===t}" onclick="switchTab('${t}')">${l}</button>`).join('');
+  document.querySelectorAll('.aptsguest-switch').forEach(el=>{el.innerHTML=html;});
+}
+window.openAptsGuest=function(){switchTab(_aptsGuestLast);};
 window.switchTab=function(tab){
   if(tab!=='apts'&&window.aptEditorDirty&&aptEditorDirty()&&!confirm('Discard unsaved changes?'))return;
   if(tab==='hksettings'&&currentTab!=='hksettings')hkSetSectionStore('menu');   // coming from another tab: start at the menu
@@ -3891,6 +3901,7 @@ window.switchTab=function(tab){
   if(tab==='stay')renderStay();
   if(tab==='elevator')renderElevator();
   if(tab==='requests')loadAndRenderRequests();
+  if(tab==='apts'||tab==='guestsettings'){_aptsGuestLast=tab;renderAptsGuestSwitch();}
   if(tab==='apts')renderAptsList();
   if(tab==='history')loadAndRenderHistory();
   if(tab==='hk')renderHk();
