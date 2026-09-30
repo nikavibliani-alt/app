@@ -141,6 +141,13 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
   - Check both hk_status docs, manualUnlock, and that the WhatsApp message arrives.
   - Revoke the link and check it shows the "no longer active" screen.
 
+### Step 2 (done)
+- Admin: Housekeeping setup → "Staff links" (checkin-admin.html) replaces "Cleaner apps". Collection `hk_staff_links/{token}` = { name, teamId, active, createdAt, lastSeenAt, revokedAt }. Token = 32 hex chars. Link format: `https://app.maxelaapartments.com/cleaner?s=TOKEN`. Revoked links stay in the list.
+- Cleaner page: `cleaner.html`, served at `/cleaner` by `cleanUrls` (no rewrite needed). Georgian by default with an EN / ქარ switch (saved in `localStorage.hk_lang`). All text lives in the `STR` object at the top of the script. The token is kept in the URL and also saved to `localStorage.hk_staff_token` as a fallback. The link is re-checked on open and on every visibilitychange; `lastSeenAt` is updated at most once per 10 minutes.
+- The board logic is a labelled copy of the admin code (`BOARD-LOGIC-START/END` in cleaner.html, copied from checkin-admin.html @ ab270e9). If the board logic changes in admin, update the copy too.
+- Done button follows the Done contract exactly, plus `doneBy`, `doneByLinkId`, `doneAt` on the checkout-day doc. Undo sets those three to null.
+- Safety check: `node scripts/check-cleaner-page.js` fails if cleaner.html contains admin-only code or writes outside `hk_status`, `checkin_guests`, `hk_staff_links`. **Step 3 must extend `ALLOWED_WRITE_COLLECTIONS` in that script for damage reports (`hk_damage_reports`, and Storage uploads).** Run it before every cleaner.html commit.
+
 ### Step 3: Damage reports (+ optional ready photos)
 **Cleaner page**
 - Put a large "Report damage" button on every card, including done and yesterday cards.
