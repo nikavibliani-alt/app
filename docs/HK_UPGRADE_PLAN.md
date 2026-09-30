@@ -156,6 +156,14 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
 - A "How to verify" box sits near the top. "Before this stay" appears only when ready photos exist.
 - Admin detail sheet: under each photo "Uploaded (server): …" and "Verify on Google"; "Taken" only with EXIF; no "unknown" text.
 
+### Step 3b (done): requests after Nika's testing
+- Cleaner page: no photo limit (uploads still one at a time with per-photo progress); "გალერეიდან" renamed "ატვირთე" / "Upload" (still the untouched original file); new first chip "სიგარეტის სუნი" / "Cigarette smell"; tags stay optional (photos-only reports allowed); send button black with white text.
+- Per-link switch: `hk_staff_links/{token}.canReportDamage` (missing = allowed; set in admin Staff links, default ON for new links). The cleaner page hides the damage button when it is `false` and re-reads it on every visibilitychange. The ready-photos link is unchanged.
+- Admin: "Damage reports" is a top-level item in More (Operations) and in the tab-bar settings pool; the HK toolbar "Damage (N)" button stays. `/checkin-admin?tab=damage` opens the damage tab (used by the notification tap; `sw.js` also navigates an already-open admin window when the notification URL has `?tab=`).
+- Admin can correct a report ("Edit": chips incl. Cigarette smell + description). First edit copies the cleaner's text into `original {categories, description}` (never overwritten), every save is logged in `adminEdits[] {at, categories, description}`, a "Cleaner's original" line shows only if different, and the evidence document uses the current (corrected) values. Each photo has "Open original" (new tab) so it can be saved and uploaded to Airbnb.
+- Notification: `pushOnDamageReport` (pipeline-functions/controllers/pushNotifications.js, exported in index.js), trigger `hk_damage_reports/{id}` created, europe-west1, same VAPID secrets. Title "⚠ Damage: <room>" ("URGENT · " prefix when urgent), body "<cleaner> · <n> photos · <tags or 'no tags'>", url `/checkin-admin?tab=damage`, tag `damage-<id>`. Deploy only this function: `firebase deploy --only functions:pipeline:pushOnDamageReport --project sleepy-5c962`.
+- Storage rule photo limit is 50 MB (as published).
+
 ### Step 4 (done, ran BEFORE Step 3)
 - Order changed: Step 4 was done before Step 3 because every cleaner already had a staff link and old access had to be cut.
 - firebase.json: 301 redirects to `/cleaner` for /hk-app, /HK, /HK-Shartava, /HK-Centre, /HK-legacy, /hk-manage (with and without `.html`). The /hk-app rewrite was removed.

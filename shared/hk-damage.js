@@ -4,9 +4,8 @@
  * Photos are ALWAYS uploaded as the original file (no canvas, no resize) so EXIF time data is kept.
  */
 
-export const DAMAGE_CATEGORIES = ['broken', 'stain', 'missing', 'notworking', 'dirty', 'other'];
+export const DAMAGE_CATEGORIES = ['cigarette', 'broken', 'stain', 'missing', 'notworking', 'dirty', 'other'];
 export const DAMAGE_CLAIM_DAYS = 14;
-export const MAX_PHOTOS = 10;
 
 /** Tbilisi (UTC+4, no DST) ISO string with offset, e.g. 2026-10-01T14:32:10.123+04:00 */
 export function tbilisiIsoNow(now = Date.now()) {

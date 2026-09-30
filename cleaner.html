@@ -96,7 +96,7 @@ button{font-family:inherit;touch-action:manipulation;}
 .sw::after{content:'';position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .15s;}
 .urgentrow.on .sw{background:#b91c1c;}
 .urgentrow.on .sw::after{left:27px;}
-.sendbtn{width:100%;min-height:68px;border:none;border-radius:var(--r);background:#b45309;color:#fff;font-size:24px;font-weight:700;cursor:pointer;}
+.sendbtn{width:100%;min-height:68px;border:none;border-radius:var(--r);background:#000;color:#fff;font-size:24px;font-weight:700;cursor:pointer;}
 .sendbtn:disabled{opacity:.35;}
 .hint{font-size:15px;color:var(--muted);text-align:center;margin-top:8px;min-height:22px;}
 .errmsg{background:var(--red-bg);color:var(--red);border-radius:var(--r);padding:12px;font-size:17px;font-weight:600;margin-bottom:12px;}
@@ -135,7 +135,7 @@ import{getStorage,ref,uploadBytesResumable,getDownloadURL,getMetadata}from"https
 import{normalizeStayDate}from"/shared/guest-unlock.js";
 import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON}from"/shared/hk-bedding.js";
 import{roomsSorted}from"/shared/room-registry.js";
-import{DAMAGE_CATEGORIES,MAX_PHOTOS,makeReportId,tbilisiIsoNow,readPhotoMeta,fileExt,uploadOriginal,pickDepartingReservation}from"/shared/hk-damage.js";
+import{DAMAGE_CATEGORIES,makeReportId,tbilisiIsoNow,readPhotoMeta,fileExt,uploadOriginal,pickDepartingReservation}from"/shared/hk-damage.js";
 
 /* ══ ALL CLEANER-PAGE TEXT (review translations here) ══ */
 const STR={
@@ -160,13 +160,12 @@ const STR={
     beforeArr:'15:00-მდე',afterMidnight:'შუაღამის შემდეგ',nextMorning:'მეორე დილით',asap:'რაც შეიძლება მალე',
     langBtn:'EN',
     reportDamage:'დაზიანება',
-    takePhoto:'გადაიღე ფოტო',fromGallery:'გალერეიდან',
-    catBroken:'გატეხილია',catStain:'ლაქა',catMissing:'ნივთი აკლია',catNotworking:'არ მუშაობს',catDirty:'ბინძურია / სუნი',catOther:'სხვა',
+    takePhoto:'გადაიღე ფოტო',fromGallery:'ატვირთე',
+    catCigarette:'სიგარეტის სუნი',catBroken:'გატეხილია',catStain:'ლაქა',catMissing:'ნივთი აკლია',catNotworking:'არ მუშაობს',catDirty:'ბინძურია / სუნი',catOther:'სხვა',
     whatDamaged:'რა არის დაზიანებული? (არასავალდებულო)',
     urgent:'სასწრაფო',
     send:'გაგზავნა',resend:'ხელახლა გაგზავნა',sending:'იგზავნება…',back:'უკან',
     needSomething:'დაამატეთ ფოტო, აირჩიეთ ან დაწერეთ რამე',
-    maxPhotos:'მაქსიმუმ 10 ფოტო',
     uploadFailed:'ზოგი ფოტო ვერ აიტვირთა. დააჭირეთ „ხელახლა გაგზავნა“.',
     sendFailed:'ვერ გაიგზავნა. შეამოწმეთ ინტერნეტი და სცადეთ ხელახლა.',
     removePhoto:'წაშლა',
@@ -201,13 +200,12 @@ const STR={
     beforeArr:'Before 15:00',afterMidnight:'After midnight',nextMorning:'Next morning',asap:'ASAP',
     langBtn:'ქარ',
     reportDamage:'Report damage',
-    takePhoto:'Take photo',fromGallery:'From gallery',
-    catBroken:'Broken',catStain:'Stain',catMissing:'Missing item',catNotworking:'Not working',catDirty:'Dirty / smell',catOther:'Other',
+    takePhoto:'Take photo',fromGallery:'Upload',
+    catCigarette:'Cigarette smell',catBroken:'Broken',catStain:'Stain',catMissing:'Missing item',catNotworking:'Not working',catDirty:'Dirty / smell',catOther:'Other',
     whatDamaged:'What is damaged? (optional)',
     urgent:'Urgent',
     send:'Send',resend:'Send again',sending:'Sending…',back:'Back',
     needSomething:'Add a photo, pick a type or write something',
-    maxPhotos:'Maximum 10 photos',
     uploadFailed:'Some photos did not upload. Tap "Send again".',
     sendFailed:'Not sent. Check your internet and try again.',
     removePhoto:'Remove',
@@ -550,7 +548,7 @@ function buildCard(room,dateStr,tomorrowStr){
     ${guestCheckedOut?`<div class="out">${esc(t('guestOut'))}</div>`:''}
     ${nextRes?beddingHtml(room.code,inGuests):''}
     <button type="button" class="donebtn${done?' undo':''}" data-act="done" data-room="${esc(room.code)}" data-date="${dateStr}"${busy.has(key)?' disabled':''}>${esc(done?t('undo'):t('done'))}</button>
-    <button type="button" class="dmgbtn" data-act="damage" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('reportDamage'))}</button>
+    ${link.canReportDamage?`<button type="button" class="dmgbtn" data-act="damage" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('reportDamage'))}</button>`:''}
     ${reportsFor(room.code,dateStr).length?`<button type="button" class="dmgbadge" data-act="viewdmg" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('badge'))}</button>`:''}
     ${done?`<button type="button" class="readylink" data-act="ready" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('readyPhotos'))}</button>`:''}
   </div>`;
@@ -593,7 +591,7 @@ function renderNow(){
 /* ══ DAMAGE REPORTS + READY PHOTOS ══
    Photos are uploaded as the ORIGINAL file (no canvas / resize) so their time data is kept.
    Cleaners can only CREATE reports and ADD photos; text is never edited and nothing is deleted. */
-const CAT_KEY={broken:'catBroken',stain:'catStain',missing:'catMissing',notworking:'catNotworking',dirty:'catDirty',other:'catOther'};
+const CAT_KEY={cigarette:'catCigarette',broken:'catBroken',stain:'catStain',missing:'catMissing',notworking:'catNotworking',dirty:'catDirty',other:'catOther'};
 function reportsFor(roomCode,dateStr){
   return Object.values(damageReports).filter(r=>r.roomCode===roomCode&&r.reportDate===dateStr)
     .sort((a,b)=>String(a.clientCreatedAt).localeCompare(String(b.clientCreatedAt)));
@@ -622,8 +620,8 @@ function renderReportSheet(){
   sh.innerHTML=sheetHead(t('roomDay',{room:d.roomCode,day:d.dayText}))+`
     ${d.error?`<div class="errmsg">${esc(d.error)}</div>`:''}
     <div class="photobtns">
-      <button type="button" class="bigbtn" data-act="pickcam"${d.sending||d.photos.length>=MAX_PHOTOS?' disabled':''}>📷 ${esc(t('takePhoto'))}</button>
-      <button type="button" class="bigbtn alt" data-act="pickgal"${d.sending||d.photos.length>=MAX_PHOTOS?' disabled':''}>🖼 ${esc(t('fromGallery'))}</button>
+      <button type="button" class="bigbtn" data-act="pickcam"${d.sending?' disabled':''}>📷 ${esc(t('takePhoto'))}</button>
+      <button type="button" class="bigbtn alt" data-act="pickgal"${d.sending?' disabled':''}>🖼 ${esc(t('fromGallery'))}</button>
     </div>
     <div class="thumbs" id="thumbs">${d.photos.map(thumbHtml).join('')}</div>
     <div class="chips">${DAMAGE_CATEGORIES.map(c=>`<button type="button" class="chip${d.cats.has(c)?' on':''}" data-act="chip" data-c="${c}">${esc(t(CAT_KEY[c]))}</button>`).join('')}</div>
@@ -656,7 +654,6 @@ let _pid=0;
 async function addPickedFiles(files){
   if(!draft)return;
   for(const f of files){
-    if(draft.photos.length>=MAX_PHOTOS){toast(t('maxPhotos'));break;}
     const meta=await readPhotoMeta(f);
     draft.photos.push({id:++_pid,file:f,meta,thumb:URL.createObjectURL(f),state:'pending',progress:0,rec:null});
   }
@@ -743,7 +740,7 @@ function openReports(roomCode,dateStr){
 }
 async function uploadExtra(files,kind,target){
   // kind 'add' -> hk_damage/{reportId}/..., kind 'ready' -> hk_ready/{room}_{date}/...
-  const list=[...files].slice(0,MAX_PHOTOS);
+  const list=[...files];
   if(!list.length)return;
   const recs=[];
   try{
@@ -795,7 +792,7 @@ async function validate(){
     return false;
   }
   linkOk=true;
-  link={name:d.name||'',teamId:d.teamId||''};
+  link={name:d.name||'',teamId:d.teamId||'',canReportDamage:d.canReportDamage!==false};
   try{localStorage.setItem('hk_staff_token',token);}catch(e){}
   const last=d.lastSeenAt?.toMillis?d.lastSeenAt.toMillis():0;
   if(Date.now()-Math.max(last,lastTouch)>10*60*1000){

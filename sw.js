@@ -38,8 +38,11 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil(
     clients.matchAll({type:'window'}).then(clientList => {
       for(const client of clientList){
-        if(client.url.includes('checkin-admin') && 'focus' in client)
+        if(client.url.includes('checkin-admin') && 'focus' in client){
+          // deep-link notifications (e.g. /checkin-admin?tab=damage) must change the open tab too
+          if(/[?&]tab=/.test(url) && 'navigate' in client)return client.navigate(url).then(c => (c || client).focus());
           return client.focus();
+        }
       }
       if(clients.openWindow) return clients.openWindow(url);
     })

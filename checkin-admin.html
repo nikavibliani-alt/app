@@ -772,6 +772,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
     <div class="more-section">Operations</div>
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('hk')">Housekeeping</button>
+      <button class="more-item" type="button" onclick="window._dmgFromHk=false;switchTab('damage')">Damage reports<span class="more-hint" id="more-damage-hint">Airbnb claim evidence</span></button>
       <button class="more-item" type="button" onclick="switchTab('apts')">Apartments</button>
       <button class="more-item" type="button" onclick="switchTab('history')">Guest history</button>
       <button class="more-item" type="button" onclick="switchTab('failures')" id="more-failures-btn">Failed searches<span class="more-badge" id="sf-more-badge" style="display:none">0</span></button>
@@ -794,7 +795,6 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
     <div class="more-section">Housekeeping setup</div>
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('hksettings')">HK settings</button>
-      <button class="more-item" type="button" onclick="window._dmgFromHk=false;switchTab('damage')">Damage reports<span class="more-hint" id="more-damage-hint">Airbnb claim evidence</span></button>
     </div>
     <div class="more-section">App</div>
     <div class="more-list">
@@ -919,7 +919,7 @@ import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 import{featherIcon}from"./shared/feather-icons.js";
 import{getStorage,ref as stRef,uploadBytesResumable,getDownloadURL,getMetadata}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
-import{MAX_PHOTOS,tbilisiIsoNow,readPhotoMeta,fileExt,uploadOriginal,claimDeadline,daysLeft}from"./shared/hk-damage.js";
+import{tbilisiIsoNow,readPhotoMeta,fileExt,uploadOriginal,claimDeadline,daysLeft}from"./shared/hk-damage.js";
 
 const STANDALONE_HK=typeof window!=='undefined'&&(window.__STANDALONE_HK__===true||/(?:^|\/)HK\.html$/i.test(location.pathname)||/[?&]app=hk(?:&|$)/.test(location.search));
 let _hkPinBuf='';
@@ -1252,6 +1252,7 @@ const NAV_POOL={
   requests:{label:'Requests',pane:'requests',icon:'message-square',extra:'<span class="badge" id="req-badge">0</span>',navId:'nav-req'},
   apts:{label:'Apts',pane:'apts',icon:'home',extra:''},
   history:{label:'History',pane:'history',icon:'clock',extra:''},
+  damage:{label:'Damage',pane:'damage',icon:'alert-triangle',extra:''},
 };
 function navTabSvg(id,size=22){return featherIcon(NAV_POOL[id]?.icon||'circle',size,1.8);}
 const DEFAULT_NAV_CONFIG={slots:['stay','requests','elevator'],landingTab:'stay'};
@@ -1287,6 +1288,10 @@ let navSlots=loadNavSlots();
 
 function loadSavedTab(){
   if(STANDALONE_HK)return 'hk';
+  try{
+    const qt=new URLSearchParams(location.search).get('tab');   // e.g. /checkin-admin?tab=damage (push notification tap)
+    if(qt&&VALID_TABS.has(qt))return qt;
+  }catch(e){}
   try{
     const t=localStorage.getItem(_TAB_KEY);
     if(t&&VALID_TABS.has(t))return t;
@@ -2654,6 +2659,7 @@ function hkRenderLinkForm(){
     <input class="apt-input" id="hk-link-name" type="text" placeholder="e.g. Nino" maxlength="40">
     <label class="apt-label" style="margin-top:10px">Team</label>
     <select class="apt-input" id="hk-link-team">${hkGetTeams().map(t=>`<option value="${esc(t.id)}">${esc(t.label)}</option>`).join('')}</select>
+    <label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;margin:4px 0 6px;cursor:pointer"><input type="checkbox" id="hk-link-dmg" checked style="width:20px;height:20px">Can report damage</label>
     <div class="hk-link-card__actions">
       <button type="button" class="btn" onclick="hkCloseNewLink()">Cancel</button>
       <button type="button" class="btn btn-primary" onclick="hkCreateLink()">Create link</button>
@@ -2671,7 +2677,8 @@ function hkRenderLinkList(){
       <div class="hk-link-card__top"><div class="hk-link-card__name">${esc(l.name||'—')}</div>
         <span class="pill ${active?'pill-ok':'pill-pending'}">${active?'Active':'Revoked'}</span></div>
       <div class="hk-link-card__sub">${esc(team?.label||l.teamId||'—')} · last opened ${esc(hkLinkAgo(l.lastSeenAt))}</div>
-      ${active?`<div class="hk-link-card__actions">
+      ${active?`<label style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;margin-top:8px;cursor:pointer"><input type="checkbox" style="width:20px;height:20px"${l.canReportDamage!==false?' checked':''} onchange="hkSetLinkDamage('${esc(l.token)}',this.checked)">Damage reports</label>
+      <div class="hk-link-card__actions">
         <button type="button" class="btn" onclick="hkCopyLink('${esc(l.token)}')">Copy</button>
         <button type="button" class="btn" onclick="hkWaLink('${esc(l.token)}')">WhatsApp</button>
         <button type="button" class="btn btn-danger" onclick="hkRevokeLink('${esc(l.token)}')">Revoke</button>
@@ -2688,7 +2695,7 @@ window.hkCreateLink=async function(){
   if(!teamId){toast('Pick a team');return;}
   const token=hkNewLinkToken();
   try{
-    await setDoc(doc(db,'hk_staff_links',token),{name,teamId,active:true,createdAt:serverTimestamp(),lastSeenAt:null,revokedAt:null});
+    await setDoc(doc(db,'hk_staff_links',token),{name,teamId,active:true,canReportDamage:document.getElementById('hk-link-dmg')?.checked!==false,createdAt:serverTimestamp(),lastSeenAt:null,revokedAt:null});
     _hkLinkFormOpen=false;_hkLinkJustCreated={token,name};
     hkRenderLinkForm();
   }catch(e){toast('Failed: '+e.message);}
@@ -2702,6 +2709,10 @@ window.hkWaLink=function(token){
   const name=(hkStaffLinks[token]||_hkLinkJustCreated||{}).name||'';
   const msg=`გამარჯობა${name?' '+name:''}! აი შენი ბმული დასუფთავების სიისთვის: ${hkStaffLinkUrl(token)}`;
   window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank','noopener');
+};
+window.hkSetLinkDamage=async function(token,on){
+  try{await updateDoc(doc(db,'hk_staff_links',token),{canReportDamage:!!on});toast(on?'Damage reports ON':'Damage reports OFF');}
+  catch(e){toast('Failed: '+e.message);}
 };
 window.hkRevokeLink=async function(token){
   const l=hkStaffLinks[token];
@@ -2747,7 +2758,12 @@ function dmgDeadline(r){
   return{text:`Claim by ${dl} · ${left===0?'last day':left+' day'+(left===1?'':'s')+' left'}`,cls:left<=3?'red':''};
 }
 const DMG_STATUS={open:'Open',claim_filed:'Claim filed',resolved:'Resolved',closed:'Closed'};
-const DMG_CATS={broken:'Broken',stain:'Stain',missing:'Missing item',notworking:'Not working',dirty:'Dirty / smell',other:'Other'};
+const DMG_CATS={cigarette:'Cigarette smell',broken:'Broken',stain:'Stain',missing:'Missing item',notworking:'Not working',dirty:'Dirty / smell',other:'Other'};
+function dmgOrigDiffers(r){
+  const o=r.original;if(!o)return false;
+  const a=[...(o.categories||[])].sort().join(','),b=[...(r.categories||[])].sort().join(',');
+  return a!==b||(o.description||'')!==(r.description||'');
+}
 function dmgPlatform(g){return SOURCE_BADGES[String(g?.source||'').toLowerCase()]?.label||(g?.source?g.source:'Direct');}
 function dmgRender(){
   const root=document.getElementById('damage-root');if(!root)return;
@@ -2824,6 +2840,10 @@ function dmgRenderDetail(){
       <div class="dmg-actions"><button type="button" class="btn" onclick="dmgCancelForm()">Cancel</button><button type="button" class="btn btn-primary" onclick="dmgSaveClaim()">Save</button></div></div>`,
     resolved:`<div class="dmg-form"><label class="apt-label">Amount received (optional)</label><input class="apt-input" type="number" step="0.01" id="dmg-f-amount">
       <div class="dmg-actions"><button type="button" class="btn" onclick="dmgCancelForm()">Cancel</button><button type="button" class="btn btn-primary" onclick="dmgSaveResolved()">Save</button></div></div>`,
+    edit:`<div class="dmg-form"><label class="apt-label">Damage types</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${Object.entries(DMG_CATS).map(([c,l])=>`<button type="button" class="filter-chip${(f?.cats||[]).includes(c)?' active':''}" onclick="dmgToggleCat('${c}')">${l}</button>`).join('')}</div>
+      <label class="apt-label">Description</label><textarea class="apt-textarea" id="dmg-f-desc" rows="4">${esc(f?.text??'')}</textarea>
+      <div class="dmg-actions"><button type="button" class="btn" onclick="dmgCancelForm()">Cancel</button><button type="button" class="btn btn-primary" onclick="dmgSaveEdit()">Save</button></div></div>`,
     note:`<div class="dmg-form"><label class="apt-label">Note</label><textarea class="apt-textarea" id="dmg-f-note" rows="3"></textarea>
       <div class="dmg-actions"><button type="button" class="btn" onclick="dmgCancelForm()">Cancel</button><button type="button" class="btn btn-primary" onclick="dmgSaveNote()">Add note</button></div></div>`,
   };
@@ -2839,17 +2859,19 @@ function dmgRenderDetail(){
     ${kv('Room marked Done',r.doneBeforeReport?esc(r.roomDoneAt?dmgDual(r.roomDoneAt):'yes (time not recorded)'):'not done at report time')}
     ${kv('Types',esc((r.categories||[]).map(c=>DMG_CATS[c]||c).join(', ')||'—'))}
     ${r.description?kv('Description',esc(r.description)):''}
+    ${dmgOrigDiffers(r)?`<div class="dmg-cap" style="margin:4px 0 6px">Cleaner's original: ${esc((r.original.categories||[]).map(c=>DMG_CATS[c]||c).join(', ')||'no tags')}${r.original.description?' — '+esc(r.original.description):''}</div>`:''}
     ${g?kv('Guest',esc(g.guestName||'—'))+kv('Platform',esc(dmgPlatform(g)))+kv('Reservation',esc(g.reservationNumber||g.reservationDocId||'—'))+kv('Stay',esc((g.checkin||'?')+' → '+(g.checkout||'?')))+kv('Guests',esc(g.guestCount||'—')):kv('Guest','No reservation linked')}
     ${kv('Deadline',`<span class="dmg-row__dl ${dl.cls}" style="margin:0">${esc(dl.text)}</span>`)}
     ${r.claim?kv('Claim',esc(`${r.claim.platform||''} · filed ${r.claim.filedAt||'?'}${r.claim.caseNumber?' · #'+r.claim.caseNumber:''}`)):''}
     ${r.resolution?kv('Resolved',esc(`${r.resolution.resolvedAt||''}${r.resolution.amount!=null?' · '+r.resolution.amount:''}`)):''}
-    <div class="dmg-grid">${photos.map((p,i)=>`<div class="dmg-ph"><img src="${esc(p.url)}" loading="lazy" alt="" onclick="dmgLightbox(${i})"><div class="dmg-cap">${esc(dmgPhotoCaption(p))}${p.addedBy==='admin'?' · added by admin':''}${p.path?`<br><a href="${esc(dmgVerifyUrl(p.path))}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Verify on Google</a>`:''}</div></div>`).join('')||'<div class="empty" style="grid-column:1/-1;padding:12px">No photos</div>'}</div>
+    <div class="dmg-grid">${photos.map((p,i)=>`<div class="dmg-ph"><img src="${esc(p.url)}" loading="lazy" alt="" onclick="dmgLightbox(${i})"><div class="dmg-cap">${esc(dmgPhotoCaption(p))}${p.addedBy==='admin'?' · added by admin':''}<br><a href="${esc(p.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open original</a>${p.path?` · <a href="${esc(dmgVerifyUrl(p.path))}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Verify on Google</a>`:''}</div></div>`).join('')||'<div class="empty" style="grid-column:1/-1;padding:12px">No photos</div>'}</div>
     ${f?forms[f.kind]||'':''}
     <div class="dmg-actions">
       ${(r.status||'open')==='open'?'':`<button type="button" class="btn" onclick="dmgSetStatus('open')">Reopen</button>`}
       <button type="button" class="btn" onclick="dmgShowForm('claim')">Claim filed</button>
       <button type="button" class="btn" onclick="dmgShowForm('resolved')">Resolved</button>
       <button type="button" class="btn" onclick="dmgCloseNoClaim()">Closed – no claim</button>
+      <button type="button" class="btn" onclick="dmgShowForm('edit')">Edit</button>
       <button type="button" class="btn" onclick="dmgShowForm('note')">Add note</button>
       <button type="button" class="btn" onclick="dmgAddPhotos()">Add photos</button>
       ${g?.guestFormId?`<button type="button" class="btn" onclick="dmgOpenGuest('${esc(g.guestFormId)}')">Guest record</button>`:''}
@@ -2858,7 +2880,25 @@ function dmgRenderDetail(){
     ${(r.adminNotes||[]).length?`<div class="section-hd"><h2>Notes</h2></div>`+(r.adminNotes||[]).map(n=>`<div class="dmg-note"><b>${esc(String(n.at||'').replace('T',' ').slice(0,16))}</b> · ${esc(n.text)}</div>`).join(''):''}
   </div>`;
 }
-window.dmgShowForm=function(kind){_dmgForm={kind};dmgRenderDetail();};
+window.dmgShowForm=function(kind){
+  _dmgForm={kind};
+  if(kind==='edit'){const r=dmgReports.find(x=>x.id===_dmgOpenId);_dmgForm.cats=[...(r?.categories||[])];_dmgForm.text=r?.description||'';}
+  dmgRenderDetail();
+};
+window.dmgToggleCat=function(c){
+  if(!_dmgForm||_dmgForm.kind!=='edit')return;
+  const ta=document.getElementById('dmg-f-desc');if(ta)_dmgForm.text=ta.value;
+  const i=_dmgForm.cats.indexOf(c);i>=0?_dmgForm.cats.splice(i,1):_dmgForm.cats.push(c);
+  dmgRenderDetail();
+};
+window.dmgSaveEdit=function(){
+  const r=dmgReports.find(x=>x.id===_dmgOpenId);if(!r||!_dmgForm||_dmgForm.kind!=='edit')return;
+  const cats=[...Object.keys(DMG_CATS)].filter(c=>_dmgForm.cats.includes(c));
+  const description=(document.getElementById('dmg-f-desc')?.value||'').trim();
+  const patch={categories:cats,description,adminEdits:arrayUnion({at:tbilisiIsoNow(),categories:cats,description})};
+  if(!r.original)patch.original={categories:r.categories||[],description:r.description||''};   // first edit only; never overwritten
+  dmgUpdate(patch,'Report updated');
+};
 window.dmgCancelForm=function(){_dmgForm=null;dmgRenderDetail();};
 window.dmgOpenGuest=function(id){dmgClose();window.openDetail(id);};
 async function dmgUpdate(patch,msg){
@@ -2891,7 +2931,7 @@ const _dmgStorage=getStorage(fb);
 const _dmgStorageApi={ref:stRef,uploadBytesResumable,getDownloadURL,getMetadata};
 window.dmgAddPhotos=function(){document.getElementById('dmg-file').click();};
 document.getElementById('dmg-file')?.addEventListener('change',async ev=>{
-  const files=[...ev.target.files].slice(0,MAX_PHOTOS);ev.target.value='';
+  const files=[...ev.target.files];ev.target.value='';
   const r=dmgReports.find(x=>x.id===_dmgOpenId);
   if(!r||!files.length)return;
   const recs=[];
