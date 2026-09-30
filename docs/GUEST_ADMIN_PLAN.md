@@ -23,3 +23,4 @@ Restore point: git tag `before-guest-redesign`.
 | 1 | 4270a59 | live, checked |
 | 2 | 3202b58 | live, checked |
 | 3 | 59785d1 | live, checked |
+| 4 | 3222d65 | live, checked |

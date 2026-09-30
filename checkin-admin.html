@@ -262,6 +262,23 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .stat.active{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);}
 .stat__n{font-family:var(--mono);font-size:18px;font-weight:700;}
 .stat__l{font-size:10px;font-weight:500;letter-spacing:.02em;color:var(--muted);margin-top:2px;}
+.search-box--compact{height:38px;margin:2px 0 10px;font-size:16px;padding:0 12px;}
+.stat-row--stay{grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;}
+.stat--wait{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:56px;padding:10px 16px;text-align:left;background:var(--surface);}
+.stat--wait .stat__n{font-size:24px;}
+.stat--wait .stat__l{font-size:15px;font-weight:600;color:var(--ink);margin:0;letter-spacing:0;flex:1;}
+.stat--wait.hot{background:var(--amber-bg);border-color:#d9c79a;}
+.stat--wait.hot .stat__n{color:var(--amber);}
+.stat--wait.active{border-color:var(--ink);}
+.stat--stay{min-height:64px;padding:10px 4px;}
+.stat--stay .stat__l{font-size:11px;line-height:1.2;}
+.stat__hint{font-size:11px;font-weight:500;color:var(--muted);}
+.pill-none{background:#f0eeec;color:var(--muted);}
+.pill-off{background:var(--red-bg);color:var(--red);}
+.card__meta{font-size:13px;color:var(--muted);}
+.card__src{font-size:11px;color:#9a948e;margin-left:6px;}
+.card__warn{font-size:12px;font-weight:600;color:var(--red);margin-top:6px;}
+.card--stay .card__name{margin-bottom:2px;}
 .section-hd{display:flex;align-items:baseline;justify-content:space-between;padding:8px 2px 10px;}
 .section-hd h2{font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--ink-2);}
 .section-hd .n{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);}
@@ -652,7 +669,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1001d · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1001e · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -661,16 +678,8 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
   </div>
 
   <div class="pane active" id="pane-stay">
-    <div class="stat-row" id="stay-stats"></div>
-    <input class="search-box" id="stay-search" placeholder="Search name, room, booking…" oninput="renderStay()">
-    <div class="filter-row" id="stay-filters">
-      <button class="filter-chip active" data-f="overview" onclick="setStayFilter('overview')">Overview</button>
-      <button class="filter-chip" data-f="arrivals" onclick="setStayFilter('arrivals')">Arrivals</button>
-      <button class="filter-chip" data-f="inhouse" onclick="setStayFilter('inhouse')">In-house</button>
-      <button class="filter-chip" data-f="upcoming" onclick="setStayFilter('upcoming')">Upcoming</button>
-      <button class="filter-chip" data-f="leaving" onclick="setStayFilter('leaving')">Leaving</button>
-      <button class="filter-chip" data-f="need" onclick="setStayFilter('need')">Need unlock</button>
-    </div>
+    <div class="stat-row stat-row--stay" id="stay-stats"></div>
+    <input class="search-box search-box--compact" id="stay-search" placeholder="Search guest, room, booking" oninput="renderStay()">
     <div class="day-row" id="upcoming-days"></div>
     <div id="stay-list"></div>
   </div>
@@ -3403,12 +3412,12 @@ function rebuildFormMaps(){
 function getForm(r){return _formById.get(r.id)||null;}
 
 function cardStatus(r,form){
-  if(!form)return{label:'Not registered',cls:'pill-pending',key:'nof'};
+  if(!form)return{label:'Not registered',cls:'pill-none',key:'nof'};
   if(form.guestConfirmedCheckin===true)return{label:'Checked in',cls:'pill-in',key:'checked'};
   const gs=guestStatus(form,r);
   if(gs.cls==='unlocked')return{label:'Has access',cls:'pill-ok',key:'unlocked'};
-  if(gs.cls==='disabled')return{label:'Access off',cls:'pill-pending',key:'disabled'};
-  return{label:'Waiting for unlock',cls:'pill-await',key:'need'};
+  if(gs.cls==='disabled')return{label:'Access off',cls:'pill-off',key:'disabled'};
+  return{label:'Waiting for unlock',cls:'pill-pending',key:'need'};
 }
 function fmtDate(s){if(!s)return'—';return new Date(s+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
 function datesOverlap(aIn,aOut,bIn,bOut){if(!aIn||!aOut||!bIn||!bOut)return false;return aIn<bOut&&bIn<aOut;}
@@ -3575,29 +3584,31 @@ function renderCard(grp,mode){
     return f?.aptId||'—';
   }).join(' · ');
   const name=_stripRoomNum(grp[0].guest||'')||'—';
-  const multi=grp.length>1?`<span class="pill pill-multi">MULTI</span>`:'';
   const rawPhone=(form?.contact||grp.reduce((p,r)=>p||r.phone||r.guest_phone||r.guestPhone||'','')||'').trim();
   const wa=buildWaUrl(normalizeWaPhone(rawPhone),name,!!form,sorted[0].roomCode);
   const waBtn=wa?`<a class="btn" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`:`<button class="btn" disabled>WhatsApp</button>`;
-  let grant='';
-  if(st.key==='need'&&form)grant=unlockButtonHtml(form,sorted[0]);
-  else if(form&&canPreviewGuest(form))grant=`<button class="btn" onclick="event.stopPropagation();window.viewGuestAsGuest('${form.id}')">Preview</button><button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
-  else if(form)grant=`<button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
-  else grant=`<button class="btn" disabled>No form yet</button>`;
-  const ref=grp[0].reservationNumber||grp[0].bookingId||'';
+  let main='';
+  if(st.key==='need'&&form&&form.blocked!==true)main=`<button class="btn btn-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Unlock</button>`;
+  else if(form)main=`<button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
+  else main=`<button class="btn" disabled>No form yet</button>`;
   const guestCount=stayGuestCount(grp,form);
   const guestCountLabel=guestCount+' guest'+(guestCount===1?'':'s');
-  const sub=[ref?'#'+ref:'',rawPhone||''].filter(Boolean).join(' · ');
+  const srcRaw=(grp[0].source||'').toLowerCase();
+  const srcLabel=(SOURCE_BADGES[srcRaw]||{label:srcRaw?'Direct':''}).label;
   const open=form?`onclick="window.openDetail('${form.id}')" style="cursor:pointer"`:'';
-  const manualBadge=reservationManualBadge(grp);
-  const driftBadge=reservationDriftBadge(grp);
-  return`<div class="card" ${open}>
-    <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${st.cls}" ${form&&(st.key==='unlocked'||st.key==='need'||st.key==='disabled')?`onclick="event.stopPropagation();window.toggleGuestAccess('${form.id}')" style="cursor:pointer"`:''}>${st.label}</span>${manualBadge}${driftBadge}</div>
-    <div class="card__name">${esc(name)}${multi}${sourceBadgeHtml(grp[0].source)}</div>
-    <div class="card__guests">${esc(guestCountLabel)}</div>
-    <div class="card__dates">${esc(datesStr(grp[0],mode))}</div>
-    ${sub?`<div class="card__sub">${esc(sub)}</div>`:''}
-    <div class="card__actions">${waBtn}${grant}</div>
+  let warn='';
+  for(const r of grp){
+    if(!(r.manualRoom===true||r.manualRoom==='true'))continue;
+    const pinned=(r.roomCode||r.room||'').trim();
+    const live=(r.minihotelLiveRoom||'').trim();
+    if(pinned&&live&&pinned!==live){warn=`<div class="card__warn">Room mismatch: MiniHotel shows ${esc(live)}</div>`;break;}
+  }
+  return`<div class="card card--stay" ${open}>
+    <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${st.cls}" ${form&&(st.key==='unlocked'||st.key==='need'||st.key==='disabled')?`onclick="event.stopPropagation();window.toggleGuestAccess('${form.id}')" style="cursor:pointer"`:''}>${st.label}</span></div>
+    <div class="card__name">${esc(name)}</div>
+    <div class="card__meta">${esc(datesStr(grp[0],mode))} · ${esc(guestCountLabel)}${srcLabel?`<span class="card__src">${esc(srcLabel)}</span>`:''}</div>
+    ${warn}
+    <div class="card__actions">${waBtn}${main}</div>
   </div>`;
 }
 
@@ -3607,18 +3618,16 @@ function sectionBlock(title,groups,mode){
 }
 
 window.setStayFilter=function(f){
-  stayFilter=f;
-  if(f==='upcoming'){
+  stayFilter=(f===stayFilter)?'overview':f;
+  if(stayFilter==='upcoming'){
     const days=upcomingDaysList();
     if(!upcomingDay||!days.some(d=>d.iso===upcomingDay))upcomingDay=days[0].iso;
   }
-  document.querySelectorAll('#stay-filters .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.f===f));
   renderStay();
 };
 window.setUpcomingDay=function(iso){
   upcomingDay=iso;
   stayFilter='upcoming';
-  document.querySelectorAll('#stay-filters .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.f==='upcoming'));
   renderStay();
 };
 
@@ -3649,11 +3658,14 @@ window.renderStay=function(){
     return hay.includes(q);
   });
 
+  const waiting=[...b.arrivals,...b.inhouse].filter(grp=>{
+    const form=grp.reduce((f,r)=>f||getForm(r),null);
+    return cardStatus(grp[0],form).key==='need';
+  }).length;
+  const tile=(f,n,l)=>`<button type="button" class="stat stat--stay ${stayFilter===f?'active':''}" aria-pressed="${stayFilter===f}" onclick="setStayFilter('${f}')"><div class="stat__n">${n}</div><div class="stat__l">${l}</div></button>`;
   document.getElementById('stay-stats').innerHTML=`
-    <button type="button" class="stat ${stayFilter==='arrivals'?'active':''}" onclick="setStayFilter('arrivals')"><div class="stat__n">${b.arrivals.length}</div><div class="stat__l">Arrive</div></button>
-    <button type="button" class="stat ${stayFilter==='inhouse'?'active':''}" onclick="setStayFilter('inhouse')"><div class="stat__n">${b.inhouse.length}</div><div class="stat__l">In-house</div></button>
-    <button type="button" class="stat ${stayFilter==='upcoming'?'active':''}" onclick="setStayFilter('upcoming')"><div class="stat__n">${b.upcoming.length}</div><div class="stat__l">Next 7d</div></button>
-    <button type="button" class="stat ${stayFilter==='leaving'?'active':''}" onclick="setStayFilter('leaving')"><div class="stat__n">${b.leaving.length}</div><div class="stat__l">Leave</div></button>`;
+    <button type="button" class="stat stat--wait ${waiting>0?'hot':''} ${stayFilter==='need'?'active':''}" aria-pressed="${stayFilter==='need'}" onclick="setStayFilter('need')"><div class="stat__l">Waiting for unlock</div><div class="stat__n">${waiting}</div></button>
+    ${tile('arrivals',b.arrivals.length,'Arriving today')}${tile('inhouse',b.inhouse.length,'Staying')}${tile('leaving',b.leaving.length,'Leaving today')}${tile('upcoming',b.upcoming.length,'Next 7 days')}`;
 
   renderUpcomingDayChips();
 
@@ -3663,9 +3675,9 @@ window.renderStay=function(){
   if(stayFilter==='overview'){
     const arr=filterByQ(b.arrivals),leave=filterByQ(b.leaving),house=filterByQ(b.inhouse);
     let html=
-      sectionBlock('Arrivals today',arr,'arrival')+
+      sectionBlock('Arriving today',arr,'arrival')+
       sectionBlock('Leaving today',leave,'leaving')+
-      sectionBlock('Currently in-house',house,'inhouse');
+      sectionBlock('Staying',house,'inhouse');
     const days=upcomingDaysList().filter(d=>groupsForCheckinDate(d.iso).length);
     if(!days.length)html+=sectionBlock('Upcoming',[],'upcoming');
     else for(const d of days){
@@ -3689,15 +3701,15 @@ window.renderStay=function(){
   }
 
   let groups=[],mode='inhouse',title='';
-  if(stayFilter==='arrivals'){groups=b.arrivals;mode='arrival';title='Arrivals today';}
-  else if(stayFilter==='inhouse'){groups=b.inhouse;mode='inhouse';title='Currently in-house';}
+  if(stayFilter==='arrivals'){groups=b.arrivals;mode='arrival';title='Arriving today';}
+  else if(stayFilter==='inhouse'){groups=b.inhouse;mode='inhouse';title='Staying';}
   else if(stayFilter==='leaving'){groups=b.leaving;mode='leaving';title='Leaving today';}
   else if(stayFilter==='need'){
     groups=[...b.arrivals,...b.inhouse].filter(grp=>{
       const form=grp.reduce((f,r)=>f||getForm(r),null);
       return cardStatus(grp[0],form).key==='need';
     });
-    mode='inhouse';title='Need unlock';
+    mode='inhouse';title='Waiting for unlock';
   }
   groups=filterByQ(groups);
   if(!groups.length){el.innerHTML=`<div class="section-hd"><h2>${esc(title)}</h2><span class="n">0</span></div><div class="empty">Nothing here</div>`;return;}
@@ -3820,7 +3832,7 @@ window.closeHistoryPhoto=function(){
 };
 
 const TAB_META={
-  stay:{title:'Stay',sub:'Overview · arrivals · in-house · upcoming'},
+  stay:{title:'Stay',sub:'Who is here, arriving and leaving'},
   elevator:{title:'Elevator',sub:'Entrance & elevator code'},
   requests:{title:'Requests',sub:'Guest service requests'},
   apts:{title:'Apartments',sub:'WiFi, instructions, photo steps'},
