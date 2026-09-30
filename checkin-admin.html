@@ -3127,6 +3127,7 @@ function buildHistoryData(){
     const key=displayName.toLowerCase().trim();
     return{
       res:r,
+      guestId:form?.id||null,
       name:displayName,
       roomCode:(r.roomCode||r.room||'').trim(),
       checkin:r.checkin||r.checkIn||'',
@@ -3180,6 +3181,10 @@ function renderHistoryUI(){
       <div style="font-size:13px;color:var(--muted);margin:4px 0 8px;">${fmtDate(r.checkin)} → ${fmtDate(r.checkout)} · ${nl} night${nl!==1?'s':''}</div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${ppHtml}</div>
       ${r.contact?`<div class="card__actions">${wa?`<a class="btn" href="https://wa.me/${wa}?text=${waMsg}" target="_blank" rel="noopener">WhatsApp</a>`:`<span style="font-size:12px;color:var(--muted);">${esc(r.contact)}</span>`}</div>`:''}
+      ${r.guestId?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);display:flex;gap:8px;">
+        <button type="button" class="btn" style="flex:1;padding:4px 10px;height:auto;font-size:12px;" onclick="window.openGenDocModal('${r.guestId}','proof')">📄 Proof of Stay</button>
+        <button type="button" class="btn" style="flex:1;padding:4px 10px;height:auto;font-size:12px;" onclick="window.openGenDocModal('${r.guestId}','chargeback')">⚖️ Chargeback Dispute</button>
+      </div>`:''}
     </div>`;
   }).join('');
 }
@@ -3661,13 +3666,6 @@ window.openDetail=function(guestId){
       ${g.blocked===true
         ?`<button class="btn btn-primary" style="flex:1" onclick="window.unblockGuest('${g.id}')">Unblock guest</button>`
         :`<button class="btn" style="flex:1;border-color:var(--red);color:var(--red)" onclick="window.blockGuest('${g.id}')">Block guest</button>`}
-    </div>
-    <div style="margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs)">
-      <div style="font-size:12px;font-weight:700;margin-bottom:8px">Documents</div>
-      <div style="display:flex;gap:8px;">
-        <button class="btn" style="flex:1" onclick="window.openGenDocModal('${g.id}','proof')">📄 Proof of Stay</button>
-        <button class="btn" style="flex:1" onclick="window.openGenDocModal('${g.id}','chargeback')">⚖️ Chargeback Dispute</button>
-      </div>
     </div>
     <button class="btn" style="width:100%;margin-top:12px" onclick="window.openAptEditor('${g.aptId||''}')">Edit apartment instructions</button>
   `;
