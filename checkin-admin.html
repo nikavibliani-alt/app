@@ -652,7 +652,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1001a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1001b · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -3845,7 +3845,7 @@ function updateHeaderBack(){
 
 window.goBack=function(){
   if(document.getElementById('gp-editor-overlay')?.classList.contains('open')){closeGpEditor();return;}
-  if(document.getElementById('apt-editor-overlay')?.classList.contains('open')){closeAptEditor();return;}
+  if(document.getElementById('apt-editor-overlay')?.classList.contains('open')){if(aptEditorDirty()&&!confirm('Discard unsaved changes?'))return;closeAptEditor();return;}
   if(document.getElementById('req-detail')?.classList.contains('open')){closeReqDetail();return;}
   if(document.getElementById('detail')?.classList.contains('open')){closeDetail();return;}
   if(MORE_SUB_PAGES.has(currentTab)){
@@ -3857,6 +3857,7 @@ window.goBack=function(){
 };
 
 window.switchTab=function(tab){
+  if(tab!=='apts'&&window.aptEditorDirty&&aptEditorDirty()&&!confirm('Discard unsaved changes?'))return;
   if(tab==='hksettings'&&currentTab!=='hksettings')hkSetSectionStore('menu');   // coming from another tab: start at the menu
   if(STANDALONE_HK){
     if(tab==='hksettings'&&!isHkAdmin())tab='hk';
@@ -4808,6 +4809,7 @@ window.saveRoomMeta=async function(roomCode){
       displayName,displayCode:displayCode||roomCode,group:group||'Other',site,
       minihotelNames,showInHk,updatedAt:serverTimestamp(),
     },{merge:true});
+    _aptRebase(k=>k.startsWith('room-meta-'));
     toast('Room settings saved');
     const title=document.getElementById('apt-ed-title');
     if(title)title.textContent=(displayCode||roomCode)+' · '+displayName;
@@ -5004,7 +5006,55 @@ window.openAptEditor=function(aptId){
     </div>
   `;
   document.getElementById('apt-editor-overlay').classList.add('open');
+  _aptBaseline=_aptSnap();
 };
+/* unsaved-edit protection for the apartment editor */
+let _aptBaseline=null;
+function _aptSnap(){
+  const out={};
+  document.querySelectorAll('#apt-ed-body input:not([type=file]),#apt-ed-body textarea,#apt-ed-body select').forEach(el=>{
+    if(!el.id)return;
+    out[el.id]=el.type==='checkbox'?el.checked:el.value;
+  });
+  out.__mode=!!document.getElementById('mode-manual')?.classList.contains('active');
+  return out;
+}
+window.aptEditorDirty=function(){
+  if(!document.getElementById('apt-editor-overlay')?.classList.contains('open')||!_aptBaseline)return false;
+  const cur=_aptSnap();
+  const keys=new Set([...Object.keys(cur),...Object.keys(_aptBaseline)]);
+  for(const k of keys){if(cur[k]!==_aptBaseline[k])return true;}
+  return false;
+};
+function _aptRebase(match){
+  if(!_aptBaseline)return;
+  const cur=_aptSnap();
+  for(const k of Object.keys(cur)){if(match(k))_aptBaseline[k]=cur[k];}
+}
+/* re-render after a photo action but keep whatever was typed; capMap[newIdx]=old caption index */
+function _aptRerender(aptId,capMap){
+  const snap=_aptSnap();
+  const scrollers=['apt-ed-body','apt-editor-overlay'].map(id=>{const e=document.getElementById(id);return[e,e?e.scrollTop:0];});
+  const foldOpen=!document.getElementById('apt-fold-registry')?.classList.contains('collapsed');
+  openAptEditor(aptId);
+  for(const k of Object.keys(snap)){
+    if(k==='__mode'||/^photo-cap-\d+$/.test(k))continue;
+    const el=document.getElementById(k);
+    if(!el)continue;
+    if(el.type==='checkbox')el.checked=!!snap[k];else el.value=snap[k];
+  }
+  const capCount=document.querySelectorAll('#apt-ed-body textarea[id^="photo-cap-"]').length;
+  for(let i=0;i<capCount;i++){
+    const old=capMap?capMap[i]:i;
+    if(old==null||old<0)continue;
+    const typed=snap['photo-cap-'+old];
+    const el=document.getElementById('photo-cap-'+i);
+    if(el&&typed!==undefined)el.value=typed;
+  }
+  if(snap.__mode!==!!document.getElementById('mode-manual')?.classList.contains('active'))setLockMode(snap.__mode?'manual':'auto');
+  if(foldOpen)document.getElementById('apt-fold-registry')?.classList.remove('collapsed');
+  scrollers.forEach(([e,t])=>{if(e)e.scrollTop=t;});
+}
 window.closeAptEditor=function(){
   document.getElementById('apt-editor-overlay').classList.remove('open');
   _currentAptId=null;
@@ -5037,6 +5087,7 @@ window.saveAptData=async function(){
   try{
     await setDoc(doc(db,'checkin_apartments',aptId),data,{merge:true});
     aptData[aptId]={...aptData[aptId],...data};
+    _aptRebase(k=>!k.startsWith('room-meta-'));
     toast('Saved ✓');
     renderAptsList();
   }catch(e){toast('Save failed: '+e.message);}
@@ -5053,17 +5104,18 @@ window.uploadPhotos=async function(input){
     while(photoCaptions.length<photos.length)photoCaptions.push('');
     await setDoc(doc(db,'checkin_apartments',aptId),{photos,photoCaptions},{merge:true});
     aptData[aptId]={...aptData[aptId],photos,photoCaptions};
-    toast('Uploaded ✓');openAptEditor(aptId);
+    toast('Uploaded ✓');_aptRerender(aptId);
   }catch(e){toast('Upload failed: '+e.message);}
 };
 window.deletePhoto=async function(idx){
   const aptId=_currentAptId;if(!aptId||!confirm('Delete this photo?'))return;
   const photos=[...(aptData[aptId]?.photos||[])];
   const photoCaptions=[...(aptData[aptId]?.photoCaptions||[])];
+  const oldN=photos.length;
   photos.splice(idx,1);photoCaptions.splice(idx,1);
   await setDoc(doc(db,'checkin_apartments',aptId),{photos,photoCaptions},{merge:true});
   aptData[aptId]={...aptData[aptId],photos,photoCaptions};
-  openAptEditor(aptId);
+  _aptRerender(aptId,[...Array(oldN).keys()].filter(i=>i!==idx));
 };
 window.movePhoto=async function(idx,dir){
   const aptId=_currentAptId;if(!aptId)return;
@@ -5074,7 +5126,8 @@ window.movePhoto=async function(idx,dir){
   [caps[idx],caps[j]]=[caps[j]||'',caps[idx]||''];
   await setDoc(doc(db,'checkin_apartments',aptId),{photos,photoCaptions:caps},{merge:true});
   aptData[aptId]={...aptData[aptId],photos,photoCaptions:caps};
-  openAptEditor(aptId);
+  const order=[...Array(photos.length).keys()];[order[idx],order[j]]=[order[j],order[idx]];
+  _aptRerender(aptId,order);
 };
 window.doReplacePhoto=async function(idx,input){
   const aptId=_currentAptId;const file=input.files?.[0];if(!aptId||!file)return;
@@ -5084,7 +5137,7 @@ window.doReplacePhoto=async function(idx,input){
     const photos=[...(aptData[aptId]?.photos||[])];photos[idx]=url;
     await setDoc(doc(db,'checkin_apartments',aptId),{photos},{merge:true});
     aptData[aptId]={...aptData[aptId],photos};
-    toast('Replaced ✓');openAptEditor(aptId);
+    toast('Replaced ✓');_aptRerender(aptId);
   }catch(e){toast('Replace failed: '+e.message);}
 };
 
