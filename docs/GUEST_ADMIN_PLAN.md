@@ -20,3 +20,5 @@ Restore point: git tag `before-guest-redesign`.
 ## HOW TO UNDO
 - Undo everything: `git revert --no-edit before-guest-redesign..HEAD` (only this redesign's commits), then push to main.
 - Undo one step: `git revert --no-edit <that step's commit>`, then push to main.
+| 1 | 4270a59 | live, checked |
+| 2 | 3202b58 | live, checked |
