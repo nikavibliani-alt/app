@@ -210,7 +210,7 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
   - the time the room was marked done
   - ready photos from before that guest's stay, if any
 - **Storage rules:** give Nika an exact snippet to paste in the Firebase Console:
-  - allow create on hk_damage/** and hk_ready/** for image/* under 25 MB
+  - allow create on hk_damage/** and hk_ready/** for image/* under 50 MB
   - allow read
   - no update or delete
   - keep the existing passport_uploads rule unchanged
@@ -229,13 +229,13 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
 ```
     match /hk_damage/{reportId}/{file} {
       allow read: if true;
-      allow create: if request.resource.size < 25 * 1024 * 1024
+      allow create: if request.resource.size < 50 * 1024 * 1024
                     && request.resource.contentType.matches('image/.*');
       allow update, delete: if false;
     }
     match /hk_ready/{folder}/{file} {
       allow read: if true;
-      allow create: if request.resource.size < 25 * 1024 * 1024
+      allow create: if request.resource.size < 50 * 1024 * 1024
                     && request.resource.contentType.matches('image/.*');
       allow update, delete: if false;
     }
