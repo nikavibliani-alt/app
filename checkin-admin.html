@@ -679,7 +679,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1004a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1004b · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -3622,9 +3622,15 @@ function renderCard(grp,mode){
   const wa=buildWaUrl(normalizeWaPhone(rawPhone),name,!!form,sorted[0].roomCode);
   const waBtn=wa?`<a class="btn" href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>`:`<button class="btn" disabled>WhatsApp</button>`;
   let main='';
-  if(st.key==='need'&&form&&form.blocked!==true)main=`<button class="btn btn-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Unlock</button>`;
-  else if(form)main=`<button class="btn" onclick="event.stopPropagation();window.openDetail('${form.id}')">Details</button>`;
-  else main=`<button class="btn" disabled>No form yet</button>`;
+  if(mode==='upcoming')main='';   // future days: WhatsApp only
+  else if(!form)main=`<button class="btn" disabled>Not registered</button>`;
+  else if(form.blocked===true)main=`<button class="btn" disabled>Blocked</button>`;
+  else{
+    const gsx=guestStatus(form,sorted[0]);
+    if(gsx.cls==='unlocked')main=`<button class="btn" onclick="event.stopPropagation();window.toggleGuestAccess('${form.id}')">Remove access</button>`;
+    else if(gsx.cls==='disabled')main=`<button class="btn btn-primary" onclick="event.stopPropagation();window.toggleGuestAccess('${form.id}','on')">Give access</button>`;
+    else main=`<button class="btn btn-primary" onclick="event.stopPropagation();window.unlockGuest('${form.id}')">Give access</button>`;
+  }
   const guestCount=stayGuestCount(grp,form);
   const guestCountLabel=guestCount+' guest'+(guestCount===1?'':'s');
   const srcRaw=(grp[0].source||'').toLowerCase();
@@ -3638,7 +3644,7 @@ function renderCard(grp,mode){
     if(pinned&&live&&pinned!==live){warn=`<div class="card__warn">Room mismatch: MiniHotel shows ${esc(live)}</div>`;break;}
   }
   return`<div class="card card--stay" ${open}>
-    <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${stShow.cls}" ${form&&(st.key==='unlocked'||st.key==='need'||st.key==='disabled')?`onclick="event.stopPropagation();window.toggleGuestAccess('${form.id}')" style="cursor:pointer"`:''}>${stShow.label}</span></div>
+    <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${stShow.cls}">${stShow.label}</span></div>
     <div class="card__name">${esc(name)}</div>
     <div class="card__meta">${esc(datesStr(grp[0],mode))} · ${esc(guestCountLabel)}${srcLabel?`<span class="card__src">${esc(srcLabel)}</span>`:''}</div>
     ${warn}
@@ -4002,14 +4008,16 @@ window.unlockGuest=async function(guestId){
     toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Failed: '+e.message);
   }
 };
-window.toggleGuestAccess=async function(guestId){
+window.toggleGuestAccess=async function(guestId,want){   // want: 'on' = always give access (used by the Give access button)
   const g=guestData.find(x=>x.id===guestId);
   if(!g)return;
   const res=reservationForGuest(g);
-  const st=cardStatus(res,g);
+  const gsx=guestStatus(g,res);   // underlying access state (also correct for guests who already checked in)
+  const st={key:gsx.cls==='unlocked'?'unlocked':gsx.cls==='disabled'?'disabled':'need'};
   const who=_stripRoomNum(res?.guest||g.nameRoman||g.name||'')||'this guest';
   const roomLbl=res?(res.roomCode||res.room||''):(g.aptId||'');
   const whoRoom=who+(roomLbl?' ('+roomLbl+')':'');
+  if(want==='on'&&st.key!=='unlocked')st.key='need';   // give access: take the grant branch
   const turningOff=(st.key==='unlocked')||(st.key==='disabled'&&tbilisiHourLocal()>=15);
   if(!confirm((turningOff?'Turn OFF':'Turn ON')+' door access for '+whoRoom+'?'))return;
   try{

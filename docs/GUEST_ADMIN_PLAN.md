@@ -99,3 +99,4 @@ Undo all: `git revert --no-edit before-round-4..HEAD`, then push. Undo one step:
 | Step | Commit | Status |
 |------|--------|--------|
 | 0 | tag before-round-4 | done |
+| 1 | 6ec1fdd | live — root cause: hero phase not re-derived after HK fetch |
