@@ -296,6 +296,8 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .day-chip__label{font-size:11px;font-weight:500;line-height:1.1;color:var(--ink-2);white-space:nowrap;}
 .day-chip__n{font-family:var(--mono);font-size:14px;font-weight:700;line-height:1;color:var(--ink);}
 .day-chip__n .miss{color:var(--amber);}
+.day-chip__n .ok{color:var(--green);}
+.day-chip.active .day-chip__n .ok{color:#a8dcc0;}
 .day-chip__n .none{color:var(--muted);font-weight:500;}
 .day-chip.today .day-chip__label{font-weight:800;color:var(--ink);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px;}
 .day-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
@@ -682,7 +684,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1004c · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1004d · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -692,7 +694,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 
   <div class="pane active" id="pane-stay">
     <div class="stat-row stat-row--stay" id="stay-stats"></div>
-    <div class="day-row show" id="upcoming-days" aria-label="Arrivals by day (arriving / not registered)"></div>
+    <div class="day-row show" id="upcoming-days" aria-label="Arrivals by day (arriving / registered)"></div>
     <div class="search-wrap">
       <input class="search-box search-box--compact" id="stay-search" placeholder="Search guest, room, booking" oninput="renderStay()">
       <button type="button" class="search-clear" id="stay-search-clear" aria-label="Clear search" onclick="clearStaySearch()" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
@@ -3700,10 +3702,10 @@ function renderUpcomingDayChips(){
   row.innerHTML=days.map(d=>{
     const groups=groupsForCheckinDate(d.iso);
     const n=groups.length;
-    const miss=groups.filter(g=>!groupHasForm(g)).length;
+    const reg=groups.filter(g=>groupHasForm(g)).length;
     const active=sel&&d.iso===upcomingDay;
-    const cnt=n?`${n}/<span class="${miss?'miss':''}">${miss}</span>`:'<span class="none">–</span>';
-    const aria=`${d.full}: ${n} arriving, ${miss} not registered`;
+    const cnt=n?`${n}/<span class="${reg<n?'miss':'ok'}">${reg}</span>`:'<span class="none">–</span>';
+    const aria=`${d.full}: ${n} arriving, ${reg} registered`;
     return`<button type="button" class="day-chip${active?' active':''}${d.offset===0?' today':''}" aria-pressed="${active}" aria-label="${aria}" onclick="setUpcomingDay('${d.iso}')">
       <span class="day-chip__label">${esc(d.label)}</span>
       <span class="day-chip__n">${cnt}</span>
@@ -3772,8 +3774,8 @@ function _renderStayCore(){
     if(!upcomingDay||!days.some(d=>d.iso===upcomingDay))upcomingDay=tbilisiToday();
     const meta=days.find(d=>d.iso===upcomingDay);
     const all=groupsForCheckinDate(upcomingDay);
-    const missAll=all.filter(g=>!groupHasForm(g)).length;
-    const title=meta.full+' · '+all.length+' arriving'+(missAll?' · '+missAll+' not registered':'');
+    const regAll=all.filter(g=>groupHasForm(g)).length;
+    const title=meta.full+' · '+all.length+' arriving'+(all.length?' · '+regAll+' registered':'');
     const cardMode=meta.offset===0?'arrival':meta.offset<0?'inhouse':'upcoming';
     const groups=filterByQ(all).map((g,i)=>[g,i]).sort((a,b)=>(groupHasForm(a[0])?1:0)-(groupHasForm(b[0])?1:0)||a[1]-b[1]).map(x=>x[0]);
     if(!groups.length){el.innerHTML=`<div class="section-hd"><h2>${esc(title)}</h2></div><div class="empty">${all.length?'No match':'No arrivals this day'}</div>`;return;}
