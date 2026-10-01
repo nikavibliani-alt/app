@@ -61,3 +61,18 @@ Round 2 notes:
 - Step 2: WebKit on desktop does not reproduce iPhone's system-blue button text; fixed by a global `button{color:inherit}` plus removing blue colors; verified by computed-color scan (no blue left outside HK). Left alone: .hk-cleaner-link, .hk-role-badge (use --blue), damage lightbox link #9cf.
 - Step 3 left for HK/WhatsApp/elevator chats: HK PIN pad glyphs, HK/damage toasts and arrows, WhatsApp settings toasts/hint, elevator toast, "Guest page saved ✓" (inside gsSaveAll, untouched).
 - Step 5: a day with 0 arrivals was not present in live data, so that look was checked in code only.
+
+# Round 3
+
+Restore point: tag `before-round-3`.
+
+1. Guest settings Save no longer writes hkSettings
+2. Door code switch per apartment type (gsVisibility[group].smartLock), not per unit
+3. Stay: compact calendar strip (Yesterday, Today, next 7 days)
+4. Stay search also finds past guests
+
+Undo all: `git revert --no-edit before-round-3..HEAD`, then push. Undo one step: `git revert --no-edit <commit>`, then push.
+
+| Step | Commit | Status |
+|------|--------|--------|
+| 0 | tag before-round-3 | done |
