@@ -125,3 +125,10 @@ Restore point: tag `before-hotel-collect`.
 2. Cloud Function `pushOnHotelCollect` (push + WhatsApp to owner when a new Hotel Collect booking arrives)
 
 Undo admin: `git revert --no-edit <commit>`, then push. Undo cloud function: `firebase functions:delete pushOnHotelCollect --region europe-west1 --project sleepy-5c962`.
+| Hotel Collect 1 (admin) | 2724769 | live |
+| Hotel Collect 2 (function pushOnHotelCollect) | 53ef99d | deployed (only this function) |
+
+Notes:
+- Incident during step 1: a stale git index lock led to a commit that deleted every file; the site was never redeployed from it. Fixed with a restore commit (tree identical to before), then step 1 recommitted. Revert ranges therefore contain that delete/restore pair; harmless.
+- Function reads ownerPhone from globals/config and uses secrets META_ACCESS_TOKEN / META_PHONE_NUMBER_ID (granted accessor to the default compute service account by the deploy). New collection hc_alerts/{reservationNumber} (one doc per alerted booking).
+- Review writes (hcReview on reservations) were tested with mocked writes only; not exercised against real Firestore rules.
