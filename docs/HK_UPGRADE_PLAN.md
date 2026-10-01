@@ -223,6 +223,14 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
   - no update or delete
   - keep the existing passport_uploads rule unchanged
 
+### Overdue carry-over: un-cleaned rooms stay on today's board (done)
+- Problem (1 Oct): tab-3 was vacated on 30 Sep but never marked Done, so it dropped off the board the next day even though a guest arrived that day. The board only listed rooms with a checkout on the shown day.
+- Rule (admin HK tab and cleaner page, same code): on TODAY's tab a room is also listed, labelled "Not cleaned yet · left dd.mm", when its last stay left in the previous 3 days (`HK_OVERDUE_DAYS`) and no `hk_status` doc with `done:true` exists for that room from that checkout date up to today. Not carried over: a guest has already arrived since the checkout (in-house), cancelled bookings, a checkout that was removed or moved on purpose. Overdue rooms sort first and count in the day tab.
+- Done on an overdue card uses today's date and follows the normal Done contract (today doc + arrival doc + guest unlock); the card then stays as Done. `toggleHkDone` is unchanged.
+- Admin: Edit sheet on an overdue card has no "Move"; "Remove from schedule" dismisses it (`removed:true` on its checkout-day doc).
+- Data windows: cleaner page and admin now load reservations/forms/`hk_status` from today-3 (still narrow queries).
+- Verified against real data on 1 Oct: Centre board = orb-2, tab-2, tab-3 (overdue).
+
 ### Staff links can cover several teams (done)
 - `hk_staff_links/{token}` now has `teamIds: [teamId, ...]`. Old links with only `teamId` are read as `[teamId]`; whenever a link is saved or edited, `teamIds` is written and `teamId` is kept as `teamIds[0]`. Teams themselves and the "one team per apartment" rule are unchanged.
 - Admin → HK settings → Staff links: the new-link form has team checkboxes (at least one required); each active link has an **Edit** button (name + ticked teams, same token, so the cleaner keeps the same link); the list shows all team names, e.g. "Centre Team + Abashidze Team".

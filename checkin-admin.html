@@ -499,6 +499,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .hk-admin-bar{margin-bottom:12px;}
 .hk-card__admin{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
 .hk-card__admin-btn{height:32px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;font-family:var(--sans);}
+.hk-overdue{display:inline-block;margin-top:8px;font-size:11px;font-weight:700;color:#9a3412;background:#fff7ed;border:1px solid #f59e0b;border-radius:999px;padding:4px 10px;}
 .hk-card__admin-btn.danger{color:var(--red);border-color:#fca5a5;background:var(--red-bg);}
 .hk-admin-modal{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:240;display:flex;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom);}
 .hk-admin-modal[hidden]{display:none;}
@@ -5538,7 +5539,7 @@ function hkSortScore(room,dateStr){
   const cleanM=hkCleanMinutes(room.code);
   const guestM=hkGuestArrivalMinutes(form,nextRes);
   const slack=guestM-(coM+cleanM);
-  return pBase+slack;
+  return pBase+slack+(room.overdueFrom?-5000:0);   // overdue rooms first
 }
 function hkDepartingGuestForm(roomCode,dateStr,coRes){
   if(coRes){
@@ -5596,19 +5597,43 @@ function hkDayTabLabel(offset,dateStr){
   if(offset===1)return 'Tomorrow';
   return new Date(dateStr+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric'});
 }
+const HK_OVERDUE_DAYS=3;   // a room that left up to this many days ago and was never marked Done stays on today's board
+/** Checkout date C of the last stay that left this room (before today, within HK_OVERDUE_DAYS) and still needs cleaning, else null.
+ *  ignoreDone=true only finds the departure (used to label a card that has just been marked Done). */
+function hkOverdueFrom(roomCode,dateStr,ignoreDone){
+  if(dateStr!==tbilisiToday())return null;
+  const lo=hkAddDays(-HK_OVERDUE_DAYS);
+  const res=(_resCache||[]).filter(r=>hkNotCancelled(r)&&r.roomCode===roomCode);
+  let C=null;
+  for(const r of res){if(r.checkout&&r.checkout>=lo&&r.checkout<dateStr&&(!C||r.checkout>C))C=r.checkout;}
+  if(!C)return null;
+  if(res.some(r=>r.checkin&&r.checkin>=C&&r.checkin<dateStr))return null;      // a guest already arrived since: in-house, not pending
+  const dismissed=hkStatusData[roomCode+'_'+C];
+  if(dismissed&&(dismissed.removed===true||dismissed.movedTo))return null;     // removed / moved on purpose
+  if(!ignoreDone){for(const v of Object.values(hkStatusData)){if(v&&v.roomCode===roomCode&&v.done===true&&v.date>=C&&v.date<=dateStr)return null;}}
+  return C;
+}
 function hkTaskRooms(dateStr){
   const movedAway=code=>{const d=hkStatusData[code+'_'+dateStr];return !!d?.movedTo||d?.removed===true;};
   const coRooms=hkRoomsForRole().filter(r=>hkGetCheckout(r.code,dateStr)&&!movedAway(r.code));
   const seen=new Set(coRooms.map(r=>r.code));
+  const overdue=[];
+  if(dateStr===tbilisiToday()){
+    for(const r of hkRoomsForRole()){
+      if(seen.has(r.code)||movedAway(r.code))continue;
+      const C=hkOverdueFrom(r.code,dateStr);
+      if(C){overdue.push({...r,overdueFrom:C});seen.add(r.code);}
+    }
+  }
   const manual=[];
   for(const key of Object.keys(hkStatusData)){
     if(!key.endsWith('_'+dateStr))continue;
     const roomCode=key.slice(0,-(dateStr.length+1));
     if(seen.has(roomCode)||movedAway(roomCode))continue;
     const room=hkRoomsForRole().find(r=>r.code===roomCode);
-    if(room){manual.push(room);seen.add(roomCode);}
+    if(room){const od=hkGetCheckout(roomCode,dateStr)?null:hkOverdueFrom(roomCode,dateStr,true);manual.push(od?{...room,overdueFrom:od}:room);seen.add(roomCode);}
   }
-  return [...coRooms,...manual];
+  return [...coRooms,...overdue,...manual];
 }
 async function renderHk(){
   const keepScroll=window.scrollY;
@@ -5649,10 +5674,11 @@ async function renderHk(){
     const key=room.code+'_'+dateStr;
     const st=hkStatusData[key]||{};
     const done=!!st.done;
-    const co=hkGetCheckout(room.code,dateStr);
+    const coDate=room.overdueFrom||dateStr;   // overdue rooms show the stay that already left
+    const co=hkGetCheckout(room.code,coDate);
     const nextRes=hkGetNextCheckin(room.code,dateStr);
     const form=hkGuestFormForRoom(room.code,dateStr,nextRes);
-    const departing=hkDepartingGuestForm(room.code,dateStr,co);
+    const departing=hkDepartingGuestForm(room.code,coDate,co);
     const guestCheckedOut=departing?.guestConfirmedCheckout===true;
     const outGuests=hkGuestCount(co,departing,st.guestCount);
     const inGuests=hkGuestCount(nextRes,form,st.arrivingGuestCount);
@@ -5675,6 +5701,7 @@ async function renderHk(){
         <div class="hk-card__time"><b>Checkout</b>${admin&&co?sourceBadgeHtml(co.source):''}${esc(coTime)}<div class="hk-card__count">${hkGuestCountHtml(co,outGuests,'leaving')}</div></div>
         <div class="hk-card__time${inBoxCls}"><b>Check-in</b>${admin&&nextRes?sourceBadgeHtml(nextRes.source):''}${nextRes?`<div class="hk-card__when">${esc(whenLabel)}</div>${esc(ciTime)}<div class="hk-card__count">${hkGuestCountHtml(nextRes,inGuests,'arriving')}</div>`:'<div class="hk-card__count">No booking</div>'}</div>
       </div>
+      ${room.overdueFrom?`<div class="hk-overdue">Not cleaned yet · left ${esc(room.overdueFrom.slice(8,10)+'.'+room.overdueFrom.slice(5,7))}</div>`:''}
       ${guestCheckedOut?'<div class="hk-guest-out">Guest checked out</div>':''}
       ${beddingHtml}
       <div class="hk-card__foot"><span style="font-size:12px;color:var(--muted)">${co?.guest?esc(_stripRoomNum(co.guest)):'—'}</span>
@@ -5725,6 +5752,7 @@ window.hkOpenEditRoom=function(roomCode,dateStr){
   let label=dateStr;
   for(let i=HK_DAY_START;i<=HK_DAY_END;i++){if(hkAddDays(i)===dateStr){label=hkDayTabLabel(i,dateStr);break;}}
   document.getElementById('hk-admin-modal-title').textContent=roomCode+' · '+label;
+  const isOverdue=!co&&!!hkOverdueFrom(roomCode,dateStr);
   const chips=[];
   for(let i=HK_DAY_START;i<=HK_DAY_END;i++){
     const ds=hkAddDays(i);
@@ -5742,8 +5770,8 @@ window.hkOpenEditRoom=function(roomCode,dateStr){
     <label class="apt-label">Checkout time</label>
     <input class="apt-input" type="time" id="hk-admin-co" value="${esc(st.checkOutTime||co?.checkoutTime||hkSettings.defaultCheckOut||'12:00')}">
     <div style="margin-top:8px"><a href="#" class="hk-reset-link" onclick="hkResetOverrides();return false">Reset to automatic</a></div>
-    <div class="apt-label" style="margin-top:16px;font-weight:700">Move to another day</div>
-    <div class="hk-move-days">${chips.join('')}</div>
+    ${isOverdue?'':`<div class="apt-label" style="margin-top:16px;font-weight:700">Move to another day</div>
+    <div class="hk-move-days">${chips.join('')}</div>`}
     <button type="button" class="btn hk-remove-btn" onclick="hkRemoveRoom('${esc(roomCode)}','${dateStr}')">Remove from schedule</button>`;
   document.getElementById('hk-admin-modal-save').style.display='';
   document.getElementById('hk-admin-modal').hidden=false;
@@ -5800,7 +5828,12 @@ window.hkRemoveRoom=async function(roomCode,dateStr){
   if(!confirm(`Remove ${roomCode} from ${dateStr}? Cleaners will not see it. If it is not marked Done, the guest will not get the 'room ready' WhatsApp.`))return;
   const key=roomCode+'_'+dateStr;
   try{
-    if(hkGetCheckout(roomCode,dateStr)){
+    const od=hkGetCheckout(roomCode,dateStr)?null:hkOverdueFrom(roomCode,dateStr);
+    if(od){   // not-cleaned carry-over: dismiss it on its checkout day (and drop a manual doc for today if any)
+      await setDoc(doc(db,'hk_status',roomCode+'_'+od),{roomCode,date:od,removed:true,removedAt:serverTimestamp()},{merge:true});
+      hkStatusData[roomCode+'_'+od]={...(hkStatusData[roomCode+'_'+od]||{}),removed:true};
+      if(hkStatusData[key]){await deleteDoc(doc(db,'hk_status',key));delete hkStatusData[key];}
+    }else if(hkGetCheckout(roomCode,dateStr)){
       await setDoc(doc(db,'hk_status',key),{roomCode,date:dateStr,removed:true,removedAt:serverTimestamp()},{merge:true});
       hkStatusData[key]={...(hkStatusData[key]||{}),removed:true};
     }else{
@@ -6080,7 +6113,7 @@ onSnapshot(collection(db,'checkin_guests'),snap=>{
   guestData=snap.docs.map(d=>({id:d.id,...d.data()}));
   if(loaded>=2){rebuildFormMaps();render();}else checkLoaded();
 });
-onSnapshot(query(collection(db,'hk_status'),where('date','>=',new Date(new Date(tbilisiToday()+'T00:00:00Z').getTime()-86400000).toISOString().slice(0,10))),snap=>{
+onSnapshot(query(collection(db,'hk_status'),where('date','>=',new Date(new Date(tbilisiToday()+'T00:00:00Z').getTime()-HK_OVERDUE_DAYS*86400000).toISOString().slice(0,10))),snap=>{
   hkStatusData={};snap.docs.forEach(d=>{hkStatusData[d.id]=d.data();});
   if(loaded>=2){render();if(currentTab==='hk')renderHk();}
 });

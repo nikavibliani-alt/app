@@ -41,6 +41,7 @@ button{font-family:inherit;touch-action:manipulation;}
 .card__top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
 .room{font-size:28px;font-weight:700;font-family:var(--mono);letter-spacing:.02em;}
 .name{font-size:14px;color:var(--muted);}
+.overdue{display:inline-block;margin-bottom:12px;font-size:15px;font-weight:700;color:#9a3412;background:#fff7ed;border:1px solid #f59e0b;border-radius:999px;padding:6px 12px;}
 .pill{display:inline-flex;align-items:center;padding:6px 12px;border-radius:999px;font-size:15px;font-weight:700;white-space:nowrap;}
 .pill-ok{background:var(--green-bg);color:var(--green);}
 .pill-wait{background:#eef3fa;color:#1a4a7a;}
@@ -141,6 +142,7 @@ import{DAMAGE_CATEGORIES,makeReportId,tbilisiIsoNow,readPhotoMeta,fileExt,upload
 const STR={
   ka:{
     title:'დასუფთავება',
+    overdue:'ჯერ არ არის მზად · გავიდა {d}',
     loading:'იტვირთება…',
     yesterday:'გუშინ',today:'დღეს',tomorrow:'ხვალ',
     checkout:'გასვლა',checkin:'შემოსვლა',
@@ -181,6 +183,7 @@ const STR={
   },
   en:{
     title:'Cleaning',
+    overdue:'Not cleaned yet · left {d}',
     loading:'Loading…',
     yesterday:'Yesterday',today:'Today',tomorrow:'Tomorrow',
     checkout:'Checkout',checkin:'Check-in',
@@ -275,7 +278,7 @@ let draft=null,sheetMode=null,fileTarget=null;
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function toast(msg,ms=2500){const el=$('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),ms);}
 
-/* ══ BOARD LOGIC — copied from checkin-admin.html @ ab270e9 (Step 1b). KEEP IN SYNC. ══ */
+/* ══ BOARD LOGIC — copied from checkin-admin.html (Step 1b + overdue carry-over). KEEP IN SYNC. ══ */
 /* BOARD-LOGIC-START */
 function tbilisiToday(){return new Date(Date.now()+4*3600*1000).toISOString().slice(0,10);}
 function hkAddDays(n){
@@ -437,22 +440,46 @@ function hkSortScore(room,dateStr){
   const cleanM=hkCleanMinutes(room.code);
   const guestM=hkGuestArrivalMinutes(form,nextRes);
   const slack=guestM-(coM+cleanM);
-  return pBase+slack;
+  return pBase+slack+(room.overdueFrom?-5000:0);   // overdue rooms first
 }
 function hkRoomsForRole(){return teamRooms;}
+const HK_OVERDUE_DAYS=3;   // a room that left up to this many days ago and was never marked Done stays on today's board
+/** Checkout date C of the last stay that left this room (before today, within HK_OVERDUE_DAYS) and still needs cleaning, else null.
+ *  ignoreDone=true only finds the departure (used to label a card that has just been marked Done). */
+function hkOverdueFrom(roomCode,dateStr,ignoreDone){
+  if(dateStr!==tbilisiToday())return null;
+  const lo=hkAddDays(-HK_OVERDUE_DAYS);
+  const res=(_resCache||[]).filter(r=>hkNotCancelled(r)&&r.roomCode===roomCode);
+  let C=null;
+  for(const r of res){if(r.checkout&&r.checkout>=lo&&r.checkout<dateStr&&(!C||r.checkout>C))C=r.checkout;}
+  if(!C)return null;
+  if(res.some(r=>r.checkin&&r.checkin>=C&&r.checkin<dateStr))return null;      // a guest already arrived since: in-house, not pending
+  const dismissed=hkStatusData[roomCode+'_'+C];
+  if(dismissed&&(dismissed.removed===true||dismissed.movedTo))return null;     // removed / moved on purpose
+  if(!ignoreDone){for(const v of Object.values(hkStatusData)){if(v&&v.roomCode===roomCode&&v.done===true&&v.date>=C&&v.date<=dateStr)return null;}}
+  return C;
+}
 function hkTaskRooms(dateStr){
   const movedAway=code=>{const d=hkStatusData[code+'_'+dateStr];return !!d?.movedTo||d?.removed===true;};
   const coRooms=hkRoomsForRole().filter(r=>hkGetCheckout(r.code,dateStr)&&!movedAway(r.code));
   const seen=new Set(coRooms.map(r=>r.code));
+  const overdue=[];
+  if(dateStr===tbilisiToday()){
+    for(const r of hkRoomsForRole()){
+      if(seen.has(r.code)||movedAway(r.code))continue;
+      const C=hkOverdueFrom(r.code,dateStr);
+      if(C){overdue.push({...r,overdueFrom:C});seen.add(r.code);}
+    }
+  }
   const manual=[];
   for(const key of Object.keys(hkStatusData)){
     if(!key.endsWith('_'+dateStr))continue;
     const roomCode=key.slice(0,-(dateStr.length+1));
     if(seen.has(roomCode)||movedAway(roomCode))continue;
     const room=hkRoomsForRole().find(r=>r.code===roomCode);
-    if(room){manual.push(room);seen.add(roomCode);}
+    if(room){const od=hkGetCheckout(roomCode,dateStr)?null:hkOverdueFrom(roomCode,dateStr,true);manual.push(od?{...room,overdueFrom:od}:room);seen.add(roomCode);}
   }
-  return [...coRooms,...manual];
+  return [...coRooms,...overdue,...manual];
 }
 function hkSiteId(roomCode){
   const r=roomsData[roomCode];
@@ -525,10 +552,11 @@ function buildCard(room,dateStr,tomorrowStr){
   const key=room.code+'_'+dateStr;
   const st=hkStatusData[key]||{};
   const done=!!st.done;
-  const co=hkGetCheckout(room.code,dateStr);
+  const coDate=room.overdueFrom||dateStr;   // overdue rooms show the stay that already left
+  const co=hkGetCheckout(room.code,coDate);
   const nextRes=hkGetNextCheckin(room.code,dateStr);
   const form=hkGuestFormForRoom(room.code,dateStr,nextRes);
-  const departing=hkDepartingGuestForm(room.code,dateStr,co);
+  const departing=hkDepartingGuestForm(room.code,coDate,co);
   const guestCheckedOut=departing?.guestConfirmedCheckout===true;
   const outGuests=hkGuestCount(co,departing,st.guestCount);
   const inGuests=hkGuestCount(nextRes,form,st.arrivingGuestCount);
@@ -547,6 +575,7 @@ function buildCard(room,dateStr,tomorrowStr){
       <div class="tbox"><b>${esc(t('checkout'))}</b><span class="tm">${esc(coTime)}</span><div class="cnt">${countHtml(co,outGuests,'leaving')}</div></div>
       <div class="tbox${inCls}"><b>${esc(t('checkin'))}</b>${nextRes?`<span class="when">${esc(when)}</span><span class="${timeCls}">${esc(ciTime)}</span><div class="cnt">${countHtml(nextRes,inGuests,'arriving')}</div>`:`<div class="cnt">${esc(t('noBooking'))}</div>`}</div>
     </div>
+    ${room.overdueFrom?`<div class="overdue">${esc(t('overdue',{d:room.overdueFrom.slice(8,10)+'.'+room.overdueFrom.slice(5,7)}))}</div>`:''}
     ${guestCheckedOut?`<div class="out">${esc(t('guestOut'))}</div>`:''}
     ${nextRes?beddingHtml(room.code,inGuests):''}
     <button type="button" class="donebtn${done?' undo':''}" data-act="done" data-room="${esc(room.code)}" data-date="${dateStr}"${busy.has(key)?' disabled':''}>${esc(done?t('undo'):t('done'))}</button>
@@ -842,7 +871,7 @@ async function startBoard(){
 }
 function subscribeData(){
   boardDay=tbilisiToday();
-  const y=hkAddDays(-1),plus30=hkAddDays(30),plus7=hkAddDays(7);
+  const y=hkAddDays(-1),lo=hkAddDays(-HK_OVERDUE_DAYS),plus30=hkAddDays(30),plus7=hkAddDays(7);   // lo: also load recent departures so un-cleaned rooms stay on today's board
   let formsA=[],formsB=[];
   const pickForm=(d)=>{const x=d.data();return{id:d.id,aptId:x.aptId,arrivalDate:x.arrivalDate,checkoutDate:x.checkoutDate,
     expectedCheckInWindow:x.expectedCheckInWindow,expectedCheckInTime:x.expectedCheckInTime,guests:x.guests,
@@ -857,7 +886,7 @@ function subscribeData(){
     render();
   };
   const onErr=n=>err=>console.warn('['+n+']',err);
-  unsubs.push(onSnapshot(query(collection(db,'reservations'),where('checkout','>=',y)),snap=>{
+  unsubs.push(onSnapshot(query(collection(db,'reservations'),where('checkout','>=',lo)),snap=>{
     hideScreen();
     _resCache=snap.docs.map(d=>{const x=d.data();return{id:d.id,roomCode:x.roomCode,room:x.room,checkin:x.checkin,checkout:x.checkout,status:x.status,
       checkoutTime:x.checkoutTime,checkinTime:x.checkinTime,guest:x.guest,guests:x.guests,guestCount:x.guestCount,adults:x.adults,
@@ -865,10 +894,10 @@ function subscribeData(){
       .filter(r=>teamCodeSet.has(r.roomCode));
     rebuildForms();
   },onErr('reservations')));
-  unsubs.push(onSnapshot(query(collection(db,'checkin_guests'),where('arrivalDate','>=',y),where('arrivalDate','<=',plus30)),snap=>{
+  unsubs.push(onSnapshot(query(collection(db,'checkin_guests'),where('arrivalDate','>=',lo),where('arrivalDate','<=',plus30)),snap=>{
     formsA=snap.docs.map(pickForm);rebuildForms();
   },onErr('guestsA')));
-  unsubs.push(onSnapshot(query(collection(db,'checkin_guests'),where('checkoutDate','>=',y),where('checkoutDate','<=',plus7)),snap=>{
+  unsubs.push(onSnapshot(query(collection(db,'checkin_guests'),where('checkoutDate','>=',lo),where('checkoutDate','<=',plus7)),snap=>{
     formsB=snap.docs.map(pickForm);rebuildForms();
   },onErr('guestsB')));
   if(HK_DAMAGE_ENABLED)unsubs.push(onSnapshot(query(collection(db,'hk_damage_reports'),where('reportDate','>=',y)),snap=>{
@@ -879,7 +908,7 @@ function subscribeData(){
     damageReports=m;render();
     if(sheetMode==='view'){const sh=$('sheet');openReports(sh.dataset.room,sh.dataset.date);}
   },onErr('damage')));
-  unsubs.push(onSnapshot(query(collection(db,'hk_status'),where('date','>=',y)),snap=>{
+  unsubs.push(onSnapshot(query(collection(db,'hk_status'),where('date','>=',lo)),snap=>{
     const m={};
     snap.docs.forEach(d=>{const x=d.data();if(teamCodeSet.has(x.roomCode))m[d.id]=x;});
     hkStatusData=m;render();
