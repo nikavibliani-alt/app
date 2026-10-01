@@ -1,0 +1,21 @@
+name: Expedia rateModel verify (temporary)
+
+on:
+  push:
+    branches:
+      - claude/expedia-fraud-detection-l38nq4
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests beautifulsoup4 "firebase-admin==6.5.0" "google-cloud-firestore==2.13.1" cryptography
+      - name: Read-only Firestore check
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: python scripts/expedia_ratemodel_verify.py
