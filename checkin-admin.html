@@ -109,6 +109,17 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .btn-danger:active{background:#fee2e2;}
 .btn{flex:1;min-height:48px;border-radius:var(--r);font-size:14px;font-weight:600;cursor:pointer;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-family:var(--sans);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;}
 .btn:disabled{opacity:.35;cursor:not-allowed;}
+.hc-badge{display:block;margin-top:8px;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:700;line-height:1.35;background:var(--red-bg);color:var(--red);border:1px solid #e8c4c4;}
+.hc-badge.ok{background:var(--green-bg);color:var(--green);border-color:#bcd9c9;}
+.hc-line{font-size:12px;color:var(--muted);margin-top:4px;}
+.hc-banner{background:var(--red-bg);border:1px solid #e8c4c4;border-radius:var(--r);padding:12px;margin-bottom:12px;}
+.hc-banner__title{font-size:14px;font-weight:700;color:var(--red);margin-bottom:8px;}
+.hc-row{display:block;width:100%;text-align:left;padding:10px;margin-bottom:6px;background:var(--surface);border:1px solid var(--line);border-radius:8px;font-family:var(--sans);color:var(--ink);cursor:pointer;}
+.hc-row__a{font-size:14px;font-weight:600;}
+.hc-row__b{font-size:12px;color:var(--muted);margin-top:2px;}
+.hc-more{background:transparent;border:0;color:var(--red);font-family:var(--sans);font-size:13px;font-weight:600;min-height:40px;cursor:pointer;}
+.hc-panel{margin-bottom:12px;padding:12px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);}
+.hc-panel__btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
 .access-sheet-overlay{position:fixed;inset:0;background:rgba(44,44,42,.45);z-index:9998;display:flex;align-items:flex-end;justify-content:center;}
 .access-sheet{width:100%;max-width:480px;background:var(--surface);border-radius:16px 16px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;}
 .access-sheet__title{font-size:16px;font-weight:700;color:var(--ink);margin-bottom:4px;line-height:1.3;}
@@ -691,7 +702,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1005a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1006a · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -700,6 +711,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
   </div>
 
   <div class="pane active" id="pane-stay">
+    <div id="stay-hc"></div>
     <div class="stat-row stat-row--stay" id="stay-stats"></div>
     <div class="day-row show" id="upcoming-days" aria-label="Arrivals by day (arriving / registered)"></div>
     <div class="search-wrap">
@@ -1330,6 +1342,7 @@ let navSlots=loadNavSlots();
 function loadSavedTab(){
   if(STANDALONE_HK)return 'hk';
   try{
+    if(new URLSearchParams(location.search).get('hc'))return 'stay';   // Hotel Collect alert deep link
     const qt=new URLSearchParams(location.search).get('tab');   // e.g. /checkin-admin?tab=damage (push notification tap)
     if(qt==='damage'&&!HK_DAMAGE_ENABLED)return 'hk';   // deep link while damage reporting is hidden
     if(qt&&VALID_TABS.has(qt))return qt;
@@ -3621,6 +3634,144 @@ function stayGuestCount(grp,form){
   if(!total&&form)total=parseStayGuestNum(form.guests);
   return total>0?total:1;
 }
+/* ── Expedia Hotel Collect review ── */
+function hcBaseNum(r){return String(r.reservationNumber||r.id||'').replace(/_\d+$/,'');}
+function hcDocs(base){return(_resCache||[]).filter(r=>hcBaseNum(r)===base);}
+function hcBaseOf(grp){return grp.some(r=>r.hotelCollect===true)?hcBaseNum(grp[0]):'';}
+function hcReviewOf(docs){const r=docs.find(x=>x.hcReview&&x.hcReview.status);return r?r.hcReview.status:'';}
+function hcCheckinDone(docs){return docs.some(r=>!!getForm(r));}
+function hcBadgeHtml(docs){
+  const st=hcReviewOf(docs);
+  if(st==='verified')return`<span class="hc-badge ok">Hotel Collect · verified</span>`;
+  if(st==='fake')return`<span class="hc-badge">Hotel Collect · marked fake – cancel in Expedia/MiniHotel</span>`;
+  return`<span class="hc-badge">Expedia · Hotel Collect · unverified</span>`;
+}
+function hcCardHtml(grp,form){
+  const docs=hcDocs(hcBaseNum(grp[0]));
+  const done=hcCheckinDone(docs.length?docs:grp);
+  return hcBadgeHtml(docs.length?docs:grp)+`<div class="hc-line">Online check-in: ${done?'done':'not done'}</div>`;
+}
+function hcTotal(docs){
+  let cur='',sum=0,ok=false;
+  for(const r of docs){
+    const m=String(r.total||'').match(/^([A-Za-z]{3})\s*([\d.,]+)/);
+    if(!m){return '';}
+    if(cur&&cur!==m[1])return '';
+    cur=m[1];sum+=parseFloat(m[2].replace(/,/g,''));ok=true;
+  }
+  return ok?cur.toUpperCase()+' '+sum.toFixed(2):'';
+}
+let _hcBannerAll=false;
+window.hcBannerToggle=function(){_hcBannerAll=!_hcBannerAll;renderHcBanner();};
+function hcPendingBookings(){
+  const today=tbilisiToday();
+  const docs=nonCancelled().filter(r=>r.hotelCollect===true&&(r.checkout||r.checkOut||'')>=today);
+  const out=[];
+  for(const grp of groupByBaseNum(docs)){
+    const base=hcBaseNum(grp[0]);
+    if(hcReviewOf(hcDocs(base)))continue;
+    out.push(grp);
+  }
+  return out.sort((a,b)=>(a[0].checkin||'').localeCompare(b[0].checkin||''));
+}
+function renderHcBanner(){
+  const el=document.getElementById('stay-hc');
+  if(!el)return;
+  if(!_resCache){el.innerHTML='';return;}
+  const list=hcPendingBookings();
+  if(!list.length){el.innerHTML='';return;}
+  const shown=(_hcBannerAll||list.length<=3)?list:list.slice(0,3);
+  el.innerHTML=`<div class="hc-banner"><div class="hc-banner__title">Hotel Collect bookings to check (${list.length})</div>`+
+    shown.map(grp=>{
+      const base=hcBaseNum(grp[0]);
+      const rooms=[...new Set(grp.map(r=>r.roomCode||r.room).filter(Boolean))].join(' · ');
+      const tot=hcTotal(grp);
+      return`<button type="button" class="hc-row" onclick="openHcDetail('${esc(base)}')"><div class="hc-row__a">#${esc(base)} · ${esc(_stripRoomNum(grp[0].guest||'Guest'))}</div><div class="hc-row__b">${esc(rooms)} · ${esc(fmtDate(grp[0].checkin))} – ${esc(fmtDate(grp[0].checkout))}${tot?' · '+esc(tot):''}</div></button>`;
+    }).join('')+
+    (list.length>3?`<button type="button" class="hc-more" onclick="hcBannerToggle()">${_hcBannerAll?'Show fewer':'Show all ('+list.length+')'}</button>`:'')+
+    `</div>`;
+}
+function hcPanelHtml(base){
+  const docs=hcDocs(base);
+  if(!docs.some(r=>r.hotelCollect===true))return '';
+  const st=hcReviewOf(docs);
+  const b=esc(base);
+  return`<div class="hc-panel">
+    ${hcBadgeHtml(docs)}
+    <div class="hc-line">Online check-in: ${hcCheckinDone(docs)?'done':'not done'}</div>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">The guest pays at the property. These bookings are often fake. Your choice is only a note; nothing is cancelled for you.</p>
+    <div class="hc-panel__btns">${st
+      ?`<button type="button" class="btn" onclick="hcUndoReview('${b}')">Undo review</button>`
+      :`<button type="button" class="btn btn-primary" onclick="hcSetReview('${b}','verified')">Verified (real guest)</button><button type="button" class="btn" style="color:var(--red);border-color:#e8c4c4" onclick="hcSetReview('${b}','fake')">Fake</button>`}</div>
+  </div>`;
+}
+window.hcSetReview=async function(base,status){
+  const docs=hcDocs(base);
+  if(!docs.length){toast('Booking not found');return;}
+  const msg=status==='fake'
+    ?`Mark booking #${base} as FAKE?\n\nThis only records your decision. You still have to cancel it in Expedia/MiniHotel.`
+    :`Mark booking #${base} as verified (real guest)?`;
+  if(!confirm(msg))return;
+  try{
+    await Promise.all(docs.map(r=>setDoc(doc(db,'reservations',r.id),{hcReview:{status,at:serverTimestamp()}},{merge:true})));
+    docs.forEach(r=>{r.hcReview={status,at:new Date()};});
+    toast(status==='fake'?'Marked fake':'Marked verified');
+    render();hcRefreshOpen(base);
+  }catch(e){console.error('[hcSetReview]',e);toast('Could not save: '+e.message);}
+};
+window.hcUndoReview=async function(base){
+  const docs=hcDocs(base);
+  if(!docs.length)return;
+  if(!confirm(`Remove the review for booking #${base}?`))return;
+  try{
+    await Promise.all(docs.map(r=>updateDoc(doc(db,'reservations',r.id),{hcReview:deleteField()})));
+    docs.forEach(r=>{delete r.hcReview;});
+    toast('Review removed');
+    render();hcRefreshOpen(base);
+  }catch(e){console.error('[hcUndoReview]',e);toast('Could not save: '+e.message);}
+};
+function hcRefreshOpen(base){
+  if(document.getElementById('detail')?.classList.contains('open')&&window._hcOpenBase===base){
+    const f=hcDocs(base).map(r=>getForm(r)).find(Boolean);
+    if(f)openDetail(f.id);else openResDetail(base);
+  }
+}
+/* Details for a booking: guest form screen if one exists, otherwise a reservation-only sheet */
+window.openHcDetail=function(base){
+  const f=hcDocs(base).map(r=>getForm(r)).find(Boolean);
+  if(f)openDetail(f.id);else openResDetail(base);
+};
+window.openResDetail=function(base){
+  const docs=hcDocs(base);
+  if(!docs.length){toast('Booking not found');return;}
+  window._hcOpenBase=base;
+  const r=docs[0];
+  const rooms=[...new Set(docs.map(x=>x.roomCode||x.room).filter(Boolean))].join(' · ');
+  const kv=(k,v)=>v?`<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px"><span style="color:var(--muted)">${esc(k)}</span><span style="text-align:right;font-weight:600">${esc(v)}</span></div>`:'';
+  document.getElementById('detail-title').textContent=_stripRoomNum(r.guest||'Guest')+(rooms?' · '+rooms:'');
+  const wa=normalizeWaPhone(r.phone||'');
+  document.getElementById('detail-body').innerHTML=`
+    ${hcPanelHtml(base)}
+    <div class="room-block">
+      ${kv('Reservation','#'+base)}${kv('Guest',_stripRoomNum(r.guest||''))}${kv('Rooms',rooms)}
+      ${kv('Dates',fmtDate(r.checkin)+' – '+fmtDate(r.checkout))}${kv('Nights',r.nights)}${kv('Guests',r.guestCount)}
+      ${kv('Total',hcTotal(docs))}${kv('Source',r.source)}${kv('Booking id',r.bookingId)}${kv('Phone',r.phone)}${kv('Email',r.email)}
+    </div>
+    ${wa?`<a class="btn" style="width:100%;margin-top:12px" href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>`:''}`;
+  document.getElementById('detail').classList.add('open');
+};
+/* deep link: /checkin-admin?hc=<reservationNumber> (push / WhatsApp alert) */
+let _hcDeepLink=null;
+try{_hcDeepLink=new URLSearchParams(location.search).get('hc')||null;}catch(e){}
+function hcTryDeepLink(){
+  if(!_hcDeepLink||!_resCache||loaded<2)return;
+  const base=_hcDeepLink;
+  if(!hcDocs(base).length)return;
+  _hcDeepLink=null;
+  try{history.replaceState(null,'',location.pathname);}catch(e){}
+  openHcDetail(base);
+}
+
 function renderCard(grp,mode){
   const sorted=[...grp].sort(byRoom);
   const form=grp.reduce((f,r)=>f||getForm(r),null);
@@ -3650,7 +3801,9 @@ function renderCard(grp,mode){
   const guestCountLabel=guestCount+' guest'+(guestCount===1?'':'s');
   const srcRaw=(grp[0].source||'').toLowerCase();
   const srcLabel=(SOURCE_BADGES[srcRaw]||{label:srcRaw?'Direct':''}).label;
-  const open=form?`onclick="window.openDetail('${form.id}')" style="cursor:pointer"`:'';
+  const hcBase=hcBaseOf(grp);
+  const hc=hcBase?hcCardHtml(grp,form):'';
+  const open=form?`onclick="window.openDetail('${form.id}')" style="cursor:pointer"`:(hcBase?`onclick="window.openResDetail('${esc(hcBase)}')" style="cursor:pointer"`:'');
   let warn='';
   for(const r of grp){
     if(!(r.manualRoom===true||r.manualRoom==='true'))continue;
@@ -3662,6 +3815,7 @@ function renderCard(grp,mode){
     <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${stShow.cls}">${stShow.label}</span></div>
     <div class="card__name">${esc(name)}</div>
     <div class="card__meta">${esc(datesStr(grp[0],mode))} · ${esc(guestCountLabel)}${srcLabel?`<span class="card__src">${esc(srcLabel)}</span>`:''}</div>
+    ${hc}
     ${warn}
     <div class="card__actions">${waBtn}${main}</div>
   </div>`;
@@ -3835,6 +3989,8 @@ window.renderStay=function(){
   _renderStayCore();
   const past=renderPastGuests();
   syncSearchClear();
+  renderHcBanner();
+  hcTryDeepLink();
   const q=(document.getElementById('stay-search')?.value||'').trim();
   if(q&&_resCache&&!_stayMatchCount&&!past)document.getElementById('stay-list').innerHTML='<div class="empty">No guests found</div>';
 };
@@ -4397,6 +4553,7 @@ function updateDetailRoomAction(guestId,resDocId){
 
 window.openDetail=function(guestId){
   const g=guestData.find(x=>x.id===guestId);if(!g){toast('Guest not found');return;}
+  window._hcOpenBase=reservationBaseNum(g.matchedReservationId)||'';
   const sibs=siblingReservations(g.matchedReservationId);
   const isMulti=sibs.length>1;
   const door=reservationForGuest(g)||sibs[0]||null;
@@ -4450,6 +4607,7 @@ window.openDetail=function(guestId){
         <button class="btn" onclick="window.rejectPassport('${g.id}')">Reject</button>
       </div>`:passportSkipped?'<p style="font-size:13px;margin-bottom:10px;"><span class="pill pill-pending" style="margin-right:6px;">SKIPPED</span>Guest skipped passport upload</p>':'<p style="color:var(--muted);font-size:13px;margin-bottom:10px;">No passport submitted yet.</p>'}
     </div>
+    ${hcPanelHtml(reservationBaseNum(g.matchedReservationId)||'')}
     ${roomBlocks}
     ${g.matchedReservationId?`<div style="margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs)">
       <div style="font-size:12px;font-weight:700;margin-bottom:8px">Move room (pipeline)${guestReservationManual(g)?' <span class="pill pill-manual">MANUAL</span>':''}</div>
