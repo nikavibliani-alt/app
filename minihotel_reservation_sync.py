@@ -899,6 +899,21 @@ def parse_guest_counts_from_remarks(remarks_text):
     return out
 
 
+def classify_rate_model(ota_text):
+    """Return 'HotelCollect', 'ExpediaCollect' or 'unknown' from Expedia remarks text.
+    All whitespace is removed first because MiniHotel wraps the text mid-word."""
+    t = re.sub(r'\s+', '', ota_text or '').lower()
+    hotel = ('ratemodel:hotelcollect' in t or 'collectpaymentfromguest' in t
+             or 'hotelcollectbooking' in t)
+    expedia = ('ratemodel:expediacollect' in t or 'expediavirtualcard' in t
+               or 'virtualcardwillbeactivated' in t)
+    if hotel and not expedia:
+        return 'HotelCollect'
+    if expedia and not hotel:
+        return 'ExpediaCollect'
+    return 'unknown'
+
+
 def fetch_booking_ids(session, db, reservations):
     """
     For OTA reservations (source=booking/expedia) fetch MiniHotel detail API and parse
@@ -911,6 +926,7 @@ def fetch_booking_ids(session, db, reservations):
     # Deduplicate by reservationNumber — multi-room bookings share one res number
     seen = set()
     targets = []
+    expedia_checkins = {}  # reservationNumber -> check-in date (Expedia only)
     for r in reservations:
         if (r.get('source') or '').lower() not in ota_sources:
             continue
@@ -922,9 +938,12 @@ def fetch_booking_ids(session, db, reservations):
         if rn and rn not in seen:
             seen.add(rn)
             targets.append(rn)
+            if (r.get('source') or '').lower() == 'expedia':
+                expedia_checkins[rn] = parse_date(r.get('checkIn')) or ''
 
     print(f"Checking OTA remarks (bookingId + guest counts) for {len(targets)} reservations...")
     updated = skipped = errors = 0
+    today_str = datetime.datetime.utcnow().strftime('%Y-%m-%d')
 
     for res_num in targets:
         try:
@@ -938,7 +957,16 @@ def fetch_booking_ids(session, db, reservations):
                 p.get('guestCount') or p.get('guests') or p.get('adults')
                 for p in doc_payloads
             )
-            if not needs_booking_id and not needs_guests:
+            # HotelCollect / ExpediaCollect are final. Missing -> check once.
+            # 'unknown' -> keep re-checking each sync until the check-in date has passed.
+            models = {p.get('rateModel') for p in doc_payloads}
+            has_unknown = 'unknown' in models
+            needs_rate_model = (
+                res_num in expedia_checkins
+                and not (models & {'HotelCollect', 'ExpediaCollect'})
+                and (not has_unknown or expedia_checkins[res_num] >= today_str)
+            )
+            if not needs_booking_id and not needs_guests and not needs_rate_model:
                 skipped += 1
                 continue
 
@@ -953,7 +981,8 @@ def fetch_booking_ids(session, db, reservations):
                 time.sleep(0.5)
                 continue
 
-            remarks = (resp.json().get('remarks') or {}).get('printed') or ''
+            remarks_obj = resp.json().get('remarks') or {}
+            remarks = remarks_obj.get('printed') or ''
             update = {}
 
             if needs_booking_id:
@@ -965,6 +994,16 @@ def fetch_booking_ids(session, db, reservations):
                 guest_fields = parse_guest_counts_from_remarks(remarks)
                 if guest_fields:
                     update.update(guest_fields)
+
+            if needs_rate_model:
+                # Only the verdict is saved; the remarks text itself is never stored or logged.
+                rate_model = classify_rate_model(remarks_obj.get('ota') or remarks)
+                if rate_model != 'unknown':
+                    update['rateModel'] = rate_model
+                    update['hotelCollect'] = (rate_model == 'HotelCollect')
+                elif not has_unknown:
+                    update['rateModel'] = 'unknown'
+                print(f"  {res_num}: rateModel={rate_model}")
 
             if update:
                 for doc in docs:
