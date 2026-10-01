@@ -109,6 +109,12 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .btn-danger:active{background:#fee2e2;}
 .btn{flex:1;min-height:48px;border-radius:var(--r);font-size:14px;font-weight:600;cursor:pointer;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-family:var(--sans);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;}
 .btn:disabled{opacity:.35;cursor:not-allowed;}
+.access-sheet-overlay{position:fixed;inset:0;background:rgba(44,44,42,.45);z-index:9998;display:flex;align-items:flex-end;justify-content:center;}
+.access-sheet{width:100%;max-width:480px;background:var(--surface);border-radius:16px 16px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;}
+.access-sheet__title{font-size:16px;font-weight:700;color:var(--ink);margin-bottom:4px;line-height:1.3;}
+.access-sheet__opt{min-height:52px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--ink);font-family:var(--sans);font-size:15px;font-weight:600;cursor:pointer;}
+.access-sheet__opt:first-of-type{background:var(--ink);border-color:var(--ink);color:#fff;}
+.access-sheet__cancel{min-height:52px;border:0;background:transparent;color:var(--muted);font-family:var(--sans);font-size:15px;font-weight:600;cursor:pointer;}
 .btn svg{flex:none;}
 .btn{gap:6px;}
 .btn-primary{background:var(--ink);color:#fff;border-color:var(--ink);}
@@ -684,7 +690,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1004d · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1005a · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -4045,49 +4051,72 @@ window.unlockGuest=async function(guestId){
     toast(/functions|internal|not-found/i.test(e.message||'')?_pipelineCallableHint():'Failed: '+e.message);
   }
 };
-window.toggleGuestAccess=async function(guestId,want){   // want: 'on' = always give access (used by the Give access button)
+/* Access button: guest has access -> "Remove access" sheet (asks how long); otherwise -> give access. */
+window.toggleGuestAccess=async function(guestId,want){   // want: 'on' = always give access
   const g=guestData.find(x=>x.id===guestId);
   if(!g)return;
   const res=reservationForGuest(g);
-  const gsx=guestStatus(g,res);   // underlying access state (also correct for guests who already checked in)
-  const st={key:gsx.cls==='unlocked'?'unlocked':gsx.cls==='disabled'?'disabled':'need'};
+  const has=guestStatus(g,res).cls==='unlocked';   // underlying access state (also right for guests who already checked in)
   const who=_stripRoomNum(res?.guest||g.nameRoman||g.name||'')||'this guest';
   const roomLbl=res?(res.roomCode||res.room||''):(g.aptId||'');
   const whoRoom=who+(roomLbl?' ('+roomLbl+')':'');
-  if(want==='on'&&st.key!=='unlocked')st.key='need';   // give access: take the grant branch
-  const turningOff=(st.key==='unlocked')||(st.key==='disabled'&&tbilisiHourLocal()>=15);
-  if(!confirm((turningOff?'Turn OFF':'Turn ON')+' door access for '+whoRoom+'?'))return;
+  if(has&&want!=='on'){openRemoveAccessSheet(guestId,whoRoom);return;}
+  if(!confirm('Turn ON door access for '+whoRoom+'?'))return;
   try{
-    if(st.key==='unlocked'){
-      const today=unlockToday();
-      const until=today+'T15:00:00+04:00';
-      await updateDoc(doc(db,'checkin_guests',guestId),{
-        manualUnlock:false,
-        accessDisabledUntil:until,
-        accessDisabledByAdmin:true,
-      });
-      toast('Access disabled until 15:00');
-    }else if(st.key==='disabled'&&tbilisiHourLocal()>=15){
-      await updateDoc(doc(db,'checkin_guests',guestId),{
-        accessDisabledUntil:null,
-        accessDisabledByAdmin:true,
-      });
-      toast('Access disabled indefinitely');
-    }else{
-      const r=await pipelineAdmin({password:_ADMIN_PWD,actionType:'force_unlock',payload:{guestId},actor:'admin'});
-      if(!r.ok){toast(r.message||'Failed');return;}
-      await updateDoc(doc(db,'checkin_guests',guestId),{
-        accessDisabledUntil:null,
-        accessDisabledByAdmin:false,
-      });
-      toast('Access granted');
-    }
+    const r=await pipelineAdmin({password:_ADMIN_PWD,actionType:'force_unlock',payload:{guestId},actor:'admin'});
+    if(!r.ok){toast(r.message||'Failed');return;}
+    await updateDoc(doc(db,'checkin_guests',guestId),{
+      accessDisabledUntil:null,
+      accessDisabledByAdmin:false,
+    });
+    toast('Access granted');
     render();
   }catch(e){
     console.error('[toggleGuestAccess]',e);
     toast('Failed: '+e.message);
   }
 };
+/* when does "until 15:00" end: today if it is before 15:00 in Tbilisi, otherwise tomorrow */
+function removeAccessUntil(mode){
+  const today=unlockToday();
+  if(mode==='forever')return null;
+  const day=mode==='tomorrow'?addDaysISO(today,1):today;
+  return day+'T15:00:00+04:00';
+}
+function removeAccessMode15(){return tbilisiHourLocal()>=15?'tomorrow':'today';}
+window.removeGuestAccess=async function(guestId,mode){
+  closeRemoveAccessSheet();
+  const until=removeAccessUntil(mode);
+  try{
+    await updateDoc(doc(db,'checkin_guests',guestId),{
+      manualUnlock:false,
+      accessDisabledUntil:until,
+      accessDisabledByAdmin:true,
+    });
+    toast(mode==='forever'?'Access off until you give it back':mode==='tomorrow'?'Access off until 15:00 tomorrow':'Access off until 15:00 today');
+    render();
+  }catch(e){
+    console.error('[removeGuestAccess]',e);
+    toast('Failed: '+e.message);
+  }
+};
+function closeRemoveAccessSheet(){document.getElementById('access-sheet-overlay')?.remove();}
+window.closeRemoveAccessSheet=closeRemoveAccessSheet;
+function openRemoveAccessSheet(guestId,whoRoom){
+  closeRemoveAccessSheet();
+  const m=removeAccessMode15();
+  const ov=document.createElement('div');
+  ov.id='access-sheet-overlay';
+  ov.className='access-sheet-overlay';
+  ov.onclick=e=>{if(e.target===ov)closeRemoveAccessSheet();};
+  ov.innerHTML=`<div class="access-sheet" role="dialog" aria-modal="true" aria-label="Remove door access">
+    <div class="access-sheet__title">Remove door access for ${esc(whoRoom)}?</div>
+    <button type="button" class="access-sheet__opt" data-opt="${m}" onclick="removeGuestAccess('${esc(guestId)}','${m}')">${m==='tomorrow'?'Until 15:00 tomorrow':'Until 15:00 today'}</button>
+    <button type="button" class="access-sheet__opt" data-opt="forever" onclick="removeGuestAccess('${esc(guestId)}','forever')">Until I turn it back on</button>
+    <button type="button" class="access-sheet__cancel" onclick="closeRemoveAccessSheet()">Cancel</button>
+  </div>`;
+  document.body.appendChild(ov);
+}
 window.blockGuest=async function(guestId){
   const g=guestData.find(x=>x.id===guestId);
   if(!g){toast('Guest not found');return;}
