@@ -84,3 +84,18 @@ Undo all: `git revert --no-edit before-round-3..HEAD`, then push. Undo one step:
 Round 3 notes:
 - Step 2: read-only check of checkin_apartments found no unit with hasSmartLock set (0 of 23), so nothing was ever switched off per unit. Old field left in Firestore untouched; no longer read or written.
 - Step 4: past guests come from Guest history's data, which covers the last 3 months of finished stays only.
+
+# Round 4
+
+Restore point: tag `before-round-4`.
+
+1. Investigate/fix: guest not unlocked while admin showed access (tab-2, 2026-10-01)
+2. Stay cards: badge is a label, card opens Details, access button (Give/Remove access)
+3. Search shows only results + clear (X) button
+4. Day strip counts registered forms, not missing ones
+
+Undo all: `git revert --no-edit before-round-4..HEAD`, then push. Undo one step: `git revert --no-edit <commit>`, then push.
+
+| Step | Commit | Status |
+|------|--------|--------|
+| 0 | tag before-round-4 | done |
