@@ -16,6 +16,7 @@
 <script src="/shared/qrcode.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+button{color:inherit;}   /* iPhone Safari paints unstyled buttons system-blue */
 :root{
   --bg:#FAFAF9;
   --surface:#FFFFFF;
@@ -42,7 +43,7 @@
   --gold-border:var(--line);
   --green:#2d6b50;--green-bg:#edf5f0;--green-border:#8ecdb0;
   --red:#8b2020;--red-bg:#fdf0f0;--red-border:#f8c4c4;
-  --blue:#1a4a7a;--blue-bg:#eef3fa;--blue-border:#c8d8f0;
+  --blue:#4A4A48;--blue-bg:#f4f2ef;--blue-border:#E0DCD6;   /* neutral: no blue in this app */
   --r:4px;--rs:4px;--rsm:2px;
 }
 html,body{height:100%;}
@@ -249,7 +250,7 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 .ct-wrap{display:flex;gap:8px;margin:4px 0 8px;}
 .ct-btn{flex:1;height:38px;border:1.5px solid var(--line);border-radius:var(--rs);background:transparent;font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;color:var(--muted);transition:all 0.15s;}
 .ct-btn.wa-active{background:#e8f8ef;border-color:#25D366;color:#1a7a3c;}
-.ct-btn.tg-active{background:#e8f4fc;border-color:#229ED9;color:#1a5e8a;}
+.ct-btn.tg-active{background:var(--surface-2);border-color:var(--ink);color:var(--ink);}
 .passport-zone{border:1.5px dashed var(--line);border-radius:var(--rs);padding:1.5rem;text-align:center;cursor:pointer;transition:all 0.15s;background:transparent;}
 .passport-zone:hover{border-color:var(--accent);}
 .passport-zone.has-photo{border-style:solid;border-color:var(--green-border);background:var(--green-bg);}

@@ -18,6 +18,7 @@
 <script src="/shared/qrcode.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+button{color:inherit;}   /* iPhone Safari paints unstyled buttons system-blue */
 :root{
   --bg:#FAFAF9;--surface:#fff;--ink:#2C2C2A;--ink-2:#4A4A48;--muted:#6B6B68;
   --line:#E8E4E0;--green:#2d6b50;--green-bg:#edf5f0;--red:#8b2020;--red-bg:#fdf0f0;
@@ -176,15 +177,15 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .hk-done.undo{background:var(--line);color:var(--muted)}
 .pill{display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.01em;white-space:nowrap;}
 .pill-pending{background:var(--amber-bg);color:var(--amber);}
-.pill-await{background:var(--blue-bg);color:var(--blue);}
+.pill-await{background:var(--amber-bg);color:var(--amber);}
 .pill-ok{background:var(--green-bg);color:var(--green);}
-.pill-in{background:#e8f0fe;color:#1a56a0;}
+.pill-in{background:#eceae7;color:var(--ink);}
 .pill-multi{background:var(--bg);color:var(--muted);margin-left:6px;}
 .pill-manual{background:#fef3c7;color:#92400e;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.04em;}
 .pill-drift{background:#fee2e2;color:#991b1b;margin-left:6px;font-size:10px;font-weight:700;letter-spacing:.04em;}
 .source-badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;color:#fff;vertical-align:middle;margin-left:6px;letter-spacing:0.02em;}
 .source-badge--airbnb{background:#FF5A5F;}
-.source-badge--booking{background:#003580;}
+.source-badge--booking{background:#4A4A48;}
 .source-badge--expedia{background:#FFC72C;color:#1a1a1a;}
 .source-badge--direct{background:#2d6a4f;}
 .elev-status{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:16px;flex-wrap:wrap;}
@@ -258,7 +259,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .pill-confirmed{background:var(--green-bg);color:var(--green);}
 .pill-cancelled{background:var(--bg);color:var(--muted);}
 .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;}
-.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 6px;text-align:center;cursor:pointer;font-family:var(--sans);width:100%;}
+.stat{color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 6px;text-align:center;cursor:pointer;font-family:var(--sans);width:100%;}
 .stat.active{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);}
 .stat__n{font-family:var(--mono);font-size:18px;font-weight:700;}
 .stat__l{font-size:10px;font-weight:500;letter-spacing:.02em;color:var(--muted);margin-top:2px;}
@@ -311,7 +312,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .apt-fold.collapsed .apt-fold__chev{transform:rotate(-90deg);}
 .apt-fold__bd{padding:0 14px 14px;border-top:1px solid var(--line);}
 .apt-hint{font-size:11px;color:var(--muted);margin:-4px 0 8px;line-height:1.4;}
-.apt-sync-note{font-size:12px;color:var(--muted);background:var(--blue-bg);border:1px solid #c7d9ef;border-radius:var(--r);padding:10px 12px;margin-bottom:12px;line-height:1.45;}
+.apt-sync-note{font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:12px;line-height:1.45;}
 .aptsguest-switch{display:flex;gap:4px;padding:4px;margin-bottom:12px;background:var(--surface);border:1px solid var(--line);border-radius:999px;}
 .aptsguest-switch button{flex:1;min-height:44px;border:0;border-radius:999px;background:transparent;font-family:var(--sans);font-size:14px;font-weight:600;color:var(--ink-2);cursor:pointer;}
 .aptsguest-switch button.active{background:var(--ink);color:#fff;}
@@ -672,7 +673,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1001f · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1002a · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
