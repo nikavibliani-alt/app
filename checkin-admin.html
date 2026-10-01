@@ -265,7 +265,10 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .stat.active{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);}
 .stat__n{font-family:var(--mono);font-size:18px;font-weight:700;}
 .stat__l{font-size:10px;font-weight:500;letter-spacing:.02em;color:var(--muted);margin-top:2px;}
-.search-box--compact{height:38px;margin:2px 0 10px;font-size:16px;padding:0 12px;}
+.search-box--compact{height:38px;margin:0;font-size:16px;padding:0 40px 0 12px;}
+.search-wrap{position:relative;margin:2px 0 10px;}
+.search-clear{position:absolute;right:0;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.search-clear[hidden]{display:none;}
 .stat-row--stay{grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px;}
 .stat--wait{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:56px;padding:10px 16px;text-align:left;background:var(--surface);}
 .stat--wait .stat__n{font-size:24px;}
@@ -679,7 +682,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1004b · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1004c · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -690,7 +693,10 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
   <div class="pane active" id="pane-stay">
     <div class="stat-row stat-row--stay" id="stay-stats"></div>
     <div class="day-row show" id="upcoming-days" aria-label="Arrivals by day (arriving / not registered)"></div>
-    <input class="search-box search-box--compact" id="stay-search" placeholder="Search guest, room, booking" oninput="renderStay()">
+    <div class="search-wrap">
+      <input class="search-box search-box--compact" id="stay-search" placeholder="Search guest, room, booking" oninput="renderStay()">
+      <button type="button" class="search-clear" id="stay-search-clear" aria-label="Clear search" onclick="clearStaySearch()" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+    </div>
     <div id="stay-list"></div>
   </div>
 
@@ -3729,6 +3735,21 @@ function _renderStayCore(){
   const el=document.getElementById('stay-list');
   if(!_resCache){el.innerHTML='<div class="empty">Loading reservations…</div>';return;}
 
+  if(q){
+    /* searching: only sections that have matches (Staying, Arriving today, Leaving today, upcoming days); past guests are appended by renderStay */
+    let html='',n=0;
+    const add=(title,groups,mode)=>{if(!groups.length)return;n+=groups.length;html+=sectionBlock(title,groups,mode);};
+    add('Staying',filterByQ(b.inhouse),'inhouse');
+    add('Arriving today',filterByQ(b.arrivals),'arrival');
+    add('Leaving today',filterByQ(b.leaving),'leaving');
+    const dayList=upcomingDaysList().slice();
+    if(stayFilter==='upcoming'){const i=dayList.findIndex(d=>d.iso===upcomingDay);if(i>0)dayList.unshift(dayList.splice(i,1)[0]);}
+    for(const d of dayList)add(d.label+' · '+d.dateLabel,filterByQ(groupsForCheckinDate(d.iso)),'upcoming');
+    _stayMatchCount=n;
+    el.innerHTML=html;
+    return;
+  }
+
   if(stayFilter==='overview'){
     const arr=filterByQ(b.arrivals),leave=filterByQ(b.leaving),house=filterByQ(b.inhouse);
     let html=
@@ -3777,22 +3798,36 @@ function _renderStayCore(){
 }
 
 /* Stay search also lists past guests (same data as Guest history: _historyData) */
-let _pastQ='',_pastShown=20;
+let _pastQ='',_pastShown=20,_stayMatchCount=0;
 window.pastShowMore=function(){_pastShown+=20;renderStay();};
 function renderPastGuests(){
   const el=document.getElementById('stay-list');
   const q=(document.getElementById('stay-search')?.value||'').trim().toLowerCase();
-  if(!el||!q||!_resCache)return;
+  if(!el||!q||!_resCache)return 0;
   if(q!==_pastQ){_pastQ=q;_pastShown=20;}
   if(!_historyData||(Date.now()-_historyBuiltAt)>HISTORY_CACHE_MS)buildHistoryData();
   const rows=_historyData.filter(r=>[r.name,r.roomCode,r.contact,r.res?.reservationNumber,r.res?.bookingId].join(' ').toLowerCase().includes(q));
-  if(!rows.length)return;
+  if(!rows.length)return 0;
   const shown=rows.slice(0,_pastShown);
   el.insertAdjacentHTML('beforeend',`<div class="section-hd"><h2>Past guests</h2><span class="n">${rows.length}</span></div>`+shown.map(historyCardHtml).join('')+(rows.length>shown.length?`<button type="button" class="btn" style="width:100%;margin-bottom:12px" onclick="pastShowMore()">Show more (${rows.length-shown.length})</button>`:''));
+  return rows.length;
 }
+function syncSearchClear(){
+  const inp=document.getElementById('stay-search'),b=document.getElementById('stay-search-clear');
+  if(b&&inp)b.hidden=!inp.value;
+}
+window.clearStaySearch=function(){
+  const inp=document.getElementById('stay-search');
+  if(inp){inp.value='';inp.blur();}
+  renderStay();
+};
 window.renderStay=function(){
+  _stayMatchCount=0;
   _renderStayCore();
-  renderPastGuests();
+  const past=renderPastGuests();
+  syncSearchClear();
+  const q=(document.getElementById('stay-search')?.value||'').trim();
+  if(q&&_resCache&&!_stayMatchCount&&!past)document.getElementById('stay-list').innerHTML='<div class="empty">No guests found</div>';
 };
 
 
