@@ -55,3 +55,9 @@ Undo all: `git revert --no-edit before-round-2..HEAD`, then push. Undo one step:
 | 2 | c31cec7 | live |
 | 3 | 0cffb7c | live |
 | 4 | 163a05f | live |
+| 5 | 94d29a6 | live |
+
+Round 2 notes:
+- Step 2: WebKit on desktop does not reproduce iPhone's system-blue button text; fixed by a global `button{color:inherit}` plus removing blue colors; verified by computed-color scan (no blue left outside HK). Left alone: .hk-cleaner-link, .hk-role-badge (use --blue), damage lightbox link #9cf.
+- Step 3 left for HK/WhatsApp/elevator chats: HK PIN pad glyphs, HK/damage toasts and arrows, WhatsApp settings toasts/hint, elevator toast, "Guest page saved ✓" (inside gsSaveAll, untouched).
+- Step 5: a day with 0 arrivals was not present in live data, so that look was checked in code only.
