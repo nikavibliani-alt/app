@@ -1078,7 +1078,7 @@ body{padding-bottom:0;}
           <button class="hero-cta__btn hero-cta__btn--checkout" id="btn-checked-out" onclick="window.guestCheckedOut()"><span id="t-btn-checked-out">I've checked out</span></button>
         </div>
 
-        <div class="dk-card dk-access">
+        <div class="dk-card dk-access" id="hero-door-card">
           <div class="dk-access__row">
             <div class="dk-access__left">
               <div class="dk-access__lbl" id="t-door-lbl">Smart lock code</div>
@@ -4611,11 +4611,14 @@ function _floorLabel(){
 function _renderHeroContent(){
   _updateParkingButtonVisibility();
   const doorEl=document.getElementById('hero-door-code');
+  const _applyDoorCardVisibility=()=>{const c=document.getElementById('hero-door-card');if(c)c.style.display=(aptData&&aptData.hasSmartLock===false)?'none':'';};
+  _applyDoorCardVisibility();   // fail open: only hidden once aptData says hasSmartLock===false
   let doorCode=_doorCodeForGuest();
   if(!doorCode&&aptId&&(!aptData||!aptData.doorCode)){
     getDoc(doc(db,'checkin_apartments',aptId)).then(s=>{
       if(s.exists()){
         aptData=s.data();
+        _applyDoorCardVisibility();
         const el=document.getElementById('hero-door-code');
         const dc=_doorCodeForGuest();
         if(el&&dc)el.textContent=dc;

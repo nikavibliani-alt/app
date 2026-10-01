@@ -318,6 +318,8 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .aptsguest-switch{display:flex;gap:4px;padding:4px;margin-bottom:12px;background:var(--surface);border:1px solid var(--line);border-radius:999px;}
 .aptsguest-switch button{flex:1;min-height:44px;border:0;border-radius:999px;background:transparent;font-family:var(--sans);font-size:14px;font-weight:600;color:var(--ink-2);cursor:pointer;}
 .aptsguest-switch button.active{background:var(--ink);color:#fff;}
+.apt-lock-switch{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;margin-bottom:8px;cursor:pointer;}
+.apt-lock-switch__txt{font-size:14px;font-weight:600;color:var(--ink);}
 .apt-toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .apt-toolbar .btn{flex:none;min-height:40px;padding:0 14px;font-size:13px;}
 .apt-pill-row{display:flex;align-items:stretch;gap:4px;margin-bottom:6px;}
@@ -675,7 +677,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1002b · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1002c · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -4272,8 +4274,8 @@ window.openDetail=function(guestId){
     return`<div class="room-block">
       <h3>Room ${esc(rc)}${isMulti?' <span class="pill pill-multi">MULTI</span>':''}${res&&(res.manualRoom===true||res.manualRoom==='true')?' <span class="pill pill-manual">MANUAL</span>':''}</h3>
       ${drift?`<p style="font-size:12px;color:var(--amber);margin-bottom:8px">Guest form still says ${esc(roomForm.aptId)} — use Move/Swap or wait for sync</p>`:''}
-      <div style="font-size:12px;color:var(--muted)">Door code</div>
-      <div class="door">${esc(doorCode)}</div>
+      ${(aptData[rc]?.hasSmartLock===false||aptData[roomForm?.aptId]?.hasSmartLock===false)?`<div style="font-size:13px;color:var(--muted)">No smart lock</div>`:`<div style="font-size:12px;color:var(--muted)">Door code</div>
+      <div class="door">${esc(doorCode)}</div>`}
       <div class="card__actions">${unlockBtn}${waPhone&&roomForm===g?`<a class="btn" href="https://wa.me/${waPhone}" target="_blank">WhatsApp</a>`:''}</div>
     </div>`;
   }).join('');
@@ -4873,13 +4875,14 @@ function renderAptsList(){
     for(const a of rooms){
       const d=aptData[a.id]||{};
       const ok=!!(d.tuyaDeviceId||d.doorCode);
+      const dotColor=d.hasSmartLock===false?'var(--muted)':(ok?'var(--green)':'var(--red)');
       const photoN=(d.photos||[]).length;
       const hint=photoN?photoN+' photo'+(photoN!==1?'s':''):(d.instructions?'Has instructions':'No instructions');
       if(_aptReorderMode){
         html+=`<div class="apt-pill-row reorder-mode" data-room="${esc(a.id)}">
           <button type="button" class="apt-drag" aria-label="Drag to reorder" onpointerdown="aptDragPointerDown(event,'${esc(a.id)}')">${APT_DRAG_SVG}</button>
           <div class="apt-pill-static">
-            <span class="apt-dot" style="background:${ok?'var(--green)':'var(--red)'}"></span>
+            <span class="apt-dot" style="background:${dotColor}"></span>
             <span class="apt-pill__code">${esc(a.code)}</span>
             <span class="apt-pill__name">${esc(a.name)} · ${esc(hint)}</span>
           </div>
@@ -4887,7 +4890,7 @@ function renderAptsList(){
       }else{
         html+=`<div class="apt-pill-row" data-room="${esc(a.id)}" onpointerdown="aptRowPressStart(event)">
           <button type="button" class="apt-pill" onclick="window.openAptEditor('${esc(a.id)}')">
-            <span class="apt-dot" style="background:${ok?'var(--green)':'var(--red)'}"></span>
+            <span class="apt-dot" style="background:${dotColor}"></span>
             <span class="apt-pill__code">${esc(a.code)}</span>
             <span class="apt-pill__name">${esc(a.name)} · ${esc(hint)}</span>
           </button>
@@ -4906,9 +4909,10 @@ function renderAptsList(){
         hidden.sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)).map(r=>{
           const d=aptData[r.roomCode]||{};
           const ok=!!(d.tuyaDeviceId||d.doorCode);
+          const dotColor=d.hasSmartLock===false?'var(--muted)':(ok?'var(--green)':'var(--red)');
           return`<div class="apt-pill-row">
             <button type="button" class="apt-pill inactive" onclick="window.openAptEditor('${esc(r.roomCode)}')">
-              <span class="apt-dot" style="background:${ok?'var(--green)':'var(--red)'}"></span>
+              <span class="apt-dot" style="background:${dotColor}"></span>
               <span class="apt-pill__code">${esc(r.displayCode||r.roomCode)}</span>
               <span class="apt-pill__name">${esc(r.displayName||r.roomCode)} · hidden</span>
             </button>
@@ -4951,8 +4955,14 @@ window.openAptEditor=function(aptId){
 
   document.getElementById('apt-ed-body').innerHTML=`
     <div class="apt-card">
-      <div class="apt-card-hd">Smart lock · ${d.tuyaDeviceId?'Tuya':d.doorCode?'Manual':'Not set'}</div>
+      <div class="apt-card-hd">Smart lock · ${d.hasSmartLock===false?'None':d.tuyaDeviceId?'Tuya':d.doorCode?'Manual':'Not set'}</div>
       <div class="apt-card-bd">
+        <label class="apt-lock-switch">
+          <span class="apt-lock-switch__txt">This apartment has a smart lock</span>
+          <span class="switch"><input type="checkbox" id="apt-hasSmartLock" ${d.hasSmartLock!==false?'checked':''} onchange="window.toggleHasSmartLock(this.checked)"><span class="switch-track"></span></span>
+        </label>
+        <p class="apt-hint" id="apt-nolock-note" style="display:${d.hasSmartLock===false?'block':'none'}">Guests won't see a door code box.</p>
+        <div id="apt-lock-fields" style="display:${d.hasSmartLock===false?'none':'block'}">
         <div class="apt-mode-group">
           <button type="button" class="apt-mode-btn ${initMode==='auto'?'active':''}" id="mode-auto" onclick="setLockMode('auto')">Auto (Tuya)</button>
           <button type="button" class="apt-mode-btn ${initMode==='manual'?'active':''}" id="mode-manual" onclick="setLockMode('manual')">Manual code</button>
@@ -4964,6 +4974,7 @@ window.openAptEditor=function(aptId){
         <div id="lock-manual" style="display:${initMode==='manual'?'block':'none'}">
           <label class="apt-label">Door code</label>
           <input class="apt-input" id="apt-doorCode" value="${esc(d.doorCode||'')}" placeholder="1234#">
+        </div>
         </div>
       </div>
     </div>
@@ -5077,12 +5088,17 @@ function _aptRerender(aptId,capMap){
     if(el&&typed!==undefined)el.value=typed;
   }
   if(snap.__mode!==!!document.getElementById('mode-manual')?.classList.contains('active'))setLockMode(snap.__mode?'manual':'auto');
+  const _hs=document.getElementById('apt-hasSmartLock');if(_hs)toggleHasSmartLock(_hs.checked);
   if(foldOpen)document.getElementById('apt-fold-registry')?.classList.remove('collapsed');
   scrollers.forEach(([e,t])=>{if(e)e.scrollTop=t;});
 }
 window.closeAptEditor=function(){
   document.getElementById('apt-editor-overlay').classList.remove('open');
   _currentAptId=null;
+};
+window.toggleHasSmartLock=function(on){
+  document.getElementById('apt-lock-fields').style.display=on?'block':'none';
+  document.getElementById('apt-nolock-note').style.display=on?'none':'block';
 };
 window.setLockMode=function(mode){
   document.getElementById('lock-auto').style.display=mode==='auto'?'block':'none';
@@ -5107,6 +5123,7 @@ window.saveAptData=async function(){
     videoUrl:document.getElementById('apt-videoUrl')?.value.trim()||'',
     photos:aptData[aptId]?.photos||[],
     photoCaptions,
+    hasSmartLock:document.getElementById('apt-hasSmartLock')?document.getElementById('apt-hasSmartLock').checked:(aptData[aptId]?.hasSmartLock!==false),
     updatedAt:serverTimestamp()
   };
   try{
