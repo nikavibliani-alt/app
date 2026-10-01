@@ -35,3 +35,19 @@ Notes:
 - Step 5: status colors — waiting = amber, has access = green, checked in = blue, access off = red, not registered = grey.
 - Step 6: Tab-bar ids 'apts' and 'guestsettings' are unchanged, so saved layouts still work.
 - Step 1/2/3/4 test notes: on localhost the app talks to the real database but the admin functions emulator is not running, so writes could not happen; step 2 was tested on a copy with writes stubbed.
+
+# Round 2
+
+Restore point: tag `before-round-2`.
+
+1. Design rules file (CLAUDE.md)
+2. Remove blue
+3. Replace emojis and symbol buttons with icons
+4. Per-apartment "has a smart lock" switch
+5. Stay: always-visible day strip
+
+Undo all: `git revert --no-edit before-round-2..HEAD`, then push. Undo one step: `git revert --no-edit <commit>`, then push.
+
+| Step | Commit | Status |
+|------|--------|--------|
+| 0 | tag before-round-2 | done |
