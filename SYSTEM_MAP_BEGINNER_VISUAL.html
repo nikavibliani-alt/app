@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maxela — Beginner system map (drawn)</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --panel:#fff; --ink:#1a1d23; --muted:#5c6570;
+    --line:#e2e6ec; --blue:#1a73e8; --blue-bg:#e8f0fe;
+    --green:#137333; --green-bg:#e6f4ea; --orange:#b06000; --orange-bg:#fef7e0;
+    --purple:#7b1fa2; --purple-bg:#f3e5f5; --red:#c62828; --red-bg:#fce8e6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden}
+  body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);display:flex;flex-direction:column}
+
+  header{
+    padding:12px 18px;background:var(--panel);border-bottom:1px solid var(--line);flex-shrink:0;
+    display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
+  }
+  header h1{font-size:18px;font-weight:760}
+  header p{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;max-width:640px}
+  .links{font-size:12px;display:flex;gap:10px;flex-shrink:0}
+  .links a{color:var(--blue);text-decoration:none;font-weight:600}
+  .links a:hover{text-decoration:underline}
+
+  .main{flex:1;display:flex;min-height:0}
+  #stage{flex:1;position:relative;overflow:hidden;background:#fafbfc;cursor:grab;touch-action:none}
+  #stage.grabbing{cursor:grabbing}
+  #stage svg{display:block;width:100%;height:100%}
+
+  .zone{fill:#fff;stroke:#e2e6ec;stroke-width:1.5;rx:16}
+  .zone-title{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;fill:var(--muted)}
+  .node{cursor:pointer}
+  .node rect{stroke-width:2;rx:10;transition:filter .15s}
+  .node:hover rect{filter:brightness(.97)}
+  .node.active rect{stroke-width:3;filter:drop-shadow(0 2px 8px rgba(26,115,232,.25))}
+  .node .t{font-size:13px;font-weight:700;fill:var(--ink);pointer-events:none}
+  .node .s{font-size:10px;font-weight:500;fill:var(--muted);pointer-events:none}
+  .link{fill:none;stroke:#94a3b8;stroke-width:2;marker-end:url(#arr)}
+  .link.auto{stroke:#b06000;stroke-dasharray:6 4}
+  .link.warn{stroke:var(--red);stroke-dasharray:6 4;stroke-width:2.2}
+  .link-label{font-size:10px;font-weight:600;fill:#64748b;pointer-events:none}
+
+  .side{
+    width:300px;background:var(--panel);border-left:1px solid var(--line);
+    display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;
+  }
+  .side-head{padding:14px 16px;border-bottom:1px solid var(--line)}
+  .side-head .eyebrow{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .side-head h2{font-size:17px;margin-top:6px;line-height:1.25}
+  .side-body{flex:1;overflow-y:auto;padding:14px 16px}
+  .side-body p{font-size:13.5px;line-height:1.55;color:#30363f;margin-bottom:12px}
+  .box{margin-bottom:10px;padding:10px 12px;border-radius:10px;background:#f7f8fa;border:1px solid var(--line)}
+  .box b{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:4px}
+  .box span{font-size:13px;line-height:1.45}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip{font-size:10px;font-weight:700;padding:4px 8px;border-radius:999px}
+  .chip.people{background:var(--blue-bg);color:#174ea6}
+  .chip.data{background:var(--green-bg);color:var(--green)}
+  .chip.auto{background:var(--orange-bg);color:var(--orange)}
+  .chip.app{background:var(--purple-bg);color:var(--purple)}
+  .chip.bad{background:var(--red-bg);color:var(--red)}
+
+  .legend{
+    position:absolute;bottom:12px;left:12px;background:rgba(255,255,255,.95);
+    border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:11px;color:var(--muted);
+    box-shadow:0 4px 16px rgba(0,0,0,.06);pointer-events:none;
+  }
+  .legend div{margin:3px 0;display:flex;align-items:center;gap:6px}
+  .sw{width:18px;height:3px;border-radius:2px;background:#94a3b8}
+  .sw.auto{background:#b06000}
+  .sw.warn{background:var(--red);background-image:repeating-linear-gradient(90deg,transparent,transparent 3px,#fff 3px,#fff 5px)}
+
+  @media(max-width:900px){
+    .main{flex-direction:column}
+    .side{width:100%;max-height:38vh;border-left:none;border-top:1px solid var(--line)}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Beginner system map</h1>
+    <p>Pre-drawn for you. Drag the map to move · scroll to zoom · click any box to read what it does. Ask questions about anything unclear.</p>
+  </div>
+  <div class="links">
+    <a href="SYSTEM_MAP_BEGINNER.html">Story view</a>
+    <a href="SYSTEM_MAP_DRAW.html">Draw your own</a>
+  </div>
+</header>
+
+<div class="main">
+  <div id="stage">
+    <svg id="svg" viewBox="0 0 2200 1100">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/>
+        </marker>
+      </defs>
+      <g id="cam">
+        <!-- zones -->
+        <rect class="zone" x="30" y="40" width="320" height="1020" fill="#fafbfc"/>
+        <text class="zone-title" x="50" y="68">Outside world</text>
+
+        <rect class="zone" x="390" y="40" width="420" height="1020" fill="#f8fafc"/>
+        <text class="zone-title" x="410" y="68">Automatic jobs</text>
+
+        <rect class="zone" x="850" y="40" width="420" height="1020" fill="#f8fafc"/>
+        <text class="zone-title" x="870" y="68">Firebase (database)</text>
+
+        <rect class="zone" x="1310" y="40" width="420" height="520" fill="#fafbfc"/>
+        <text class="zone-title" x="1330" y="68">Guest</text>
+
+        <rect class="zone" x="1310" y="580" width="420" height="480" fill="#fafbfc"/>
+        <text class="zone-title" x="1330" y="608">Admin &amp; HK</text>
+
+        <rect class="zone" x="1770" y="40" width="400" height="1020" fill="#f0fdf4"/>
+        <text class="zone-title" x="1790" y="68">Guest gets access</text>
+
+        <g id="links"></g>
+        <g id="nodes"></g>
+      </g>
+    </svg>
+    <div class="legend">
+      <div><span class="sw"></span> normal flow</div>
+      <div><span class="sw auto"></span> automatic job</div>
+      <div><span class="sw warn"></span> fragile / watch out</div>
+    </div>
+  </div>
+
+  <aside class="side">
+    <div class="side-head">
+      <div class="eyebrow">Click a box</div>
+      <h2 id="side-title">Welcome</h2>
+    </div>
+    <div class="side-body" id="side-body">
+      <p>This map shows how Maxela works at a beginner level — from booking to guest access.</p>
+      <p>Start with the blue <b>Guest check-in page</b> on the right, or follow left → right from <b>MiniHotel booking</b>.</p>
+      <div class="chips">
+        <span class="chip people">People</span>
+        <span class="chip auto">Automatic</span>
+        <span class="chip data">Database</span>
+        <span class="chip app">App / page</span>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const NODES = {
+  booking: {
+    x:70, y:120, w:240, h:72, fill:'#e8f0fe', stroke:'#1a73e8',
+    title:'MiniHotel booking', sub:'Booking.com / Airbnb → MiniHotel',
+    plain:'Guests book on travel sites. Those bookings land in MiniHotel first — the hotel software Maxela already uses.',
+    who:'Travel sites → MiniHotel', happens:'New bookings appear in MiniHotel.', why:'This is where every stay starts.',
+    chips:[['people','Outside'],['auto','Every ~10 min syncs to Maxela']]
+  },
+  sync: {
+    x:430, y:200, w:340, h:72, fill:'#fef7e0', stroke:'#b06000',
+    title:'Booking sync job', sub:'~every 10 minutes',
+    plain:'An automatic job copies new and updated bookings from MiniHotel into Maxela’s database.',
+    who:'GitHub Action + minihotel_reservation_sync.py', happens:'Creates/updates reservation records.', why:'If this stops, new guests never appear in admin or on the guest page.',
+    chips:[['auto','Automatic job']]
+  },
+  reservations: {
+    x:890, y:200, w:340, h:72, fill:'#e6f4ea', stroke:'#137333',
+    title:'reservations', sub:'Name, room, check-in/out dates',
+    plain:'Each booking is stored as a reservation: guest name, room code, and stay dates.',
+    who:'Written by sync job', happens:'Admin and guest page both search this.', why:'Starting point for almost everything.',
+    chips:[['data','Firebase']]
+  },
+  guestpage: {
+    x:1350, y:120, w:340, h:72, fill:'#f3e5f5', stroke:'#7b1fa2',
+    title:'Guest check-in page', sub:'checkin-guest-v2.html',
+    plain:'Guest opens the Maxela check-in website and searches for their booking by name.',
+    who:'Guest', happens:'Finds reservation → starts registration.', why:'If search fails, guest gets stuck before check-in.',
+    chips:[['app','Guest page'],['people','Guest']]
+  },
+  register: {
+    x:1350, y:240, w:340, h:72, fill:'#f3e5f5', stroke:'#7b1fa2',
+    title:'Guest registers', sub:'Rules + passport + contact',
+    plain:'Guest accepts house rules, uploads ID photo, and saves WhatsApp/contact info.',
+    who:'Guest', happens:'Creates a guest form in the database.', why:'Without this, admin doesn’t know the guest is ready.',
+    chips:[['app','Guest page'],['people','Guest']]
+  },
+  guests: {
+    x:890, y:380, w:340, h:72, fill:'#e6f4ea', stroke:'#137333',
+    title:'checkin_guests', sub:'Guest form + unlock flags',
+    plain:'Stores the guest’s registration: ID photo, contact, approval status, and whether access is unlocked.',
+    who:'Written by guest page + admin', happens:'Admin reviews ID here; unlock flags live here too.', why:'Bridge between guest and admin.',
+    chips:[['data','Firebase']]
+  },
+  apartments: {
+    x:890, y:520, w:340, h:72, fill:'#e6f4ea', stroke:'#137333',
+    title:'checkin_apartments', sub:'WiFi, door code, photos per room',
+    plain:'Each apartment has the info guests see: WiFi password, door instructions, photo steps.',
+    who:'Edited by admin', happens:'Guest page reads room info by room code.', why:'Wrong WiFi or photos = confused guests.',
+    chips:[['data','Firebase']]
+  },
+  elevator: {
+    x:890, y:660, w:340, h:72, fill:'#e6f4ea', stroke:'#137333',
+    title:'Elevator / entrance code', sub:'globals/elevator_code + RTDB',
+    plain:'Shared building code for 6-x and 7-x apartments. Admin pastes the latest code.',
+    who:'You update in admin', happens:'Saved to Firebase; monitor checks it hourly.', why:'Stale code = guest can’t enter the building.',
+    chips:[['data','Firebase']]
+  },
+  hkstatus: {
+    x:890, y:800, w:340, h:72, fill:'#e6f4ea', stroke:'#137333',
+    title:'hk_status', sub:'“Room clean today” flag',
+    plain:'Housekeeping marks a room clean for today. The system uses this for early check-in.',
+    who:'HK app → database', happens:'Creates today’s clean flag per room.', why:'Without it, early unlock can’t work.',
+    chips:[['data','Firebase']]
+  },
+  unlock: {
+    x:1810, y:320, w:320, h:88, fill:'#dcfce7', stroke:'#15803d',
+    title:'Access unlocks', sub:'Door + WiFi + elevator appear',
+    plain:'At check-in time (or earlier if room is clean / admin unlocked), the guest page shows door code, WiFi, photos, and elevator code.',
+    who:'Guest page rules + admin + HK', happens:'Waiting screen → ready screen.', why:'The moment the guest can actually enter.',
+    chips:[['app','Guest page'],['people','Guest']]
+  },
+  admin: {
+    x:1350, y:660, w:340, h:72, fill:'#f3e5f5', stroke:'#7b1fa2',
+    title:'Admin panel', sub:'checkin-admin.html',
+    plain:'Your daily board: see arrivals, review passports, grant early access, edit apartments, update elevator code.',
+    who:'You (admin)', happens:'Reads reservations + guest forms; writes unlocks and room info.', why:'Where you run daily operations.',
+    chips:[['app','Admin'],['people','You']]
+  },
+  hkapp: {
+    x:1350, y:820, w:340, h:72, fill:'#f3e5f5', stroke:'#7b1fa2',
+    title:'HK app', sub:'Housekeeping phone page',
+    plain:'Housekeepers mark each room cleaned for today.',
+    who:'Housekeeping staff', happens:'Writes hk_status for that room + date.', why:'Signals that early check-in may be allowed.',
+    chips:[['app','HK app'],['people','Housekeeper']]
+  },
+  whatsapp: {
+    x:430, y:680, w:340, h:72, fill:'#fef7e0', stroke:'#b06000',
+    title:'WhatsApp “room ready”', sub:'Daily automatic job',
+    plain:'Once a day, a job finds today’s arrivals whose rooms are marked clean and sends them a WhatsApp message.',
+    who:'whatsapp_checkin_ready.py', happens:'“Your unit is ready” message if contact exists.', why:'Guest knows they can come without calling you.',
+    chips:[['auto','Daily job'],['people','WhatsApp']]
+  },
+  roomtruth: {
+    x:890, y:960, w:340, h:72, fill:'#fce8e6', stroke:'#c62828',
+    title:'⚠ Room in 2 places', sub:'reservations.roomCode vs checkin_guests.aptId',
+    plain:'The booking stores one room field. The guest form stores another. They must stay matched — especially when admin moves a guest.',
+    who:'Admin move + sync rules', happens:'If only one side changes, guest sees wrong WiFi/door.', why:'Known weak spot — future pipeline will fix this.',
+    chips:[['bad','Watch out']]
+  }
+};
+
+const LINKS = [
+  { from:'booking', to:'sync', label:'bookings', cls:'auto' },
+  { from:'sync', to:'reservations', label:'copies', cls:'auto' },
+  { from:'reservations', to:'guestpage', label:'search' },
+  { from:'guestpage', to:'register', label:'registers' },
+  { from:'register', to:'guests', label:'saves form' },
+  { from:'guests', to:'unlock', label:'unlock rules' },
+  { from:'apartments', to:'unlock', label:'room info' },
+  { from:'elevator', to:'unlock', label:'building code' },
+  { from:'hkstatus', to:'unlock', label:'early unlock' },
+  { from:'admin', to:'guests', label:'approve / unlock' },
+  { from:'admin', to:'apartments', label:'edit room' },
+  { from:'admin', to:'elevator', label:'paste code' },
+  { from:'hkapp', to:'hkstatus', label:'marks clean' },
+  { from:'hkstatus', to:'whatsapp', label:'room ready', cls:'auto' },
+  { from:'reservations', to:'roomtruth', label:'roomCode', cls:'warn' },
+  { from:'guests', to:'roomtruth', label:'aptId', cls:'warn' },
+];
+
+const stage = document.getElementById('stage');
+const svg = document.getElementById('svg');
+const cam = document.getElementById('cam');
+const nodesG = document.getElementById('nodes');
+const linksG = document.getElementById('links');
+const sideTitle = document.getElementById('side-title');
+const sideBody = document.getElementById('side-body');
+
+let camX = 0, camY = 0, camS = 1;
+let panning = null;
+let active = null;
+
+function cx(n){ return n.x + n.w/2; }
+function cy(n){ return n.y + n.h/2; }
+
+function applyCam(){
+  cam.setAttribute('transform', `translate(${camX},${camY}) scale(${camS})`);
+}
+
+function renderLinks(){
+  linksG.innerHTML = '';
+  LINKS.forEach(l=>{
+    const a = NODES[l.from], b = NODES[l.to];
+    if(!a||!b) return;
+    const x1=cx(a), y1=cy(a), x2=cx(b), y2=cy(b);
+    const mx=(x1+x2)/2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('class','link'+(l.cls?' '+l.cls:''));
+    path.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+    linksG.appendChild(path);
+    if(l.label){
+      const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('class','link-label');
+      t.setAttribute('x', (x1+x2)/2);
+      t.setAttribute('y', (y1+y2)/2 - 6);
+      t.setAttribute('text-anchor','middle');
+      t.textContent = l.label;
+      linksG.appendChild(t);
+    }
+  });
+}
+
+function showNode(id){
+  const n = NODES[id];
+  if(!n) return;
+  active = id;
+  document.querySelectorAll('.node').forEach(el=> el.classList.toggle('active', el.dataset.id===id));
+  sideTitle.textContent = n.title;
+  const chips = (n.chips||[]).map(([k,t])=>`<span class="chip ${k}">${t}</span>`).join('');
+  sideBody.innerHTML = `
+    <p>${n.plain}</p>
+    <div class="box"><b>Who</b><span>${n.who}</span></div>
+    <div class="box"><b>What happens</b><span>${n.happens}</span></div>
+    <div class="box"><b>Why it matters</b><span>${n.why}</span></div>
+    <div class="chips">${chips}</div>`;
+}
+
+function renderNodes(){
+  nodesG.innerHTML = '';
+  Object.entries(NODES).forEach(([id,n])=>{
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.className.baseVal = 'node';
+    g.dataset.id = id;
+    const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    r.setAttribute('x', n.x); r.setAttribute('y', n.y);
+    r.setAttribute('width', n.w); r.setAttribute('height', n.h);
+    r.setAttribute('fill', n.fill); r.setAttribute('stroke', n.stroke);
+    const t1 = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t1.setAttribute('class','t');
+    t1.setAttribute('x', n.x + 14);
+    t1.setAttribute('y', n.y + 30);
+    t1.textContent = n.title;
+    const t2 = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t2.setAttribute('class','s');
+    t2.setAttribute('x', n.x + 14);
+    t2.setAttribute('y', n.y + 50);
+    t2.textContent = n.sub;
+    g.append(r,t1,t2);
+    g.addEventListener('click', e=>{ e.stopPropagation(); showNode(id); });
+    nodesG.appendChild(g);
+  });
+}
+
+stage.addEventListener('pointerdown', e=>{
+  if(e.target.closest('.node')) return;
+  panning = {sx:e.clientX, sy:e.clientY, cx:camX, cy:camY};
+  stage.classList.add('grabbing');
+});
+stage.addEventListener('pointermove', e=>{
+  if(!panning) return;
+  camX = panning.cx + (e.clientX - panning.sx);
+  camY = panning.cy + (e.clientY - panning.sy);
+  applyCam();
+});
+stage.addEventListener('pointerup', ()=>{
+  panning = null;
+  stage.classList.remove('grabbing');
+});
+stage.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const r = stage.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const prev = camS;
+  camS = Math.min(2, Math.max(0.35, camS * (e.deltaY < 0 ? 1.08 : 0.92)));
+  camX = mx - (mx - camX) * (camS / prev);
+  camY = my - (my - camY) * (camS / prev);
+  applyCam();
+}, {passive:false});
+
+stage.addEventListener('click', ()=>{
+  active = null;
+  document.querySelectorAll('.node').forEach(el=> el.classList.remove('active'));
+});
+
+renderLinks();
+renderNodes();
+applyCam();
+showNode('guestpage');
+</script>
+</body>
+</html>
