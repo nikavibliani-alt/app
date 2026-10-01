@@ -115,3 +115,4 @@ Restore point: tag `before-round-5`.
 1. "Remove access" asks how long (bottom sheet) and actually works after 15:00
 
 Undo: `git revert --no-edit <commit>` (or `before-round-5..HEAD`), then push.
+| 1 | a7c00a6 | live |
