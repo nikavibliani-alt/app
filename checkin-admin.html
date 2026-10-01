@@ -679,7 +679,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1003c · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1003d · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -3700,7 +3700,7 @@ function renderUpcomingDayChips(){
   row.scrollLeft=keep;
 }
 
-window.renderStay=function(){
+function _renderStayCore(){
   const b=scheduleBuckets();
   const q=(document.getElementById('stay-search')?.value||'').trim().toLowerCase();
   const filterByQ=(groups)=>!q?groups:groups.filter(grp=>{
@@ -3768,7 +3768,27 @@ window.renderStay=function(){
   groups=filterByQ(groups);
   if(!groups.length){el.innerHTML=`<div class="section-hd"><h2>${esc(title)}</h2><span class="n">0</span></div><div class="empty">Nothing here</div>`;return;}
   el.innerHTML=sectionBlock(title,groups,mode);
+}
+
+/* Stay search also lists past guests (same data as Guest history: _historyData) */
+let _pastQ='',_pastShown=20;
+window.pastShowMore=function(){_pastShown+=20;renderStay();};
+function renderPastGuests(){
+  const el=document.getElementById('stay-list');
+  const q=(document.getElementById('stay-search')?.value||'').trim().toLowerCase();
+  if(!el||!q||!_resCache)return;
+  if(q!==_pastQ){_pastQ=q;_pastShown=20;}
+  if(!_historyData||(Date.now()-_historyBuiltAt)>HISTORY_CACHE_MS)buildHistoryData();
+  const rows=_historyData.filter(r=>[r.name,r.roomCode,r.contact,r.res?.reservationNumber,r.res?.bookingId].join(' ').toLowerCase().includes(q));
+  if(!rows.length)return;
+  const shown=rows.slice(0,_pastShown);
+  el.insertAdjacentHTML('beforeend',`<div class="section-hd"><h2>Past guests</h2><span class="n">${rows.length}</span></div>`+shown.map(historyCardHtml).join('')+(rows.length>shown.length?`<button type="button" class="btn" style="width:100%;margin-bottom:12px" onclick="pastShowMore()">Show more (${rows.length-shown.length})</button>`:''));
+}
+window.renderStay=function(){
+  _renderStayCore();
+  renderPastGuests();
 };
+
 
 // ── History tab ─────────────────────────────────────────────────────────────
 // Derived purely from data already resident/live-subscribed elsewhere
@@ -3833,21 +3853,7 @@ const HISTORY_FILTERS=[
   {id:'no',label:'No Passport'},
   {id:'returning',label:'Returning'},
 ];
-function renderHistoryUI(){
-  const el=document.getElementById('history-list');
-  if(!el)return;
-  if(!_historyData){el.innerHTML='<div class="empty">Loading…</div>';return;}
-  document.getElementById('history-filters').innerHTML=HISTORY_FILTERS.map(f=>
-    `<button class="filter-chip ${_historyFilter===f.id?'active':''}" onclick="setHistoryFilter('${f.id}')">${esc(f.label)}</button>`
-  ).join('');
-  const q=(document.getElementById('history-search')?.value||'').toLowerCase().trim();
-  let rows=_historyData;
-  if(_historyFilter==='has')rows=rows.filter(r=>!!r.passportUrl);
-  else if(_historyFilter==='no')rows=rows.filter(r=>!r.passportUrl);
-  else if(_historyFilter==='returning')rows=rows.filter(r=>r.returning);
-  if(q)rows=rows.filter(r=>[r.name,r.roomCode,r.contact].join(' ').toLowerCase().includes(q));
-  if(!rows.length){el.innerHTML='<div class="empty">No guests in this range</div>';return;}
-  el.innerHTML=rows.map(r=>{
+function historyCardHtml(r){
     const nl=nights({checkin:r.checkin,checkout:r.checkout});
     const wa=normalizeWaPhone(r.contact||'');
     const waMsg=encodeURIComponent(`Hi ${r.name}, hope you enjoyed your stay at Maxela! We'd love to welcome you back.`);
@@ -3870,7 +3876,22 @@ function renderHistoryUI(){
         <button type="button" class="btn" style="flex:1;padding:4px 10px;height:auto;font-size:12px;" onclick="window.openGenDocModal('${r.guestId}','chargeback')">${featherIcon('scale',14,2)} Chargeback Dispute</button>
       </div>`:''}
     </div>`;
-  }).join('');
+}
+function renderHistoryUI(){
+  const el=document.getElementById('history-list');
+  if(!el)return;
+  if(!_historyData){el.innerHTML='<div class="empty">Loading…</div>';return;}
+  document.getElementById('history-filters').innerHTML=HISTORY_FILTERS.map(f=>
+    `<button class="filter-chip ${_historyFilter===f.id?'active':''}" onclick="setHistoryFilter('${f.id}')">${esc(f.label)}</button>`
+  ).join('');
+  const q=(document.getElementById('history-search')?.value||'').toLowerCase().trim();
+  let rows=_historyData;
+  if(_historyFilter==='has')rows=rows.filter(r=>!!r.passportUrl);
+  else if(_historyFilter==='no')rows=rows.filter(r=>!r.passportUrl);
+  else if(_historyFilter==='returning')rows=rows.filter(r=>r.returning);
+  if(q)rows=rows.filter(r=>[r.name,r.roomCode,r.contact].join(' ').toLowerCase().includes(q));
+  if(!rows.length){el.innerHTML='<div class="empty">No guests in this range</div>';return;}
+  el.innerHTML=rows.map(historyCardHtml).join('');
 }
 window.renderHistoryUI = renderHistoryUI;
 window.setHistoryFilter=function(f){_historyFilter=f;renderHistoryUI();};

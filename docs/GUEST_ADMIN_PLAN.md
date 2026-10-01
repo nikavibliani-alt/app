@@ -78,3 +78,4 @@ Undo all: `git revert --no-edit before-round-3..HEAD`, then push. Undo one step:
 | 0 | tag before-round-3 | done |
 | 1 | 92e6b53 | live |
 | 2 | e9f4bdc | live (no unit had hasSmartLock set) |
+| 3 | 2e2a989 | live |
