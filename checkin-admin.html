@@ -266,7 +266,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .stat__n{font-family:var(--mono);font-size:18px;font-weight:700;}
 .stat__l{font-size:10px;font-weight:500;letter-spacing:.02em;color:var(--muted);margin-top:2px;}
 .search-box--compact{height:38px;margin:2px 0 10px;font-size:16px;padding:0 12px;}
-.stat-row--stay{grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;}
+.stat-row--stay{grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px;}
 .stat--wait{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:56px;padding:10px 16px;text-align:left;background:var(--surface);}
 .stat--wait .stat__n{font-size:24px;}
 .stat--wait .stat__l{font-size:15px;font-weight:600;color:var(--ink);margin:0;letter-spacing:0;flex:1;}
@@ -288,18 +288,16 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .day-row{display:none;gap:6px;overflow-x:auto;padding:0 0 12px;scrollbar-width:none;}
 .day-row.show{display:flex;}
 .day-row::-webkit-scrollbar{display:none;}
-.day-chip{flex:none;min-width:72px;padding:8px 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);cursor:pointer;font-family:var(--sans);text-align:center;}
+.day-row{gap:6px;padding:0 0 10px;-webkit-overflow-scrolling:touch;}
+.day-chip{flex:none;width:60px;height:52px;padding:4px 2px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);cursor:pointer;font-family:var(--sans);text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;}
+.day-chip__label{font-size:11px;font-weight:500;line-height:1.1;color:var(--ink-2);white-space:nowrap;}
+.day-chip__n{font-family:var(--mono);font-size:14px;font-weight:700;line-height:1;color:var(--ink);}
+.day-chip__n .miss{color:var(--amber);}
+.day-chip__n .none{color:var(--muted);font-weight:500;}
+.day-chip.today .day-chip__label{font-weight:800;color:var(--ink);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px;}
 .day-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
-.day-chip.active .day-chip__date,.day-chip.active .day-chip__n{color:rgba(255,255,255,.75);}
-.day-strip__hd{font-size:12px;font-weight:600;color:var(--ink-2);margin:2px 2px 6px;}
-.day-chip{min-width:90px;padding:8px 6px;color:var(--ink);}
-.day-chip.quiet{opacity:.55;}
-.day-chip.active.quiet{opacity:1;}
-.day-chip__miss{display:inline-block;margin-top:5px;padding:2px 7px;border-radius:999px;background:var(--amber-bg);border:1px solid #d9c79a;color:var(--amber);font-size:10px;font-weight:700;white-space:nowrap;}
-.day-chip.active .day-chip__miss{background:#fff;border-color:#fff;color:var(--amber);}
-.day-chip__label{display:block;font-size:12px;font-weight:700;line-height:1.2;}
-.day-chip__date{display:block;font-size:10px;font-weight:600;color:var(--muted);margin-top:2px;}
-.day-chip__n{display:block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);margin-top:4px;}
+.day-chip.active .day-chip__label,.day-chip.active .day-chip__n,.day-chip.active .day-chip__n .none{color:#fff;}
+.day-chip.active .day-chip__n .miss{color:#f3d9a0;}
 .apt-group{margin-bottom:12px;}
 .apt-group__hd{display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;margin-bottom:6px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);cursor:pointer;font-family:var(--sans);text-align:left;-webkit-tap-highlight-color:transparent;}
 .apt-group__hd:active{background:var(--bg);}
@@ -681,7 +679,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1003b · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1003c · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -691,7 +689,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 
   <div class="pane active" id="pane-stay">
     <div class="stat-row stat-row--stay" id="stay-stats"></div>
-    <div class="day-strip"><div class="day-strip__hd">Arriving in the next days</div><div class="day-row show" id="upcoming-days"></div></div>
+    <div class="day-row show" id="upcoming-days" aria-label="Arrivals by day (arriving / not registered)"></div>
     <input class="search-box search-box--compact" id="stay-search" placeholder="Search guest, room, booking" oninput="renderStay()">
     <div id="stay-list"></div>
   </div>
@@ -3669,25 +3667,37 @@ window.setUpcomingDay=function(iso){
 };
 
 function groupHasForm(grp){return !!grp.reduce((f,r)=>f||getForm(r),null);}
+function stripDaysList(){
+  const today=tbilisiToday();
+  return[-1,0,1,2,3,4,5,6,7].map(i=>{
+    const iso=addDaysISO(today,i);
+    const d=new Date(iso+'T00:00:00Z');
+    const wd=d.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'});
+    const label=i===-1?'Yesterday':i===0?'Today':wd+' '+d.getUTCDate();
+    return{iso,offset:i,label,full:wd+' '+d.getUTCDate()+' '+d.toLocaleDateString('en-GB',{month:'short',timeZone:'UTC'})};
+  });
+}
 function renderUpcomingDayChips(){
   const row=document.getElementById('upcoming-days');
   if(!row)return;
-  const days=upcomingDaysList();
-  if(!upcomingDay||!days.some(d=>d.iso===upcomingDay))upcomingDay=days[0].iso;
+  const days=stripDaysList();
+  if(!upcomingDay||!days.some(d=>d.iso===upcomingDay))upcomingDay=tbilisiToday();
   const sel=stayFilter==='upcoming';
+  const keep=row.scrollLeft;
   row.classList.add('show');
   row.innerHTML=days.map(d=>{
     const groups=groupsForCheckinDate(d.iso);
     const n=groups.length;
     const miss=groups.filter(g=>!groupHasForm(g)).length;
-    const active=sel&&d.iso===upcomingDay?'active':'';
-    return`<button type="button" class="day-chip ${active} ${n?'':'quiet'}" aria-pressed="${!!active}" onclick="setUpcomingDay('${d.iso}')">
+    const active=sel&&d.iso===upcomingDay;
+    const cnt=n?`${n}/<span class="${miss?'miss':''}">${miss}</span>`:'<span class="none">–</span>';
+    const aria=`${d.full}: ${n} arriving, ${miss} not registered`;
+    return`<button type="button" class="day-chip${active?' active':''}${d.offset===0?' today':''}" aria-pressed="${active}" aria-label="${aria}" onclick="setUpcomingDay('${d.iso}')">
       <span class="day-chip__label">${esc(d.label)}</span>
-      <span class="day-chip__date">${esc(d.dateLabel)}</span>
-      <span class="day-chip__n">${n} arriving</span>
-      ${miss?`<span class="day-chip__miss">${miss} not registered</span>`:''}
+      <span class="day-chip__n">${cnt}</span>
     </button>`;
   }).join('');
+  row.scrollLeft=keep;
 }
 
 window.renderStay=function(){
@@ -3706,7 +3716,7 @@ window.renderStay=function(){
   const tile=(f,n,l)=>`<button type="button" class="stat stat--stay ${stayFilter===f?'active':''}" aria-pressed="${stayFilter===f}" onclick="setStayFilter('${f}')"><div class="stat__n">${n}</div><div class="stat__l">${l}</div></button>`;
   document.getElementById('stay-stats').innerHTML=`
     <button type="button" class="stat stat--wait ${waiting>0?'hot':''} ${stayFilter==='need'?'active':''}" aria-pressed="${stayFilter==='need'}" onclick="setStayFilter('need')"><div class="stat__l">Waiting for unlock</div><div class="stat__n">${waiting}</div></button>
-    ${tile('arrivals',b.arrivals.length,'Arriving today')}${tile('inhouse',b.inhouse.length,'Staying')}${tile('leaving',b.leaving.length,'Leaving today')}`;
+    ${tile('inhouse',b.inhouse.length,'Staying')}${tile('leaving',b.leaving.length,'Leaving today')}`;
 
   renderUpcomingDayChips();
 
@@ -3731,17 +3741,16 @@ window.renderStay=function(){
   }
 
   if(stayFilter==='upcoming'){
-    const days=upcomingDaysList();
-    if(!upcomingDay||!days.some(d=>d.iso===upcomingDay))upcomingDay=days[0].iso;
-    const meta=days.find(d=>d.iso===upcomingDay)||days[0];
+    const days=stripDaysList();
+    if(!upcomingDay||!days.some(d=>d.iso===upcomingDay))upcomingDay=tbilisiToday();
+    const meta=days.find(d=>d.iso===upcomingDay);
     const all=groupsForCheckinDate(upcomingDay);
     const missAll=all.filter(g=>!groupHasForm(g)).length;
-    const dd=new Date(upcomingDay+'T00:00:00Z');
-    const dayName=dd.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})+' '+dd.toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'});
-    const title=dayName+' · '+all.length+' arriving'+(missAll?' · '+missAll+' not registered':'');
+    const title=meta.full+' · '+all.length+' arriving'+(missAll?' · '+missAll+' not registered':'');
+    const cardMode=meta.offset===0?'arrival':meta.offset<0?'inhouse':'upcoming';
     const groups=filterByQ(all).map((g,i)=>[g,i]).sort((a,b)=>(groupHasForm(a[0])?1:0)-(groupHasForm(b[0])?1:0)||a[1]-b[1]).map(x=>x[0]);
     if(!groups.length){el.innerHTML=`<div class="section-hd"><h2>${esc(title)}</h2></div><div class="empty">${all.length?'No match':'No arrivals this day'}</div>`;return;}
-    el.innerHTML=`<div class="section-hd"><h2>${esc(title)}</h2></div>`+groups.map(g=>renderCard(g,'upcoming')).join('');
+    el.innerHTML=`<div class="section-hd"><h2>${esc(title)}</h2></div>`+groups.map(g=>renderCard(g,cardMode)).join('');
     return;
   }
 
