@@ -109,6 +109,8 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .btn-danger:active{background:#fee2e2;}
 .btn{flex:1;min-height:48px;border-radius:var(--r);font-size:14px;font-weight:600;cursor:pointer;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-family:var(--sans);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;}
 .btn:disabled{opacity:.35;cursor:not-allowed;}
+.btn svg{flex:none;}
+.btn{gap:6px;}
 .btn-primary{background:var(--ink);color:#fff;border-color:var(--ink);}
 .btn-green{background:var(--ink);color:#fff;border-color:var(--ink);}
 .empty{text-align:center;padding:40px 16px;color:var(--muted);font-size:14px;}
@@ -347,7 +349,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .apt-step img{width:72px;height:72px;object-fit:cover;border-radius:var(--rs);border:1px solid var(--line);}
 .apt-step-textarea{width:100%;min-height:72px;padding:8px;border:1px solid var(--line);border-radius:var(--rs);font-size:13px;font-family:var(--sans);}
 .apt-step-actions{display:flex;flex-direction:column;gap:4px;}
-.apt-step-btn{width:32px;height:32px;border:1px solid var(--line);border-radius:6px;background:var(--surface);cursor:pointer;font-size:11px;}
+.apt-step-btn{width:32px;height:32px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);cursor:pointer;font-size:11px;display:inline-flex;align-items:center;justify-content:center;padding:0;}
 .apt-step-btn:disabled{opacity:.3;}
 .apt-step-btn.del{color:var(--red);}
 .apt-add{width:100%;min-height:44px;border:1.5px dashed var(--line);border-radius:var(--r);background:transparent;font-weight:600;cursor:pointer;margin-top:8px;font-family:var(--sans);}
@@ -673,7 +675,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1002a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1002b · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -1419,7 +1421,7 @@ function navCfgRowHtml(id,i){
       </select>
     </div>
     <button type="button" class="nav-cfg-landing${isLand?' on':''}" aria-label="Set as landing tab" aria-pressed="${isLand}" onclick="navSetLanding(${i})"><span class="nav-cfg-landing__dot"></span><span>Landing</span></button>
-    <button type="button" class="nav-cfg-remove" aria-label="Remove tab" onclick="navRemoveSlot(${i})" ${n<=NAV_MIN?'disabled':''}>×</button>
+    <button type="button" class="nav-cfg-remove" aria-label="Remove tab" onclick="navRemoveSlot(${i})" ${n<=NAV_MIN?'disabled':''}>${featherIcon('x',18,2)}</button>
   </div>`;
 }
 
@@ -1858,7 +1860,7 @@ window.openGpEditor=function(ctx){
       <label class="apt-label">Description</label><textarea class="apt-textarea" oninput="gpSetCat('description',this.value)">${esc(data.description||'')}</textarea>
       <label class="apt-label">Max guests</label><input class="apt-input" type="number" value="${data.maxGuests||''}" oninput="gpSetCat('maxGuests',parseInt(this.value)||0)">
       <label class="apt-label">Amenities</label>
-      <div style="display:flex;flex-wrap:gap:6px;margin-bottom:10px">${amenities.map((a,i)=>`<span style="font-size:12px;padding:4px 10px;background:var(--bg);border-radius:999px">${esc(a)} <button type="button" style="border:none;background:none;cursor:pointer" onclick="gpRemoveAmenity(${i})">×</button></span>`).join('')}</div>
+      <div style="display:flex;flex-wrap:gap:6px;margin-bottom:10px">${amenities.map((a,i)=>`<span style="font-size:12px;padding:4px 10px;background:var(--bg);border-radius:999px">${esc(a)} <button type="button" aria-label="Remove" style="border:none;background:none;cursor:pointer;color:var(--muted);vertical-align:middle" onclick="gpRemoveAmenity(${i})">${featherIcon('x',12,2)}</button></span>`).join('')}</div>
       <div class="apt-row"><input class="apt-input" id="gp-new-amenity" placeholder="Add amenity" style="margin:0"><button class="btn" onclick="gpAddAmenity()">Add</button></div>`;
   }else if(ctx==='location'){
     title.textContent='Location';
@@ -1963,7 +1965,7 @@ window.gpUploadParkingMedia=async function(input){
     toast('Uploading…',15000);
     const url=await uploadToCloudinary(file,'maxela/parking-media');
     window.gpSetParking('parkingMediaUrl',url);
-    toast('Uploaded ✓');
+    toast('Uploaded');
   }catch(e){toast('Upload failed: '+e.message);}
 };
 window.gpAddAmenity=function(){
@@ -3270,7 +3272,7 @@ window.resolveSearchFailure=async function(id){
   try{
     await updateDoc(doc(db,'search_failures',id),{resolved:true,resolvedAt:serverTimestamp()});
     searchFailures=searchFailures.filter(f=>f.id!==id);
-    updateSfBadge();renderFailures();toast('Resolved ✓');
+    updateSfBadge();renderFailures();toast('Resolved');
   }catch(e){toast('Failed: '+e.message);}
 };
 
@@ -3317,7 +3319,7 @@ function reservationDriftBadge(grp){
     const pinned=(r.roomCode||r.room||'').trim();
     const live=(r.minihotelLiveRoom||'').trim();
     if(pinned&&live&&pinned!==live){
-      return `<span class="pill pill-drift" title="MiniHotel shows ${esc(live)}">MH→${esc(live)}</span>`;
+      return `<span class="pill pill-drift" title="MiniHotel shows ${esc(live)}">MiniHotel: ${esc(live)}</span>`;
     }
   }
   return '';
@@ -3486,9 +3488,9 @@ function nights(r){return Math.max(0,Math.round((new Date(r.checkout+'T00:00:00Z
 function datesStr(r,mode){
   const n=nights(r);
   const nl=n+' night'+(n!==1?'s':'');
-  if(mode==='arrival')return'Today → '+fmtDate(r.checkout)+' · '+nl;
-  if(mode==='leaving')return fmtDate(r.checkin)+' → Today · '+nl;
-  return fmtDate(r.checkin)+' → '+fmtDate(r.checkout)+' · '+nl;
+  if(mode==='arrival')return'Today – '+fmtDate(r.checkout)+' · '+nl;
+  if(mode==='leaving')return fmtDate(r.checkin)+' – Today · '+nl;
+  return fmtDate(r.checkin)+' – '+fmtDate(r.checkout)+' · '+nl;
 }
 function normalizeWaPhone(raw){
   if(!raw)return null;
@@ -3803,7 +3805,7 @@ function renderHistoryUI(){
     const wa=normalizeWaPhone(r.contact||'');
     const waMsg=encodeURIComponent(`Hi ${r.name}, hope you enjoyed your stay at Maxela! We'd love to welcome you back.`);
     const ppHtml=r.passportUrl
-      ?`<button type="button" class="btn" style="padding:4px 10px;height:auto;font-size:12px;" onclick="window.openHistoryPassport('${esc(r.passportUrl)}')">📎 View passport</button>`
+      ?`<button type="button" class="btn" style="padding:4px 10px;height:auto;font-size:12px;" onclick="window.openHistoryPassport('${esc(r.passportUrl)}')">${featherIcon('paperclip',14,2)} View passport</button>`
       :r.passportSkipped
         ?`<span class="pill pill-pending">SKIPPED</span>`
         :`<span style="color:var(--muted);font-size:12px;">— No passport</span>`;
@@ -3813,12 +3815,12 @@ function renderHistoryUI(){
         ${sourceBadgeHtml(r.source)}
       </div>
       <div class="card__room">Room ${esc(r.roomCode)}</div>
-      <div style="font-size:13px;color:var(--muted);margin:4px 0 8px;">${fmtDate(r.checkin)} → ${fmtDate(r.checkout)} · ${nl} night${nl!==1?'s':''}</div>
+      <div style="font-size:13px;color:var(--muted);margin:4px 0 8px;">${fmtDate(r.checkin)} – ${fmtDate(r.checkout)} · ${nl} night${nl!==1?'s':''}</div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${ppHtml}</div>
       ${r.contact?`<div class="card__actions">${wa?`<a class="btn" href="https://wa.me/${wa}?text=${waMsg}" target="_blank" rel="noopener">WhatsApp</a>`:`<span style="font-size:12px;color:var(--muted);">${esc(r.contact)}</span>`}</div>`:''}
       ${r.guestId?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);display:flex;gap:8px;">
-        <button type="button" class="btn" style="flex:1;padding:4px 10px;height:auto;font-size:12px;" onclick="window.openGenDocModal('${r.guestId}','proof')">📄 Proof of Stay</button>
-        <button type="button" class="btn" style="flex:1;padding:4px 10px;height:auto;font-size:12px;" onclick="window.openGenDocModal('${r.guestId}','chargeback')">⚖️ Chargeback Dispute</button>
+        <button type="button" class="btn" style="flex:1;padding:4px 10px;height:auto;font-size:12px;" onclick="window.openGenDocModal('${r.guestId}','proof')">${featherIcon('file-text',14,2)} Proof of Stay</button>
+        <button type="button" class="btn" style="flex:1;padding:4px 10px;height:auto;font-size:12px;" onclick="window.openGenDocModal('${r.guestId}','chargeback')">${featherIcon('scale',14,2)} Chargeback Dispute</button>
       </div>`:''}
     </div>`;
   }).join('');
@@ -3924,7 +3926,7 @@ window.unlockGuest=async function(guestId){
     if(!r.ok){toast(r.message||'Failed');return;}
     const g=guestData.find(x=>x.id===guestId);
     if(g){g.manualUnlock=true;g.unlockedAt=g.unlockedAt||new Date();}
-    toast('Access granted ✓');
+    toast('Access granted');
     render();
     if(document.getElementById('detail')?.classList.contains('open'))openDetail(guestId);
   }catch(e){
@@ -3994,7 +3996,7 @@ window.unblockGuest=async function(guestId){
   try{
     await Promise.all(targets.map(t=>updateDoc(doc(db,'checkin_guests',t.id),{blocked:false})));
     targets.forEach(t=>{t.blocked=false;});
-    toast('Guest unblocked ✓');
+    toast('Guest unblocked');
     render();
     if(document.getElementById('detail')?.classList.contains('open'))openDetail(guestId);
   }catch(e){toast('Failed: '+e.message);}
@@ -4083,13 +4085,13 @@ window.moveGuestPipeline=async function(guestId,resDocId){
     try{
       const r=await swapGuestsPipeline(res.id,conflictRes.id);
       if(r.ok){
-        pipelineRoomToast(r,`Swapped ${currentRoom} ↔ ${newRoom} ✓`);
+        pipelineRoomToast(r,`Swapped ${currentRoom} and ${newRoom}`);
         openDetail(guestId);
         return;
       }
     }catch(e){}
     await swapGuestsLocal(res,conflictRes);
-    toast(`Swapped ${currentRoom} ↔ ${newRoom} ✓`);
+    toast(`Swapped ${currentRoom} and ${newRoom}`);
     openDetail(guestId);
     return;
   }
@@ -4108,13 +4110,13 @@ window.moveGuestPipeline=async function(guestId,resDocId){
           try{
             let sr=await swapGuestsPipeline(res.id,conflictRes.id);
             if(!sr.ok)await swapGuestsLocal(res,conflictRes);
-            else pipelineRoomToast(sr,`Swapped ${currentRoom} ↔ ${newRoom} ✓`);
-            if(!sr.ok)toast(`Swapped ${currentRoom} ↔ ${newRoom} ✓`);
+            else pipelineRoomToast(sr,`Swapped ${currentRoom} and ${newRoom}`);
+            if(!sr.ok)toast(`Swapped ${currentRoom} and ${newRoom}`);
             openDetail(guestId);
             return;
           }catch(swapErr){
             await swapGuestsLocal(res,conflictRes);
-            toast(`Swapped ${currentRoom} ↔ ${newRoom} ✓`);
+            toast(`Swapped ${currentRoom} and ${newRoom}`);
             openDetail(guestId);
             return;
           }
@@ -4122,7 +4124,7 @@ window.moveGuestPipeline=async function(guestId,resDocId){
       }
       if(/functions|internal|not-found/i.test(r.message||'')){
         await moveGuestLocal(roomForm,res,newRoom);
-        toast('Moved to '+newRoom+' ✓');
+        toast('Moved to '+newRoom+'');
         openDetail(guestId);
         return;
       }
@@ -4130,13 +4132,13 @@ window.moveGuestPipeline=async function(guestId,resDocId){
       updateDetailRoomAction(guestId,resDocId);
       return;
     }
-    pipelineRoomToast(r,'Moved to '+newRoom+' ✓');
+    pipelineRoomToast(r,'Moved to '+newRoom+'');
     await refreshReservationsNow();
     openDetail(guestId);
   }catch(e){
     try{
       await moveGuestLocal(roomForm,res,newRoom);
-      toast('Moved to '+newRoom+' ✓');
+      toast('Moved to '+newRoom+'');
       openDetail(guestId);
     }catch(err){
       console.error('[moveGuestPipeline]',err);
@@ -4161,7 +4163,7 @@ window.swapGuestPipeline=async function(guestId,resDocId){
   const selfName=_stripRoomNum(roomForm.nameRoman||roomForm.name||g.nameRoman||g.name||'Guest');
   const otherName=guestDisplayNameForRes(conflict);
   const fromRoom=(res.roomCode||res.room||roomForm.aptId||'—');
-  if(!confirm(`Swap rooms with ${otherName}?\n\n${selfName} → ${newRoom}\n${otherName} → ${fromRoom}`))return;
+  if(!confirm(`Swap rooms with ${otherName}?\n\n${selfName} moves to ${newRoom}\n${otherName} moves to ${fromRoom}`))return;
   try{
     const r=await pipelineAdmin({
       password:_ADMIN_PWD,
@@ -4171,18 +4173,18 @@ window.swapGuestPipeline=async function(guestId,resDocId){
     });
     if(!r.ok){
       await swapGuestsLocal(res,conflictRes);
-      toast(`Swapped with ${otherName} ✓`);
+      toast(`Swapped with ${otherName}`);
       await refreshReservationsNow();
       openDetail(guestId);
       return;
     }
-    pipelineRoomToast(r,'Swapped with '+otherName+' ✓');
+    pipelineRoomToast(r,'Swapped with '+otherName+'');
     await refreshReservationsNow();
     openDetail(guestId);
   }catch(e){
     try{
       await swapGuestsLocal(res,conflictRes);
-      toast(`Swapped with ${otherName} ✓`);
+      toast(`Swapped with ${otherName}`);
       await refreshReservationsNow();
       openDetail(guestId);
     }catch(err){
@@ -4206,7 +4208,7 @@ window.releaseToMinihotel=async function(guestId){
       actor:'admin',
     });
     if(!r.ok){toast(r.message||'Release failed');return;}
-    toast('Released to MiniHotel ✓');
+    toast('Released to MiniHotel');
     await refreshReservationsNow();
     openDetail(guestId);
   }catch(e){
@@ -4310,9 +4312,9 @@ window.openDetail=function(guestId){
       <div style="font-size:12px;font-weight:700;margin-bottom:8px">Move room (pipeline)${guestReservationManual(g)?' <span class="pill pill-manual">MANUAL</span>':''}</div>
       ${moveBlocks}
       ${guestReservationManual(g)?`<button class="btn" style="width:100%;margin-top:8px" onclick="window.releaseToMinihotel('${g.id}')">Release to MiniHotel (clear manual pin)</button>`:''}
-      <p style="font-size:11px;color:var(--muted);margin-top:8px">AdminAction → RoomAssignment · one row per room on multi bookings</p>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px">Admin action: room assignment · one row per room on multi bookings</p>
     </div>`:''}
-    <p style="font-size:12px;color:var(--muted);margin-top:8px;">${esc(fmtDate(g.arrivalDate))} → ${esc(fmtDate(g.checkoutDate||door?.checkout||''))} · ${esc(g.contact||'no contact')}</p>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px;">${esc(fmtDate(g.arrivalDate))} – ${esc(fmtDate(g.checkoutDate||door?.checkout||''))} · ${esc(g.contact||'no contact')}</p>
     ${bookingRef?`<p style="font-size:12px;color:var(--muted);">Booking #${esc(bookingRef)}</p>`:''}
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="btn" style="flex:1" onclick="window.viewGuestAsGuest('${g.id}')">Preview guest page</button>
@@ -4333,7 +4335,7 @@ window.closeDetail=function(){document.getElementById('detail').classList.remove
 window.showPassport=function(){document.getElementById('pp-gate').style.display='none';document.getElementById('pp-view').classList.add('show');};
 window.approvePassport=async function(guestId){
   if(!confirm('Approve this ID?'))return;
-  try{await updateDoc(doc(db,'checkin_guests',guestId),{'passportScanResult.overrideByAdmin':true,'passportScanResult.valid':true});toast('ID approved ✓');openDetail(guestId);}
+  try{await updateDoc(doc(db,'checkin_guests',guestId),{'passportScanResult.overrideByAdmin':true,'passportScanResult.valid':true});toast('ID approved');openDetail(guestId);}
   catch(e){toast('Failed: '+e.message);}
 };
 window.rejectPassport=async function(guestId){
@@ -4697,7 +4699,7 @@ window.setReqStatus=async function(id,status){
     updateRequestsBadge();
     buildRequestsUI();
     closeReqDetail();
-    toast(status==='CONFIRMED'?'Confirmed ✓':'Cancelled');
+    toast(status==='CONFIRMED'?'Confirmed':'Cancelled');
   }catch(e){toast('Update failed: '+e.message);}
 };
 window.deleteReq=async function(id){
@@ -4720,7 +4722,7 @@ window.deleteCompleted=async function(){
     reqData=reqData.filter(r=>r.status!=='CONFIRMED'&&r.status!=='CANCELLED');
     updateRequestsBadge();
     buildRequestsUI();
-    toast('Cleared ✓');
+    toast('Cleared');
   }catch(e){toast('Delete failed: '+e.message);}
 };
 
@@ -4941,9 +4943,9 @@ window.openAptEditor=function(aptId){
         <input type="file" id="replace-${i}" accept="image/*" style="display:none" onchange="window.doReplacePhoto(${i},this)">
       </div>
       <div class="apt-step-actions">
-        <button type="button" class="apt-step-btn" onclick="window.movePhoto(${i},-1)" ${i===0?'disabled':''}>↑</button>
-        <button type="button" class="apt-step-btn" onclick="window.movePhoto(${i},1)" ${i===photos.length-1?'disabled':''}>↓</button>
-        <button type="button" class="apt-step-btn del" onclick="window.deletePhoto(${i})">×</button>
+        <button type="button" class="apt-step-btn" aria-label="Move up" onclick="window.movePhoto(${i},-1)" ${i===0?'disabled':''}>${featherIcon('chevron-up',16,2)}</button>
+        <button type="button" class="apt-step-btn" aria-label="Move down" onclick="window.movePhoto(${i},1)" ${i===photos.length-1?'disabled':''}>${featherIcon('chevron-down',16,2)}</button>
+        <button type="button" class="apt-step-btn del" aria-label="Delete photo" onclick="window.deletePhoto(${i})">${featherIcon('x',16,2)}</button>
       </div>
     </div>`).join('')||'<div style="font-size:13px;color:var(--muted);padding:8px 0;">No photos yet.</div>';
 
@@ -5111,7 +5113,7 @@ window.saveAptData=async function(){
     await setDoc(doc(db,'checkin_apartments',aptId),data,{merge:true});
     aptData[aptId]={...aptData[aptId],...data};
     _aptRebase(k=>!k.startsWith('room-meta-'));
-    toast('Saved ✓');
+    toast('Saved');
     renderAptsList();
   }catch(e){toast('Save failed: '+e.message);}
 };
@@ -5127,7 +5129,7 @@ window.uploadPhotos=async function(input){
     while(photoCaptions.length<photos.length)photoCaptions.push('');
     await setDoc(doc(db,'checkin_apartments',aptId),{photos,photoCaptions},{merge:true});
     aptData[aptId]={...aptData[aptId],photos,photoCaptions};
-    toast('Uploaded ✓');_aptRerender(aptId);
+    toast('Uploaded');_aptRerender(aptId);
   }catch(e){toast('Upload failed: '+e.message);}
 };
 window.deletePhoto=async function(idx){
@@ -5160,7 +5162,7 @@ window.doReplacePhoto=async function(idx,input){
     const photos=[...(aptData[aptId]?.photos||[])];photos[idx]=url;
     await setDoc(doc(db,'checkin_apartments',aptId),{photos},{merge:true});
     aptData[aptId]={...aptData[aptId],photos};
-    toast('Replaced ✓');_aptRerender(aptId);
+    toast('Replaced');_aptRerender(aptId);
   }catch(e){toast('Replace failed: '+e.message);}
 };
 

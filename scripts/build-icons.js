@@ -12,6 +12,7 @@ const ICON_NAMES = [
   // Better semantic icons (guest settings + nav)
   'arrow-up-down','sparkles','washing-machine','compass','plane','bed','clipboard-check',
   'layout-grid','ellipsis','pencil','grip-vertical',
+  'globe','paperclip','scale',
 ];
 
 const ALIASES = { 'edit-2': 'pencil' };

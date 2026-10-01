@@ -78,6 +78,7 @@ body{
 .lang-pill{height:44px;padding:0 14px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;font-family:var(--mono);font-size:11px;color:var(--ink-2);background:var(--surface);cursor:pointer;}
 .lang-pill svg{width:11px;height:11px;opacity:.75;}
 .lang-option{display:block;width:100%;text-align:left;padding:10px 14px;font-size:13px;font-family:var(--sans);background:none;border:none;border-radius:8px;cursor:pointer;color:var(--ink);white-space:nowrap;}
+.lang-code{display:inline-block;min-width:26px;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--muted);}
 .lang-option:hover,.lang-option.active{background:#F5F5F4;font-weight:600;}
 .avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#6B6B68,#2C2C2A);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:500;letter-spacing:0.02em;box-shadow:0 0 0 2px var(--bg),0 0 0 3px var(--line);}
 
@@ -930,7 +931,7 @@ body{padding-bottom:0;}
       </div>
       <div class="rule-item" id="rule-card" onclick="window.toggleRule('card')" style="display:none;">
         <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <div class="rule-icon" aria-hidden="true">🗝️</div>
+        <div class="rule-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 21 9.6-9.6"></path><path d="m7.5 15.5 2.3 2.3a1 1 0 0 1 0 1.4l-2.1 2.1a1 1 0 0 1-1.4 0L4 19"></path><circle cx="15.5" cy="7.5" r="5.5"></circle></svg></div>
         <div class="rule-body">
           <div class="rule-title" id="t-rule-card-title">Entrance Card &amp; Key</div>
           <div class="rule-sub" id="t-rule-card-sub">Entrance card and key are provided. Loss or damage fee: 50 GEL per item.</div>
@@ -987,7 +988,7 @@ body{padding-bottom:0;}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M9 6l6 6-6 6"/></svg>
     </button>
     <div id="passport-skip-link" style="display:none;text-align:center;margin-top:12px;">
-      <a href="#" onclick="event.preventDefault();window.skipPassportUpload();" style="font-size:12.5px;color:var(--muted);text-decoration:underline;">Having trouble? Skip for now →</a>
+      <a href="#" onclick="event.preventDefault();window.skipPassportUpload();" style="font-size:12.5px;color:var(--muted);text-decoration:underline;">Having trouble? Skip for now</a>
     </div>
     <div class="auth-foot">
       <div class="lang-switcher">
@@ -1011,10 +1012,10 @@ body{padding-bottom:0;}
             <span id="lang-pill-label-home">EN</span>
           </button>
           <div id="lang-dropdown" style="display:none;position:absolute;top:100%;right:0;background:#fff;border:1.5px solid #E0D8D0;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.10);padding:6px;z-index:9999;min-width:110px;" onclick="event.stopPropagation()">
-            <button class="lang-option" onclick="selectLang('en')">🇬🇧 English</button>
-            <button class="lang-option" onclick="selectLang('ka')">🇬🇪 ქართული</button>
-            <button class="lang-option" onclick="selectLang('ru')">🇷🇺 Русский</button>
-            <button class="lang-option" onclick="selectLang('ar')">🇸🇦 العربية</button>
+            <button class="lang-option" onclick="selectLang('en')"><span class="lang-code">EN</span> English</button>
+            <button class="lang-option" onclick="selectLang('ka')"><span class="lang-code">KA</span> ქართული</button>
+            <button class="lang-option" onclick="selectLang('ru')"><span class="lang-code">RU</span> Русский</button>
+            <button class="lang-option" onclick="selectLang('ar')"><span class="lang-code">AR</span> العربية</button>
           </div>
         </div>
         <button class="lang-pill" onclick="window.logout()" style="gap:5px;">
@@ -1173,39 +1174,39 @@ body{padding-bottom:0;}
 
   <!-- CONTENT PAGES (hash navigation) -->
   <div class="page" id="page-content-wifi">
-    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-wifi">WiFi &amp; Internet</div></div>
+    <div class="subpage-header"><button class="back-btn" aria-label="Back" onclick="window.history.back()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><div class="subpage-title" id="pg-title-wifi">WiFi &amp; Internet</div></div>
     <div class="subpage-body" id="pg-body-wifi"></div>
   </div>
   <div class="page" id="page-content-services">
-    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-services">Services</div></div>
+    <div class="subpage-header"><button class="back-btn" aria-label="Back" onclick="window.history.back()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><div class="subpage-title" id="pg-title-services">Services</div></div>
     <div class="subpage-body" id="pg-body-services"></div>
   </div>
   <div class="page" id="page-content-recs">
-    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-recs">Recommendations</div></div>
+    <div class="subpage-header"><button class="back-btn" aria-label="Back" onclick="window.history.back()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><div class="subpage-title" id="pg-title-recs">Recommendations</div></div>
     <div class="subpage-body" id="pg-body-recs"></div>
   </div>
   <div class="page" id="page-content-rules">
-    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-rules">House Rules</div></div>
+    <div class="subpage-header"><button class="back-btn" aria-label="Back" onclick="window.history.back()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><div class="subpage-title" id="pg-title-rules">House Rules</div></div>
     <div class="subpage-body" id="pg-body-rules"></div>
   </div>
   <div class="page" id="page-content-contact">
-    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-contact">Contact Us</div></div>
+    <div class="subpage-header"><button class="back-btn" aria-label="Back" onclick="window.history.back()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><div class="subpage-title" id="pg-title-contact">Contact Us</div></div>
     <div class="subpage-body" id="pg-body-contact"></div>
   </div>
   <div class="page" id="page-content-location">
-    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-location">Location</div></div>
+    <div class="subpage-header"><button class="back-btn" aria-label="Back" onclick="window.history.back()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><div class="subpage-title" id="pg-title-location">Location</div></div>
     <div class="subpage-body" id="pg-body-location"></div>
   </div>
   <div class="page" id="page-content-parking">
-    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-parking">Parking</div></div>
+    <div class="subpage-header"><button class="back-btn" aria-label="Back" onclick="window.history.back()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><div class="subpage-title" id="pg-title-parking">Parking</div></div>
     <div class="subpage-body" id="pg-body-parking"></div>
   </div>
   <div class="page" id="page-content-transfer">
-    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-transfer">Shuttle service</div></div>
+    <div class="subpage-header"><button class="back-btn" aria-label="Back" onclick="window.history.back()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><div class="subpage-title" id="pg-title-transfer">Shuttle service</div></div>
     <div class="subpage-body" id="pg-body-transfer"></div>
   </div>
   <div class="page" id="page-content-tours">
-    <div class="subpage-header"><button class="back-btn" onclick="window.history.back()">←</button><div class="subpage-title" id="pg-title-tours">Tours</div></div>
+    <div class="subpage-header"><button class="back-btn" aria-label="Back" onclick="window.history.back()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><div class="subpage-title" id="pg-title-tours">Tours</div></div>
     <div class="subpage-body" id="pg-body-tours"></div>
   </div>
 
@@ -1214,7 +1215,7 @@ body{padding-bottom:0;}
 <div id="subpages"></div>
 
 <div class="qr-fullscreen hidden" id="qr-fullscreen-overlay" onclick="document.getElementById('qr-fullscreen-overlay').classList.add('hidden')">
-  <button onclick="event.stopPropagation();document.getElementById('qr-fullscreen-overlay').classList.add('hidden')" style="position:absolute;top:20px;right:20px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer;line-height:1;padding:8px;z-index:1;">×</button>
+  <button onclick="event.stopPropagation();document.getElementById('qr-fullscreen-overlay').classList.add('hidden')" aria-label="Close" style="position:absolute;top:20px;right:20px;background:none;border:none;color:#fff;font-size:32px;cursor:pointer;line-height:1;padding:8px;z-index:1;display:flex;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
   <div class="qr-fullscreen-inner">
     <canvas id="qr-fullscreen-canvas"></canvas>
   </div>
@@ -2147,7 +2148,7 @@ window.handlePassport=function(input){
     const p=document.getElementById('passport-preview');
     p.src=e.target.result;p.style.display='block';
     document.getElementById('passport-zone').classList.add('has-photo');
-    document.getElementById('t-passport-hint').textContent='Photo selected ✓';
+    document.getElementById('t-passport-hint').textContent='Photo selected';
     const pcb=document.getElementById('passport-continue-btn');
     if(pcb)pcb.disabled=false;
     scanPassport(file);
@@ -2194,7 +2195,7 @@ async function scanPassport(file){
     catch(pe){result={valid:false,confidence:'low',reason:'Unable to parse result',isPassport:false};}
     passportScanResult=result;
     statusEl.className='scan-status scan-ok';
-    statusEl.innerHTML='<span>✓</span><span>Document received</span>';
+    statusEl.innerHTML='<span>'+fi('check',16,2.2)+'</span><span>Document received</span>';
   }catch(e){
     passportScanResult={valid:false,reason:'Scan failed',confidence:'low'};
     statusEl.style.display='none';
@@ -2808,7 +2809,7 @@ window.searchReservation=async function(){
       const errEl=document.createElement('div');
       errEl.id='reg-verify-error';
       errEl.style.cssText='background:#450a0a;color:#fca5a5;border-radius:10px;padding:16px 20px;text-align:center;margin:12px 0;font-size:14px;line-height:1.6;';
-      errEl.innerHTML=`We couldn't verify your booking.<br><a href="https://wa.me/${WA}" target="_blank" style="color:#86efac;font-weight:600;display:inline-block;margin-top:8px;">Contact host on WhatsApp →</a>`;
+      errEl.innerHTML=`We couldn't verify your booking.<br><a href="https://wa.me/${WA}" target="_blank" style="color:#86efac;font-weight:600;display:inline-block;margin-top:8px;">Contact host on WhatsApp</a>`;
       wrap.appendChild(errEl);
       return;
     }
@@ -3773,7 +3774,7 @@ function openLocked(res){
 function openSubpage(title,body){
   document.getElementById('cur-sp')?.remove();
   const sp=document.createElement('div');sp.className='subpage';sp.id='cur-sp';
-  sp.innerHTML=`<div class="subpage-header"><button class="back-btn" onclick="closeSP()">←</button><div class="subpage-title">${esc(title)}</div></div><div class="subpage-body">${body}</div>`;
+  sp.innerHTML=`<div class="subpage-header"><button class="back-btn" aria-label="Back" onclick="closeSP()">${fi('chevron-left',20,2)}</button><div class="subpage-title">${esc(title)}</div></div><div class="subpage-body">${body}</div>`;
   document.getElementById('subpages').appendChild(sp);
 }
 
@@ -4860,7 +4861,7 @@ setupDateInput();
 </script>
 
 <div class="lightbox hidden" id="lightbox" onclick="if(event.target===this)window.closeLightbox()">
-  <button class="lb-close" onclick="window.closeLightbox()">×</button>
+  <button class="lb-close" aria-label="Close" onclick="window.closeLightbox()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
   <button class="lb-prev" id="lb-prev" onclick="window.lbMove(-1)">‹</button>
   <img class="lb-img" id="lb-img" src="" alt="">
   <button class="lb-next" id="lb-next" onclick="window.lbMove(1)">›</button>
