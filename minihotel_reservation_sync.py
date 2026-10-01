@@ -926,7 +926,7 @@ def fetch_booking_ids(session, db, reservations):
     # Deduplicate by reservationNumber — multi-room bookings share one res number
     seen = set()
     targets = []
-    expedia_nums = set()
+    expedia_checkins = {}  # reservationNumber -> check-in date (Expedia only)
     for r in reservations:
         if (r.get('source') or '').lower() not in ota_sources:
             continue
@@ -939,10 +939,11 @@ def fetch_booking_ids(session, db, reservations):
             seen.add(rn)
             targets.append(rn)
             if (r.get('source') or '').lower() == 'expedia':
-                expedia_nums.add(rn)
+                expedia_checkins[rn] = parse_date(r.get('checkIn')) or ''
 
     print(f"Checking OTA remarks (bookingId + guest counts) for {len(targets)} reservations...")
     updated = skipped = errors = 0
+    today_str = datetime.datetime.utcnow().strftime('%Y-%m-%d')
 
     for res_num in targets:
         try:
@@ -956,8 +957,14 @@ def fetch_booking_ids(session, db, reservations):
                 p.get('guestCount') or p.get('guests') or p.get('adults')
                 for p in doc_payloads
             )
-            needs_rate_model = res_num in expedia_nums and not any(
-                p.get('rateModel') for p in doc_payloads
+            # HotelCollect / ExpediaCollect are final. Missing -> check once.
+            # 'unknown' -> keep re-checking each sync until the check-in date has passed.
+            models = {p.get('rateModel') for p in doc_payloads}
+            has_unknown = 'unknown' in models
+            needs_rate_model = (
+                res_num in expedia_checkins
+                and not (models & {'HotelCollect', 'ExpediaCollect'})
+                and (not has_unknown or expedia_checkins[res_num] >= today_str)
             )
             if not needs_booking_id and not needs_guests and not needs_rate_model:
                 skipped += 1
@@ -991,9 +998,11 @@ def fetch_booking_ids(session, db, reservations):
             if needs_rate_model:
                 # Only the verdict is saved; the remarks text itself is never stored or logged.
                 rate_model = classify_rate_model(remarks_obj.get('ota') or remarks)
-                update['rateModel'] = rate_model
                 if rate_model != 'unknown':
+                    update['rateModel'] = rate_model
                     update['hotelCollect'] = (rate_model == 'HotelCollect')
+                elif not has_unknown:
+                    update['rateModel'] = 'unknown'
                 print(f"  {res_num}: rateModel={rate_model}")
 
             if update:
