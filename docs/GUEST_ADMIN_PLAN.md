@@ -107,3 +107,11 @@ Undo all: `git revert --no-edit before-round-4..HEAD`, then push. Undo one step:
 Round 4 notes:
 - Step 1 root cause: on the guest page the "hero" (waiting vs instructions) was decided once when home opened and on guest-document changes, but not again when the HK status arrived a moment later (or when 15:00 passed). Tiles unlocked, hero stayed "waiting" until reload. Fixed in checkin-guest.html (syncHomePhase on HK fetch + 30s tick, HK data kept per room, HK re-fetched whenever home opens). Shared unlock rules untouched. Real data for tab-2 on 2026-10-01: HK done 09:34Z, guest registered 09:42Z, server stored unlockReason hk_early, so rules agreed; only the page display was stale.
 - Step 2: toggleGuestAccess now decides from the underlying access state (so "Remove access" works for guests who already checked in) and accepts an optional 'on' argument for "Give access".
+
+# Round 5
+
+Restore point: tag `before-round-5`.
+
+1. "Remove access" asks how long (bottom sheet) and actually works after 15:00
+
+Undo: `git revert --no-edit <commit>` (or `before-round-5..HEAD`), then push.
