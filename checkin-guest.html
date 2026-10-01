@@ -3345,6 +3345,7 @@ async function getGuestCfg(){
   try{
     const snap=await getDoc(doc(db,'checkin_admin','config'));
     guestCfgVisibility=(snap.exists()&&snap.data().visibility)||{};
+    applyDoorCardVisibility();
   }catch(e){guestCfgVisibility={};}
   return guestCfgVisibility;
 }
@@ -3353,6 +3354,10 @@ async function getGuestCfg(){
 // visibility shape (per property): {ROOMS:{checkin,access_code,elevator_code,wifi,
 //   services,laundry,cleaning,city_tour,airport_transfer,recs,rules,contact},MAXELA:{...},...}
 // Missing key or unloaded config ⇒ visible (fail open so a config gap never hides guest info).
+function applyDoorCardVisibility(){
+  const c=document.getElementById('hero-door-card');
+  if(c)c.style.display=sectionVisible('smartLock')?'':'none';
+}
 function sectionVisible(key){
   const v=guestCfgVisibility;
   if(!v)return true; // config not loaded yet — show everything
@@ -3372,6 +3377,7 @@ async function getFullCfg(){
     const snap=await getDoc(doc(db,'checkin_admin','config'));
     guestFullCfg=snap.exists()?snap.data():{};
     if(guestFullCfg.visibility&&!guestCfgVisibility)guestCfgVisibility=guestFullCfg.visibility;
+    applyDoorCardVisibility();
     _applyWaitingTabs(guestFullCfg);
   }catch(e){guestFullCfg={};}
   return guestFullCfg;
@@ -3403,6 +3409,7 @@ async function _ensureServicesConfigLoaded(){
     const cfgData=cfgSnap.exists()?cfgSnap.data():{};
     if(cfgData.laundryItems&&cfgData.laundryItems.length)laundryItems=cfgData.laundryItems;
     if(cfgData.visibility&&!guestCfgVisibility)guestCfgVisibility=cfgData.visibility;
+    applyDoorCardVisibility();
     if(cfgData.services)guestSvcs=cfgData.services;
     _laundryLoaded=true;
     _applyWaitingTabs(cfgData);
@@ -4611,14 +4618,12 @@ function _floorLabel(){
 function _renderHeroContent(){
   _updateParkingButtonVisibility();
   const doorEl=document.getElementById('hero-door-code');
-  const _applyDoorCardVisibility=()=>{const c=document.getElementById('hero-door-card');if(c)c.style.display=(aptData&&aptData.hasSmartLock===false)?'none':'';};
-  _applyDoorCardVisibility();   // fail open: only hidden once aptData says hasSmartLock===false
+  applyDoorCardVisibility();   // fail open: only hidden once config says smartLock===false for this apartment type
   let doorCode=_doorCodeForGuest();
   if(!doorCode&&aptId&&(!aptData||!aptData.doorCode)){
     getDoc(doc(db,'checkin_apartments',aptId)).then(s=>{
       if(s.exists()){
         aptData=s.data();
-        _applyDoorCardVisibility();
         const el=document.getElementById('hero-door-code');
         const dc=_doorCodeForGuest();
         if(el&&dc)el.textContent=dc;

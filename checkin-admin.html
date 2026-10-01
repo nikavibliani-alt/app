@@ -324,8 +324,6 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .aptsguest-switch{display:flex;gap:4px;padding:4px;margin-bottom:12px;background:var(--surface);border:1px solid var(--line);border-radius:999px;}
 .aptsguest-switch button{flex:1;min-height:44px;border:0;border-radius:999px;background:transparent;font-family:var(--sans);font-size:14px;font-weight:600;color:var(--ink-2);cursor:pointer;}
 .aptsguest-switch button.active{background:var(--ink);color:#fff;}
-.apt-lock-switch{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;margin-bottom:8px;cursor:pointer;}
-.apt-lock-switch__txt{font-size:14px;font-weight:600;color:var(--ink);}
 .apt-toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .apt-toolbar .btn{flex:none;min-height:40px;padding:0 14px;font-size:13px;}
 .apt-pill-row{display:flex;align-items:stretch;gap:4px;margin-bottom:6px;}
@@ -683,7 +681,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1003a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1003b · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -1666,6 +1664,23 @@ const PARKING_INFO_DEFAULTS={
   FREEDOM:{parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
   ORBELIANI:{parkingEnabled:false,parkingDesc:'',parkingMapsUrl:'',parkingMediaUrl:''},
 };
+const GP_ROOM_PROP={
+  '0-1':'ROOMS','0-2':'ROOMS','0-3':'ROOMS','0-4':'ROOMS','0-5':'ROOMS',
+  '6-1':'MAXELA','6-2':'MAXELA','6-4':'MAXELA','6-3':'BIG_APT',
+  '7-1':'MAXELA','7-2':'MAXELA','7-3':'MAXELA','7-4':'MAXELA',
+  'tab-1':'FREEDOM','tab-2':'FREEDOM','tab-3':'FREEDOM',
+};
+function gpPropForRoom(code){
+  const c=String(code||'');
+  if(c.startsWith('orb-'))return'ORBELIANI';
+  return GP_ROOM_PROP[c]||'ROOMS';
+}
+/* "no smart lock" follows the Guest page setting of the apartment's type (gsVisibility[group].smartLock === false) */
+let _gsKick=false;
+function gpNoLock(code){
+  if(!gsLoaded&&!_gsKick){_gsKick=true;loadGuestSettings().then(()=>{if(currentTab==='apts')renderAptsList();});}
+  return !!gsLoaded&&(gsVisibility[gpPropForRoom(code)]||{}).smartLock===false;
+}
 const GP_PROPS=[
   {id:'ROOMS',label:'Rooms'},{id:'MAXELA',label:'Maxela'},{id:'BIG_APT',label:'Big Apt'},
   {id:'FREEDOM',label:'Freedom'},{id:'ORBELIANI',label:'Orbeliani'},
@@ -1830,6 +1845,11 @@ function renderGuestSettings(){
     </div>
     <div class="section-hd" style="margin-top:8px"><h2>Home tiles</h2></div>
     ${GP_TILES.filter(t=>t.group==='essential').map(row).join('')}
+    <div class="gp-row">
+      <div class="gp-row__icon">${gpIcon('key')}</div>
+      <div class="gp-row__body"><div class="gp-row__title">Door code box</div><div class="gp-row__sub">Show the smart lock code to guests</div></div>
+      <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${vis.smartLock!==false?'checked':''} onchange="gsToggle('smartLock',this.checked)"><span class="switch-track"></span></label>
+    </div>
     <div class="section-hd" style="margin-top:8px"><h2>Services</h2></div>
     ${GP_TILES.filter(t=>t.group==='service').map(row).join('')}
     <div class="section-hd" style="margin-top:8px"><h2>Content pages</h2></div>
@@ -4290,7 +4310,7 @@ window.openDetail=function(guestId){
     return`<div class="room-block">
       <h3>Room ${esc(rc)}${isMulti?' <span class="pill pill-multi">MULTI</span>':''}${res&&(res.manualRoom===true||res.manualRoom==='true')?' <span class="pill pill-manual">MANUAL</span>':''}</h3>
       ${drift?`<p style="font-size:12px;color:var(--amber);margin-bottom:8px">Guest form still says ${esc(roomForm.aptId)} — use Move/Swap or wait for sync</p>`:''}
-      ${(aptData[rc]?.hasSmartLock===false||aptData[roomForm?.aptId]?.hasSmartLock===false)?`<div style="font-size:13px;color:var(--muted)">No smart lock</div>`:`<div style="font-size:12px;color:var(--muted)">Door code</div>
+      ${(gpNoLock(rc)||gpNoLock(roomForm?.aptId))?`<div style="font-size:13px;color:var(--muted)">No smart lock</div>`:`<div style="font-size:12px;color:var(--muted)">Door code</div>
       <div class="door">${esc(doorCode)}</div>`}
       <div class="card__actions">${unlockBtn}${waPhone&&roomForm===g?`<a class="btn" href="https://wa.me/${waPhone}" target="_blank">WhatsApp</a>`:''}</div>
     </div>`;
@@ -4891,7 +4911,7 @@ function renderAptsList(){
     for(const a of rooms){
       const d=aptData[a.id]||{};
       const ok=!!(d.tuyaDeviceId||d.doorCode);
-      const dotColor=d.hasSmartLock===false?'var(--muted)':(ok?'var(--green)':'var(--red)');
+      const dotColor=gpNoLock(a.id)?'var(--muted)':(ok?'var(--green)':'var(--red)');
       const photoN=(d.photos||[]).length;
       const hint=photoN?photoN+' photo'+(photoN!==1?'s':''):(d.instructions?'Has instructions':'No instructions');
       if(_aptReorderMode){
@@ -4925,7 +4945,7 @@ function renderAptsList(){
         hidden.sort((a,b)=>(a.sortOrder??999)-(b.sortOrder??999)).map(r=>{
           const d=aptData[r.roomCode]||{};
           const ok=!!(d.tuyaDeviceId||d.doorCode);
-          const dotColor=d.hasSmartLock===false?'var(--muted)':(ok?'var(--green)':'var(--red)');
+          const dotColor=gpNoLock(r.roomCode)?'var(--muted)':(ok?'var(--green)':'var(--red)');
           return`<div class="apt-pill-row">
             <button type="button" class="apt-pill inactive" onclick="window.openAptEditor('${esc(r.roomCode)}')">
               <span class="apt-dot" style="background:${dotColor}"></span>
@@ -4971,14 +4991,8 @@ window.openAptEditor=function(aptId){
 
   document.getElementById('apt-ed-body').innerHTML=`
     <div class="apt-card">
-      <div class="apt-card-hd">Smart lock · ${d.hasSmartLock===false?'None':d.tuyaDeviceId?'Tuya':d.doorCode?'Manual':'Not set'}</div>
+      <div class="apt-card-hd">Smart lock · ${d.tuyaDeviceId?'Tuya':d.doorCode?'Manual':'Not set'}</div>
       <div class="apt-card-bd">
-        <label class="apt-lock-switch">
-          <span class="apt-lock-switch__txt">This apartment has a smart lock</span>
-          <span class="switch"><input type="checkbox" id="apt-hasSmartLock" ${d.hasSmartLock!==false?'checked':''} onchange="window.toggleHasSmartLock(this.checked)"><span class="switch-track"></span></span>
-        </label>
-        <p class="apt-hint" id="apt-nolock-note" style="display:${d.hasSmartLock===false?'block':'none'}">Guests won't see a door code box.</p>
-        <div id="apt-lock-fields" style="display:${d.hasSmartLock===false?'none':'block'}">
         <div class="apt-mode-group">
           <button type="button" class="apt-mode-btn ${initMode==='auto'?'active':''}" id="mode-auto" onclick="setLockMode('auto')">Auto (Tuya)</button>
           <button type="button" class="apt-mode-btn ${initMode==='manual'?'active':''}" id="mode-manual" onclick="setLockMode('manual')">Manual code</button>
@@ -4990,7 +5004,6 @@ window.openAptEditor=function(aptId){
         <div id="lock-manual" style="display:${initMode==='manual'?'block':'none'}">
           <label class="apt-label">Door code</label>
           <input class="apt-input" id="apt-doorCode" value="${esc(d.doorCode||'')}" placeholder="1234#">
-        </div>
         </div>
       </div>
     </div>
@@ -5104,17 +5117,12 @@ function _aptRerender(aptId,capMap){
     if(el&&typed!==undefined)el.value=typed;
   }
   if(snap.__mode!==!!document.getElementById('mode-manual')?.classList.contains('active'))setLockMode(snap.__mode?'manual':'auto');
-  const _hs=document.getElementById('apt-hasSmartLock');if(_hs)toggleHasSmartLock(_hs.checked);
   if(foldOpen)document.getElementById('apt-fold-registry')?.classList.remove('collapsed');
   scrollers.forEach(([e,t])=>{if(e)e.scrollTop=t;});
 }
 window.closeAptEditor=function(){
   document.getElementById('apt-editor-overlay').classList.remove('open');
   _currentAptId=null;
-};
-window.toggleHasSmartLock=function(on){
-  document.getElementById('apt-lock-fields').style.display=on?'block':'none';
-  document.getElementById('apt-nolock-note').style.display=on?'none':'block';
 };
 window.setLockMode=function(mode){
   document.getElementById('lock-auto').style.display=mode==='auto'?'block':'none';
@@ -5139,7 +5147,6 @@ window.saveAptData=async function(){
     videoUrl:document.getElementById('apt-videoUrl')?.value.trim()||'',
     photos:aptData[aptId]?.photos||[],
     photoCaptions,
-    hasSmartLock:document.getElementById('apt-hasSmartLock')?document.getElementById('apt-hasSmartLock').checked:(aptData[aptId]?.hasSmartLock!==false),
     updatedAt:serverTimestamp()
   };
   try{
