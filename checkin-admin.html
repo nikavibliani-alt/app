@@ -266,7 +266,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .stat__n{font-family:var(--mono);font-size:18px;font-weight:700;}
 .stat__l{font-size:10px;font-weight:500;letter-spacing:.02em;color:var(--muted);margin-top:2px;}
 .search-box--compact{height:38px;margin:2px 0 10px;font-size:16px;padding:0 12px;}
-.stat-row--stay{grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;}
+.stat-row--stay{grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;}
 .stat--wait{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:56px;padding:10px 16px;text-align:left;background:var(--surface);}
 .stat--wait .stat__n{font-size:24px;}
 .stat--wait .stat__l{font-size:15px;font-weight:600;color:var(--ink);margin:0;letter-spacing:0;flex:1;}
@@ -291,6 +291,12 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .day-chip{flex:none;min-width:72px;padding:8px 10px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);cursor:pointer;font-family:var(--sans);text-align:center;}
 .day-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
 .day-chip.active .day-chip__date,.day-chip.active .day-chip__n{color:rgba(255,255,255,.75);}
+.day-strip__hd{font-size:12px;font-weight:600;color:var(--ink-2);margin:2px 2px 6px;}
+.day-chip{min-width:90px;padding:8px 6px;color:var(--ink);}
+.day-chip.quiet{opacity:.55;}
+.day-chip.active.quiet{opacity:1;}
+.day-chip__miss{display:inline-block;margin-top:5px;padding:2px 7px;border-radius:999px;background:var(--amber-bg);border:1px solid #d9c79a;color:var(--amber);font-size:10px;font-weight:700;white-space:nowrap;}
+.day-chip.active .day-chip__miss{background:#fff;border-color:#fff;color:var(--amber);}
 .day-chip__label{display:block;font-size:12px;font-weight:700;line-height:1.2;}
 .day-chip__date{display:block;font-size:10px;font-weight:600;color:var(--muted);margin-top:2px;}
 .day-chip__n{display:block;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);margin-top:4px;}
@@ -677,7 +683,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1002c · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1002d · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -687,8 +693,8 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 
   <div class="pane active" id="pane-stay">
     <div class="stat-row stat-row--stay" id="stay-stats"></div>
+    <div class="day-strip"><div class="day-strip__hd">Arriving in the next days</div><div class="day-row show" id="upcoming-days"></div></div>
     <input class="search-box search-box--compact" id="stay-search" placeholder="Search guest, room, booking" oninput="renderStay()">
-    <div class="day-row" id="upcoming-days"></div>
     <div id="stay-list"></div>
   </div>
 
@@ -3586,6 +3592,7 @@ function renderCard(grp,mode){
   const sorted=[...grp].sort(byRoom);
   const form=grp.reduce((f,r)=>f||getForm(r),null);
   const st=cardStatus(sorted[0],form);
+  const stShow=(mode==='upcoming')?(form?{label:'Registered',cls:'pill-ok'}:{label:'Not registered',cls:'pill-pending'}):st;
   const roomStr=sorted.map(r=>{
     const rc=r.roomCode||r.room||'';
     if(rc)return rc;
@@ -3613,7 +3620,7 @@ function renderCard(grp,mode){
     if(pinned&&live&&pinned!==live){warn=`<div class="card__warn">Room mismatch: MiniHotel shows ${esc(live)}</div>`;break;}
   }
   return`<div class="card card--stay" ${open}>
-    <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${st.cls}" ${form&&(st.key==='unlocked'||st.key==='need'||st.key==='disabled')?`onclick="event.stopPropagation();window.toggleGuestAccess('${form.id}')" style="cursor:pointer"`:''}>${st.label}</span></div>
+    <div class="card__top"><div class="card__room">${esc(roomStr)}</div><span class="pill ${stShow.cls}" ${form&&(st.key==='unlocked'||st.key==='need'||st.key==='disabled')?`onclick="event.stopPropagation();window.toggleGuestAccess('${form.id}')" style="cursor:pointer"`:''}>${stShow.label}</span></div>
     <div class="card__name">${esc(name)}</div>
     <div class="card__meta">${esc(datesStr(grp[0],mode))} · ${esc(guestCountLabel)}${srcLabel?`<span class="card__src">${esc(srcLabel)}</span>`:''}</div>
     ${warn}
@@ -3635,25 +3642,30 @@ window.setStayFilter=function(f){
   renderStay();
 };
 window.setUpcomingDay=function(iso){
+  if(stayFilter==='upcoming'&&upcomingDay===iso){stayFilter='overview';renderStay();return;}
   upcomingDay=iso;
   stayFilter='upcoming';
   renderStay();
 };
 
+function groupHasForm(grp){return !!grp.reduce((f,r)=>f||getForm(r),null);}
 function renderUpcomingDayChips(){
   const row=document.getElementById('upcoming-days');
   if(!row)return;
-  if(stayFilter!=='upcoming'){row.classList.remove('show');row.innerHTML='';return;}
   const days=upcomingDaysList();
   if(!upcomingDay||!days.some(d=>d.iso===upcomingDay))upcomingDay=days[0].iso;
+  const sel=stayFilter==='upcoming';
   row.classList.add('show');
   row.innerHTML=days.map(d=>{
-    const n=groupsForCheckinDate(d.iso).length;
-    const active=d.iso===upcomingDay?'active':'';
-    return`<button type="button" class="day-chip ${active}" onclick="setUpcomingDay('${d.iso}')">
+    const groups=groupsForCheckinDate(d.iso);
+    const n=groups.length;
+    const miss=groups.filter(g=>!groupHasForm(g)).length;
+    const active=sel&&d.iso===upcomingDay?'active':'';
+    return`<button type="button" class="day-chip ${active} ${n?'':'quiet'}" aria-pressed="${!!active}" onclick="setUpcomingDay('${d.iso}')">
       <span class="day-chip__label">${esc(d.label)}</span>
       <span class="day-chip__date">${esc(d.dateLabel)}</span>
-      <span class="day-chip__n">${n}</span>
+      <span class="day-chip__n">${n} arriving</span>
+      ${miss?`<span class="day-chip__miss">${miss} not registered</span>`:''}
     </button>`;
   }).join('');
 }
@@ -3674,7 +3686,7 @@ window.renderStay=function(){
   const tile=(f,n,l)=>`<button type="button" class="stat stat--stay ${stayFilter===f?'active':''}" aria-pressed="${stayFilter===f}" onclick="setStayFilter('${f}')"><div class="stat__n">${n}</div><div class="stat__l">${l}</div></button>`;
   document.getElementById('stay-stats').innerHTML=`
     <button type="button" class="stat stat--wait ${waiting>0?'hot':''} ${stayFilter==='need'?'active':''}" aria-pressed="${stayFilter==='need'}" onclick="setStayFilter('need')"><div class="stat__l">Waiting for unlock</div><div class="stat__n">${waiting}</div></button>
-    ${tile('arrivals',b.arrivals.length,'Arriving today')}${tile('inhouse',b.inhouse.length,'Staying')}${tile('leaving',b.leaving.length,'Leaving today')}${tile('upcoming',b.upcoming.length,'Next 7 days')}`;
+    ${tile('arrivals',b.arrivals.length,'Arriving today')}${tile('inhouse',b.inhouse.length,'Staying')}${tile('leaving',b.leaving.length,'Leaving today')}`;
 
   renderUpcomingDayChips();
 
@@ -3702,10 +3714,14 @@ window.renderStay=function(){
     const days=upcomingDaysList();
     if(!upcomingDay||!days.some(d=>d.iso===upcomingDay))upcomingDay=days[0].iso;
     const meta=days.find(d=>d.iso===upcomingDay)||days[0];
-    const groups=filterByQ(groupsForCheckinDate(upcomingDay));
-    const title=meta.label+' · '+meta.dateLabel;
-    if(!groups.length){el.innerHTML=`<div class="section-hd"><h2>${esc(title)}</h2><span class="n">0</span></div><div class="empty">No arrivals this day</div>`;return;}
-    el.innerHTML=sectionBlock(title,groups,'upcoming');
+    const all=groupsForCheckinDate(upcomingDay);
+    const missAll=all.filter(g=>!groupHasForm(g)).length;
+    const dd=new Date(upcomingDay+'T00:00:00Z');
+    const dayName=dd.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})+' '+dd.toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'});
+    const title=dayName+' · '+all.length+' arriving'+(missAll?' · '+missAll+' not registered':'');
+    const groups=filterByQ(all).map((g,i)=>[g,i]).sort((a,b)=>(groupHasForm(a[0])?1:0)-(groupHasForm(b[0])?1:0)||a[1]-b[1]).map(x=>x[0]);
+    if(!groups.length){el.innerHTML=`<div class="section-hd"><h2>${esc(title)}</h2></div><div class="empty">${all.length?'No match':'No arrivals this day'}</div>`;return;}
+    el.innerHTML=`<div class="section-hd"><h2>${esc(title)}</h2></div>`+groups.map(g=>renderCard(g,'upcoming')).join('');
     return;
   }
 
