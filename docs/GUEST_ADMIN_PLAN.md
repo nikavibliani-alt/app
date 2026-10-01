@@ -79,3 +79,8 @@ Undo all: `git revert --no-edit before-round-3..HEAD`, then push. Undo one step:
 | 1 | 92e6b53 | live |
 | 2 | e9f4bdc | live (no unit had hasSmartLock set) |
 | 3 | 2e2a989 | live |
+| 4 | 688ff79 | live |
+
+Round 3 notes:
+- Step 2: read-only check of checkin_apartments found no unit with hasSmartLock set (0 of 23), so nothing was ever switched off per unit. Old field left in Firestore untouched; no longer read or written.
+- Step 4: past guests come from Guest history's data, which covers the last 3 months of finished stays only.
