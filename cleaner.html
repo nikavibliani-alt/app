@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cleaner">
+<meta name="theme-color" content="#2C2C2A">
+<title>Cleaner</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#FAFAF9;--surface:#fff;--ink:#2C2C2A;--ink-2:#4A4A48;--muted:#6B6B68;
+  --line:#E8E4E0;--green:#2d6b50;--green-bg:#edf5f0;--red:#8b2020;--red-bg:#fdf0f0;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans Georgian',system-ui,sans-serif;
+  --mono:ui-monospace,'SF Mono','Cascadia Code',monospace;
+  --r:12px;
+}
+html,body{min-height:100%;}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:18px;line-height:1.4;max-width:520px;margin:0 auto;
+  padding-bottom:calc(32px + env(safe-area-inset-bottom));-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;}
+button{font-family:inherit;touch-action:manipulation;}
+.hdr{position:sticky;top:0;z-index:20;background:var(--ink);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.hdr__who{min-width:0;}
+.hdr__title{font-size:20px;font-weight:700;}
+.hdr__sub{font-size:13px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lang{flex:none;height:44px;min-width:64px;padding:0 14px;border:2px solid rgba(255,255,255,.6);border-radius:999px;background:transparent;color:#fff;font-size:16px;font-weight:700;cursor:pointer;}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:12px 16px;scrollbar-width:none;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab{flex:none;min-height:48px;padding:0 16px;border:2px solid var(--line);border-radius:999px;background:var(--surface);font-size:17px;font-weight:600;color:var(--ink-2);cursor:pointer;}
+.tab.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+#list{padding:0 16px;}
+.site{font-size:15px;font-weight:700;color:var(--ink-2);padding:14px 2px 8px;}
+.card{background:var(--surface);border:2px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px;}
+.card.p-red{border-color:#fca5a5;background:#fef2f2;}
+.card.p-yellow{border-color:#f59e0b;background:#fffbf5;}
+.card.p-green{border-color:#86efac;background:#f0fdf4;}
+.card.done{opacity:.7;}
+.card__top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
+.room{font-size:28px;font-weight:700;font-family:var(--mono);letter-spacing:.02em;}
+.name{font-size:14px;color:var(--muted);}
+.overdue{display:inline-block;margin-bottom:12px;font-size:15px;font-weight:700;color:#9a3412;background:#fff7ed;border:1px solid #f59e0b;border-radius:999px;padding:6px 12px;}
+.pill{display:inline-flex;align-items:center;padding:6px 12px;border-radius:999px;font-size:15px;font-weight:700;white-space:nowrap;}
+.pill-ok{background:var(--green-bg);color:var(--green);}
+.pill-wait{background:#eef3fa;color:#1a4a7a;}
+.times{display:flex;gap:10px;margin-bottom:12px;}
+.tbox{flex:1;background:#f7f8fa;border:2px solid var(--line);border-radius:10px;padding:10px;min-width:0;}
+.tbox b{display:block;font-size:13px;color:var(--muted);text-transform:uppercase;margin-bottom:2px;}
+.tbox.urgent{border-color:#fca5a5;background:#fef2f2;}
+.tbox.soon{border-color:#f59e0b;background:#fff7ed;}
+.when{display:block;font-size:14px;font-weight:700;}
+.tm{display:block;font-size:24px;font-weight:700;}
+.tm.small{font-size:18px;}
+.cnt{font-size:15px;font-weight:600;margin-top:6px;}
+.cnt-line{display:inline-flex;align-items:center;gap:6px;}
+.hk-icon{width:18px;height:18px;flex-shrink:0;}
+.bed{display:flex;align-items:flex-start;gap:8px;margin-bottom:12px;padding:10px 12px;border-radius:10px;background:#fff;border:2px solid #d97706;font-size:16px;font-weight:700;}
+.bed .hk-icon{color:#c2410c;width:22px;height:22px;}
+.out{display:inline-block;margin-bottom:12px;font-size:15px;font-weight:700;color:var(--green);background:var(--green-bg);border:1px solid #86efac;border-radius:999px;padding:6px 12px;}
+.donebtn{width:100%;min-height:60px;border:none;border-radius:var(--r);background:var(--ink);color:#fff;font-size:22px;font-weight:700;cursor:pointer;}
+.donebtn.undo{background:var(--line);color:var(--ink-2);font-size:18px;}
+.donebtn:disabled{opacity:.5;}
+.empty{text-align:center;padding:48px 16px;color:var(--muted);font-size:18px;}
+.screen{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:32px;text-align:center;font-size:22px;font-weight:600;}
+.screen[hidden]{display:none;}
+.screen button{min-height:56px;padding:0 28px;border:none;border-radius:var(--r);background:var(--ink);color:#fff;font-size:20px;font-weight:700;}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:#fff;padding:14px 22px;border-radius:999px;font-size:18px;font-weight:700;z-index:200;opacity:0;pointer-events:none;transition:opacity .2s;max-width:92%;text-align:center;}
+.toast.show{opacity:1;}
+.dmgbtn{width:100%;min-height:56px;margin-top:10px;border:2px solid #b45309;border-radius:var(--r);background:#fff;color:#b45309;font-size:19px;font-weight:700;cursor:pointer;}
+.dmgbadge{display:block;width:100%;margin-top:10px;min-height:48px;border:none;border-radius:var(--r);background:#fff7ed;color:#9a3412;font-size:16px;font-weight:700;cursor:pointer;}
+.readylink{display:block;width:100%;margin-top:8px;min-height:48px;border:none;background:transparent;color:var(--ink-2);font-size:16px;font-weight:600;text-decoration:underline;cursor:pointer;}
+.sheet{position:fixed;inset:0;z-index:150;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px calc(32px + env(safe-area-inset-bottom));}
+.sheet[hidden]{display:none;}
+.sheet__hd{position:sticky;top:0;background:var(--bg);padding:calc(12px + env(safe-area-inset-top)) 0 12px;display:flex;align-items:center;gap:12px;border-bottom:2px solid var(--line);margin-bottom:16px;z-index:2;}
+.sheet__back{flex:none;min-height:48px;padding:0 16px;border:2px solid var(--line);border-radius:999px;background:var(--surface);font-size:17px;font-weight:700;cursor:pointer;}
+.sheet__title{font-size:22px;font-weight:700;font-family:var(--mono);}
+.photobtns{display:flex;gap:10px;margin-bottom:14px;}
+.bigbtn{flex:1;min-height:64px;border:none;border-radius:var(--r);background:var(--ink);color:#fff;font-size:19px;font-weight:700;cursor:pointer;}
+.bigbtn.alt{background:#fff;color:var(--ink);border:2px solid var(--ink);}
+.bigbtn:disabled{opacity:.4;}
+.thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+.thumb{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--line);}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.thumb__x{position:absolute;top:4px;right:4px;width:40px;height:40px;border:none;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;font-size:22px;font-weight:700;cursor:pointer;}
+.thumb__p{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);color:#fff;font-size:14px;font-weight:700;text-align:center;padding:4px;}
+.thumb__p.err{background:#b91c1c;}
+.thumb__p.ok{background:#15803d;}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+.chip{min-height:52px;padding:0 18px;border:2px solid var(--line);border-radius:999px;background:var(--surface);font-size:18px;font-weight:600;cursor:pointer;}
+.chip.on{background:var(--ink);border-color:var(--ink);color:#fff;}
+.sheet label.lbl{display:block;font-size:16px;font-weight:600;color:var(--ink-2);margin-bottom:6px;}
+.sheet textarea{width:100%;min-height:96px;padding:12px;border:2px solid var(--line);border-radius:var(--r);font-size:18px;font-family:inherit;background:#fff;margin-bottom:16px;resize:vertical;}
+.urgentrow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:60px;padding:0 16px;border:2px solid var(--line);border-radius:var(--r);background:#fff;margin-bottom:18px;font-size:20px;font-weight:700;cursor:pointer;}
+.sw{width:56px;height:32px;border-radius:999px;background:var(--line);position:relative;flex:none;transition:background .15s;}
+.sw::after{content:'';position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .15s;}
+.urgentrow.on .sw{background:#b91c1c;}
+.urgentrow.on .sw::after{left:27px;}
+.sendbtn{width:100%;min-height:68px;border:none;border-radius:var(--r);background:#000;color:#fff;font-size:24px;font-weight:700;cursor:pointer;}
+.sendbtn:disabled{opacity:.35;}
+.hint{font-size:15px;color:var(--muted);text-align:center;margin-top:8px;min-height:22px;}
+.errmsg{background:var(--red-bg);color:var(--red);border-radius:var(--r);padding:12px;font-size:17px;font-weight:600;margin-bottom:12px;}
+.sent{text-align:center;padding-top:18vh;}
+.sent h2{font-size:34px;margin-bottom:12px;}
+.sent p{font-size:20px;color:var(--ink-2);margin-bottom:32px;}
+.rep{background:#fff;border:2px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:14px;}
+.rep__meta{font-size:15px;color:var(--muted);margin-bottom:6px;}
+.rep__cats{font-size:18px;font-weight:700;margin-bottom:6px;}
+.rep__txt{font-size:17px;margin-bottom:8px;white-space:pre-wrap;}
+.tag{display:inline-block;background:#b91c1c;color:#fff;font-size:13px;font-weight:700;border-radius:999px;padding:2px 10px;margin-left:6px;}
+.busy{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:180;background:var(--ink);color:#fff;border-radius:var(--r);padding:16px;font-size:18px;font-weight:700;text-align:center;}
+.busy[hidden]{display:none;}
+.spin{width:32px;height:32px;border:4px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="hdr" id="hdr" hidden>
+  <div class="hdr__who"><div class="hdr__title" id="hdr-title"></div><div class="hdr__sub" id="hdr-sub"></div></div>
+  <button type="button" class="lang" id="lang-btn"></button>
+</div>
+<div class="tabs" id="tabs"></div>
+<div id="list"></div>
+<div class="screen" id="screen"><div class="spin"></div></div>
+<div class="sheet" id="sheet" hidden></div>
+<div class="busy" id="busy" hidden></div>
+<input type="file" id="file-cam" accept="image/*" capture="environment" multiple hidden>
+<input type="file" id="file-gal" accept="image/*" multiple hidden>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import{getFirestore,collection,doc,setDoc,updateDoc,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,arrayUnion,increment}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import{getStorage,ref,uploadBytesResumable,getDownloadURL,getMetadata}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
+import{normalizeStayDate}from"/shared/guest-unlock.js";
+import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON}from"/shared/hk-bedding.js";
+import{roomsSorted}from"/shared/room-registry.js";
+import{DAMAGE_CATEGORIES,makeReportId,tbilisiIsoNow,readPhotoMeta,fileExt,uploadOriginal,pickDepartingReservation}from"/shared/hk-damage.js";
+
+/* ══ ALL CLEANER-PAGE TEXT (review translations here) ══ */
+const STR={
+  ka:{
+    title:'დასუფთავება',
+    overdue:'ჯერ არ არის მზად · გავიდა {d}',
+    loading:'იტვირთება…',
+    yesterday:'გუშინ',today:'დღეს',tomorrow:'ხვალ',
+    checkout:'გასვლა',checkin:'შემოსვლა',
+    leaving:'{n} გადის',arriving:'{n} შემოდის',
+    leavingShort:'გადის',arrivingShort:'შემოდის',
+    noBooking:'ჯავშანი არ არის',
+    pending:'დასალაგებელი',donePill:'მზადაა',
+    done:'მზადაა',undo:'გაუქმება',
+    guestOut:'სტუმარმა გასვლა დაადასტურა',
+    sheets:'საჭიროა დამატებითი თეთრეული',sofa:'საჭიროა დივნის დამატებითი თეთრეული',
+    emptyDay:'ამ დღეს დასალაგებელი ბინა არ არის',
+    inactive:'ეს ბმული აღარ მუშაობს. სთხოვეთ მენეჯერს ახალი ბმული.',
+    noLink:'ბმული ვერ მოიძებნა. სთხოვეთ მენეჯერს თქვენი ბმული.',
+    noRooms:'ბინები არ არის მიმაგრებული. დაუკავშირდით მენეჯერს.',
+    offline:'ინტერნეტი არ არის.',retry:'ხელახლა',
+    toastDone:'ბინა მზადაა ✓',toastUndo:'გაუქმებულია',toastErr:'ვერ შეინახა. სცადეთ ხელახლა.',
+    beforeArr:'15:00-მდე',afterMidnight:'შუაღამის შემდეგ',nextMorning:'მეორე დილით',asap:'რაც შეიძლება მალე',
+    langBtn:'EN',
+    reportDamage:'დაზიანება',
+    takePhoto:'გადაიღე ფოტო',fromGallery:'ატვირთე',
+    catCigarette:'სიგარეტის სუნი',catBroken:'გატეხილია',catStain:'ლაქა',catMissing:'ნივთი აკლია',catNotworking:'არ მუშაობს',catDirty:'ბინძურია / სუნი',catOther:'სხვა',
+    whatDamaged:'რა არის დაზიანებული? (არასავალდებულო)',
+    urgent:'სასწრაფო',
+    send:'გაგზავნა',resend:'ხელახლა გაგზავნა',sending:'იგზავნება…',back:'უკან',
+    needSomething:'დაამატეთ ფოტო, აირჩიეთ ან დაწერეთ რამე',
+    uploadFailed:'ზოგი ფოტო ვერ აიტვირთა. დააჭირეთ „ხელახლა გაგზავნა“.',
+    sendFailed:'ვერ გაიგზავნა. შეამოწმეთ ინტერნეტი და სცადეთ ხელახლა.',
+    removePhoto:'წაშლა',
+    sentTitle:'გაგზავნილია ✓',sentSub:'მენეჯერმა დაინახა დაზიანება',ok:'კარგი',
+    badge:'⚠ დაზიანება გაგზავნილია',
+    reportsTitle:'გაგზავნილი დაზიანებები',
+    addMorePhotos:'ფოტოს დამატება',
+    closeWarn:'გაგზავნა არ დასრულებულა. დარწმუნებული ხართ, რომ გსურთ დახურვა?',
+    readyPhotos:'+ ფოტო მზა ოთახის',
+    uploadingN:'იტვირთება {i}/{n}…',photosSaved:'ფოტო შენახულია ✓',
+    photosN:'{n} ფოტო',
+    roomDay:'{room} · {day}'
+  },
+  en:{
+    title:'Cleaning',
+    overdue:'Not cleaned yet · left {d}',
+    loading:'Loading…',
+    yesterday:'Yesterday',today:'Today',tomorrow:'Tomorrow',
+    checkout:'Checkout',checkin:'Check-in',
+    leaving:'{n} leaving',arriving:'{n} arriving',
+    leavingShort:'Leaving',arrivingShort:'Arriving',
+    noBooking:'No booking',
+    pending:'To clean',donePill:'Done',
+    done:'Done',undo:'Undo',
+    guestOut:'Guest checked out',
+    sheets:'Extra sheets needed',sofa:'Extra sofa bed sheets needed',
+    emptyDay:'No rooms to clean this day',
+    inactive:'This link is no longer active. Ask your manager for a new link.',
+    noLink:'No link found. Ask your manager for your link.',
+    noRooms:'No apartments assigned. Contact your manager.',
+    offline:'No internet connection.',retry:'Try again',
+    toastDone:'Room marked done ✓',toastUndo:'Undone',toastErr:'Could not save. Try again.',
+    beforeArr:'Before 15:00',afterMidnight:'After midnight',nextMorning:'Next morning',asap:'ASAP',
+    langBtn:'ქარ',
+    reportDamage:'Report damage',
+    takePhoto:'Take photo',fromGallery:'Upload',
+    catCigarette:'Cigarette smell',catBroken:'Broken',catStain:'Stain',catMissing:'Missing item',catNotworking:'Not working',catDirty:'Dirty / smell',catOther:'Other',
+    whatDamaged:'What is damaged? (optional)',
+    urgent:'Urgent',
+    send:'Send',resend:'Send again',sending:'Sending…',back:'Back',
+    needSomething:'Add a photo, pick a type or write something',
+    uploadFailed:'Some photos did not upload. Tap "Send again".',
+    sendFailed:'Not sent. Check your internet and try again.',
+    removePhoto:'Remove',
+    sentTitle:'Sent ✓',sentSub:'Your manager can see the damage report',ok:'OK',
+    badge:'⚠ Damage reported',
+    reportsTitle:'Damage reports sent',
+    addMorePhotos:'Add more photos',
+    closeWarn:'Sending is not finished. Are you sure you want to close?',
+    readyPhotos:'+ Add photos of ready room',
+    uploadingN:'Uploading {i}/{n}…',photosSaved:'Photos saved ✓',
+    photosN:'{n} photos',
+    roomDay:'{room} · {day}'
+  }
+};
+let lang='ka';
+try{lang=localStorage.getItem('hk_lang')==='en'?'en':'ka';}catch(e){}
+function t(k,vars){
+  let s=(STR[lang]&&STR[lang][k])??STR.ka[k]??k;
+  if(vars)for(const[a,b]of Object.entries(vars))s=s.replace('{'+a+'}',b);
+  return s;
+}
+
+const fb=initializeApp({
+  apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
+  authDomain:"sleepy-5c962.firebaseapp.com",
+  projectId:"sleepy-5c962",
+  storageBucket:"sleepy-5c962.firebasestorage.app",
+  messagingSenderId:"152940098906",
+  appId:"1:152940098906:web:bf245230d705c0a62c2f63"
+});
+const db=getFirestore(fb);
+
+// Damage reporting + ready photos are hidden for now (cleaners send photos via WhatsApp). Code and data are kept; set true to bring it back.
+const HK_DAMAGE_ENABLED = false;
+const HK_DAY_START=-1,HK_DAY_END=6;
+const HK_CLEAN_TYPE_DEFAULTS={'0-':45,'6-7':90,'6-3':120,'orb-tab':50,'vgl':90,'abashidze':90,default:75};
+const HK_CLEAN_TYPES=[
+  {id:'0-',match:c=>/^0-/.test(c)},
+  {id:'6-7',match:c=>/^6-|^7-/.test(c)&&c!=='6-3'},
+  {id:'6-3',match:c=>c==='6-3'},
+  {id:'orb-tab',match:c=>/^orb-|^tab-/.test(c)},
+  {id:'vgl',match:c=>/^vgl-/.test(c)},
+  {id:'abashidze',match:c=>c==='abashidze'},
+];
+const HK_SITES_ALL=[
+  {id:'shartava',title:'Shartava'},
+  {id:'centre',title:'City Centre · Orb & Tab'},
+  {id:'vgl',title:'VGL'},
+  {id:'abashidze',title:'Abashidze'},
+];
+
+/* ══ STATE ══ */
+const $=id=>document.getElementById(id);
+let token='',link=null;            // link = {name,teamId}
+let roomsData={},aptData={};
+let hkSettings={defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS},cleanMinutesByRoom:{},teams:[]};
+let hkCategoryCapacity={ROOMS:{default:2},MAXELA:{default:2},BIG_APT:{default:6},FREEDOM:{default:2},ORBELIANI:{default:2},VGL:{default:2}};
+let teamRooms=[],teamCodeSet=new Set();
+let _resCache=null,guestData=[],hkStatusData={};
+let hkActiveDay=0;
+const busy=new Set();
+const storage=getStorage(fb);
+const storageApi={ref,uploadBytesResumable,getDownloadURL,getMetadata};
+let damageReports={};
+let draft=null,sheetMode=null,fileTarget=null;
+
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function toast(msg,ms=2500){const el=$('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),ms);}
+
+/* ══ BOARD LOGIC — copied from checkin-admin.html (Step 1b + overdue carry-over). KEEP IN SYNC. ══ */
+/* BOARD-LOGIC-START */
+function tbilisiToday(){return new Date(Date.now()+4*3600*1000).toISOString().slice(0,10);}
+function hkAddDays(n){
+  const d=new Date(tbilisiToday()+'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate()+n);
+  return d.toISOString().slice(0,10);
+}
+function hkTomorrowStr(dateStr){
+  const d=new Date(dateStr+'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate()+1);
+  return d.toISOString().slice(0,10);
+}
+function hkNotCancelled(r){return(r.status||'').toUpperCase()!=='CANCELLED';}
+function _stripRoomNum(s){return(s||'').replace(/\s+0\d+\s+/,' ').replace(/\s+/g,' ').trim();}
+function isSameReservation(r,ref){
+  if(!ref)return false;
+  return r.id===ref||r.reservationNumber===ref;
+}
+function hkGetCheckout(roomCode,dateStr){
+  const co=(_resCache||[]).find(r=>hkNotCancelled(r)&&r.roomCode===roomCode&&r.checkout===dateStr);
+  return co||null;
+}
+function hkGetNextCheckin(roomCode,dateStr){
+  return (_resCache||[]).filter(r=>hkNotCancelled(r)&&r.roomCode===roomCode&&r.checkin>=dateStr).sort((a,b)=>a.checkin.localeCompare(b.checkin))[0]||null;
+}
+function findFormForReservation(r){
+  if(!r)return null;
+  const linked=guestData.filter(g=>!g.companionGuest&&isSameReservation(r,g.matchedReservationId));
+  if(linked.length===1)return linked[0];
+  if(linked.length>1){
+    const rc=r.roomCode||r.room||'';
+    return linked.find(g=>g.aptId===rc)||linked[0];
+  }
+  const ci=normalizeStayDate(r.checkin||r.checkIn);
+  const rc=r.roomCode||r.room||'';
+  const rn=_stripRoomNum(r.guest||'').toLowerCase();
+  const co=normalizeStayDate(r.checkout||r.checkOut);
+  if(rn&&ci){
+    const byName=guestData.find(g=>{
+      if(g.companionGuest||g.matchedReservationId)return false;
+      const gn=_stripRoomNum((g.nameRoman||g.name||'').trim()).toLowerCase();
+      if(gn!==rn||normalizeStayDate(g.arrivalDate)!==ci)return false;
+      if(co&&normalizeStayDate(g.checkoutDate)&&normalizeStayDate(g.checkoutDate)!==co)return false;
+      return true;
+    });
+    if(byName)return byName;
+  }
+  if(rc&&ci){
+    return guestData.find(g=>{
+      if(g.companionGuest||g.matchedReservationId)return false;
+      if(g.aptId!==rc||normalizeStayDate(g.arrivalDate)!==ci)return false;
+      if(co&&normalizeStayDate(g.checkoutDate)&&normalizeStayDate(g.checkoutDate)!==co)return false;
+      return true;
+    })||null;
+  }
+  return null;
+}
+function hkDepartingGuestForm(roomCode,dateStr,coRes){
+  if(coRes){
+    const linked=findFormForReservation(coRes);
+    if(linked)return linked;
+  }
+  const co=normalizeStayDate(dateStr);
+  return guestData.find(g=>!g.companionGuest&&g.aptId===roomCode&&normalizeStayDate(g.checkoutDate)===co)||null;
+}
+function hkGuestFormForRoom(roomCode,dateStr,nextRes){
+  if(nextRes){
+    const linked=findFormForReservation(nextRes);
+    if(linked)return linked;
+  }
+  const ci=normalizeStayDate(dateStr);
+  return guestData.find(g=>!g.companionGuest&&g.aptId===roomCode&&normalizeStayDate(g.arrivalDate)===ci)||null;
+}
+function formatGuestArrival(form,res){
+  const w=form?.expectedCheckInWindow||form?.expectedCheckInTime||'';
+  if(w==='before-15')return'Before 15:00';
+  if(w==='00:00+')return'After midnight';
+  if(w==='next-morning')return'Next morning';
+  if(w==='asap')return'ASAP';
+  if(/^\d{2}:\d{2}$/.test(w))return w;
+  return res?.checkinTime||hkSettings.defaultCheckIn||'15:00';
+}
+function hkParseGuestNum(v){
+  if(v==null||v==='')return 0;
+  if(typeof v==='number')return v>0?v:0;
+  const n=parseInt(String(v),10);
+  return Number.isFinite(n)&&n>0?n:0;
+}
+function hkGuestCountFromRes(res){
+  if(!res)return 0;
+  let n=hkParseGuestNum(res.guests);
+  if(n)return n;
+  n=hkParseGuestNum(res.guestCount);
+  if(n)return n;
+  const adults=hkParseGuestNum(res.adults);
+  const children=hkParseGuestNum(res.children||res.child||res.kids);
+  if(adults||children)return adults+children;
+  return 0;
+}
+function hkGuestCount(res,form,statusOverride){
+  const override=hkParseGuestNum(statusOverride);
+  if(override)return override;
+  const fromRes=hkGuestCountFromRes(res);
+  if(fromRes)return fromRes;
+  return hkParseGuestNum(form?.guests);
+}
+function hkCleanTypeId(roomCode){
+  const c=String(roomCode||'').toLowerCase();
+  for(const tp of HK_CLEAN_TYPES){if(tp.match(c))return tp.id;}
+  return 'default';
+}
+function hkTypeCleanMinutes(typeId){
+  const raw=hkSettings.cleanMinutesByType?.[typeId];
+  if(raw!=null&&raw!=='')return parseInt(raw,10)||HK_CLEAN_TYPE_DEFAULTS[typeId]||75;
+  return HK_CLEAN_TYPE_DEFAULTS[typeId]??75;
+}
+function hkCleanMinutes(roomCode){
+  const custom=hkSettings.cleanMinutesByRoom?.[roomCode];
+  if(custom!=null&&custom!=='')return parseInt(custom,10)||hkTypeCleanMinutes(hkCleanTypeId(roomCode));
+  return hkTypeCleanMinutes(hkCleanTypeId(roomCode));
+}
+function hkGetPriority(roomCode,dateStr){
+  const nextRes=hkGetNextCheckin(roomCode,dateStr);
+  if(!nextRes)return 'green';
+  if(nextRes.checkin===dateStr)return 'red';
+  if(nextRes.checkin===hkTomorrowStr(dateStr))return 'yellow';
+  return 'green';
+}
+function hkTimeToMinutes(tm){
+  if(!tm)return null;
+  if(/^\d{2}:\d{2}$/.test(tm)){const [h,m]=tm.split(':').map(Number);return h*60+m;}
+  if(tm==='before-15')return 15*60;
+  if(tm==='asap')return hkTimeToMinutes(hkSettings.defaultCheckIn||'15:00')||15*60;
+  if(tm==='00:00+')return 18*60;
+  if(tm==='next-morning')return 11*60;
+  if(tm==='Before 15:00')return 15*60;
+  if(tm==='After midnight')return 18*60;
+  if(tm==='Next morning')return 11*60;
+  if(tm==='ASAP')return hkTimeToMinutes(hkSettings.defaultCheckIn||'15:00')||15*60;
+  const m=tm.match(/^(\d{1,2}):(\d{2})/);
+  if(m)return parseInt(m[1],10)*60+parseInt(m[2],10);
+  return null;
+}
+function hkGuestArrivalMinutes(form,nextRes){
+  if(!nextRes)return 24*60;
+  const raw=form?.expectedCheckInWindow||form?.expectedCheckInTime||'';
+  const display=formatGuestArrival(form,nextRes);
+  return hkTimeToMinutes(raw)||hkTimeToMinutes(display)||hkTimeToMinutes(hkSettings.defaultCheckIn||'15:00')||15*60;
+}
+/** Lower score = clean first (urgency + guest arrival + clean duration). */
+function hkSortScore(room,dateStr){
+  const key=room.code+'_'+dateStr;
+  if(hkStatusData[key]?.done)return 1e9;
+  const priority=hkGetPriority(room.code,dateStr);
+  const pBase={red:0,yellow:1000,green:2000}[priority];
+  const nextRes=hkGetNextCheckin(room.code,dateStr);
+  const form=hkGuestFormForRoom(room.code,dateStr,nextRes);
+  const coM=hkTimeToMinutes(hkSettings.defaultCheckOut||'12:00')||12*60;
+  const cleanM=hkCleanMinutes(room.code);
+  const guestM=hkGuestArrivalMinutes(form,nextRes);
+  const slack=guestM-(coM+cleanM);
+  return pBase+slack+(room.overdueFrom?-5000:0);   // overdue rooms first
+}
+function hkRoomsForRole(){return teamRooms;}
+const HK_OVERDUE_DAYS=3;   // a room that left up to this many days ago and was never marked Done stays on today's board
+/** Checkout date C of the last stay that left this room (before today, within HK_OVERDUE_DAYS) and still needs cleaning, else null.
+ *  ignoreDone=true only finds the departure (used to label a card that has just been marked Done). */
+function hkOverdueFrom(roomCode,dateStr,ignoreDone){
+  if(dateStr!==tbilisiToday())return null;
+  const lo=hkAddDays(-HK_OVERDUE_DAYS);
+  const res=(_resCache||[]).filter(r=>hkNotCancelled(r)&&r.roomCode===roomCode);
+  let C=null;
+  for(const r of res){if(r.checkout&&r.checkout>=lo&&r.checkout<dateStr&&(!C||r.checkout>C))C=r.checkout;}
+  if(!C)return null;
+  if(res.some(r=>r.checkin&&r.checkin>=C&&r.checkin<dateStr))return null;      // a guest already arrived since: in-house, not pending
+  const dismissed=hkStatusData[roomCode+'_'+C];
+  if(dismissed&&(dismissed.removed===true||dismissed.movedTo))return null;     // removed / moved on purpose
+  if(!ignoreDone){for(const v of Object.values(hkStatusData)){if(v&&v.roomCode===roomCode&&v.done===true&&v.date>=C&&v.date<=dateStr)return null;}}
+  return C;
+}
+function hkTaskRooms(dateStr){
+  const movedAway=code=>{const d=hkStatusData[code+'_'+dateStr];return !!d?.movedTo||d?.removed===true;};
+  const coRooms=hkRoomsForRole().filter(r=>hkGetCheckout(r.code,dateStr)&&!movedAway(r.code));
+  const seen=new Set(coRooms.map(r=>r.code));
+  const overdue=[];
+  if(dateStr===tbilisiToday()){
+    for(const r of hkRoomsForRole()){
+      if(seen.has(r.code)||movedAway(r.code))continue;
+      const C=hkOverdueFrom(r.code,dateStr);
+      if(C){overdue.push({...r,overdueFrom:C});seen.add(r.code);}
+    }
+  }
+  const manual=[];
+  for(const key of Object.keys(hkStatusData)){
+    if(!key.endsWith('_'+dateStr))continue;
+    const roomCode=key.slice(0,-(dateStr.length+1));
+    if(seen.has(roomCode)||movedAway(roomCode))continue;
+    const room=hkRoomsForRole().find(r=>r.code===roomCode);
+    if(room){const od=hkGetCheckout(roomCode,dateStr)?null:hkOverdueFrom(roomCode,dateStr,true);manual.push(od?{...room,overdueFrom:od}:room);seen.add(roomCode);}
+  }
+  return [...coRooms,...overdue,...manual];
+}
+function hkSiteId(roomCode){
+  const r=roomsData[roomCode];
+  if(r?.site)return r.site;
+  if(/^orb-|^tab-/i.test(roomCode))return 'centre';
+  if(/^vgl-/i.test(roomCode))return 'vgl';
+  if(roomCode==='abashidze')return 'abashidze';
+  return 'shartava';
+}
+/* BOARD-LOGIC-END */
+
+/* ══ DONE — follows the "Done contract" in docs/HK_UPGRADE_PLAN.md (same docs/fields/order as admin toggleHkDone) ══ */
+/* DONE-START */
+async function toggleHkDone(roomCode,dateStr){
+  const key=roomCode+'_'+dateStr;
+  if(busy.has(key))return;
+  busy.add(key);
+  const cur=!!(hkStatusData[key]?.done);
+  const next=!cur;
+  const nextRes=hkGetNextCheckin(roomCode,dateStr);
+  try{
+    const who=next?{doneBy:link.name,doneByLinkId:token,doneAt:serverTimestamp()}:{doneBy:null,doneByLinkId:null,doneAt:null};
+    await setDoc(doc(db,'hk_status',key),{done:next,roomCode,date:dateStr,updatedAt:serverTimestamp(),...who},{merge:true});
+    hkStatusData[key]={...(hkStatusData[key]||{}),done:next,roomCode,date:dateStr};
+    if(nextRes?.checkin&&nextRes.checkin>=dateStr){
+      const arrivalKey=roomCode+'_'+nextRes.checkin;
+      await setDoc(doc(db,'hk_status',arrivalKey),{done:next,roomCode,date:nextRes.checkin,updatedAt:serverTimestamp()},{merge:true});
+      hkStatusData[arrivalKey]={...(hkStatusData[arrivalKey]||{}),done:next,roomCode,date:nextRes.checkin};
+    }
+    if(next){
+      const unlockIds=new Set();
+      if(nextRes&&nextRes.checkin===dateStr){
+        const form=findFormForReservation(nextRes)||hkGuestFormForRoom(roomCode,dateStr,nextRes);
+        if(form?.id)unlockIds.add(form.id);
+        const snap=await getDocs(query(collection(db,'checkin_guests'),where('aptId','==',roomCode),where('arrivalDate','==',dateStr)));
+        snap.docs.forEach(d=>unlockIds.add(d.id));
+      }
+      for(const guestId of unlockIds){
+        await updateDoc(doc(db,'checkin_guests',guestId),{manualUnlock:true,unlockedAt:serverTimestamp()});
+      }
+    }
+    toast(next?t('toastDone'):t('toastUndo'));
+  }catch(e){console.warn('[done]',e);toast(t('toastErr'),4000);}
+  busy.delete(key);
+  render();
+}
+/* DONE-END */
+
+/* ══ RENDER ══ */
+function dayLabel(offset,dateStr){
+  if(offset===-1)return t('yesterday');
+  if(offset===0)return t('today');
+  if(offset===1)return t('tomorrow');
+  return new Date(dateStr+'T12:00:00Z').toLocaleDateString(lang==='ka'?'ka-GE':'en-GB',{weekday:'short',day:'numeric',timeZone:'UTC'});
+}
+function arrivalLabel(text){
+  return {'Before 15:00':t('beforeArr'),'After midnight':t('afterMidnight'),'Next morning':t('nextMorning'),'ASAP':t('asap')}[text]||text;
+}
+function countHtml(res,count,kind){
+  if(count>0)return `<span class="cnt-line">${HK_GUEST_ICON}<span>${esc(t(kind,{n:count}))}</span></span>`;
+  if(res)return esc(t(kind+'Short'));
+  return '—';
+}
+function beddingHtml(roomCode,guests){
+  const a=hkBeddingAlert(roomCode,guests,aptData[roomCode]?.normalCapacity,hkCategoryCapacity);
+  if(!a)return '';
+  return `<div class="bed">${HK_SHEET_ICON}<span>${esc(a.kind==='sofa'?t('sofa'):t('sheets'))}</span></div>`;
+}
+function buildCard(room,dateStr,tomorrowStr){
+  const key=room.code+'_'+dateStr;
+  const st=hkStatusData[key]||{};
+  const done=!!st.done;
+  const coDate=room.overdueFrom||dateStr;   // overdue rooms show the stay that already left
+  const co=hkGetCheckout(room.code,coDate);
+  const nextRes=hkGetNextCheckin(room.code,dateStr);
+  const form=hkGuestFormForRoom(room.code,dateStr,nextRes);
+  const departing=hkDepartingGuestForm(room.code,coDate,co);
+  const guestCheckedOut=departing?.guestConfirmedCheckout===true;
+  const outGuests=hkGuestCount(co,departing,st.guestCount);
+  const inGuests=hkGuestCount(nextRes,form,st.arrivingGuestCount);
+  const coTime=st.checkOutTime||co?.checkoutTime||hkSettings.defaultCheckOut||'12:00';
+  const ciTime=arrivalLabel(st.checkInTime||formatGuestArrival(form,nextRes));
+  const nextSameDay=nextRes&&nextRes.checkin===dateStr;
+  const nextTomorrow=nextRes&&nextRes.checkin===tomorrowStr;
+  const pCls={red:'p-red',yellow:'p-yellow',green:'p-green'}[hkGetPriority(room.code,dateStr)];
+  const inCls=nextSameDay?' urgent':nextTomorrow?' soon':'';
+  const when=nextRes?(nextSameDay?t('today'):nextTomorrow?t('tomorrow'):nextRes.checkin):'';
+  const timeCls=/^\d{2}:\d{2}$/.test(ciTime)?'tm':'tm small';
+  return `<div class="card ${pCls}${done?' done':''}">
+    <div class="card__top"><div><div class="room">${esc(room.code)}</div><div class="name">${esc(room.name)}</div></div>
+      <span class="pill ${done?'pill-ok':'pill-wait'}">${esc(done?t('donePill'):t('pending'))}</span></div>
+    <div class="times">
+      <div class="tbox"><b>${esc(t('checkout'))}</b><span class="tm">${esc(coTime)}</span><div class="cnt">${countHtml(co,outGuests,'leaving')}</div></div>
+      <div class="tbox${inCls}"><b>${esc(t('checkin'))}</b>${nextRes?`<span class="when">${esc(when)}</span><span class="${timeCls}">${esc(ciTime)}</span><div class="cnt">${countHtml(nextRes,inGuests,'arriving')}</div>`:`<div class="cnt">${esc(t('noBooking'))}</div>`}</div>
+    </div>
+    ${room.overdueFrom?`<div class="overdue">${esc(t('overdue',{d:room.overdueFrom.slice(8,10)+'.'+room.overdueFrom.slice(5,7)}))}</div>`:''}
+    ${guestCheckedOut?`<div class="out">${esc(t('guestOut'))}</div>`:''}
+    ${nextRes?beddingHtml(room.code,inGuests):''}
+    <button type="button" class="donebtn${done?' undo':''}" data-act="done" data-room="${esc(room.code)}" data-date="${dateStr}"${busy.has(key)?' disabled':''}>${esc(done?t('undo'):t('done'))}</button>
+    ${HK_DAMAGE_ENABLED&&link.canReportDamage?`<button type="button" class="dmgbtn" data-act="damage" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('reportDamage'))}</button>`:''}
+    ${HK_DAMAGE_ENABLED&&reportsFor(room.code,dateStr).length?`<button type="button" class="dmgbadge" data-act="viewdmg" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('badge'))}</button>`:''}
+    ${HK_DAMAGE_ENABLED&&done?`<button type="button" class="readylink" data-act="ready" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('readyPhotos'))}</button>`:''}
+  </div>`;
+}
+let _renderQueued=false;
+function render(){
+  if(_renderQueued)return;
+  _renderQueued=true;
+  requestAnimationFrame(()=>{_renderQueued=false;renderNow();});
+}
+function renderNow(){
+  if(!link||_resCache===null)return;
+  $('hdr-title').textContent=t('title');
+  const labels=(link.teamIds||[]).map(id=>(hkSettings.teams||[]).find(x=>x.id===id)?.label).filter(Boolean);
+  $('hdr-sub').textContent=link.name+(labels.length?' · '+labels.join(' + '):'');
+  $('lang-btn').textContent=t('langBtn');
+  document.documentElement.lang=lang;
+  let tabs='';
+  for(let i=HK_DAY_START;i<=HK_DAY_END;i++){
+    const ds=hkAddDays(i);
+    const n=hkTaskRooms(ds).length;
+    tabs+=`<button type="button" class="tab${i===hkActiveDay?' active':''}" data-act="day" data-i="${i}">${esc(dayLabel(i,ds))}${n?` (${n})`:''}</button>`;
+  }
+  $('tabs').innerHTML=tabs;
+  const dateStr=hkAddDays(hkActiveDay);
+  const rooms=hkTaskRooms(dateStr);
+  if(!rooms.length){$('list').innerHTML=`<div class="empty">${esc(t('emptyDay'))}</div>`;return;}
+  const tomorrowStr=hkTomorrowStr(dateStr);
+  rooms.sort((a,b)=>hkSortScore(a,dateStr)-hkSortScore(b,dateStr));
+  const sites=HK_SITES_ALL.filter(s=>rooms.some(r=>hkSiteId(r.code)===s.id));
+  let html='';
+  sites.forEach(site=>{
+    if(sites.length>1)html+=`<div class="site">${esc(site.title)}</div>`;
+    rooms.filter(r=>hkSiteId(r.code)===site.id).forEach(r=>{html+=buildCard(r,dateStr,tomorrowStr);});
+  });
+  $('list').innerHTML=html;
+}
+
+
+/* ══ DAMAGE REPORTS + READY PHOTOS ══
+   Photos are uploaded as the ORIGINAL file (no canvas / resize) so their time data is kept.
+   Cleaners can only CREATE reports and ADD photos; text is never edited and nothing is deleted. */
+const CAT_KEY={cigarette:'catCigarette',broken:'catBroken',stain:'catStain',missing:'catMissing',notworking:'catNotworking',dirty:'catDirty',other:'catOther'};
+function reportsFor(roomCode,dateStr){
+  return Object.values(damageReports).filter(r=>r.roomCode===roomCode&&r.reportDate===dateStr)
+    .sort((a,b)=>String(a.clientCreatedAt).localeCompare(String(b.clientCreatedAt)));
+}
+function draftHasContent(){return !!draft&&(draft.sending||draft.photos.length>0||draft.cats.size>0||draft.text.trim().length>0);}
+window.addEventListener('beforeunload',e=>{if(draftHasContent()){e.preventDefault();e.returnValue='';}});
+function showBusy(msg){const b=$('busy');b.textContent=msg;b.hidden=false;}
+function hideBusy(){$('busy').hidden=true;}
+function closeSheet(force){
+  if(!force&&sheetMode==='report'&&draftHasContent()&&!confirm(t('closeWarn')))return;
+  if(draft)draft.photos.forEach(p=>{try{URL.revokeObjectURL(p.thumb);}catch(e){}});
+  draft=null;sheetMode=null;$('sheet').hidden=true;$('sheet').innerHTML='';
+}
+function sheetHead(title){
+  return `<div class="sheet__hd"><button type="button" class="sheet__back" data-act="sheet-close">← ${esc(t('back'))}</button><div class="sheet__title">${esc(title)}</div></div>`;
+}
+function thumbHtml(p,i){
+  const st=p.state==='uploading'?`<div class="thumb__p">${Math.round((p.progress||0)*100)}%</div>`
+    :p.state==='error'?`<div class="thumb__p err">!</div>`:p.state==='done'?`<div class="thumb__p ok">✓</div>`:'';
+  const x=(!draft.sending&&p.state!=='done')?`<button type="button" class="thumb__x" data-act="rmphoto" data-i="${i}" aria-label="${esc(t('removePhoto'))}">×</button>`:'';
+  return `<div class="thumb" data-pid="${p.id}"><img src="${p.thumb}" alt="">${x}${st}</div>`;
+}
+function renderReportSheet(){
+  const d=draft;if(!d)return;
+  const sh=$('sheet');
+  sh.innerHTML=sheetHead(t('roomDay',{room:d.roomCode,day:d.dayText}))+`
+    ${d.error?`<div class="errmsg">${esc(d.error)}</div>`:''}
+    <div class="photobtns">
+      <button type="button" class="bigbtn" data-act="pickcam"${d.sending?' disabled':''}>📷 ${esc(t('takePhoto'))}</button>
+      <button type="button" class="bigbtn alt" data-act="pickgal"${d.sending?' disabled':''}>🖼 ${esc(t('fromGallery'))}</button>
+    </div>
+    <div class="thumbs" id="thumbs">${d.photos.map(thumbHtml).join('')}</div>
+    <div class="chips">${DAMAGE_CATEGORIES.map(c=>`<button type="button" class="chip${d.cats.has(c)?' on':''}" data-act="chip" data-c="${c}">${esc(t(CAT_KEY[c]))}</button>`).join('')}</div>
+    <label class="lbl" for="dmg-text">${esc(t('whatDamaged'))}</label>
+    <textarea id="dmg-text"${d.sending?' disabled':''}></textarea>
+    <div class="urgentrow${d.urgent?' on':''}" data-act="urgent"><span>${esc(t('urgent'))}</span><span class="sw"></span></div>
+    <button type="button" class="sendbtn" id="sendbtn" data-act="send">${esc(d.sending?t('sending'):(d.retry?t('resend'):t('send')))}</button>
+    <div class="hint" id="sendhint"></div>`;
+  $('dmg-text').value=d.text;
+  updateSendBtn();
+}
+function updateSendBtn(){
+  const d=draft;if(!d)return;
+  const ok=d.photos.length>0||d.cats.size>0||d.text.trim().length>0;
+  const b=$('sendbtn');if(b)b.disabled=d.sending||!ok;
+  const h=$('sendhint');if(h)h.textContent=ok?'':t('needSomething');
+}
+function updateThumb(p){
+  const el=document.querySelector(`.thumb[data-pid="${p.id}"]`);
+  if(el){const tmp=document.createElement('div');tmp.innerHTML=thumbHtml(p,draft?draft.photos.indexOf(p):0);el.replaceWith(tmp.firstElementChild);}
+}
+function openDamage(roomCode,dateStr){
+  const room=teamRooms.find(r=>r.code===roomCode);if(!room)return;
+  const off=[...Array(HK_DAY_END-HK_DAY_START+1).keys()].map(i=>i+HK_DAY_START).find(i=>hkAddDays(i)===dateStr);
+  draft={roomCode,roomName:room.name,site:hkSiteId(roomCode),date:dateStr,dayText:off!==undefined?dayLabel(off,dateStr):dateStr,
+    photos:[],cats:new Set(),text:'',urgent:false,sending:false,reportId:null,error:'',retry:false};
+  sheetMode='report';$('sheet').hidden=false;$('sheet').scrollTop=0;renderReportSheet();
+}
+let _pid=0;
+async function addPickedFiles(files){
+  if(!draft)return;
+  for(const f of files){
+    const meta=await readPhotoMeta(f);
+    draft.photos.push({id:++_pid,file:f,meta,thumb:URL.createObjectURL(f),state:'pending',progress:0,rec:null});
+  }
+  renderReportSheet();
+}
+async function findDeparting(roomCode,dateStr){
+  let res=pickDepartingReservation(_resCache||[],roomCode,dateStr);
+  if(!res){
+    try{
+      const snap=await getDocs(query(collection(db,'reservations'),where('roomCode','==',roomCode)));
+      res=pickDepartingReservation(snap.docs.map(d=>({id:d.id,...d.data()})),roomCode,dateStr);
+    }catch(e){console.warn('[guest snapshot]',e);}
+  }
+  if(!res)return null;
+  const form=findFormForReservation(res);
+  return {
+    reservationDocId:res.id||null,
+    reservationNumber:res.reservationNumber||null,
+    guestName:_stripRoomNum(res.guest||'')||null,
+    source:res.source||null,
+    checkin:res.checkin||null,
+    checkout:res.checkout||null,
+    guestCount:hkGuestCountFromRes(res)||hkParseGuestNum(form?.guests)||null,
+    guestFormId:form?.id||null,
+  };
+}
+function withTimeout(p,ms){return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);}
+async function sendReport(){
+  const d=draft;
+  if(!d||d.sending)return;
+  if(!(d.photos.length||d.cats.size||d.text.trim()))return;
+  d.sending=true;d.error='';
+  if(!d.reportId)d.reportId=makeReportId(d.date,d.roomCode);
+  renderReportSheet();
+  let failed=0;
+  for(let i=0;i<d.photos.length;i++){
+    const p=d.photos[i];
+    if(p.state==='done')continue;
+    p.state='uploading';p.progress=0;updateThumb(p);
+    try{
+      p.rec=await uploadOriginal(storageApi,storage,p.file,`hk_damage/${d.reportId}/${i+1}.${fileExt(p.file)}`,p.meta,'cleaner',f=>{p.progress=f;updateThumb(p);},{addedByName:link.name});
+      p.state='done';
+    }catch(e){console.warn('[upload]',e);p.state='error';failed++;}
+    updateThumb(p);
+  }
+  if(failed){d.sending=false;d.retry=true;d.error=t('uploadFailed');renderReportSheet();return;}
+  try{
+    const guest=await findDeparting(d.roomCode,d.date);
+    const st=hkStatusData[d.roomCode+'_'+d.date]||{};
+    const report={
+      roomCode:d.roomCode,roomName:d.roomName,site:d.site,reportDate:d.date,
+      createdAt:serverTimestamp(),clientCreatedAt:tbilisiIsoNow(),
+      reportedBy:{name:link.name,linkId:token},
+      categories:[...d.cats],description:d.text.trim(),urgent:d.urgent,
+      photos:d.photos.map(p=>p.rec),photoCount:d.photos.length,
+      guest,
+      roomDoneAt:st.done?(st.doneAt||null):null,doneBeforeReport:!!st.done,
+      status:'open',
+    };
+    await withTimeout(setDoc(doc(db,'hk_damage_reports',d.reportId),report),30000);
+  }catch(e){
+    console.warn('[report]',e);
+    d.sending=false;d.retry=true;d.error=t('sendFailed');renderReportSheet();return;
+  }
+  d.photos.forEach(p=>{try{URL.revokeObjectURL(p.thumb);}catch(e){}});
+  draft=null;sheetMode='sent';
+  $('sheet').innerHTML=`<div class="sent"><h2>${esc(t('sentTitle'))}</h2><p>${esc(t('sentSub'))}</p><button type="button" class="bigbtn" style="width:100%" data-act="sheet-done">${esc(t('ok'))}</button></div>`;
+  render();
+}
+function openReports(roomCode,dateStr){
+  sheetMode='view';fileTarget=null;
+  const list=reportsFor(roomCode,dateStr);
+  $('sheet').hidden=false;$('sheet').scrollTop=0;
+  $('sheet').innerHTML=sheetHead(t('reportsTitle')+' · '+roomCode)+list.map(r=>{
+    const time=String(r.clientCreatedAt||'').slice(11,16);
+    return `<div class="rep">
+      <div class="rep__meta">${esc(r.reportDate)} ${esc(time)}${r.urgent?`<span class="tag">${esc(t('urgent'))}</span>`:''} · ${esc(t('photosN',{n:(r.photos||[]).length}))}</div>
+      ${(r.categories||[]).length?`<div class="rep__cats">${esc(r.categories.map(c=>t(CAT_KEY[c]||'catOther')).join(' · '))}</div>`:''}
+      ${r.description?`<div class="rep__txt">${esc(r.description)}</div>`:''}
+      <div class="thumbs">${(r.photos||[]).map(p=>`<div class="thumb"><a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt=""></a></div>`).join('')}</div>
+      <button type="button" class="bigbtn alt" style="width:100%" data-act="addmore" data-id="${esc(r.id)}">${esc(t('addMorePhotos'))}</button>
+    </div>`;}).join('');
+  $('sheet').dataset.room=roomCode;$('sheet').dataset.date=dateStr;
+}
+async function uploadExtra(files,kind,target){
+  // kind 'add' -> hk_damage/{reportId}/..., kind 'ready' -> hk_ready/{room}_{date}/...
+  const list=[...files];
+  if(!list.length)return;
+  const recs=[];
+  try{
+    for(let i=0;i<list.length;i++){
+      showBusy(t('uploadingN',{i:i+1,n:list.length}));
+      const f=list[i];
+      const meta=await readPhotoMeta(f);
+      const base=kind==='add'?`hk_damage/${target.reportId}`:`hk_ready/${target.room}_${target.date}`;
+      const n=(target.count||0)+i+1;
+      const rand=Math.random().toString(36).slice(2,6);
+      recs.push(await uploadOriginal(storageApi,storage,f,`${base}/${n}-${rand}.${fileExt(f)}`,meta,'cleaner',null,{addedByName:link.name}));
+    }
+    if(kind==='add'){
+      await withTimeout(updateDoc(doc(db,'hk_damage_reports',target.reportId),{photos:arrayUnion(...recs),photoCount:increment(recs.length)}),30000);
+    }else{
+      await withTimeout(updateDoc(doc(db,'hk_status',target.room+'_'+target.date),{readyPhotos:arrayUnion(...recs)}),30000);
+    }
+    hideBusy();toast(t('photosSaved'));
+  }catch(e){console.warn('[extra upload]',e);hideBusy();toast(t('toastErr'),4000);}
+}
+
+/* ══ ACCESS + DATA ══ */
+let unsubs=[],boardStarted=false,boardDay='',linkOk=false,lastTouch=0;
+function stopListeners(){unsubs.forEach(u=>{try{u();}catch(e){}});unsubs=[];boardStarted=false;}
+function clearData(){damageReports={};_resCache=null;guestData=[];hkStatusData={};teamRooms=[];teamCodeSet=new Set();roomsData={};aptData={};link=null;}
+function showScreen(kind){
+  $('hdr').hidden=true;$('tabs').innerHTML='';$('list').innerHTML='';
+  const s=$('screen');s.hidden=false;
+  if(kind==='loading'){s.innerHTML='<div class="spin"></div>';return;}
+  if(kind==='offline'){s.innerHTML=`<div>${esc(t('offline'))}</div><button type="button" data-act="retry">${esc(t('retry'))}</button>`;return;}
+  s.innerHTML=`<div>${esc(t(kind))}</div>`;
+}
+function hideScreen(){$('screen').hidden=true;$('hdr').hidden=false;}
+function clearToken(){try{localStorage.removeItem('hk_staff_token');}catch(e){}}
+function getToken(){
+  let tk='';
+  try{tk=new URLSearchParams(location.search).get('s')||'';}catch(e){}
+  if(!tk){try{tk=localStorage.getItem('hk_staff_token')||'';}catch(e){}}
+  return /^[0-9a-f]{32}$/i.test(tk)?tk.toLowerCase():'';
+}
+async function validate(){
+  if(!token){stopListeners();clearData();linkOk=false;showScreen('noLink');return false;}
+  let snap;
+  try{snap=await getDoc(doc(db,'hk_staff_links',token));}
+  catch(e){console.warn('[link]',e);if(!linkOk)showScreen('offline');return linkOk;}
+  const d=snap.exists()?snap.data():null;
+  if(!d||d.active!==true){
+    clearToken();stopListeners();clearData();closeSheet(true);linkOk=false;showScreen('inactive');
+    return false;
+  }
+  linkOk=true;
+  link={name:d.name||'',teamId:d.teamId||'',teamIds:(Array.isArray(d.teamIds)&&d.teamIds.length?d.teamIds:(d.teamId?[d.teamId]:[])).map(String),canReportDamage:d.canReportDamage!==false};
+  try{localStorage.setItem('hk_staff_token',token);}catch(e){}
+  const last=d.lastSeenAt?.toMillis?d.lastSeenAt.toMillis():0;
+  if(Date.now()-Math.max(last,lastTouch)>10*60*1000){
+    lastTouch=Date.now();
+    updateDoc(doc(db,'hk_staff_links',token),{lastSeenAt:serverTimestamp()}).catch(()=>{});
+  }
+  return true;
+}
+/** Rooms of all the link's teams, de-duplicated (teams that no longer exist are ignored). */
+function roomsForTeams(teamIds){
+  const want=new Set();
+  (teamIds||[]).forEach(id=>{const team=(hkSettings.teams||[]).find(x=>x.id===id);(team?.roomCodes||[]).forEach(x=>want.add(String(x).toLowerCase()));});
+  return roomsSorted(roomsData,true).filter(r=>r.showInHk!==false&&want.has(String(r.roomCode).toLowerCase()))
+    .map(r=>({code:r.roomCode,name:r.displayName||r.roomCode,site:r.site||'shartava'}));
+}
+function defaultTeams(){
+  const bySite={};
+  roomsSorted(roomsData,true).filter(r=>r.showInHk!==false).forEach(r=>{(bySite[hkSiteId(r.roomCode)]=bySite[hkSiteId(r.roomCode)]||[]).push(r.roomCode);});
+  const labels={shartava:'Shartava Team',centre:'Centre Team',vgl:'VGL Team',abashidze:'Abashidze Team'};
+  return Object.keys(labels).filter(id=>bySite[id]?.length).map(id=>({id,label:labels[id],roomCodes:bySite[id]}));
+}
+async function startBoard(){
+  if(boardStarted||!link)return;
+  boardStarted=true;
+  try{
+    const[cfg,roomsSnap]=await Promise.all([getDoc(doc(db,'checkin_admin','config')),getDocs(collection(db,'checkin_rooms'))]);
+    const c=cfg.exists()?cfg.data():{};
+    if(c.hkSettings)hkSettings={...hkSettings,...c.hkSettings,
+      cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS,...(c.hkSettings.cleanMinutesByType||{})},
+      cleanMinutesByRoom:{...(c.hkSettings.cleanMinutesByRoom||{})},
+      teams:Array.isArray(c.hkSettings.teams)?c.hkSettings.teams:[]};
+    if(c.categoryCapacity)hkCategoryCapacity={...hkCategoryCapacity,...c.categoryCapacity};
+    roomsData={};
+    roomsSnap.docs.forEach(d=>{const x=d.data();roomsData[d.id]={roomCode:d.id,site:x.site,displayName:x.displayName,showInHk:x.showInHk,active:x.active,sortOrder:x.sortOrder};});
+    const teams=hkSettings.teams.length?hkSettings.teams:defaultTeams();
+    hkSettings.teams=teams;
+    teamRooms=roomsForTeams(link.teamIds);
+    teamCodeSet=new Set(teamRooms.map(r=>r.code));
+    if(!teamRooms.length){showScreen('noRooms');boardStarted=false;return;}
+    await Promise.all(teamRooms.map(async r=>{
+      try{const s=await getDoc(doc(db,'checkin_apartments',r.code));if(s.exists()){const cap=s.data().normalCapacity;if(cap!=null)aptData[r.code]={normalCapacity:cap};}}catch(e){}
+    }));
+    subscribeData();
+  }catch(e){console.warn('[board]',e);boardStarted=false;showScreen('offline');}
+}
+function subscribeData(){
+  boardDay=tbilisiToday();
+  const y=hkAddDays(-1),lo=hkAddDays(-HK_OVERDUE_DAYS),plus30=hkAddDays(30),plus7=hkAddDays(7);   // lo: also load recent departures so un-cleaned rooms stay on today's board
+  let formsA=[],formsB=[];
+  const pickForm=(d)=>{const x=d.data();return{id:d.id,aptId:x.aptId,arrivalDate:x.arrivalDate,checkoutDate:x.checkoutDate,
+    expectedCheckInWindow:x.expectedCheckInWindow,expectedCheckInTime:x.expectedCheckInTime,guests:x.guests,
+    guestConfirmedCheckout:x.guestConfirmedCheckout,name:x.name,nameRoman:x.nameRoman,matchedReservationId:x.matchedReservationId,
+    companionGuest:x.companionGuest};};
+  const rebuildForms=()=>{
+    const resKeys=new Set();
+    (_resCache||[]).forEach(r=>{resKeys.add(r.id);if(r.reservationNumber)resKeys.add(r.reservationNumber);});
+    const byId=new Map();
+    [...formsA,...formsB].forEach(f=>byId.set(f.id,f));
+    guestData=[...byId.values()].filter(f=>teamCodeSet.has(f.aptId)||(f.matchedReservationId&&resKeys.has(f.matchedReservationId)));
+    render();
+  };
+  const onErr=n=>err=>console.warn('['+n+']',err);
+  unsubs.push(onSnapshot(query(collection(db,'reservations'),where('checkout','>=',lo)),snap=>{
+    hideScreen();
+    _resCache=snap.docs.map(d=>{const x=d.data();return{id:d.id,roomCode:x.roomCode,room:x.room,checkin:x.checkin,checkout:x.checkout,status:x.status,
+      checkoutTime:x.checkoutTime,checkinTime:x.checkinTime,guest:x.guest,guests:x.guests,guestCount:x.guestCount,adults:x.adults,
+      children:x.children,child:x.child,kids:x.kids,reservationNumber:x.reservationNumber,source:x.source};})
+      .filter(r=>teamCodeSet.has(r.roomCode));
+    rebuildForms();
+  },onErr('reservations')));
+  unsubs.push(onSnapshot(query(collection(db,'checkin_guests'),where('arrivalDate','>=',lo),where('arrivalDate','<=',plus30)),snap=>{
+    formsA=snap.docs.map(pickForm);rebuildForms();
+  },onErr('guestsA')));
+  unsubs.push(onSnapshot(query(collection(db,'checkin_guests'),where('checkoutDate','>=',lo),where('checkoutDate','<=',plus7)),snap=>{
+    formsB=snap.docs.map(pickForm);rebuildForms();
+  },onErr('guestsB')));
+  if(HK_DAMAGE_ENABLED)unsubs.push(onSnapshot(query(collection(db,'hk_damage_reports'),where('reportDate','>=',y)),snap=>{
+    const m={};
+    snap.docs.forEach(d=>{const x=d.data();if(!teamCodeSet.has(x.roomCode))return;
+      m[d.id]={id:d.id,roomCode:x.roomCode,reportDate:x.reportDate,clientCreatedAt:x.clientCreatedAt,categories:x.categories||[],
+        description:x.description||'',urgent:!!x.urgent,photos:(x.photos||[]).map(p=>({url:p.url,name:p.name}))};});
+    damageReports=m;render();
+    if(sheetMode==='view'){const sh=$('sheet');openReports(sh.dataset.room,sh.dataset.date);}
+  },onErr('damage')));
+  unsubs.push(onSnapshot(query(collection(db,'hk_status'),where('date','>=',lo)),snap=>{
+    const m={};
+    snap.docs.forEach(d=>{const x=d.data();if(teamCodeSet.has(x.roomCode))m[d.id]=x;});
+    hkStatusData=m;render();
+  },onErr('hk_status')));
+}
+/** Re-read the team settings; true when this link's room set is different from the running board. */
+async function teamsChanged(){
+  try{
+    const cfg=await getDoc(doc(db,'checkin_admin','config'));
+    const h=cfg.exists()?cfg.data().hkSettings:null;
+    if(h&&Array.isArray(h.teams)&&h.teams.length)hkSettings={...hkSettings,teams:h.teams};
+    const next=roomsForTeams(link.teamIds).map(r=>r.code).sort().join(',');
+    return next!==[...teamCodeSet].sort().join(',');
+  }catch(e){return false;}
+}
+async function refresh(){
+  const ok=await validate();
+  if(!ok)return;
+  if(boardStarted&&boardDay&&boardDay!==tbilisiToday()){stopListeners();}  // new day: re-subscribe with fresh date window
+  if(boardStarted&&await teamsChanged())stopListeners();                    // team/link change: rebuild the board
+  if(!boardStarted){showScreen('loading');await startBoard();}
+  else render();
+}
+
+/* ══ EVENTS ══ */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const act=b.dataset.act;
+  if(act==='done')toggleHkDone(b.dataset.room,b.dataset.date);
+  else if(act==='day'){hkActiveDay=parseInt(b.dataset.i,10);renderNow();
+    const a=$('tabs').querySelector('.tab.active');if(a)a.scrollIntoView({inline:'center',block:'nearest'});}
+  else if(act==='retry'){showScreen('loading');refresh();}
+  else if(act==='damage')openDamage(b.dataset.room,b.dataset.date);
+  else if(act==='viewdmg')openReports(b.dataset.room,b.dataset.date);
+  else if(act==='sheet-close')closeSheet(false);
+  else if(act==='sheet-done')closeSheet(true);
+  else if(act==='pickcam'){fileTarget={kind:'draft'};$('file-cam').click();}
+  else if(act==='pickgal'){fileTarget={kind:'draft'};$('file-gal').click();}
+  else if(act==='rmphoto'&&draft&&!draft.sending){const p=draft.photos[parseInt(b.dataset.i,10)];if(p&&p.state!=='done'){try{URL.revokeObjectURL(p.thumb);}catch(e){}draft.photos.splice(draft.photos.indexOf(p),1);renderReportSheet();}}
+  else if(act==='chip'&&draft&&!draft.sending){const c=b.dataset.c;draft.cats.has(c)?draft.cats.delete(c):draft.cats.add(c);b.classList.toggle('on');updateSendBtn();}
+  else if(act==='urgent'&&draft&&!draft.sending){draft.urgent=!draft.urgent;b.classList.toggle('on',draft.urgent);}
+  else if(act==='send')sendReport();
+  else if(act==='addmore'){const r=damageReports[b.dataset.id];fileTarget={kind:'add',reportId:b.dataset.id,count:r?r.photos.length:0};$('file-gal').click();}
+  else if(act==='ready'){const c=Object.keys(hkStatusData[b.dataset.room+'_'+b.dataset.date]?.readyPhotos||[]).length;fileTarget={kind:'ready',room:b.dataset.room,date:b.dataset.date,count:c};$('file-gal').click();}
+});
+function onFilesPicked(ev){
+  const files=[...ev.target.files];ev.target.value='';
+  const tg=fileTarget;if(!files.length||!tg)return;
+  if(tg.kind==='draft')addPickedFiles(files);
+  else uploadExtra(files,tg.kind,tg);
+}
+$('file-cam').addEventListener('change',onFilesPicked);
+$('file-gal').addEventListener('change',onFilesPicked);
+document.addEventListener('input',e=>{if(e.target.id==='dmg-text'&&draft){draft.text=e.target.value;updateSendBtn();}});
+$('lang-btn').addEventListener('click',()=>{
+  lang=lang==='ka'?'en':'ka';
+  try{localStorage.setItem('hk_lang',lang);}catch(e){}
+  renderNow();
+});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refresh();});
+
+token=getToken();
+showScreen('loading');
+refresh();
+</script>
+</body>
+</html>

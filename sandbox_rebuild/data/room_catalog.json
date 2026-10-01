@@ -1,0 +1,21 @@
+{
+  "rooms": [
+    {"code": "0-1", "property": "ROOMS"},
+    {"code": "0-2", "property": "ROOMS"},
+    {"code": "0-3", "property": "ROOMS"},
+    {"code": "0-4", "property": "ROOMS"},
+    {"code": "6-1", "property": "MAXELA"},
+    {"code": "6-2", "property": "MAXELA"},
+    {"code": "6-3", "property": "MAXELA"},
+    {"code": "6-4", "property": "MAXELA"},
+    {"code": "7-1", "property": "BIG_APT"},
+    {"code": "7-2", "property": "BIG_APT"},
+    {"code": "7-3", "property": "BIG_APT"},
+    {"code": "7-4", "property": "BIG_APT"},
+    {"code": "tab-1", "property": "FREEDOM"},
+    {"code": "tab-2", "property": "FREEDOM"},
+    {"code": "orb-1", "property": "ORBELIANI"},
+    {"code": "orb-2", "property": "ORBELIANI"}
+  ],
+  "note": "Sandbox catalog only — not wired to live admin yet. Single list for v2 pipeline tests."
+}

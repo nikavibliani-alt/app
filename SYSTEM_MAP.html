@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maxela — System Connection Map</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:#1a1a2e;
+    color:#eaeaf5;
+    padding:20px;
+  }
+  h1{font-size:20px;font-weight:700;letter-spacing:-0.01em;margin-bottom:4px;}
+  h1 span{color:#8b8bd8;}
+  .sub{font-size:13px;color:#9694b8;margin-bottom:14px;max-width:900px;line-height:1.5;}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;}
+  .toolbar button{
+    background:#232342;color:#eaeaf5;border:1px solid #3a3a5e;border-radius:7px;
+    padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;
+    transition:all .15s;
+  }
+  .toolbar button:hover{background:#2d2d52;border-color:#5555a0;}
+  .toolbar button.active{background:#4c4ca0;border-color:#7070d0;color:#fff;}
+  .toolbar .sep{width:1px;height:22px;background:#3a3a5e;margin:0 4px;}
+  .toolbar .hint{font-size:11.5px;color:#7a7aa0;margin-left:4px;}
+  #canvas-wrap{
+    position:relative;
+    width:100%;
+    min-width:1400px;
+    height:900px;
+    background:#1a1a2e;
+    border:1px solid #2e2e52;
+    border-radius:12px;
+    overflow:hidden;
+  }
+  svg{width:100%;height:100%;display:block;cursor:grab;}
+  svg:active{cursor:grabbing;}
+  .layer-label{
+    fill:#4c4c78;
+    font-size:13px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+  }
+  .node-shape{stroke-width:1.6;cursor:pointer;transition:opacity .15s;}
+  .node-label{
+    fill:#f4f4ff;
+    font-size:11px;
+    font-weight:600;
+    text-anchor:middle;
+    pointer-events:none;
+    transition:opacity .15s;
+  }
+  .node-sub{
+    fill:#b8b8d8;
+    font-size:8.6px;
+    text-anchor:middle;
+    pointer-events:none;
+    transition:opacity .15s;
+  }
+  .link{fill:none;transition:opacity .15s, stroke-width .15s;}
+  .link-label{
+    font-size:10px;
+    fill:#c9c9e6;
+    text-anchor:middle;
+    pointer-events:none;
+    transition:opacity .15s;
+  }
+  .link-label-bg{fill:#1a1a2e;opacity:.86;pointer-events:none;}
+  .dimmed{opacity:.09;}
+  .tooltip{
+    position:fixed;
+    max-width:340px;
+    background:#101024;
+    border:1px solid #4c4ca0;
+    border-radius:9px;
+    padding:11px 13px;
+    font-size:12px;
+    line-height:1.55;
+    color:#e6e6f7;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity .12s;
+    z-index:999;
+    box-shadow:0 8px 30px rgba(0,0,0,.5);
+  }
+  .tooltip.show{opacity:1;}
+  .tooltip .tt-title{font-weight:700;font-size:13px;margin-bottom:4px;color:#fff;}
+  .tooltip .tt-type{
+    display:inline-block;font-size:9.5px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.05em;padding:2px 7px;border-radius:20px;margin-bottom:7px;
+  }
+  .tooltip .tt-desc{color:#c7c7e6;margin-bottom:6px;}
+  .tooltip .tt-row{margin-top:5px;}
+  .tooltip .tt-row b{color:#9a9ad8;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;}
+  .legend{
+    display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:11.5px;color:#c7c7e6;
+    padding:12px 14px;background:#15152b;border:1px solid #2e2e52;border-radius:10px;
+  }
+  .legend-group{display:flex;flex-direction:column;gap:6px;}
+  .legend-group .lg-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#7a7aa0;margin-bottom:2px;}
+  .legend-item{display:flex;align-items:center;gap:7px;}
+  .legend-swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0;}
+  .legend-line{width:22px;height:0;border-top:2.5px solid;flex-shrink:0;}
+</style>
+</head>
+<body>
+
+<h1>Maxela <span>System Connection Map</span></h1>
+<div class="sub">
+  Interactive diagram of every app, script, cloud function, and data store described in
+  <b>SYSTEM_CONNECTION_MAP.md</b> — click a node to trace its connections, hover for details.
+  Red = fragile / unknown / duplicated. Grey-dashed = intentionally inactive (not a bug).
+</div>
+
+<div class="toolbar">
+  <button id="btn-fragile">Show fragile connections only</button>
+  <button id="btn-all" class="active">Show all connections</button>
+  <span class="sep"></span>
+  <button id="btn-reset-zoom">Reset zoom</button>
+  <span class="hint">Scroll / drag to pan · click background to clear selection</span>
+</div>
+
+<div id="canvas-wrap">
+  <svg id="svg"></svg>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+/* ============================== DATA ============================== */
+
+const TYPE_COLOR = {
+  html:     '#3b82f6',
+  script:   '#22c55e',
+  cloudfn:  '#e5e7eb',
+  col:      '#f59e0b',
+  rtdb:     '#ef4444',
+  storage:  '#f59e0b',
+  ext:      '#a855f7',
+  warn:     '#ef4444',
+};
+const TYPE_STROKE = {
+  html:'#1d4ed8', script:'#15803d', cloudfn:'#9ca3af', col:'#b45309',
+  rtdb:'#991b1b', storage:'#b45309', ext:'#7e22ce', warn:'#991b1b',
+};
+const TYPE_TEXT = {
+  html:'#fff', script:'#062e12', cloudfn:'#1f2937', col:'#3a1f00',
+  rtdb:'#fff', storage:'#3a1f00', ext:'#fff', warn:'#fff',
+};
+const TYPE_NAMES = {
+  html:'HTML app', script:'Python script / GitHub Action', cloudfn:'Cloud Function',
+  col:'Firestore collection', rtdb:'Realtime Database', storage:'Firebase Storage',
+  ext:'External service', warn:'Fragility marker',
+};
+
+const KIND_COLOR = {
+  read:'#60a5fa', write:'#4ade80', both:'#9ca3af', trigger:'#9ca3af',
+  inactive:'#6b6b8f', fragile:'#ef4444',
+};
+const KIND_DASH = { trigger:'4,3', inactive:'5,4', fragile:'6,3' };
+
+const NODES = [
+  // ── Layer 1 — External services ──
+  {id:'minihotel_api', label:'MiniHotel API', sub:'PMS / booking system', type:'ext', layer:1, col:0,
+   desc:'MiniHotel Cloud PMS — the property’s actual booking system. All reservation data originates here.'},
+  {id:'tuya_cloud', label:'Tuya Cloud API', sub:'smart lock platform', type:'ext', layer:1, col:1,
+   desc:'Smart-lock cloud platform. Generates offline temp door passwords on request via a local proxy.'},
+  {id:'cronjob_org', label:'cron-job.org', sub:'external scheduler', type:'ext', layer:1, col:2,
+   desc:'External scheduler. Calls the GitHub Actions workflow_dispatch API every 10 minutes to trigger the reservation sync.'},
+  {id:'whatsapp_cloud', label:'WhatsApp Cloud API', sub:'Meta Business', type:'ext', layer:1, col:3,
+   desc:'Meta’s WhatsApp Business Cloud API. Sends outbound guest messages and delivers inbound messages to the webhook.'},
+  {id:'cloudinary', label:'Cloudinary', sub:'photo / video CDN', type:'ext', layer:1, col:4,
+   desc:'Image/video hosting. Stores apartment walkthrough photos and videos uploaded from either admin app.'},
+  {id:'sendgrid', label:'SendGrid', sub:'transactional email', type:'ext', layer:1, col:5,
+   desc:'Transactional email API. Used by the pricing event scanner to email alerts about detected local events.'},
+  {id:'resend', label:'Resend', sub:'transactional email', type:'ext', layer:1, col:6,
+   desc:'Transactional email API. Used by elevator-monitor.js to alert the host if the elevator code goes stale.'},
+  {id:'github_actions_api', label:'GitHub Actions API', sub:'workflow_dispatch', type:'ext', layer:1, col:7,
+   desc:'GitHub’s REST API for dispatching workflow_dispatch events. The trigger mechanism for both the 10-min reservation sync and urgent repricing.'},
+
+  // ── Layer 2 — Scripts / Actions / Cloud Functions ──
+  {id:'minihotel_sync', label:'minihotel_reservation_sync.py', sub:'every 10 min via cron-job.org', type:'script', layer:2, col:0,
+   desc:'Core sync job. Pulls MiniHotel reservations, writes reservations, propagates room changes to checkin_guests, detects cancellations, triggers urgent repricing.'},
+  {id:'housekeeper_sync', label:'housekeeper_sync.py', sub:'disabled workflow', type:'script', layer:2, col:1, status:'disabled',
+   desc:'⚠ Second, independent MiniHotel scraper. HTML-scrapes the housekeeping report, name-matches, force-writes roomCode + manualRoom:true. Wired only to a .disabled workflow — currently dormant.'},
+  {id:'minihotel_monthly_report', label:'minihotel_monthly_report.py', sub:'disabled workflow', type:'script', layer:2, col:2, status:'disabled',
+   desc:'Scrapes a MiniHotel Excel export and emails it. Wired only to the same .disabled workflow as housekeeper_sync.py.'},
+  {id:'pricing_engine', label:'pricing_engine.py', sub:'manual / triggered', type:'script', layer:2, col:3,
+   desc:'Main pricing decision engine. Reads occupancy/reservations, writes pricing_state/pricing_log/pricing_changes, applies new nightly rates back to MiniHotel. Triggered manually, via urgent repricing, or via pricing-old.html’s button.'},
+  {id:'pricing_subscripts', label:'Pricing sub-scripts', sub:'claude_pricing / ai_pricing / event_scanner / price_tracker / velocity_engine', type:'script', layer:2, col:4,
+   desc:'claude_pricing.py, ai_pricing.py, event_scanner.py, price_tracker.py, velocity_engine.py — AI proposals, event scanning, outcome tracking feeding the pricing collections.'},
+  {id:'elevator_monitor', label:'elevator-monitor.js', sub:'hourly (GitHub schedule)', type:'script', layer:2, col:5,
+   desc:'Hourly GitHub Action. Reads RTDB elevator code, emails an alert via Resend if it hasn’t updated in 26+ hours. The one flow in the system with a real automated health check.'},
+  {id:'whatsapp_checkin_ready', label:'whatsapp_checkin_ready.py', sub:'daily 11:00 UTC', type:'script', layer:2, col:6,
+   desc:'Daily 11:00 UTC cron. Finds today’s arrivals whose room is marked hk_status.done, sends a ‘room ready’ WhatsApp message.'},
+  {id:'whatsapp_checkin_reminder', label:'whatsapp_checkin_reminder', sub:'OFF — intentional', type:'script', layer:2, col:7, status:'inactive',
+   desc:'whatsapp_automation.py --job checkin_reminder. Wired to a repository_dispatch event nothing in this repo fires — intentionally disabled by design, not broken.'},
+  {id:'whatsapp_checkout', label:'whatsapp_checkout', sub:'OFF — intentional', type:'script', layer:2, col:8, status:'inactive',
+   desc:'whatsapp_automation.py --job checkout. Same repository_dispatch gap — intentionally disabled by design.'},
+  {id:'whatsapp_midstay', label:'whatsapp_midstay', sub:'OFF — intentional', type:'script', layer:2, col:9, status:'inactive',
+   desc:'whatsapp_automation.py --job midstay. Same repository_dispatch gap — intentionally disabled by design.'},
+  {id:'check_guest_script', label:'check_guest.py', sub:'debug / inspection tool', type:'script', layer:2, col:10,
+   desc:'Debug/inspection script. Reads checkin_forms — a collection name no other file in the repo references (everywhere else uses checkin_guests). Possible ghost collection.'},
+  {id:'cf_whatsappWebhook', label:'Cloud Fn: whatsappWebhook', sub:'tuya-functions/index.js', type:'cloudfn', layer:2, col:11,
+   desc:'Firebase Cloud Function. Receives inbound WhatsApp messages from Meta, looks up the guest, calls Claude for an auto-reply, sends it back via the WhatsApp Cloud API.'},
+  {id:'cf_roomReadyNotification', label:'Cloud Fn: roomReadyNotification', sub:'deployed but inert', type:'cloudfn', layer:2, col:12, status:'inert',
+   desc:'⚠ Firestore-triggered on hk_status writes. Meant to send an instant ‘room ready’ WhatsApp message. Code is deployed but hardcoded to return immediately — fully inert. Duplicate of whatsapp_checkin_ready.py’s job if ever re-enabled.'},
+
+  // ── Layer 3 — Firestore collections + RTDB + Storage ──
+  {id:'col_reservations', label:'reservations', sub:'Firestore collection', type:'col', layer:3, col:0,
+   desc:'Core booking data. Written by minihotel_reservation_sync.py (primary) and housekeeper_sync.py (disabled, second writer). Read by every admin/guest/HK app and both WhatsApp scripts.'},
+  {id:'col_checkin_guests', label:'checkin_guests', sub:'Firestore collection', type:'col', layer:3, col:1,
+   desc:'Guest registration/check-in form data. Written by guest pages on submit, by admin on unlock/move/passport actions. Contains manualUnlock and aptId, which drive unlock status.'},
+  {id:'col_checkin_apartments', label:'checkin_apartments', sub:'Firestore collection', type:'col', layer:3, col:2,
+   desc:'Per-room content: door code, WiFi, check-in instructions, photos. Written by admin apps’ apartment editor. Read by guest pages as the door-code fallback.'},
+  {id:'col_checkin_admin_config', label:'checkin_admin/config', sub:'single shared doc', type:'col', layer:3, col:3,
+   desc:'⚠ Single shared doc: Guest Page Settings (visibility toggles, services, laundry, room categories, location). Written by full-document setDoc (no merge) from BOTH admin apps — last-write-wins risk if both are open at once.'},
+  {id:'doc_globals_elevator', label:'globals/elevator_code', sub:'Firestore doc', type:'col', layer:3, col:4,
+   desc:'Firestore mirror of the elevator code. Dual-written alongside RTDB by both admin apps whenever the elevator code is updated.'},
+  {id:'col_hk_status', label:'hk_status', sub:'Firestore collection', type:'col', layer:3, col:5,
+   desc:'Per-room, per-day housekeeping done-flag, keyed "{roomCode}_{date}". Written by all 3 HK apps. Read by both admin apps (unlock rule) and whatsapp_checkin_ready.py. Also the trigger for the inert roomReadyNotification function.'},
+  {id:'col_hk_pins', label:'hk_pins', sub:'Firestore collection', type:'col', layer:3, col:6,
+   desc:'4-digit login PINs for the HK apps (Shartava/Centre/VGL/Admin). Written by both admin apps’ HK Pins tab.'},
+  {id:'col_hk_cleaner', label:'hk_cleaner', sub:'Centre-only', type:'col', layer:3, col:7, status:'ghost',
+   desc:'⚠ Centre-property-only per-room cleaner assignment. HK.html and HK-Shartava.html have no equivalent collection — inconsistent across properties.'},
+  {id:'col_service_requests', label:'service_requests', sub:'Firestore collection', type:'col', layer:3, col:8,
+   desc:'Guest service requests (laundry/cleaning/tours/transfer/other). Written by guest pages on submit. Read one-shot (not live) by both admin apps’ Requests tab.'},
+  {id:'col_search_failures', label:'search_failures', sub:'Firestore collection', type:'col', layer:3, col:9,
+   desc:'Failed guest self-match attempts. Written by guest pages. Live-listened by both admin apps for the unresolved-count badge.'},
+  {id:'col_properties', label:'properties', sub:'SleepyPMS room master', type:'col', layer:3, col:10,
+   desc:'SleepyPMS’s own room/rate master list — a separate "what rooms exist" source from checkin_apartments and the hardcoded APARTMENTS arrays. Also read by HK apps and the reservation importer.'},
+  {id:'col_checkin_forms', label:'checkin_forms', sub:'possible ghost collection', type:'col', layer:3, col:11, status:'ghost',
+   desc:'⚠ Referenced only by check_guest.py — no other file in the repo writes or reads this name. Likely a stale reference to checkin_guests, or a genuine orphaned collection. Status unconfirmed.'},
+  {id:'col_whatsapp_messages', label:'whatsapp_messages', sub:'delivery log', type:'col', layer:3, col:12,
+   desc:'Delivery log written by every WhatsApp-sending script (checkin_ready + the automation jobs) — sent/failed status per message.'},
+  {id:'col_whatsapp_alerts', label:'whatsapp_alerts', sub:'no known reader', type:'col', layer:3, col:13, status:'ghost',
+   desc:'⚠ Written by whatsapp_automation.py on delivery failure. No reader was found anywhere in the repo — alerts may be going nowhere.'},
+  {id:'col_pricing_cluster', label:'pricing_* collections', sub:'state / log / changes / events / config / proposals / snapshots / outcomes / locks', type:'col', layer:3, col:14,
+   desc:'pricing_state, pricing_log, pricing_changes, pricing_events, pricing_config/rules, pricing_proposals, pricing_snapshots, pricing_outcomes, pricing_locks — grouped here for legibility.'},
+  {id:'col_prices', label:'prices', sub:'SleepyPMS legacy rates', type:'col', layer:3, col:15,
+   desc:'SleepyPMS’s own legacy room-rate collection — separate from the pricing_* cluster used by pricing_engine.py.'},
+  {id:'rtdb_elevator', label:'RTDB /elevator_code', sub:'Realtime Database', type:'rtdb', layer:3, col:16,
+   desc:'Realtime Database path holding the live elevator code + QR value. Preferred source for guest pages when fresher than the Firestore mirror. Monitored hourly by elevator-monitor.js.'},
+  {id:'storage_passport', label:'Firebase Storage', sub:'passport photos', type:'storage', layer:3, col:17,
+   desc:'Guest passport/ID photo uploads from checkin-guest-v2.html. Download URL is written back onto the checkin_guests doc as passportUrl.'},
+  {id:'room_list_fragility', label:'⚠ Room / Property Definitions', sub:'4 independent sources', type:'warn', layer:3, col:18, status:'ghost',
+   desc:'Not a real data store — a visual marker for 4 independent, never-reconciled "what rooms exist" sources: the JS APARTMENTS arrays, the Python ROOM_MAP dicts, the properties collection, and checkin_apartments docs.'},
+
+  // ── Layer 4 — HTML apps ──
+  {id:'guest_v2', label:'checkin-guest-v2.html', sub:'production guest page', type:'html', layer:4, col:0,
+   desc:'Production guest check-in page. Registration, passport upload, unlock display, door/elevator code, service requests.'},
+  {id:'guest_sandbox2', label:'checkin-guest-sandbox-2.html', sub:'redesign sandbox', type:'html', layer:4, col:1, status:'sandbox',
+   desc:'Guest-side redesign sandbox (Cursor’s track) — the host’s chosen direction for the rebuild. Not production yet.'},
+  {id:'admin_live', label:'checkin-admin.html', sub:'production admin', type:'html', layer:4, col:2,
+   desc:'Production desktop admin. Full write access to reservations, checkin_guests, checkin_apartments, checkin_admin/config, elevator code, hk_pins, service_requests, search_failures.'},
+  {id:'admin_sandbox', label:'checkin-admin-sandbox.html', sub:'mobile admin sandbox', type:'html', layer:4, col:3, status:'sandbox',
+   desc:'Mobile-first admin rebuild sandbox. Independently re-implements nearly every write path the live admin has.'},
+  {id:'checkin_details', label:'checkin-details.html', sub:'new, lightly scanned', type:'html', layer:4, col:4, status:'ghost',
+   desc:'⚠ New, lightly-scanned details sub-page. Reads reservations (incl. tuyaPassword) and the elevator RTDB path. Uses a 5th, unmatched design system. Relationship to the other guest pages not confirmed.'},
+  {id:'hk_centre', label:'HK-Centre.html', sub:'housekeeping app', type:'html', layer:4, col:5,
+   desc:'Centre-property housekeeping app. Writes hk_status and the Centre-only hk_cleaner collection.'},
+  {id:'sleepy_pms', label:'SleepyPMS.html', sub:'PMS / dashboard', type:'html', layer:4, col:6,
+   desc:'The actual PMS/dashboard app. Owns the properties and prices collections — a separate data-entry path from the MiniHotel sync pipeline.'},
+];
+
+const LINKS = [
+  // Triggers
+  {source:'cronjob_org', target:'github_actions_api', label:'HTTP call every 10 min', kind:'trigger'},
+  {source:'github_actions_api', target:'minihotel_sync', label:'workflow_dispatch', kind:'trigger'},
+  {source:'minihotel_sync', target:'github_actions_api', label:'trigger_urgent_pricing()', kind:'trigger'},
+  {source:'github_actions_api', target:'pricing_engine', label:'workflow_dispatch (urgent / manual)', kind:'trigger'},
+  {source:'whatsapp_cloud', target:'cf_whatsappWebhook', label:'inbound message webhook', kind:'trigger'},
+  {source:'cf_whatsappWebhook', target:'whatsapp_cloud', label:'Claude auto-reply', kind:'write'},
+  {source:'col_hk_status', target:'cf_roomReadyNotification', label:'onDocumentWritten (inert)', kind:'fragile'},
+  {source:'cf_roomReadyNotification', target:'whatsapp_cloud', label:'would send room-ready msg (inert)', kind:'fragile'},
+
+  // MiniHotel sync
+  {source:'minihotel_api', target:'minihotel_sync', label:'reservations, guest details, booking IDs', kind:'read'},
+  {source:'minihotel_sync', target:'col_reservations', label:'roomCode, status, guest, manualRoom-respecting merge', kind:'write'},
+  {source:'minihotel_sync', target:'col_checkin_guests', label:'aptId (propagate_room_change)', kind:'write'},
+  {source:'minihotel_sync', target:'pricing_engine', label:'near-term cancellation → urgent reprice', kind:'trigger'},
+
+  // housekeeper_sync (disabled, fragile)
+  {source:'minihotel_api', target:'housekeeper_sync', label:'housekeeping report (HTML scrape)', kind:'inactive'},
+  {source:'housekeeper_sync', target:'col_reservations', label:'roomCode + manualRoom:true (unconditional)', kind:'fragile'},
+
+  // minihotel_monthly_report (disabled)
+  {source:'minihotel_api', target:'minihotel_monthly_report', label:'Excel export (disabled)', kind:'inactive'},
+
+  // pricing
+  {source:'col_reservations', target:'pricing_engine', label:'occupancy / booking velocity', kind:'read'},
+  {source:'pricing_engine', target:'minihotel_api', label:'apply new nightly rates', kind:'write'},
+  {source:'pricing_engine', target:'col_pricing_cluster', label:'pricing_state, pricing_log, pricing_changes', kind:'write'},
+  {source:'col_pricing_cluster', target:'pricing_engine', label:'pricing_config/rules, approved events', kind:'read'},
+  {source:'pricing_subscripts', target:'col_pricing_cluster', label:'proposals, events, snapshots, outcomes, locks', kind:'write'},
+  {source:'col_reservations', target:'pricing_subscripts', label:'reservations (14d cutoff)', kind:'read'},
+  {source:'pricing_subscripts', target:'sendgrid', label:'event / pricing alert emails', kind:'write'},
+
+  // elevator monitor
+  {source:'rtdb_elevator', target:'elevator_monitor', label:'reads code, checks staleness', kind:'read'},
+  {source:'elevator_monitor', target:'resend', label:'stale / recovery alert email', kind:'write'},
+
+  // whatsapp_checkin_ready
+  {source:'col_reservations', target:'whatsapp_checkin_ready', label:'today’s check-ins', kind:'read'},
+  {source:'col_hk_status', target:'whatsapp_checkin_ready', label:'room ready (done flag)', kind:'read'},
+  {source:'col_checkin_guests', target:'whatsapp_checkin_ready', label:'WA contact', kind:'read'},
+  {source:'whatsapp_checkin_ready', target:'whatsapp_cloud', label:'room ready message', kind:'write'},
+  {source:'whatsapp_checkin_ready', target:'col_whatsapp_messages', label:'delivery log', kind:'write'},
+
+  // whatsapp off jobs (intentionally inactive, NOT fragile)
+  {source:'col_reservations', target:'whatsapp_checkin_reminder', label:'check-in window (off)', kind:'inactive'},
+  {source:'col_checkin_guests', target:'whatsapp_checkin_reminder', label:'already-checked-in guard (off)', kind:'inactive'},
+  {source:'whatsapp_checkin_reminder', target:'whatsapp_cloud', label:'reminder message (off)', kind:'inactive'},
+  {source:'col_reservations', target:'whatsapp_checkout', label:'checkout tomorrow (off)', kind:'inactive'},
+  {source:'col_checkin_guests', target:'whatsapp_checkout', label:'WA contact (off)', kind:'inactive'},
+  {source:'whatsapp_checkout', target:'whatsapp_cloud', label:'checkout reminder (off)', kind:'inactive'},
+  {source:'col_checkin_guests', target:'whatsapp_midstay', label:'arrivalDate==yesterday (off)', kind:'inactive'},
+  {source:'whatsapp_midstay', target:'whatsapp_cloud', label:'midstay message (off)', kind:'inactive'},
+
+  // check_guest.py debug tool (fragile — ghost collection)
+  {source:'col_checkin_forms', target:'check_guest_script', label:'reads checkin_forms (ghost?)', kind:'fragile'},
+  {source:'col_checkin_guests', target:'check_guest_script', label:'reads checkin_guests', kind:'read'},
+  {source:'col_reservations', target:'check_guest_script', label:'reads reservations', kind:'read'},
+
+  // admin_live writes
+  {source:'admin_live', target:'col_checkin_guests', label:'manualUnlock, aptId (move guest)', kind:'write'},
+  {source:'admin_live', target:'col_reservations', label:'roomCode, manualRoom:true (move guest)', kind:'write'},
+  {source:'admin_live', target:'col_checkin_apartments', label:'doorCode, wifi, instructions, photos', kind:'write'},
+  {source:'admin_live', target:'doc_globals_elevator', label:'elevator code (dual-write)', kind:'write'},
+  {source:'admin_live', target:'rtdb_elevator', label:'elevator code (dual-write)', kind:'write'},
+  {source:'admin_live', target:'col_checkin_admin_config', label:'guest page settings (full overwrite)', kind:'fragile'},
+  {source:'admin_live', target:'col_hk_pins', label:'HK PIN codes', kind:'write'},
+  {source:'admin_live', target:'col_service_requests', label:'status / delete', kind:'both'},
+  {source:'admin_live', target:'col_search_failures', label:'resolve', kind:'write'},
+  {source:'col_reservations', target:'admin_live', label:'_loadResCache (1yr window)', kind:'read'},
+  {source:'col_checkin_guests', target:'admin_live', label:'live listener', kind:'read'},
+  {source:'col_hk_status', target:'admin_live', label:'live listener (today)', kind:'read'},
+  {source:'admin_live', target:'cloudinary', label:'apartment photo / video upload', kind:'write'},
+  {source:'cloudinary', target:'admin_live', label:'secure_url', kind:'read'},
+  {source:'tuya_cloud', target:'admin_live', label:'offline temp password (local proxy only)', kind:'fragile'},
+
+  // admin_sandbox — mirrors admin_live (duplication)
+  {source:'admin_sandbox', target:'col_checkin_guests', label:'manualUnlock, aptId', kind:'write'},
+  {source:'admin_sandbox', target:'col_reservations', label:'roomCode, manualRoom:true', kind:'write'},
+  {source:'admin_sandbox', target:'col_checkin_apartments', label:'doorCode, wifi, instructions, photos', kind:'write'},
+  {source:'admin_sandbox', target:'doc_globals_elevator', label:'elevator code (dual-write)', kind:'write'},
+  {source:'admin_sandbox', target:'rtdb_elevator', label:'elevator code (dual-write)', kind:'write'},
+  {source:'admin_sandbox', target:'col_checkin_admin_config', label:'guest page settings (full overwrite)', kind:'fragile'},
+  {source:'admin_sandbox', target:'col_hk_pins', label:'HK PIN codes', kind:'write'},
+  {source:'admin_sandbox', target:'col_service_requests', label:'status / delete', kind:'both'},
+  {source:'admin_sandbox', target:'col_search_failures', label:'resolve', kind:'write'},
+  {source:'col_reservations', target:'admin_sandbox', label:'_loadResCache', kind:'read'},
+  {source:'col_checkin_guests', target:'admin_sandbox', label:'live listener', kind:'read'},
+  {source:'col_hk_status', target:'admin_sandbox', label:'live listener', kind:'read'},
+  {source:'admin_sandbox', target:'cloudinary', label:'apartment photo / video upload', kind:'write'},
+
+  // guest_v2
+  {source:'guest_v2', target:'col_checkin_guests', label:'registration, passport, contact', kind:'write'},
+  {source:'guest_v2', target:'col_search_failures', label:'failed self-match', kind:'write'},
+  {source:'guest_v2', target:'col_service_requests', label:'service request', kind:'write'},
+  {source:'guest_v2', target:'storage_passport', label:'passport photo upload', kind:'write'},
+  {source:'storage_passport', target:'guest_v2', label:'download URL', kind:'read'},
+  {source:'col_reservations', target:'guest_v2', label:'match by name / #, tuyaPassword', kind:'fragile'},
+  {source:'col_checkin_apartments', target:'guest_v2', label:'doorCode / wifi / instructions fallback', kind:'read'},
+  {source:'doc_globals_elevator', target:'guest_v2', label:'elevator code (Firestore fallback)', kind:'read'},
+  {source:'rtdb_elevator', target:'guest_v2', label:'elevator code (RTDB preferred)', kind:'read'},
+
+  // guest_sandbox2
+  {source:'guest_sandbox2', target:'col_checkin_guests', label:'registration (sandbox)', kind:'inactive'},
+  {source:'col_reservations', target:'guest_sandbox2', label:'match, tuyaPassword', kind:'fragile'},
+  {source:'doc_globals_elevator', target:'guest_sandbox2', label:'elevator code', kind:'inactive'},
+  {source:'rtdb_elevator', target:'guest_sandbox2', label:'elevator code', kind:'inactive'},
+
+  // checkin-details.html
+  {source:'col_reservations', target:'checkin_details', label:'tuyaPassword, active reservation', kind:'fragile'},
+  {source:'rtdb_elevator', target:'checkin_details', label:'elevator code', kind:'read'},
+
+  // tuyaPassword unknown writer — the top fragile edge in the whole map
+  {source:'tuya_cloud', target:'col_reservations', label:'tuyaPassword — WRITER UNKNOWN, not found in repo', kind:'fragile'},
+
+  // HK-Centre
+  {source:'hk_centre', target:'col_hk_status', label:'done flag', kind:'write'},
+  {source:'hk_centre', target:'col_hk_cleaner', label:'cleaner assignment (Centre-only)', kind:'fragile'},
+  {source:'col_checkin_guests', target:'hk_centre', label:'guest info', kind:'read'},
+  {source:'col_reservations', target:'hk_centre', label:'occupancy', kind:'read'},
+  {source:'col_properties', target:'hk_centre', label:'room list', kind:'read'},
+
+  // SleepyPMS
+  {source:'sleepy_pms', target:'col_properties', label:'owns this collection', kind:'write'},
+  {source:'sleepy_pms', target:'col_reservations', label:'manual reservation entry', kind:'write'},
+  {source:'col_reservations', target:'sleepy_pms', label:'read', kind:'read'},
+  {source:'sleepy_pms', target:'col_prices', label:'room rates', kind:'both'},
+
+  // Room / property list fragility hub
+  {source:'admin_live', target:'room_list_fragility', label:'APARTMENTS array', kind:'fragile'},
+  {source:'admin_sandbox', target:'room_list_fragility', label:'APARTMENTS array (dup)', kind:'fragile'},
+  {source:'minihotel_sync', target:'room_list_fragility', label:'ROOM_MAP / ROOM_TO_PROPERTY dict', kind:'fragile'},
+  {source:'housekeeper_sync', target:'room_list_fragility', label:'ROOM_MAP dict (dup)', kind:'fragile'},
+  {source:'col_properties', target:'room_list_fragility', label:'properties collection', kind:'fragile'},
+  {source:'col_checkin_apartments', target:'room_list_fragility', label:'per-room content docs', kind:'fragile'},
+];
+
+/* ============================== LAYOUT ============================== */
+
+const LAYER_Y = {1:110, 2:340, 3:590, 4:850};
+const LAYER_TITLES = {
+  1:'Layer 1 — External Services',
+  2:'Layer 2 — Scripts / GitHub Actions / Cloud Functions',
+  3:'Layer 3 — Firestore Collections + RTDB + Storage',
+  4:'Layer 4 — HTML Apps',
+};
+const COL_W = 195;
+const MARGIN_X = 130;
+
+function nodeDims(n){
+  if(n.type==='col' || n.type==='rtdb' || n.type==='storage') return {w:158, h:60};
+  if(n.type==='warn') return {w:180, h:56};
+  return {w:172, h:52};
+}
+
+let maxCols = 0;
+NODES.forEach(n=>{ maxCols = Math.max(maxCols, n.col+1); });
+const CANVAS_W = MARGIN_X*2 + maxCols*COL_W;
+const CANVAS_H = 980;
+
+NODES.forEach(n=>{
+  n.x = MARGIN_X + n.col*COL_W + COL_W/2;
+  n.y = LAYER_Y[n.layer];
+  Object.assign(n, nodeDims(n));
+});
+
+const nodeById = {};
+NODES.forEach(n=> nodeById[n.id]=n);
+
+/* Derive reads/writes/triggers per node from LINKS, for tooltips */
+NODES.forEach(n=>{ n.reads=[]; n.writes=[]; n.trig=[]; });
+LINKS.forEach(l=>{
+  const s = nodeById[l.source], t = nodeById[l.target];
+  if(!s||!t) return;
+  if(l.kind==='trigger'){
+    t.trig.push(`${s.label} → ${l.label}`);
+  } else if(l.kind==='read'){
+    t.reads.push(`${l.label} ← ${s.label}`);
+  } else if(l.kind==='write'){
+    s.writes.push(`${l.label} → ${t.label}`);
+  } else if(l.kind==='both'){
+    s.writes.push(`${l.label} ↔ ${t.label}`);
+    t.reads.push(`${l.label} ↔ ${s.label}`);
+  } else if(l.kind==='fragile'){
+    s.writes.push(`⚠ ${l.label} → ${t.label}`);
+    t.reads.push(`⚠ ${l.label} ← ${s.label}`);
+  } else if(l.kind==='inactive'){
+    s.writes.push(`(off) ${l.label} → ${t.label}`);
+  }
+});
+
+/* ============================== RENDER ============================== */
+
+const svg = d3.select('#svg');
+const wrap = document.getElementById('canvas-wrap');
+const viewW = wrap.clientWidth || 1400;
+const viewH = wrap.clientHeight || 900;
+svg.attr('viewBox', `0 0 ${viewW} ${viewH}`);
+
+const zoomG = svg.append('g').attr('class','zoom-layer');
+
+// arrow markers per kind color
+const defs = svg.append('defs');
+Object.entries(KIND_COLOR).forEach(([kind,color])=>{
+  defs.append('marker')
+    .attr('id','arrow-'+kind)
+    .attr('viewBox','0 0 10 10')
+    .attr('refX',9).attr('refY',5)
+    .attr('markerWidth',7).attr('markerHeight',7)
+    .attr('orient','auto-start-reverse')
+    .append('path')
+      .attr('d','M0,0 L10,5 L0,10 Z')
+      .attr('fill', color);
+});
+
+const linkLayer = zoomG.append('g').attr('class','links');
+const nodeLayer = zoomG.append('g').attr('class','nodes');
+const labelLayer = zoomG.append('g').attr('class','layer-labels');
+
+// layer band labels
+Object.entries(LAYER_TITLES).forEach(([layer,title])=>{
+  labelLayer.append('text')
+    .attr('class','layer-label')
+    .attr('x', 20)
+    .attr('y', LAYER_Y[layer] - 68)
+    .text(title);
+});
+
+function cylinderPaths(w,h){
+  const rx = w/2, ry = Math.max(8, h*0.18);
+  const top = `M ${-rx},${-h/2+ry}
+    A ${rx} ${ry} 0 1 1 ${rx},${-h/2+ry}
+    A ${rx} ${ry} 0 1 1 ${-rx},${-h/2+ry} Z`;
+  const body = `M ${-rx},${-h/2+ry}
+    A ${rx} ${ry} 0 0 0 ${rx},${-h/2+ry}
+    L ${rx},${h/2-ry}
+    A ${rx} ${ry} 0 0 1 ${-rx},${h/2-ry}
+    Z`;
+  return {top, body, ry};
+}
+
+function pathBetween(s,t){
+  // straight-ish line with slight curve, offset from node edges
+  const dx = t.x - s.x, dy = t.y - s.y;
+  const dist = Math.sqrt(dx*dx+dy*dy) || 1;
+  const ux = dx/dist, uy = dy/dist;
+  const sx = s.x + ux*(s.h/2+4), sy = s.y + uy*(s.h/2+4);
+  const tx = t.x - ux*(t.h/2+9), ty = t.y - uy*(t.h/2+9);
+  const mx = (sx+tx)/2 + (sy-ty)*0.06;
+  const my = (sy+ty)/2 + (tx-sx)*0.06;
+  return {d:`M${sx},${sy} Q${mx},${my} ${tx},${ty}`, mx, my};
+}
+
+// links
+const linkSel = linkLayer.selectAll('path.link')
+  .data(LINKS)
+  .join('path')
+    .attr('class','link')
+    .attr('id',(d,i)=>'link'+i)
+    .attr('stroke', d=>KIND_COLOR[d.kind])
+    .attr('stroke-width', d=> d.kind==='fragile'?2.2:1.4)
+    .attr('stroke-dasharray', d=> KIND_DASH[d.kind]||null)
+    .attr('marker-end', d=>`url(#arrow-${d.kind})`)
+    .attr('opacity', 0.72)
+    .attr('d', d=>{
+      const s=nodeById[d.source], t=nodeById[d.target];
+      const p = pathBetween(s,t);
+      d._mx=p.mx; d._my=p.my;
+      return p.d;
+    });
+
+const linkLabelBg = linkLayer.selectAll('rect.link-label-bg')
+  .data(LINKS).join('rect')
+    .attr('class','link-label-bg')
+    .attr('height', 12);
+
+const linkLabelSel = linkLayer.selectAll('text.link-label')
+  .data(LINKS).join('text')
+    .attr('class','link-label')
+    .attr('opacity', 0.85)
+    .text(d=>d.label);
+
+function positionLinkLabels(){
+  linkLabelSel.each(function(d){
+    const el = d3.select(this);
+    el.attr('x', d._mx).attr('y', d._my+3);
+    const bbox = this.getBBox();
+    linkLabelBg.filter(dd=>dd===d)
+      .attr('x', bbox.x-3).attr('y', bbox.y-1)
+      .attr('width', bbox.width+6);
+  });
+}
+positionLinkLabels();
+
+// nodes
+const nodeG = nodeLayer.selectAll('g.node')
+  .data(NODES)
+  .join('g')
+    .attr('class','node')
+    .attr('transform', d=>`translate(${d.x},${d.y})`);
+
+nodeG.each(function(d){
+  const g = d3.select(this);
+  const dashed = (d.status==='disabled'||d.status==='inactive'||d.status==='ghost'||d.status==='inert');
+  const strokeColor = (d.status==='ghost'||d.status==='inert') ? '#ef4444' : TYPE_STROKE[d.type];
+
+  if(d.type==='col' || d.type==='rtdb' || d.type==='storage'){
+    const {top, body} = cylinderPaths(d.w, d.h);
+    g.append('path').attr('class','node-shape').attr('d',body)
+      .attr('fill', TYPE_COLOR[d.type]).attr('fill-opacity',0.92)
+      .attr('stroke', strokeColor)
+      .attr('stroke-dasharray', dashed?'4,3':null);
+    g.append('path').attr('d',top)
+      .attr('fill', d3.color(TYPE_COLOR[d.type]).brighter(0.6))
+      .attr('stroke', strokeColor)
+      .attr('stroke-dasharray', dashed?'4,3':null)
+      .attr('pointer-events','none');
+  } else {
+    g.append('rect').attr('class','node-shape')
+      .attr('x',-d.w/2).attr('y',-d.h/2)
+      .attr('width',d.w).attr('height',d.h)
+      .attr('rx', d.type==='warn'?10:8)
+      .attr('fill', TYPE_COLOR[d.type]).attr('fill-opacity', d.type==='cloudfn'?0.95:0.93)
+      .attr('stroke', strokeColor)
+      .attr('stroke-dasharray', dashed?'5,3':null);
+  }
+
+  const textColor = TYPE_TEXT[d.type];
+  g.append('text').attr('class','node-label')
+    .attr('y', d.sub ? -2 : 4)
+    .attr('fill', textColor)
+    .text(d.label);
+  if(d.sub){
+    g.append('text').attr('class','node-sub')
+      .attr('y', 11)
+      .attr('fill', textColor)
+      .attr('opacity',0.85)
+      .text(d.sub);
+  }
+});
+
+/* ============================== ZOOM / PAN ============================== */
+
+const zoom = d3.zoom()
+  .scaleExtent([0.15, 2.5])
+  .on('zoom', (event)=>{ zoomG.attr('transform', event.transform); });
+
+svg.call(zoom);
+
+function fitToView(){
+  const scale = Math.min(viewW/(CANVAS_W+60), viewH/(CANVAS_H+60)) * 0.96;
+  const tx = (viewW - CANVAS_W*scale)/2;
+  const ty = (viewH - CANVAS_H*scale)/2 + 10;
+  svg.transition().duration(400).call(
+    zoom.transform,
+    d3.zoomIdentity.translate(tx,ty).scale(scale)
+  );
+}
+fitToView();
+document.getElementById('btn-reset-zoom').addEventListener('click', fitToView);
+
+/* ============================== INTERACTION ============================== */
+
+const tooltip = document.getElementById('tooltip');
+
+function showTooltip(evt, d){
+  const parts = [];
+  parts.push(`<div class="tt-title">${d.label}</div>`);
+  parts.push(`<span class="tt-type" style="background:${TYPE_COLOR[d.type]};color:${TYPE_TEXT[d.type]}">${TYPE_NAMES[d.type]}</span>`);
+  parts.push(`<div class="tt-desc">${d.desc}</div>`);
+  if(d.trig.length) parts.push(`<div class="tt-row"><b>Triggered by</b><br>${d.trig.join('<br>')}</div>`);
+  if(d.reads.length) parts.push(`<div class="tt-row"><b>Reads</b><br>${d.reads.join('<br>')}</div>`);
+  if(d.writes.length) parts.push(`<div class="tt-row"><b>Writes</b><br>${d.writes.join('<br>')}</div>`);
+  tooltip.innerHTML = parts.join('');
+  tooltip.classList.add('show');
+  moveTooltip(evt);
+}
+function moveTooltip(evt){
+  const pad = 16;
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if(x + 350 > window.innerWidth) x = evt.clientX - 350 - pad;
+  if(y + 220 > window.innerHeight) y = evt.clientY - 220;
+  tooltip.style.left = x+'px';
+  tooltip.style.top = y+'px';
+}
+function hideTooltip(){ tooltip.classList.remove('show'); }
+
+nodeG.on('mousemove', function(evt,d){ moveTooltip(evt); })
+  .on('mouseenter', function(evt,d){ showTooltip(evt,d); })
+  .on('mouseleave', hideTooltip)
+  .on('click', function(evt,d){ evt.stopPropagation(); selectNode(d.id); });
+
+let selected = null;
+let fragileOnly = false;
+
+function connectedIds(id){
+  const ids = new Set([id]);
+  const linkIdx = new Set();
+  LINKS.forEach((l,i)=>{
+    if(l.source===id || l.target===id){ ids.add(l.source); ids.add(l.target); linkIdx.add(i); }
+  });
+  return {ids, linkIdx};
+}
+
+function selectNode(id){
+  if(selected===id){ selected=null; renderState(); return; }
+  selected = id;
+  renderState();
+}
+
+function renderState(){
+  let visibleLinkIdx = null;
+  if(selected){
+    visibleLinkIdx = connectedIds(selected).linkIdx;
+  }
+
+  nodeG.classed('dimmed', d=>{
+    if(fragileOnly){
+      const touchesFragile = LINKS.some(l => l.kind==='fragile' && (l.source===d.id || l.target===d.id));
+      if(!touchesFragile) return true;
+    }
+    if(selected){
+      return !(connectedIds(selected).ids.has(d.id));
+    }
+    return false;
+  });
+
+  linkSel
+    .classed('dimmed', (d,i)=>{
+      if(fragileOnly && d.kind!=='fragile') return true;
+      if(visibleLinkIdx && !visibleLinkIdx.has(i)) return true;
+      return false;
+    })
+    .attr('stroke-width', (d,i)=>{
+      if(selected && visibleLinkIdx && visibleLinkIdx.has(i)) return 3;
+      return d.kind==='fragile'?2.2:1.4;
+    });
+
+  linkLabelSel.classed('dimmed', (d,i)=>{
+    if(fragileOnly && d.kind!=='fragile') return true;
+    if(visibleLinkIdx && !visibleLinkIdx.has(i)) return true;
+    return false;
+  });
+  linkLabelBg.classed('dimmed', (d,i)=>{
+    if(fragileOnly && d.kind!=='fragile') return true;
+    if(visibleLinkIdx && !visibleLinkIdx.has(i)) return true;
+    return false;
+  });
+}
+
+svg.on('click', ()=>{ selected=null; renderState(); });
+
+document.getElementById('btn-fragile').addEventListener('click', function(){
+  fragileOnly = true;
+  this.classList.add('active');
+  document.getElementById('btn-all').classList.remove('active');
+  renderState();
+});
+document.getElementById('btn-all').addEventListener('click', function(){
+  fragileOnly = false;
+  this.classList.add('active');
+  document.getElementById('btn-fragile').classList.remove('active');
+  renderState();
+});
+
+/* ============================== LEGEND ============================== */
+
+const legend = document.getElementById('legend');
+const typeLegend = Object.keys(TYPE_NAMES).map(k=>
+  `<div class="legend-item"><div class="legend-swatch" style="background:${TYPE_COLOR[k]}"></div>${TYPE_NAMES[k]}</div>`
+).join('');
+const kindLegend = [
+  ['read','Read'],['write','Write'],['both','Both'],['trigger','Trigger'],
+  ['inactive','Intentionally off'],['fragile','Fragile / unknown / duplicated'],
+].map(([k,label])=>
+  `<div class="legend-item"><div class="legend-line" style="border-top-color:${KIND_COLOR[k]}${KIND_DASH[k]?';border-top-style:dashed':''}"></div>${label}</div>`
+).join('');
+
+legend.innerHTML = `
+  <div class="legend-group"><div class="lg-title">Node types</div>${typeLegend}</div>
+  <div class="legend-group"><div class="lg-title">Connection kinds</div>${kindLegend}</div>
+  <div class="legend-group"><div class="lg-title">Dashed border on a node</div>
+    <div class="legend-item">Disabled / intentionally inactive / unconfirmed (ghost) / inert</div>
+  </div>
+`;
+</script>
+</body>
+</html>

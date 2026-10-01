@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maxela — Beginner map (Aug 2026)</title>
+<style>
+:root{
+  --bg:#f4f6f9;--card:#fff;--ink:#1a1d24;--muted:#5a6472;--line:#dfe3ea;
+  --live:#137333;--live-bg:#e6f4ea;--new:#1a56db;--new-bg:#e8f0fe;
+  --warn:#b06000;--warn-bg:#fef7e0;--bad:#c5221f;--bad-bg:#fce8e6;
+  --shadow:0 10px 32px rgba(26,29,36,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+header{max-width:1100px;margin:0 auto;padding:28px 20px 12px}
+header h1{font-size:28px;font-weight:800;letter-spacing:-.03em}
+header p{margin-top:8px;color:var(--muted);max-width:680px;font-size:15px}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;max-width:1100px;margin:0 auto;padding:8px 20px 0}
+.tab{border:1px solid var(--line);background:#fff;border-radius:999px;padding:10px 16px;font:inherit;font-weight:650;cursor:pointer}
+.tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.wrap{max-width:1100px;margin:0 auto;padding:20px;display:grid;gap:18px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:var(--shadow)}
+.panel h2{font-size:20px;margin-bottom:6px}
+.panel .sub{color:var(--muted);font-size:14px;margin-bottom:18px}
+.hidden{display:none}
+
+/* Big picture */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:800px){.split{grid-template-columns:1fr}}
+.col{border-radius:14px;padding:18px;border:2px solid}
+.col.live{background:var(--live-bg);border-color:#81c995}
+.col.new{background:var(--new-bg);border-color:#aecbfa}
+.col h3{font-size:16px;margin-bottom:10px}
+.col ul{font-size:14px;padding-left:18px;color:#30363f}
+.col li{margin-bottom:6px}
+.arrow-box{text-align:center;padding:12px;font-size:24px;color:var(--muted)}
+.verdict{margin-top:16px;padding:14px 16px;border-radius:12px;font-size:14px;font-weight:600}
+.verdict.ok{background:var(--live-bg);color:var(--live)}
+.verdict.mid{background:var(--warn-bg);color:var(--warn)}
+
+/* Flow */
+.flow{display:flex;flex-direction:column;gap:0;max-width:640px}
+.step{display:grid;grid-template-columns:40px 1fr;gap:12px;padding:12px;border-radius:12px;cursor:pointer;border:1px solid transparent}
+.step:hover{background:#f8f9fb}
+.step.on{background:var(--new-bg);border-color:#c5d8f8}
+.num{width:40px;height:40px;border-radius:12px;background:var(--new-bg);color:var(--new);display:grid;place-items:center;font-weight:800;font-size:15px}
+.step h4{font-size:15px;margin-bottom:2px}
+.step p{font-size:13px;color:var(--muted)}
+.down{width:40px;text-align:center;color:#adb5bd;font-size:16px;padding:2px 0}
+
+/* Scorecard */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.score{padding:14px;border-radius:12px;border:1px solid var(--line);font-size:14px}
+.score b{display:block;font-size:13px;margin-bottom:4px}
+.score.good{background:var(--live-bg);border-color:#b7dfc8}
+.score.warn{background:var(--warn-bg);border-color:#f0d598}
+.score.bad{background:var(--bad-bg);border-color:#f5c2c0}
+.tag{display:inline-block;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;margin-top:6px}
+.tag.good{background:#fff;color:var(--live)}
+.tag.warn{background:#fff;color:var(--warn)}
+.tag.bad{background:#fff;color:var(--bad)}
+
+/* Bots */
+.bot-row{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px}
+.bot-icon{font-size:28px;line-height:1}
+.bot-row h4{font-size:15px;margin-bottom:4px}
+.bot-row p{font-size:13px;color:var(--muted)}
+.status{font-size:11px;font-weight:800;padding:4px 8px;border-radius:6px;white-space:nowrap}
+.status.live{background:var(--live-bg);color:var(--live)}
+.status.plan{background:var(--warn-bg);color:var(--warn)}
+
+footer{max-width:1100px;margin:0 auto;padding:0 20px 32px;color:var(--muted);font-size:13px}
+footer a{color:var(--new)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Maxela system map — beginner view</h1>
+  <p>Updated Aug 2026. Shows what guests use <strong>today</strong> vs what we built in <strong>sandbox</strong>, and whether the architecture is still messy.</p>
+</header>
+
+<div class="tabs" id="tabs">
+  <button class="tab active" data-tab="picture">Big picture</button>
+  <button class="tab" data-tab="guest">Guest journey</button>
+  <button class="tab" data-tab="score">Clean or messy?</button>
+  <button class="tab" data-tab="bots">Auto testers</button>
+  <button class="tab" data-tab="merge">If we merge today</button>
+</div>
+
+<div class="wrap">
+
+<!-- BIG PICTURE -->
+<section class="panel" id="panel-picture">
+  <h2>Two layers — do not confuse them</h2>
+  <p class="sub">Merging code to GitHub does <em>not</em> automatically change what guests see. Only changing the LIVE web pages does.</p>
+  <div class="split">
+    <div class="col live">
+      <h3>🟢 LIVE today (production)</h3>
+      <ul>
+        <li><code>checkin-guest-v2.html</code> — guests open this URL</li>
+        <li><code>checkin-admin.html</code> — you use this admin</li>
+        <li><code>HK.html</code> / HK-Shartava — housekeeping</li>
+        <li>Writes directly to Firestore (old way for moves)</li>
+        <li>Room list hardcoded in several files</li>
+      </ul>
+    </div>
+    <div class="col new">
+      <h3>🔵 NEW (sandbox + backend — ready, not live)</h3>
+      <ul>
+        <li><code>checkin-guest-sandbox-2.html</code> — new guest design</li>
+        <li><code>checkin-admin-sandbox.html</code> — swap, HK, room registry</li>
+        <li><code>pipeline-functions/</code> — move/swap/unlock/register</li>
+        <li><code>shared/room-registry.js</code> — add apartments in one place</li>
+        <li>54 automated unit tests + CI</li>
+      </ul>
+    </div>
+  </div>
+  <div class="arrow-box">↓ same database (Firestore sleepy-5c962) ↓</div>
+  <div class="split">
+    <div class="col" style="background:#fff;border-color:var(--line)">
+      <h3>One database holds everything</h3>
+      <ul>
+        <li><strong>reservations</strong> — bookings from MiniHotel</li>
+        <li><strong>checkin_guests</strong> — guest forms + unlock</li>
+        <li><strong>checkin_apartments</strong> — WiFi, photos, door</li>
+        <li><strong>checkin_rooms</strong> — room catalog (new, growing)</li>
+        <li><strong>hk_status</strong> — room cleaned today?</li>
+      </ul>
+    </div>
+    <div class="col" style="background:#fff;border-color:var(--line)">
+      <h3>Backend pipeline (small robots)</h3>
+      <ul>
+        <li>✅ Elevator sync — already live</li>
+        <li>⏸ Room move / swap — built, not deployed</li>
+        <li>⏸ Guest register — built, not deployed</li>
+        <li>Every action → <strong>system_logs</strong> audit</li>
+      </ul>
+    </div>
+  </div>
+  <div class="verdict mid">Getting cleaner: sandbox + pipeline are structured. Live pages still use the old pattern until you choose cutover.</div>
+</section>
+
+<!-- GUEST JOURNEY -->
+<section class="panel hidden" id="panel-guest">
+  <h2>Guest journey (simple)</h2>
+  <p class="sub">Click a step. This is the happy path — same idea on live and sandbox.</p>
+  <div class="flow" id="guest-flow"></div>
+  <div id="guest-detail" style="margin-top:16px;padding:14px;background:#f8f9fb;border-radius:12px;font-size:14px;color:var(--muted)">Click a step above.</div>
+</section>
+
+<!-- SCORECARD -->
+<section class="panel hidden" id="panel-score">
+  <h2>Clean or messy? (honest scorecard)</h2>
+  <p class="sub">Aug 2026 — after pipeline + room registry work.</p>
+  <div class="grid">
+    <div class="score good"><b>Backend pipeline</b>One writer per fact, tests, audit logs.<span class="tag good">CLEAN</span></div>
+    <div class="score good"><b>Guest sandbox UI</b>Design complete, unlock rules shared with backend.<span class="tag good">CLEAN</span></div>
+    <div class="score good"><b>Admin sandbox</b>Swap, HK, room registry sync.<span class="tag good">CLEAN</span></div>
+    <div class="score good"><b>One Firestore</b>No v2 shadow database.<span class="tag good">CLEAN</span></div>
+    <div class="score warn"><b>Room list</b>Fixed in sandbox; live admin still hardcoded (no VGL).<span class="tag warn">IMPROVING</span></div>
+    <div class="score warn"><b>4 HK apps</b>HK.html vs HK-Shartava vs sandbox — staff can open wrong one.<span class="tag warn">IMPROVING</span></div>
+    <div class="score warn"><b>Two worlds</b>Live HTML ≠ sandbox until you cut over.<span class="tag warn">BY DESIGN</span></div>
+    <div class="score bad"><b>Live admin moves</b>Still direct Firestore, not pipeline.<span class="tag bad">OLD (until cutover)</span></div>
+  </div>
+  <div class="verdict ok" style="margin-top:16px">Not messy anymore in the NEW stack. Live production is the leftover messy part — and guests still use it on purpose until you switch.</div>
+</section>
+
+<!-- BOTS -->
+<section class="panel hidden" id="panel-bots">
+  <h2>Automated testers (“bots”)</h2>
+  <p class="sub">These run without a human clicking — they catch regressions before guests do.</p>
+
+  <div class="bot-row">
+    <div class="bot-icon">🧪</div>
+    <div style="flex:1">
+      <h4>Unit tests — pipeline-functions</h4>
+      <p>54 tests: move, swap, conflict, unlock, elevator, register. Runs on every PR via GitHub Actions.</p>
+    </div>
+    <span class="status live">LIVE</span>
+  </div>
+  <div class="bot-row">
+    <div class="bot-icon">🔄</div>
+    <div style="flex:1">
+      <h4>Unlock sync check</h4>
+      <p>Browser rules and server rules must match — CI fails if they drift.</p>
+    </div>
+    <span class="status live">LIVE</span>
+  </div>
+  <div class="bot-row">
+    <div class="bot-icon">📋</div>
+    <div style="flex:1">
+      <h4>Scenario tester (Python)</h4>
+      <p><code>sandbox_rebuild/pipeline/scenario_tester.py</code> — fake reservations, move/swap/conflict in memory. Not in CI yet.</p>
+    </div>
+    <span class="status plan">NEXT</span>
+  </div>
+  <div class="bot-row">
+    <div class="bot-icon">🏥</div>
+    <div style="flex:1">
+      <h4>Health monitor (planned)</h4>
+      <p>Daily job: MiniHotel sync ran? Elevator fresh? Missing checkin_rooms? Alert you on Slack/email.</p>
+    </div>
+    <span class="status plan">PLANNED</span>
+  </div>
+  <div class="bot-row">
+    <div class="bot-icon">🎭</div>
+    <div style="flex:1">
+      <h4>Smoke scenarios (planned)</h4>
+      <p>After deploy: callable responds, unlock math for today’s date, registry has all seed rooms.</p>
+    </div>
+    <span class="status plan">PLANNED</span>
+  </div>
+</section>
+
+<!-- MERGE -->
+<section class="panel hidden" id="panel-merge">
+  <h2>If we merge today — what do guests see?</h2>
+  <p class="sub">Short answer: <strong>nothing changes for guests</strong> unless we also replace the live web pages or change the URL.</p>
+  <div class="grid">
+    <div class="score good"><b>Merge PRs to main only</b>Live files untouched. Guests keep same page, same links, same behavior.<span class="tag good">NO CHANGE</span></div>
+    <div class="score good"><b>Deploy pipeline functions only</b>Live pages don't call them yet. Guests unchanged.<span class="tag good">NO CHANGE</span></div>
+    <div class="score warn"><b>Deploy + wire live admin to pipeline</b>You get swap/unlock on production admin. Guests still old guest page unless that file changes too.<span class="tag warn">ADMIN ONLY</span></div>
+    <div class="score bad"><b>Replace checkin-guest-v2 with sandbox design</b>Every guest who opens the link sees the new UI on next refresh. Existing ?g= links should still work if cutover is done carefully.<span class="tag bad">GUESTS CHANGE</span></div>
+  </div>
+  <div style="margin-top:18px;padding:16px;background:var(--new-bg);border-radius:12px;font-size:14px">
+    <strong>Recommended cutover order:</strong><br>
+    1) Merge + deploy backend callables<br>
+    2) Wire live admin → test moves/swaps yourself<br>
+    3) Replace guest page when ready → one announcement to team<br>
+    4) Retire old HK apps gradually
+  </div>
+</section>
+
+</div>
+
+<footer>
+  Also see: <a href="SYSTEM_MAP_BEGINNER.html">older beginner map</a> ·
+  <a href="BACKEND_MAP.md">BACKEND_MAP.md</a> ·
+  <a href="PROJECT_ARCHIVE.md">PROJECT_ARCHIVE.md</a>
+</footer>
+
+<script>
+const GUEST_STEPS=[
+  {t:'Booking arrives',p:'MiniHotel → automatic sync → reservations in Firestore',d:'Every ~30 min. Guest name, room, dates land in Maxela.'},
+  {t:'Guest opens check-in link',p:'Today: checkin-guest-v2.html on maxelaapartments.com',d:'WhatsApp and booking messages point here. Sandbox URLs are different files — guests do not see them unless you change the link.'},
+  {t:'Guest finds booking + registers',p:'Search by name → passport → contact saved',d:'Creates checkin_guests doc. Link ?g= token lets them return without re-uploading ID.'},
+  {t:'Waiting for unlock',p:'Before check-in time or until room is clean',d:'Same rules in sandbox and (mostly) live — shared guest-unlock.js in sandbox.'},
+  {t:'Access unlocked',p:'Door code, WiFi, photos, elevator',d:'From checkin_apartments + elevator_code. Admin can Grant Access early.'},
+];
+const gf=document.getElementById('guest-flow');
+const gd=document.getElementById('guest-detail');
+GUEST_STEPS.forEach((s,i)=>{
+  if(i>0){const d=document.createElement('div');d.className='down';d.textContent='↓';gf.appendChild(d);}
+  const el=document.createElement('div');el.className='step';
+  el.innerHTML=`<div class="num">${i+1}</div><div><h4>${s.t}</h4><p>${s.p}</p></div>`;
+  el.onclick=()=>{document.querySelectorAll('#guest-flow .step').forEach(x=>x.classList.remove('on'));el.classList.add('on');gd.innerHTML=`<strong>${s.t}</strong><br><br>${s.d}`;};
+  gf.appendChild(el);
+});
+
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const id=btn.dataset.tab;
+    document.querySelectorAll('.panel').forEach(p=>p.classList.add('hidden'));
+    document.getElementById('panel-'+id).classList.remove('hidden');
+  };
+});
+</script>
+</body>
+</html>

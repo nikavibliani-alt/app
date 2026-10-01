@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Clear Reservations</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:520px;margin:4rem auto;padding:0 1.5rem;color:#1e293b;background:#f8fafc;}
+h1{font-size:18px;font-weight:700;margin-bottom:.4rem;}
+p{font-size:13px;color:#64748b;margin-bottom:1.25rem;}
+.btn{padding:11px 22px;font-size:14px;font-weight:600;cursor:pointer;border-radius:7px;border:none;}
+.btn-danger{background:#dc2626;color:#fff;}
+.btn-danger:disabled{opacity:.4;cursor:not-allowed;}
+.btn-check{background:#16a34a;color:#fff;margin-left:8px;}
+#log{margin-top:1.25rem;font-family:monospace;font-size:12px;line-height:1.8;background:#0f172a;color:#94a3b8;padding:1rem 1.25rem;border-radius:8px;min-height:48px;white-space:pre-wrap;}
+.ok{color:#4ade80;}.err{color:#f87171;}.info{color:#60a5fa;}
+</style>
+</head>
+<body>
+<h1>Clear Reservations — Sleepy PMS</h1>
+<p>Deletes every document in the <code>reservations</code> Firestore collection, then verifies the collection is empty.</p>
+<button class="btn btn-danger" id="delBtn" onclick="run()">Delete All Reservations</button>
+<button class="btn btn-check" onclick="verify()">Verify Empty</button>
+<div id="log">Ready.</div>
+
+<script type="module">
+import{initializeApp}from'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js';
+import{getFirestore,collection,getDocs,deleteDoc,doc}from'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
+
+const db=getFirestore(initializeApp({
+  apiKey:'AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk',
+  authDomain:'sleepy-5c962.firebaseapp.com',
+  projectId:'sleepy-5c962',
+  storageBucket:'sleepy-5c962.firebasestorage.app',
+  messagingSenderId:'152940098906',
+  appId:'1:152940098906:web:bf245230d705c0a62c2f63'
+}));
+
+function log(msg,cls=''){
+  const el=document.getElementById('log');
+  el.innerHTML+=(cls?`<span class="${cls}">${msg}</span>`:msg)+'\n';
+  el.scrollTop=el.scrollHeight;
+}
+
+window.run=async function(){
+  if(!confirm('Delete ALL reservations permanently? This cannot be undone.'))return;
+  document.getElementById('delBtn').disabled=true;
+  document.getElementById('log').textContent='';
+  log('Fetching reservations…','info');
+  try{
+    const snap=await getDocs(collection(db,'reservations'));
+    log(`Found ${snap.docs.length} document(s).`);
+    if(!snap.docs.length){log('Collection already empty. ✓','ok');return;}
+    log('Deleting…','info');
+    await Promise.all(snap.docs.map(d=>deleteDoc(doc(db,'reservations',d.id))));
+    log(`Deleted ${snap.docs.length} document(s). ✓`,'ok');
+    log('\nVerifying…','info');
+    const check=await getDocs(collection(db,'reservations'));
+    if(check.empty){
+      log('Collection is now EMPTY. ✓','ok');
+      log('\nYou can close this tab.','info');
+    }else{
+      log(`Warning: ${check.docs.length} document(s) still remain.`,'err');
+    }
+  }catch(e){
+    log('ERROR: '+e.message,'err');
+    document.getElementById('delBtn').disabled=false;
+  }
+};
+
+window.verify=async function(){
+  log('\nChecking collection…','info');
+  try{
+    const snap=await getDocs(collection(db,'reservations'));
+    if(snap.empty){log('reservations collection is EMPTY. ✓','ok');}
+    else{log(`${snap.docs.length} document(s) still in collection.`,'err');}
+  }catch(e){log('ERROR: '+e.message,'err');}
+};
+</script>
+</body>
+</html>

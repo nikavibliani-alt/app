@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /profit/
+Disallow: /internal-profit-shartava
+Disallow: /internal-tuka-tracker
+Disallow: /internal-venu-tracker

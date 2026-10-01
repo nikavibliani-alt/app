@@ -1,0 +1,375 @@
+{
+  "_comment": "Maxela Pricing Engine Config \u2014 edit this file to change pricing rules",
+  "run_window_days": 90,
+  "dry_run": true,
+  "unit_counts": {
+    "ROOMS": 5,
+    "MAXELA": 7,
+    "BIG_APT": 1,
+    "FREEDOM": 3,
+    "ORBE_1": 2,
+    "ORBE_2": 1
+  },
+  "seasons": [
+    {
+      "name": "new_year",
+      "ranges": [
+        [
+          "01-01",
+          "01-14"
+        ],
+        [
+          "12-24",
+          "12-31"
+        ]
+      ]
+    },
+    {
+      "name": "low",
+      "ranges": [
+        [
+          "01-15",
+          "03-15"
+        ]
+      ]
+    },
+    {
+      "name": "mid",
+      "ranges": [
+        [
+          "03-16",
+          "04-30"
+        ],
+        [
+          "10-01",
+          "11-30"
+        ]
+      ]
+    },
+    {
+      "name": "high",
+      "ranges": [
+        [
+          "05-01",
+          "06-30"
+        ],
+        [
+          "09-01",
+          "09-30"
+        ]
+      ]
+    },
+    {
+      "name": "peak",
+      "ranges": [
+        [
+          "07-01",
+          "08-31"
+        ]
+      ]
+    },
+    {
+      "name": "xmas_low",
+      "ranges": [
+        [
+          "12-01",
+          "12-23"
+        ]
+      ]
+    }
+  ],
+  "base_prices_gel": {
+    "ROOMS": {
+      "low": 145,
+      "mid": 150,
+      "high": 155,
+      "peak": 160,
+      "xmas_low": 145,
+      "new_year": 190
+    },
+    "MAXELA": {
+      "low": 245,
+      "mid": 255,
+      "high": 260,
+      "peak": 265,
+      "xmas_low": 250,
+      "new_year": 330
+    },
+    "BIG_APT": {
+      "low": 600,
+      "mid": 630,
+      "high": 670,
+      "peak": 700,
+      "xmas_low": 610,
+      "new_year": 800
+    },
+    "FREEDOM": {
+      "low": 245,
+      "mid": 255,
+      "high": 260,
+      "peak": 265,
+      "xmas_low": 250,
+      "new_year": 330
+    },
+    "ORBE_1": {
+      "low": 225,
+      "mid": 235,
+      "high": 245,
+      "peak": 255,
+      "xmas_low": 230,
+      "new_year": 300
+    }
+  },
+  "base_prices_eur": {
+    "BIG_APT": {
+      "low": 150,
+      "mid": 155,
+      "high": 160,
+      "peak": 170,
+      "xmas_low": 150,
+      "new_year": 190
+    },
+    "FREEDOM": {
+      "low": 58,
+      "mid": 60,
+      "high": 63,
+      "peak": 65,
+      "xmas_low": 58,
+      "new_year": 80
+    },
+    "ORBE_1": {
+      "low": 54,
+      "mid": 56,
+      "high": 59,
+      "peak": 61,
+      "xmas_low": 54,
+      "new_year": 72
+    },
+    "ORBE_2": {
+      "low": 54,
+      "mid": 56,
+      "high": 59,
+      "peak": 61,
+      "xmas_low": 54,
+      "new_year": 72
+    }
+  },
+  "floor_prices_gel": {
+    "ROOMS": {
+      "low": 100,
+      "mid": 100,
+      "high": 105,
+      "peak": 110,
+      "xmas_low": 100,
+      "new_year": 120
+    },
+    "MAXELA": {
+      "low": 170,
+      "mid": 180,
+      "high": 190,
+      "peak": 200,
+      "xmas_low": 175,
+      "new_year": 220
+    },
+    "BIG_APT": {
+      "low": 400,
+      "mid": 420,
+      "high": 450,
+      "peak": 500,
+      "xmas_low": 400,
+      "new_year": 550
+    },
+    "FREEDOM": {
+      "low": 170,
+      "mid": 180,
+      "high": 190,
+      "peak": 200,
+      "xmas_low": 175,
+      "new_year": 220
+    },
+    "ORBE_1": {
+      "low": 160,
+      "mid": 170,
+      "high": 180,
+      "peak": 190,
+      "xmas_low": 165,
+      "new_year": 210
+    }
+  },
+  "floor_prices_eur": {
+    "BIG_APT": {
+      "low": 100,
+      "mid": 110,
+      "high": 120,
+      "peak": 130,
+      "xmas_low": 100,
+      "new_year": 150
+    },
+    "FREEDOM": {
+      "low": 40,
+      "mid": 42,
+      "high": 45,
+      "peak": 50,
+      "xmas_low": 40,
+      "new_year": 60
+    },
+    "ORBE_1": {
+      "low": 38,
+      "mid": 40,
+      "high": 42,
+      "peak": 48,
+      "xmas_low": 38,
+      "new_year": 55
+    },
+    "ORBE_2": {
+      "low": 38,
+      "mid": 40,
+      "high": 42,
+      "peak": 48,
+      "xmas_low": 38,
+      "new_year": 55
+    }
+  },
+  "event_premiums": {
+    "_comment": "Add Tbilisi events manually here. Example: 2026-07-15: {label: Big Concert, multiplier: 1.35}"
+  },
+  "date_overrides": {
+    "_comment": "Per-date manual floor override \u2014 engine will never go below this price on this date",
+    "ROOMS": {},
+    "MAXELA": {},
+    "BIG_APT": {},
+    "FREEDOM": {},
+    "ORBE_1": {},
+    "ORBE_2": {}
+  },
+  "rounding": 5,
+  "last_minute_cascade": {
+    "ROOMS": [
+      {
+        "days": 2,
+        "price_gel": 110
+      },
+      {
+        "days": 1,
+        "price_gel": 100
+      },
+      {
+        "days": 0,
+        "price_gel": 90
+      }
+    ],
+    "MAXELA": [
+      {
+        "days": 2,
+        "price_gel": 210
+      },
+      {
+        "days": 1,
+        "price_gel": 200
+      },
+      {
+        "days": 0,
+        "price_gel": 190
+      }
+    ],
+    "BIG_APT": [
+      {
+        "days": 2,
+        "price_gel": 460
+      },
+      {
+        "days": 1,
+        "price_gel": 450
+      },
+      {
+        "days": 0,
+        "price_gel": 400
+      }
+    ]
+  },
+  "ceiling_prices_gel": {
+    "ROOMS": {
+      "low": 155,
+      "mid": 160,
+      "high": 165,
+      "peak": 170,
+      "xmas_low": 155,
+      "new_year": 200
+    },
+    "MAXELA": {
+      "low": 260,
+      "mid": 270,
+      "high": 275,
+      "peak": 280,
+      "xmas_low": 265,
+      "new_year": 350
+    },
+    "BIG_APT": {
+      "low": 650,
+      "mid": 680,
+      "high": 720,
+      "peak": 750,
+      "xmas_low": 660,
+      "new_year": 850
+    },
+    "FREEDOM": {
+      "low": 260,
+      "mid": 270,
+      "high": 275,
+      "peak": 280,
+      "xmas_low": 265,
+      "new_year": 350
+    },
+    "ORBE_1": {
+      "low": 240,
+      "mid": 250,
+      "high": 260,
+      "peak": 270,
+      "xmas_low": 245,
+      "new_year": 320
+    }
+  },
+  "ceiling_prices_eur": {
+    "BIG_APT": {
+      "low": 160,
+      "mid": 165,
+      "high": 170,
+      "peak": 180,
+      "xmas_low": 160,
+      "new_year": 200
+    },
+    "FREEDOM": {
+      "low": 62,
+      "mid": 65,
+      "high": 68,
+      "peak": 70,
+      "xmas_low": 62,
+      "new_year": 85
+    },
+    "ORBE_1": {
+      "low": 58,
+      "mid": 60,
+      "high": 63,
+      "peak": 65,
+      "xmas_low": 58,
+      "new_year": 78
+    },
+    "ORBE_2": {
+      "low": 58,
+      "mid": 60,
+      "high": 63,
+      "peak": 65,
+      "xmas_low": 58,
+      "new_year": 78
+    }
+  },
+  "_pricing_engine": "inverted-model v2 (start high, drop only when behind target)",
+  "base_price_pct": {
+    "ROOMS": 0.9,
+    "MAXELA": 0.9,
+    "BIG_APT": 0.9,
+    "FREEDOM": 0.9,
+    "ORBE_1": 0.9,
+    "ORBE_2": 0.9
+  }
+}

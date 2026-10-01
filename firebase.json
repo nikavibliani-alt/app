@@ -1,0 +1,207 @@
+{
+  "firestore": {
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": ".",
+    "cleanUrls": true,
+    "redirects": [
+      {
+        "source": "/",
+        "destination": "/checkin-guest",
+        "type": 301
+      },
+      {
+        "source": "/hk-app",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/hk-app.html",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK.html",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK-Shartava",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK-Shartava.html",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK-Centre",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK-Centre.html",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK-legacy",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/HK-legacy.html",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/hk-manage",
+        "destination": "/cleaner",
+        "type": 301
+      },
+      {
+        "source": "/hk-manage.html",
+        "destination": "/cleaner",
+        "type": 301
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/profit/sh-t937c6gzg7z8",
+        "destination": "/internal-profit-shartava.html"
+      },
+      {
+        "source": "/profit/tk-3uohi9r7hvtk",
+        "destination": "/internal-tuka-tracker.html"
+      },
+      {
+        "source": "/profit/vn-kctuee7onrah",
+        "destination": "/internal-venu-tracker.html"
+      },
+      {
+        "source": "/checkin-guest",
+        "destination": "/checkin-guest.html"
+      },
+      {
+        "source": "/checkin-admin",
+        "destination": "/checkin-admin.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {"key": "Cache-Control", "value": "no-cache, no-store, must-revalidate"},
+          {"key": "Pragma", "value": "no-cache"},
+          {"key": "Expires", "value": "0"}
+        ]
+      },
+      {
+        "source": "**/*.js",
+        "headers": [
+          {"key": "Cache-Control", "value": "no-cache, no-store, must-revalidate"}
+        ]
+      },
+      {
+        "source": "assets/**",
+        "headers": [
+          {"key": "Cache-Control", "value": "max-age=31536000, immutable"}
+        ]
+      }
+    ],
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "firebase-debug*.log",
+      "**/.*",
+      "serviceAccountKey.json",
+      "node_modules/**",
+      "tuya-functions/**",
+      "pipeline-functions/**",
+      "whatsapp-functions/**",
+      "sandbox_rebuild/**",
+      "scripts/**",
+      "clear-reservations.html",
+      "import-reservations.html",
+      "checkin-admin-backup.html",
+      "checkin-admin-legacy.html",
+      "tuya-test.html",
+      "SleepyDashboard.html",
+      "SleepyPMS.html",
+      "sandbox-index.html",
+      "SYSTEM_MAP.html",
+      "SYSTEM_MAP_CURSOR.html",
+      "checkin-guest-sandbox.html",
+      "checkin-guest-sandbox-2.html",
+      "checkin-guest-sandbox-3.html",
+      "checkin-admin-sandbox.html",
+      "HK-legacy.html",
+      "hk-manage.html",
+      "*.md",
+      "*.py",
+      "config.json",
+      "package.json",
+      "package-lock.json",
+      "skills-lock.json",
+      "firebase.emulator-lite.json",
+      "*.yml",
+      "*.patch*",
+      "CNAME"
+    ]
+  },
+  "functions": [
+    {
+      "source": "tuya-functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    },
+    {
+      "source": "pipeline-functions",
+      "codebase": "pipeline",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local",
+        "tests"
+      ]
+    },
+    {
+      "source": "whatsapp-functions",
+      "codebase": "whatsapp",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
+  "emulators": {
+    "functions": {
+      "host": "127.0.0.1",
+      "port": 5001
+    },
+    "ui": {
+      "enabled": true,
+      "host": "127.0.0.1",
+      "port": 4000
+    },
+    "singleProjectMode": true
+  }
+}

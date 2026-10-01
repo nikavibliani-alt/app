@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Price History — Maxela</title>
+<style>
+  :root {
+    --bg: #f5f5f3; --white: #fff; --border: #e5e5e2; --text: #1a1a1a;
+    --muted: #888; --accent: #1e6b3e; --accent-light: #e8f4ed;
+    --red: #c0392b; --green: #2d7d4e; --blue: #2563a8;
+    --font: 'Inter', system-ui, sans-serif; --mono: 'JetBrains Mono','SF Mono',monospace;
+    --radius: 8px; --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; }
+  .header { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .header-left { display: flex; align-items: center; gap: 8px; }
+  .back-link { color: var(--muted); text-decoration: none; font-size: 13px; }
+  .page-title { font-size: 14px; font-weight: 600; }
+  .main { max-width: 1100px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .card-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .card-title { font-size: 13px; font-weight: 600; }
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .select, .date-input { padding: 7px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--white); color: var(--text); font-family: var(--font); }
+  .select:focus, .date-input:focus { outline: none; border-color: var(--accent); }
+  .load-btn { background: var(--accent); color: white; border: none; padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .load-btn:hover { opacity: 0.88; }
+
+  .chart-wrap { padding: 20px; }
+  .chart-svg { width: 100%; height: 320px; }
+  .empty { padding: 60px 20px; text-align: center; color: var(--muted); }
+  .empty-icon { font-size: 28px; margin-bottom: 10px; }
+
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th { background: var(--bg); padding: 8px 12px; border: 1px solid var(--border); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); text-align: left; }
+  .tbl td { padding: 8px 12px; border: 1px solid var(--border); font-family: var(--mono); }
+  .tbl tr:hover td { background: #fafafa; }
+  .price-up { color: var(--green); font-weight: 600; }
+  .price-down { color: var(--red); font-weight: 600; }
+  .price-same { color: var(--muted); }
+  .reason-cell { font-family: var(--font); font-size: 12px; color: var(--muted); max-width: 320px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <a href="pricing.html" class="back-link">← Pricing Engine</a>
+    <span style="color:#e5e5e2">/</span>
+    <span class="page-title">Price History</span>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">📈 Price Trend</span>
+      <div class="controls">
+        <select class="select" id="propSelect" onchange="loadHistory()">
+          <option value="ROOMS">Rooms</option>
+          <option value="MAXELA">Maxela Apts</option>
+          <option value="BIG_APT">3-Bed Apartment</option>
+          <option value="FREEDOM">Freedom Square</option>
+          <option value="ORBE_1">Orbeliani 1</option>
+          <option value="ORBE_2">Orbeliani 3</option>
+        </select>
+        <input type="date" class="date-input" id="dateSelect">
+        <select class="select" id="currencySelect" onchange="renderChart()">
+          <option value="gel">GEL</option>
+          <option value="eur">EUR</option>
+        </select>
+        <button class="load-btn" onclick="loadHistory()">Load History</button>
+      </div>
+    </div>
+    <div class="chart-wrap" id="chartWrap">
+      <div class="empty"><div class="empty-icon">📊</div>Select a property and date, then click Load History.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">📋 Run-by-Run Detail</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tbl" id="historyTable">
+        <thead><tr><th>Time</th><th>Price</th><th>Change</th><th>Occupancy</th><th>Reason</th></tr></thead>
+        <tbody><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:30px">No data loaded yet</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, query, where, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const app = initializeApp({ apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk", authDomain:"sleepy-5c962.firebaseapp.com", projectId:"sleepy-5c962", storageBucket:"sleepy-5c962.firebasestorage.app", messagingSenderId:"152940098906", appId:"1:152940098906:web:bf245230d705c0a62c2f63" });
+const db = getFirestore(app);
+
+let currentSnapshots = [];
+
+// Default date = today
+const today = new Date().toISOString().split('T')[0];
+document.getElementById('dateSelect').value = today;
+
+window.loadHistory = async () => {
+  const prop = document.getElementById('propSelect').value;
+  const date = document.getElementById('dateSelect').value;
+  if (!date) { alert('Select a date'); return; }
+
+  document.getElementById('chartWrap').innerHTML = '<div class="empty"><div class="empty-icon">⏳</div>Loading...</div>';
+
+  try {
+    const q = query(
+      collection(db, 'pricing_snapshots'),
+      where('property', '==', prop),
+      where('date', '==', date),
+      orderBy('ts', 'asc')
+    );
+    const snap = await getDocs(q);
+    currentSnapshots = snap.docs.map(d => d.data());
+
+    if (!currentSnapshots.length) {
+      document.getElementById('chartWrap').innerHTML = '<div class="empty"><div class="empty-icon">📭</div>No price history found for this date yet.</div>';
+      document.querySelector('#historyTable tbody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:30px">No history found</td></tr>';
+      return;
+    }
+
+    renderChart();
+    renderTable();
+  } catch(e) {
+    document.getElementById('chartWrap').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+};
+
+window.renderChart = () => {
+  if (!currentSnapshots.length) return;
+  const currency = document.getElementById('currencySelect').value;
+  const field = currency === 'eur' ? 'price_eur' : 'price_gel';
+  const prices = currentSnapshots.map(s => s[field] || 0).filter(p => p > 0);
+
+  if (!prices.length) {
+    document.getElementById('chartWrap').innerHTML = '<div class="empty">No ' + currency.toUpperCase() + ' prices recorded for this date.</div>';
+    return;
+  }
+
+  const W = 1000, H = 280, PAD = 40;
+  const minP = Math.min(...prices) * 0.95;
+  const maxP = Math.max(...prices) * 1.05;
+  const range = maxP - minP || 1;
+
+  const points = currentSnapshots
+    .filter(s => (s[field] || 0) > 0)
+    .map((s, i, arr) => {
+      const x = PAD + (i / Math.max(arr.length - 1, 1)) * (W - PAD * 2);
+      const y = H - PAD - ((s[field] - minP) / range) * (H - PAD * 2);
+      return { x, y, val: s[field], time: s.ts };
+    });
+
+  const pathD = points.map((p, i) => (i === 0 ? 'M' : 'L') + p.x + ',' + p.y).join(' ');
+
+  const sym = currency === 'eur' ? '€' : '₾';
+
+  let svg = `<svg class="chart-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+  // Grid lines
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD + (i / 4) * (H - PAD * 2);
+    const val = Math.round(maxP - (i / 4) * range);
+    svg += `<line x1="${PAD}" y1="${y}" x2="${W-PAD}" y2="${y}" stroke="#e5e5e2" stroke-width="1"/>`;
+    svg += `<text x="${PAD-8}" y="${y+4}" font-size="11" fill="#888" text-anchor="end">${val}${sym}</text>`;
+  }
+  // Line
+  svg += `<path d="${pathD}" fill="none" stroke="#1e6b3e" stroke-width="2.5"/>`;
+  // Points
+  points.forEach(p => {
+    const time = new Date(p.time).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+    svg += `<circle cx="${p.x}" cy="${p.y}" r="4" fill="#1e6b3e"/>`;
+    svg += `<text x="${p.x}" y="${H-PAD+18}" font-size="10" fill="#888" text-anchor="middle">${time}</text>`;
+  });
+  svg += `</svg>`;
+
+  document.getElementById('chartWrap').innerHTML = svg;
+};
+
+function renderTable() {
+  const tbody = document.querySelector('#historyTable tbody');
+  let rows = '';
+  let prevGel = null;
+
+  currentSnapshots.forEach(s => {
+    const time = new Date(s.ts).toLocaleString('en-GB', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+    const price = s.price_gel || 0;
+    let changeClass = 'price-same', changeText = '—';
+
+    if (prevGel !== null && price !== prevGel) {
+      if (price > prevGel) { changeClass = 'price-up'; changeText = `+${(price - prevGel).toFixed(0)}₾`; }
+      else { changeClass = 'price-down'; changeText = `${(price - prevGel).toFixed(0)}₾`; }
+    }
+    prevGel = price;
+
+    rows += `<tr>
+      <td>${time}</td>
+      <td><strong>${price.toFixed(0)}₾</strong>${s.price_eur ? ' / ' + s.price_eur.toFixed(0) + '€' : ''}</td>
+      <td class="${changeClass}">${changeText}</td>
+      <td>${(s.occupancy_pct||0).toFixed(0)}%</td>
+      <td class="reason-cell">${s.reason || '—'}</td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = rows;
+}
+</script>
+</body>
+</html>

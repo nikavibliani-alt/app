@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maxela — How the system works (simple)</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --card:#fff; --ink:#1c1f26; --muted:#5c6570;
+    --line:#e3e6eb; --blue:#1a73e8; --blue-bg:#e8f0fe;
+    --green:#137333; --green-bg:#e6f4ea; --orange:#b06000; --orange-bg:#fef7e0;
+    --purple:#7b1fa2; --purple-bg:#f3e5f5; --red:#c62828; --red-bg:#fce8e6;
+    --shadow:0 8px 28px rgba(28,31,38,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--ink);min-height:100vh;
+  }
+  header{
+    padding:22px 24px 8px;max-width:1180px;margin:0 auto;
+  }
+  header h1{font-size:26px;font-weight:760;letter-spacing:-.03em}
+  header p{margin-top:6px;color:var(--muted);font-size:15px;line-height:1.5;max-width:720px}
+  .tabs{
+    display:flex;flex-wrap:wrap;gap:8px;padding:14px 24px 0;max-width:1180px;margin:0 auto;
+  }
+  .tab{
+    border:1px solid var(--line);background:var(--card);color:var(--ink);
+    border-radius:999px;padding:10px 16px;font:inherit;font-size:14px;font-weight:650;
+    cursor:pointer;
+  }
+  .tab:hover{background:#f1f3f5}
+  .tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .tab.warn.active{background:var(--red);border-color:var(--red)}
+  .wrap{
+    max-width:1180px;margin:0 auto;padding:18px 24px 40px;
+    display:grid;grid-template-columns:1.4fr .85fr;gap:18px;align-items:start;
+  }
+  @media (max-width:920px){.wrap{grid-template-columns:1fr}}
+  .story-card{
+    background:var(--card);border:1px solid var(--line);border-radius:18px;
+    box-shadow:var(--shadow);padding:22px;
+  }
+  .story-title{font-size:18px;font-weight:740;margin-bottom:4px}
+  .story-sub{color:var(--muted);font-size:14px;line-height:1.45;margin-bottom:18px}
+  .flow{
+    display:flex;flex-direction:column;gap:0;
+  }
+  .step{
+    display:grid;grid-template-columns:44px 1fr;gap:14px;align-items:start;
+    cursor:pointer;border-radius:14px;padding:12px;border:1px solid transparent;
+    transition:background .15s,border-color .15s;
+  }
+  .step:hover{background:#f8f9fb}
+  .step.active{background:var(--blue-bg);border-color:#c5d8f8}
+  .step.problem.active{background:var(--red-bg);border-color:#f5c2c0}
+  .num{
+    width:44px;height:44px;border-radius:14px;display:grid;place-items:center;
+    font-weight:800;font-size:16px;background:var(--blue-bg);color:var(--blue);
+  }
+  .step.problem .num{background:var(--red-bg);color:var(--red)}
+  .step h3{font-size:16px;font-weight:720;margin-bottom:4px}
+  .step p{font-size:14px;color:var(--muted);line-height:1.45}
+  .arrow{
+    width:44px;display:flex;justify-content:center;color:#b0b7c0;font-size:18px;
+    padding:2px 0 2px;user-select:none;
+  }
+  .chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{
+    font-size:11px;font-weight:700;padding:4px 8px;border-radius:999px;
+    background:#eef1f4;color:#3c4650;
+  }
+  .chip.people{background:var(--blue-bg);color:#174ea6}
+  .chip.data{background:var(--green-bg);color:var(--green)}
+  .chip.auto{background:var(--orange-bg);color:var(--orange)}
+  .chip.app{background:var(--purple-bg);color:var(--purple)}
+  .chip.bad{background:var(--red-bg);color:var(--red)}
+
+  .side{
+    background:var(--card);border:1px solid var(--line);border-radius:18px;
+    box-shadow:var(--shadow);padding:22px;position:sticky;top:16px;min-height:280px;
+  }
+  .side .eyebrow{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .side h2{font-size:20px;margin:8px 0 10px;letter-spacing:-.02em}
+  .side p{font-size:14.5px;line-height:1.55;color:#30363f;margin-bottom:10px}
+  .side .box{
+    margin-top:12px;padding:12px;border-radius:12px;background:#f7f8fa;border:1px solid var(--line);
+  }
+  .side .box b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:6px}
+  .side .box span{font-size:14px;line-height:1.45;color:var(--ink)}
+  .empty{color:var(--muted);font-size:14px;line-height:1.5;padding-top:8px}
+  .footer-note{
+    max-width:1180px;margin:0 auto;padding:0 24px 28px;color:var(--muted);font-size:13px;line-height:1.45;
+  }
+  .footer-note a{color:var(--blue)}
+</style>
+</head>
+<body>
+<header>
+  <h1>How Maxela works</h1>
+  <p>A simple map for beginners. Pick a story below. Click any step to see what it means in plain language.</p>
+</header>
+
+<div class="tabs" id="tabs"></div>
+
+<div class="wrap">
+  <section class="story-card">
+    <div class="story-title" id="story-title">Guest check-in</div>
+    <div class="story-sub" id="story-sub"></div>
+    <div class="flow" id="flow"></div>
+  </section>
+
+  <aside class="side" id="side">
+    <div class="eyebrow">Step details</div>
+    <div class="empty">Click any step on the left to learn what happens.</div>
+  </aside>
+</div>
+
+<p class="footer-note">
+  This is the beginner view. Full technical map:
+  <a href="SYSTEM_MAP_CURSOR.html">SYSTEM_MAP_CURSOR.html</a>
+  · Claude map:
+  <a href="SYSTEM_MAP.html">SYSTEM_MAP.html</a>
+</p>
+
+<script>
+const STORIES = {
+  guest: {
+    title: 'Guest check-in',
+    sub: 'From booking → guest opens the page → gets room access.',
+    steps: [
+      {
+        id: 'g1',
+        title: 'A booking arrives',
+        text: 'Someone books a Maxela apartment on Booking.com / Airbnb / etc. MiniHotel holds that booking.',
+        chips: [['people','Outside'],['auto','Every ~10 min']],
+        detail: {
+          title: 'A booking arrives',
+          plain: 'Guests book through travel websites. Those bookings land in MiniHotel first — that is the hotel software Maxela already uses.',
+          who: 'Travel sites → MiniHotel',
+          happens: 'About every 10 minutes, an automatic job copies new and updated bookings into Maxela’s database.',
+          why: 'If this stops, new guests will not appear in admin or on the check-in page.',
+        }
+      },
+      {
+        id: 'g2',
+        title: 'Booking is saved in Maxela',
+        text: 'The booking is stored as a reservation: guest name, room, check-in and check-out dates.',
+        chips: [['data','Reservations']],
+        detail: {
+          title: 'Booking is saved in Maxela',
+          plain: 'Maxela keeps a copy of each booking so the guest page and admin page can find it quickly.',
+          who: 'Automatic sync job',
+          happens: 'Creates/updates a reservation record with name, room, and dates.',
+          why: 'This is the starting point for almost everything else.',
+        }
+      },
+      {
+        id: 'g3',
+        title: 'Guest opens check-in page',
+        text: 'Guest searches by name / booking and finds their stay.',
+        chips: [['app','Guest page (LIVE)'],['people','Guest']],
+        detail: {
+          title: 'Guest opens check-in page',
+          plain: 'The guest opens the Maxela check-in website and looks up their booking.',
+          who: 'Guest',
+          happens: 'The page searches reservations. If nothing matches well enough, it logs a failed search for admin.',
+          why: 'If search is confusing, guests get stuck before registration.',
+        }
+      },
+      {
+        id: 'g4',
+        title: 'Guest registers',
+        text: 'Guest accepts rules, uploads passport / ID, and saves contact info.',
+        chips: [['data','Guest forms'],['app','Guest page']],
+        detail: {
+          title: 'Guest registers',
+          plain: 'The guest completes a short form: house rules, ID photo, and WhatsApp/contact.',
+          who: 'Guest',
+          happens: 'A guest form is saved. Admin can later review the ID and unlock access.',
+          why: 'Without this form, Maxela does not know the guest is ready.',
+        }
+      },
+      {
+        id: 'g5',
+        title: 'Access unlocks',
+        text: 'At check-in time (or earlier if cleaned / admin unlocks), door + elevator info appear.',
+        chips: [['data','Room info'],['data','Elevator code']],
+        detail: {
+          title: 'Access unlocks',
+          plain: 'When it is time, the guest page shows door code, WiFi, photos, and elevator code (for buildings that need it).',
+          who: 'System rules + optional admin unlock + housekeeping “room ready”',
+          happens: 'Guest home screen switches from waiting → ready.',
+          why: 'This is the moment the guest can actually enter.',
+        }
+      },
+    ]
+  },
+
+  admin: {
+    title: 'Admin daily work',
+    sub: 'What you do in the admin panel to help guests.',
+    steps: [
+      {
+        id: 'a1',
+        title: 'See today’s guests',
+        text: 'Admin opens the panel and checks arrivals, in-house guests, and who still needs unlock.',
+        chips: [['app','Admin panel'],['people','You']],
+        detail: {
+          title: 'See today’s guests',
+          plain: 'The admin screen shows who is arriving, staying, leaving, and who is waiting for access.',
+          who: 'You (admin)',
+          happens: 'Reads reservations + guest forms together and shows status.',
+          why: 'This is your daily operations board.',
+        }
+      },
+      {
+        id: 'a2',
+        title: 'Check passport / ID',
+        text: 'Open a guest, review ID, approve or reject if needed.',
+        chips: [['data','Guest forms']],
+        detail: {
+          title: 'Check passport / ID',
+          plain: 'Guests upload an ID photo. You can hide it until needed, then approve or reject.',
+          who: 'You',
+          happens: 'Updates the guest form with your decision.',
+          why: 'Keeps ID private until you need it, and lets you block bad uploads.',
+        }
+      },
+      {
+        id: 'a3',
+        title: 'Grant access early',
+        text: 'If a guest should enter before normal time, tap Grant Access / Unlock.',
+        chips: [['data','Guest forms']],
+        detail: {
+          title: 'Grant access early',
+          plain: 'You can manually unlock a guest so door info appears before the normal check-in rule.',
+          who: 'You',
+          happens: 'Marks the guest form as manually unlocked.',
+          why: 'Useful for early arrivals after the room is ready.',
+        }
+      },
+      {
+        id: 'a4',
+        title: 'Update room info',
+        text: 'Edit WiFi, door instructions, and photo steps for an apartment.',
+        chips: [['data','Room info'],['app','Apartments editor']],
+        detail: {
+          title: 'Update room info',
+          plain: 'Each apartment has WiFi, instructions, and photo steps that guests see on their page.',
+          who: 'You',
+          happens: 'Saves room settings into the apartments database.',
+          why: 'Wrong WiFi or missing photos = confused guests.',
+        }
+      },
+      {
+        id: 'a5',
+        title: 'Update elevator code',
+        text: 'Paste the new entrance/elevator code so guests can enter the building.',
+        chips: [['data','Elevator code']],
+        detail: {
+          title: 'Update elevator code',
+          plain: 'Some buildings need a shared elevator/entrance code. You paste the latest code into admin.',
+          who: 'You',
+          happens: 'Saves the code in two places so guest page and monitor both see it.',
+          why: 'If this is stale, guests cannot enter the building.',
+        }
+      },
+    ]
+  },
+
+  hk: {
+    title: 'Housekeeping → room ready',
+    sub: 'How cleaning connects to early check-in and WhatsApp.',
+    steps: [
+      {
+        id: 'h1',
+        title: 'Housekeeper finishes a room',
+        text: 'Staff marks the room clean / done in the HK app.',
+        chips: [['app','HK app'],['people','Housekeeper']],
+        detail: {
+          title: 'Housekeeper finishes a room',
+          plain: 'Housekeeping uses a simple phone page to mark each room cleaned for today.',
+          who: 'Housekeeping staff',
+          happens: 'Saves a “room ready” flag for that room + date.',
+          why: 'This is the signal that early check-in may be allowed.',
+        }
+      },
+      {
+        id: 'h2',
+        title: 'System records “room ready”',
+        text: 'Maxela stores that the room is clean today.',
+        chips: [['data','HK status']],
+        detail: {
+          title: 'System records “room ready”',
+          plain: 'The clean flag is stored so admin and guest pages can react.',
+          who: 'HK app → database',
+          happens: 'Creates/updates today’s status for that room.',
+          why: 'Without this flag, early unlock and “room ready” messages cannot work.',
+        }
+      },
+      {
+        id: 'h3',
+        title: 'Guest may unlock early',
+        text: 'If cleaned (and time rules pass), guest can see access earlier.',
+        chips: [['app','Guest page']],
+        detail: {
+          title: 'Guest may unlock early',
+          plain: 'The guest page checks: is the room cleaned, and is it late enough in the day?',
+          who: 'Automatic rule on guest page',
+          happens: 'Waiting screen can switch to ready earlier than normal check-in time.',
+          why: 'Lets good guests enter once the apartment is actually ready.',
+        }
+      },
+      {
+        id: 'h4',
+        title: 'WhatsApp “room ready” message',
+        text: 'An automatic message can tell the guest the unit is ready.',
+        chips: [['auto','Daily job'],['people','WhatsApp']],
+        detail: {
+          title: 'WhatsApp “room ready” message',
+          plain: 'Once a day, a job looks for today’s arrivals whose rooms are marked clean, then messages them on WhatsApp.',
+          who: 'Automatic WhatsApp job',
+          happens: 'Sends “your unit is ready” if guest contact exists.',
+          why: 'Guests know they can come without calling you.',
+        }
+      },
+    ]
+  },
+
+  problems: {
+    title: 'Known weak spots',
+    sub: 'The messy parts. You do not need to fix these today — just know where bugs hide.',
+    steps: [
+      {
+        id: 'p1',
+        title: 'Door code writer is unclear',
+        text: 'Guest pages look for a special lock code on the booking, but nothing in this project clearly writes it.',
+        chips: [['bad','Fragile']],
+        detail: {
+          title: 'Door code writer is unclear',
+          plain: 'Every guest page prefers a field called tuyaPassword on the booking. In this code repo, we could not find what writes that field.',
+          who: 'Maybe an outside Tuya system — unknown',
+          happens: 'Guests may silently fall back to the apartment’s static door code.',
+          why: 'If auto lock codes stop working, it is hard to know where to look.',
+        }
+      },
+      {
+        id: 'p2',
+        title: 'Settings can overwrite each other',
+        text: 'Guest-page settings are saved as one full document. Two open tabs can erase each other’s edits.',
+        chips: [['bad','Fragile']],
+        detail: {
+          title: 'Settings can overwrite each other',
+          plain: 'Admin guest-page settings save the whole config at once.',
+          who: 'Live admin and/or sandbox admin',
+          happens: 'Last save wins. Earlier changes from another tab can disappear.',
+          why: 'Easy to lose tile/service edits during parallel work.',
+        }
+      },
+      {
+        id: 'p3',
+        title: 'Two “room ready” notifiers',
+        text: 'A daily WhatsApp job works. An old Cloud Function does the same job but is turned off.',
+        chips: [['bad','Fragile']],
+        detail: {
+          title: 'Two “room ready” notifiers',
+          plain: 'There are two systems meant to send the same “room ready” WhatsApp.',
+          who: 'whatsapp_checkin_ready.py (on) + roomReadyNotification (off)',
+          happens: 'Today only the daily job runs. If both are on, guests could get double messages.',
+          why: 'Duplicates make bugs confusing.',
+        }
+      },
+      {
+        id: 'p4',
+        title: 'Room list exists in 4 places',
+        text: 'Which apartments exist is copied in several files/apps. Updating one place can miss the others.',
+        chips: [['bad','Fragile']],
+        detail: {
+          title: 'Room list exists in 4 places',
+          plain: 'Admin pages, sync scripts, Sleepy PMS, and apartment docs each keep their own idea of rooms.',
+          who: 'Multiple apps/scripts',
+          happens: 'Add/rename a room in one place → others can stay old.',
+          why: 'Classic source of “why doesn’t this room show up?” bugs.',
+        }
+      },
+      {
+        id: 'p5',
+        title: 'Guest room has two sources',
+        text: 'Guest form has aptId. Booking has roomCode. They must stay matched.',
+        chips: [['bad','Fragile']],
+        detail: {
+          title: 'Guest room has two sources',
+          plain: 'The guest form stores one room id. The booking stores another room field. Admin “move room” must update both.',
+          who: 'Admin move tools + sync rules',
+          happens: 'If only one side changes, guest page and admin can disagree on the room.',
+          why: 'Wrong door/WiFi can appear for a guest.',
+        }
+      },
+    ]
+  }
+};
+
+const tabOrder = [
+  ['guest', '1. Guest check-in'],
+  ['admin', '2. Admin work'],
+  ['hk', '3. Housekeeping'],
+  ['problems', '⚠ Problems', true],
+];
+
+let currentStory = 'guest';
+let currentStep = null;
+
+const tabsEl = document.getElementById('tabs');
+const flowEl = document.getElementById('flow');
+const sideEl = document.getElementById('side');
+const titleEl = document.getElementById('story-title');
+const subEl = document.getElementById('story-sub');
+
+function renderTabs() {
+  tabsEl.innerHTML = '';
+  tabOrder.forEach(([id, label, warn]) => {
+    const b = document.createElement('button');
+    b.className = 'tab' + (warn ? ' warn' : '') + (id === currentStory ? ' active' : '');
+    b.type = 'button';
+    b.textContent = label;
+    b.onclick = () => {
+      currentStory = id;
+      currentStep = STORIES[id].steps[0]?.id || null;
+      render();
+    };
+    tabsEl.appendChild(b);
+  });
+}
+
+function renderFlow() {
+  const story = STORIES[currentStory];
+  titleEl.textContent = story.title;
+  subEl.textContent = story.sub;
+  flowEl.innerHTML = '';
+  story.steps.forEach((step, i) => {
+    if (i) {
+      const a = document.createElement('div');
+      a.className = 'arrow';
+      a.textContent = '↓';
+      flowEl.appendChild(a);
+    }
+    const el = document.createElement('div');
+    el.className = 'step' + (currentStory === 'problems' ? ' problem' : '') + (currentStep === step.id ? ' active' : '');
+    el.onclick = () => { currentStep = step.id; render(); };
+    const chips = (step.chips || []).map(([k,t]) => `<span class="chip ${k}">${t}</span>`).join('');
+    el.innerHTML = `
+      <div class="num">${currentStory === 'problems' ? '⚠' : (i+1)}</div>
+      <div>
+        <h3>${step.title}</h3>
+        <p>${step.text}</p>
+        <div class="chip-row">${chips}</div>
+      </div>`;
+    flowEl.appendChild(el);
+  });
+}
+
+function renderSide() {
+  const story = STORIES[currentStory];
+  const step = story.steps.find(s => s.id === currentStep) || story.steps[0];
+  if (!step) {
+    sideEl.innerHTML = `<div class="eyebrow">Step details</div><div class="empty">Nothing selected.</div>`;
+    return;
+  }
+  const d = step.detail;
+  sideEl.innerHTML = `
+    <div class="eyebrow">${currentStory === 'problems' ? 'Why this is risky' : 'What this step means'}</div>
+    <h2>${d.title}</h2>
+    <p>${d.plain}</p>
+    <div class="box"><b>Who</b><span>${d.who}</span></div>
+    <div class="box"><b>What happens</b><span>${d.happens}</span></div>
+    <div class="box"><b>Why it matters</b><span>${d.why}</span></div>
+  `;
+}
+
+function render() {
+  renderTabs();
+  if (!currentStep) currentStep = STORIES[currentStory].steps[0]?.id;
+  renderFlow();
+  renderSide();
+}
+
+render();
+</script>
+</body>
+</html>
