@@ -37,3 +37,6 @@ exports.pushOnGuestCheckout = pushOnGuestCheckout;
 exports.pushOnServiceRequest = pushOnServiceRequest;
 exports.pushOnHkDone = pushOnHkDone;
 exports.pushOnDamageReport = pushOnDamageReport;
+
+const { registerCloudFunction: registerHotelCollectAlert } = require('./controllers/hotelCollectAlert');
+exports.pushOnHotelCollect = registerHotelCollectAlert();
