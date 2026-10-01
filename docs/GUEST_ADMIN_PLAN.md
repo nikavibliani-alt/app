@@ -116,3 +116,12 @@ Restore point: tag `before-round-5`.
 
 Undo: `git revert --no-edit <commit>` (or `before-round-5..HEAD`), then push.
 | 1 | a7c00a6 | live |
+
+# Hotel Collect alerts
+
+Restore point: tag `before-hotel-collect`.
+
+1. Admin page: badge on Stay cards, banner of bookings to check, review buttons (verified / fake / undo), reservation-only details, deep link `?hc=<reservationNumber>`
+2. Cloud Function `pushOnHotelCollect` (push + WhatsApp to owner when a new Hotel Collect booking arrives)
+
+Undo admin: `git revert --no-edit <commit>`, then push. Undo cloud function: `firebase functions:delete pushOnHotelCollect --region europe-west1 --project sleepy-5c962`.
