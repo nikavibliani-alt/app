@@ -1935,6 +1935,7 @@ function getExpectedCheckInWindow(){
 // ── HK STATUS (single today-doc fetch; refreshed every 60s and on visibilitychange) ──
 let _hkTodayData=null; // null = not yet fetched
 let _hkYesterdayData=null; // null = not yet fetched
+let _hkDataRoom=''; // room the cached HK data belongs to — never reuse HK data from another room
 let _hkFetching=false;
 let _unlockPollTimer=null; // 30s lightweight time-only re-check
 let _hkPollTimer=null;    // 60s Firestore HK fetch
@@ -1945,21 +1946,25 @@ let _homeLoading=false;   // guard: prevents concurrent showHome() invocations
 async function refreshHkToday(){
   if(_hkFetching||!aptId)return;
   _hkFetching=true;
+  const room=aptId;
   const today=tbilisiToday();
   const yesterday=new Date(new Date(today+'T00:00:00Z').getTime()-86400000).toISOString().slice(0,10);
   try{
     const[snap,snapYesterday]=await Promise.all([
-      getDoc(doc(db,'hk_status',aptId+'_'+today)),
-      getDoc(doc(db,'hk_status',aptId+'_'+yesterday)),
+      getDoc(doc(db,'hk_status',room+'_'+today)),
+      getDoc(doc(db,'hk_status',room+'_'+yesterday)),
     ]);
+    if(room!==aptId){_hkFetching=false;refreshHkToday();return;}   // room changed mid-fetch: drop this result, fetch for the new room
     _hkTodayData=snap.exists()?snap.data():null;
     _hkYesterdayData=snapYesterday.exists()?snapYesterday.data():null;
-  }catch(e){_hkTodayData=null;_hkYesterdayData=null;}
+    _hkDataRoom=room;
+  }catch(e){_hkTodayData=null;_hkYesterdayData=null;_hkDataRoom='';}
   _hkFetching=false;
-  if(document.getElementById('page-home')?.classList.contains('active'))renderTiles();
+  if(document.getElementById('page-home')?.classList.contains('active')){syncHomePhase();renderTiles();}
 }
 
 function _unlockTick(){
+  syncHomePhase();   // flip the hero (waiting -> arriving) when time/HK now unlock the guest
   // Auto-dismiss locked subpage if the gate has now opened
   if(isUnlocked()){
     const sp=document.getElementById('cur-sp');
@@ -1993,7 +1998,7 @@ function isUnlocked(){
     guest:guestData,
     arrivalDate:arrival,
     checkInHour:getCheckInHour(),
-    hkDone:_hkTodayData?.done===true||_hkYesterdayData?.done===true,
+    hkDone:_hkDataRoom===aptId&&(_hkTodayData?.done===true||_hkYesterdayData?.done===true),
     today:tbilisiToday(),
     hour:sharedTbilisiHour(),
   });
@@ -2429,7 +2434,7 @@ window.switchApt=async function(newRoomCode){
   window._switchingApt=true;
   try{
   aptId=newRoomCode;
-  _hkTodayData=null; // reset HK cache for new apt
+  _hkTodayData=null;_hkYesterdayData=null;_hkDataRoom=''; // reset HK cache for new apt
   // Pin activeReservation to the selected apt — prefer upcoming/current, fall back to any match
   const _swToday=tbilisiToday();
   const _swCandidates=allMatchedReservations.filter(r=>r.roomCode===newRoomCode&&(r.status||'').toUpperCase()!=='CANCELLED');
@@ -3084,6 +3089,7 @@ function showHome(){
     renderTiles();
   }).catch(()=>{});
   startUnlockPoller();
+  refreshHkToday();   // always re-fetch HK when home opens (registration, room change) — then syncHomePhase() flips the hero
   renderWhatYouBooked();
   renderPassportBanner();
   applyTranslations();
@@ -4224,7 +4230,7 @@ window.logout=function(){
   if(aptId)localStorage.removeItem('maxela_g_'+aptId);
   guestId=null;guestData=null;aptData=null;activeReservation=null;allMatchedReservations=[];
   passportFile=null;passportScanResult=null;
-  stopUnlockPoller();_hkTodayData=null;
+  stopUnlockPoller();_hkTodayData=null;_hkYesterdayData=null;_hkDataRoom='';
   aptId=params.get('apt')||'';
   document.getElementById('reg-verify-error')?.remove();
   ['r-name','r-contact','r-arrival','r-arrival-display'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';el.classList&&el.classList.remove('invalid');}});
@@ -4782,6 +4788,22 @@ function _startCountdownTick(){
 
 // §3.2 — derives which of the 4 home phases to show. Reads isUnlocked() / isStayEnded()
 // (both unchanged — §4.1/§4.2 math lives elsewhere) plus the two new guest-confirmed flags.
+function _homePhaseNow(){
+  if(!isUnlocked())return'waiting';
+  const co=guestData?.checkoutDate||activeReservation?.checkout||activeReservation?.checkOut||'';
+  const today=tbilisiToday();
+  if(co&&today===co)return'leaving';
+  if(guestData?.guestConfirmedCheckin===true)return'staying';
+  return'arriving';
+}
+// Re-derive the hero phase only when it actually changed (HK data / clock moved since the page opened)
+function syncHomePhase(){
+  const home=document.getElementById('page-home');
+  if(!home||!guestData)return;
+  if(home.classList.contains('phase-ended'))return;
+  const want='phase-'+_homePhaseNow();
+  if(!home.classList.contains(want))applyHomePhase();
+}
 function applyHomePhase(){
   const home=document.getElementById('page-home');
   if(!home)return;
@@ -4795,16 +4817,7 @@ function applyHomePhase(){
     return; // no phase-* class — hero-card (daily key) stays hidden, thank-you card shows instead
   }
 
-  let phase;
-  if(!isUnlocked()){
-    phase='waiting';
-  }else{
-    const co=guestData?.checkoutDate||activeReservation?.checkout||activeReservation?.checkOut||'';
-    const today=tbilisiToday();
-    if(co&&today===co)phase='leaving';
-    else if(guestData?.guestConfirmedCheckin===true)phase='staying';
-    else phase='arriving';
-  }
+  const phase=_homePhaseNow();
   home.classList.add('phase-'+phase);
   const wt=document.getElementById('hero-walkthrough');
   if(wt&&phase!=='staying')wt.classList.remove('wt-expanded');
