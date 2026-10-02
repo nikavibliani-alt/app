@@ -257,6 +257,7 @@ const HK_SITES_ALL=[
   {id:'shartava',title:'Shartava'},
   {id:'centre',title:'City Centre · Orb & Tab'},
   {id:'vgl',title:'VGL'},
+  {id:'xcv',title:'XCV'},
   {id:'abashidze',title:'Abashidze'},
 ];
 
@@ -486,6 +487,7 @@ function hkSiteId(roomCode){
   if(r?.site)return r.site;
   if(/^orb-|^tab-/i.test(roomCode))return 'centre';
   if(/^vgl-/i.test(roomCode))return 'vgl';
+  if(/^xcv-/i.test(roomCode))return 'xcv';
   if(roomCode==='abashidze')return 'abashidze';
   return 'shartava';
 }
@@ -842,7 +844,7 @@ function roomsForTeams(teamIds){
 function defaultTeams(){
   const bySite={};
   roomsSorted(roomsData,true).filter(r=>r.showInHk!==false).forEach(r=>{(bySite[hkSiteId(r.roomCode)]=bySite[hkSiteId(r.roomCode)]||[]).push(r.roomCode);});
-  const labels={shartava:'Shartava Team',centre:'Centre Team',vgl:'VGL Team',abashidze:'Abashidze Team'};
+  const labels={shartava:'Shartava Team',centre:'Centre Team',vgl:'VGL Team',xcv:'XCV Team',abashidze:'Abashidze Team'};
   return Object.keys(labels).filter(id=>bySite[id]?.length).map(id=>({id,label:labels[id],roomCodes:bySite[id]}));
 }
 async function startBoard(){

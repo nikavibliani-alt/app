@@ -702,7 +702,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1006a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1007a · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -2044,7 +2044,7 @@ async function loadAndRenderGuestSettings(){
 const HK_ADMIN_ROLE={id:'admin',label:'Admin PIN',desc:'All rooms across properties'};
 function hkBuildDefaultTeams(){
   const rooms=getHkRooms();
-  const bySite={shartava:[],centre:[],vgl:[],abashidze:[]};
+  const bySite={shartava:[],centre:[],vgl:[],xcv:[],abashidze:[]};
   rooms.forEach(r=>{
     const s=hkSiteId(r.code);
     if(bySite[s])bySite[s].push(r.code);
@@ -2053,6 +2053,7 @@ function hkBuildDefaultTeams(){
   if(bySite.shartava.length)teams.push({id:'shartava',label:'Shartava Team',roomCodes:bySite.shartava});
   if(bySite.centre.length)teams.push({id:'centre',label:'Centre Team',roomCodes:bySite.centre});
   if(bySite.vgl.length)teams.push({id:'vgl',label:'VGL Team',roomCodes:bySite.vgl});
+  if(bySite.xcv.length)teams.push({id:'xcv',label:'XCV Team',roomCodes:bySite.xcv});
   if(bySite.abashidze.length)teams.push({id:'abashidze',label:'Abashidze Team',roomCodes:bySite.abashidze});
   return teams;
 }
@@ -2088,6 +2089,7 @@ function hkTeamRoomBlocks(){
     {title:'Shartava',rooms:getHkRooms().filter(r=>hkSiteId(r.code)==='shartava')},
     {title:'City Centre · Orb & Tab',rooms:getHkRooms().filter(r=>hkSiteId(r.code)==='centre')},
     {title:'VGL',rooms:getHkRooms().filter(r=>hkSiteId(r.code)==='vgl')},
+    {title:'XCV',rooms:getHkRooms().filter(r=>hkSiteId(r.code)==='xcv')},
     {title:'Abashidze',rooms:getHkRooms().filter(r=>hkSiteId(r.code)==='abashidze')},
   ].filter(g=>g.rooms.length);
   const selected=new Set((_hkTeamEdit?.roomCodes||[]).map(c=>String(c).toLowerCase()));
@@ -2266,12 +2268,14 @@ function renderHkSettings(){
   const shartava=getHkRooms().filter(r=>hkSiteId(r.code)==='shartava');
   const centre=getHkRooms().filter(r=>hkSiteId(r.code)==='centre');
   const vgl=getHkRooms().filter(r=>hkSiteId(r.code)==='vgl');
+  const xcv=getHkRooms().filter(r=>hkSiteId(r.code)==='xcv');
   const abash=getHkRooms().filter(r=>hkSiteId(r.code)==='abashidze');
   const detailBlock=_hkCleanDetailOpen?`
     <div class="hk-clean-detail">
       ${siteBlock('Shartava · per room',shartava)}
       ${siteBlock('City Centre · per room',centre)}
       ${vgl.length?siteBlock('VGL · per room',vgl):''}
+      ${xcv.length?siteBlock('XCV · per room',xcv):''}
       ${abash.length?siteBlock('Abashidze · per room',abash):''}
     </div>`:'';
   const sec=_hkSetSection;
@@ -5498,6 +5502,7 @@ const HK_ROLE_LABELS={
   shartava:'Shartava Team',
   centre:'Centre Team',
   vgl:'VGL Team',
+  xcv:'XCV Team',
   abashidze:'Abashidze Team',
 };
 function hkRefreshRoleLabels(){
@@ -5630,6 +5635,7 @@ const HK_SITES_ALL=[
   {id:'shartava',title:'Shartava'},
   {id:'centre',title:'City Centre · Orb & Tab'},
   {id:'vgl',title:'VGL'},
+  {id:'xcv',title:'XCV'},
   {id:'abashidze',title:'Abashidze'},
 ];
 function hkSiteId(roomCode){
@@ -5637,6 +5643,7 @@ function hkSiteId(roomCode){
   if(r?.site)return r.site;
   if(/^orb-|^tab-/i.test(roomCode))return 'centre';
   if(/^vgl-/i.test(roomCode))return 'vgl';
+  if(/^xcv-/i.test(roomCode))return 'xcv';
   if(roomCode==='abashidze')return 'abashidze';
   return 'shartava';
 }

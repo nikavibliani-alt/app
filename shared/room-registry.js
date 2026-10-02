@@ -13,6 +13,7 @@ export const ROOM_SITES = [
   { id: 'shartava', label: 'Shartava' },
   { id: 'centre', label: 'City Centre' },
   { id: 'vgl', label: 'VGL' },
+  { id: 'xcv', label: 'XCV' },
   { id: 'abashidze', label: 'Abashidze' },
 ];
 
@@ -40,6 +41,8 @@ export const DEFAULT_ROOMS_SEED = [
   { roomCode: 'vgl-st2', displayName: 'VGL Studio 2', displayCode: 'vgl-st2', group: 'VGL', sortOrder: 51, site: 'vgl', showInHk: true, minihotelNames: ['VGL_ST2'], beddingRule: 'orb-tab' },
   { roomCode: 'vgl-ap3', displayName: 'VGL Apartment 3', displayCode: 'vgl-ap3', group: 'VGL', sortOrder: 52, site: 'vgl', showInHk: true, minihotelNames: ['VGL_AP3'], beddingRule: '6-7' },
   { roomCode: 'vgl-ap4', displayName: 'VGL Apartment 4', displayCode: 'vgl-ap4', group: 'VGL', sortOrder: 53, site: 'vgl', showInHk: true, minihotelNames: ['VGL_AP4'], beddingRule: '6-7' },
+  { roomCode: 'xcv-1', displayName: 'XCV 1', displayCode: 'xcv-1', group: 'XCV', sortOrder: 54, site: 'xcv', showInHk: true, minihotelNames: ['XCV_1'] },
+  { roomCode: 'xcv-2', displayName: 'XCV 2', displayCode: 'xcv-2', group: 'XCV', sortOrder: 55, site: 'xcv', showInHk: true, minihotelNames: ['XCV_2'] },
   { roomCode: 'abashidze', displayName: 'Abashidze', displayCode: 'abashidze', group: 'Abashidze', sortOrder: 60, site: 'abashidze', showInHk: true, minihotelNames: [], beddingRule: '6-7' },
 ];
 
