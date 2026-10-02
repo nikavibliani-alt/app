@@ -142,3 +142,10 @@ Restore point: tag `before-xcv`.
 3. Confirm XCV bookings arrive from the MiniHotel sync
 
 Undo: `git revert --no-edit <commit>`, then push. Firestore: delete the 4 docs (checkin_rooms/xcv-1, xcv-2; checkin_apartments/xcv-1, xcv-2).
+| 1 | 8119c1b | live |
+| 2 | (same run) | checkin_rooms/xcv-1, xcv-2 and checkin_apartments/xcv-1, xcv-2 were created automatically by the admin seed sync on first load (exactly these 4 docs) |
+| 3 | - | XCV bookings arrived: xcv-1 x2 docs, xcv-2 x3 docs (4 bookings; 007005372 is a 2-room booking). Names XCV_1 / XCV_2 matched. |
+
+Notes:
+- cleaner.html changes (belongs to HK chat): added {id:'xcv',title:'XCV'} to HK_SITES_ALL, an xcv- fallback in hkSiteId, and an XCV Team label in defaultTeams. Nothing else. check-cleaner-page.js passes.
+- XCV rooms are not in any HK team yet, so they will not appear on the HK board until added in HK settings.
