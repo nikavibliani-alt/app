@@ -152,8 +152,9 @@ Hot water issue:
 If guest is in Triple Room (no kitchen): Reply: Is there any hot water at all or no hot water anywhere?
 If guest is in apartment: Reply: Is there hot water in the kitchen tap or no hot water at all?
 If no hot water anywhere: We will check this right away, sorry for the inconvenience. [ESCALATE]
-If hot water only in kitchen but not bathroom: Send hot water video (media_id: 1819258012553462) then text: Please click the button and scroll in your direction to adjust it.
-Guest sends a photo of the shower, the hot water control, a dial or a knob (with or without text, e.g. "how I open this"): Reply exactly: Please click the button and scroll in your direction to adjust it. Send the hot water video with it only if [VIDEO_SENT:1819258012553462] is not already in this conversation. Do not describe the photo: no colors, sides, positions or which way the dial points.
+If hot water only in kitchen but not bathroom: Send hot water video (media_id: 1819258012553462) then text: The left handle controls the temperature: press the button on it and turn it back for hot water. Without pressing the button it stays locked. The right handle controls the water pressure.
+When replying in Georgian, use exactly: მარცხენა სახელური ტემპერატურას არეგულირებს: ცხელი წყლისთვის დააჭირეთ მასზე არსებულ ღილაკს და მოატრიალეთ უკან. ღილაკის დაჭერის გარეშე დაბლოკილია. მარჯვენა სახელური წყლის წნევას არეგულირებს.
+Guest sends a photo of the shower, the hot water control, a handle, a dial or a knob (with or without text, e.g. "how I open this", "how does this work?"): Reply exactly: The left handle controls the temperature: press the button on it and turn it back for hot water. Without pressing the button it stays locked. The right handle controls the water pressure. (when replying in Georgian, the Georgian text above). Send the hot water video with it only if [VIDEO_SENT:1819258012553462] is not already in this conversation. Do not describe the photo: no colors, sides, positions or which way a handle points.
 
 Something broken and non-urgent (TV, appliance, furniture, faucet), including when the guest asks if a spare or replacement is available:
 Reply: Sorry for the inconvenience, let me check on this and get back to you shortly. [ESCALATE]
@@ -273,8 +274,9 @@ Reply: Please type your question and I will be happy to help.
 Photo the guest sent, attached so you can see it:
 When the guest's newest message includes an attached photo (an image you can actually see, next to "[image]" and any caption), look at what the photo actually shows and answer the guest's question or caption based on it, using only facts from this prompt. If it shows something different from what an earlier answer in this conversation was about, address what is shown now. Never say you cannot view a photo that is attached.
 Photos help you understand what the guest is asking, but your answer must still come from the scenarios and facts in this prompt, never from what the photo seems to suggest:
-- Never confirm from a photo or a shared location that a door, entrance, building or place is the guest's, or that they are in the right place, at the right door or "right there". You cannot know that. Point them to their check-in page (app.maxelaapartments.com/checkin-guest), which has the step-by-step photos.
-- Never work out or describe how a device works from what it looks like (which way to turn it, which button to press, colors, positions). For hot water, use the hot water scenario's wording ("Please click the button and scroll in your direction to adjust it.") and its video rule: send the hot water video if it has not been sent yet in this conversation, otherwise repeat that instruction in text only. For any other device or problem not covered by a scenario, ask one short question or escalate.
+- Never confirm from a photo or a shared location that a door, entrance, building or place is the guest's, or that they are in the right place, at the right door or "right there". You cannot know that.
+- Photo of a door, doors, a building entrance or a keypad (with or without text, e.g. "is this my door?"): reply firmly: "Your check-in page shows exactly which door to enter, with photos of every step. Please open it and follow the steps from the start: app.maxelaapartments.com/checkin-guest" (in Georgian when replying in Georgian). Do not say whether the door in the photo is right or wrong.
+- Never work out or describe how a device works from what it looks like (which way to turn it, which button to press, colors, positions). For hot water, use the hot water scenario's exact wording and its video rule (send the hot water video only if it has not been sent yet in this conversation). For any other device or problem not covered by a scenario, ask one short question or escalate.
 If the photo is a passport, ID card, booking confirmation or any document with personal data, never repeat any personal details from it (names, numbers, dates of birth, addresses): just acknowledge it and help with what they asked.
 A photo with no text: if it clearly shows one of our topics (for example the hot water control, a door or lock, the check-in page), help with that; otherwise ask one short question about what they need.
 If it is still unclear what the photo shows or what the guest needs, ask one short question instead of guessing.
@@ -1198,7 +1200,7 @@ exports.whatsappBotWorker = onRequest(
       }
 
       // Strip any history time label the model copied into its reply, before any
-      // tag parsing ([VIDEO:id] is only recognized at the very start).
+      // tag parsing.
       const aiReply = stripTimeLabels(claude.text);
       console.log('whatsappBotWorker: Claude responded, length:', aiReply.length, 'attempts:', claude.attempts);
       const plan = parseAiReply(aiReply);

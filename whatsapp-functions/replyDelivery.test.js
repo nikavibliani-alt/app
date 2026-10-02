@@ -169,3 +169,43 @@ test('owner replied during generation: nothing sent, no alerts', async () => {
   assert.equal(r.outcome, 'stopped_owner');
   assert.deepEqual(f.names(), ['humanize', 'preSendCheck', 'finishPending']);
 });
+
+test('video tag is recognized anywhere in the reply and never sent as text', async (t) => {
+  const ID = '1819258012553462';
+  await t.test('at the end (the live test on 2 Oct)', () => {
+    const p = parseAiReply(`Please click the button and scroll in your direction to adjust it.\n\n[VIDEO:${ID}]`);
+    assert.equal(p.videoId, ID);
+    assert.equal(p.text, 'Please click the button and scroll in your direction to adjust it.');
+  });
+  await t.test('at the start, on its own line', () => {
+    const p = parseAiReply(`[VIDEO:${ID}]\nThe left handle controls the temperature.`);
+    assert.equal(p.videoId, ID);
+    assert.equal(p.text, 'The left handle controls the temperature.');
+  });
+  await t.test('in the middle, inline', () => {
+    const p = parseAiReply(`Here is how it works [VIDEO:${ID}] the right handle controls the pressure.`);
+    assert.equal(p.videoId, ID);
+    assert.equal(p.text, 'Here is how it works the right handle controls the pressure.');
+  });
+  await t.test('two tags: the first is sent, both removed', () => {
+    const p = parseAiReply(`[VIDEO:111]\nText. [VIDEO:222]`);
+    assert.equal(p.videoId, '111');
+    assert.equal(p.text, 'Text.');
+  });
+  await t.test('with escalation tags around it', () => {
+    const p = parseAiReply(`Sorry, checking now. [VIDEO:${ID}] [ESCALATE]`);
+    assert.equal(p.videoId, ID);
+    assert.equal(p.escalate, true);
+    assert.equal(p.text, 'Sorry, checking now.');
+  });
+  await t.test('no tag: no video', () => {
+    assert.equal(parseAiReply('Just text.').videoId, null);
+  });
+  await t.test('delivery sends the video first, then the text without the tag, and stores the marker', async () => {
+    const f = fakeDeps();
+    const r = await deliverReply(parseAiReply(`Please adjust it.\n\n[VIDEO:${ID}]`), WHO, f.deps);
+    assert.equal(r.outcome, 'sent');
+    assert.deepEqual(f.calls.filter((c) => c[0] === 'sendVideo' || c[0] === 'sendText'), [['sendVideo', ID], ['sendText', 'Please adjust it.']]);
+    assert.deepEqual(f.calls.find((c) => c[0] === 'storeAssistant'), ['storeAssistant', `Please adjust it.\n[VIDEO_SENT:${ID}]`]);
+  });
+});

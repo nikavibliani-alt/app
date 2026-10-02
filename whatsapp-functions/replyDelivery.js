@@ -15,12 +15,15 @@ const { applyToneGuard } = require('./toneGuard');
  */
 function parseAiReply(raw) {
   let text = String(raw ?? '');
-  let videoId = null;
-  const videoMatch = text.match(/^\[VIDEO:(\d+)\]\s*\n?/);
-  if (videoMatch) {
-    videoId = videoMatch[1];
-    text = text.slice(videoMatch[0].length);
-  }
+  // [VIDEO:id] anywhere in the reply (the prompt asks for it first, but the
+  // model sometimes puts it at the end): the first one is the video to send,
+  // and every video tag is removed from the guest-facing text.
+  const videoMatch = text.match(/\[VIDEO:(\d+)\]/i);
+  const videoId = videoMatch ? videoMatch[1] : null;
+  text = text
+    .replace(/[ \t]*\[VIDEO:\d+\][ \t]*/gi, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n');
   const angry = /\[URGENT:ANGRY\]/i.test(text);
   const silent = /\[SILENT\]/i.test(text);
   const urgentMatch = text.match(/\[URGENT:(LOCKOUT|ISSUE)\]/i);
