@@ -310,3 +310,16 @@ test('loadCurrentStayHistory (Firestore path)', async (t) => {
     assert.equal(recentNewestFirst.length, 6);
   });
 });
+
+test('prepareClaudeHistory returns the unanswered stored messages (with their photo ids)', () => {
+  const now = NOW;
+  const newestFirst = [
+    { ...m('user', '[image] how I open this', now - 60 * 1000), media: { type: 'image', id: 'p2' } },
+    { ...m('user', '[image]', now - 2 * 60 * 1000), media: { type: 'image', id: 'p1' } },
+    m('assistant', 'Sure.', now - 60 * 60 * 1000),
+    { ...m('user', '[image]', now - 61 * 60 * 1000), media: { type: 'image', id: 'old' } },
+  ];
+  const r = prepareClaudeHistory(newestFirst, now);
+  assert.deepEqual(r.unanswered.map((x) => x.media.id), ['p1', 'p2'], 'oldest first; the answered older photo is not included');
+  assert.equal(r.unansweredCount, 2);
+});

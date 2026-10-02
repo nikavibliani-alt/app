@@ -23,6 +23,8 @@ const {
 const { loadCurrentStayHistory, prepareClaudeHistory, stripTimeLabels } = require('./stayContext');
 const { findCurrentGuestForm } = require('./guestLookup');
 const { otherPropertyForRoom, stayTiming, stayTimingContextLines } = require('./stayRules');
+const { describeInbound } = require('./inboundContent');
+const { downloadMetaMedia, photosToAttach, attachPhotos } = require('./metaMedia');
 const { callClaudeWithRetry, describeClaudeError, buildCachedSystem, formatUsage } = require('./claudeClient');
 const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
 
@@ -151,6 +153,7 @@ If guest is in Triple Room (no kitchen): Reply: Is there any hot water at all or
 If guest is in apartment: Reply: Is there hot water in the kitchen tap or no hot water at all?
 If no hot water anywhere: We will check this right away, sorry for the inconvenience. [ESCALATE]
 If hot water only in kitchen but not bathroom: Send hot water video (media_id: 1819258012553462) then text: Please click the button and scroll in your direction to adjust it.
+Guest sends a photo of the shower, the hot water control, a dial or a knob (with or without text, e.g. "how I open this"): Reply exactly: Please click the button and scroll in your direction to adjust it. Send the hot water video with it only if [VIDEO_SENT:1819258012553462] is not already in this conversation. Do not describe the photo: no colors, sides, positions or which way the dial points.
 
 Something broken and non-urgent (TV, appliance, furniture, faucet), including when the guest asks if a spare or replacement is available:
 Reply: Sorry for the inconvenience, let me check on this and get back to you shortly. [ESCALATE]
@@ -267,11 +270,25 @@ If CURRENT_TBILISI_HOUR is outside 10-19: Our cleaning staff has finished for to
 Voice message or audio received:
 Reply: Please type your question and I will be happy to help.
 
-Photo or video received:
-If there is guest text in this same message, or a clear unanswered question in the guest's immediately preceding message, treat the photo/video as supporting evidence for that text and answer the actual question — do not send the generic fallback. Look carefully at what the image/video actually shows; if it depicts something different from what an earlier answer in this conversation was about (e.g. a different appliance, a different location), do not reuse that earlier answer — address what's actually shown now.
-If genuinely unclear what the photo/video shows or what the guest is asking, ask a short clarifying question instead of guessing or repeating an unrelated previous answer.
-If a photo with no accompanying text anywhere (this message or the one before it) and nothing in the conversation history clarifies what's being asked: Reply: Sorry, we're unable to view the photo right now, could you describe the issue in a message so we can help?
+Photo the guest sent, attached so you can see it:
+When the guest's newest message includes an attached photo (an image you can actually see, next to "[image]" and any caption), look at what the photo actually shows and answer the guest's question or caption based on it, using only facts from this prompt. If it shows something different from what an earlier answer in this conversation was about, address what is shown now. Never say you cannot view a photo that is attached.
+Photos help you understand what the guest is asking, but your answer must still come from the scenarios and facts in this prompt, never from what the photo seems to suggest:
+- Never confirm from a photo or a shared location that a door, entrance, building or place is the guest's, or that they are in the right place, at the right door or "right there". You cannot know that. Point them to their check-in page (app.maxelaapartments.com/checkin-guest), which has the step-by-step photos.
+- Never work out or describe how a device works from what it looks like (which way to turn it, which button to press, colors, positions). For hot water, use the hot water scenario's wording ("Please click the button and scroll in your direction to adjust it.") and its video rule: send the hot water video if it has not been sent yet in this conversation, otherwise repeat that instruction in text only. For any other device or problem not covered by a scenario, ask one short question or escalate.
+If the photo is a passport, ID card, booking confirmation or any document with personal data, never repeat any personal details from it (names, numbers, dates of birth, addresses): just acknowledge it and help with what they asked.
+A photo with no text: if it clearly shows one of our topics (for example the hot water control, a door or lock, the check-in page), help with that; otherwise ask one short question about what they need.
+If it is still unclear what the photo shows or what the guest needs, ask one short question instead of guessing.
+
+"[photo you cannot see]" (an older photo in the history, or a photo that could not be loaded) and "[video]":
+If there is guest text in this same message, or a clear unanswered question in the guest's immediately preceding message, treat the photo/video as supporting evidence for that text and answer the actual question — do not send the generic fallback. You cannot see an unattached photo or any video: never say "looking at the photo", "in the photo", "I can see", or anything else that describes or guesses what it shows. Answer from the guest's words and the scenarios only.
+If genuinely unclear what the guest is asking, ask a short clarifying question instead of guessing or repeating an unrelated previous answer.
+If a photo with no attached image and no accompanying text anywhere (this message or the one before it) and nothing in the conversation history clarifies what's being asked: Reply: Sorry, we're unable to view the photo right now, could you describe the issue in a message so we can help?
 If a video with no accompanying text anywhere (this message or the one before it) and nothing in the conversation history clarifies what's being asked: Reply: Sorry, we're unable to view the video right now, could you describe the issue in a message so we can help?
+
+Other message types:
+"[sticker]" is like a reaction: it needs no reply on its own. If the guest also wrote text, answer the text.
+"[location: ...]" means the guest shared where they are. Use it together with their text (for example they are on the way, or cannot find the building): give the address and maps link from this prompt, or point them to their check-in page. Never invent distances, travel times or directions.
+"[document: ...]" is a file you cannot open. If the guest's text says what it is, help with that; otherwise ask one short question about what they need.
 
 Returning guest (previous stay notes exist):
 Reply: Good to hear from you again. How can I help?
@@ -596,14 +613,9 @@ async function claimOncePerStay(db, key) {
 
 // ---- Inbound content classification ----------------------------------------
 
-/** Returns the text to store for an inbound message, or a bracketed placeholder for non-text types. */
+/** Returns the text to store for a message, or a bracketed placeholder for non-text types (see inboundContent.js). */
 function classifyIncomingContent(msg) {
-  if (msg.text?.body) return msg.text.body;
-  const type = msg.type;
-  if (type === 'audio' || type === 'voice') return '[audio]';
-  if (type === 'image' || type === 'sticker') return '[image]';
-  if (type === 'video') return '[video]';
-  return '[unsupported]';
+  return describeInbound(msg).content;
 }
 
 /**
@@ -813,7 +825,15 @@ exports.whatsappWebhook = onRequest(
         const phone = normalizePhone(msg.from);
         if (!phone) return res.sendStatus(200);
 
-        const text = classifyIncomingContent(msg);
+        const inbound = describeInbound(msg);
+        const text = inbound.content;
+
+        // Reactions (👍 on one of our messages): nothing to answer, no alert —
+        // not stored and no bot run.
+        if (inbound.action === 'ignore') {
+          console.log(`whatsappWebhook: ${text} from`, phone, '— ignored (no reply, not stored)');
+          return res.sendStatus(200);
+        }
 
         const convoRef    = db.collection('whatsapp_conversations').doc(phone);
         const messagesRef = convoRef.collection('messages');
@@ -829,7 +849,17 @@ exports.whatsappWebhook = onRequest(
           content: text,
           timestamp: FieldValue.serverTimestamp(),
           metaMessageId: msg.id || null,
+          // Photos: Meta's media id only (never the image); the worker downloads
+          // it while the photo is part of the guest's unanswered batch.
+          ...(inbound.media ? { media: inbound.media } : {}),
         });
+
+        // Stickers: kept in the history, but no bot run of their own. If the
+        // guest also writes text, that text's run sees the sticker.
+        if (inbound.action === 'store_only') {
+          console.log(`whatsappWebhook: ${text} from`, phone, '— stored, no reply');
+          return res.sendStatus(200);
+        }
 
         const config = await getGlobalsConfig(db);
 
@@ -1106,7 +1136,18 @@ exports.whatsappBotWorker = onRequest(
         await deletePendingIfTokenMatches(db, phone, batchToken);
         return res.sendStatus(200);
       }
-      const history = prepared.messages;
+      // Photos in the guest's unanswered batch go to Claude as images (newest 4;
+      // older photos stay "[image]" text in the history). Downloaded from Meta
+      // now, passed through, never stored. A failed download keeps "[image]".
+      const photos = photosToAttach(prepared.unanswered);
+      const downloads = new Map();
+      for (const p of photos) {
+        const d = await downloadMetaMedia({ mediaId: p.mediaId, accessToken: process.env.META_ACCESS_TOKEN });
+        downloads.set(p.index, d);
+        if (d.ok) console.log(`whatsappBotWorker: photo ${p.mediaId} attached (${d.mimeType}, ${d.bytes} bytes) for`, phone);
+        else console.warn(`whatsappBotWorker: photo ${p.mediaId} not attached, using "[image]" text — ${d.reason} — for`, phone);
+      }
+      const history = attachPhotos(prepared.messages, prepared.unansweredCount, downloads);
 
       // CHANGE G — inject the current Tbilisi hour so the model can apply
       // hour-dependent scenarios (e.g. cleaning staff availability).

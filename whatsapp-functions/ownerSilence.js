@@ -191,7 +191,7 @@ function findMostRecentOwnerMessage(messagesNewestFirst) {
 // of these placeholders (no real wording at all) as ack-equivalent for the
 // owner-continuation-silence window. A batch mixing a placeholder with real
 // text is NOT covered here — that combination still carries a real question.
-const NON_TEXT_PLACEHOLDER_RE = /^\[(?:image|video|audio|unsupported)\]$/;
+const NON_TEXT_PLACEHOLDER_RE = /^\[(?:image|video|audio|sticker|unsupported)\]$/;
 
 /** True if every line of `text` is one of classifyIncomingContent()'s non-text
  * placeholder strings — i.e. the guest sent no real wording at all, just

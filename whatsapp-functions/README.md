@@ -307,6 +307,28 @@ is stripped (`stripTimeLabels`) before tag parsing.
 `toneGuard.js` runs on the final guest-facing text of every reply. It turns
 `!` into `.` and `—` into `, `, and never changes anything inside a link.
 
+## Non-text guest messages (`inboundContent.js`, `metaMedia.js`)
+
+`describeInbound` decides how each Meta message type is stored and whether the bot runs:
+
+| Type | Stored as | Bot run |
+|---|---|---|
+| text | the text | yes |
+| image | `[image]` + caption, plus `media: { type, id, mimeType }` (the media id only, never the image) | yes |
+| reaction | not stored | no, and no alert |
+| sticker | `[sticker]` | no run of its own (a text in the same batch sees it) |
+| location | `[location: name, address, lat, lng]` | yes |
+| document | `[document: filename]` + caption | yes |
+| button / interactive reply | the button or list text | yes |
+| video | `[video]` + caption | yes |
+| audio | `[audio]` | yes |
+| anything else | `[unsupported]` | yes |
+
+How photos reach Claude:
+- **Attached:** photos in the guest's current unanswered batch (newest 4) are downloaded from Meta when the worker runs (media id → URL → bytes, with the access token, 10 s timeout, max 5 MB, jpeg/png/gif/webp). They go to Claude as image blocks and are then dropped; nothing is stored.
+- **Not attached:** every photo Claude cannot see (a failed download, or an older photo in the history) reaches Claude as `[photo you cannot see]`, so it never writes as if it could see it.
+- **Cost:** a phone photo adds about 1,400–1,600 input tokens, which isn't cached (about $0.0045 on Sonnet 4.6).
+
 ## Model and prompt caching (`claudeClient.js`)
 
 - **Model:** `MODEL` in `claudeClient.js` is the only place the model is set, for guest replies and post-checkout summaries alike. It's currently `claude-sonnet-4-6`. `claude-sonnet-5` is planned once the prompt holds up on it in the replay; the 25 Sep and 2 Oct replays found it going silent on real guest problems under the old rules.

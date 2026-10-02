@@ -283,3 +283,10 @@ test('ownerMuteDecision — guest message during the mute is answered late, not 
     assert.deepEqual(d, { action: 'proceed' });
   });
 });
+
+test('isNonTextPlaceholderOnly — stickers count as no wording', () => {
+  assert.equal(isNonTextPlaceholderOnly('[sticker]'), true);
+  assert.equal(isNonTextPlaceholderOnly('[image]\n[sticker]'), true);
+  assert.equal(isNonTextPlaceholderOnly('[image] how I open this'), false, 'a caption is real wording');
+  assert.equal(isNonTextPlaceholderOnly('[location: 41.7, 44.8]'), false, 'a shared location carries information');
+});

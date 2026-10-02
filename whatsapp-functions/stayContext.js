@@ -102,7 +102,7 @@ function toClaudeHistory(recentNewestFirst, nowMs) {
  *
  * Answered messages keep their order; the unanswered guest messages go last
  * as the final user turn(s), with their time labels. Returns
- * `{ messages, unansweredCount, newestUnansweredMs }`, or `{ silent: true }`
+ * `{ messages, unansweredCount, unanswered, newestUnansweredMs }`, or `{ silent: true }`
  * when there is no unanswered guest message (nothing to reply to).
  */
 function prepareClaudeHistory(recentNewestFirst, nowMs) {
@@ -123,6 +123,9 @@ function prepareClaudeHistory(recentNewestFirst, nowMs) {
   return {
     messages: toClaudeHistory([...ordered].reverse(), nowMs),
     unansweredCount: unanswered.length,
+    // The stored unanswered guest messages, oldest first (the last
+    // `unansweredCount` turns of `messages`), e.g. to attach their photos.
+    unanswered,
     newestUnansweredMs: Math.max(...unanswered.map((m) => toMillis(m.timestamp)).filter(Number.isFinite)),
   };
 }
