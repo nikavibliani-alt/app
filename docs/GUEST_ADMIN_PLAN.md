@@ -132,3 +132,13 @@ Notes:
 - Incident during step 1: a stale git index lock led to a commit that deleted every file; the site was never redeployed from it. Fixed with a restore commit (tree identical to before), then step 1 recommitted. Revert ranges therefore contain that delete/restore pair; harmless.
 - Function reads ownerPhone from globals/config and uses secrets META_ACCESS_TOKEN / META_PHONE_NUMBER_ID (granted accessor to the default compute service account by the deploy). New collection hc_alerts/{reservationNumber} (one doc per alerted booking).
 - Review writes (hcReview on reservations) were tested with mocked writes only; not exercised against real Firestore rules.
+
+# XCV apartments
+
+Restore point: tag `before-xcv`.
+
+1. XCV as a building (room-registry site + seed, admin HK site lists)
+2. Create checkin_rooms/xcv-1, xcv-2 and checkin_apartments/xcv-1, xcv-2
+3. Confirm XCV bookings arrive from the MiniHotel sync
+
+Undo: `git revert --no-edit <commit>`, then push. Firestore: delete the 4 docs (checkin_rooms/xcv-1, xcv-2; checkin_apartments/xcv-1, xcv-2).
