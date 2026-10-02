@@ -128,12 +128,12 @@ test('classifyError', () => {
   assert.equal(classifyError(503, ''), 'server');
 });
 
-test('request body: one model constant (Sonnet 5), thinking off, no sampling params', async () => {
-  assert.equal(MODEL, 'claude-sonnet-5');
+test('request body: one model constant, thinking off, no sampling params', async () => {
+  assert.equal(MODEL, 'claude-sonnet-4-6');
   const f = scripted(ok('Hi'));
   await callClaudeWithRetry(base({ fetchImpl: f.fetchImpl }));
   const body = JSON.parse(f.calls[0].body);
-  assert.equal(body.model, 'claude-sonnet-5');
+  assert.equal(body.model, MODEL);
   assert.equal(body.max_tokens, 500);
   assert.deepEqual(body.thinking, { type: 'disabled' });
   for (const p of ['temperature', 'top_p', 'top_k']) assert.ok(!(p in body), `${p} never sent`);
@@ -142,9 +142,9 @@ test('request body: one model constant (Sonnet 5), thinking off, no sampling par
 
 test('model can be overridden per call (used by the old-vs-new replay)', async () => {
   const f = scripted(ok('Hi'));
-  const r = await callClaudeWithRetry(base({ fetchImpl: f.fetchImpl, model: 'claude-sonnet-4-6' }));
-  assert.equal(JSON.parse(f.calls[0].body).model, 'claude-sonnet-4-6');
-  assert.equal(r.model, 'claude-sonnet-4-6');
+  const r = await callClaudeWithRetry(base({ fetchImpl: f.fetchImpl, model: 'claude-sonnet-5' }));
+  assert.equal(JSON.parse(f.calls[0].body).model, 'claude-sonnet-5');
+  assert.equal(r.model, 'claude-sonnet-5');
 });
 
 test('reads the first text block, even if a thinking block comes first; returns usage', async () => {

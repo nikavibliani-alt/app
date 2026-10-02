@@ -6,8 +6,9 @@
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 // The one place the model is set, for both guest replies and post-checkout
-// summaries. To switch back, set it to 'claude-sonnet-4-6'.
-const MODEL = 'claude-sonnet-5';
+// summaries. 'claude-sonnet-5' is the planned next step once the prompt holds
+// up on it in the replay (see README "Model and prompt caching").
+const MODEL = 'claude-sonnet-4-6';
 // Thinking explicitly off: Sonnet 5 runs adaptive thinking when the field is
 // omitted (Sonnet 4.6 did not), and thinking tokens count against the small
 // max_tokens used for 1-3 sentence replies. Valid on both models.

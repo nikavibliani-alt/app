@@ -5,7 +5,7 @@
 - Every button must set its own text color (iPhone Safari paints buttons blue by default).
 - Plain language, no ALL CAPS shouting labels.
 
-Read first: docs/GUEST_ADMIN_PLAN.md, docs/AGENT_HANDOFF.md, docs/OPERATIONS.md. Every push to main deploys live (Firebase Hosting); never run firebase deploy by hand.
+Read first: docs/GUEST_ADMIN_PLAN.md, docs/AGENT_HANDOFF.md, docs/OPERATIONS.md. Every push to main deploys the website live (Firebase Hosting); never run `firebase deploy` by hand for Hosting. Cloud Functions are not deployed by a push: the WhatsApp bot functions are deployed by hand with `firebase deploy --only functions:whatsapp --project sleepy-5c962`, which is OK.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
