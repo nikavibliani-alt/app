@@ -2238,6 +2238,35 @@ function isArabic(s){return/[؀-ۿ]/.test(s||'');}
 // Strip vowels for consonant-skeleton comparison (handles missing short vowels)
 function _csk(s){return s.replace(/[aeiouy]/g,'');}
 
+// Booking number typed in the Name field = the channel confirmation number (bookingId) only.
+// MiniHotel reservation numbers are sequential/guessable, so they are never accepted here.
+function _normRef(s){return String(s||'').replace(/[\s\-]/g,'').toUpperCase();}
+function _looksLikeBookingRef(name){return /^[A-Z0-9]{8,}$/.test(_normRef(name));}
+function scoreReservations(name,arrival,pool){
+  const allScored=[];
+  let best=null,bestScore=0;
+  const isRef=_looksLikeBookingRef(name),ref=_normRef(name);
+  for(const r of pool){
+    if((r.status||'').toUpperCase()==='CANCELLED')continue;
+    const ci=r.checkin||r.checkIn||'';
+    if(!ci)continue;
+    let score=0;
+    if(isRef&&_normRef(r.bookingId)===ref)score=10;   // exact match: a wrong arrival date does not block it
+    if(score<10){
+      const isAr=isArabic(name);
+      const nm=nameMatch(name,r.guest||r.guestName||'');
+      const dateOk=!!(arrival&&arrival===ci);
+      const partial=partialNameMatch(name,r.guest||r.guestName||'');
+      if(nm&&dateOk)score=3;
+      else if(nm)score=2;
+      // Arabic: single-word consonant match + correct date is strong enough signal
+      else if(dateOk&&partial)score=isAr?3:2;
+    }
+    if(score>bestScore){bestScore=score;best=r;}
+    allScored.push({guest:r.guest||r.guestName||'',room:r.roomCode||'',checkin:ci,score});
+  }
+  return{allScored,best,bestScore};
+}
 function nameMatch(input,resGuest){
   const iw=_nameWords(input),rw=_nameWords(resGuest);
   if(!iw.length||!rw.length)return false;
@@ -2748,34 +2777,19 @@ window.searchReservation=async function(){
       :_getDocs(query(collection(db,'reservations'),where('checkin','>=',_searchCutoffStr),_orderBy('checkin','desc'),limit(500)));
     const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('Query timeout')),15000));
     const resSnap=await Promise.race([queryPromise,timeoutPromise]);
-    const allScored=[];
-    let _bestMatch=null,_bestScore=0;
-    resSnap.forEach(d=>{
-      const r={id:d.id,...d.data()};
-      if((r.status||'').toUpperCase()==='CANCELLED')return;
-      const ci=r.checkin||r.checkIn||'';
-      if(!ci)return;
-      let score=0;
-      // Hidden fallback: if name looks like a pure booking number, try exact bookingId match
-      const _looksLikeRef=/^[A-Z0-9\-]{5,}$/i.test(name.replace(/\s/g,''));
-      if(_looksLikeRef){
-        const ref=name.replace(/\s/g,'').toUpperCase();
-        if(ref===(r.bookingId||'').replace(/\s+/g,'').toUpperCase()||
-           ref===String(r.reservationNumber||'').replace(/\s+/g,'').toUpperCase()) score=10;
-      }
-      if(score<10){
-        const isAr=isArabic(name);
-        const nm=nameMatch(name,r.guest||r.guestName||'');
-        const dateOk=!!(arrival&&arrival===ci);
-        const partial=partialNameMatch(name,r.guest||r.guestName||'');
-        if(nm&&dateOk)score=3;
-        else if(nm)score=2;
-        // Arabic: single-word consonant match + correct date is strong enough signal
-        else if(dateOk&&partial)score=isAr?3:2;
-      }
-      if(score>_bestScore){_bestScore=score;_bestMatch=r;}
-      allScored.push({guest:r.guest||r.guestName||'',room:r.roomCode||'',checkin:ci,score});
-    });
+    // Exact OTA confirmation number: look it up across ALL rooms (an exact number is safe), even on an apartment link.
+    let _pool=[];resSnap.forEach(d=>_pool.push({id:d.id,...d.data()}));
+    if(_looksLikeBookingRef(name)){
+      try{
+        const _typed=name.trim();
+        const _variants=[...new Set([_typed,_typed.toUpperCase(),_normRef(name)])];
+        const _refSnap=await _getDocs(query(collection(db,'reservations'),where('bookingId','in',_variants)));
+        _refSnap.forEach(d=>{if(!_pool.some(x=>x.id===d.id))_pool.push({id:d.id,...d.data()});});
+      }catch(e){console.warn('[search] booking number lookup failed',e);}
+    }
+    const _scored=scoreReservations(name,arrival,_pool);
+    const allScored=_scored.allScored;
+    let _bestMatch=_scored.best,_bestScore=_scored.bestScore;
     console.log('Scored reservations:',allScored.map(r=>({name:r.guest,score:r.score})));
     console.log('[DEBUG] input name:',JSON.stringify(name),'arrival:',arrival);
     console.log('[DEBUG] total docs:',allScored.length,'bestScore:',_bestScore,'bestMatch:',_bestMatch?.guest||'none');
@@ -2817,6 +2831,10 @@ window.searchReservation=async function(){
       errEl.innerHTML=`We couldn't verify your booking.<br><a href="https://wa.me/${WA}" target="_blank" style="color:#86efac;font-weight:600;display:inline-block;margin-top:8px;">Contact host on WhatsApp</a>`;
       wrap.appendChild(errEl);
       return;
+    }
+    if(_bestScore===10&&_bestMatch.roomCode&&aptId&&_bestMatch.roomCode!==aptId){
+      aptId=_bestMatch.roomCode;   // matched by exact booking number on another room's link: use the booking's own room
+      try{renderGreetingApt();}catch(e){}
     }
     // Build the multi-room sibling group by base reservation number (007004961_001 + _002).
     let group=[_bestMatch];
