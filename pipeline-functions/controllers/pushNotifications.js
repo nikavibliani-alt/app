@@ -42,6 +42,13 @@ const VAPID_PUBLIC_KEY = defineSecret('VAPID_PUBLIC_KEY');
 const VAPID_PRIVATE_KEY = defineSecret('VAPID_PRIVATE_KEY');
 const REGION = 'europe-west1';
 
+/** Notify only for today or earlier (Tbilisi, UTC+4); future-dated Done docs are skipped. */
+function isHkDoneDateNotFuture(date, nowMs = Date.now()) {
+  const d = String(date || '');
+  if (!d) return true; // no date to judge — keep the old behaviour
+  return d <= new Date(nowMs + 4 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
 // Helper — send to all subscribed devices
 async function sendPushToAll(payload) {
   const webpush = require('web-push');
@@ -129,6 +136,11 @@ function registerCloudFunctions() {
       if (!after) return; // deleted — nothing to notify
       const wasDone = !!before?.done;
       const isDone = after.done === true;
+      // Emergency fix 2026-10-04: a Done on a future day (toggleHkDone also marks the next-arrival day) is not "ready now".
+      if (!isHkDoneDateNotFuture(after.date || event.params.id.split('_')[1])) {
+        console.log('pushOnHkDone skipped: future date', event.params.id);
+        return;
+      }
       if (!wasDone && isDone) {
         const roomCode = after.roomCode || event.params.id.split('_')[0];
         await sendPushToAll({
@@ -163,4 +175,4 @@ function registerCloudFunctions() {
   return { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone, pushOnDamageReport };
 }
 
-module.exports = { sendPushToAll, registerCloudFunctions };
+module.exports = { sendPushToAll, registerCloudFunctions, isHkDoneDateNotFuture };

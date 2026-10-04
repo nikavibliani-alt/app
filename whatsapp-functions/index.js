@@ -1,4 +1,5 @@
 const { onRequest } = require('firebase-functions/v2/https');
+const { isRoomReadyDateToday } = require('./roomReadyDate');
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { defineString } = require('firebase-functions/params');
 const { initializeApp, getApps } = require('firebase-admin/app');
@@ -1316,6 +1317,13 @@ exports.roomReadyNotification = onDocumentWritten(
 
     const { roomCode, date } = after.data();
     if (!roomCode || !date) return;
+
+    // Emergency fix 2026-10-04: only for a Done on TODAY (Tbilisi). toggleHkDone also marks the next-arrival
+    // day done, which messaged a guest arriving 6 days later.
+    if (!isRoomReadyDateToday(date)) {
+      console.log(`roomReadyNotification: skipped: future date (${roomCode} / ${date}, not today)`);
+      return;
+    }
 
     const db = getFirestore();
 
