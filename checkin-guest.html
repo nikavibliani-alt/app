@@ -2265,7 +2265,29 @@ function scoreReservations(name,arrival,pool){
     if(score>bestScore){bestScore=score;best=r;}
     allScored.push({guest:r.guest||r.guestName||'',room:r.roomCode||'',checkin:ci,score});
   }
+  // Short names only (booking name has 0 or 1 words of 3+ letters, e.g. "Hs X"): normal matching can never score 3.
+  // Accept when every word of the booking name matches the typed name's words/initials, the arrival date is exact,
+  // and exactly ONE booking (by base reservation number) qualifies that day. Otherwise no match.
+  if(bestScore<3&&arrival){
+    const cands=pool.filter(r=>(r.status||'').toUpperCase()!=='CANCELLED'&&(r.checkin||r.checkIn||'')===arrival&&_isShortNameBooking(r.guest||r.guestName||'')&&_shortNameMatches(name,r.guest||r.guestName||''));
+    const bases=new Set(cands.map(r=>reservationBaseNum(r.reservationNumber||r.id)));
+    if(bases.size===1){
+      cands.sort((a,b)=>String(a.roomCode||'').localeCompare(String(b.roomCode||'')));
+      best=cands[0];bestScore=3;
+    }
+  }
   return{allScored,best,bestScore};
+}
+function _allWords(s){return(s||'').toLowerCase().trim().split(/[\s,.\-]+/).filter(Boolean);}
+function _isShortNameBooking(g){return _nameWords(g).length<=1;}
+function _shortNameMatches(input,g){
+  const bw=_allWords(g),tw=_allWords(input);
+  if(!bw.length||!tw.length)return false;
+  const ini=tw.map(w=>w[0]).join('');
+  return bw.every(b=>{
+    if(b.length<=2)return tw.some(t=>t===b||t.startsWith(b))||ini===b;   // short word: same word, start of a typed word, or the typed initials
+    return tw.some(t=>t.length>2&&(levenshtein(t,b)<=2||t.includes(b)||b.includes(t)));
+  });
 }
 function nameMatch(input,resGuest){
   const iw=_nameWords(input),rw=_nameWords(resGuest);
