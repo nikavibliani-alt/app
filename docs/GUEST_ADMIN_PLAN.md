@@ -168,3 +168,9 @@ Notes:
 - Of 86 current/upcoming reservations (checkout >= 2026-10-04), 42 have no bookingId: 35 Airbnb, 7 direct. Those can only use the name search.
 - 5 bookings (incl. test blocker "Reserved") changed result with step 3; all were previously unfindable by their own name. No same-day collisions among short-name bookings; two identical short names the same day are refused on purpose.
 - Guest app version 1.1.4 -> 1.1.7 (one bump per step).
+
+# Room-ready fix (emergency 2026-10-04)
+
+Restore point: tag `before-room-ready-fix`. Undo: `git revert --no-edit 4b55292`, then redeploy the two functions (`firebase deploy --only functions:whatsapp:roomReadyNotification,functions:pipeline:pushOnHkDone --project sleepy-5c962`).
+Cause: cleaner staff link (Shartava) tapped Done on 0-1 on the 10 Oct day tab at 07:51Z; the guest arriving 10 Oct got the room_ready WhatsApp 3 s later and a push "0-1 is ready"; toggleHkDone also set manualUnlock:true on that guest's checkin_guests doc.
+Fix: roomReadyNotification only sends when hk_status.date == today (Tbilisi); pushOnHkDone skips future-dated docs. Deployed only these two functions. whatsapp-functions is owned by the WhatsApp chat.
