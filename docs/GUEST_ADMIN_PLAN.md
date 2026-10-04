@@ -159,3 +159,12 @@ Restore point: tag `before-search-fix`.
 3. Short names (0 or 1 word of 3+ letters): match by initials/words + exact date + only candidate
 
 Undo: `git revert --no-edit <commit>`, then push.
+| 1 | 7d19d30 | live |
+| 2 | ee2b088 | live |
+| 3 | 7f4ab74 | live |
+
+Notes:
+- searchReservation() resets aptId to '' on every search, so the old "apartment link limits the search to that room" branch never ran; searches were always global (last 2 months, 500 rows). input_apt therefore reads the ?apt= URL parameter.
+- Of 86 current/upcoming reservations (checkout >= 2026-10-04), 42 have no bookingId: 35 Airbnb, 7 direct. Those can only use the name search.
+- 5 bookings (incl. test blocker "Reserved") changed result with step 3; all were previously unfindable by their own name. No same-day collisions among short-name bookings; two identical short names the same day are refused on purpose.
+- Guest app version 1.1.4 -> 1.1.7 (one bump per step).
