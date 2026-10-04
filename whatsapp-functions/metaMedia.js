@@ -53,24 +53,28 @@ function photosToAttach(unanswered) {
   return withPhotos.slice(-MAX_IMAGES);
 }
 
-// What Claude sees for a photo that is NOT attached (an older photo in the
-// history, or one whose download failed). "[image]" alone made the model write
-// "looking at the photo" as if it could see it; this wording leaves no doubt.
+// What Claude sees for photos that are NOT attached. "[image]" alone made the
+// model write "looking at the photo", or treat an old photo as still waiting
+// for an answer ("we're unable to view the photo" to a guest's "I'm worried").
+// - An unanswered photo that could not be attached (download failed):
 const UNSEEN_PHOTO = '[photo you cannot see]';
+// - A photo from before a bot or Host reply, i.e. already answered:
+const ANSWERED_PHOTO = '[photo, already answered]';
 
 /**
  * Turns the trailing unanswered user turns that carry a downloaded photo into
  * [image, text] content blocks (the text keeps "[image]" next to the real
  * image). `messages` ends with the unanswered turns in order (see
  * prepareClaudeHistory); `downloads` maps unanswered index -> result.
- * Every other "[image]" in the guest's turns (failed downloads, older photos)
- * becomes "[photo you cannot see]".
+ * Every other "[image]" in the guest's turns is relabelled: before the
+ * unanswered turns -> "[photo, already answered]"; in an unanswered turn whose
+ * photo was not attached -> "[photo you cannot see]".
  */
 function attachPhotos(messages, unansweredCount, downloads) {
-  const out = messages.map((turn) => (turn.role === 'user' && typeof turn.content === 'string'
-    ? { ...turn, content: turn.content.replace(/\[image\]/g, UNSEEN_PHOTO) }
+  const first = messages.length - unansweredCount;
+  const out = messages.map((turn, i) => (turn.role === 'user' && typeof turn.content === 'string'
+    ? { ...turn, content: turn.content.replace(/\[image\]/g, i < first ? ANSWERED_PHOTO : UNSEEN_PHOTO) }
     : turn));
-  const first = out.length - unansweredCount;
   for (const [index, d] of downloads) {
     if (!d?.ok) continue;
     const i = first + index;
@@ -87,4 +91,4 @@ function attachPhotos(messages, unansweredCount, downloads) {
   return out;
 }
 
-module.exports = { downloadMetaMedia, photosToAttach, attachPhotos, MAX_IMAGES, UNSEEN_PHOTO };
+module.exports = { downloadMetaMedia, photosToAttach, attachPhotos, MAX_IMAGES, UNSEEN_PHOTO, ANSWERED_PHOTO };

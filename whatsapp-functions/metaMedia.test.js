@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { downloadMetaMedia, photosToAttach, attachPhotos, MAX_IMAGES, UNSEEN_PHOTO } = require('./metaMedia');
+const { downloadMetaMedia, photosToAttach, attachPhotos, MAX_IMAGES, UNSEEN_PHOTO, ANSWERED_PHOTO } = require('./metaMedia');
 
 const TOKEN = 'META-TEST-TOKEN';
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
@@ -84,7 +84,8 @@ test('attachPhotos: downloaded photos become image blocks; every photo Claude ca
   const downloads = new Map([[0, { ok: true, mimeType: 'image/jpeg', base64: 'AAAA' }], [1, { ok: false, reason: 'expired' }]]);
   const out = attachPhotos(messages, 2, downloads);
   assert.equal(UNSEEN_PHOTO, '[photo you cannot see]');
-  assert.equal(out[0].content, '[2 days ago] [photo you cannot see]', 'older photo in history');
+  assert.equal(ANSWERED_PHOTO, '[photo, already answered]');
+  assert.equal(out[0].content, '[2 days ago] [photo, already answered]', 'photo before a bot reply = already answered');
   assert.equal(out[1].content, messages[1].content, 'bot turns untouched');
   assert.deepEqual(out[2].content, [
     { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'AAAA' } },
@@ -93,4 +94,33 @@ test('attachPhotos: downloaded photos become image blocks; every photo Claude ca
   assert.equal(out[3].content, '[just now] [photo you cannot see]', 'failed download: Claude is told it cannot see it');
   assert.equal(out[2].content[1].text, '[1 min ago] [image] how I open this', 'an attached photo keeps "[image]" next to the real image');
   assert.equal(messages[0].content, '[2 days ago] [image]', 'input not mutated');
+});
+
+test('…7553 replay: an answered screenshot is labelled "already answered", the newest text is left alone', () => {
+  // screenshot -> bot answered -> guest "Я переживаю" (the only unanswered turn)
+  const messages = [
+    { role: 'user', content: '[3 min ago] [image]' },
+    { role: 'assistant', content: '[2 min ago] Let me check this with the team and get back to you shortly.' },
+    { role: 'user', content: '[just now] Я переживаю' },
+  ];
+  const out = attachPhotos(messages, 1, new Map());
+  assert.equal(out[0].content, '[3 min ago] [photo, already answered]');
+  assert.equal(out[2].content, '[just now] Я переживаю');
+  assert.ok(!JSON.stringify(out).includes(UNSEEN_PHOTO), 'nothing tells Claude a photo is waiting');
+});
+
+test('a Host reply also marks earlier photos as answered', () => {
+  const messages = [
+    { role: 'user', content: '[10 min ago] [image] is this the entrance?' },
+    { role: 'assistant', content: '[9 min ago] Host: Yes, 4th entrance' },
+    { role: 'user', content: '[just now] thanks, and the code?' },
+  ];
+  assert.equal(attachPhotos(messages, 1, new Map())[0].content, '[10 min ago] [photo, already answered] is this the entrance?');
+});
+
+test('unanswered photos beyond the newest 4 are not attached and are labelled as unseen', () => {
+  const messages = [{ role: 'user', content: '[1 min ago] [image]' }, { role: 'user', content: '[just now] [image]' }];
+  const out = attachPhotos(messages, 2, new Map([[1, { ok: true, mimeType: 'image/jpeg', base64: 'BB' }]]));
+  assert.equal(out[0].content, '[1 min ago] [photo you cannot see]');
+  assert.equal(out[1].content[0].type, 'image');
 });
