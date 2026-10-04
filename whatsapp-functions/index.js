@@ -25,6 +25,7 @@ const { findCurrentGuestForm } = require('./guestLookup');
 const { otherPropertyForRoom, stayTiming, stayTimingContextLines } = require('./stayRules');
 const { describeInbound } = require('./inboundContent');
 const { downloadMetaMedia, photosToAttach, attachPhotos } = require('./metaMedia');
+const { sendOwnerAlert, ownerAlertStatusLines } = require('./ownerAlert');
 const { callClaudeWithRetry, describeClaudeError, buildCachedSystem, formatUsage } = require('./claudeClient');
 const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
 
@@ -561,23 +562,17 @@ async function writeAlert(db, { reason, phone, guestName = '', room = '', messag
   }
 }
 
-/** Best-effort free-form WhatsApp notification to the owner. Never throws. */
-async function notifyOwner(ownerPhone, text) {
+/**
+ * Owner alert via the approved "owner_alert" template ({{1}} guest, {{2}}
+ * issue), delivered even outside the 24-hour window; falls back to the same
+ * content as free-form text if the template send fails (see ownerAlert.js).
+ * Meta's later delivery reports for these show up in the webhook logs.
+ * Best-effort: never throws.
+ */
+async function notifyOwner(ownerPhone, { guest, issue }) {
   const to = normalizePhone(ownerPhone);
   if (!to) return;
-  try {
-    const data = await sendWhatsAppMessage({
-      messaging_product: 'whatsapp',
-      to,
-      type: 'text',
-      text: { body: text },
-    });
-    if (!data?.messages) {
-      console.error('notifyOwner: Meta error —', JSON.stringify(data));
-    }
-  } catch (err) {
-    console.error('notifyOwner: fetch failed:', err);
-  }
+  await sendOwnerAlert({ to, guest, issue, send: sendWhatsAppChecked });
 }
 
 const OWNER_NOTIFY_WINDOW_MS = 30 * 60 * 1000;
@@ -587,7 +582,7 @@ const OWNER_NOTIFY_WINDOW_MS = 30 * 60 * 1000;
  * 30 minutes, tracked in whatsapp_alert_throttle/{key} so it holds across
  * worker instances. Callers always write the whatsapp_alerts doc themselves.
  */
-async function notifyOwnerThrottled(db, ownerPhone, key, text) {
+async function notifyOwnerThrottled(db, ownerPhone, key, alert) {
   if (!ownerPhone) return;
   const ref = db.collection('whatsapp_alert_throttle').doc(String(key).replace(/[^\w-]/g, '_'));
   let send = true;
@@ -596,7 +591,7 @@ async function notifyOwnerThrottled(db, ownerPhone, key, text) {
       const snap = await tx.get(ref);
       const now = Date.now();
       if (!shouldNotifyNow(snap.exists ? Number(snap.data().lastNotifiedMs) : NaN, now, OWNER_NOTIFY_WINDOW_MS)) return false;
-      tx.set(ref, { lastNotifiedMs: now, lastText: String(text).slice(0, 300) });
+      tx.set(ref, { lastNotifiedMs: now, lastText: `${alert.guest}: ${alert.issue}`.slice(0, 300) });
       return true;
     });
   } catch (err) {
@@ -606,7 +601,7 @@ async function notifyOwnerThrottled(db, ownerPhone, key, text) {
     console.log(`notifyOwnerThrottled: owner already notified about "${key}" in the last 30 min — alert doc written, WhatsApp notification skipped`);
     return;
   }
-  await notifyOwner(ownerPhone, text);
+  await notifyOwner(ownerPhone, alert);
 }
 
 /**
@@ -818,6 +813,15 @@ exports.whatsappWebhook = onRequest(
           }
           // Owner echoes never enqueue a bot reply.
           return res.sendStatus(200);
+        }
+
+        // Meta delivery reports (sent / delivered / read / failed). Only those for
+        // owner alerts are logged, so a failed alert shows up in the logs.
+        if (Array.isArray(value?.statuses) && value.statuses.length) {
+          const statusConfig = await getGlobalsConfig(db);
+          for (const line of ownerAlertStatusLines(value.statuses, statusConfig.ownerPhone)) {
+            console[line.level](`whatsappWebhook: ${line.text}`);
+          }
         }
 
         const messages = value?.messages;
@@ -1119,7 +1123,7 @@ exports.whatsappBotWorker = onRequest(
             mode: effectiveMode,
           });
           if (config.ownerPhone) {
-            await notifyOwner(config.ownerPhone, `${otherProperty} guest ${guestName} / ${bookingRoom} wrote: ${combinedGuestText.slice(0, 300)}`);
+            await notifyOwner(config.ownerPhone, { guest: `${guestName} / ${bookingRoom}`, issue: `${otherProperty} guest wrote: ${combinedGuestText}` });
           }
           console.log(`whatsappBotWorker: STOPPED — ${otherProperty} booking (${bookingRoom}); nothing sent, owner alerted (first message this stay), for`, phone);
         } else {
@@ -1208,7 +1212,7 @@ exports.whatsappBotWorker = onRequest(
           errorType: claude.errorType,
           errorMessage: claude.message,
         });
-        await notifyOwnerThrottled(db, config.ownerPhone, `claude_${claude.errorType}`, `Bot could not reply to ${label}: ${describeClaudeError(claude)}`);
+        await notifyOwnerThrottled(db, config.ownerPhone, `claude_${claude.errorType}`, { guest: label, issue: `Bot could not reply: ${describeClaudeError(claude)}` });
         return res.sendStatus(200);
       }
 
@@ -1272,8 +1276,8 @@ exports.whatsappBotWorker = onRequest(
           mode: effectiveMode,
           ...fields,
         }),
-        notifyOwner: async (text) => { if (config.ownerPhone) await notifyOwner(config.ownerPhone, text); },
-        notifyOwnerThrottled: (key, text) => notifyOwnerThrottled(db, config.ownerPhone, key, text),
+        notifyOwner: async (issue) => { if (config.ownerPhone) await notifyOwner(config.ownerPhone, { guest: label, issue }); },
+        notifyOwnerThrottled: (key, issue) => notifyOwnerThrottled(db, config.ownerPhone, key, { guest: label, issue }),
         finishPending: () => deletePendingIfTokenMatches(db, phone, batchToken),
       });
 

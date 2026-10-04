@@ -74,11 +74,12 @@ function shouldNotifyNow(lastNotifiedMs, nowMs, windowMs) {
  * who: { name, room, guestText, mode }
  * deps: preSendCheck() -> 'send'|'newer_message'|'owner_replied', humanize(),
  *   sendVideo(id) / sendText(body) -> { ok, id } | { ok: false, code, reason },
- *   storeAssistant(content), writeAlert(fields), notifyOwner(text),
- *   notifyOwnerThrottled(key, text), finishPending(), log
+ *   storeAssistant(content), writeAlert(fields), notifyOwner(issue),
+ *   notifyOwnerThrottled(key, issue), finishPending(), log
+ * (the caller adds the guest name / room to owner alerts; `issue` is the reason
+ * plus the guest's message)
  */
 async function deliverReply(plan, who, deps) {
-  const label = `${who.name} / ${who.room || 'unknown room'}`;
   const hasContent = !!plan.text || !!plan.videoId;
 
   if (hasContent && !plan.angry) await deps.humanize();
@@ -94,7 +95,7 @@ async function deliverReply(plan, who, deps) {
   // Angry guest: nothing to the guest, urgent alert to the owner.
   if (plan.angry) {
     await deps.writeAlert({ reason: 'angry_guest', urgency: true });
-    await deps.notifyOwner(`URGENT: ${label} — angry/complaint guest: ${who.guestText.slice(0, 300)}`);
+    await deps.notifyOwner(`URGENT, angry or complaining guest: ${who.guestText}`);
     await deps.finishPending();
     return { outcome: 'angry_alerted' };
   }
@@ -102,8 +103,8 @@ async function deliverReply(plan, who, deps) {
   // Urgent issues page the owner ahead of the guest-facing send.
   if (plan.urgent) {
     await deps.notifyOwner(plan.urgent === 'LOCKOUT'
-      ? `URGENT: ${label} — guest is locked out`
-      : `URGENT: ${label} — ${who.guestText.slice(0, 300)}`);
+      ? 'URGENT, guest is locked out'
+      : `URGENT: ${who.guestText}`);
   }
 
   // Tag-only reply (e.g. just "[ESCALATE]"): never send an empty WhatsApp message.
@@ -111,13 +112,13 @@ async function deliverReply(plan, who, deps) {
     if (plan.escalate) {
       deps.log.warn('deliverReply: reply had only tags, nothing sent to the guest; escalating to the owner');
       await deps.writeAlert({ reason: 'escalation', urgency: !!plan.urgent });
-      if (!plan.urgent) await deps.notifyOwner(`Guest needs help — ${label} / mode=${who.mode}: ${who.guestText}`);
+      if (!plan.urgent) await deps.notifyOwner(`Guest needs help (mode ${who.mode}): ${who.guestText}`);
       await deps.finishPending();
       return { outcome: 'escalated_only' };
     }
     deps.log.error('deliverReply: reply was empty after removing tags, nothing sent');
     await deps.writeAlert({ reason: 'bot_error', errorType: 'empty_reply', errorMessage: 'reply was empty after removing internal tags' });
-    await deps.notifyOwnerThrottled('bot_empty_reply', `Bot could not reply to ${label}: its reply was empty`);
+    await deps.notifyOwnerThrottled('bot_empty_reply', 'Bot could not reply: its reply was empty');
     return { outcome: 'empty_reply' }; // pending kept: the next guest message retries it
   }
 
@@ -128,7 +129,7 @@ async function deliverReply(plan, who, deps) {
     if (!v.ok) {
       deps.log.error(`deliverReply: video ${plan.videoId} failed to send — ${v.reason}`);
       await deps.writeAlert({ reason: 'bot_error', errorType: 'meta_send_failed', errorMessage: `video: ${v.reason}` });
-      await deps.notifyOwnerThrottled(`meta_${v.code}`, `Reply to ${label} failed to send (video): ${v.reason}`);
+      await deps.notifyOwnerThrottled(`meta_${v.code}`, `Reply to the guest failed to send (video): ${v.reason}`);
       if (!plan.text) return { outcome: 'send_failed' }; // nothing reached the guest; pending kept
     }
   }
@@ -138,7 +139,7 @@ async function deliverReply(plan, who, deps) {
     if (!t.ok) {
       deps.log.error(`deliverReply: text failed to send — ${t.reason}`);
       await deps.writeAlert({ reason: 'bot_error', errorType: 'meta_send_failed', errorMessage: t.reason, urgency: !!plan.urgent });
-      await deps.notifyOwnerThrottled(`meta_${t.code}`, `Reply to ${label} failed to send: ${t.reason}${plan.escalate ? ` (it was an escalation: ${who.guestText.slice(0, 200)})` : ''}`);
+      await deps.notifyOwnerThrottled(`meta_${t.code}`, `Reply to the guest failed to send: ${t.reason}${plan.escalate ? ` (it was an escalation: ${who.guestText})` : ''}`);
       return { outcome: 'send_failed' }; // not stored as sent; pending kept
     }
   }
@@ -150,7 +151,7 @@ async function deliverReply(plan, who, deps) {
   if (plan.escalate) {
     await deps.writeAlert({ reason: 'escalation', urgency: !!plan.urgent });
     // Urgent cases were already paged above.
-    if (!plan.urgent) await deps.notifyOwner(`Guest needs help — ${label} / mode=${who.mode}: ${who.guestText}`);
+    if (!plan.urgent) await deps.notifyOwner(`Guest needs help (mode ${who.mode}): ${who.guestText}`);
   }
   await deps.finishPending();
   return { outcome: 'sent' };

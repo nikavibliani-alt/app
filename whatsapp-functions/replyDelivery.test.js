@@ -80,14 +80,14 @@ test('empty reply after removing tags', async (t) => {
     assert.ok(!f.names().includes('sendText'), 'no empty WhatsApp message');
     assert.ok(!f.names().includes('storeAssistant'));
     assert.deepEqual(f.calls.find((c) => c[0] === 'writeAlert')[1], { reason: 'escalation', urgency: false });
-    assert.match(f.calls.find((c) => c[0] === 'notifyOwner')[1], /^Guest needs help — Anna Petrova \/ 6-2/);
+    assert.equal(f.calls.find((c) => c[0] === 'notifyOwner')[1], 'Guest needs help (mode available): I am locked out, the code does not work', 'issue only; the caller adds the guest name / room');
     assert.ok(f.names().includes('finishPending'));
   });
   await t.test('urgent escalation with no text: paged once, nothing sent', async () => {
     const f = fakeDeps();
     const r = await deliverReply(parseAiReply('[ESCALATE] [URGENT:LOCKOUT]'), WHO, f.deps);
     assert.equal(r.outcome, 'escalated_only');
-    assert.deepEqual(f.calls.filter((c) => c[0] === 'notifyOwner').map((c) => c[1]), ['URGENT: Anna Petrova / 6-2 — guest is locked out']);
+    assert.deepEqual(f.calls.filter((c) => c[0] === 'notifyOwner').map((c) => c[1]), ['URGENT, guest is locked out']);
     assert.ok(!f.names().includes('sendText'));
   });
   await t.test('no escalation either: bot_error alert, pending kept', async () => {
@@ -113,7 +113,7 @@ test('Meta send failure', async (t) => {
     assert.equal(alert.errorType, 'meta_send_failed');
     const [, key, text] = f.calls.find((c) => c[0] === 'notifyOwnerThrottled');
     assert.equal(key, 'meta_131047');
-    assert.match(text, /^Reply to Anna Petrova \/ 6-2 failed to send: Meta error 131047: Re-engagement message \(it was an escalation/);
+    assert.match(text, /^Reply to the guest failed to send: Meta error 131047: Re-engagement message \(it was an escalation: I am locked out/);
   });
   await t.test('video rejected, text sent: stored without the video marker, owner alerted', async () => {
     const f = fakeDeps({ sendVideo: { ok: false, code: 131053, reason: 'Meta error 131053: Media upload error' } });
@@ -159,6 +159,7 @@ test('angry guest: alerts the owner only after the pre-send check, sends nothing
     assert.equal((await deliverReply(parseAiReply('[URGENT:ANGRY]'), WHO, f.deps)).outcome, 'angry_alerted');
     assert.deepEqual(f.names(), ['preSendCheck', 'writeAlert', 'notifyOwner', 'finishPending']);
     assert.deepEqual(f.calls[1][1], { reason: 'angry_guest', urgency: true });
+    assert.equal(f.calls[2][1], 'URGENT, angry or complaining guest: I am locked out, the code does not work');
     assert.ok(!f.names().includes('sendText'));
   });
 });
