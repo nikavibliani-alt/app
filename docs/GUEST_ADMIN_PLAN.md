@@ -149,3 +149,13 @@ Undo: `git revert --no-edit <commit>`, then push. Firestore: delete the 4 docs (
 Notes:
 - cleaner.html changes (belongs to HK chat): added {id:'xcv',title:'XCV'} to HK_SITES_ALL, an xcv- fallback in hkSiteId, and an XCV Team label in defaultTeams. Nothing else. check-cleaner-page.js passes.
 - XCV rooms are not in any HK team yet, so they will not appear on the HK board until added in HK settings.
+
+# Search fix
+
+Restore point: tag `before-search-fix`.
+
+1. Booking number in the Name field = OTA confirmation number (bookingId) only; exact match searches all rooms
+2. Help text after a failed search (4 languages) + input_apt saved in search_failures
+3. Short names (0 or 1 word of 3+ letters): match by initials/words + exact date + only candidate
+
+Undo: `git revert --no-edit <commit>`, then push.
