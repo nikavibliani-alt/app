@@ -86,6 +86,10 @@
         "destination": "/internal-venu-tracker.html"
       },
       {
+        "source": "/profit/kt-4h7vmbf9teop",
+        "destination": "/internal-keti-tracker.html"
+      },
+      {
         "source": "/checkin-guest",
         "destination": "/checkin-guest.html"
       },
