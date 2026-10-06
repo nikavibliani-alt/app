@@ -15,6 +15,10 @@ const TEMPLATE = 'owner_alert';
 const LANGUAGES = ['en', 'en_US'];
 const MAX_GUEST = 60;
 const MAX_ISSUE = 500;
+// whatsapp_owner_alerts/{messageId}: one small doc per owner alert sent, so the
+// webhook can tell Meta's delivery reports for real alerts from other messages
+// to the owner's number (e.g. the bot replying to the owner as a guest).
+const ALERTS_COLLECTION = 'whatsapp_owner_alerts';
 
 /** Template parameters may not contain newlines, tabs or 4+ spaces in a row, nor be empty. */
 function cleanParam(value, max, fallback) {
@@ -62,9 +66,10 @@ async function sendOwnerAlert({ to, guest, issue, send, log = console }) {
       return { ok: true, via: 'template', id: r.id, language };
     }
     lastReason = r.reason;
+    log.error(`owner alert: template "${TEMPLATE}" (${language}) failed: ${r.reason}`);
     if (r.code !== 132001) break; // only "template not found in this language" is worth another language
   }
-  log.error(`owner alert: template "${TEMPLATE}" failed (${lastReason}), falling back to free-form text`);
+  log.error(`owner alert: template "${TEMPLATE}" failed, falling back to free-form text`);
   const t = await send({ messaging_product: 'whatsapp', to, type: 'text', text: { body: ownerAlertText(params) } })
     .catch((e) => ({ ok: false, reason: String(e?.message || e) }));
   if (t.ok) {
@@ -75,24 +80,39 @@ async function sendOwnerAlert({ to, guest, issue, send, log = console }) {
   return { ok: false, via: null, reason: `${lastReason} / ${t.reason}` };
 }
 
+/** Firestore doc id for a Meta message id (base64 ids may contain "/"). */
+const alertDocId = (messageId) => String(messageId).replace(/\//g, '_');
+
+const digits = (v) => String(v || '').replace(/\D/g, '');
+
+/** Ids of the delivery reports (webhook value.statuses) for messages to the owner's number. */
+function ownerStatusIds(statuses, ownerPhone) {
+  const owner = digits(ownerPhone);
+  if (!owner) return [];
+  return [...new Set((statuses || []).filter((s) => s?.id && digits(s.recipient_id) === owner).map((s) => String(s.id)))];
+}
+
 /**
- * Meta delivery reports (webhook value.statuses) for messages to the owner,
- * as log lines: [{ level: 'log' | 'error', text }]. Other recipients ignored.
+ * Meta delivery reports for messages to the owner's number, as log lines:
+ * [{ level: 'log' | 'error', text }]. Only ids in `alertIds` (recorded in
+ * whatsapp_owner_alerts when sent) are labelled "owner alert"; anything else
+ * to that number is "message to the owner's number". Other recipients ignored.
  */
-function ownerAlertStatusLines(statuses, ownerPhone) {
-  const owner = String(ownerPhone || '').replace(/\D/g, '');
+function ownerAlertStatusLines(statuses, ownerPhone, alertIds = new Set()) {
+  const owner = digits(ownerPhone);
   if (!owner) return [];
   return (statuses || [])
-    .filter((s) => String(s?.recipient_id || '').replace(/\D/g, '') === owner)
+    .filter((s) => digits(s?.recipient_id) === owner)
     .map((s) => {
+      const label = alertIds.has(String(s.id)) ? 'owner alert' : "message to the owner's number";
       const id = String(s.id || '').slice(-12);
       if (s.status === 'failed') {
         const e = (s.errors || [])[0] || {};
         const detail = e.error_data?.details ? ` (${e.error_data.details})` : '';
-        return { level: 'error', text: `owner alert …${id} FAILED: Meta error ${e.code ?? '?'} ${e.title || e.message || ''}${detail}`.trim() };
+        return { level: 'error', text: `${label} …${id} FAILED: Meta error ${e.code ?? '?'} ${e.title || e.message || ''}${detail}`.trim() };
       }
-      return { level: 'log', text: `owner alert …${id} ${s.status}` };
+      return { level: 'log', text: `${label} …${id} ${s.status}` };
     });
 }
 
-module.exports = { ownerAlertParams, ownerAlertTemplatePayload, ownerAlertText, sendOwnerAlert, ownerAlertStatusLines, TEMPLATE };
+module.exports = { ownerAlertParams, ownerAlertTemplatePayload, ownerAlertText, sendOwnerAlert, ownerStatusIds, ownerAlertStatusLines, alertDocId, TEMPLATE, ALERTS_COLLECTION };

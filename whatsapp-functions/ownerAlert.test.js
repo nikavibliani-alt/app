@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { ownerAlertParams, ownerAlertTemplatePayload, ownerAlertText, sendOwnerAlert, ownerAlertStatusLines } = require('./ownerAlert');
+const { ownerAlertParams, ownerAlertTemplatePayload, ownerAlertText, sendOwnerAlert, ownerStatusIds, ownerAlertStatusLines, alertDocId } = require('./ownerAlert');
 
 const quiet = () => {
   const lines = [];
@@ -56,10 +56,11 @@ test('sendOwnerAlert', async (t) => {
   });
 
   await t.test('template not found in "en" (132001): retried as "en_US"', async () => {
-    const s = sender({ ok: false, code: 132001, reason: 'Meta error 132001: Template name does not exist in the translation' }, { ok: true, id: 'wamid.T2' });
-    const r = await sendOwnerAlert({ ...base, send: s.send, log: quiet().log });
+    const q = quiet(); const s = sender({ ok: false, code: 132001, reason: 'Meta error 132001: Template name does not exist in the translation' }, { ok: true, id: 'wamid.T2' });
+    const r = await sendOwnerAlert({ ...base, send: s.send, log: q.log });
     assert.deepEqual(r, { ok: true, via: 'template', id: 'wamid.T2', language: 'en_US' });
     assert.deepEqual(s.sent.map((p) => p.template.language.code), ['en', 'en_US']);
+    assert.ok(q.lines.some(([lvl, m]) => lvl === 'error' && /template "owner_alert" \(en\) failed: Meta error 132001/.test(m)), 'the "en" failure is logged');
   });
 
   await t.test('template fails for another reason: free-form fallback, logged', async () => {
@@ -68,7 +69,19 @@ test('sendOwnerAlert', async (t) => {
     assert.deepEqual(r, { ok: true, via: 'text', id: 'wamid.F1' });
     assert.equal(s.sent.length, 2, 'no language retry for other errors');
     assert.equal(s.sent[1].text.body, 'New alert from your Maxela bot. Guest: Anna / 6-2. Issue: URGENT, guest is locked out. Please check the WhatsApp chat.');
-    assert.ok(q.lines.some(([lvl, m]) => lvl === 'error' && /template "owner_alert" failed .*falling back to free-form/.test(m)));
+    assert.ok(q.lines.some(([lvl, m]) => lvl === 'error' && /template "owner_alert" \(en\) failed: Meta error 132000/.test(m)));
+    assert.ok(q.lines.some(([lvl, m]) => lvl === 'error' && /template "owner_alert" failed, falling back to free-form text/.test(m)));
+  });
+
+  await t.test('template missing in every language: each failure logged, then fallback', async () => {
+    const q = quiet();
+    const nf = (lang) => ({ ok: false, code: 132001, reason: `Meta error 132001: template name (owner_alert) does not exist in ${lang}` });
+    const s = sender(nf('en'), nf('en_US'), { ok: true, id: 'wamid.F2' });
+    const r = await sendOwnerAlert({ ...base, send: s.send, log: q.log });
+    assert.deepEqual(r, { ok: true, via: 'text', id: 'wamid.F2' });
+    const errors = q.lines.filter(([lvl]) => lvl === 'error').map(([, m]) => m);
+    assert.ok(errors.some((m) => /\(en\) failed: .*does not exist in en$/.test(m)));
+    assert.ok(errors.some((m) => /\(en_US\) failed: .*does not exist in en_US$/.test(m)));
   });
 
   await t.test('both fail: logged, never throws', async () => {
@@ -84,19 +97,39 @@ test('sendOwnerAlert', async (t) => {
   });
 });
 
-test('ownerAlertStatusLines: delivery reports for the owner only; failures as errors', () => {
+test('ownerAlertStatusLines: owner-number reports only; "owner alert" only for recorded alert ids; failures as errors', () => {
   const statuses = [
     { id: 'wamid.HBgMOTk1NTU1MTIzNDU2FQIAERgSAAAA', status: 'sent', recipient_id: '995555123456' },
     { id: 'wamid.HBgMOTk1NTU1MTIzNDU2FQIAERgSAAAA', status: 'delivered', recipient_id: '995555123456' },
     { id: 'wamid.GUEST', status: 'delivered', recipient_id: '491701234567' },
     { id: 'wamid.HBgMOTk1NTU1MTIzNDU2FQIAERgSBBBB', status: 'failed', recipient_id: '995555123456',
       errors: [{ code: 131047, title: 'Re-engagement message', error_data: { details: 'More than 24 hours have passed' } }] },
+    { id: 'wamid.HBgMOTk1NTU1MTIzNDU2FQIAERgSCCCC', status: 'read', recipient_id: '995555123456' },
   ];
-  assert.deepEqual(ownerAlertStatusLines(statuses, '+995 555 12 34 56'), [
+  const alertIds = new Set(['wamid.HBgMOTk1NTU1MTIzNDU2FQIAERgSAAAA', 'wamid.HBgMOTk1NTU1MTIzNDU2FQIAERgSBBBB']);
+  assert.deepEqual(ownerAlertStatusLines(statuses, '+995 555 12 34 56', alertIds), [
     { level: 'log', text: 'owner alert …FQIAERgSAAAA sent' },
     { level: 'log', text: 'owner alert …FQIAERgSAAAA delivered' },
     { level: 'error', text: 'owner alert …FQIAERgSBBBB FAILED: Meta error 131047 Re-engagement message (More than 24 hours have passed)' },
+    { level: 'log', text: "message to the owner's number …FQIAERgSCCCC read" },
   ]);
+  assert.equal(ownerAlertStatusLines(statuses, '995555123456')[0].text, "message to the owner's number …FQIAERgSAAAA sent", 'no recorded ids: never called an owner alert');
   assert.deepEqual(ownerAlertStatusLines(statuses, ''), [], 'no owner phone configured');
   assert.deepEqual(ownerAlertStatusLines(undefined, '995555123456'), []);
+});
+
+test('ownerStatusIds: unique ids of reports to the owner only', () => {
+  const statuses = [
+    { id: 'a', status: 'sent', recipient_id: '995555123456' },
+    { id: 'a', status: 'delivered', recipient_id: '995555123456' },
+    { id: 'g', status: 'sent', recipient_id: '491701234567' },
+    { id: 'b', status: 'read', recipient_id: '995555123456' },
+  ];
+  assert.deepEqual(ownerStatusIds(statuses, '+995 555 12 34 56'), ['a', 'b']);
+  assert.deepEqual(ownerStatusIds(statuses, ''), []);
+});
+
+test('alertDocId: Meta ids with "/" become valid Firestore doc ids', () => {
+  assert.equal(alertDocId('wamid.HBgL/MzI0OTM5=='), 'wamid.HBgL_MzI0OTM5==');
+  assert.equal(alertDocId('wamid.ABC'), 'wamid.ABC');
 });

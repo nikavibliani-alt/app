@@ -26,7 +26,7 @@ const { findCurrentGuestForm } = require('./guestLookup');
 const { otherPropertyForRoom, stayTiming, stayTimingContextLines } = require('./stayRules');
 const { describeInbound } = require('./inboundContent');
 const { downloadMetaMedia, photosToAttach, attachPhotos } = require('./metaMedia');
-const { sendOwnerAlert, ownerAlertStatusLines } = require('./ownerAlert');
+const { sendOwnerAlert, ownerStatusIds, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
 const { callClaudeWithRetry, describeClaudeError, buildCachedSystem, formatUsage } = require('./claudeClient');
 const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
 
@@ -567,13 +567,24 @@ async function writeAlert(db, { reason, phone, guestName = '', room = '', messag
  * Owner alert via the approved "owner_alert" template ({{1}} guest, {{2}}
  * issue), delivered even outside the 24-hour window; falls back to the same
  * content as free-form text if the template send fails (see ownerAlert.js).
- * Meta's later delivery reports for these show up in the webhook logs.
+ * Each sent alert's message id is recorded in whatsapp_owner_alerts so Meta's
+ * later delivery reports for it are logged as "owner alert" by the webhook.
  * Best-effort: never throws.
  */
 async function notifyOwner(ownerPhone, { guest, issue }) {
   const to = normalizePhone(ownerPhone);
   if (!to) return;
-  await sendOwnerAlert({ to, guest, issue, send: sendWhatsAppChecked });
+  const r = await sendOwnerAlert({ to, guest, issue, send: sendWhatsAppChecked });
+  if (!r.ok || !r.id) return;
+  try {
+    await getFirestore().collection(ALERTS_COLLECTION).doc(alertDocId(r.id)).set({
+      via: r.via,
+      language: r.language || null,
+      sentAt: FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn('notifyOwner: could not record the alert id:', err.message || err);
+  }
 }
 
 const OWNER_NOTIFY_WINDOW_MS = 30 * 60 * 1000;
@@ -816,12 +827,23 @@ exports.whatsappWebhook = onRequest(
           return res.sendStatus(200);
         }
 
-        // Meta delivery reports (sent / delivered / read / failed). Only those for
-        // owner alerts are logged, so a failed alert shows up in the logs.
+        // Meta delivery reports (sent / delivered / read / failed) for messages to
+        // the owner's number are logged, so a failed owner alert shows up in the
+        // logs; only ids recorded in whatsapp_owner_alerts are called "owner alert".
         if (Array.isArray(value?.statuses) && value.statuses.length) {
           const statusConfig = await getGlobalsConfig(db);
-          for (const line of ownerAlertStatusLines(value.statuses, statusConfig.ownerPhone)) {
-            console[line.level](`whatsappWebhook: ${line.text}`);
+          const ids = ownerStatusIds(value.statuses, statusConfig.ownerPhone);
+          if (ids.length) {
+            let alertIds = new Set();
+            try {
+              const snaps = await db.getAll(...ids.map((id) => db.collection(ALERTS_COLLECTION).doc(alertDocId(id))));
+              alertIds = new Set(ids.filter((id, i) => snaps[i].exists));
+            } catch (err) {
+              console.warn('whatsappWebhook: owner alert id lookup failed:', err.message || err);
+            }
+            for (const line of ownerAlertStatusLines(value.statuses, statusConfig.ownerPhone, alertIds)) {
+              console[line.level](`whatsappWebhook: ${line.text}`);
+            }
           }
         }
 
