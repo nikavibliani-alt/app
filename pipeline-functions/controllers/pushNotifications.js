@@ -90,7 +90,7 @@ function registerCloudFunctions() {
         title: 'Failed Search',
         body: `Guest could not find booking: "${data.input_name}"`,
         tag: 'failed-search',
-        url: '/checkin-admin',
+        url: '/checkin-admin?tab=failures',
       });
     }
   );
@@ -123,7 +123,7 @@ function registerCloudFunctions() {
         title: 'New Request',
         body: `${type} — Room ${room}`,
         tag: 'request-' + event.params.id,
-        url: '/checkin-admin',
+        url: '/checkin-admin?tab=requests',
       });
     }
   );
