@@ -1637,6 +1637,14 @@ async function _hydrateGuestReservations(){
     }catch(e){}
   }
   _syncGuestReservationContext();
+  // keep the saved guest record on the booking's own dates (the typed date may have been wrong)
+  try{
+    const bCi=activeReservation?.checkin||activeReservation?.checkIn||'',bCo=activeReservation?.checkout||activeReservation?.checkOut||'';
+    if(activeReservation&&_isOwnRes(activeReservation)&&bCi&&bCo&&(guestData.arrivalDate!==bCi||guestData.checkoutDate!==bCo)){
+      guestData={...guestData,arrivalDate:bCi,checkoutDate:bCo};
+      if(guestId&&!isPreviewMode())setDoc(doc(db,'checkin_guests',guestId),{arrivalDate:bCi,checkoutDate:bCo},{merge:true}).catch(()=>{});
+    }
+  }catch(e){}
   const resRoom=activeReservation?.roomCode||'';
   if(resRoom&&resRoom!==aptId){
     aptId=resRoom;
@@ -2025,7 +2033,7 @@ document.addEventListener('visibilitychange',()=>{
 function isUnlocked(){
   if(_adminPreviewMode||isPreview)return true;
   if(!guestData)return false;
-  const arrival=guestData.arrivalDate||activeReservation?.checkin||activeReservation?.checkIn||'';
+  const arrival=activeReservation?.checkin||activeReservation?.checkIn||guestData.arrivalDate||'';   // the booking's own date wins over the typed one
   return isGuestUnlocked({
     guest:guestData,
     arrivalDate:arrival,
@@ -2040,7 +2048,7 @@ function isUnlocked(){
 
 function timeUntilCheckin(){
   // Countdown to check-in hour on arrival date (works before check-in day too)
-  const ci=guestData?.arrivalDate||activeReservation?.checkin||activeReservation?.checkIn||'';
+  const ci=activeReservation?.checkin||activeReservation?.checkIn||guestData?.arrivalDate||'';
   const now=new Date();
   const tb=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Tbilisi'}));
   const target=new Date(tb);
@@ -2679,7 +2687,7 @@ async function finishRegistration_(bestRes,formData,opts){
   }else{
     throw new Error('Passport required');
   }
-  const arrivalDate=arrival||bestRes?.checkin||bestRes?.checkIn||'';
+  const arrivalDate=bestRes?.checkin||bestRes?.checkIn||arrival||'';   // the booking's own date; the typed date was only used to find it
   const checkoutDate=bestRes?.checkout||bestRes?.checkOut||'';
   // RETENTION POLICY (see docs/DATA_RETENTION.md): checkin_guests/{id}.passportUrl
   // and .passportScanResult are retained a minimum of 1 month for chargeback
@@ -4747,7 +4755,7 @@ function setupDateInput(){
 window.isStayEnded=function(){
   if(!guestData)return false;
   if(guestData.guestConfirmedCheckout===true)return true;
-  const co=guestData.checkoutDate||activeReservation?.checkout||activeReservation?.checkOut||'';
+  const co=activeReservation?.checkout||activeReservation?.checkOut||guestData.checkoutDate||'';
   if(!co)return false;
   const today=tbilisiToday();
   if(today>co)return true;
@@ -4826,7 +4834,7 @@ function _renderHeroContent(){
 
   const coLbl=document.getElementById('hero-checkout-label');
   if(coLbl){
-    const co=guestData?.checkoutDate||activeReservation?.checkout||activeReservation?.checkOut||'';
+    const co=activeReservation?.checkout||activeReservation?.checkOut||guestData?.checkoutDate||'';
     coLbl.dataset.hasDate=co?'1':'';
     coLbl.textContent=co?(t('checkoutToday')+' · '+co):t('checkoutToday');
   }
@@ -4941,7 +4949,7 @@ function _startCountdownTick(){
 function _homePhaseNow(){
   if(window.isStayEnded&&window.isStayEnded())return'ended';   // stay over while the page stays open (checkout day 20:00 or "I've checked out")
   if(!isUnlocked())return'waiting';
-  const co=guestData?.checkoutDate||activeReservation?.checkout||activeReservation?.checkOut||'';
+  const co=activeReservation?.checkout||activeReservation?.checkOut||guestData?.checkoutDate||'';
   const today=tbilisiToday();
   if(co&&today===co)return'leaving';
   if(guestData?.guestConfirmedCheckin===true)return'staying';
