@@ -1335,6 +1335,7 @@ let currentSvcName=null;
 let laundryItems=[];
 let laundryQtys={};
 let _laundryLoaded=false;
+let _trMapsUrl='';
 let _trDropoffMissing=false;   // no unit/location address: the request goes to the host, not the driver
 let _trSmallCars=0;
 let _trLargeCars=1;
@@ -4120,6 +4121,7 @@ window.openSvc=async function(id,name,hasTime){
     let _locD={};try{_locD=await _getLocationData();}catch(e){}
     const loc=(_locD.address||'').trim();
     _trDropoffMissing=!loc;
+    _trMapsUrl=(_locD.mapsUrl||'').trim();
     const{small,large,max}=getTransferConfig();
     const inputStyle=`width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);background:var(--bg);outline:none;`;
     const labelStyle=`font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:0.06em;`;
@@ -4131,6 +4133,10 @@ window.openSvc=async function(id,name,hasTime){
       <div style="margin-bottom:0.85rem;">
         <label style="${labelStyle}">Landing / Arrival Time <span style="color:var(--red);">*</span></label>
         <input type="time" id="tr-time" style="${inputStyle}">
+      </div>
+      <div style="margin-bottom:0.85rem;">
+        <label style="${labelStyle}">Flight number (optional)</label>
+        <input type="text" id="tr-flight" maxlength="12" autocapitalize="characters" autocomplete="off" placeholder="e.g. W6 1234" style="${inputStyle}">
       </div>
       <div style="margin-bottom:0.5rem;">
         <label style="${labelStyle}">Number of Guests <span style="color:var(--red);">*</span></label>
@@ -4175,6 +4181,8 @@ window.openSvc=async function(id,name,hasTime){
       if(dateEl&&p.pickupDate)dateEl.value=p.pickupDate;
       const timeEl2=document.getElementById('tr-time');
       if(timeEl2&&p.arrivalTime)timeEl2.value=p.arrivalTime;
+      const flightEl=document.getElementById('tr-flight');
+      if(flightEl&&p.flightNumber)flightEl.value=p.flightNumber;
       const guestEl=document.getElementById('tr-guests');
       if(guestEl&&p.guests){guestEl.value=p.guests;window.updateTransferPrice();}
     }
@@ -4342,7 +4350,8 @@ window.submitService=async function(){
     if(!trTime){alert('Please enter your landing/arrival time.');return;}
     const trGuestsNum=parseInt(trGuests)||1;
     const trSum=buildTransferSummary();
-    transferDetails={pickupDate:trDate,arrivalTime:trTime,guests:trGuestsNum,pickupLocation:trPickup,dropoffLocation:trDropoff,cars:trSum.totalCars,carConfig:trSum.carDesc,price:trSum.price,priceLabel:trSum.label};
+    const trFlight=(document.getElementById('tr-flight')?.value||'').trim();
+    transferDetails={pickupDate:trDate,arrivalTime:trTime,...(trFlight?{flightNumber:trFlight}:{flightNumber:''}),...(_trMapsUrl?{mapsUrl:_trMapsUrl}:{}),guests:trGuestsNum,pickupLocation:trPickup,dropoffLocation:trDropoff,cars:trSum.totalCars,carConfig:trSum.carDesc,price:trSum.price,priceLabel:trSum.label};
   }
 
   // Laundry: collect selected items
@@ -4365,14 +4374,17 @@ window.submitService=async function(){
 
   // Build WhatsApp URL before any async work so it counts as user-initiated
   let waBody=`New service request from ${aptName}:\n`+
+    (currentSvcId==='transfer'?`${brandInfo().mode==='neutral'?'':`Property: ${brandInfo().mode==='default'?'Maxela Apartments':brandInfo().name}\n`}Room: ${aptId}\n`:'')+
     `Guest: ${guestData?.name||'Guest'}\n`+
     `Service: ${currentSvcName}\n`;
   if(currentSvcId==='transfer'){
     waBody+=`Date: ${transferDetails.pickupDate}\n`;
     waBody+=`Arrival time: ${transferDetails.arrivalTime}\n`;
+    if(transferDetails.flightNumber)waBody+=`Flight: ${transferDetails.flightNumber}\n`;
     waBody+=`Guests: ${transferDetails.guests}\n`;
     waBody+=`Pickup: ${transferDetails.pickupLocation}\n`;
     waBody+=transferDetails.dropoffLocation?`Drop-off: ${transferDetails.dropoffLocation}\n`:`Drop-off: address not set — please confirm with the guest\n`;
+    if(transferDetails.mapsUrl)waBody+=`Map: ${transferDetails.mapsUrl}\n`;
     waBody+=`Cars: ${transferDetails.carConfig}\n`;
     waBody+=`Total: ${transferDetails.price} GEL\n`;
   }
