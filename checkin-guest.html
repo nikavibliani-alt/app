@@ -1335,6 +1335,7 @@ let currentSvcName=null;
 let laundryItems=[];
 let laundryQtys={};
 let _laundryLoaded=false;
+let _trDropoffMissing=false;   // no unit/location address: the request goes to the host, not the driver
 let _trSmallCars=0;
 let _trLargeCars=1;
 let currentReqId=null;
@@ -4115,7 +4116,10 @@ window.openSvc=async function(id,name,hasTime){
     ${infoBar}${datePicker}${timePicker}`;
   } else if(id==='transfer'){
     const todayIso=tbilisiToday();
-    const loc=getPickupLocation();
+    // drop-off = the unit's own address (apartment Location card), then the location group's address; none -> host confirms
+    let _locD={};try{_locD=await _getLocationData();}catch(e){}
+    const loc=(_locD.address||'').trim();
+    _trDropoffMissing=!loc;
     const{small,large,max}=getTransferConfig();
     const inputStyle=`width:100%;height:46px;padding:0 14px;border:1.5px solid var(--border);border-radius:var(--rs);font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);background:var(--bg);outline:none;`;
     const labelStyle=`font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:0.06em;`;
@@ -4157,8 +4161,11 @@ window.openSvc=async function(id,name,hasTime){
       </div>
       ${loc?`<div style="margin-bottom:0.85rem;">
         <label style="${labelStyle}">Drop-off</label>
-        <input type="text" id="tr-dropoff" readonly value="${loc}" style="${inputStyle}background:var(--surface2);color:var(--muted);">
-      </div>`:''}`;
+        <input type="text" id="tr-dropoff" readonly value="${esc(loc)}" style="${inputStyle}background:var(--surface2);color:var(--muted);">
+      </div>`:`<div style="margin-bottom:0.85rem;">
+        <label style="${labelStyle}">Drop-off</label>
+        <div id="tr-dropoff-missing" style="padding:12px 14px;border:1.5px dashed var(--border);border-radius:var(--rs);font-size:14px;color:var(--muted);">Address not set — we'll confirm on WhatsApp</div>
+      </div>`}`;
     const _nb=calcTransferBreakdown(1);
     _trSmallCars=_nb.numSmall;_trLargeCars=_nb.numLarge;
     window.updateTransferCars();
@@ -4330,7 +4337,7 @@ window.submitService=async function(){
     const trTime=document.getElementById('tr-time')?.value||'';
     const trGuests=document.getElementById('tr-guests')?.value||'1';
     const trPickup=document.getElementById('tr-pickup')?.value||'Tbilisi International Airport';
-    const trDropoff=document.getElementById('tr-dropoff')?.value||getPickupLocation();
+    const trDropoff=_trDropoffMissing?'':(document.getElementById('tr-dropoff')?.value||'');
     if(!trDate){alert('Please select a pickup date.');return;}
     if(!trTime){alert('Please enter your landing/arrival time.');return;}
     const trGuestsNum=parseInt(trGuests)||1;
@@ -4353,7 +4360,7 @@ window.submitService=async function(){
   // Map guest SVCS ids to Firestore service ids
   const _fsId=currentSvcId==='transfer'?'airport_transfer':currentSvcId==='tour'?'city_tour':currentSvcId;
   const svcWA=currentSvcId==='transfer'
-    ?(getShuttleSettings().driverWa||(guestSvcs||[]).find(s=>s.id===_fsId)?.whatsappNumber||WA)
+    ?(_trDropoffMissing?WA:(getShuttleSettings().driverWa||(guestSvcs||[]).find(s=>s.id===_fsId)?.whatsappNumber||WA))
     :((guestSvcs||[]).find(s=>s.id===_fsId)?.whatsappNumber||WA);
 
   // Build WhatsApp URL before any async work so it counts as user-initiated
@@ -4365,7 +4372,7 @@ window.submitService=async function(){
     waBody+=`Arrival time: ${transferDetails.arrivalTime}\n`;
     waBody+=`Guests: ${transferDetails.guests}\n`;
     waBody+=`Pickup: ${transferDetails.pickupLocation}\n`;
-    if(transferDetails.dropoffLocation)waBody+=`Drop-off: ${transferDetails.dropoffLocation}\n`;
+    waBody+=transferDetails.dropoffLocation?`Drop-off: ${transferDetails.dropoffLocation}\n`:`Drop-off: address not set — please confirm with the guest\n`;
     waBody+=`Cars: ${transferDetails.carConfig}\n`;
     waBody+=`Total: ${transferDetails.price} GEL\n`;
   }
