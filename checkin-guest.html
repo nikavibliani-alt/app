@@ -1353,8 +1353,15 @@ let _lastActiveResKey=''; // dedupe key for the reservations-by-roomCode onSnaps
 // A guest's OWN bookings = the booking they are linked to (matchedReservationId) and its exact reservationNumber siblings.
 // Never another reservation that merely shares the room.
 let _ownCancelled=false;
+let _pendingRelatedIds=[];   // reservation ids of the guest's OTHER bookings (same name + date + phone) found at search time
 function _ownBase(){return reservationBaseNum(guestData?.matchedReservationId||'');}
-function _isOwnRes(r){const b=_ownBase();return !!b&&reservationBaseNum(r.reservationNumber||r.id)===b;}
+function _isOwnRes(r){
+  const b=_ownBase();
+  if(!b)return false;
+  const rb=reservationBaseNum(r.reservationNumber||r.id);
+  if(rb===b)return true;
+  return(guestData?.relatedReservationIds||[]).some(id=>reservationBaseNum(id)===rb);   // the guest's other booking(s) in the same group
+}
 function _noteOwnCancelled(docs){   // docs include cancelled ones
   const own=docs.filter(_isOwnRes);
   if(!own.length)return;
@@ -1621,7 +1628,14 @@ function _syncGuestReservationContext(){
 async function _hydrateGuestReservations(){
   const ref=guestData?.matchedReservationId;
   if(!ref)return null;
-  const sibs=await loadSiblingReservations(ref);
+  let sibs=await loadSiblingReservations(ref);
+  // the guest's other bookings (same group) saved at registration
+  for(const rid of (guestData?.relatedReservationIds||[])){
+    try{
+      const more=await loadSiblingReservations(rid);
+      more.forEach(m=>{if(!sibs.some(x=>x.id===m.id))sibs.push(m);});
+    }catch(e){}
+  }
   if(sibs.length){
     allMatchedReservations=sibs;
     _ownCancelled=false;
@@ -2408,6 +2422,25 @@ function partialNameMatch(input,resGuest){
   return false;
 }
 
+/* Group bookings: separate reservations by the SAME guest. Related = exact same guest name (room tag stripped),
+   same check-in date, and the same phone when both bookings have one. Shown together with the room switcher. */
+function _relatedBookings(best,pool){
+  if(!best)return [];
+  const nm=_stripRoomNum(best.guest||best.guestName||'').toLowerCase();
+  if(!nm)return [];
+  const ci=best.checkin||best.checkIn||'';
+  if(!ci)return [];
+  const ph=normalizePhone(best.phone||'');
+  const bb=reservationBaseNum(best.reservationNumber||best.id);
+  return pool.filter(r=>{
+    if((r.status||'').toUpperCase()==='CANCELLED')return false;
+    if(reservationBaseNum(r.reservationNumber||r.id)===bb)return false;
+    if((r.checkin||r.checkIn||'')!==ci)return false;
+    if(_stripRoomNum(r.guest||r.guestName||'').toLowerCase()!==nm)return false;
+    const rp=normalizePhone(r.phone||'');
+    return !ph||!rp||rp===ph;
+  });
+}
 function normGuestId(n){return(n||'').toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'').slice(0,40);}
 
 function fmtStay(s){
@@ -2524,6 +2557,9 @@ async function _initCompanionFromToken(){
     const snap=await _getDocs(query(collection(db,'reservations'),where('reservationNumber','>=',base),where('reservationNumber','<=',base+'\uf8ff')));
     const res=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED'&&reservationBaseNum(r.reservationNumber||r.id)===base);
     if(!res.length)return;
+    for(const rid of (primary.relatedReservationIds||[])){   // the primary's other bookings (same group)
+      try{(await loadSiblingReservations(rid)).forEach(m=>{if(!res.some(x=>x.id===m.id))res.push(m);});}catch(e){}
+    }
     _companionGuest=true;_companionResNum=base;_companionPrimaryId=primary.id;
     _showCompanionBanner();
     _companionResGroup=res;
@@ -2782,6 +2818,12 @@ async function finishRegistration_(bestRes,formData,opts){
   }
   guestId=docId;
   await saveAgreement(guestId);
+  if(_pendingRelatedIds.length&&!_companionGuest){
+    try{
+      await setDoc(doc(db,'checkin_guests',guestId),{relatedReservationIds:_pendingRelatedIds},{merge:true});
+      guestData={...guestData,relatedReservationIds:_pendingRelatedIds};
+    }catch(e){console.warn('[Group] could not save related ids',e);}
+  }
   localStorage.setItem('maxela_apt_id',aptId);
   localStorage.setItem('maxela_guest_id',guestId);
   localStorage.setItem('maxela_g_'+aptId,guestId);
@@ -2993,6 +3035,20 @@ window.searchReservation=async function(){
         if(sibs.length)group=sibs;
       }catch(e){console.warn('[MultiRoom] sibling lookup failed, using single match',e);}
     }
+    // other bookings by the same guest (same name + check-in date + phone): show all apartments together
+    _pendingRelatedIds=[];
+    try{
+      const rel=_relatedBookings(_bestMatch,_pool);
+      for(const rb of rel){
+        const rbase=reservationBaseNum(rb.reservationNumber||rb.id);
+        if(group.some(g=>reservationBaseNum(g.reservationNumber||g.id)===rbase))continue;
+        const more=await loadSiblingReservations(rb.id);
+        const add=more.length?more:[rb];
+        add.forEach(a=>{if(!group.some(g=>g.id===a.id))group.push(a);});
+        _pendingRelatedIds.push(rb.id);
+      }
+      group.sort((a,b)=>(a.roomCode||'').localeCompare(b.roomCode||''));
+    }catch(e){console.warn('[Group] related bookings lookup failed',e);}
     allMatchedReservations=group;
     _pendingReg={name:name||(_bestMatch.guest||''),guests,nationality,contact,contactType,arrival,expectedCheckInWindow:getExpectedCheckInWindow()};
     _pendingMatches=[{res:_bestMatch,score:_bestScore}];
