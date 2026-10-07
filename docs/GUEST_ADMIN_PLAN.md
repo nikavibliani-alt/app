@@ -253,3 +253,15 @@ Restore point: tag `before-s3`. Undo one step: `git revert --no-edit <commit>`, 
 6. Live requests list (onSnapshot), filters match saved ids
 7. "Clear done" only cancelled/past-confirmed within the filter
 8. Push notifications open ?tab=requests / ?tab=failures
+| 1 | 9ade7e9 | live: shuttle settings per group (config.shuttleInfo[group]) |
+| 2 | b0448b4 | live: drop-off from unit/location address; host fallback |
+| 3 | 52a1a15 | live: message adds property, room, flight, map |
+| 4 | 38da277 | live: cancel/edit updates same docs; admin mirrors to checkin_requests |
+| 5 | 7d80d3d | live |
+| 6 | ab78d76 | live: onSnapshot (pending + last 30 days) |
+| 7 | 2217fec | live |
+| 8 | ab436fa | live; deployed only pushOnFailedSearch + pushOnServiceRequest (function list unchanged) |
+
+Notes (S3):
+- Old requests (made before step 4) have no serviceRequestId/checkinRequestId: guest cancel/edit on those updates only the guest's own doc and opens the driver message; admin actions on them don't reach the guest's doc.
+- Old config keeps the global airport_transfer service values as the fallback for any group without its own shuttle settings.
