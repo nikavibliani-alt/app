@@ -702,7 +702,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1013a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1013b · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -4876,13 +4876,14 @@ window.generateGuestDoc=function(guestId,type){
 /* ── Requests ── */
 const REQ_FILTERS=[
   {id:'all',label:'All'},
-  {id:'airport_transfer',label:'Airport'},
-  {id:'transfer',label:'Transfer'},
-  {id:'city_tour',label:'Tour'},
+  {id:'transfer',label:'Shuttle'},
+  {id:'tour',label:'Tour'},
   {id:'cleaning',label:'Cleaning'},
   {id:'laundry',label:'Laundry'},
   {id:'custom',label:'Other'},
 ];
+/* saved service ids: transfer, tour, cleaning, laundry, custom (older records used airport_transfer / city_tour) */
+function reqSid(r){const s=r.serviceId||'';return s==='airport_transfer'?'transfer':s==='city_tour'?'tour':s;}
 function reqTs(r){
   if(r.timestamp?.toDate)return r.timestamp.toDate();
   if(r.timestamp?.seconds)return new Date(r.timestamp.seconds*1000);
@@ -4953,15 +4954,29 @@ function updateRequestsBadge(){
   btn.classList.toggle('has-badge',pending>0);
   badge.textContent=pending>99?'99+':String(pending);
 }
+/* Live requests: every PENDING one + everything from the last 30 days (two snapshot listeners, merged) */
+const _reqLive={pending:new Map(),recent:new Map(),started:false,ready:0};
+function _reqMerge(){
+  const all=new Map([..._reqLive.recent,..._reqLive.pending]);
+  reqData=[...all.values()].sort((a,b)=>reqTs(b)-reqTs(a));
+  updateRequestsBadge();
+  if(currentTab==='requests'&&document.getElementById('req-list'))buildRequestsUI();
+}
+function startRequestsLive(){
+  if(_reqLive.started)return;
+  _reqLive.started=true;
+  const since=new Date(Date.now()-30*864e5);
+  const mk=(q,map)=>onSnapshot(q,snap=>{
+    map.clear();snap.docs.forEach(d=>map.set(d.id,{id:d.id,...d.data()}));
+    _reqLive.ready++;_reqMerge();
+  },err=>{console.error('[requests live]',err);_reqLive.ready++;});
+  mk(query(collection(db,'service_requests'),where('status','==','PENDING')),_reqLive.pending);
+  mk(query(collection(db,'service_requests'),where('timestamp','>=',since),orderBy('timestamp','desc')),_reqLive.recent);
+}
 async function loadRequests(force){
-  if(_reqLoading)return;
-  if(reqData.length&&!force){updateRequestsBadge();return;}
-  _reqLoading=true;
-  try{
-    const snap=await getDocs(query(collection(db,'service_requests'),orderBy('timestamp','desc'),limit(100)));
-    reqData=snap.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){console.error(e);if(!reqData.length)reqData=[];}
-  _reqLoading=false;
+  startRequestsLive();
+  // wait for the first snapshots (max ~4s) so the first render is not empty
+  for(let i=0;i<40&&_reqLive.ready<2;i++)await new Promise(r=>setTimeout(r,100));
   updateRequestsBadge();
 }
 async function loadAndRenderRequests(){
@@ -4971,14 +4986,14 @@ async function loadAndRenderRequests(){
   buildRequestsUI();
 }
 function buildRequestsUI(){
-  const used=new Set(reqData.map(r=>r.serviceId));
+  const used=new Set(reqData.map(reqSid));
   const filters=REQ_FILTERS.filter(f=>f.id==='all'||used.has(f.id));
   if(!filters.some(f=>f.id===reqFilter))reqFilter='all';
   document.getElementById('req-filters').innerHTML=filters.map(f=>
     `<button class="filter-chip ${reqFilter===f.id?'active':''}" onclick="setReqFilter('${f.id}')">${esc(f.label)}</button>`
   ).join('')+`<button class="filter-chip" onclick="deleteCompleted()">Clear done</button>`;
 
-  const filtered=reqFilter==='all'?reqData:reqData.filter(r=>r.serviceId===reqFilter);
+  const filtered=reqFilter==='all'?reqData:reqData.filter(r=>reqSid(r)===reqFilter);
   const now=new Date();
   const todayStr=now.toDateString();
   const yd=new Date(now);yd.setDate(yd.getDate()-1);const ydStr=yd.toDateString();
