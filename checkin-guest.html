@@ -2074,11 +2074,40 @@ document.addEventListener('click',function(){
   if(dd)dd.style.display='none';
 });
 
-function propName(def){return(aptData&&aptData.propertyName)||def;}
+/* ── Guest-facing property name: apartment propertyName > group propertyName (locationInfo) > Maxela (as today).
+   No apartment known yet (plain link, before search) -> neutral "Online check-in". ── */
+let _aptBrand='',_brandFor='',_brandCfgDone=false;
+const _BRAND_HTML={loading:'<span>Maxela</span> Apartments',logo:'<span>Maxela</span><small>apts</small>'};
+function brandInfo(){
+  const own=(aptData&&aptData.propertyName)||(_brandFor===aptId?_aptBrand:'');
+  if(own&&aptId)return{name:own,mode:'custom'};
+  if(!aptId)return{name:'Online check-in',mode:'neutral'};
+  const grp=(guestFullCfg&&guestFullCfg.locationInfo&&guestFullCfg.locationInfo[aptPropTypeForConfig()]||{}).propertyName;
+  if(grp)return{name:grp,mode:'custom'};
+  const p=aptPropType();
+  if((p==='XCV'||p==='VGL')&&!_brandCfgDone)return{name:'Online check-in',mode:'neutral'};   // wait for the group name instead of flashing "Maxela"
+  return{name:'Maxela Apartments',mode:'default'};
+}
+function propName(def){const b=brandInfo();return b.mode==='default'?def:b.name;}   // short form: default stays "Maxela"
+function ensureBrand(){
+  if(!aptId||_brandFor===aptId)return;
+  const id=aptId;_brandFor=id;_aptBrand='';
+  Promise.all([getDoc(doc(db,'checkin_apartments',id)).catch(()=>null),getFullCfg()]).then(([s])=>{
+    if(id!==aptId)return;
+    _aptBrand=(s&&s.exists()&&s.data().propertyName)||'';
+    _brandCfgDone=true;applyPropertyName();
+    try{if(document.getElementById('page-home')?.classList.contains('active'))renderGreetingApt();}catch(e){}
+  });
+}
 function applyPropertyName(){
-  const pn=propName('Maxela Apartments');
-  document.querySelectorAll('.foot__mark').forEach(el=>{el.textContent=pn+' · Tbilisi';});
-  const m=document.querySelector('.meta');if(m&&/TBILISI/i.test(m.textContent))m.textContent=pn.toUpperCase()+' · TBILISI';
+  ensureBrand();
+  const b=brandInfo(),def=b.mode==='default',neutral=b.mode==='neutral';
+  const full=b.name;
+  document.querySelectorAll('.foot__mark').forEach(el=>{el.textContent=neutral?full:full+' · Tbilisi';});
+  document.querySelectorAll('.meta').forEach(m=>{if(/TBILISI|CHECK-IN/i.test(m.textContent))m.textContent=neutral?full.toUpperCase():full.toUpperCase()+' · TBILISI';});
+  document.querySelectorAll('.reg-brand').forEach(el=>{el.textContent=def?'Maxela':full;});
+  const lb=document.querySelector('.loading-brand');if(lb){if(def)lb.innerHTML=_BRAND_HTML.loading;else lb.textContent=full;}
+  const lg=document.querySelector('.brand');if(lg&&lg.querySelector('small,span')){if(def)lg.innerHTML=_BRAND_HTML.logo;else lg.innerHTML='<span>'+esc(full)+'</span>';}
 }
 function applyTranslations(){
   const map={
@@ -2344,7 +2373,7 @@ function renderGreetingApt(){
   applyPropertyName();
   const aptName=aptDisplayName(aptId);
   if(!allMatchedReservations||allMatchedReservations.length<=1){
-    el.innerHTML='<div style="font-size:13px;color:var(--muted);margin-top:6px;"><b id="home-apt-name" style="color:var(--ink);font-weight:500;">'+esc(aptName)+'</b> · '+esc(propName('Maxela'))+' · Tbilisi</div>';
+    el.innerHTML='<div style="font-size:13px;color:var(--muted);margin-top:6px;"><b id="home-apt-name" style="color:var(--ink);font-weight:500;">'+esc(aptName)+'</b> · '+esc(propName('Maxela'))+(brandInfo().mode==='neutral'?'':' · Tbilisi')+'</div>';
     return;
   }
   const n=allMatchedReservations.length;
@@ -4954,6 +4983,8 @@ window.switchHomeTab=function(id){
 
 init();
 setupDateInput();
+
+applyPropertyName();   // brand name as early as the apartment is known (?apt= link); neutral on a plain link
 </script>
 
 <div class="lightbox hidden" id="lightbox" onclick="if(event.target===this)window.closeLightbox()">

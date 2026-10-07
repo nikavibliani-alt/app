@@ -702,7 +702,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1008b · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1009a · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -1686,8 +1686,8 @@ const LOCATION_INFO_DEFAULTS={
   BIG_APT:{address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:''},
   FREEDOM:{address:'Galaktion Tabidze St. 3/5, Tbilisi',mapsUrl:'',neighborhood:''},
   ORBELIANI:{address:'Atoneli St. 9, Tbilisi',mapsUrl:'',neighborhood:''},
-  VGL:{address:'',mapsUrl:'',neighborhood:''},
-  XCV:{address:'',mapsUrl:'',neighborhood:''},
+  VGL:{address:'',mapsUrl:'',neighborhood:'',propertyName:'VGL Group'},
+  XCV:{address:'',mapsUrl:'',neighborhood:'',propertyName:'Modern Avlabari'},
 };
 const PARKING_INFO_DEFAULTS={
   ROOMS:{parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
@@ -1933,6 +1933,7 @@ window.openGpEditor=function(ctx){
     const def=LOCATION_INFO_DEFAULTS[gsProp]||{};
     const data={...def,...loc};
     body.innerHTML=`
+      <label class="apt-label">Property name</label><input class="apt-input" value="${esc(data.propertyName||'')}" oninput="gpSetLoc('propertyName',this.value)" placeholder="Leave empty for Maxela"><p class="apt-hint" style="margin:-4px 0 8px">Shown to guests in the header and footer. An apartment's own name (Apartments, Location card) wins over this.</p>
       <label class="apt-label">Address</label><input class="apt-input" value="${esc(data.address||'')}" oninput="gpSetLoc('address',this.value)">
       <label class="apt-label">Google Maps URL</label><input class="apt-input" value="${esc(data.mapsUrl||'')}" oninput="gpSetLoc('mapsUrl',this.value)" placeholder="https://maps.google.com/…">
       <label class="apt-label">Neighborhood blurb</label><textarea class="apt-textarea" oninput="gpSetLoc('neighborhood',this.value)">${esc(data.neighborhood||'')}</textarea>`;
