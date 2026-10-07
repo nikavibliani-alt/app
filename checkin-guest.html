@@ -1325,6 +1325,7 @@ let _geminiKey='';
 let guestId=null;
 let guestData=null;
 let aptData=null;
+let _roomMeta=null,_roomMetaFetching='';   // checkin_rooms/{aptId} (site, displayName) for rooms the page doesn't know
 let activeReservation=null; // reservation matching this apt with tuyaPassword
 let isPreview=false; // admin preview mode flag
 let _adminPreviewMode=params.get('adminPreview')==='1';
@@ -2341,7 +2342,7 @@ function renderGreetingApt(){
   const el=document.getElementById('apt-area');
   if(!el)return;
   applyPropertyName();
-  const aptName=APT_NAMES[aptId]||aptId;
+  const aptName=aptDisplayName(aptId);
   if(!allMatchedReservations||allMatchedReservations.length<=1){
     el.innerHTML='<div style="font-size:13px;color:var(--muted);margin-top:6px;"><b id="home-apt-name" style="color:var(--ink);font-weight:500;">'+esc(aptName)+'</b> · '+esc(propName('Maxela'))+' · Tbilisi</div>';
     return;
@@ -2363,7 +2364,7 @@ function renderGreetingApt(){
   let html='<div id="multi-room-label" class="apt-grid" style="--apt-cols:'+n+'">';
   for(const res of allMatchedReservations){
     const room=res.roomCode||'';
-    const name=APT_NAMES[room]||room;
+    const name=aptDisplayName(room);
     const active=room===aptId;
     html+='<button type="button" class="apt-tile'+(active?' active':'')+'" data-room="'+esc(room)+'">'+
       '<span class="apt-tile__room">'+esc(room)+'</span>'+
@@ -2412,7 +2413,7 @@ async function findExistingPrimaryGuest(resId,resNum){
 async function _getParkingData(){
   const cfg=await getFullCfg();
   const prop=aptPropTypeForConfig();
-  const parkDefaults={ROOMS:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'},MAXELA:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'},BIG_APT:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'},FREEDOM:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'},ORBELIANI:{parkingEnabled:false,parkingDesc:''}};
+  const parkDefaults={ROOMS:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'},MAXELA:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'},BIG_APT:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'},FREEDOM:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'},ORBELIANI:{parkingEnabled:false,parkingDesc:''},VGL:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'},XCV:{parkingEnabled:true,parkingDesc:'Paid parking available nearby'}};
   return{...(parkDefaults[prop]||{}),...((cfg.parkingInfo||{})[prop]||{})};
 }
 
@@ -2577,7 +2578,7 @@ async function finishRegistration_(bestRes,formData,opts){
   if(!aptId)aptId=bestRes.roomCode||'';
   if(aptId){
     try{const s=await getDoc(doc(db,'checkin_apartments',aptId));if(s.exists())aptData=s.data();}catch(e){}
-    document.getElementById('home-apt-name').textContent=APT_NAMES[aptId]||aptId;
+    document.getElementById('home-apt-name').textContent=aptDisplayName(aptId);
   }
   const scanPromise=(passportFile&&!passportScanResult&&!_companionGuest&&!skipPassport)?scanPassport(passportFile):Promise.resolve();
   let passportUrl='';
@@ -3384,7 +3385,22 @@ const ROOM_TO_PROP={
   'tab-1':'FREEDOM','tab-2':'FREEDOM','tab-3':'FREEDOM',
   'orb-1':'ORBE_1','orb-2':'ORBE_1','orb-3':'ORBE_2',
 };
-function aptPropType(){return ROOM_TO_PROP[aptId]||'ROOMS';}
+// Room -> property group. Known rooms keep their fixed group; new rooms use their site (checkin_rooms) or id prefix.
+function aptPropType(){
+  if(ROOM_TO_PROP[aptId])return ROOM_TO_PROP[aptId];
+  const site=(_roomMeta&&_roomMeta.id===aptId)?_roomMeta.site:'';
+  if(site==='xcv'||/^xcv-/i.test(aptId))return'XCV';
+  if(site==='vgl'||/^vgl-/i.test(aptId))return'VGL';
+  return'ROOMS';
+}
+function aptDisplayName(id){return APT_NAMES[id]||((_roomMeta&&_roomMeta.id===id&&_roomMeta.displayName)||id);}
+async function ensureRoomMeta(){
+  if(!aptId||(_roomMeta&&_roomMeta.id===aptId)||_roomMetaFetching===aptId)return;
+  const id=aptId;_roomMetaFetching=id;
+  try{const s=await getDoc(doc(db,'checkin_rooms',id));_roomMeta=s.exists()?{id,...s.data()}:{id};}catch(e){_roomMeta={id};}
+  _roomMetaFetching='';
+  if(id===aptId){try{renderGreetingApt();renderTiles();}catch(e){}}
+}
 function aptPropTypeForConfig(){
   if(aptId.startsWith('orb-'))return'ORBELIANI';
   return aptPropType();
@@ -3640,6 +3656,7 @@ async function renderWhatYouBooked(){
     const prop=aptPropTypeForConfig();
     const defaults={ROOMS:{name:'Triple Room with Private Bathroom',maxGuests:4,amenities:['Private Bathroom','Free WiFi']},MAXELA:{name:'Superior Apartment',maxGuests:6,amenities:['Full Kitchen','Free WiFi']},BIG_APT:{name:'3-Bedroom Apartment',maxGuests:12,amenities:['3 Bedrooms','Free WiFi']},FREEDOM:{name:'Tabidze Studio',maxGuests:2,amenities:['Kitchenette','Free WiFi']},ORBELIANI:{name:'Orbeliani Suite',maxGuests:3,amenities:['Free WiFi','City View']}};
     _wybCat={...(defaults[prop]||{}),...((cfg.roomCategories||{})[prop]||{})};
+    if(!_wybCat.name)_wybCat.name=aptDisplayName(aptId);   // new groups have no preset name
     _renderWybCard(_wybCat);
   }catch(e){const el2=document.getElementById('what-you-booked');if(el2)el2.innerHTML='';}
 }
@@ -3757,7 +3774,7 @@ try{
   }
 
   if(type==='contact'){
-    const aptName=APT_NAMES[aptId]||aptId;
+    const aptName=aptDisplayName(aptId);
     const waMsg=encodeURIComponent(`Hello! I'm staying at ${aptName}. My name is ${guestData?.name||''}. I need assistance.`);
     body=`<p style="font-size:13px;color:var(--muted);margin-bottom:1.25rem;line-height:1.6;">${t('tcos')} — ${t('cwas')}</p>
     <a class="contact-btn" href="https://wa.me/${WA}?text=${waMsg}" target="_blank">
@@ -4115,7 +4132,7 @@ window.submitService=async function(){
   if(timeEl&&!preferredTime){alert('Please select a preferred time.');return;}
   const dateEl=document.getElementById('svc-date');
   const preferredDate=dateEl?.value||'';
-  const aptName=APT_NAMES[aptId]||aptId;
+  const aptName=aptDisplayName(aptId);
 
   // Transfer: collect extra fields
   let transferDetails={};
@@ -4321,7 +4338,7 @@ window.logout=function(){
     document.getElementById('auth-apt').style.display='none';
   }else{
     document.getElementById('auth-apt').style.display='';
-    document.getElementById('t-apt-name-reg').textContent=APT_NAMES[aptId]||aptId;
+    document.getElementById('t-apt-name-reg').textContent=aptDisplayName(aptId);
   }
 }
 
@@ -4511,7 +4528,7 @@ async function init(){
   // No valid session — show register page
   if(aptId){
     try{const snap=await getDoc(doc(db,'checkin_apartments',aptId));if(snap.exists())aptData=snap.data();}catch(e){}
-    document.getElementById('t-apt-name-reg').textContent=APT_NAMES[aptId]||aptId;
+    document.getElementById('t-apt-name-reg').textContent=aptDisplayName(aptId);
     _updateRulesForApt();
   }else{
     document.getElementById('auth-apt').style.display='none';
@@ -4680,6 +4697,7 @@ function _floorLabel(){
 function _renderHeroContent(){
   _updateParkingButtonVisibility();
   applyPropertyName();
+  ensureRoomMeta();
   const doorEl=document.getElementById('hero-door-code');
   applyDoorCardVisibility();   // fail open: only hidden once config says smartLock===false for this apartment type
   let doorCode=_doorCodeForGuest();

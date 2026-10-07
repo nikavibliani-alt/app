@@ -702,7 +702,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1008a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1008b · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -1657,6 +1657,8 @@ const SECTION_DEFAULTS={
   BIG_APT:{checkin:true,access_code:true,elevator_code:true,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
   FREEDOM:{checkin:true,access_code:true,elevator_code:false,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
   ORBELIANI:{checkin:true,access_code:true,elevator_code:false,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  VGL:{checkin:true,access_code:true,elevator_code:false,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
+  XCV:{checkin:true,access_code:true,elevator_code:false,wifi:true,services:true,laundry:true,cleaning:true,city_tour:true,airport_transfer:true,recs:true,rules:true,contact:true},
 };
 const LAUNDRY_DEFAULTS=[
   {name:'T-shirt / Polo',price:5},{name:'Pants / Jeans',price:8},{name:'Dress',price:10},
@@ -1675,6 +1677,8 @@ const ROOM_CATEGORY_DEFAULTS={
   BIG_APT:{name:'3-Bedroom Apartment',maxGuests:12,amenities:['3 Bedrooms','Full Kitchen','Living Room','Free WiFi'],photos:[]},
   FREEDOM:{name:'Tabidze Studio',maxGuests:2,amenities:['Kitchenette','Free WiFi','City Center'],photos:[]},
   ORBELIANI:{name:'Orbeliani Suite',maxGuests:3,amenities:['Free WiFi','City View','Historic District'],photos:[]},
+  VGL:{name:'',maxGuests:2,amenities:[],photos:[]},
+  XCV:{name:'',maxGuests:2,amenities:[],photos:[]},
 };
 const LOCATION_INFO_DEFAULTS={
   ROOMS:{address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:''},
@@ -1682,6 +1686,8 @@ const LOCATION_INFO_DEFAULTS={
   BIG_APT:{address:'Zhiuli Shartava St. 37, Tbilisi',mapsUrl:'',neighborhood:''},
   FREEDOM:{address:'Galaktion Tabidze St. 3/5, Tbilisi',mapsUrl:'',neighborhood:''},
   ORBELIANI:{address:'Atoneli St. 9, Tbilisi',mapsUrl:'',neighborhood:''},
+  VGL:{address:'',mapsUrl:'',neighborhood:''},
+  XCV:{address:'',mapsUrl:'',neighborhood:''},
 };
 const PARKING_INFO_DEFAULTS={
   ROOMS:{parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
@@ -1689,6 +1695,8 @@ const PARKING_INFO_DEFAULTS={
   BIG_APT:{parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
   FREEDOM:{parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
   ORBELIANI:{parkingEnabled:false,parkingDesc:'',parkingMapsUrl:'',parkingMediaUrl:''},
+  VGL:{parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
+  XCV:{parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
 };
 const GP_ROOM_PROP={
   '0-1':'ROOMS','0-2':'ROOMS','0-3':'ROOMS','0-4':'ROOMS','0-5':'ROOMS',
@@ -1699,6 +1707,8 @@ const GP_ROOM_PROP={
 function gpPropForRoom(code){
   const c=String(code||'');
   if(c.startsWith('orb-'))return'ORBELIANI';
+  if(/^xcv-/i.test(c))return'XCV';
+  if(/^vgl-/i.test(c))return'VGL';
   return GP_ROOM_PROP[c]||'ROOMS';
 }
 /* "no smart lock" follows the Guest page setting of the apartment's type (gsVisibility[group].smartLock === false) */
@@ -1710,6 +1720,7 @@ function gpNoLock(code){
 const GP_PROPS=[
   {id:'ROOMS',label:'Rooms'},{id:'MAXELA',label:'Maxela'},{id:'BIG_APT',label:'Big Apt'},
   {id:'FREEDOM',label:'Freedom'},{id:'ORBELIANI',label:'Orbeliani'},
+  {id:'VGL',label:'VGL'},{id:'XCV',label:'XCV'},
 ];
 const GP_ICON_MAP={
   key:'key',wifi:'wifi',elevator:'arrow-up-down',services:'layout-grid',
