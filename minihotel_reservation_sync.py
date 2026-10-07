@@ -17,7 +17,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # ── Config ──
-HOTEL_CODE = os.environ.get('MINIHOTEL_HOTEL', 'freedo45')
+HOTEL_CODE = os.environ.get('MINIHOTEL_HOTEL', '')
 USERNAME = os.environ.get('MINIHOTEL_USER', '')
 PASSWORD = os.environ.get('MINIHOTEL_PASS', '')
 
