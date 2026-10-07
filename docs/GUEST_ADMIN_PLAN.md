@@ -206,3 +206,14 @@ Restore point: tag `before-s1`. Undo one step: `git revert --no-edit <commit>`, 
 5. Admin "Grant Access" hidden before arrival day
 6. Group-member and extra-room guest docs get random token ids; ?g= must look like a token
 7. Privacy wording on the passport/search pages (4 languages)
+| 1 | fcbb223 | live: preview links show placeholders only |
+| 2 | 39dc295 | live: ?join=<companionToken> |
+| 3 | e666c68 | live: cancelled / stay ended / own booking only (shared unlock rules + tests; server lib only gained optional inputs, behaviour unchanged, not redeployed) |
+| 4 | 6bad26b | live: booking dates |
+| 5 | d9910c7 | live: admin Grant Access hidden before arrival day |
+| 6 | 4c6d9a3 | live; function guestRegister redeployed (only that one; function list unchanged) |
+| 7 | ae082df | live: privacy wording |
+
+Notes (S1):
+- Old companion docs with ids like <room>_<date> can no longer be opened with ?g=; saved sessions in a browser still load them.
+- A GitHub Actions hosting run for step 6 sat queued; the step 7 run deployed everything.
