@@ -122,3 +122,48 @@ test('runGuestUnlock force_unlock writes derived fields', async () => {
   assert.equal(store.patches[0].manualUnlock, true);
   assert.equal(store.patches[0].unlockState, 'unlocked');
 });
+
+// ── S1: cancelled booking, stay over, booking date vs typed date ──────────────
+test('cancelled booking → no access, even mid-stay', () => {
+  const r = computeGuestUnlock({
+    guest: { arrivalDate: '2026-09-01' }, cancelled: true, today: '2026-09-03', hour: 12,
+  });
+  assert.equal(r.unlocked, false);
+  assert.equal(r.reason, 'cancelled');
+});
+
+test('cancelled beats manualUnlock', () => {
+  const r = computeGuestUnlock({
+    guest: { arrivalDate: '2026-09-01', manualUnlock: true }, cancelled: true, today: '2026-09-01', hour: 16,
+  });
+  assert.equal(r.unlocked, false);
+});
+
+test('stay over: past checkout day → locked while the page is still open', () => {
+  const r = computeGuestUnlock({
+    guest: { arrivalDate: '2026-09-01' }, checkoutDate: '2026-09-03', today: '2026-09-04', hour: 9,
+  });
+  assert.equal(r.unlocked, false);
+  assert.equal(r.reason, 'stay_ended');
+});
+
+test('checkout day: still unlocked at 19:00, ended from 20:00', () => {
+  const base = { guest: { arrivalDate: '2026-09-01' }, checkoutDate: '2026-09-03', today: '2026-09-03' };
+  assert.equal(computeGuestUnlock({ ...base, hour: 19 }).unlocked, true);
+  assert.equal(computeGuestUnlock({ ...base, hour: 20 }).unlocked, false);
+});
+
+test('without checkoutDate the old behaviour is unchanged (admin does not pass it)', () => {
+  assert.equal(
+    isGuestUnlocked({ guest: { arrivalDate: '2026-09-01' }, today: '2026-09-30', hour: 10 }),
+    true
+  );
+});
+
+test('booking arrival date wins over a wrongly typed date (caller passes the booking date)', () => {
+  // typed date 2026-09-10 (wrong) vs booking 2026-09-01: the caller must pass the booking's date
+  const typedWrong = computeGuestUnlock({ guest: { arrivalDate: '2026-09-10' }, today: '2026-09-02', hour: 10 });
+  const bookingDate = computeGuestUnlock({ guest: { arrivalDate: '2026-09-10' }, arrivalDate: '2026-09-01', today: '2026-09-02', hour: 10 });
+  assert.equal(typedWrong.unlocked, false);
+  assert.equal(bookingDate.unlocked, true);
+});

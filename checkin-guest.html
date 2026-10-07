@@ -1350,6 +1350,17 @@ let _pendingAgreement=null;
 let allMatchedReservations=[];
 let _lastActiveResKey=''; // dedupe key for the reservations-by-roomCode onSnapshot below — skips renderTiles() when the picked reservation didn't actually change
 
+// A guest's OWN bookings = the booking they are linked to (matchedReservationId) and its exact reservationNumber siblings.
+// Never another reservation that merely shares the room.
+let _ownCancelled=false;
+function _ownBase(){return reservationBaseNum(guestData?.matchedReservationId||'');}
+function _isOwnRes(r){const b=_ownBase();return !!b&&reservationBaseNum(r.reservationNumber||r.id)===b;}
+function _noteOwnCancelled(docs){   // docs include cancelled ones
+  const own=docs.filter(_isOwnRes);
+  if(!own.length)return;
+  const c=own.every(r=>(r.status||'').toUpperCase()==='CANCELLED');
+  if(c!==_ownCancelled){_ownCancelled=c;try{syncHomePhase();renderTiles();}catch(e){}}
+}
 function reservationBaseNum(ref){
   if(!ref)return '';
   return String(ref).trim().replace(/_\d+$/,'');
@@ -1613,7 +1624,17 @@ async function _hydrateGuestReservations(){
   const sibs=await loadSiblingReservations(ref);
   if(sibs.length){
     allMatchedReservations=sibs;
+    _ownCancelled=false;
     try{localStorage.setItem('maxela_all_res',JSON.stringify(sibs));}catch(e){}
+  }else{
+    // no live sibling: if the guest's own booking is cancelled there is no access (and no stale saved list to fall back on)
+    try{
+      const own=await getDoc(doc(db,'reservations',ref));
+      if(own.exists()&&(own.data().status||'').toUpperCase()==='CANCELLED'){
+        _ownCancelled=true;allMatchedReservations=[];activeReservation=null;
+        try{localStorage.removeItem('maxela_all_res');}catch(e){}
+      }
+    }catch(e){}
   }
   _syncGuestReservationContext();
   const resRoom=activeReservation?.roomCode||'';
@@ -2012,6 +2033,8 @@ function isUnlocked(){
     hkDone:_hkDataRoom===aptId&&(_hkTodayData?.done===true||_hkYesterdayData?.done===true),
     today:tbilisiToday(),
     hour:sharedTbilisiHour(),
+    cancelled:_ownCancelled,
+    checkoutDate:activeReservation?.checkout||activeReservation?.checkOut||guestData.checkoutDate||'',
   });
 }
 
@@ -2593,7 +2616,9 @@ window.switchApt=async function(newRoomCode){
     snap=>{
       if(aptId!==_snapRoom)return; // user switched room again; stale snapshot, ignore
       const today=tbilisiToday();
-      const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
+      const raw=snap.docs.map(d=>({id:d.id,...d.data()}));
+      _noteOwnCancelled(raw);
+      const all=raw.filter(r=>(r.status||'').toUpperCase()!=='CANCELLED'&&_isOwnRes(r));   // own booking only
       const valid=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=today;});
       const current=valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return ci&&ci<=today;});
       const upcoming=valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return !ci||ci>today;});
@@ -3221,6 +3246,7 @@ function showHome(){
     if(_matchedResId){
       _homeSnaps.push(onSnapshot(doc(db,'reservations',_matchedResId),snap=>{
         if(!snap.exists())return;
+        _noteOwnCancelled([{id:snap.id,...snap.data()}]);
         const _newRoom=snap.data().roomCode;
         if(_newRoom&&_newRoom!==aptId){
           console.log('[RoomFix] Real-time correction from',aptId,'to',_newRoom);
@@ -3256,7 +3282,10 @@ function showHome(){
       query(collection(db,'reservations'),where('roomCode','==',aptId)),
       snap=>{
         const today=tbilisiToday();
-        const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
+        const raw=snap.docs.map(d=>({id:d.id,...d.data()}));
+        _noteOwnCancelled(raw);
+        // only THIS guest's booking (exact reservationNumber siblings) — never another reservation in the room
+        const all=raw.filter(r=>(r.status||'').toUpperCase()!=='CANCELLED'&&_isOwnRes(r));
         const valid=all.filter(r=>{const co=r.checkout||r.checkOut||'';return co&&co>=today;});
         const current=valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return ci&&ci<=today;});
         const upcoming=valid.filter(r=>{const ci=r.checkin||r.checkIn||'';return !ci||ci>today;});
@@ -3267,17 +3296,6 @@ function showHome(){
         if(!picked&&matchedId){
           const matched=valid.find(r=>r.id===matchedId);
           if(matched)picked=matched;
-        }
-        if(!picked){
-          const ci=guestData?.arrivalDate||'';
-          const co=guestData?.checkoutDate||'';
-          if(ci){
-            picked=valid.find(r=>{
-              const rc=r.checkin||r.checkIn||'';
-              const rco=r.checkout||r.checkOut||'';
-              return rc===ci&&(!co||!rco||rco===co);
-            })||null;
-          }
         }
         if(!picked)picked=_pickReservationFromPool(current)||_pickReservationFromPool(upcoming)||_pickReservationFromPool(valid);
         activeReservation=picked;
@@ -4921,6 +4939,7 @@ function _startCountdownTick(){
 // §3.2 — derives which of the 4 home phases to show. Reads isUnlocked() / isStayEnded()
 // (both unchanged — §4.1/§4.2 math lives elsewhere) plus the two new guest-confirmed flags.
 function _homePhaseNow(){
+  if(window.isStayEnded&&window.isStayEnded())return'ended';   // stay over while the page stays open (checkout day 20:00 or "I've checked out")
   if(!isUnlocked())return'waiting';
   const co=guestData?.checkoutDate||activeReservation?.checkout||activeReservation?.checkOut||'';
   const today=tbilisiToday();

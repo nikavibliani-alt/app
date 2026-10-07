@@ -8,6 +8,7 @@
 const TBILISI_TZ = 'Asia/Tbilisi';
 const DEFAULT_CHECK_IN_HOUR = 15;
 const HK_EARLY_HOUR = 11;
+const STAY_END_HOUR = 20;
 
 function tbilisiNow() {
   return new Date(Date.now() + 4 * 3600 * 1000);
@@ -61,6 +62,17 @@ function computeGuestUnlock(opts = {}) {
 
   const today = opts.today || tbilisiToday();
   const hour = opts.hour != null ? opts.hour : tbilisiHour();
+
+  // The guest's own booking was cancelled: no access.
+  if (opts.cancelled === true) {
+    return { state: 'locked', unlocked: false, label: 'Cancelled', cls: 'waiting', reason: 'cancelled' };
+  }
+  // Stay over (only when the caller passes the booking's checkout date): checkout day from 20:00, or any later day.
+  const checkoutDate = normalizeStayDate(opts.checkoutDate || '');
+  if (checkoutDate && (today > checkoutDate || (today === checkoutDate && hour >= STAY_END_HOUR))) {
+    return { state: 'locked', unlocked: false, label: 'Stay ended', cls: 'waiting', reason: 'stay_ended' };
+  }
+
   const checkInHour = opts.checkInHour != null ? opts.checkInHour : DEFAULT_CHECK_IN_HOUR;
   const hkDone = opts.hkDone === true;
   const arrival = normalizeStayDate(opts.arrivalDate || guest.arrivalDate || '');
