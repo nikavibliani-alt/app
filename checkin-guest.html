@@ -3063,6 +3063,10 @@ window.searchReservation=async function(){
       localStorage.setItem('maxela_apt_id',aptId);
       localStorage.setItem('maxela_g_'+aptId,guestId);
       localStorage.setItem('maxela_all_res',JSON.stringify(group));
+      // welcome back: load the BOOKED room's apartment data (the previous room / empty data must not be shown) before home opens
+      aptData=null;
+      if(aptId){try{const _as=await getDoc(doc(db,'checkin_apartments',aptId));aptData=_as.exists()?_as.data():null;}catch(e){}}
+      _ownCancelled=false;_brandFor='';   // re-read the property name for this room
       if(_bestMatch.roomCode&&_bestMatch.roomCode!==existing.aptId){
         setDoc(doc(db,'checkin_guests',guestId),{aptId:_bestMatch.roomCode,matchedReservationId:_bestMatch.id||existing.matchedReservationId},{merge:true}).catch(()=>{});
       }
