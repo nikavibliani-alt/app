@@ -702,7 +702,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1012b · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1013a · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -4894,6 +4894,33 @@ function reqStatusPill(status){
   if(s==='CANCELLED')return{label:'CANCELLED',cls:'pill-cancelled'};
   return{label:'PENDING',cls:'pill-pending-req'};
 }
+/* requested date (pickupDate / preferredDate), ISO yyyy-mm-dd or '' */
+function reqDate(r){
+  const d=r.details||{};
+  const v=d.pickupDate||d.preferredDate||r.pickupDate||r.preferredDate||'';
+  return /^\d{4}-\d{2}-\d{2}$/.test(v)?v:'';
+}
+function reqDateLabel(iso){
+  if(!iso)return'No date set';
+  const today=tbilisiToday();
+  const d=new Date(iso+'T00:00:00Z');
+  const base=d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'});
+  if(iso===today)return'Today · '+base;
+  if(iso===addDaysISO(today,1))return'Tomorrow · '+base;
+  if(iso<today)return base+' (past)';
+  return base;
+}
+/* the guest's contact for a request: saved on the request, else looked up from the guest form */
+function reqGuestContact(r){
+  let contact=r.guestContact||'',type=r.guestContactType||'';
+  if(!contact&&r.guestId){const g=(guestData||[]).find(x=>x.id===r.guestId);if(g){contact=g.contact||'';type=g.contactType||'';}}
+  contact=String(contact||'').trim();
+  if(!contact)return null;
+  const isTg=type==='tg'||/^@/.test(contact);
+  if(isTg)return{kind:'telegram',url:'https://t.me/'+encodeURIComponent(contact.replace(/^@/,'').replace(/\s+/g,''))};
+  const wa=normalizeWaPhone(contact);
+  return wa?{kind:'whatsapp',url:'https://wa.me/'+wa}:null;
+}
 function reqSubline(r){
   const ts=reqTs(r);
   const timeStr=ts.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+', '+ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
@@ -4955,11 +4982,13 @@ function buildRequestsUI(){
   const now=new Date();
   const todayStr=now.toDateString();
   const yd=new Date(now);yd.setDate(yd.getDate()-1);const ydStr=yd.toDateString();
+  /* grouped by the REQUESTED date (pickup / preferred date); requests without a date go last */
   const groupOrder=[];const groups={};
-  filtered.forEach(r=>{
-    const ts=reqTs(r);
-    const ds=ts.toDateString();
-    const label=ds===todayStr?'Today':ds===ydStr?'Yesterday':ts.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const _today=tbilisiToday();
+  // order: today and later (soonest first), then no date, then past dates (most recent first)
+  const rank=r=>{const d=reqDate(r);return !d?[1,0]:d>=_today?[0,Date.parse(d)]:[2,-Date.parse(d)];};
+  [...filtered].sort((a,b)=>{const x=rank(a),y=rank(b);return x[0]-y[0]||x[1]-y[1]||reqTs(b)-reqTs(a);}).forEach(r=>{
+    const label=reqDateLabel(reqDate(r));
     if(!groups[label]){groups[label]=[];groupOrder.push(label);}
     groups[label].push(r);
   });
@@ -4997,6 +5026,7 @@ window.openReqDetail=function(id){
     ${row('Guest',r.guestName||'—')}
     ${row('Apartment',r.aptId||r.roomCode||'—')}
     ${row('Service',r.service||sid||'—')}
+    ${row('Requested date',reqDate(r)?reqDateLabel(reqDate(r)):'')}
     ${row('Submitted',timeStr)}`;
   if(sid==='airport_transfer'||sid==='transfer'){
     body+=row('Pickup date',d.pickupDate);
@@ -5017,10 +5047,12 @@ window.openReqDetail=function(id){
   if(d.preferredTime&&sid!=='cleaning')body+=row('Preferred time',d.preferredTime);
   if(r.whatsappNumber)body+=row('WhatsApp',r.whatsappNumber);
   const wa=normalizeWaPhone(r.whatsappNumber||'');
+  const gc=reqGuestContact(r);
   body+=`<div class="req-actions">
     ${wa?`<a class="btn" href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>`:''}
+    ${gc?`<a class="btn" href="${gc.url}" target="_blank" rel="noopener">Message guest</a>`:`<button class="btn" disabled>Message guest</button>`}
     ${(r.status||'PENDING')!=='CONFIRMED'?`<button class="btn btn-primary" onclick="setReqStatus('${id}','CONFIRMED')">Confirm</button>`:''}
-    ${(r.status||'PENDING')!=='CANCELLED'?`<button class="btn" onclick="setReqStatus('${id}','CANCELLED')">Cancel</button>`:''}
+    ${(r.status||'PENDING')!=='CANCELLED'?`<button class="btn" onclick="setReqStatus('${id}','CANCELLED')">Decline request</button>`:''}
   </div>
   <button class="btn" style="width:100%;margin-top:10px;color:var(--red)" onclick="deleteReq('${id}')">Delete request</button>`;
   document.getElementById('req-detail-title').textContent=(r.guestName||'Request')+' · '+(r.aptId||r.roomCode||'');
@@ -5029,6 +5061,7 @@ window.openReqDetail=function(id){
 };
 window.closeReqDetail=function(){document.getElementById('req-detail')?.classList.remove('open');};
 window.setReqStatus=async function(id,status){
+  if(status==='CANCELLED'&&!confirm('Decline this request? The guest will see it as cancelled.'))return;
   try{
     await updateDoc(doc(db,'service_requests',id),{status});
     const r=reqData.find(x=>x.id===id);if(r)r.status=status;
@@ -5039,7 +5072,7 @@ window.setReqStatus=async function(id,status){
     updateRequestsBadge();
     buildRequestsUI();
     closeReqDetail();
-    toast(status==='CONFIRMED'?'Confirmed':'Cancelled');
+    toast(status==='CONFIRMED'?'Confirmed':'Request declined');
   }catch(e){toast('Update failed: '+e.message);}
 };
 window.deleteReq=async function(id){
