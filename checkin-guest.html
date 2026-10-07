@@ -4068,6 +4068,7 @@ window.openSvc=async function(id,name,hasTime){
   currentSvcId=id;currentSvcName=name;
   laundryQtys={};
   await _ensureServicesConfigLoaded();
+  if(id==='transfer'){try{await getFullCfg();}catch(e){}}   // per-group shuttle settings
   const modal=document.getElementById('svc-modal');
   document.getElementById('svc-modal-title').textContent=name;
   document.getElementById('svc-note-lbl').textContent=t('sn');
@@ -4250,9 +4251,16 @@ function refreshMyRequestsSection(){
     return `<div class="req-card${isCan?' req-cancelled-card':''}" onclick="window.openRequestDetail('${r.id}')"><div class="req-name">${esc(r.serviceName||'')}</div>${sub?`<div class="req-note">${esc(sub)}</div>`:''} ${badge}</div>`;
   }).join('');
 }
+// Shuttle settings are per location group (config.shuttleInfo[group]); the old global service values are the fallback.
+function getShuttleSettings(){
+  const svc=(guestSvcs||[]).find(s=>s.id==='airport_transfer')||{};
+  const grp=((guestFullCfg&&guestFullCfg.shuttleInfo)||{})[aptPropTypeForConfig()]||{};
+  const digits=String(grp.driverWhatsapp??'').replace(/\D/g,'')||String(svc.whatsappNumber||'').replace(/\D/g,'');
+  return{small:grp.smallCarPrice||svc.smallCarPrice||70,large:grp.largeCarPrice||svc.largeCarPrice||100,max:grp.maxGuestsPerCar||svc.maxGuestsPerCar||7,driverWa:digits};
+}
 function getTransferConfig(){
-  const svc=(guestSvcs||[]).find(s=>s.id==='airport_transfer');
-  return{small:svc?.smallCarPrice||70,large:svc?.largeCarPrice||100,max:svc?.maxGuestsPerCar||7};
+  const c=getShuttleSettings();
+  return{small:c.small,large:c.large,max:c.max};
 }
 function calcTransferBreakdown(guests){
   const n=parseInt(guests)||1;
@@ -4344,7 +4352,9 @@ window.submitService=async function(){
   // Resolve per-service WhatsApp number (fallback to global WA)
   // Map guest SVCS ids to Firestore service ids
   const _fsId=currentSvcId==='transfer'?'airport_transfer':currentSvcId==='tour'?'city_tour':currentSvcId;
-  const svcWA=(guestSvcs||[]).find(s=>s.id===_fsId)?.whatsappNumber||WA;
+  const svcWA=currentSvcId==='transfer'
+    ?(getShuttleSettings().driverWa||(guestSvcs||[]).find(s=>s.id===_fsId)?.whatsappNumber||WA)
+    :((guestSvcs||[]).find(s=>s.id===_fsId)?.whatsappNumber||WA);
 
   // Build WhatsApp URL before any async work so it counts as user-initiated
   let waBody=`New service request from ${aptName}:\n`+

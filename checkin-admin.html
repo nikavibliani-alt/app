@@ -702,7 +702,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1011b · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1012a · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -1782,6 +1782,7 @@ let gsSectionLabels={};
 let gsRoomCategories={};
 let gsLocationInfo={};
 let gsParkingInfo={};
+let gsShuttleInfo={};   // per location group: {driverWhatsapp, smallCarPrice, largeCarPrice, maxGuestsPerCar}
 let gsDirty=false;
 let _gpEditCtx=null;
 
@@ -1801,6 +1802,7 @@ async function loadGuestSettings(){
       if(d.roomCategories)gsRoomCategories=d.roomCategories;
       if(d.locationInfo)gsLocationInfo=d.locationInfo;
       if(d.parkingInfo)gsParkingInfo=d.parkingInfo;
+      if(d.shuttleInfo)gsShuttleInfo=d.shuttleInfo;
       if(d.waitingTabs){
         const wt={...WAITING_TABS_DEFAULTS,...d.waitingTabs};
         delete wt.shuttle;
@@ -1828,7 +1830,7 @@ window.gsSaveAll=async function(){
     delete waitingTabs.shuttle;
     await setDoc(doc(db,'checkin_admin','config'),{
       visibility:gsVisibility,laundryItems:gsLaundry,services:gsServices,sectionLabels:gsSectionLabels,
-      roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,parkingInfo:gsParkingInfo,waitingTabs,
+      roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,parkingInfo:gsParkingInfo,shuttleInfo:gsShuttleInfo,waitingTabs,
       updatedAt:serverTimestamp()
     },{merge:true});
     gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');
@@ -1977,10 +1979,15 @@ window.openGpEditor=function(ctx){
     body.innerHTML=`
       <label class="apt-label">Display name</label><input class="apt-input" id="gp-svc-name" value="${esc(svc.name||'')}">
       <label class="apt-label">Description</label><input class="apt-input" id="gp-svc-desc" value="${esc(svc.desc||'')}">
-      ${isTransfer?`
-        <label class="apt-label">Small car (1–3 guests) GEL</label><input class="apt-input" type="number" id="gp-svc-small" value="${svc.smallCarPrice||70}">
-        <label class="apt-label">Large car (4+) GEL</label><input class="apt-input" type="number" id="gp-svc-large" value="${svc.largeCarPrice||100}">
-        <label class="apt-label">WhatsApp</label><input class="apt-input" id="gp-svc-wa" value="${esc(svc.whatsappNumber||'')}">`
+      ${isTransfer?(()=>{
+        // shuttle settings belong to the selected location group; the old global values are the starting values
+        const grp=gsShuttleInfo[gsProp]||{};
+        const g=GP_PROPS.find(p=>p.id===gsProp);
+        return`<div class="section-hd" style="margin-top:12px"><h2>Shuttle for ${esc(g?g.label:gsProp)}</h2></div>
+        <label class="apt-label">Driver WhatsApp number</label><input class="apt-input" id="gp-sh-wa" inputmode="tel" value="${esc(grp.driverWhatsapp??svc.whatsappNumber??'')}" placeholder="995555123456"><p class="apt-hint" style="margin:-4px 0 8px">With country code, e.g. 995555123456. Spaces and + are removed when you apply.</p>
+        <label class="apt-label">Small car price (GEL)</label><input class="apt-input" type="number" id="gp-sh-small" value="${grp.smallCarPrice??svc.smallCarPrice??70}">
+        <label class="apt-label">Large car price (GEL)</label><input class="apt-input" type="number" id="gp-sh-large" value="${grp.largeCarPrice??svc.largeCarPrice??100}">
+        <label class="apt-label">Max guests per car</label><input class="apt-input" type="number" id="gp-sh-max" min="1" value="${grp.maxGuestsPerCar??svc.maxGuestsPerCar??7}">`;})()
       :`<label class="apt-label">Price (GEL)</label><input class="apt-input" type="number" id="gp-svc-price" value="${svc.price||0}">
         <label class="apt-label">Price note</label><input class="apt-input" id="gp-svc-note" value="${esc(svc.note||'')}">`}`;
   }
@@ -2000,9 +2007,13 @@ window.applyGpEditor=function(){
       svc.name=document.getElementById('gp-svc-name')?.value.trim()||svc.name;
       svc.desc=document.getElementById('gp-svc-desc')?.value.trim()||'';
       if(ctx==='airport_transfer'){
-        svc.smallCarPrice=parseFloat(document.getElementById('gp-svc-small')?.value)||70;
-        svc.largeCarPrice=parseFloat(document.getElementById('gp-svc-large')?.value)||100;
-        svc.whatsappNumber=document.getElementById('gp-svc-wa')?.value.trim()||'';
+        // saved per location group (gsShuttleInfo[group]); driver number as digits only
+        gsShuttleInfo[gsProp]={
+          driverWhatsapp:(document.getElementById('gp-sh-wa')?.value||'').replace(/\D/g,''),
+          smallCarPrice:parseFloat(document.getElementById('gp-sh-small')?.value)||70,
+          largeCarPrice:parseFloat(document.getElementById('gp-sh-large')?.value)||100,
+          maxGuestsPerCar:Math.max(1,parseInt(document.getElementById('gp-sh-max')?.value)||7),
+        };
       }else{
         svc.price=parseFloat(document.getElementById('gp-svc-price')?.value)||0;
         svc.note=document.getElementById('gp-svc-note')?.value.trim()||'';
