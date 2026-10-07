@@ -424,7 +424,7 @@ async function render(){
   body.innerHTML=elevBlock+doorBlock+instrHtml+photosHtml+videoHtml
     ||(body.innerHTML=`<div style="text-align:center;padding:3rem;color:#B8B6B2;font-size:14px;">Check-in details not set up yet</div>`);
 
-  if(needsElevatorCode()){subscribeElevatorCode();}
+  if(needsElevatorCode()){if(isPreviewMode)_applyElevatorData({display_code:'0000',qr_code:'0000'},null);else subscribeElevatorCode();}
 }
 
 function _applyElevatorData(fsData,rtdbData){
@@ -515,6 +515,13 @@ async function init(){
     banner.textContent='PREVIEW MODE — Viewing as guest in '+previewApt+'. Lock bypass active.';
     document.body.prepend(banner);
 
+    // Preview shows the layout with placeholders only — never the real codes / WiFi / reservation password
+    if(aptData){
+      const _mask=s=>String(s||'').replace(/\d[\d \-]{1,}\d#?/g,'••••');
+      aptData={...aptData,doorCode:aptData.doorCode?'0000#':'',wifiName:aptData.wifiName?'WiFi network':'',wifiPass:aptData.wifiPass?'wifi-password':'',
+        instructions:_mask(aptData.instructions),photoCaptions:(aptData.photoCaptions||[]).map(_mask)};
+    }
+    if(activeReservation)activeReservation={...activeReservation,tuyaPassword:activeReservation.tuyaPassword?'0000#':'',tuyaInvalidTime:null};
     await loadGuestCfg(); // visibility toggles apply in preview too
     document.getElementById('loading').style.display='none';
     document.getElementById('app').style.display='block';

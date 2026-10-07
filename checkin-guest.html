@@ -1421,6 +1421,7 @@ function _elevatorQrPayload(data){
   return String(data.qr_code||data.qrCode||'').trim();
 }
 function _elevatorCodeForGuest(){
+  if(isPreviewMode())return'0000';
   if(!elevatorData)return '';
   return String(elevatorData.code||elevatorData.display_code||'').trim();
 }
@@ -1538,7 +1539,16 @@ function _drawElevatorQr(text){
 function _normalizeElevatorData(raw){
   return _buildElevatorMerged(null,raw);
 }
+/* Preview links (?preview=true, ?adminPreview=1) show the layout with placeholder values only — never real codes. */
+function isPreviewMode(){return !!(isPreview||_adminPreviewMode||params.get('preview')==='true');}
+function maskCodes(s){return isPreviewMode()?String(s||'').replace(/\d[\d \-]{1,}\d#?/g,'••••'):s;}
+function previewScrub(a){
+  if(!isPreviewMode()||!a)return a;
+  return{...a,doorCode:a.doorCode?'0000#':'',wifiName:a.wifiName?'WiFi network':'',wifiPass:a.wifiPass?'wifi-password':'',
+    instructions:maskCodes(a.instructions||''),photoCaptions:(a.photoCaptions||[]).map(maskCodes)};
+}
 function _doorCodeForGuest(){
+  if(isPreviewMode())return'0000#';
   const fromRes=activeReservation?.tuyaPassword||'';
   if(fromRes)return String(fromRes);
   const fromApt=aptData?.doorCode||'';
@@ -3276,7 +3286,7 @@ function _renderTilesNow(){
   _renderHeroContent(); // sandbox: keep hero daily key (door/elevator/wifi/floor) in sync with same data tiles used
   const u=isUnlocked();
   const _ARR=fi('chevron-right',14,2);
-  const ssid=(aptData&&aptData.wifiName)?aptData.wifiName:'';
+  const ssid=(previewScrub(aptData)&&previewScrub(aptData).wifiName)?previewScrub(aptData).wifiName:'';
   const _detailsUrl='checkin-details.html?apt='+encodeURIComponent(aptId)+(isPreview?'&preview=true':'');
   const _tiles=[];
   if(sectionVisible('checkin'))_tiles.push(`
@@ -3738,7 +3748,7 @@ try{
     return co&&co>=_prToday; // never a reservation that already ended
   })||activeReservation;
   if(type==='wifi'&&!isUnlocked()){openLocked(pageRes);return;}
-  const d=aptData||{};
+  const d=previewScrub(aptData)||{};
   const titles={wifi:t('tw'),services:t('tsv'),recs:t('tr'),rules:t('tru'),contact:t('tco'),transfer:t('tabShuttle'),tours:t('tabTours'),location:'Location',parking:'Parking'};
   let body='';
 
@@ -4748,7 +4758,7 @@ function _renderHeroContent(){
       elevWrap.style.display='';
       const codeEl=document.getElementById('hero-elevator-code');
       const elevCode=_elevatorCodeForGuest();
-      const qrText=_elevatorQrPayload(elevatorData)||elevCode;
+      const qrText=isPreviewMode()?'0000':(_elevatorQrPayload(elevatorData)||elevCode);
       if(codeEl)codeEl.textContent=elevCode||'Contact host';
       if(elevCode){
         _drawElevatorQr(qrText).then(ok=>{if(ok&&!_homeInitialScrollDone)_nudgeHomeScrollOnce();});
@@ -4762,9 +4772,9 @@ function _renderHeroContent(){
   }
 
   const wifiNameEl=document.getElementById('hero-wifi-name');
-  if(wifiNameEl)wifiNameEl.textContent=aptData?.wifiName||'—';
+  if(wifiNameEl)wifiNameEl.textContent=previewScrub(aptData)?.wifiName||'—';
   const wifiPassEl=document.getElementById('hero-wifi-pass');
-  if(wifiPassEl)wifiPassEl.textContent=aptData?.wifiPass||'—';
+  if(wifiPassEl)wifiPassEl.textContent=previewScrub(aptData)?.wifiPass||'—';
 
   const floorEl=document.getElementById('hero-floor-info');
   if(floorEl)floorEl.textContent=_floorLabel()||'—';
@@ -4808,7 +4818,7 @@ function _renderWalkthrough(){
   const wrap=document.getElementById('hero-walkthrough');
   if(!list||!wrap)return;
   const photos=aptData?.photos||[];
-  const caps=aptData?.photoCaptions||[];
+  const caps=(previewScrub(aptData)||{}).photoCaptions||[];
   const phase=_homePhase();
   const expanded=wrap.classList.contains('wt-expanded');
 
