@@ -229,3 +229,14 @@ Restore point: tag `before-s2`. Undo one step: `git revert --no-edit <commit>`, 
 5. Welcome-back login loads the booked room's apartment data first
 6. Georgian smoking rule + ka/ru/ar rule texts aligned with English
 7. Booking number in Name field saves the guest name; Telegram @username; "not found" under the button; dates up to 365 days
+| 1 | a17d230 | live; guestRegister redeployed (only that function) |
+| 2 | 69e9879 | live |
+| 3 | 4894de9 | live |
+| 4 | 4b1956b | live |
+| 5 | aa32782 | live |
+| 6 | 6f67891 | live |
+| 7 | c73f247 | live |
+
+Notes (S2):
+- Group case found (read only): one guest had a 4-room booking (007005305: 7-4, 6-2, 6-4, 7-2) plus a separate 1-room booking (007005312: 7-1), same check-in day, same phone. The MiniHotel names differ only by a room tag ("name 004 surname"), and the guest page grouped rooms only by exact reservationNumber, so the second booking's apartment was never shown. Fixed by comparing the name with the room tag stripped + check-in date + phone.
+- Entrance card default changed: Maxela and Big Apt were implicitly ON before; now only Freedom is on by default (switch per group in Guest page settings).
