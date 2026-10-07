@@ -121,7 +121,7 @@ test('register_primary fails without passport', async () => {
   assert.equal(result.errorCode, 'BAD_REQUEST');
 });
 
-test('register_companion uses room_date doc id', async () => {
+test('register_companion uses a random token doc id (not room_date)', async () => {
   const ctx = makeCtx({
     reservations: {
       res1: {
@@ -141,6 +141,8 @@ test('register_companion uses room_date doc id', async () => {
   });
 
   assert.equal(result.ok, true);
-  assert.equal(result.data.guestToken, '6-2_2026-09-01');
-  assert.equal(ctx.guests.get('6-2_2026-09-01').companionGuest, true);
+  assert.match(result.data.guestToken, /^[a-f0-9]{32}$/);
+  assert.notEqual(result.data.guestToken, '6-2_2026-09-01');
+  assert.equal(ctx.guests.get(result.data.guestToken).companionGuest, true);
+  assert.equal(ctx.guests.get(result.data.guestToken).aptId, '6-2');
 });

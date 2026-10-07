@@ -205,7 +205,8 @@ async function registerCompanion(ctx, params, input) {
   const roomCode = reservation.roomCode || reservation.room || '';
   const dates = reservationDates(reservation);
   const arrivalDate = profile.arrivalDate || dates.checkin || '';
-  const docId = `${roomCode}_${arrivalDate || Date.now()}`;
+  // random token id (never <room>_<date>): companion records must not be guessable from the room and date
+  const docId = generateGuestToken();
 
   const doc = {
     aptId: roomCode,

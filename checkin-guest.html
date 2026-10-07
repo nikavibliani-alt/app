@@ -1229,7 +1229,7 @@ import{getStorage,ref,uploadBytes,getDownloadURL}from"https://www.gstatic.com/fi
 import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
 import{isGuestUnlocked,tbilisiHour as sharedTbilisiHour}from"./shared/guest-unlock.js";
 import{createPipelineGuestClient}from"./shared/pipeline-guest.js";
-import{buildRegisterPrimaryPayload,buildRegisterCompanionPayload,buildUpdateProfilePayload}from"./shared/guest-register.js";
+import{buildRegisterPrimaryPayload,buildRegisterCompanionPayload,buildUpdateProfilePayload,isLikelyGuestToken}from"./shared/guest-register.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 import{GUEST_APP_VERSION,GUEST_APP_URL}from"./shared/guest-app-version.js";
 import{featherIcon}from"./shared/feather-icons.js";
@@ -2747,7 +2747,7 @@ async function finishRegistration_(bestRes,formData,opts){
     }
     console.warn('[finishRegistration_] pipeline fallback:',pipeErr);
     if(_companionGuest){
-      docId=`${aptId}_${arrivalDate||Date.now()}`;
+      docId=generateGuestToken();
     }else{
       const existing=await findExistingPrimaryGuest(bestRes?.id,bestRes?.reservationNumber);
       docId=existing?.id||generateGuestToken();
@@ -2783,12 +2783,14 @@ async function finishRegistration_(bestRes,formData,opts){
     );
     for(const r of otherRes){
       const _xApt=r.roomCode;
-      const _xArr=arrival||r.checkin||r.checkIn||'';
-      const _xId=`${_xApt}_${_xArr||Date.now()}`;
-      const _xData={...data,aptId:_xApt,matchedReservationId:r.id||null,primaryGuestId:guestId};
+      const _xData={...data,aptId:_xApt,matchedReservationId:r.id||null,primaryGuestId:guestId,
+        arrivalDate:r.checkin||r.checkIn||data.arrivalDate||'',checkoutDate:r.checkout||r.checkOut||data.checkoutDate||''};
       try{
-        const _xEx=await getDoc(doc(db,'checkin_guests',_xId));
-        if(_xEx.exists()){
+        // extra-room records get random token ids (never <room>_<date>); reuse the one already saved for this room's booking
+        const _xSnap=await getDocs(query(collection(db,'checkin_guests'),where('matchedReservationId','==',r.id||''),limit(5)));
+        const _xEx=_xSnap.docs.find(d=>d.id!==guestId&&d.data().primaryGuestId===guestId);
+        const _xId=_xEx?_xEx.id:generateGuestToken();
+        if(_xEx){
           await setDoc(doc(db,'checkin_guests',_xId),{..._xData,updatedAt:serverTimestamp()},{merge:true});
         }else{
           await setDoc(doc(db,'checkin_guests',_xId),{..._xData,submittedAt:serverTimestamp()});
@@ -3265,9 +3267,10 @@ function showHome(){
           if(_prev)localStorage.removeItem('maxela_g_'+_prev);
           setDoc(doc(db,'checkin_guests',guestId),{aptId:_newRoom},{merge:true}).catch(()=>{});
           (async()=>{try{
-            const _arrDate=guestData.arrivalDate||'';
-            const _newDocId=`${_newRoom}_${_arrDate||Date.now()}`;
-            const _existing=await getDoc(doc(db,'checkin_guests',_newDocId));
+            const _exSnap=await getDocs(query(collection(db,'checkin_guests'),where('matchedReservationId','==',guestData.matchedReservationId||''),limit(10)));
+            const _exDoc=_exSnap.docs.find(d=>d.data().aptId===_newRoom);
+            const _newDocId=_exDoc?_exDoc.id:generateGuestToken();   // random token id, never <room>_<date>
+            const _existing={exists:()=>!!_exDoc};
             if(!_existing.exists()){
               const {id:_,submittedAt:_s,..._baseData}=guestData;
               await setDoc(doc(db,'checkin_guests',_newDocId),{..._baseData,aptId:_newRoom,movedFrom:_prev,submittedAt:serverTimestamp()});
@@ -4466,7 +4469,8 @@ async function init(){
   if(_joinToken)await _initCompanionFromToken();
 
   // Personal link ?g= — open on any device without passport re-upload
-  if(_urlGuestToken&&!_companionGuest){
+  // ?g= must be a real guest token; room_date style ids (guessable) are never accepted
+  if(_urlGuestToken&&isLikelyGuestToken(_urlGuestToken)&&!_companionGuest){
     const {data:guestDocData,found}=await loadGuestDataWithRetry(_urlGuestToken);
     if(found===true){
       guestId=_urlGuestToken;
