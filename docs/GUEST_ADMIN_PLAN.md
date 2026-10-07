@@ -189,3 +189,8 @@ Undo: `git revert --no-edit <commit>`, then push.
 Notes:
 - Location resolution order on the guest page: apartment (checkin_apartments propertyName/address/mapsUrl/neighborhood/floorLabel) > property group (locationInfo) > old default.
 - New groups VGL and XCV copy FREEDOM visibility + parking defaults; location and room-category defaults are empty. Entrance-card rule and shuttle pickup text still use the old fixed lists for other groups.
+
+# Brand fix (follow-up to location fix)
+
+Restore point: tag `before-brand-fix`. Commit 43b29b6. Undo: `git revert --no-edit 43b29b6`, then push (the two propertyName values written to checkin_admin/config.locationInfo.XCV/VGL are harmless; remove by hand if wanted).
+Guest-facing name order: apartment propertyName > group locationInfo[group].propertyName > "Maxela Apartments"; plain link before a booking is found shows "Online check-in". Defaults written: XCV "Modern Avlabari", VGL "VGL Group".
