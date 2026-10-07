@@ -702,7 +702,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1009a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1010a · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -3363,6 +3363,9 @@ function siblingGuestForms(g){
 function unlockButtonHtml(roomForm,res){
   if(!roomForm)return '';
   if(roomForm.blocked===true)return'';
+  // Before the arrival day a manual unlock would open the door from midnight: no button until the day itself.
+  const _arr=guestArrivalDate(roomForm,res);
+  if(_arr&&_arr>unlockToday())return'<div style="font-size:12px;color:var(--muted);padding:8px 0">Access can be given from the arrival day</div>';
   const st=guestStatus(roomForm,res);
   if(st.cls==='unlocked'||roomForm.manualUnlock===true){
     return'<button class="btn" disabled style="opacity:1;cursor:default">Access granted</button>';
