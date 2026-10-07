@@ -1764,10 +1764,21 @@ function toast(msg,dur=2500){const el=document.getElementById('toast');el.textCo
 // checkbox only applies to properties where an entrance card is actually
 // handed over (Rooms and Orbeliani don't use one). Safe to call before
 // aptId is known — ROOM_TO_PROP falls back to 'ROOMS' (3 keys, no card).
+// "Entrance card & key rule" is a per-group switch (Guest page settings -> visibility[group].entranceCard).
+// Default when not set: on for FREEDOM only. It is read for the MATCHED BOOKING's room every time the rules page opens
+// (plain link, room link, group link), so a guest is never blocked by a rule that does not apply to their room.
+function rulesRoomCode(){return(_pendingMatches&&_pendingMatches[0]&&_pendingMatches[0].res&&_pendingMatches[0].res.roomCode)||aptId||'';}
+function entranceCardOn(room){
+  const code=room||'';
+  const prop=code.startsWith('orb-')?'ORBELIANI':(ROOM_TO_PROP[code]||(/^xcv-/i.test(code)?'XCV':/^vgl-/i.test(code)?'VGL':'ROOMS'));
+  const v=guestCfgVisibility||(guestFullCfg&&guestFullCfg.visibility)||null;
+  const scope=v&&typeof v[prop]==='object'?v[prop]:null;
+  if(scope&&typeof scope.entranceCard==='boolean')return scope.entranceCard;
+  return prop==='FREEDOM';
+}
 function rulesRequiredKeys(){
-  const prop=aptPropTypeForConfig();
   const keys=['noise','smoke','care'];
-  if(['MAXELA','BIG_APT','FREEDOM'].includes(prop))keys.push('card');
+  if(entranceCardOn(rulesRoomCode()))keys.push('card');
   return keys;
 }
 const _rules={noise:false,smoke:false,care:false,card:false};
@@ -1810,8 +1821,7 @@ function _updateRulesForApt(){
       sub.style.cssText='';
     }
   }
-  const prop=aptPropTypeForConfig();
-  const showCard=['MAXELA','BIG_APT','FREEDOM'].includes(prop);
+  const showCard=entranceCardOn(rulesRoomCode());
   const cardEl=document.getElementById('rule-card');
   if(cardEl)cardEl.style.display=showCard?'':'none';
 }
@@ -2866,6 +2876,8 @@ window.searchReservation=async function(){
     _pendingMatches=[{res:primary,score:10}];
     btn.disabled=false;
     document.getElementById('t-search-btn').textContent=t('companionJoin');
+    try{await getFullCfg();}catch(e){}
+    _updateRulesForApt();
     _showPage('page-rules');
     return;
   }
@@ -3007,6 +3019,8 @@ window.searchReservation=async function(){
     }
     btn.disabled=false;
     document.getElementById('t-search-btn').textContent='Find my booking';
+    try{await getFullCfg();}catch(e){}   // the rules page needs the group's entrance-card switch
+    _updateRulesForApt();
     _showPage('page-rules');
   }catch(e){
     btn.disabled=false;
