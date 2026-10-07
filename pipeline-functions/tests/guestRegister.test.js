@@ -109,6 +109,31 @@ test('register_primary reuses existing token for same reservation', async () => 
   assert.equal(result.data.guestToken, 'a'.repeat(32));
 });
 
+test('register_primary without passport is accepted for an Airbnb booking', async () => {
+  const ctx = makeCtx({
+    reservations: { resA: { roomCode: '6-2', checkin: '2026-09-01', checkout: '2026-09-04', reservationNumber: 'R300', status: 'OK2', source: 'airbnb' } },
+  });
+  const result = await runGuestRegister(ctx, {
+    mode: 'register_primary', reservationId: 'resA',
+    profile: { name: 'A Guest', passportSkipped: true, skipReason: 'airbnb', arrivalDate: '2026-09-01' },
+  });
+  assert.equal(result.ok, true);
+  const saved = ctx.guests.get(result.data.guestToken);
+  assert.equal(saved.passportSkipped, true);
+  assert.equal(saved.skipReason, 'airbnb');
+  assert.equal(saved.passportUrl, '');
+  assert.equal(saved.isPrimaryGuest, true);
+});
+
+test('register_primary without passport is still rejected for Booking.com', async () => {
+  const ctx = makeCtx({
+    reservations: { resB: { roomCode: '6-2', checkin: '2026-09-01', checkout: '2026-09-04', reservationNumber: 'R301', status: 'OK2', source: 'booking' } },
+  });
+  const result = await runGuestRegister(ctx, { mode: 'register_primary', reservationId: 'resB', profile: { name: 'B Guest' } });
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, 'BAD_REQUEST');
+});
+
 test('register_primary fails without passport', async () => {
   const ctx = makeCtx({
     reservations: { res1: { roomCode: '6-1', status: 'CONFIRMED' } },

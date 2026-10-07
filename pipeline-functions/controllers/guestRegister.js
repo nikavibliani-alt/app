@@ -24,6 +24,8 @@ function pickProfile(payload) {
     contactType: p.contactType || '',
     passportUrl: p.passportUrl || '',
     passportScanResult: p.passportScanResult || {},
+    passportSkipped: p.passportSkipped === true,
+    skipReason: p.skipReason || '',
     arrivalDate: p.arrivalDate || '',
     checkoutDate: p.checkoutDate || '',
     expectedCheckInWindow: p.expectedCheckInWindow || p.expectedCheckInTime || '',
@@ -134,7 +136,9 @@ async function registerPrimary(ctx, params, input) {
   const guestLinkBase = params.guestLinkBase || '';
   const guestLink = buildGuestLink(guestLinkBase, guestToken) || null;
 
-  if (!profile.passportUrl) {
+  // Airbnb verifies its guests itself: no passport needed. Booking/Expedia/direct still must upload one.
+  const isAirbnb = String(reservation.source || '').toLowerCase() === 'airbnb';
+  if (!profile.passportUrl && !isAirbnb) {
     await ctx.logRun({
       controller: 'GuestRegister',
       action: 'register_primary',
@@ -158,6 +162,12 @@ async function registerPrimary(ctx, params, input) {
     linkedReservationNumber: null,
     registeredBy: actor,
   };
+  if (!profile.passportUrl && isAirbnb) {
+    doc.passportSkipped = true;
+    doc.skipReason = 'airbnb';
+  } else {
+    delete doc.skipReason;
+  }
 
   const existed = await ctx.getGuest(guestToken);
   await ctx.saveGuest(guestToken, doc, { isCreate: !existed });
@@ -309,7 +319,8 @@ function buildLiveCtx() {
         for (const doc of snap.docs) {
           const data = doc.data();
           if (data.companionGuest) continue;
-          if (data.passportUrl && isLikelyGuestToken(doc.id)) return { id: doc.id, ...data };
+          // a returning primary guest is found by isPrimaryGuest / the linked booking, not by having a passport (Airbnb has none)
+          if ((data.isPrimaryGuest === true || data.passportUrl) && isLikelyGuestToken(doc.id)) return { id: doc.id, ...data };
         }
       }
       return null;

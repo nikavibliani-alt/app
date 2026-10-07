@@ -2476,7 +2476,8 @@ async function findExistingPrimaryGuest(resId,resNum){
       for(const d of snap.docs){
         const data=d.data();
         if(data.companionGuest)continue;
-        if(data.passportUrl)return{id:d.id,...data};
+        // returning primary guest = isPrimaryGuest / linked booking, not "has a passport" (Airbnb guests have none)
+        if((data.isPrimaryGuest===true||data.passportUrl)&&isLikelyGuestToken(d.id))return{id:d.id,...data};
       }
     }catch(e){console.warn('[findExistingPrimaryGuest]',e);}
   }
@@ -2696,7 +2697,7 @@ async function finishRegistration_(bestRes,formData,opts){
     name,guests,nationality,contact,contactType:ct,passportUrl,
     passportScanResult:{},arrivalDate,checkoutDate,
     expectedCheckInWindow:expectedCheckInWindow||'',expectedCheckInTime:expectedCheckInWindow||'',
-    nameRoman:bestRes?.guest||'',passportSkipped:skipPassport,
+    nameRoman:bestRes?.guest||'',passportSkipped:skipPassport,skipReason:opts?.skipReason||'',
   };
   let docId,guestLink,data;
   let usedPipeline=false;
@@ -2984,7 +2985,7 @@ window.searchReservation=async function(){
     _pendingReg={name:name||(_bestMatch.guest||''),guests,nationality,contact,contactType,arrival,expectedCheckInWindow:getExpectedCheckInWindow()};
     _pendingMatches=[{res:_bestMatch,score:_bestScore}];
     const existing=await findExistingPrimaryGuest(_bestMatch.id,_bestMatch.reservationNumber);
-    if(existing?.passportUrl&&!_companionGuest){
+    if(existing&&!_companionGuest){
       guestId=existing.id;
       guestData={...existing,id:existing.id};
       aptId=_bestMatch.roomCode||existing.aptId||'';
@@ -3040,6 +3041,16 @@ window.proceedFromRules=function(){
   if(_companionGuest&&_pendingMatches?.[0]){
     finishRegistration_(_pendingMatches[0].res,_pendingReg).catch(e=>{
       console.error('[companion]',e);
+      toast('Could not complete check-in — try again');
+    });
+    return;
+  }
+  // Airbnb verifies its guests itself: never show the passport page (also for multi-room Airbnb bookings)
+  const _pm=_pendingMatches?.[0]?.res;
+  const _isAirbnb=r=>(r?.source||'').toLowerCase()==='airbnb';
+  if(_isAirbnb(_pm)||(allMatchedReservations||[]).some(_isAirbnb)){
+    finishRegistration_(_pm,_pendingReg,{skipPassport:true,skipReason:'airbnb'}).catch(e=>{
+      console.error('[airbnb skip]',e);
       toast('Could not complete check-in — try again');
     });
     return;

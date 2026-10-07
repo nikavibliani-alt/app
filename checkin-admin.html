@@ -702,7 +702,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1010a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1011a · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -4085,7 +4085,7 @@ function historyCardHtml(r){
     const ppHtml=r.passportUrl
       ?`<button type="button" class="btn" style="padding:4px 10px;height:auto;font-size:12px;" onclick="window.openHistoryPassport('${esc(r.passportUrl)}')">${featherIcon('paperclip',14,2)} View passport</button>`
       :r.passportSkipped
-        ?`<span class="pill pill-pending">SKIPPED</span>`
+        ?(String(r.source||'').toLowerCase()==='airbnb'?`<span style="color:var(--muted);font-size:12px;">Not required (Airbnb)</span>`:`<span class="pill pill-pending">SKIPPED</span>`)
         :`<span style="color:var(--muted);font-size:12px;">— No passport</span>`;
     return`<div class="card">
       <div class="card__top">
@@ -4624,7 +4624,7 @@ window.openDetail=function(guestId){
       <div class="card__actions" style="margin-top:10px">
         <button class="btn btn-primary" onclick="window.approvePassport('${g.id}')">Approve ID</button>
         <button class="btn" onclick="window.rejectPassport('${g.id}')">Reject</button>
-      </div>`:passportSkipped?'<p style="font-size:13px;margin-bottom:10px;"><span class="pill pill-pending" style="margin-right:6px;">SKIPPED</span>Guest skipped passport upload</p>':'<p style="color:var(--muted);font-size:13px;margin-bottom:10px;">No passport submitted yet.</p>'}
+      </div>`:passportSkipped?(g.skipReason==='airbnb'||(reservationForGuest(g)?.source||'').toLowerCase()==='airbnb'?'<p style="font-size:13px;margin-bottom:10px;color:var(--muted)">Not required (Airbnb)</p>':'<p style="font-size:13px;margin-bottom:10px;"><span class="pill pill-pending" style="margin-right:6px;">SKIPPED</span>Guest skipped passport upload</p>'):'<p style="color:var(--muted);font-size:13px;margin-bottom:10px;">No passport submitted yet.</p>'}
     </div>
     ${hcPanelHtml(reservationBaseNum(g.matchedReservationId)||'')}
     ${roomBlocks}
