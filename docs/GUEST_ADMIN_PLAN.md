@@ -240,3 +240,16 @@ Restore point: tag `before-s2`. Undo one step: `git revert --no-edit <commit>`, 
 Notes (S2):
 - Group case found (read only): one guest had a 4-room booking (007005305: 7-4, 6-2, 6-4, 7-2) plus a separate 1-room booking (007005312: 7-1), same check-in day, same phone. The MiniHotel names differ only by a room tag ("name 004 surname"), and the guest page grouped rooms only by exact reservationNumber, so the second booking's apartment was never shown. Fixed by comparing the name with the room tag stripped + check-in date + phone.
 - Entrance card default changed: Maxela and Big Apt were implicitly ON before; now only Freedom is on by default (switch per group in Guest page settings).
+
+# Audit S3 (airport shuttle per location + requests)
+
+Restore point: tag `before-s3`. Undo one step: `git revert --no-edit <commit>`, then push (step 8: redeploy the two push functions after the revert).
+
+1. Shuttle settings per location group (driver WhatsApp, car prices, max guests)
+2. Drop-off from the unit's address; host fallback when no address
+3. Driver message: property name, room, flight number, maps link
+4. Guest cancel/edit updates the same service_requests doc; admin actions update checkin_requests
+5. Admin request sheet: requested date grouping, "Message guest", "Decline request"
+6. Live requests list (onSnapshot), filters match saved ids
+7. "Clear done" only cancelled/past-confirmed within the filter
+8. Push notifications open ?tab=requests / ?tab=failures
