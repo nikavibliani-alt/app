@@ -2423,8 +2423,10 @@ function renderGreetingApt(){
   });
 }
 
-let _companionGuest=params.get('companion')==='1';
-const _resParam=(params.get('res')||'').trim();
+// Share-with-group link: ?join=<random companionToken> only. Old ?res=<number>&companion=1 links are ignored (normal search page).
+let _companionGuest=false;
+const _joinToken=(params.get('join')||'').trim();
+let _companionResNum='',_companionPrimaryId='';
 const _urlGuestToken=(params.get('g')||'').trim();
 let _companionResGroup=null;
 
@@ -2468,13 +2470,20 @@ async function _updateParkingButtonVisibility(){
   }catch(e){}
 }
 
-async function _initCompanionFromRes(){
-  if(!_companionGuest||!_resParam)return;
+async function _initCompanionFromToken(){
+  if(!_joinToken||_joinToken.length<16)return;
   try{
     const {getDocs:_getDocs}=await import('https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js');
-    const snap=await _getDocs(query(collection(db,'reservations'),where('reservationNumber','==',_resParam)));
-    const res=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED');
+    const pSnap=await _getDocs(query(collection(db,'checkin_guests'),where('companionToken','==',_joinToken),limit(1)));
+    const primary=pSnap.docs.map(d=>({id:d.id,...d.data()})).find(g=>!g.companionGuest);
+    if(!primary)return;   // unknown token: show the normal search page
+    const base=reservationBaseNum(primary.matchedReservationId);
+    if(!base)return;
+    const snap=await _getDocs(query(collection(db,'reservations'),where('reservationNumber','>=',base),where('reservationNumber','<=',base+'\uf8ff')));
+    const res=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED'&&reservationBaseNum(r.reservationNumber||r.id)===base);
     if(!res.length)return;
+    _companionGuest=true;_companionResNum=base;_companionPrimaryId=primary.id;
+    _showCompanionBanner();
     _companionResGroup=res;
     const dateRow=document.getElementById('r-arrival')?.closest('.auth-row');
     if(dateRow)dateRow.style.display='none';
@@ -2487,15 +2496,25 @@ async function _initCompanionFromRes(){
   }catch(e){console.warn('[companion init]',e);}
 }
 
-window.buildCompanionLink=function(){
-  const rn=String(activeReservation?.reservationNumber||'').trim();
-  const base=window.location.origin+window.location.pathname;
-  if(!rn)return base+'?companion=1';
-  return base+'?res='+encodeURIComponent(rn)+'&companion=1';
+// Random, unguessable token stored on the PRIMARY guest doc (never the sequential reservation number).
+window.ensureCompanionToken=async function(){
+  if(!guestId||!guestData||guestData.companionGuest)return '';
+  if(guestData.companionToken)return guestData.companionToken;
+  const token=generateGuestToken();
+  await setDoc(doc(db,'checkin_guests',guestId),{companionToken:token},{merge:true});
+  guestData={...guestData,companionToken:token};
+  return token;
+};
+window.buildCompanionLink=async function(){
+  const token=await window.ensureCompanionToken();
+  if(!token)return '';
+  return window.location.origin+window.location.pathname+'?join='+encodeURIComponent(token);
 };
 
 window.shareGroupLink=async function(){
-  const link=window.buildCompanionLink();
+  let link='';
+  try{link=await window.buildCompanionLink();}catch(e){}
+  if(!link){toast('Could not create the link — try again');return;}
   const shareText='Use this link to access your check-in details — same door code and elevator code, no passport needed: '+link;
   // Try native share sheet first (iOS/Android) — this is what makes the link
   // actually useful for sharing, unlike the old window.open() which just
@@ -2519,7 +2538,9 @@ window.shareGroupLink=async function(){
 };
 
 window.copyCompanionLink=async function(btn){
-  const url=window.buildCompanionLink();
+  let url='';
+  try{url=await window.buildCompanionLink();}catch(e){}
+  if(!url){toast('Could not create the link — try again');return;}
   try{
     await navigator.clipboard.writeText(url);
     if(btn){const t=btn.textContent;btn.textContent='Link copied!';setTimeout(()=>{btn.textContent=t;},2000);}
@@ -2650,9 +2671,9 @@ async function finishRegistration_(bestRes,formData,opts){
     if(_companionGuest){
       const r=await pipelineGuest(buildRegisterCompanionPayload({
         reservationId:bestRes?.id,
-        reservationNumber:String(_resParam||bestRes?.reservationNumber||'').trim(),
+        reservationNumber:String(_companionResNum||bestRes?.reservationNumber||'').trim(),
         profile,
-        primaryGuestId:guestId||null,
+        primaryGuestId:_companionPrimaryId||guestId||null,
       }));
       if(!r.ok)throw new Error(r.message||'Companion registration failed');
       docId=r.data.guestToken;
@@ -2660,8 +2681,8 @@ async function finishRegistration_(bestRes,formData,opts){
       data={
         ...profile,aptId:r.data.aptId||aptId,
         matchedReservationId:bestRes?.id||null,manualUnlock:false,companionGuest:true,isPrimaryGuest:false,guestLink:null,
-        linkedReservationNumber:String(_resParam||bestRes?.reservationNumber||'').trim()||null,
-        primaryGuestId:guestId||null,
+        linkedReservationNumber:String(_companionResNum||bestRes?.reservationNumber||'').trim()||null,
+        primaryGuestId:_companionPrimaryId||guestId||null,
       };
       usedPipeline=true;
     }else{
@@ -2702,7 +2723,7 @@ async function finishRegistration_(bestRes,formData,opts){
     data={...profile,aptId,nameRoman:bestRes?.guest||'',guests,nationality,contact,contactType:ct,passportUrl,
       passportScanResult:{},arrivalDate,checkoutDate,expectedCheckInWindow:expectedCheckInWindow||'',expectedCheckInTime:expectedCheckInWindow||'',
       matchedReservationId:bestRes?.id||null,manualUnlock:false,companionGuest:!!_companionGuest,isPrimaryGuest:!_companionGuest,guestLink,
-      linkedReservationNumber:_companionGuest?(String(_resParam||bestRes?.reservationNumber||'').trim()||null):null};
+      linkedReservationNumber:_companionGuest?(String(_companionResNum||bestRes?.reservationNumber||'').trim()||null):null};
     const existing=await getDoc(doc(db,'checkin_guests',docId));
     if(existing.exists()){
       await setDoc(doc(db,'checkin_guests',docId),{...data,updatedAt:serverTimestamp()},{merge:true});
@@ -4416,10 +4437,7 @@ function _showCompanionBanner(){
 }
 
 async function init(){
-  if(_companionGuest){
-    _showCompanionBanner();
-    await _initCompanionFromRes();
-  }
+  if(_joinToken)await _initCompanionFromToken();
 
   // Personal link ?g= — open on any device without passport re-upload
   if(_urlGuestToken&&!_companionGuest){
