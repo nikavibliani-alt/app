@@ -2342,7 +2342,7 @@ function _csk(s){return s.replace(/[aeiouy]/g,'');}
 
 // Booking number typed in the Name field = the channel confirmation number (bookingId) only.
 // MiniHotel reservation numbers are sequential/guessable, so they are never accepted here.
-function _normRef(s){return String(s||'').replace(/[\s\-]/g,'').toUpperCase();}
+function _normRef(s){return String(s||'').replace(/[\s\-.,#]/g,'').toUpperCase();}   // booking numbers: ignore spaces, dashes, dots, commas and #
 function _looksLikeBookingRef(name){return /^[A-Z0-9]{8,}$/.test(_normRef(name));}
 function scoreReservations(name,arrival,pool){
   const allScored=[];
@@ -2953,9 +2953,9 @@ window.searchReservation=async function(){
     const _searchCutoff=new Date();
     _searchCutoff.setMonth(_searchCutoff.getMonth()-2);
     const _searchCutoffStr=_searchCutoff.toISOString().slice(0,10);
-    const queryPromise=aptId
-      ?_getDocs(query(collection(db,'reservations'),where('roomCode','==',aptId)))
-      :_getDocs(query(collection(db,'reservations'),where('checkin','>=',_searchCutoffStr),_orderBy('checkin','desc'),limit(500)));
+    // Look up the bookings that check in on the EXACT date the guest typed (not the newest-500 list);
+    // an exact booking number is looked up separately below and works with any date.
+    const queryPromise=_getDocs(query(collection(db,'reservations'),where('checkin','==',arrival)));
     const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('Query timeout')),15000));
     const resSnap=await Promise.race([queryPromise,timeoutPromise]);
     // Exact OTA confirmation number: look it up across ALL rooms (an exact number is safe), even on an apartment link.
