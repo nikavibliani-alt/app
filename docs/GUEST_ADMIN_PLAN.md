@@ -174,3 +174,12 @@ Notes:
 Restore point: tag `before-room-ready-fix`. Undo: `git revert --no-edit 4b55292`, then redeploy the two functions (`firebase deploy --only functions:whatsapp:roomReadyNotification,functions:pipeline:pushOnHkDone --project sleepy-5c962`).
 Cause: cleaner staff link (Shartava) tapped Done on 0-1 on the 10 Oct day tab at 07:51Z; the guest arriving 10 Oct got the room_ready WhatsApp 3 s later and a push "0-1 is ready"; toggleHkDone also set manualUnlock:true on that guest's checkin_guests doc.
 Fix: roomReadyNotification only sends when hk_status.date == today (Tbilisi); pushOnHkDone skips future-dated docs. Deployed only these two functions. whatsapp-functions is owned by the WhatsApp chat.
+
+# Location fix
+
+Restore point: tag `before-location-fix`.
+
+1. Per-apartment location (propertyName, address, mapsUrl, neighborhood, floorLabel) edited in the Apartments editor; guest page uses apartment value, then property-group setting, then old default
+2. VGL and XCV property groups in Guest page settings + guest page room-to-group mapping
+
+Undo: `git revert --no-edit <commit>`, then push.
