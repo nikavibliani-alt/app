@@ -194,3 +194,15 @@ Notes:
 
 Restore point: tag `before-brand-fix`. Commit 43b29b6. Undo: `git revert --no-edit 43b29b6`, then push (the two propertyName values written to checkin_admin/config.locationInfo.XCV/VGL are harmless; remove by hand if wanted).
 Guest-facing name order: apartment propertyName > group locationInfo[group].propertyName > "Maxela Apartments"; plain link before a booking is found shows "Online check-in". Defaults written: XCV "Modern Avlabari", VGL "VGL Group".
+
+# Audit S1 (safety fixes)
+
+Restore point: tag `before-s1`. Undo one step: `git revert --no-edit <commit>`, then push (server function steps: redeploy that function after the revert).
+
+1. Preview links never show real codes
+2. Share-with-group link uses a random companionToken (?join=)
+3. End of stay: cancelled booking / stay ended while open / no fallback to another reservation
+4. Use the booking's own check-in/check-out dates once linked
+5. Admin "Grant Access" hidden before arrival day
+6. Group-member and extra-room guest docs get random token ids; ?g= must look like a token
+7. Privacy wording on the passport/search pages (4 languages)
