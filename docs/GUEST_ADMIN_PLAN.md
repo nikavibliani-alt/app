@@ -217,3 +217,15 @@ Restore point: tag `before-s1`. Undo one step: `git revert --no-edit <commit>`, 
 Notes (S1):
 - Old companion docs with ids like <room>_<date> can no longer be opened with ?g=; saved sessions in a browser still load them.
 - A GitHub Actions hosting run for step 6 sat queued; the step 7 run deployed everything.
+
+# Audit S2 (guest check-in flow)
+
+Restore point: tag `before-s2`. Undo one step: `git revert --no-edit <commit>`, then push (server step: redeploy guestRegister after the revert).
+
+1. Airbnb bookings skip the passport page (passportSkipped, skipReason 'airbnb'); server accepts it
+2. "Entrance card & key rule" is a per-group switch in Guest page settings
+3. Group bookings: same name + same check-in date shown together; own records per member/room
+4. Search by the exact typed date + booking-number lookup; booking numbers ignore . , space - #
+5. Welcome-back login loads the booked room's apartment data first
+6. Georgian smoking rule + ka/ru/ar rule texts aligned with English
+7. Booking number in Name field saves the guest name; Telegram @username; "not found" under the button; dates up to 365 days
