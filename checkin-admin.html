@@ -702,7 +702,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1007a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1008a · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -5291,6 +5291,22 @@ window.openAptEditor=function(aptId){
       </div></div>
     </div>
     <div class="apt-card">
+      <div class="apt-card-hd">Location (shown to guests)</div>
+      <div class="apt-card-bd">
+        <p class="apt-hint" style="margin-bottom:8px">Leave empty to use the property type's settings.</p>
+        <label class="apt-label">Property name</label>
+        <input class="apt-input" id="apt-propertyName" value="${esc(d.propertyName||'')}" placeholder="Maxela Apartments">
+        <label class="apt-label">Address</label>
+        <input class="apt-input" id="apt-address" value="${esc(d.address||'')}" placeholder="Street and number, Tbilisi">
+        <label class="apt-label">Google Maps link</label>
+        <input class="apt-input" id="apt-mapsUrl" value="${esc(d.mapsUrl||'')}" placeholder="https://maps.app.goo.gl/…">
+        <label class="apt-label">Neighbourhood</label>
+        <textarea class="apt-textarea" id="apt-neighborhood" style="min-height:70px" placeholder="What is nearby, how to find the building">${esc(d.neighborhood||'')}</textarea>
+        <label class="apt-label">Building / floor line</label>
+        <input class="apt-input" id="apt-floorLabel" value="${esc(d.floorLabel||'')}" placeholder="Floor 6">
+      </div>
+    </div>
+    <div class="apt-card">
       <div class="apt-card-hd">Check-in instructions · ${photos.length} photos</div>
       <div class="apt-card-bd">
         <label class="apt-label">Written instructions</label>
@@ -5408,6 +5424,11 @@ window.saveAptData=async function(){
     checkInTime:document.getElementById('apt-checkInTime')?.value||'15:00',
     checkOutTime:document.getElementById('apt-checkOutTime')?.value||'12:00',
     wifiName:document.getElementById('apt-wifiName')?.value.trim()||'',
+    propertyName:document.getElementById('apt-propertyName')?.value.trim()||'',
+    address:document.getElementById('apt-address')?.value.trim()||'',
+    mapsUrl:document.getElementById('apt-mapsUrl')?.value.trim()||'',
+    neighborhood:document.getElementById('apt-neighborhood')?.value.trim()||'',
+    floorLabel:document.getElementById('apt-floorLabel')?.value.trim()||'',
     wifiPass:document.getElementById('apt-wifiPass')?.value.trim()||'',
     rules:aptData[aptId]?.rules||'',
     instructions:document.getElementById('apt-instructions')?.value.trim()||'',

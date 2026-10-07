@@ -2073,6 +2073,12 @@ document.addEventListener('click',function(){
   if(dd)dd.style.display='none';
 });
 
+function propName(def){return(aptData&&aptData.propertyName)||def;}
+function applyPropertyName(){
+  const pn=propName('Maxela Apartments');
+  document.querySelectorAll('.foot__mark').forEach(el=>{el.textContent=pn+' · Tbilisi';});
+  const m=document.querySelector('.meta');if(m&&/TBILISI/i.test(m.textContent))m.textContent=pn.toUpperCase()+' · TBILISI';
+}
 function applyTranslations(){
   const map={
     't-welcome-sub':'checkinKicker','t-checkin-title':'checkinTitle','t-checkin-sub':'checkinSub',
@@ -2133,6 +2139,7 @@ function applyTranslations(){
   const ppt=document.getElementById('t-passport-page-title');if(ppt)ppt.textContent=t('passportPageTitle');
   const pps=document.getElementById('t-passport-page-sub');if(pps)pps.textContent=t('passportPageSub');
   const ppr=document.getElementById('t-passport-required');if(ppr)ppr.textContent=t('passportRequired');
+  applyPropertyName();
   _renderHomeQuick();
   if(_wybCat)_renderWybCard(_wybCat);
 }
@@ -2333,9 +2340,10 @@ function fmtStay(s){
 function renderGreetingApt(){
   const el=document.getElementById('apt-area');
   if(!el)return;
+  applyPropertyName();
   const aptName=APT_NAMES[aptId]||aptId;
   if(!allMatchedReservations||allMatchedReservations.length<=1){
-    el.innerHTML='<div style="font-size:13px;color:var(--muted);margin-top:6px;"><b id="home-apt-name" style="color:var(--ink);font-weight:500;">'+esc(aptName)+'</b> · Maxela · Tbilisi</div>';
+    el.innerHTML='<div style="font-size:13px;color:var(--muted);margin-top:6px;"><b id="home-apt-name" style="color:var(--ink);font-weight:500;">'+esc(aptName)+'</b> · '+esc(propName('Maxela'))+' · Tbilisi</div>';
     return;
   }
   const n=allMatchedReservations.length;
@@ -3107,7 +3115,7 @@ function showHome(){
     }
     document.getElementById('t-greeting-label').textContent='';
     const aptEl=document.getElementById('apt-area');
-    if(aptEl){aptEl.className='greeting__apt';aptEl.innerHTML='<span class="swatch"></span><b>Maxela · Tbilisi</b>';}
+    if(aptEl){aptEl.className='greeting__apt';aptEl.innerHTML='<span class="swatch"></span><b>'+esc(propName('Maxela'))+' · Tbilisi</b>';}
     document.getElementById('tiles-grid').innerHTML=
       `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3rem 1.5rem 4rem;">
         <div class="farewell-icon">${fi('star',52,1.6)}</div>
@@ -3382,6 +3390,9 @@ function aptPropTypeForConfig(){
   return aptPropType();
 }
 function getPickupLocation(){
+  if(aptData&&aptData.address)return aptData.address;   // the apartment's own address wins
+  const _grp=(guestFullCfg?.locationInfo||{})[aptPropTypeForConfig()]?.address;
+  if(_grp)return _grp;
   if(aptId.startsWith('0-')||aptId.startsWith('6-')||aptId.startsWith('7-'))return'Zhiuli Shartava St. 37';
   if(aptId.startsWith('orb-'))return'Atoneli St. 9';
   if(aptId.startsWith('tab-'))return'Galaktion Tabidze St. 3/5';
@@ -3647,8 +3658,11 @@ window.wybToggle=function(){
 async function _getLocationData(){
   const cfg=await getFullCfg();
   const prop=aptPropTypeForConfig();
+  if(aptId&&!aptData){try{const s=await getDoc(doc(db,'checkin_apartments',aptId));if(s.exists())aptData=s.data();}catch(e){}}
+  const _own={};
+  if(aptData){for(const k of['address','mapsUrl','neighborhood']){if(aptData[k])_own[k]=aptData[k];}}
   const locDefaults={ROOMS:{address:'Zhiuli Shartava St. 37, Tbilisi'},MAXELA:{address:'Zhiuli Shartava St. 37, Tbilisi'},BIG_APT:{address:'Zhiuli Shartava St. 37, Tbilisi'},FREEDOM:{address:'Galaktion Tabidze St. 3/5, Tbilisi'},ORBELIANI:{address:'Atoneli St. 9, Tbilisi'}};
-  return {...(locDefaults[prop]||{}),...((cfg.locationInfo||{})[prop]||{})};
+  return {...(locDefaults[prop]||{}),...((cfg.locationInfo||{})[prop]||{}),..._own};   // apartment > property group > old default
 }
 
 // Visual feedback for buttons whose action is async with no other loading UI —
@@ -4651,6 +4665,7 @@ window.isStayEnded=function(){
 
 function _floorLabel(){
   if(!aptId)return'';
+  if(aptData&&aptData.floorLabel)return aptData.floorLabel;
   if(aptId.startsWith('0-'))return'Ground floor';
   if(aptId.startsWith('6-'))return'Floor 6';
   if(aptId.startsWith('7-'))return'Floor 7';
@@ -4664,6 +4679,7 @@ function _floorLabel(){
 // Safe to call any time home is on screen — every element lookup is null-checked.
 function _renderHeroContent(){
   _updateParkingButtonVisibility();
+  applyPropertyName();
   const doorEl=document.getElementById('hero-door-code');
   applyDoorCardVisibility();   // fail open: only hidden once config says smartLock===false for this apartment type
   let doorCode=_doorCodeForGuest();
