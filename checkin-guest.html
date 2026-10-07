@@ -2243,7 +2243,12 @@ window.setContact=function(type){
   contactType=type;
   document.getElementById('ct-wa').className='ct-btn'+(type==='wa'?' wa-active':'');
   document.getElementById('ct-tg').className='ct-btn'+(type==='tg'?' tg-active':'');
-  document.getElementById('r-contact').placeholder=type==='wa'?'+995...':'@username';
+  const _rc=document.getElementById('r-contact');
+  _rc.placeholder=type==='wa'?'+995...':'@username';
+  // WhatsApp = phone keypad; Telegram = normal keyboard so guests can type @username
+  _rc.type=type==='wa'?'tel':'text';
+  _rc.setAttribute('inputmode',type==='wa'?'tel':'text');
+  _rc.setAttribute('autocapitalize','none');_rc.setAttribute('autocorrect','off');_rc.setAttribute('spellcheck','false');
 }
 
 window.handlePassport=function(input){
@@ -3004,14 +3009,14 @@ window.searchReservation=async function(){
       btn.disabled=false;
       document.getElementById('t-search-btn').textContent='Find my booking';
       const errDiv=document.getElementById('reg-verify-error');
-      if(errDiv){errDiv.style.display='';const _h=document.getElementById('reg-cantfind');if(_h)_h.textContent=t('cantFind');return;}
+      if(errDiv){btn.insertAdjacentElement('afterend',errDiv);errDiv.style.display='';const _h=document.getElementById('reg-cantfind');if(_h)_h.textContent=t('cantFind');return;}
       const wrap=document.getElementById('page-register');
       if(!wrap){alert('Page error — please reload and try again.');btn.disabled=false;return;}
       const errEl=document.createElement('div');
       errEl.id='reg-verify-error';
       errEl.style.cssText='background:#450a0a;color:#fca5a5;border-radius:10px;padding:16px 20px;text-align:center;margin:12px 0;font-size:14px;line-height:1.6;';
       errEl.innerHTML=`We couldn't verify your booking.<div id="reg-cantfind" style="font-size:13px;line-height:1.5;margin-top:8px;color:#fecaca;">${esc(t('cantFind'))}</div><a href="https://wa.me/${WA}" target="_blank" style="color:#86efac;font-weight:600;display:inline-block;margin-top:8px;">Contact host on WhatsApp</a>`;
-      wrap.appendChild(errEl);
+      btn.insertAdjacentElement('afterend',errEl);   // the "not found" message sits right under the button
       return;
     }
     if(_bestScore===10&&_bestMatch.roomCode&&aptId&&_bestMatch.roomCode!==aptId){
@@ -3050,7 +3055,9 @@ window.searchReservation=async function(){
       group.sort((a,b)=>(a.roomCode||'').localeCompare(b.roomCode||''));
     }catch(e){console.warn('[Group] related bookings lookup failed',e);}
     allMatchedReservations=group;
-    _pendingReg={name:name||(_bestMatch.guest||''),guests,nationality,contact,contactType,arrival,expectedCheckInWindow:getExpectedCheckInWindow()};
+    // a booking number typed in the Name field must not become the guest's name: save the booking's guest name
+    const _regName=(_bestScore===10&&_looksLikeBookingRef(name))?(_stripRoomNum(_bestMatch.guest||_bestMatch.guestName||'')||name):(name||(_bestMatch.guest||''));
+    _pendingReg={name:_regName,guests,nationality,contact,contactType,arrival,expectedCheckInWindow:getExpectedCheckInWindow()};
     _pendingMatches=[{res:_bestMatch,score:_bestScore}];
     const existing=await findExistingPrimaryGuest(_bestMatch.id,_bestMatch.reservationNumber);
     if(existing&&!_companionGuest){
@@ -4779,7 +4786,7 @@ function syncDisplayToHidden(){
 function setupDateInput(){
   const today=tbilisiToday();
   const tp=today.split('-').map(Number);
-  const maxDt=new Date(tp[0],tp[1]-1,tp[2]+90);
+  const maxDt=new Date(tp[0],tp[1]-1,tp[2]+365);   // bookings up to a year ahead
   const maxStr=maxDt.getFullYear()+'-'+String(maxDt.getMonth()+1).padStart(2,'0')+'-'+String(maxDt.getDate()).padStart(2,'0');
   const hidden=document.getElementById('r-arrival');
   const display=document.getElementById('r-arrival-display');
