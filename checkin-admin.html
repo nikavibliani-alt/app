@@ -702,7 +702,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1012a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1012b · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -5032,6 +5032,10 @@ window.setReqStatus=async function(id,status){
   try{
     await updateDoc(doc(db,'service_requests',id),{status});
     const r=reqData.find(x=>x.id===id);if(r)r.status=status;
+    // keep the guest's own request in step (their page reads checkin_requests)
+    if(r&&r.checkinRequestId){
+      try{await updateDoc(doc(db,'checkin_requests',r.checkinRequestId),status==='CONFIRMED'?{status:'CONFIRMED',done:true}:{status:'CANCELLED',done:false,declinedByHost:true});}catch(e){console.warn('[guest request sync]',e);}
+    }
     updateRequestsBadge();
     buildRequestsUI();
     closeReqDetail();
@@ -5041,7 +5045,11 @@ window.setReqStatus=async function(id,status){
 window.deleteReq=async function(id){
   if(!confirm('Delete this request?'))return;
   try{
+    const _r=reqData.find(x=>x.id===id);
     await deleteDoc(doc(db,'service_requests',id));
+    if(_r&&_r.checkinRequestId){
+      try{await updateDoc(doc(db,'checkin_requests',_r.checkinRequestId),{status:'CANCELLED',done:false,removedByHost:true});}catch(e){console.warn('[guest request sync]',e);}
+    }
     reqData=reqData.filter(x=>x.id!==id);
     updateRequestsBadge();
     buildRequestsUI();

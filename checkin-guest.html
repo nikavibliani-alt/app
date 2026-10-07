@@ -4236,15 +4236,42 @@ window.openRequestDetail=function(id){
   modal.classList.remove('hidden');
 };
 window.closeRequestDetail=function(){document.getElementById('req-detail-modal')?.classList.add('hidden');};
+// Message the driver (shuttle) or host about a cancelled request — opened from the guest's tap, like a new request
+function _openRequestWhatsapp(r,kind){
+  const d=r;
+  const aptNm=aptDisplayName(r.aptId||aptId);
+  const b=brandInfo();
+  let body=`${kind} service request from ${aptNm}:\n`+
+    `${b.mode==='neutral'?'':`Property: ${b.mode==='default'?'Maxela Apartments':b.name}\n`}Room: ${r.aptId||aptId}\n`+
+    `Guest: ${guestData?.name||'Guest'}\nService: ${r.serviceName||''}\n`;
+  if(r.serviceId==='transfer'){
+    body+=`Date: ${d.pickupDate||''}\nArrival time: ${d.arrivalTime||''}\n`;
+    if(d.flightNumber)body+=`Flight: ${d.flightNumber}\n`;
+    body+=`Guests: ${d.guests||''}\nPickup: ${d.pickupLocation||''}\n`;
+    body+=d.dropoffLocation?`Drop-off: ${d.dropoffLocation}\n`:`Drop-off: address not set\n`;
+    if(d.mapsUrl)body+=`Map: ${d.mapsUrl}\n`;
+    body+=`Cars: ${d.carConfig||''}\nTotal: ${d.price!=null?d.price:''} GEL\n`;
+  }
+  body+=`Contact: ${guestData?.contact||'—'}`;
+  const to=String(r.whatsappNumber||getShuttleSettings().driverWa||WA).replace(/\D/g,'')||WA;
+  const url='https://wa.me/'+to+'?text='+encodeURIComponent(body);
+  setTimeout(()=>{
+    if(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent))window.location.href=url;else window.open(url,'_blank');
+  },300);
+  return url;
+}
 window.cancelRequest=async function(){
   if(!currentReqId)return;
   try{
-    await setDoc(doc(db,'checkin_requests',currentReqId),{status:'CANCELLED'},{merge:true});
     const r=myRequests.find(x=>x.id===currentReqId);
+    await setDoc(doc(db,'checkin_requests',currentReqId),{status:'CANCELLED',updatedAt:serverTimestamp()},{merge:true});
+    // the admin list shows the same request: mark that service_requests doc cancelled too
+    if(r&&r.serviceRequestId)await setDoc(doc(db,'service_requests',r.serviceRequestId),{status:'CANCELLED',cancelledByGuest:true,updatedAt:serverTimestamp()},{merge:true});
     if(r)r.status='CANCELLED';
     window.closeRequestDetail();
     toast('Request cancelled');
     refreshMyRequestsSection();
+    if(r&&r.serviceId==='transfer')_openRequestWhatsapp(r,'CANCELLED');
   }catch(e){toast('Could not cancel: '+e.message);}
 };
 window.editRequest=function(){
@@ -4373,7 +4400,8 @@ window.submitService=async function(){
     :((guestSvcs||[]).find(s=>s.id===_fsId)?.whatsappNumber||WA);
 
   // Build WhatsApp URL before any async work so it counts as user-initiated
-  let waBody=`New service request from ${aptName}:\n`+
+  const _isEdit=!!_editingReqId;
+  let waBody=`${_isEdit?'UPDATED':'New'} service request from ${aptName}:\n`+
     (currentSvcId==='transfer'?`${brandInfo().mode==='neutral'?'':`Property: ${brandInfo().mode==='default'?'Maxela Apartments':brandInfo().name}\n`}Room: ${aptId}\n`:'')+
     `Guest: ${guestData?.name||'Guest'}\n`+
     `Service: ${currentSvcName}\n`;
@@ -4400,6 +4428,7 @@ window.submitService=async function(){
   try{
     const payload={
       guestId,aptId,serviceId:currentSvcId,serviceName:currentSvcName,
+      guestContact:guestData?.contact||'',whatsappNumber:svcWA,
       note,preferredTime,...(preferredDate?{preferredDate}:{}),status:'PENDING',done:false,createdAt:serverTimestamp()
     };
     if(currentSvcId==='laundry'){
@@ -4409,27 +4438,39 @@ window.submitService=async function(){
     if(currentSvcId==='transfer'){
       Object.assign(payload,transferDetails);
     }
+    let _reqId=null,_srId=null;
     if(_editingReqId){
       const{createdAt:_ct,...updatePayload}=payload;
-      await setDoc(doc(db,'checkin_requests',_editingReqId),{...updatePayload,status:'PENDING',updatedAt:serverTimestamp()},{merge:true});
+      _reqId=_editingReqId;
+      await setDoc(doc(db,'checkin_requests',_editingReqId),{...updatePayload,status:'PENDING',done:false,updatedAt:serverTimestamp()},{merge:true});
       const ridx=myRequests.findIndex(x=>x.id===_editingReqId);
-      if(ridx>=0)Object.assign(myRequests[ridx],updatePayload);
+      if(ridx>=0){Object.assign(myRequests[ridx],updatePayload,{status:'PENDING',done:false});_srId=myRequests[ridx].serviceRequestId||null;}
       _editingReqId=null;
       refreshMyRequestsSection();
     }else{
       const newRef=await addDoc(collection(db,'checkin_requests'),payload);
+      _reqId=newRef.id;
       myRequests.push({...payload,id:newRef.id,status:'PENDING',createdAt:new Date()});
       refreshMyRequestsSection();
     }
 
     // Log all requests to service_requests for tracking
     const details={note,...(currentSvcId==='transfer'?transferDetails:{}),...(currentSvcId==='laundry'?{items:selectedItems,total:laundryTotal}:{}),...(preferredTime?{preferredTime}:{}),...(preferredDate?{preferredDate}:{})};
-    await addDoc(collection(db,'service_requests'),{
+    // ONE service_requests doc per request: an edit updates the same doc (no duplicate); ids are cross-linked
+    const _srBody={
       aptId,roomCode:aptId,guestName:guestData?.name||'',
+      guestId,guestContact:guestData?.contact||'',guestContactType:guestData?.contactType||'',checkinRequestId:_reqId,
       service:currentSvcName,serviceId:currentSvcId,
       status:'PENDING',details,whatsappNumber:svcWA,
-      timestamp:serverTimestamp()
-    });
+    };
+    if(_srId){
+      await setDoc(doc(db,'service_requests',_srId),{..._srBody,updatedAt:serverTimestamp()},{merge:true});
+    }else{
+      const _srRef=await addDoc(collection(db,'service_requests'),{..._srBody,timestamp:serverTimestamp()});
+      _srId=_srRef.id;
+      await setDoc(doc(db,'checkin_requests',_reqId),{serviceRequestId:_srId},{merge:true});
+      const _ri=myRequests.findIndex(x=>x.id===_reqId);if(_ri>=0)myRequests[_ri].serviceRequestId=_srId;
+    }
 
     window.closeServiceModal();
     toast(t('rs'));
