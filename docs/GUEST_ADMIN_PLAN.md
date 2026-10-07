@@ -183,3 +183,9 @@ Restore point: tag `before-location-fix`.
 2. VGL and XCV property groups in Guest page settings + guest page room-to-group mapping
 
 Undo: `git revert --no-edit <commit>`, then push.
+| 1 | edbd153 | live |
+| 2 | c270092 | live |
+
+Notes:
+- Location resolution order on the guest page: apartment (checkin_apartments propertyName/address/mapsUrl/neighborhood/floorLabel) > property group (locationInfo) > old default.
+- New groups VGL and XCV copy FREEDOM visibility + parking defaults; location and room-category defaults are empty. Entrance-card rule and shuttle pickup text still use the old fixed lists for other groups.
