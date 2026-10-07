@@ -702,7 +702,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1013b · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1013c · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -4991,7 +4991,7 @@ function buildRequestsUI(){
   if(!filters.some(f=>f.id===reqFilter))reqFilter='all';
   document.getElementById('req-filters').innerHTML=filters.map(f=>
     `<button class="filter-chip ${reqFilter===f.id?'active':''}" onclick="setReqFilter('${f.id}')">${esc(f.label)}</button>`
-  ).join('')+`<button class="filter-chip" onclick="deleteCompleted()">Clear done</button>`;
+  ).join('');
 
   const filtered=reqFilter==='all'?reqData:reqData.filter(r=>reqSid(r)===reqFilter);
   const now=new Date();
@@ -5025,6 +5025,8 @@ function buildRequestsUI(){
       </button>`;
     }).join('');
   }
+  const _nDone=reqClearable().length;
+  if(_nDone)html+=`<button type="button" class="btn" style="width:100%;margin:16px 0 8px;color:var(--muted)" onclick="deleteCompleted()">Clear done (${_nDone})</button>`;
   el.innerHTML=html;
 }
 window.setReqFilter=function(f){reqFilter=f;buildRequestsUI();};
@@ -5105,13 +5107,28 @@ window.deleteReq=async function(id){
     toast('Deleted');
   }catch(e){toast('Delete failed: '+e.message);}
 };
+/* requests that "Clear done" may delete: cancelled ones, and confirmed ones whose requested date has passed — within the current filter */
+function reqClearable(){
+  const today=tbilisiToday();
+  const inFilter=reqFilter==='all'?reqData:reqData.filter(r=>reqSid(r)===reqFilter);
+  return inFilter.filter(r=>{
+    if(r.status==='CANCELLED')return true;
+    if(r.status==='CONFIRMED'){
+      const d=reqDate(r)||tbilisiISOFromTs(r);
+      return !!d&&d<today;
+    }
+    return false;
+  });
+}
+function tbilisiISOFromTs(r){const t=reqTs(r);return t.getTime()?new Date(t.getTime()+4*3600*1000).toISOString().slice(0,10):'';}
 window.deleteCompleted=async function(){
-  const toDelete=reqData.filter(r=>r.status==='CONFIRMED'||r.status==='CANCELLED');
-  if(!toDelete.length){toast('No completed requests');return;}
-  if(!confirm('Delete '+toDelete.length+' completed request'+(toDelete.length!==1?'s':'')+'?'))return;
+  const toDelete=reqClearable();
+  if(!toDelete.length){toast('Nothing to clear');return;}
+  if(!confirm('Delete '+toDelete.length+' cancelled or finished request'+(toDelete.length!==1?'s':'')+'?'))return;
   try{
     await Promise.all(toDelete.map(r=>deleteDoc(doc(db,'service_requests',r.id))));
-    reqData=reqData.filter(r=>r.status!=='CONFIRMED'&&r.status!=='CANCELLED');
+    const gone=new Set(toDelete.map(r=>r.id));
+    reqData=reqData.filter(r=>!gone.has(r.id));
     updateRequestsBadge();
     buildRequestsUI();
     toast('Cleared');
