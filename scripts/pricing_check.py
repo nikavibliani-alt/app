@@ -13,6 +13,7 @@ import base64
 import json
 import os
 import re
+import subprocess
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
@@ -498,11 +499,71 @@ def check_res_api():
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# --check dryrun: prove pricing_engine.py --report writes nothing
+# ---------------------------------------------------------------------------
+
+DRYRUN_COLLECTIONS = ["pricing_events", "pricing_outcomes", "pricing_locks", "pricing_log",
+                      "pricing_proposals", "pricing_changes", "pricing_snapshots"]
+
+
+def count_docs(db):
+    out = {}
+    for name in DRYRUN_COLLECTIONS:
+        out[name] = sum(1 for _ in db.collection(name).select([]).stream())
+    return out
+
+
+def check_dryrun():
+    hdr("DRY RUN PROOF: python pricing_engine.py --report (no --apply)")
+    for k in ("ANTHROPIC_API_KEY", "SENDGRID_KEY", "SERPAPI_KEY"):
+        print(f"  {k} present in environment: {'yes' if os.environ.get(k) else 'no'}")
+    db = init_firestore()
+    before = count_docs(db)
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    proc = subprocess.run([sys.executable, "pricing_engine.py", "--report"], cwd=root,
+                          capture_output=True, text=True, timeout=420)
+    out, err = proc.stdout, proc.stderr
+    after = count_docs(db)
+
+    print(f"\nengine exit code: {proc.returncode}")
+    print(f"{'collection':20} {'before':>8} {'after':>8}")
+    equal = True
+    for name in DRYRUN_COLLECTIONS:
+        flag = "" if before[name] == after[name] else "   <-- CHANGED"
+        equal &= before[name] == after[name]
+        print(f"{name:20} {before[name]:>8} {after[name]:>8}{flag}")
+    print("\nRESULT:", "PASS, all counts equal" if equal else "FAIL, a count changed")
+
+    blocked = [l for l in (out + err).splitlines() if "WRITE BLOCKED" in l or "Write guard blocked" in l]
+    print(f"write attempts blocked by the engine's own guard: {len(blocked)}")
+    for l in blocked[:5]:
+        print("  ", l[:160])
+    for l in out.splitlines():
+        if l.startswith(("DRY RUN", "TOTAL:", "Skipping event scan")):
+            print(l[:160])
+
+    rows = [l for l in out.splitlines() if l.startswith("R | ")]
+    print(f"\nreport rows: {len(rows)}")
+    for rt in ("MAXELA", "BIG_APT"):
+        sel = [l for l in rows if l.split(" | ")[1] == rt]
+        print(f"\nfirst 15 rows for {rt} (of {len(sel)}): room | date | days | cur GEL | new GEL | cur EUR | new EUR | reason")
+        for l in sel[:15]:
+            print("  " + l[4:][:200])
+    if proc.returncode != 0:
+        print("\nengine stderr (tail):")
+        print("\n".join(err.splitlines()[-15:])[:1500])
+    if not equal or proc.returncode != 0:
+        sys.exit(1)
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", default="step1")
     args = ap.parse_args()
+    if args.check == "dryrun":
+        check_dryrun()
+        return
     if args.check != "step1":
         raise SystemExit(f"unknown check: {args.check}")
 

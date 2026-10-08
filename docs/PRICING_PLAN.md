@@ -14,4 +14,4 @@ Steps (work one at a time, in order):
 
 ## Progress log
 
-(empty)
+- 2026-10-08, step 2a: plain `pricing_engine.py` run (no --apply) now writes nothing anywhere (write guard, no event scan, no Claude call, no email); `--report` prints a row per room type and date; `pricing_config/control` paused switch added (engine and pricing.html). Proof: read-only check `dryrun`.

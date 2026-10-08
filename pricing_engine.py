@@ -15,8 +15,10 @@ Rules:
   - dry_run = true    → only prints what would change, no writes
 
 Usage:
-  python3 pricing_engine.py              # dry run (safe, no writes)
+  python3 pricing_engine.py              # dry run: writes NOTHING anywhere
+  python3 pricing_engine.py --report     # dry run + full table of every date
   python3 pricing_engine.py --apply      # actually write to MiniHotel
+                                         # (does nothing but log if pricing_config/control is paused)
   python3 pricing_engine.py --days 60    # override window (default 90)
 """
 
@@ -441,10 +443,101 @@ def sync_channels(results: dict):
 
 
 # ---------------------------------------------------------------------------
+# WRITE GUARD + PAUSE SWITCH
+# ---------------------------------------------------------------------------
+
+_WRITES_BLOCKED = False
+_GUARD_HITS = []
+_MH_HOSTS = ("minihotelpms.com", "minihotel.cloud", "hotelpms.cloud")
+_LOGIN_URL = "https://login.minihotel.cloud/login.aspx"
+
+
+def _blocked(what: str):
+    _GUARD_HITS.append(what)
+    raise RuntimeError(f"WRITE BLOCKED (read-only run): {what}")
+
+
+def install_write_guard():
+    """
+    Belt and braces for runs that must not write (dry run, paused).
+    Any Firestore write, any non-GET HTTP request (MiniHotel, SendGrid, ...)
+    raises while _WRITES_BLOCKED is True. The login form POST is allowed.
+    """
+    global _WRITES_BLOCKED
+    _WRITES_BLOCKED = True
+    try:
+        from google.cloud.firestore_v1.document import DocumentReference
+        from google.cloud.firestore_v1.batch import WriteBatch
+        for name in ("set", "update", "delete", "create"):
+            orig = getattr(DocumentReference, name)
+
+            def make(orig, name):
+                def guarded(self, *a, **k):
+                    if _WRITES_BLOCKED:
+                        _blocked(f"firestore {name} {getattr(self, 'path', '?')}")
+                    return orig(self, *a, **k)
+                return guarded
+            setattr(DocumentReference, name, make(orig, name))
+        orig_commit = WriteBatch.commit
+
+        def guarded_commit(self, *a, **k):
+            if _WRITES_BLOCKED:
+                _blocked("firestore batch commit")
+            return orig_commit(self, *a, **k)
+        WriteBatch.commit = guarded_commit
+    except Exception as e:  # firestore not installed: nothing to guard
+        print(f"  (firestore guard not installed: {e})", file=sys.stderr)
+
+    orig_request = requests.Session.request
+
+    def guarded_request(self, method, url, *a, **k):
+        if _WRITES_BLOCKED and str(method).upper() not in ("GET", "HEAD"):
+            if not (str(method).upper() == "POST" and str(url).split("?")[0].lower() == _LOGIN_URL):
+                _blocked(f"http {str(method).upper()} {str(url).split('/')[2] if '//' in str(url) else url}")
+        return orig_request(self, method, url, *a, **k)
+    requests.Session.request = guarded_request
+
+
+def allow_writes():
+    global _WRITES_BLOCKED
+    _WRITES_BLOCKED = False
+
+
+def _firestore_client():
+    import firebase_admin
+    from firebase_admin import credentials, firestore as fs
+    import base64, json as _json
+    if not firebase_admin._apps:
+        sa = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
+        if not sa:
+            return None
+        firebase_admin.initialize_app(credentials.Certificate(_json.loads(base64.b64decode(sa).decode())))
+    return fs.client()
+
+
+def read_paused() -> bool:
+    """
+    pricing_config/control {paused: true|false}. Missing doc = not paused.
+    No Firestore credentials = cannot know, so not paused. A read ERROR counts as
+    paused: a failed switch check must never turn into a live price write.
+    """
+    try:
+        db = _firestore_client()
+        if db is None:
+            return False
+        snap = db.collection("pricing_config").document("control").get()
+        return bool(snap.exists and (snap.to_dict() or {}).get("paused") is True)
+    except Exception as e:
+        print(f"  Could not read pause switch ({e}); treating as PAUSED.", file=sys.stderr)
+        return True
+
+
+# ---------------------------------------------------------------------------
 # FIRESTORE LOG
 # ---------------------------------------------------------------------------
 
-def write_firestore_log(results: dict, dry_run: bool, error: str = None, trigger: str = "scheduled"):
+def write_firestore_log(results: dict, dry_run: bool, error: str = None, trigger: str = "scheduled",
+                        paused_count: int = None):
     """Write run summary to Firestore pricing_log collection."""
     try:
         import firebase_admin
@@ -473,11 +566,17 @@ def write_firestore_log(results: dict, dry_run: bool, error: str = None, trigger
             "trigger":       trigger,
             "message":       f"{'DRY RUN' if dry_run else 'LIVE'}: {total_changes} price updates",
         }
+        if paused_count is not None:
+            entry["changes_count"] = 0
+            entry["paused"] = True
+            entry["message"] = f"PAUSED: {paused_count} changes not written"
         if error:
             entry["error"] = error
 
         db.collection("pricing_log").add(entry)
         print("  Log written to Firestore.")
+        if paused_count is not None:
+            return  # paused: one log entry only, no history card
 
         # Write engine_run summary to pricing_changes for the history card
         if not dry_run and results:
@@ -588,6 +687,21 @@ def print_report(results: dict, dry_run: bool):
     print(f"TOTAL: {total_changes} price updates, {total_skipped} dates skipped (fully booked)\n")
 
 
+def print_table(results: dict):
+    """--report: one line per room type and date, nothing else (no guest data)."""
+    print("\nREPORT TABLE (R | room type | date | days | cur GEL | new GEL | cur EUR | new EUR | reason)")
+    for rt, dates in results.items():
+        for d in dates:
+            reason = d.get("reason") or ""
+            if d.get("skip"):
+                reason = d.get("reason") or "skipped"
+            elif not d.get("changed"):
+                reason = reason or "no change"
+            print(f"R | {rt} | {d['date']} | {d['days_ahead']} | {d['current_gel']:.0f} | "
+                  f"{d['proposed_gel']:.0f} | {d['current_eur']:.0f} | {d['proposed_eur']:.0f} | {reason}")
+    print()
+
+
 # ---------------------------------------------------------------------------
 # MAIN
 # ---------------------------------------------------------------------------
@@ -605,10 +719,20 @@ def main():
                         help="Write prices to MiniHotel (default: dry run)")
     parser.add_argument("--days", type=int, default=None,
                         help="Override run window in days")
+    parser.add_argument("--report", action="store_true",
+                        help="Print a table of every room type/date (current vs new prices)")
     args = parser.parse_args()
 
     config  = load_config()
-    dry_run = not args.apply and config.get("dry_run", True)
+    # Only --apply writes. (config.json "dry_run" no longer turns a plain run live.)
+    paused  = read_paused() if args.apply else False
+    # read_only = dry run or paused: nothing may be written except the one PAUSED log line
+    read_only = (not args.apply) or paused
+    dry_run   = not args.apply
+    if paused:
+        print("PAUSED: pricing_config/control says paused. Calculating only; nothing will be written to MiniHotel.")
+    if read_only:
+        install_write_guard()
 
     if urgent:
         # Narrow window for speed: cover only the near-term cancellation dates
@@ -622,8 +746,11 @@ def main():
         window = args.days or config.get("run_window_days", 90)
 
     # Scan for Tbilisi events and update config
-    print("Scanning for events...")
-    scan_events()
+    if read_only:
+        print("Skipping event scan (read-only run).")
+    else:
+        print("Scanning for events...")
+        scan_events()
     print()
 
     # Auto-login — no manual cookie needed
@@ -653,7 +780,7 @@ def main():
         pass
 
     # Log urgent cancellation runs to pricing_changes for history card
-    if urgent and _db_for_ai:
+    if urgent and _db_for_ai and not read_only:
         try:
             _db_for_ai.collection("pricing_changes").add({
                 "ts":     datetime.now(),
@@ -664,7 +791,7 @@ def main():
             pass
 
     # Record any new booking outcomes before computing new prices
-    if _db_for_ai:
+    if _db_for_ai and not read_only:
         record_outcomes(raw)
 
     # Load pricing rules from Firestore (set from pricing page)
@@ -717,11 +844,11 @@ def main():
         date_to_iso = (today + timedelta(days=window)).strftime("%Y-%m-%d")
         print("  Checking for manual price experiments...")
         experiment_locks = load_experiment_locks(_db_for_ai, today_iso, date_to_iso)
-        experiment_locks = detect_manual_experiments(_db_for_ai, raw, experiment_locks)
+        experiment_locks = detect_manual_experiments(_db_for_ai, raw, experiment_locks, write=not read_only)
 
     # Claude daily strategy analyst — runs once per day, updates config before velocity engine
     # Skipped for urgent/cancellation runs to keep them fast
-    if _db_for_ai and not urgent:
+    if _db_for_ai and not urgent and not read_only:
         print("  Running Claude strategy analyst...")
         config = claude_write_daily_proposal(config, _db_for_ai, velocity)
 
@@ -733,13 +860,26 @@ def main():
     if urgent and urgent_props:
         results = {rt: dates for rt, dates in results.items() if rt in urgent_props}
 
-    print_report(results, dry_run)
+    print_report(results, dry_run or paused)
+    if args.report:
+        print_table(results)
 
     trigger = "cancellation" if urgent else "scheduled"
 
     if dry_run:
-        print("DRY RUN — run with --apply to write changes to MiniHotel")
-        write_firestore_log(results, dry_run=True, trigger=trigger)
+        print("DRY RUN — nothing was written. Run with --apply to write changes to MiniHotel.")
+        if _GUARD_HITS:
+            print(f"Write guard blocked {len(_GUARD_HITS)} attempted write(s): {_GUARD_HITS[:5]}")
+        return
+
+    if paused:
+        pending = sum(
+            len([d for d in dates if not d.get("skip") and d.get("changed")])
+            for dates in results.values()
+        )
+        print(f"PAUSED: {pending} changes not written.")
+        allow_writes()  # the single pricing_log entry is the only write allowed
+        write_firestore_log(results, dry_run=False, trigger=trigger, paused_count=pending)
         return
 
     payload = build_write_payload(results)

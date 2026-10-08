@@ -283,7 +283,7 @@ def load_experiment_locks(db, date_from: str, date_to: str) -> dict:
     return result
 
 
-def detect_manual_experiments(db, raw_data: list, locks: dict) -> dict:
+def detect_manual_experiments(db, raw_data: list, locks: dict, write: bool = True) -> dict:
     """
     Detect manual price experiments by comparing current MiniHotel prices against
     last_engine_price stored in pricing_locks.
@@ -291,7 +291,8 @@ def detect_manual_experiments(db, raw_data: list, locks: dict) -> dict:
     Detection uses EXACT mismatch — no percentage threshold.
     Only detects when a baseline (last_engine_price) exists for the date.
 
-    Updates Firestore pricing_locks for newly detected experiments.
+    Updates Firestore pricing_locks for newly detected experiments (unless write=False,
+    which still returns the updated locks but commits nothing).
     Returns the updated locks dict.
     """
     try:
@@ -367,11 +368,12 @@ def detect_manual_experiments(db, raw_data: list, locks: dict) -> dict:
                         locks.setdefault(rt, {})[date_str] = {**lock, "manual_lock": False}
 
                 if batch_count >= 450:
-                    batch.commit()
+                    if write:
+                        batch.commit()
                     batch = db.batch()
                     batch_count = 0
 
-        if batch_count > 0:
+        if batch_count > 0 and write:
             batch.commit()
 
     except Exception as e:

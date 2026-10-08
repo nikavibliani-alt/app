@@ -23,7 +23,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests beautifulsoup4 firebase-admin
+        run: pip install requests beautifulsoup4 firebase-admin anthropic
 
       - name: Run read-only check
         env:

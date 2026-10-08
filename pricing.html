@@ -21,6 +21,11 @@ h1{font-size:1.4rem;font-weight:600;letter-spacing:-.01em}
 .engine-status b{color:var(--text-main);font-weight:600}
 .engine-status .err{color:var(--status-amber);font-weight:600}
 .engine-status .ok{color:var(--status-green);font-weight:600}
+.pause-switch{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius-el);overflow:hidden;background:var(--card-bg)}
+.pause-switch button{padding:.35rem .9rem;border:0;background:var(--card-bg);color:var(--text-muted);font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit}
+.pause-switch button.on-active{background:var(--bg-green);color:var(--status-green)}
+.pause-switch button.paused-active{background:var(--bg-amber);color:var(--status-amber)}
+.pause-note{font-size:.75rem;color:var(--status-amber);font-weight:600}
 .dashboard-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:1.25rem;align-items:start}
 @media(max-width:1100px){.dashboard-grid{grid-template-columns:1fr}}
 .card{background:var(--card-bg);border-radius:var(--radius-card);box-shadow:var(--shadow);padding:1.1rem 1.25rem;margin-bottom:1.25rem;border:1px solid var(--border)}
@@ -144,6 +149,11 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
   <header>
     <h1>Pricing</h1>
     <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+      <div class="pause-switch" id="pauseSwitch" role="group" aria-label="Pricing engine">
+        <button type="button" id="pauseOn" onclick="setPaused(false)">On</button>
+        <button type="button" id="pausePaused" onclick="setPaused(true)">Paused</button>
+      </div>
+      <span class="pause-note" id="pauseNote"></span>
       <div class="engine-status" id="engineStatus"><span class="muted">Loading engine status…</span></div>
       <button class="btn btn-small" id="logoutBtn" style="display:none;color:var(--text-muted)" onclick="logout()">Log out</button>
     </div>
@@ -378,6 +388,7 @@ async function init(){
   $("btnRange").onclick = loadSnapshots;
   $("btnToggle").onclick = ()=>{listMinimized=!listMinimized;$("btnToggle").textContent=listMinimized?"Expand":"Minimize";renderDates();};
   loadEngineStatus();
+  loadPause();
   await loadRules();
   loadLocks().then(loadSnapshots);
   loadProposals();
@@ -419,6 +430,27 @@ async function loadHistory(){
 }
 
 
+/* ---------- pause switch (pricing_config/control) ---------- */
+function paintPause(paused){
+  $("pauseOn").className = paused ? "" : "on-active";
+  $("pausePaused").className = paused ? "paused-active" : "";
+  $("pauseNote").textContent = paused ? "Paused: prices are calculated but not written" : "";
+}
+async function loadPause(){
+  try{
+    const snap=await getDoc(doc(db,"pricing_config","control"));
+    paintPause(snap.exists() && snap.data().paused===true);
+  }catch(e){ $("pauseNote").textContent="Switch unavailable: "+e.message; }
+}
+async function setPaused(paused){
+  try{
+    await setDoc(doc(db,"pricing_config","control"),{paused,updatedAt:new Date()},{merge:true});
+    paintPause(paused);
+    logChange("engine_switch", paused ? "Pricing engine paused" : "Pricing engine switched on");
+  }catch(e){ alert("Could not change the switch: "+e.message); loadPause(); }
+}
+window.setPaused=setPaused;
+
 /* ---------- engine status ---------- */
 async function loadEngineStatus(){
   const el=$("engineStatus");
@@ -427,7 +459,7 @@ async function loadEngineStatus(){
     if(qs.empty){el.innerHTML='<span class="muted">No runs logged yet</span>';return;}
     const d=qs.docs[0].data();
     const errs = d.error;
-    const status = errs ? `<span class="err">⚠ ${esc(errs)}</span>` : `<span class="ok">OK</span>`;
+    const status = errs ? `<span class="err">⚠ ${esc(errs)}</span>` : d.paused ? `<span class="err">${esc(d.message||"Paused")}</span>` : `<span class="ok">OK</span>`;
     const nr = nextRun();
     el.innerHTML =
       `<span>Last run <b>${fmtRel(d.timestamp)}</b></span>`+
