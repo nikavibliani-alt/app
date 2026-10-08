@@ -16,6 +16,10 @@ on:
         required: false
         default: ''
 
+concurrency:
+  group: pricing-engine
+  cancel-in-progress: false
+
 jobs:
   pricing:
     runs-on: ubuntu-latest

@@ -774,6 +774,7 @@ def main():
     config = load_approved_events(config)
 
     # Initialize Firestore client for AI and tracking
+    _data_error = None
     _db_for_ai = None
     try:
         import firebase_admin
@@ -805,41 +806,56 @@ def main():
             rules_data = rules_snap.to_dict() if rules_snap.exists else {}
             if rules_data.get("base_price_pct"):
                 config["base_price_pct"] = rules_data["base_price_pct"]
-            if rules_data.get("startPrices"):
-                config["startPrices"] = rules_data["startPrices"]
-            if rules_data.get("startPricesEur"):
-                config["startPricesEur"] = rules_data["startPricesEur"]
-            if rules_data.get("priceRules"):
-                for rt, seasons in rules_data["priceRules"].items():
-                    for s, vals in seasons.items():
-                        if "floor_prices_gel" not in config: config["floor_prices_gel"] = {}
-                        if rt not in config["floor_prices_gel"]: config["floor_prices_gel"][rt] = {}
-                        if "ceiling_prices_gel" not in config: config["ceiling_prices_gel"] = {}
-                        if rt not in config["ceiling_prices_gel"]: config["ceiling_prices_gel"][rt] = {}
-                        config["floor_prices_gel"][rt][s] = vals.get("min", 0)
-                        config["ceiling_prices_gel"][rt][s] = vals.get("max", 0)
-            if rules_data.get("eurRules"):
-                for rt, seasons in rules_data["eurRules"].items():
-                    for s, vals in seasons.items():
-                        if "floor_prices_eur" not in config: config["floor_prices_eur"] = {}
-                        if rt not in config["floor_prices_eur"]: config["floor_prices_eur"][rt] = {}
-                        if "ceiling_prices_eur" not in config: config["ceiling_prices_eur"] = {}
-                        if rt not in config["ceiling_prices_eur"]: config["ceiling_prices_eur"][rt] = {}
-                        config["floor_prices_eur"][rt][s] = vals.get("min", 0)
-                        config["ceiling_prices_eur"][rt][s] = vals.get("max", 0)
+            # A null / missing / non-numeric start, min or max is ignored (the config.json
+            # value stays). It must never become 0, which means "no limit".
+            def _ok(v):
+                return isinstance(v, (int, float)) and not isinstance(v, bool)
+            for _key in ("startPrices", "startPricesEur"):
+                for rt, seasons in (rules_data.get(_key) or {}).items():
+                    for s, v in (seasons or {}).items():
+                        if _ok(v):
+                            config.setdefault(_key, {}).setdefault(rt, {})[s] = v
+            for _rkey, _fkey, _ckey in (("priceRules", "floor_prices_gel", "ceiling_prices_gel"),
+                                        ("eurRules", "floor_prices_eur", "ceiling_prices_eur")):
+                for rt, seasons in (rules_data.get(_rkey) or {}).items():
+                    for s, vals in (seasons or {}).items():
+                        vals = vals or {}
+                        if _ok(vals.get("min")):
+                            config.setdefault(_fkey, {}).setdefault(rt, {})[s] = vals["min"]
+                        if _ok(vals.get("max")):
+                            config.setdefault(_ckey, {}).setdefault(rt, {})[s] = vals["max"]
             if rules_data.get("dateOverrides") is not None:
                 config["dateOverrides"] = rules_data["dateOverrides"]
             print(f"  Loaded pricing rules from Firestore.")
         except Exception as _bpe:
             print(f"  Warning: could not load pricing rules: {_bpe}", file=sys.stderr)
+            _data_error = f"could not load pricing rules from Firestore: {_bpe}"
 
     print("Computing prices...")
 
-    # Load booking velocity
+    # Load booking velocity. get_booking_velocity() swallows its own errors and returns
+    # zeros, so its warning is captured here: velocity 0 must never be used for pricing.
     velocity = {}
     if _db_for_ai:
         print("  Loading booking velocity...")
-        velocity = get_booking_velocity(_db_for_ai)
+        import contextlib, io
+        _cap = io.StringIO()
+        with contextlib.redirect_stderr(_cap):
+            velocity = get_booking_velocity(_db_for_ai)
+        if _cap.getvalue():
+            sys.stderr.write(_cap.getvalue())
+        if "could not fetch booking velocity" in _cap.getvalue():
+            _data_error = _data_error or "could not fetch booking velocity from Firestore"
+    if _db_for_ai is None:
+        _data_error = _data_error or "Firestore could not be reached (no client)"
+
+    if _data_error:
+        msg = f"NO PRICES WRITTEN: {_data_error}"
+        print(msg, file=sys.stderr)
+        if not dry_run:
+            allow_writes()  # the one error log line is the only write
+            write_firestore_log({}, dry_run=False, error=msg, trigger="cancellation" if urgent else "scheduled")
+        sys.exit(1)
 
     # Load and detect manual experiment locks before computing prices
     experiment_locks = {}

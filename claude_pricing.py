@@ -245,7 +245,15 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict
     batch = db.batch()
     batch_count = 0
 
+    if not isinstance(proposals, list):
+        proposals = []
+
+    def _is_num(v):
+        return isinstance(v, (int, float)) and not isinstance(v, bool)
+
     for p in proposals:
+        if not isinstance(p, dict):
+            continue
         prop = p.get("property")
         season = p.get("season")
         ptype = p.get("type")
@@ -253,16 +261,21 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict
         current_val = p.get("current")
         reasoning = p.get("reasoning", "")
 
-        if not all([prop, season, ptype, suggested is not None]):
+        if not all([prop, season, ptype]):
+            continue
+        # A null or non-numeric number skips this proposal; it must never stop the run
+        if not _is_num(suggested) or not _is_num(current_val):
+            print(f"  Skipping proposal with a missing/non-numeric value: {prop} {season} {ptype}")
             continue
 
         # Compute actual change_pct ourselves to verify (don't trust Claude's math)
-        if current_val and current_val != 0:
+        if current_val != 0:
             actual_pct = (suggested - current_val) / abs(current_val) * 100
         else:
-            actual_pct = p.get("change_pct", 100.0)
+            actual_pct = 100.0
 
-        status = "auto_applied" if abs(actual_pct) <= 5.0 else "pending"
+        # Auto-apply is OFF: every proposal waits for manual approval in pricing.html
+        status = "pending"
 
         # Save proposal doc
         prop_ref = db.collection("pricing_proposals").document()
@@ -306,13 +319,7 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict
 
     batch.commit()
 
-    # Persist auto-applied changes back to pricing_config/rules
-    if auto_applied and rules_data:
-        try:
-            rules_ref.set(rules_data, merge=True)
-            print(f"  Auto-applied {auto_applied} proposals (≤5% change) to pricing_config/rules.")
-        except Exception as e:
-            print(f"  Warning: could not write auto-applied rules: {e}", file=sys.stderr)
+    # (auto-apply is off: the analyst never writes to pricing_config/rules)
 
     # Log auto-applied proposals to pricing_changes for history card
     if auto_applied:
