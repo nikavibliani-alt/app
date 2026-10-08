@@ -389,7 +389,8 @@ def check_screen_a():
     headers = {"Cookie": cookie, "Accept": "application/json, text/plain, */*",
                "X-Requested-With": "XMLHttpRequest", "User-Agent": "Mozilla/5.0"}
     today = datetime.now(TBILISI).date()
-    d_from, d_to = today.isoformat(), (today + timedelta(days=90)).isoformat()
+    # same date format pricing_engine.py uses: YYYYMMDD
+    d_from, d_to = today.strftime("%Y%m%d"), (today + timedelta(days=90)).strftime("%Y%m%d")
 
     def fetch(rooms):
         params = {"dateFrom": d_from, "dateTo": d_to}
@@ -402,10 +403,18 @@ def check_screen_a():
     print(f"call without rooms param: HTTP {code}, entries={len(data) if isinstance(data, list) else 'n/a'}")
     src = "all (no rooms param)"
     if not isinstance(data, list) or not data:
-        code, data = fetch(KNOWN_ROOM_TYPES + EXTRA_ROOM_TYPES)
-        src = "known + VGL/XCV names"
-        print(f"call with explicit room list: HTTP {code}, entries={len(data) if isinstance(data, list) else 'n/a'}")
-    if not isinstance(data, list) or not data:
+        code, data = fetch(KNOWN_ROOM_TYPES)
+        src = "the 6 types pricing_engine.py uses"
+        print(f"call with the 6 known types: HTTP {code}, entries={len(data) if isinstance(data, list) else 'n/a'}")
+        data = data if isinstance(data, list) else []
+        # probe the other names one by one (a bad name may make the whole call fail)
+        for name in EXTRA_ROOM_TYPES:
+            c, extra = fetch([name])
+            n = len(extra) if isinstance(extra, list) else "n/a"
+            print(f"probe {name}: HTTP {c}, entries={n}")
+            if isinstance(extra, list):
+                data += [e for e in extra if e.get("RoomTypeCode") not in {x.get("RoomTypeCode") for x in data}]
+    if not data:
         print("no data returned")
         return
     print("room-type source:", src)
