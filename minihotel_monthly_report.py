@@ -11,9 +11,9 @@ from email import encoders
 import requests
 from bs4 import BeautifulSoup
 
-HOTEL_CODE = "freedo45"
-USERNAME = "komp"
-PASSWORD = "Katleti1"
+HOTEL_CODE = os.environ.get("MINIHOTEL_HOTEL", "")
+USERNAME = os.environ.get("MINIHOTEL_USER", "")
+PASSWORD = os.environ.get("MINIHOTEL_PASS", "")
 SMTP_USER = "info@maxelaapartments.com"
 SMTP_PASS = os.environ.get("SMTP_PASS", "")
 EMAIL_TO = "info@maxelaapartments.com"

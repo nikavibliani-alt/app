@@ -13,9 +13,9 @@ LOGIN_URL = "https://login.minihotel.cloud/login.aspx"
 DASHBOARD_URL = "https://emea5.hotelpms.cloud/Home/dashboard.aspx"
 
 import os
-HOTEL_CODE = os.environ.get("MINIHOTEL_HOTEL", "freedo45")
-USERNAME   = os.environ.get("MINIHOTEL_USER", "nika")
-PASSWORD   = os.environ.get("MINIHOTEL_PASS", "Katleti")
+HOTEL_CODE = os.environ.get("MINIHOTEL_HOTEL", "")
+USERNAME   = os.environ.get("MINIHOTEL_USER", "")
+PASSWORD   = os.environ.get("MINIHOTEL_PASS", "")
 
 
 def get_session_cookie() -> str:
