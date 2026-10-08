@@ -27,7 +27,7 @@ h1{font-size:1.4rem;font-weight:600;letter-spacing:-.01em}
 .pause-switch button.paused-active{background:var(--bg-amber);color:var(--status-amber)}
 .pause-note{font-size:.75rem;color:var(--status-amber);font-weight:600}
 .dashboard-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:1.25rem;align-items:start}
-@media(max-width:1100px){.dashboard-grid{grid-template-columns:1fr}}
+@media(max-width:1100px){.dashboard-grid{grid-template-columns:minmax(0,1fr)}}
 .card{background:var(--card-bg);border-radius:var(--radius-card);box-shadow:var(--shadow);padding:1.1rem 1.25rem;margin-bottom:1.25rem;border:1px solid var(--border)}
 .card-title{font-size:1rem;font-weight:600;margin-bottom:.9rem;display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap}
 .card-title small{font-size:.72rem;color:var(--text-muted);font-weight:400}
@@ -114,6 +114,37 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
 @keyframes pin-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
 .pin-shake{animation:pin-shake .35s ease}
 .loading{text-align:center;padding:1.5rem;color:var(--text-muted);font-size:.85rem}
+.rng-form,.eng-row2{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.dp{position:relative;display:inline-flex;align-items:center}
+.dp svg{position:absolute;left:.55rem;width:18px;height:18px;pointer-events:none;color:var(--text-muted)}
+.dp input[type=date]{padding:.5rem .5rem .5rem 2.1rem;border:1px solid var(--border);border-radius:var(--radius-el);font-size:16px;font-family:inherit;color:var(--text-main);background:var(--card-bg);min-height:40px;min-width:0;width:11.5rem;accent-color:var(--primary)}
+.dp input[type=date]::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.fld{padding:.5rem .6rem;border:1px solid var(--border);border-radius:var(--radius-el);font-size:16px;font-family:inherit;color:var(--text-main);background:var(--card-bg);min-height:40px;accent-color:var(--primary)}
+.btn-add{padding:.5rem 1.1rem;min-height:40px;font-size:.9rem;font-weight:600;color:#fff;background:var(--primary);border:1px solid var(--primary);border-radius:var(--radius-el);cursor:pointer;font-family:inherit}
+.btn-x{background:none;border:0;color:var(--text-muted);cursor:pointer;padding:.35rem;line-height:0;min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center}
+.msg-err{color:var(--status-red);font-size:.78rem;margin-top:.3rem}
+.msg-ok{color:var(--status-green);font-size:.78rem;margin-top:.3rem}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius-el);overflow:hidden;background:var(--card-bg)}
+.seg button{padding:.45rem .8rem;border:0;border-right:1px solid var(--border);background:var(--card-bg);color:var(--text-muted);font-size:.85rem;font-weight:600;cursor:pointer;font-family:inherit;min-height:40px}
+.seg button:last-child{border-right:0}
+.seg button.sel{background:#F1F1F1;color:var(--text-main)}
+.seg button.sel.good{background:var(--bg-green);color:var(--status-green)}
+.seg button.sel.warn{background:var(--bg-amber);color:var(--status-amber)}
+.eng-room{border-top:1px solid var(--border);padding:.75rem 0}
+.eng-room.first{border-top:0}
+.eng-name{font-weight:600;font-size:.92rem}
+.eng-controls{display:flex;flex-wrap:wrap;gap:.7rem 1.2rem;margin-top:.45rem}
+.eng-ctl{display:flex;flex-direction:column;gap:.2rem}
+.eng-ctl>span{font-size:.72rem;color:var(--text-muted)}
+.eng-help{font-size:.74rem;color:var(--text-muted)}
+.eng-sub{font-size:.88rem;font-weight:600;margin:1rem 0 .3rem}
+.eng-status{font-size:.8rem;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-el);padding:.5rem .7rem;margin-bottom:.6rem}
+.eng-rule{display:flex;gap:.5rem;align-items:flex-start;justify-content:space-between;padding:.45rem 0;border-top:1px solid var(--border);font-size:.82rem}
+.eng-rule:first-child{border-top:0}
+.pick-rooms{display:flex;flex-wrap:wrap;gap:.4rem .9rem;margin-top:.3rem}
+.pick-rooms label{display:inline-flex;gap:.35rem;align-items:center;font-size:.85rem;min-height:32px}
+.pick-rooms input{accent-color:var(--primary);width:18px;height:18px}
+@media(max-width:520px){.dp input[type=date]{width:100%}.dp{flex:1 1 9rem}}
 </style>
 </head>
 <body>
@@ -180,17 +211,18 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
           <div style="margin-top:.9rem;border-top:1px solid var(--border);padding-top:.7rem">
             <div style="font-size:.82rem;font-weight:600;margin-bottom:.4rem">Exact date ranges <span class="muted" style="font-weight:400;font-size:.72rem">— override month settings</span></div>
             <div id="dateOverrideList"></div>
-            <div style="margin-top:.45rem;display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
-              <input type="text" id="orFrom" placeholder="MM-DD" maxlength="5" style="width:64px;padding:.22rem .35rem;border:1px solid var(--border);border-radius:4px;font-size:.8rem">
-              <span class="muted">–</span>
-              <input type="text" id="orTo" placeholder="MM-DD" maxlength="5" style="width:64px;padding:.22rem .35rem;border:1px solid var(--border);border-radius:4px;font-size:.8rem">
-              <span class="muted">→</span>
-              <select id="orSeason" style="padding:.22rem .35rem;font-size:.8rem;border:1px solid var(--border);border-radius:4px;background:var(--card-bg)">
+            <div class="rng-form" style="margin-top:.55rem">
+              <label class="dp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><input type="date" id="orFrom" aria-label="From date" oninput="updateOrPreview()"></label>
+              <span class="muted">to</span>
+              <label class="dp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><input type="date" id="orTo" aria-label="To date" oninput="updateOrPreview()"></label>
+              <select id="orSeason" class="fld" aria-label="Season">
                 <option value="low">Low</option><option value="mid">Mid</option><option value="high">High</option>
                 <option value="peak">Peak</option><option value="new_year">New Year</option><option value="xmas_low">Xmas low</option>
               </select>
-              <button class="btn btn-small btn-primary" onclick="addDateOverride()">+ Add</button>
+              <button type="button" class="btn-add" id="orAdd" onclick="addDateOverride()">Add</button>
             </div>
+            <div class="muted" id="orPreview" style="font-size:.74rem;margin-top:.3rem"></div>
+            <div id="orMsg" role="status"></div>
           </div>
         </div>
       </div>
@@ -210,6 +242,37 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
         <div style="overflow-x:auto"><table id="eurTable"><thead>
           <tr><th>Property</th><th>Minimum €</th><th>Start price €</th><th>Maximum €</th></tr>
         </thead><tbody><tr><td colspan="4" class="loading">Loading…</td></tr></tbody></table></div>
+      </div>
+
+
+      <div class="card" id="engCard">
+        <div class="card-title"><span>New engine</span><small>Settings for the new pricing engine</small></div>
+        <div class="eng-status" id="engStatus" role="status">Loading…</div>
+        <div id="engRooms"></div>
+
+        <div class="eng-sub">Date rules</div>
+        <div class="eng-help">Special dates the engine should treat differently. They repeat only on the exact dates you pick.</div>
+        <div id="engRuleList" style="margin:.4rem 0"></div>
+        <div class="rng-form">
+          <label class="dp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><input type="date" id="erFrom" aria-label="Rule from date"></label>
+          <span class="muted">to</span>
+          <label class="dp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><input type="date" id="erTo" aria-label="Rule to date"></label>
+        </div>
+        <div class="rng-form" style="margin-top:.5rem">
+          <select id="erRooms" class="fld" aria-label="Rooms" onchange="engRoomsMode()">
+            <option value="all">All rooms</option><option value="pick">Pick rooms</option>
+          </select>
+          <select id="erAction" class="fld" aria-label="Action" onchange="engActionHelp()">
+            <option value="protect">Protect</option><option value="aggressive">Aggressive</option><option value="normal">Normal</option>
+          </select>
+        </div>
+        <div class="pick-rooms" id="erPick" style="display:none"><label><input type="checkbox" value="XCV_1"> XCV 1 (small)</label><label><input type="checkbox" value="XCV_2"> XCV 2 (balcony)</label><label><input type="checkbox" value="VGL_ST"> VGL studios</label><label><input type="checkbox" value="VGL_AP"> VGL apartments</label><label><input type="checkbox" value="ROOMS"> ROOMS</label><label><input type="checkbox" value="MAXELA"> MAXELA</label><label><input type="checkbox" value="BIG_APT"> BIG_APT</label><label><input type="checkbox" value="FREEDOM"> FREEDOM</label><label><input type="checkbox" value="ORBE_1"> ORBE_1</label><label><input type="checkbox" value="ORBE_2"> ORBE_2</label></div>
+        <div class="eng-help" id="erHelp" style="margin-top:.3rem"></div>
+        <div class="rng-form" style="margin-top:.5rem">
+          <input type="text" id="erNote" class="fld" maxlength="60" placeholder="Short note (optional)" style="flex:1 1 12rem" aria-label="Note">
+          <button type="button" class="btn-add" onclick="addEngRule()">Add rule</button>
+        </div>
+        <div id="erMsg" role="status"></div>
       </div>
 
       <div class="card">
@@ -394,6 +457,7 @@ async function init(){
   $("btnToggle").onclick = ()=>{listMinimized=!listMinimized;$("btnToggle").textContent=listMinimized?"Expand":"Minimize";renderDates();};
   loadEngineStatus();
   loadPause();
+  loadEngineCard();
   await loadRules();
   loadLocks().then(loadSnapshots);
   loadProposals();
@@ -633,11 +697,12 @@ function onEdit(e){
   $("saveBar").classList.add("show");
 }
 
-window.discardChanges = ()=>{ pendingEdits={}; $("saveBar").classList.remove("show"); renderRules(); renderDateOverrides(); };
+window.discardChanges = ()=>{ pendingEdits={}; $("saveBar").classList.remove("show"); renderRules(); renderDateOverrides(); renderEngineCard(); setMsg("orMsg",""); setMsg("erMsg",""); };
 
 window.saveChanges = async ()=>{
-  const upd={};
+  const upd={}, engEdits={};
   for(const [k,v] of Object.entries(pendingEdits)){
+    if(k.startsWith("eng|")){ engEdits[k]=v; continue; }
     if(k==="dateOverrides"){ upd["dateOverrides"]=v; continue; }
     if(k.startsWith("month|")){ upd["monthSeasons."+k.split("|")[1]]=v; continue; }
     const [p,s,cur,field]=k.split("|");
@@ -646,12 +711,24 @@ window.saveChanges = async ()=>{
     else path = field==="base" ? `startPricesEur.${p}.${s}` : `eurRules.${p}.${s}.${field==="floor"?"min":"max"}`;
     upd[path]=v;
   }
+  const goingLive=Object.entries(engEdits).filter(([k,v])=>k.endsWith("|engine")&&v==="live").map(([k])=>k.split("|")[1]);
+  if(goingLive.length && !confirm(goingLive.map(engLabel).join(", ")+" will start getting prices written to MiniHotel at the next run. Save?")) return;
   try{
-    await updateDoc(doc(db,"pricing_config","rules"),upd);
-    logChange("rules_edit","Manual edit: "+Object.entries(upd).map(([k,v])=>k+" → "+v).join(", "));
+    if(Object.keys(upd).length){
+      await updateDoc(doc(db,"pricing_config","rules"),upd);
+      logChange("rules_edit","Manual edit: "+Object.entries(upd).map(([k,v])=>k+" → "+v).join(", "));
+    }
+    const engSettings=buildEngineSettings(engEdits);
+    if(engSettings){
+      // only the "settings" field, merged: "rules" and every other field stay untouched
+      await setDoc(doc(db,"pricing_config","engine_v2"),{settings:engSettings},{merge:true});
+      logChange("engine_edit","New engine settings: "+JSON.stringify(engSettings));
+    }
     pendingEdits={};
     $("saveBar").classList.remove("show");
+    setMsg("orMsg",""); setMsg("erMsg","");
     await loadRules();
+    if(engSettings) await loadEngineCard();
   }catch(e){ alert("Save failed: "+e.message); }
 };
 
@@ -659,33 +736,51 @@ window.saveChanges = async ()=>{
 const MONTH_SHORT=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function fmtMD(md){const[m,d]=md.split("-");return d.replace(/^0/,"")+" "+MONTH_SHORT[(parseInt(m)||1)-1];}
 
+function markDirty(){
+  const n=Object.keys(pendingEdits).length;
+  if(!n){ $("saveBar").classList.remove("show"); return; }
+  $("saveMsg").textContent=`${n} unsaved change${n>1?"s":""}`;
+  $("saveBar").classList.add("show");
+}
+const XICON='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+const mdOf=iso=>/^\d{4}-\d{2}-\d{2}$/.test(iso||"")?iso.slice(5):null;
+function setMsg(id,text,cls){ const m=$(id); if(!m) return; m.className=cls||""; m.textContent=text||""; }
+
 function renderDateOverrides(){
   const el=$("dateOverrideList");
   if(!el) return;
   const overrides=pendingEdits["dateOverrides"]??rules?.dateOverrides??[];
   if(!overrides.length){
-    el.innerHTML='<div class="muted" style="font-size:.75rem">No date ranges set</div>';
+    el.innerHTML='<div class="muted" style="font-size:.78rem">No date ranges set</div>';
     return;
   }
   el.innerHTML=overrides.map((ov,i)=>`
-    <div style="display:flex;gap:.5rem;align-items:center;padding:.2rem 0;font-size:.8rem">
-      <span>${fmtMD(ov.from)} – ${fmtMD(ov.to)}</span>
+    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;padding:.15rem 0;font-size:.85rem">
+      <span>${fmtMD(ov.from||"01-01")} – ${fmtMD(ov.to||"01-01")}</span>
       <span class="muted">→</span>
-      <span class="schip s-${ov.season}" style="padding:.1rem .4rem;min-height:unset;font-size:.72rem;pointer-events:none">${esc(SEASON_META[ov.season]||ov.season)}</span>
-      <button onclick="removeDateOverride(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.9rem;padding:.1rem .2rem;line-height:1" title="Remove">✕</button>
+      <span class="schip s-${esc(ov.season)}" style="padding:.1rem .5rem;min-height:unset;font-size:.78rem;pointer-events:none">${esc(SEASON_META[ov.season]||ov.season)}</span>
+      <button type="button" class="btn-x" onclick="removeDateOverride(${i})" title="Remove" aria-label="Remove this range">${XICON}</button>
     </div>`).join("");
 }
 
+window.updateOrPreview=()=>{
+  const f=mdOf($("orFrom").value), t=mdOf($("orTo").value);
+  const pv=$("orPreview");
+  if(!f||!t){ pv.textContent=""; return; }
+  pv.textContent=`Repeats every year: ${fmtMD(f)} – ${fmtMD(t)}`+(f>t?" (runs over New Year)":"");
+  setMsg("orMsg","");
+};
+
 window.addDateOverride=()=>{
-  const frm=$("orFrom").value.trim(), to=$("orTo").value.trim(), season=$("orSeason").value;
-  if(!/^\d{2}-\d{2}$/.test(frm)||!/^\d{2}-\d{2}$/.test(to)){alert("Use MM-DD format, e.g. 12-30");return;}
+  const f=mdOf($("orFrom").value), t=mdOf($("orTo").value), season=$("orSeason").value;
+  if(!f||!t){ setMsg("orMsg","Pick both dates with the calendar buttons.","msg-err"); return; }
   const current=[...(pendingEdits["dateOverrides"]??rules?.dateOverrides??[])];
-  current.push({from:frm,to,season});
+  if(current.some(o=>o.from===f&&o.to===t&&o.season===season)){ setMsg("orMsg","That range is already in the list.","msg-err"); return; }
+  current.push({from:f,to:t,season});
   pendingEdits["dateOverrides"]=current;
-  const n=Object.keys(pendingEdits).length;
-  $("saveMsg").textContent=`${n} unsaved change${n>1?"s":""}`;
-  $("saveBar").classList.add("show");
-  $("orFrom").value=""; $("orTo").value="";
+  markDirty();
+  $("orFrom").value=""; $("orTo").value=""; $("orPreview").textContent="";
+  setMsg("orMsg","Added. Press Save changes at the bottom to keep it.","msg-ok");
   renderDateOverrides();
 };
 
@@ -693,11 +788,163 @@ window.removeDateOverride=i=>{
   const current=[...(pendingEdits["dateOverrides"]??rules?.dateOverrides??[])];
   current.splice(i,1);
   pendingEdits["dateOverrides"]=current;
-  const n=Object.keys(pendingEdits).length;
-  $("saveMsg").textContent=`${n} unsaved change${n>1?"s":""}`;
-  $("saveBar").classList.add("show");
+  markDirty();
+  setMsg("orMsg","Removed. Press Save changes at the bottom to keep it.","msg-ok");
   renderDateOverrides();
 };
+
+/* ---------- New engine card (pricing_config/engine_v2, field "settings" only) ---------- */
+const ENG_NEW=[["XCV_1","XCV 1 (small)"],["XCV_2","XCV 2 (balcony)"],["VGL_ST","VGL studios"],["VGL_AP","VGL apartments"]];
+const ENG_OLD=["ROOMS","MAXELA","BIG_APT","FREEDOM","ORBE_1","ORBE_2"];
+const engLabel=c=>(ENG_NEW.find(r=>r[0]===c)||[c,c])[1];
+const WINDOWS=[[90,"3 months"],[180,"6 months"],[365,"1 year"]];
+const ACTION_HELP={
+  protect:"Protect: the engine leaves these dates alone.",
+  aggressive:"Aggressive: the engine fills these dates faster. It lowers sooner and further when they are selling slowly.",
+  normal:"Normal: the normal rules, even if the room is set to Aggressive."
+};
+const ACTION_NAME={protect:"Protect",aggressive:"Aggressive",normal:"Normal"};
+let engFs=null;      // settings saved in Firestore (or null)
+let engFile=null;    // settings from calm_settings.json (or null)
+
+function engBase(code,field){
+  const fsv=engFs?.room_types?.[code]?.[field];
+  if(fsv!==undefined&&fsv!==null) return {v:fsv,src:"page"};
+  const fv=engFile?.room_types?.[code]?.[field];
+  if(fv!==undefined&&fv!==null) return {v:fv,src:"file"};
+  return {v:field==="engine"?"test":field==="style"?"normal":90,src:"default"};
+}
+function engVal(code,field){
+  const k=`eng|${code}|${field}`;
+  return (k in pendingEdits)?pendingEdits[k]:engBase(code,field).v;
+}
+function segButtons(code,field,options,cur){
+  return `<div class="seg" role="group">`+options.map(([val,label,cls])=>
+    `<button type="button" data-eng="${code}|${field}|${val}" class="${cur===val?"sel "+(cls||""):""}" aria-pressed="${cur===val}">${label}</button>`).join("")+`</div>`;
+}
+function engRoomHtml(code,label,canLive,first){
+  const eng=engVal(code,"engine"), style=engVal(code,"style"), win=Number(engVal(code,"window_days"));
+  const winOpts=WINDOWS.map(([d,l])=>[String(d),l]);
+  const custom=WINDOWS.some(([d])=>d===win)?"":`<span class="eng-help">now ${win} days</span>`;
+  const fromFile=["engine","style","window_days"].some(f=>!(`eng|${code}|${f}` in pendingEdits)&&engBase(code,f).src==="file");
+  return `<div class="eng-room ${first?"first":""}">
+    <div class="eng-name">${esc(label)} ${fromFile?'<span class="eng-help" style="font-weight:400">· some values come from the settings file</span>':""}</div>
+    <div class="eng-controls">
+      <div class="eng-ctl"><span>Live or test</span>${canLive
+        ? segButtons(code,"engine",[["test","Test",""],["live","Live","good"]],eng)
+        : '<span class="eng-help" style="font-size:.8rem;color:var(--text-main)">Test only (current engine sets the price)</span>'}</div>
+      <div class="eng-ctl"><span>Mode</span>${segButtons(code,"style",[["normal","Normal",""],["aggressive","Aggressive","warn"]],style)}</div>
+      <div class="eng-ctl"><span>How far ahead</span><div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">${segButtons(code,"window_days",winOpts,String(win))}${custom}</div></div>
+    </div>
+  </div>`;
+}
+function renderEngineCard(){
+  const el=$("engRooms");
+  if(!el) return;
+  let h=`<div class="eng-help" style="margin-bottom:.3rem">Live: the new engine sets this room's prices. Test: it only calculates, nothing is sent. Aggressive mode fills the month: lowers faster and further when selling slowly.</div>`;
+  h+=ENG_NEW.map(([c,l],i)=>engRoomHtml(c,l,true,i===0)).join("");
+  h+=`<div class="eng-sub">Rooms of the current engine</div>`;
+  h+=ENG_OLD.map((c,i)=>engRoomHtml(c,c,false,i===0)).join("");
+  el.innerHTML=h;
+  renderEngRules();
+  engActionHelp();
+}
+function engSetBase(code,field,val){
+  const k=`eng|${code}|${field}`;
+  const base=engBase(code,field).v;
+  if(String(base)===String(val)) delete pendingEdits[k];
+  else pendingEdits[k]=(field==="window_days")?Number(val):val;
+  markDirty();
+  renderEngineCard();
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest&&e.target.closest("button[data-eng]");
+  if(!b) return;
+  const [code,field,val]=b.dataset.eng.split("|");
+  engSetBase(code,field,val);
+});
+
+function engRulesNow(){ return pendingEdits["eng|rules"]??engFs?.date_rules??[]; }
+function fmtFull(iso){
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||"");
+  return m? `${parseInt(m[3],10)} ${MONTH_SHORT[parseInt(m[2],10)-1]} ${m[1]}` : String(iso||"");
+}
+function ruleHtml(r,idx){
+  const rooms=(r.rooms==="all"||r.rooms===undefined)?"All rooms":(Array.isArray(r.rooms)?r.rooms.map(engLabel).join(", "):"?");
+  return `<div class="eng-rule"><div>
+      <b>${fmtFull(r.from)} – ${fmtFull(r.to)}</b> · ${esc(rooms)}<br>
+      <span class="eng-help">${esc(ACTION_NAME[r.action]||r.action)}${r.note?" · "+esc(r.note):""}</span></div>
+      ${idx===null?'<span class="eng-help">settings file</span>'
+        :`<button type="button" class="btn-x" onclick="removeEngRule(${idx})" title="Remove" aria-label="Remove this rule">${XICON}</button>`}</div>`;
+}
+function renderEngRules(){
+  const el=$("engRuleList"); if(!el) return;
+  const fileRules=engFile?.date_rules??[];
+  const own=engRulesNow();
+  if(!fileRules.length&&!own.length){ el.innerHTML='<div class="muted" style="font-size:.78rem">No date rules</div>'; return; }
+  el.innerHTML=fileRules.map(r=>ruleHtml(r,null)).join("")+own.map((r,i)=>ruleHtml(r,i)).join("");
+}
+window.engRoomsMode=()=>{ $("erPick").style.display=$("erRooms").value==="pick"?"flex":"none"; };
+window.engActionHelp=()=>{ const h=$("erHelp"); if(h) h.textContent=ACTION_HELP[$("erAction").value]||""; };
+window.addEngRule=()=>{
+  const from=$("erFrom").value, to=$("erTo").value, action=$("erAction").value;
+  if(!from||!to){ setMsg("erMsg","Pick both dates with the calendar buttons.","msg-err"); return; }
+  if(to<from){ setMsg("erMsg","The end date is before the start date.","msg-err"); return; }
+  let rooms="all";
+  if($("erRooms").value==="pick"){
+    rooms=[...document.querySelectorAll("#erPick input:checked")].map(i=>i.value);
+    if(!rooms.length){ setMsg("erMsg","Tick at least one room, or choose All rooms.","msg-err"); return; }
+  }
+  const rule={from,to,rooms,action}; const note=$("erNote").value.trim().slice(0,60); if(note) rule.note=note;
+  pendingEdits["eng|rules"]=[...engRulesNow(),rule];
+  markDirty();
+  $("erFrom").value=""; $("erTo").value=""; $("erNote").value="";
+  document.querySelectorAll("#erPick input").forEach(i=>i.checked=false);
+  setMsg("erMsg","Rule added. Press Save changes at the bottom to keep it.","msg-ok");
+  renderEngRules();
+};
+window.removeEngRule=i=>{
+  const cur=[...engRulesNow()]; cur.splice(i,1);
+  pendingEdits["eng|rules"]=cur;
+  markDirty();
+  setMsg("erMsg","Rule removed. Press Save changes at the bottom to keep it.","msg-ok");
+  renderEngRules();
+};
+function buildEngineSettings(edits){
+  const out={}; let any=false;
+  for(const [k,v] of Object.entries(edits)){
+    if(k==="eng|rules"){ out.date_rules=v; any=true; continue; }
+    const [,code,field]=k.split("|");
+    (out.room_types??={})[code]??={};
+    out.room_types[code][field]=v; any=true;
+  }
+  return any?out:null;
+}
+async function loadEngineCard(){
+  try{
+    const snap=await getDoc(doc(db,"pricing_config","engine_v2"));
+    engFs=snap.exists()?(snap.data().settings||null):null;
+  }catch(e){ engFs=null; }
+  try{
+    const r=await fetch("calm_settings.json",{cache:"no-store"});
+    engFile=r.ok?await r.json():null;
+  }catch(e){ engFile=null; }
+  renderEngineCard();
+  loadCalmStatus();
+}
+async function loadCalmStatus(){
+  const el=$("engStatus"); if(!el) return;
+  try{
+    const qs=await getDocs(query(collection(db,"pricing_calm_runs"),orderBy("ts","desc"),limit(1)));
+    if(qs.empty){ el.textContent="The new engine has not run yet."; return; }
+    const d=qs.docs[0].data();
+    const when=d.ts?new Date(String(d.ts).slice(0,19)+"+04:00"):null;   // saved in Tbilisi time
+    const t=when&&!isNaN(when)?`${fmtTbilisi(when,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})} (${fmtRel(when)})`:"unknown time";
+    const alerts=Array.isArray(d.alerts)?d.alerts:[];
+    const wrote=d.paused?"PAUSED: nothing written":`${d.writes??d.moves??0} prices written`;
+    el.textContent=`Last run ${t}: ${wrote}. `+(alerts.length?`${alerts.length} alert${alerts.length>1?"s":""}: ${alerts[0]}`:"No alerts.");
+  }catch(e){ el.textContent="Run status unavailable: "+e.message; }
+}
 
 /* ---------- manual locks ---------- */
 async function loadLocks(){

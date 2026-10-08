@@ -18,7 +18,7 @@ after a 2-week shadow test. The full plan is in the Claude doc
 | `pricing_calm_live.py` | LIVE runner for the room types switched on in `calm_settings.json` (XCV first). Writes their prices to MiniHotel the same way the current engine does (GEL list; EUR list + `*ALL` for Airbnb) and pushes BOOKING and AIRBNB. Never writes the six room types of the current engine. Obeys the pause switch. `--dry` = calculate only. |
 | `calm_settings.json` | Which room types are live, their style (normal / aggressive) and date rules (protect / aggressive / normal for a date range). Firestore `pricing_config/engine_v2.settings` can override it. |
 | `pricing_shadow_report.py` | After the test: compares the new engine with the current one. Reads only. |
-| `tests/calm/` | 81 tests: every promise of the plan, the findings of three Cursor reviews, the step 1 data check, the live runner with a fake MiniHotel, modes and protected dates. |
+| `tests/calm/` | 85 tests: every promise of the plan, the findings of three Cursor reviews, the step 1 data check, the live runner with a fake MiniHotel, modes and protected dates. |
 | `sim/simulate.py` | Market simulator used to compare the engines offline (fake guests). |
 
 ## The rules it follows
@@ -95,3 +95,8 @@ Local check without saving anything: `python pricing_shadow.py --print`.
   Dates beyond the window are left as they are in MiniHotel. Far dates (61+ days) move only a
   little (-3% to +8% around start), so a long window mainly keeps far prices inside your
   minimum and maximum.
+- Empty dates (no price in MiniHotel yet) of a live room type get a first price: the engine's
+  price for that date, starting from your start price (weekend, demand and limits as usual,
+  always inside your minimum and maximum). Only when at least half of the free dates in the
+  next 60 days have a price, so a MiniHotel glitch that drops all prices is never "filled".
+  Protected dates are never filled. Switch off per room type with `"fill_missing": false`.

@@ -103,8 +103,10 @@ def live_room_types(rules: dict, settings: dict) -> dict:
         if not rules.get(rt):
             print(f"  {rt} is set to live but has no minimum/start/maximum: skipped.")
             continue
-        out[rt] = {**ps.ROOM_TYPES[rt], **{k: v for k, v in over.items() if k in ("style", "portals", "window_days")},
+        out[rt] = {**ps.ROOM_TYPES[rt], "fill_missing": True,
+                   **{k: v for k, v in over.items() if k in ("style", "portals", "window_days", "fill_missing")},
                    "status": "live"}
+        out[rt]["fill_missing"] = out[rt]["fill_missing"] is True
         if "window_days" in out[rt]:
             try:
                 w = int(out[rt]["window_days"])
@@ -205,7 +207,10 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
             print("  ALERT:", a)
         for w in result["warnings"][:5]:
             print("  note:", w)
-        for d in [d for d in result["decisions"] if d["kind"] in ("move", "correction")][:20]:
+        fills = sum(1 for d in result["decisions"] if d.get("fill") and d["kind"] in ("fill", "move"))
+        if fills:
+            print(f"  {fills} empty date(s) get a first price from your start price.")
+        for d in [d for d in result["decisions"] if d["kind"] in ("move", "correction", "fill")][:20]:
             print(f"  {d['rt']:6} {d['date']} {d['currency']}: {d['current']:.0f} -> {d['proposed']:.0f}  ({d['why'][-1]})")
 
         if args.dry:

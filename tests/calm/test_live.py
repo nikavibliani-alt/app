@@ -255,3 +255,70 @@ def test_whole_year_far_dates_move_only_a_little(http, settings_file):
     for d in res["decisions"]:
         if d["rt"] == "XCV_1" and d["days_out"] > 61 and d["target"] is not None and d["currency"] == "GEL":
             assert 110 * 0.97 - 1 <= d["target"] <= 110 * 1.08 * 1.08 + 1, d
+
+
+
+def vgl_like_minihotel(priced_days=70):
+    """Prices only for the first `priced_days` days (like VGL today); free units everywhere."""
+    def get(url, params=None, headers=None, timeout=None):
+        f, t = params["dateFrom"], params["dateTo"]
+        d0 = date(int(f[:4]), int(f[4:6]), int(f[6:]))
+        d1 = date(int(t[:4]), int(t[4:6]), int(t[6:]))
+        out = []
+        for rt in params["rooms"].split(","):
+            dates, d = [], d0
+            while d <= d1:
+                priced = (d - d0).days < priced_days
+                rates = [{"PriceList": "GEL", "Price": 160}, {"PriceList": "EUR", "Price": 40}] if priced else []
+                dates.append({"Date": d.isoformat() + "T00:00:00", "Availability": "", "DefaultAvailability": 1,
+                              "Rates": rates})
+                d += timedelta(days=1)
+            out.append({"RoomTypeCode": rt, "Dates": dates})
+
+        class R:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return out
+        return R()
+    return get
+
+
+def test_empty_dates_get_a_first_price_from_start(http, settings_file):
+    settings_file({"room_types": {"XCV_1": {"engine": "live", "window_days": 180}}})
+    res = live.main([], db=xcv_db(), get=vgl_like_minihotel(70), cookie_fn=lambda: "c", now=NOW)
+    assert res["ok"] and not res["stopped_room_types"], res["alerts"]
+    payload = [b for m, u, b in http if m == "POST" and u.endswith("/api/ScreenA")][0]
+    by_date = {d["Date"]: {r["PriceList"]: r["Price"] for r in d["Rates"]} for x in payload for d in x["Dates"]}
+    far = (TODAY + timedelta(days=120)).isoformat()
+    assert far in by_date
+    assert 85 <= by_date[far]["GEL"] <= 140 and 32 <= by_date[far]["EUR"] <= 53     # inside min and max
+    assert abs(by_date[far]["GEL"] - 110) <= 110 * 0.10                              # near your start price
+    fills = [d for d in res["decisions"] if d.get("fill")]
+    assert fills and all(d["mh_price"] == 0 for d in fills)
+
+
+def test_no_fill_when_minihotel_prices_look_broken(http, settings_file):
+    settings_file({"room_types": {"XCV_1": {"engine": "live", "window_days": 180}}})
+    res = live.main([], db=xcv_db(), get=vgl_like_minihotel(0), cookie_fn=lambda: "c", now=NOW)
+    assert res["stopped_room_types"] == ["XCV_1"] and res["writes"] == []
+    assert not [h for h in http if h[0] == "POST" and h[1].endswith("/api/ScreenA")]
+
+
+def test_fill_can_be_switched_off(http, settings_file):
+    settings_file({"room_types": {"XCV_1": {"engine": "live", "window_days": 180, "fill_missing": False}}})
+    res = live.main([], db=xcv_db(), get=vgl_like_minihotel(70), cookie_fn=lambda: "c", now=NOW)
+    assert res["stopped_room_types"] == ["XCV_1"]          # 110 of 181 dates without a price: left alone
+
+
+def test_protected_dates_are_not_filled(http, settings_file):
+    settings_file({"room_types": {"XCV_1": {"engine": "live", "window_days": 180}},
+                   "date_rules": [{"from": (TODAY + timedelta(days=100)).isoformat(),
+                                   "to": (TODAY + timedelta(days=110)).isoformat(),
+                                   "rooms": "all", "action": "protect", "note": "New Year"}]})
+    live.main([], db=xcv_db(), get=vgl_like_minihotel(70), cookie_fn=lambda: "c", now=NOW)
+    payload = [b for m, u, b in http if m == "POST" and u.endswith("/api/ScreenA")][0]
+    dates = {d["Date"] for x in payload for d in x["Dates"]}
+    for k in range(100, 111):
+        assert (TODAY + timedelta(days=k)).isoformat() not in dates

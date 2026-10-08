@@ -6,7 +6,5 @@
     "VGL_ST": {"engine": "live", "style": "normal", "portals": ["BOOKING", "AIRBNB"], "window_days": 180},
     "VGL_AP": {"engine": "live", "style": "normal", "portals": ["BOOKING", "AIRBNB"], "window_days": 180}
   },
-  "date_rules": [
-    {"from": "2026-12-24", "to": "2027-01-14", "rooms": "all", "action": "protect", "note": "New Year, set by hand"}
-  ]
+  "date_rules": []
 }

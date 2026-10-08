@@ -321,6 +321,16 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
         shape = _int_keys(curves.get(group) or curves.get(rt) or cfg["shape_default"])
         goal = cfg["occupancy_goal"].get(group, cfg["occupancy_goal"].get("default", 0.85))
         rt_state = state.setdefault(rt, {})
+        # Filling empty dates: only when the next 60 days look normally priced (at least half of
+        # the free dates have a price). A MiniHotel glitch that drops all prices is never "filled".
+        fill_ok = {}
+        if info.get("fill_missing"):
+            for cur_ in info.get("currencies", ["GEL"]):
+                open_ds = [d for d, c in inventory[rt].items()
+                           if d >= today_s and (_d(d) - today).days <= 60
+                           and c.get("avail") is not None and int(c["avail"]) > 0]
+                priced = [d for d in open_ds if float((inventory[rt][d].get("prices") or {}).get(cur_) or 0) > 0]
+                fill_ok[cur_] = bool(open_ds) and len(priced) / len(open_ds) >= 0.5
         can_write = status_rt == "live"
 
         for ds in sorted(inventory[rt]):
@@ -412,10 +422,17 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 mp = missing_price.setdefault((rt, cur), [0, 0, None])
                 mp[1] += 1
                 if current <= 0:
-                    mp[0] += 1
-                    mp[2] = mp[2] or ds
-                    dec["why"].append("No current price in MiniHotel: left alone and reported.")
-                    continue
+                    if fill_ok.get(cur):
+                        # no price yet: start from your start price; the engine's price for this date is written
+                        current = float(rules["start"])
+                        dec["current"] = dec["proposed"] = current
+                        dec["fill"] = True
+                        dec["why"].append("No price in MiniHotel yet: the engine sets one from your start price.")
+                    else:
+                        mp[0] += 1
+                        mp[2] = mp[2] or ds
+                        dec["why"].append("No current price in MiniHotel: left alone and reported.")
+                        continue
                 if can_write:
                     considered += 1
                     per_rt[rt][0] += 1
@@ -638,6 +655,13 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                         if not lo_r <= ratio <= hi_r:
                             warnings.append(f"{rt} {ds}: GEL price is {ratio:.2f}x the {cur} price; check it is intended.")
 
+    # ---- empty dates that get a price: written even when no move was needed ----
+    for dec in decisions:
+        if dec.get("fill") and dec["kind"] in ("hold",):
+            dec["kind"] = "fill"
+            dec["write"] = room_types[dec["rt"]].get("status", "live") == "live" and not shadow
+            dec["why"].append(f"Price set: {_fmt(dec['currency'], dec['proposed'])}.")
+
     # ---- run-level safety ----
     for (rt, cur), (n_miss, n_all, first) in missing_price.items():
         if not n_miss:
@@ -668,7 +692,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
 
     writes, shadow_moves = [], []
     for dec in decisions:
-        if dec["kind"] not in ("move", "correction"):
+        if dec["kind"] not in ("move", "correction", "fill"):
             continue
         st = state[dec["rt"]][dec["date"]][dec["currency"]]
         if not ok or dec["rt"] in stopped_rts:
