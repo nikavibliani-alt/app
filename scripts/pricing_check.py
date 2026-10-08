@@ -37,6 +37,7 @@ EXTRA_ROOM_TYPES = ["VGL_ST", "VGL_AP", "XCV_1", "XCV_2"]
 # Write guard
 # ---------------------------------------------------------------------------
 
+BLOCKED = []  # attempted non-GET requests to MiniHotel (always stays empty in a clean run)
 _orig_request = requests.Session.request
 
 
@@ -46,6 +47,7 @@ def _guarded_request(self, method, url, *args, **kwargs):
     if any(host == h or host.endswith("." + h) for h in MH_HOSTS):
         is_login_post = m == "POST" and str(url).split("?")[0].lower() == LOGIN_URL
         if m not in ("GET", "HEAD") and not is_login_post:
+            BLOCKED.append(f"{m} {host}")
             raise RuntimeError(f"BLOCKED non-GET request to MiniHotel host: {m} {host}")
     return _orig_request(self, method, url, *args, **kwargs)
 
@@ -576,6 +578,20 @@ def check_dryrun():
     if not equal or proc.returncode != 0:
         sys.exit(1)
 
+# ---------------------------------------------------------------------------
+# --check shadow: run the calm engine in print-only mode
+# ---------------------------------------------------------------------------
+
+def check_shadow():
+    hdr("SHADOW CHECK: pricing_shadow.py --print (calculates and prints, saves nothing)")
+    import pricing_shadow
+    result = pricing_shadow.main(["--print"])
+    print(f"\nMiniHotel writes produced by the shadow engine: {len(result['writes'])}")
+    print(f"Attempted non-GET requests to MiniHotel (blocked by the check's guard): {len(BLOCKED)}")
+    print("Nothing was sent to MiniHotel and nothing was saved (--print).")
+    if result["writes"] or BLOCKED:
+        sys.exit(1)
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -583,6 +599,9 @@ def main():
     args = ap.parse_args()
     if args.check == "dryrun":
         check_dryrun()
+        return
+    if args.check == "shadow":
+        check_shadow()
         return
     if args.check != "step1":
         raise SystemExit(f"unknown check: {args.check}")
