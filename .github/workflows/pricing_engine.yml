@@ -49,3 +49,50 @@ jobs:
           PRICING_PROPERTIES:       ${{ github.event.inputs.property_types }}
           PRICING_DATES:            ${{ github.event.inputs.dates }}
         run: python pricing_engine.py --apply
+
+  shadow:
+    needs: pricing
+    if: ${{ always() && github.event.inputs.urgent != 'true' }}
+    concurrency:
+      group: pricing-shadow
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests firebase-admin
+      - name: Shadow run of the new engine (reads only)
+        env:
+          MINIHOTEL_HOTEL:          ${{ secrets.MINIHOTEL_HOTEL }}
+          MINIHOTEL_USER:           ${{ secrets.MINIHOTEL_USER }}
+          MINIHOTEL_PASS:           ${{ secrets.MINIHOTEL_PASS }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: python pricing_shadow.py
+
+  calm_live:
+    needs: pricing
+    if: ${{ always() && github.event.inputs.urgent != 'true' }}
+    concurrency:
+      group: pricing-calm-live
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests firebase-admin
+      - name: New engine, live room types (XCV)
+        env:
+          MINIHOTEL_HOTEL:          ${{ secrets.MINIHOTEL_HOTEL }}
+          MINIHOTEL_USER:           ${{ secrets.MINIHOTEL_USER }}
+          MINIHOTEL_PASS:           ${{ secrets.MINIHOTEL_PASS }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: python pricing_calm_live.py
