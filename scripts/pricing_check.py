@@ -747,6 +747,36 @@ def live_report(result):
             shown += 1
         if not dates_moved:
             print("    no examples: nothing would change")
+        fills = sorted({d["date"] for d in decs if d.get("fill") and d["kind"] in ("fill", "move")})
+        fill_cur = {c: sum(1 for d in decs if d.get("fill") and d["kind"] in ("fill", "move") and d["currency"] == c) for c in ("GEL", "USD")}
+        print(f"  Empty dates it would fill with a first price: {len(fills)} dates "
+              f"(Booking GEL {fill_cur['GEL']}, Airbnb EUR list {fill_cur['USD']})"
+              + (f" | first {fills[0]}, last {fills[-1]}" if fills else ""))
+        print("  Check dates (MiniHotel today -> new price, Booking GEL | Airbnb EUR list):")
+        for ds in ("2026-12-10", "2026-12-22", "2026-12-31", "2027-01-03", "2027-01-10", "2027-02-20"):
+            cells = by_date.get(ds)
+            if not cells:
+                print(f"    {ds}: not covered by this run")
+                continue
+            parts = []
+            for cur, label in (("GEL", "GEL"), ("USD", "EUR")):
+                d = cells.get(cur)
+                if d is None:
+                    continue
+                if d["avail"] == 0:
+                    parts.append(f"{label} fully booked, left alone")
+                    continue
+                now_p = f"{d['mh_price']:g}" if d["mh_price"] > 0 else "empty"
+                if d["kind"] == "stopped":
+                    parts.append(f"{label} {now_p} -> held back by a safety stop")
+                elif d["kind"] == "protected":
+                    parts.append(f"{label} {now_p} -> protected, left alone")
+                elif d["min"] is None:
+                    parts.append(f"{label} {now_p} -> left alone ({d['why'][-1] if d['why'] else 'no usable prices'})")
+                else:
+                    tag = " (first price)" if d.get("fill") and d["kind"] in ("fill", "move") else ""
+                    parts.append(f"{label} {now_p} -> {d['proposed']:g}{tag}")
+            print(f"    {ds}: " + " | ".join(parts))
     print(f"\nRun ok: {result.get('ok')} | stopped room types: {result.get('stopped_room_types') or 'none'} | main run: {result.get('main_run')}")
     for a in (result.get("alerts") or [])[:10]:
         print("  ALERT:", a)
