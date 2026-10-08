@@ -164,6 +164,8 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
       <option value="ALL">All properties</option>
       <option>ROOMS</option><option>MAXELA</option><option>BIG_APT</option>
       <option>FREEDOM</option><option>ORBE_1</option><option>ORBE_2</option>
+      <option value="XCV_1">XCV 1 (small)</option><option value="XCV_2">XCV 2 (balcony)</option>
+      <option value="VGL_ST">VGL studios</option><option value="VGL_AP">VGL apartments</option>
     </select>
   </div>
 
@@ -264,7 +266,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const PROPERTIES = ["ROOMS","MAXELA","BIG_APT","FREEDOM","ORBE_1","ORBE_2"];
+const PROPERTIES = ["ROOMS","MAXELA","BIG_APT","FREEDOM","ORBE_1","ORBE_2","XCV_1","XCV_2","VGL_ST","VGL_AP"];
+// Always shown in both price cards, even with no prices yet (empty boxes to fill in)
+const ALWAYS_SHOWN = ["XCV_1","XCV_2","VGL_ST","VGL_AP"];
+const PROP_LABEL = {XCV_1:"XCV 1 (small)", XCV_2:"XCV 2 (balcony)", VGL_ST:"VGL studios", VGL_AP:"VGL apartments"};
 const SEASONS = ["low","mid","high","peak","new_year","xmas_low"];
 const RUN_HOURS_UTC = [0,5,9,12,18];
 
@@ -493,8 +498,8 @@ let activeSeasonGel="peak";
 let activeSeasonEur="peak";
 
 // Fallbacks — used when rules doc is empty or a property has no data yet
-const GEL_CARD_FALLBACK=["ROOMS","MAXELA","BIG_APT","FREEDOM","ORBE_1"];
-const EUR_CARD_FALLBACK=["BIG_APT","FREEDOM","ORBE_1","ORBE_2"];
+const GEL_CARD_FALLBACK=["ROOMS","MAXELA","BIG_APT","FREEDOM","ORBE_1",...ALWAYS_SHOWN];
+const EUR_CARD_FALLBACK=["BIG_APT","FREEDOM","ORBE_1","ORBE_2",...ALWAYS_SHOWN];
 // Derived from live rules after loadRules(); updated each time rules reload
 let gelCardProps=GEL_CARD_FALLBACK;
 let eurCardProps=EUR_CARD_FALLBACK;
@@ -506,6 +511,10 @@ function deriveCardProps(){
   const ed=PROPERTIES.filter(hasEur);
   gelCardProps=gd.length?gd:GEL_CARD_FALLBACK;
   eurCardProps=ed.length?ed:EUR_CARD_FALLBACK;
+  ALWAYS_SHOWN.forEach(p=>{
+    if(!gelCardProps.includes(p)) gelCardProps=[...gelCardProps,p];
+    if(!eurCardProps.includes(p)) eurCardProps=[...eurCardProps,p];
+  });
 }
 
 function initSeasonPicker(){
@@ -598,7 +607,7 @@ function renderPriceTable(tableId,props,cur,season){
       v3=rules.eurRules?.[p]?.[s]?.max;
     }
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td style="white-space:nowrap;font-weight:500">${p}</td>`
+    tr.innerHTML=`<td style="white-space:nowrap;font-weight:500">${PROP_LABEL[p]||p}</td>`
       +cfgCell(p,s,cur,"floor",v2,true)
       +cfgCell(p,s,cur,"base",v1,true)
       +cfgCell(p,s,cur,"ceil",v3,true);
