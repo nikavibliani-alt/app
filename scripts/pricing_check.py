@@ -13,6 +13,7 @@ import base64
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 from collections import Counter, defaultdict
@@ -521,10 +522,29 @@ def check_dryrun():
     db = init_firestore()
     before = count_docs(db)
     root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-    proc = subprocess.run([sys.executable, "pricing_engine.py", "--report"], cwd=root,
-                          capture_output=True, text=True, timeout=420)
-    out, err = proc.stdout, proc.stderr
+    # -u + faulthandler: if the engine hangs we get a stack trace instead of silence
+    p = subprocess.Popen([sys.executable, "-u", "-X", "faulthandler", "pricing_engine.py", "--report"],
+                         cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    timed_out = False
+    try:
+        out, err = p.communicate(timeout=300)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        p.send_signal(signal.SIGABRT)  # faulthandler prints all thread stacks to stderr
+        try:
+            out, err = p.communicate(timeout=20)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            out, err = p.communicate()
     after = count_docs(db)
+
+    class proc:  # keep the names used below
+        returncode = -1 if timed_out else p.returncode
+    if timed_out:
+        print("\nENGINE TIMED OUT after 300 s. Last output lines:")
+        print("\n".join(l for l in out.splitlines() if not l.startswith("R | "))[-1500:])
+        print("\nstack at the time of the hang (stderr tail):")
+        print(err[-2500:])
 
     print(f"\nengine exit code: {proc.returncode}")
     print(f"{'collection':20} {'before':>8} {'after':>8}")
