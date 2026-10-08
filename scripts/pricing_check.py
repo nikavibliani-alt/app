@@ -666,6 +666,86 @@ def check_shadow():
 # ---------------------------------------------------------------------------
 # --check live: the calm engine's live job in dry mode (writes and saves nothing)
 # ---------------------------------------------------------------------------
+LIVE_RTS = ["XCV_1", "XCV_2", "VGL_ST", "VGL_AP"]
+LIVE_SEASONS = ["low", "mid", "high", "peak", "new_year", "xmas_low"]
+
+
+def live_report(result):
+    """Plain report for the live room types: price boxes per season, first-run changes, examples."""
+    hdr("LIVE REPORT: XCV and VGL (first run, nothing sent)")
+    db = init_firestore()
+    page = db.collection("pricing_config").document("rules").get().to_dict() or {}
+
+    def num(x):
+        try:
+            v = float(x)
+        except (TypeError, ValueError):
+            return None
+        return v if v > 0 else None
+
+    def cell(table, rt, s):
+        row = (table or {}).get(rt) if isinstance(table, dict) else None
+        c = row.get(s) if isinstance(row, dict) else None
+        return c
+
+    cards = [("Booking GEL", "startPrices", "priceRules"), ("Airbnb EUR list", "startPricesEur", "eurRules")]
+    for rt in LIVE_RTS:
+        print(f"\n=== {rt} ===")
+        for label, sk, rk in cards:
+            complete, problems = [], []
+            for s in LIVE_SEASONS:
+                st = num(cell(page.get(sk), rt, s))
+                r = cell(page.get(rk), rt, s)
+                r = r if isinstance(r, dict) else {}
+                mn, mx = num(r.get("min")), num(r.get("max"))
+                missing = [n for n, v in (("minimum", mn), ("start", st), ("maximum", mx)) if not v]
+                if missing:
+                    problems.append(f"{s}: missing {', '.join(missing)}" if len(missing) < 3 else f"{s}: all empty")
+                elif not (mn <= st <= mx):
+                    problems.append(f"{s}: not in order ({mn:g}/{st:g}/{mx:g})")
+                else:
+                    complete.append(s)
+            print(f"  {label}: complete seasons: {', '.join(complete) or 'none'}")
+            if problems:
+                print(f"    incomplete: {'; '.join(problems)}")
+        decs = [d for d in result.get("decisions", []) if d["rt"] == rt]
+        if not decs:
+            print("  not calculated (no usable prices, or a safety stop)")
+            continue
+        full = sum(1 for d in decs if d["avail"] == 0)
+        norules = sum(1 for d in decs if d["avail"] != 0 and d["min"] is None)
+        moved = [d for d in decs if d["kind"] in ("move", "correction") and d["proposed"] != d["current"]]
+        stopped = [d for d in decs if d["kind"] == "stopped"]
+        dates_moved = sorted({d["date"] for d in moved})
+        by_cur = {c: sum(1 for d in moved if d["currency"] == c) for c in ("GEL", "USD")}
+        print(f"  Dates seen {len({d['date'] for d in decs})} | fully booked {full // max(1, len({d['currency'] for d in decs}))}"
+              f" | left alone (season has no complete prices) {norules // max(1, len({d['currency'] for d in decs}))}")
+        print(f"  Would change on the first run: {len(dates_moved)} dates "
+              f"(Booking GEL prices {by_cur['GEL']}, Airbnb EUR list prices {by_cur['USD']})"
+              + (f" | held back by a safety stop: {len(stopped)}" if stopped else ""))
+        by_date = defaultdict(dict)
+        for d in decs:
+            by_date[d["date"]][d["currency"]] = d
+        shown = 0
+        for ds in dates_moved:
+            if shown >= 5:
+                break
+            parts = []
+            for cur, label in (("GEL", "Booking GEL"), ("USD", "Airbnb EUR")):
+                d = by_date[ds].get(cur)
+                if d is None:
+                    continue
+                parts.append(f"{label} {d['mh_price']:g} -> {d['proposed']:g}")
+            print(f"    {ds}: " + " | ".join(parts))
+            shown += 1
+        if not dates_moved:
+            print("    no examples: nothing would change")
+    print(f"\nRun ok: {result.get('ok')} | stopped room types: {result.get('stopped_room_types') or 'none'} | main run: {result.get('main_run')}")
+    for a in (result.get("alerts") or [])[:10]:
+        print("  ALERT:", a)
+    for w in (result.get("warnings") or [])[:10]:
+        print("  note:", w)
+
 
 def check_live():
     hdr("LIVE CHECK: pricing_calm_live.py --dry (calculates and prints; writes nothing, saves nothing)")
@@ -673,6 +753,7 @@ def check_live():
     result = pricing_calm_live.main(["--dry"])
     print(f"\nPrice changes it would send (not sent): {len(result.get('writes') or [])}")
     print(f"Sent to MiniHotel: {bool(result.get('sent'))}")
+    live_report(result)
     print(f"Attempted non-GET requests to MiniHotel (blocked by the check's guard): {len(BLOCKED)}")
     if result.get("sent") or BLOCKED:
         sys.exit(1)
