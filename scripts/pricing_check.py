@@ -712,6 +712,9 @@ def live_report(result):
         if not decs:
             print("  not calculated (no usable prices, or a safety stop)")
             continue
+        last_date = max(d["date"] for d in decs)
+        ahead = (datetime.strptime(last_date, "%Y-%m-%d").date() - datetime.now(TBILISI).date()).days
+        print(f"  Covers {ahead} days ahead (up to {last_date})")
         full_dates = {d["date"] for d in decs if d["avail"] == 0}
         noprice = {d["date"] for d in decs if d["avail"] != 0 and any("No current price" in w for w in d["why"])}
         norules = {d["date"] for d in decs if d["avail"] != 0 and any("No minimum/start/maximum" in w or "not in order" in w for w in d["why"])}

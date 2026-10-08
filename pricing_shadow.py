@@ -373,7 +373,8 @@ def main(argv=None, db=None, get=requests.get, cookie_fn=None, now=None):
             from minihotel_auth import get_session_cookie
             cookie_fn = get_session_cookie
         live_rts = [rt for rt, v in cfg["room_types"].items() if v.get("status", "live") != "off"]
-        inventory = fetch_inventory(cookie_fn(), today, cfg["window_days"], get=get, room_types=live_rts)
+        days = max([cfg["window_days"]] + [int(v.get("window_days") or 0) for v in cfg["room_types"].values()])
+        inventory = fetch_inventory(cookie_fn(), today, days, get=get, room_types=live_rts)
         reservations, skipped = load_reservations(db, today)
         learned = {}
         for group in {v["group"] for v in cfg["room_types"].values()}:

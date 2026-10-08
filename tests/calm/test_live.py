@@ -200,3 +200,58 @@ def test_second_day_moves_within_daily_limit(http, settings_file):
             for r in d["Rates"]:
                 if r["PriceList"] == "GEL":
                     assert 140 * (1 - lim) - 0.01 <= r["Price"] <= 140, d
+
+
+
+def xcv_minihotel_days():
+    """Like xcv_minihotel, but returns as many days as asked for (dateFrom..dateTo)."""
+    asked = []
+
+    def get(url, params=None, headers=None, timeout=None):
+        f, t = params["dateFrom"], params["dateTo"]
+        d0 = date(int(f[:4]), int(f[4:6]), int(f[6:]))
+        d1 = date(int(t[:4]), int(t[4:6]), int(t[6:]))
+        asked.append((d1 - d0).days)
+        out = []
+        for rt in params["rooms"].split(","):
+            dates = []
+            d = d0
+            while d <= d1:
+                dates.append({"Date": d.isoformat() + "T00:00:00", "Availability": "", "DefaultAvailability": 1,
+                              "Rates": [{"PriceList": "GEL", "Price": 200}, {"PriceList": "EUR", "Price": 60}]})
+                d += timedelta(days=1)
+            out.append({"RoomTypeCode": rt, "Dates": dates})
+
+        class R:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return out
+        return R()
+    return get, asked
+
+
+def test_how_far_ahead_is_set_per_room_type(http, settings_file):
+    settings_file({"room_types": {"XCV_1": {"engine": "live", "window_days": 365},
+                                  "XCV_2": {"engine": "live", "window_days": 5000}}})
+    get, asked = xcv_minihotel_days()
+    res = live.main(["--dry"], db=xcv_db(), get=get, cookie_fn=lambda: "c", now=NOW)
+    assert asked == [365]
+    last = {rt: max(d["days_out"] for d in res["decisions"] if d["rt"] == rt) for rt in ("XCV_1", "XCV_2")}
+    assert last["XCV_1"] == 365 and last["XCV_2"] == 90          # 5000 is not allowed: 90 used
+    assert res["ok"], res["alerts"]
+
+
+def test_whole_year_far_dates_move_only_a_little(http, settings_file):
+    settings_file({"room_types": {"XCV_1": {"engine": "live", "window_days": 365}}})
+    db = xcv_db()
+    for rt in ("XCV_1",):
+        for c, (mn, st, mx) in (("GEL", (85, 110, 250)), ("USD", (32, 42, 90))):
+            for s_ in ps.SEASONS:
+                db.store["pricing_config"]["engine_v2"]["rules"][rt][c][s_] = {"min": mn, "start": st, "max": mx}
+    get, _ = xcv_minihotel_days()
+    res = live.main(["--dry"], db=db, get=get, cookie_fn=lambda: "c", now=NOW)
+    for d in res["decisions"]:
+        if d["rt"] == "XCV_1" and d["days_out"] > 61 and d["target"] is not None and d["currency"] == "GEL":
+            assert 110 * 0.97 - 1 <= d["target"] <= 110 * 1.08 * 1.08 + 1, d

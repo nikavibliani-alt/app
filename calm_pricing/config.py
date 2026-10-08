@@ -28,7 +28,7 @@ DEFAULT_CURVE = {0: 0.85, 1: 0.80, 3: 0.75, 7: 0.60, 14: 0.45, 30: 0.25, 60: 0.1
 DEFAULT_SHAPE = {d: round(v / DEFAULT_CURVE[0], 4) for d, v in DEFAULT_CURVE.items()}
 
 DEFAULTS = {
-    "window_days": 90,
+    "window_days": 90,          # how many days ahead the engine prices (30-400); per room type: room_types.X.window_days
     "rounding": {"GEL": 5, "USD": 1, "EUR": 1},
     # Lari per unit of currency; only used for sanity checks between channels.
     "fx": {"USD": 2.65, "EUR": 2.95},
@@ -134,7 +134,7 @@ WHOLE_DAY_TABLES = ("cascade", "curve_default", "shape_default")
 # Hard limits for settings that can be changed from Firestore. A value outside its range,
 # or not a number, falls back to the default and is reported. The defaults sit well inside.
 HARD_LIMITS = {
-    ("window_days",): (30, 120),
+    ("window_days",): (30, 400),
     ("calm", "daily_down"): (0.0, 0.10),
     ("calm", "daily_up"): (0.0, 0.12),
     ("calm", "daily_down_last3"): (0.0, 0.20),
@@ -244,6 +244,10 @@ def apply_limits(cfg: dict) -> list:
             problems.append(f"setting date_rules entry {r!r} is not valid; ignored.")
     cfg["date_rules"] = good
     for rt, info in list((cfg.get("room_types") or {}).items()):
+        if isinstance(info, dict) and "window_days" in info:
+            info["window_days"] = _check(info["window_days"], cfg["window_days"], 30, 400,
+                                         f"room_types.{rt}.window_days", problems)
+            info["window_days"] = int(info["window_days"])
         if isinstance(info, dict) and info.get("style") not in (None,) + STYLES:
             problems.append(f"setting room_types.{rt}.style={info.get('style')!r} is not valid; normal used.")
             info["style"] = "normal"

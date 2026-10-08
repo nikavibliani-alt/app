@@ -103,8 +103,20 @@ def live_room_types(rules: dict, settings: dict) -> dict:
         if not rules.get(rt):
             print(f"  {rt} is set to live but has no minimum/start/maximum: skipped.")
             continue
-        out[rt] = {**ps.ROOM_TYPES[rt], **{k: v for k, v in over.items() if k in ("style", "portals")},
+        out[rt] = {**ps.ROOM_TYPES[rt], **{k: v for k, v in over.items() if k in ("style", "portals", "window_days")},
                    "status": "live"}
+        if "window_days" in out[rt]:
+            try:
+                w = int(out[rt]["window_days"])
+            except (TypeError, ValueError):
+                w = 0
+            if not 30 <= w <= 400:
+                print(f"  {rt}: window_days {out[rt]['window_days']!r} is outside 30-400; 90 used.")
+                w = 90
+            out[rt]["window_days"] = w
+        if out[rt].get("style") not in (None, "normal", "aggressive"):
+            print(f"  {rt}: style {out[rt]['style']!r} is not valid; normal used.")
+            out[rt]["style"] = "normal"
     return out
 
 
@@ -176,7 +188,8 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
             from minihotel_auth import get_session_cookie
             cookie_fn = get_session_cookie
         cookie = cookie_fn()
-        inventory = ps.fetch_inventory(cookie, today, cfg["window_days"], get=get, room_types=list(live_rts))
+        days = max([cfg["window_days"]] + [int(v.get("window_days") or 0) for v in live_rts.values()])
+        inventory = ps.fetch_inventory(cookie, today, days, get=get, room_types=list(live_rts))
         reservations, skipped = ps.load_reservations(db, today)
         state = ps.load_state(db, prefix=STATE_PREFIX)
         result = run({"now": now, "inventory": inventory, "reservations": reservations, "shadow": False}, cfg, state)

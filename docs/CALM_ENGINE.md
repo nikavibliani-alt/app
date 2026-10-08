@@ -18,7 +18,7 @@ after a 2-week shadow test. The full plan is in the Claude doc
 | `pricing_calm_live.py` | LIVE runner for the room types switched on in `calm_settings.json` (XCV first). Writes their prices to MiniHotel the same way the current engine does (GEL list; EUR list + `*ALL` for Airbnb) and pushes BOOKING and AIRBNB. Never writes the six room types of the current engine. Obeys the pause switch. `--dry` = calculate only. |
 | `calm_settings.json` | Which room types are live, their style (normal / aggressive) and date rules (protect / aggressive / normal for a date range). Firestore `pricing_config/engine_v2.settings` can override it. |
 | `pricing_shadow_report.py` | After the test: compares the new engine with the current one. Reads only. |
-| `tests/calm/` | 79 tests: every promise of the plan, the findings of three Cursor reviews, the step 1 data check, the live runner with a fake MiniHotel, modes and protected dates. |
+| `tests/calm/` | 81 tests: every promise of the plan, the findings of three Cursor reviews, the step 1 data check, the live runner with a fake MiniHotel, modes and protected dates. |
 | `sim/simulate.py` | Market simulator used to compare the engines offline (fake guests). |
 
 ## The rules it follows
@@ -90,3 +90,8 @@ Local check without saving anything: `python pricing_shadow.py --print`.
   stop the run. Big changes right after you changed your own minimum/start/maximum are allowed,
   unless a value changed by more than double or half (that looks like a typo).
 - Live results: `pricing_engine_state/live_*`, `pricing_calm_daily`, `pricing_calm_runs`.
+- How far ahead the engine prices: `window_days` (default 90, allowed 30-400), for all room
+  types at the top of `calm_settings.json`, or per room type (`room_types.X.window_days`).
+  Dates beyond the window are left as they are in MiniHotel. Far dates (61+ days) move only a
+  little (-3% to +8% around start), so a long window mainly keeps far prices inside your
+  minimum and maximum.

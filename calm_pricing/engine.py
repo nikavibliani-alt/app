@@ -258,7 +258,9 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                         f"{calm.get('main_run_latest_hour', 12) - 1:02d}:59 today: this {now:%H:%M} run is the one allowed to lower prices.")
 
     # ---- safety: is the data complete? ----
-    window = cfg["window_days"]
+    def window_of(info_):
+        return int(info_.get("window_days") or cfg["window_days"])
+
     for rt, info in room_types.items():
         if info.get("status", "live") == "off":
             continue
@@ -267,8 +269,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
             stop_rt(rt, f"{rt}: MiniHotel returned no data for this room type.")
             continue
         future = [d for d in dates if d >= today_s]
-        if len(future) < cfg["safety"]["min_dates_ratio"] * window:
-            stop_rt(rt, f"{rt}: MiniHotel returned only {len(future)} of {window} days.")
+        if len(future) < cfg["safety"]["min_dates_ratio"] * window_of(info):
+            stop_rt(rt, f"{rt}: MiniHotel returned only {len(future)} of {window_of(info)} days.")
 
     occ, booked, missing = _build_occupancy(inventory, room_types)
     for rt, ms in missing.items():
@@ -327,7 +329,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
             cell = inventory[rt][ds]
             dday = _d(ds)
             days_out = (dday - today).days
-            if days_out > window:
+            if days_out > window_of(info):
                 continue
             avail = max(0, min(units, int(cell["avail"])))
             season = season_of(ds, cfg)
