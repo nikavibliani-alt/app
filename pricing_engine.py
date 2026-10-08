@@ -492,7 +492,11 @@ def install_write_guard():
 
     def guarded_request(self, method, url, *a, **k):
         if _WRITES_BLOCKED and str(method).upper() not in ("GET", "HEAD"):
-            if not (str(method).upper() == "POST" and str(url).split("?")[0].lower() == _LOGIN_URL):
+            host = str(url).split("/")[2].lower() if "//" in str(url) else ""
+            is_login = str(method).upper() == "POST" and str(url).split("?")[0].lower() == _LOGIN_URL
+            # Google's OAuth token refresh (needed to READ Firestore) is a POST to googleapis.com
+            is_google_auth = host == "oauth2.googleapis.com" or host == "www.googleapis.com"
+            if not (is_login or is_google_auth):
                 _blocked(f"http {str(method).upper()} {str(url).split('/')[2] if '//' in str(url) else url}")
         return orig_request(self, method, url, *a, **k)
     requests.Session.request = guarded_request
