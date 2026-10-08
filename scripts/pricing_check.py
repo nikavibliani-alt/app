@@ -663,6 +663,20 @@ def check_shadow():
     if result["writes"] or BLOCKED:
         sys.exit(1)
 
+# ---------------------------------------------------------------------------
+# --check live: the calm engine's live job in dry mode (writes and saves nothing)
+# ---------------------------------------------------------------------------
+
+def check_live():
+    hdr("LIVE CHECK: pricing_calm_live.py --dry (calculates and prints; writes nothing, saves nothing)")
+    import pricing_calm_live
+    result = pricing_calm_live.main(["--dry"])
+    print(f"\nPrice changes it would send (not sent): {len(result.get('writes') or [])}")
+    print(f"Sent to MiniHotel: {bool(result.get('sent'))}")
+    print(f"Attempted non-GET requests to MiniHotel (blocked by the check's guard): {len(BLOCKED)}")
+    if result.get("sent") or BLOCKED:
+        sys.exit(1)
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -673,6 +687,9 @@ def main():
         return
     if args.check == "shadow":
         check_shadow()
+        return
+    if args.check == "live":
+        check_live()
         return
     if args.check != "step1":
         raise SystemExit(f"unknown check: {args.check}")

@@ -24,8 +24,15 @@ sys.path.insert(0, ROOT)
 if not os.path.exists(os.path.join(ROOT, "config.json")) and os.path.exists("/root/maxela-app/config.json"):
     shutil.copy("/root/maxela-app/config.json", os.path.join(ROOT, "config.json"))
 
+import pytest  # noqa: E402
 import requests  # noqa: E402
 import pricing_shadow as ps  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _no_repo_settings_file(monkeypatch, tmp_path):
+    """Tests decide their own settings; the repo's calm_settings.json is not read."""
+    monkeypatch.setattr(ps, "SETTINGS_FILE", str(tmp_path / "no_settings.json"))
 
 
 # ---------------- fake Firestore ----------------

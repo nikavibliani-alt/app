@@ -1,4 +1,4 @@
-# Calm pricing engine (new engine, shadow test)
+# Calm pricing engine (new engine)
 
 Plain-language guide. Written 2026-10-07. Status: **shadow test only**. Nothing in
 this package changes prices in MiniHotel or on Booking / Expedia / Airbnb.
@@ -15,8 +15,10 @@ after a 2-week shadow test. The full plan is in the Claude doc
 | `calm_pricing/config.py` | Default settings (limits, bands, speeds). Every number can be changed later from Firestore `pricing_config/engine_v2.settings`. |
 | `calm_pricing/curve.py` | Learns *how early* guests book from your own reservations. |
 | `pricing_shadow.py` | Reads MiniHotel + Firestore, runs the engine in shadow mode, saves only its own results. Refuses any POST/PUT/DELETE. |
+| `pricing_calm_live.py` | LIVE runner for the room types switched on in `calm_settings.json` (XCV first). Writes their prices to MiniHotel the same way the current engine does (GEL list; EUR list + `*ALL` for Airbnb) and pushes BOOKING and AIRBNB. Never writes the six room types of the current engine. Obeys the pause switch. `--dry` = calculate only. |
+| `calm_settings.json` | Which room types are live, their style (normal / aggressive) and date rules (protect / aggressive / normal for a date range). Firestore `pricing_config/engine_v2.settings` can override it. |
 | `pricing_shadow_report.py` | After the test: compares the new engine with the current one. Reads only. |
-| `tests/calm/` | 61 tests: every promise of the plan, the findings of three Cursor reviews and the step 1 data check, and end-to-end tests of the shadow script with a fake MiniHotel and a fake Firestore. |
+| `tests/calm/` | 79 tests: every promise of the plan, the findings of three Cursor reviews, the step 1 data check, the live runner with a fake MiniHotel, modes and protected dates. |
 | `sim/simulate.py` | Market simulator used to compare the engines offline (fake guests). |
 
 ## The rules it follows
@@ -70,3 +72,21 @@ Local check without saving anything: `python pricing_shadow.py --print`.
 - The engine does not count Booking discounts (Genius, mobile rate, country rates). It works with the prices set in MiniHotel and on the pricing page. Later the system will learn from MiniHotel what each booked night actually sold for.
 - MiniHotel leaves `Availability` empty and sends the free units in `DefaultAvailability` (checked on real data, 8 Oct 2026). The shadow reads `DefaultAvailability` when `Availability` is empty; a real 0 is never replaced.
 - Room 7-3 is not in `ROOM_MAP` in `minihotel_reservation_sync.py`; check whether its bookings reach Firestore.
+
+
+## Live room types, modes and protected dates
+
+- A room type goes live with `"engine": "live"` in `calm_settings.json`. It is written only once
+  its minimum, start and maximum exist (pricing page). The six room types of the current engine
+  can never go live while that engine runs.
+- Style `normal` (default) or `aggressive` ("fill the month"): aggressive lowers faster and further
+  when selling slower than normal (15-30 days down to -15%, 8-14 days -20%, 4-7 days -25%, up to -8%
+  a day), aims at 92% occupancy, and keeps every other rule (never below minimum, never on arrival
+  day, one lowering run a day).
+- Date rules: `protect` leaves the dates completely alone (you set them by hand; default: New Year
+  24 Dec - 14 Jan for all rooms); `aggressive` / `normal` sets the style for those dates only.
+- The run-wide safety stop counts only big changes (more than 10% at once, min/max corrections
+  included) on more than 40% of prices. Small daily steps toward the target are normal and never
+  stop the run. Big changes right after you changed your own minimum/start/maximum are allowed,
+  unless a value changed by more than double or half (that looks like a typo).
+- Live results: `pricing_engine_state/live_*`, `pricing_calm_daily`, `pricing_calm_runs`.

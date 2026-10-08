@@ -27,7 +27,9 @@ from __future__ import annotations
 import math
 from datetime import date, datetime, timedelta, timezone
 
-from .config import season_of
+import copy
+
+from .config import season_of, AGGRESSIVE
 from .curve import interpolate
 
 STATUS_WORDS = {
@@ -125,6 +127,28 @@ def _move_ts(m):
 
 def _move_price(m):
     return m["p"] if isinstance(m, dict) else m[1]
+
+
+def _profiles(cfg: dict) -> dict:
+    """The settings used per style. 'normal' is cfg itself; 'aggressive' changes only how far and how fast prices drop."""
+    ag = dict(cfg)
+    ag["bands"] = copy.deepcopy(AGGRESSIVE["bands"])
+    ag["demand"] = {**cfg["demand"],
+                    "target_adj": {**cfg["demand"]["target_adj"], **AGGRESSIVE["target_adj"]},
+                    "speed_down": {**cfg["demand"]["speed_down"], **AGGRESSIVE["speed_down"]}}
+    ag["calm"] = {**cfg["calm"], "daily_down": max(cfg["calm"]["daily_down"], AGGRESSIVE["daily_down"])}
+    ag["min_guard_share"] = min(cfg.get("min_guard_share", 0.25), AGGRESSIVE["min_guard_share"])
+    return {"normal": cfg, "aggressive": ag}
+
+
+def _date_rule(rt: str, ds: str, rules: list):
+    """The last matching date rule for this room type and date, or None."""
+    found = None
+    for r in rules or []:
+        rooms = r.get("rooms", "all")
+        if str(r["from"]) <= ds <= str(r["to"]) and (rooms == "all" or rt in rooms):
+            found = r
+    return found
 
 
 def _int_keys(d: dict) -> dict:
@@ -255,8 +279,36 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
     curves = snapshot.get("curves", {})
 
     considered, changed, corrections = 0, 0, 0
-    per_rt = {rt: [0, 0] for rt in room_types}   # rt -> [prices considered, prices that would move]
+    per_rt = {rt: [0, 0, 0] for rt in room_types}   # rt -> [prices considered, prices that would move, big changes]
+    # Rules seen in the last applied run, to tell a deliberate change of your prices from a typo.
+    seen = meta.setdefault("rules_seen", {})
+    rule_change = {}                                  # rt -> "same" | "new" | "modest" | "large"
+    for rt in room_types:
+        now_r = {c: {s_: [float(r["min"]), float(r["start"]), float(r["max"])] for s_, r in by_s.items()}
+                 for c, by_s in (cfg["rules"].get(rt) or {}).items()}
+        old_r = seen.get(rt)
+        if not old_r:
+            rule_change[rt] = "new"
+        elif old_r == now_r:
+            rule_change[rt] = "same"
+        else:
+            large = []
+            for c, by_s in now_r.items():
+                for s_, vals in by_s.items():
+                    prev = (old_r.get(c) or {}).get(s_)
+                    if prev and any(v > 2 * pv or v < 0.5 * pv for v, pv in zip(vals, prev) if pv > 0):
+                        large.append(f"{c} {s_}: {'/'.join(f'{x:g}' for x in prev)} -> {'/'.join(f'{x:g}' for x in vals)}")
+            rule_change[rt] = "large" if large else "modest"
+            if large:
+                warnings.append(f"{rt}: your minimum/start/maximum changed by more than double or half ({'; '.join(large[:3])}). "
+                                "Big price changes from this are not allowed automatically; if it is intended, change it "
+                                "in steps of at most double or half per day.")
+            else:
+                warnings.append(f"{rt}: your minimum/start/maximum changed; prices may follow in one step this run.")
+        rule_change.setdefault(rt, "new")
+        per_rt[rt].append(now_r)                      # per_rt[rt][3] = rules as seen now
     missing_price = {}   # (rt, currency) -> [dates without a price, dates checked, first such date]
+    profiles = _profiles(cfg)
     for rt, info in room_types.items():
         status_rt = info.get("status", "live")
         if status_rt == "off" or rt not in inventory:
@@ -280,6 +332,24 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
             avail = max(0, min(units, int(cell["avail"])))
             season = season_of(ds, cfg)
 
+            # ---------- date rules and style ----------
+            rule = _date_rule(rt, ds, cfg.get("date_rules"))
+            if rule and rule["action"] == "protect":
+                for cur in info.get("currencies", ["GEL"]):
+                    p0 = float((cell.get("prices") or {}).get(cur) or 0)
+                    st0 = rt_state.setdefault(ds, {}).setdefault(cur, {})
+                    c0 = float(st0.get("shadow_price", p0)) if shadow else p0
+                    decisions.append({"rt": rt, "date": ds, "currency": cur, "days_out": days_out, "season": season,
+                                      "avail": avail, "units": units, "mh_price": p0, "current": c0, "proposed": c0,
+                                      "min": None, "max": None, "target": None, "status": None, "write": False,
+                                      "kind": "protected", "style": None, "blocked": [],
+                                      "why": [f"Protected date ({rule.get('note') or 'date rule'}): left alone."]})
+                continue
+            style = (rule["action"] if rule else None) or info.get("style") or "normal"
+            pc = profiles.get(style, cfg)
+            dm, calm = pc["demand"], pc["calm"]
+            goal_d = max(goal, AGGRESSIVE["occupancy_goal_floor"]) if style == "aggressive" else goal
+
             # ---------- demand signal (same for every currency) ----------
             own = occ[rt][ds]
             g_occ, g_units = _group_occ(group, ds, room_types, booked) if group else (None, 0)
@@ -289,7 +359,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 signal = 0.6 * own + 0.4 * g_occ if (g_occ is not None and g_units > units) else own
             else:  # single: empty or full, nothing in between
                 signal = own
-            expected = goal * interpolate(shape, days_out)
+            expected = goal_d * interpolate(shape, days_out)
             gap = signal - expected
             status = _status(gap, dm)
             building_busy = False
@@ -321,7 +391,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 current = float(st.get("shadow_price", mh_price)) if shadow else mh_price
                 dec = {"rt": rt, "date": ds, "currency": cur, "days_out": days_out, "season": season,
                        "avail": avail, "units": units, "mh_price": mh_price, "current": current, "proposed": current,
-                       "min": None, "max": None,
+                       "min": None, "max": None, "style": style,
                        "target": None, "status": status, "write": False, "kind": "hold",
                        "why": [], "blocked": []}
                 decisions.append(dec)
@@ -380,6 +450,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                     dec["proposed"], dec["kind"] = new, "correction"
                     dec["write"] = can_write and not shadow
                     corrections += 1
+                    if can_write and abs(new - current) / current > 0.10:
+                        per_rt[rt][2] += 1
                     dec["why"].append(f"Today: {_fmt(cur, current)} -> {_fmt(cur, new)}.")
                     continue
 
@@ -415,7 +487,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 base = start * (1 + wk) * (1 + ev_pct)
                 adj = dm["target_adj"][status]
                 raw = base * (1 + lu) * (1 + adj)
-                band = _band(days_out, cfg)
+                band = _band(days_out, pc)
                 high = base * (1 + float(band["up"]))
                 if band["down"] == "min":
                     low = mn
@@ -425,7 +497,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                     low = base * (1 - float(band["down"]))
                 if days_out >= 2:
                     # the minimum itself is kept for the night before arrival day
-                    guard = mn + cfg.get("min_guard_share", 0.25) * max(0.0, start - mn)
+                    guard = mn + pc.get("min_guard_share", 0.25) * max(0.0, start - mn)
                     low = max(low, guard) if band["down"] != "min" else max(low, mn + (guard - mn) * 0.5)
                 target = min(max(raw, low), high)
                 last_days_behind = 1 <= days_out <= 3 and status in ("behind", "far_behind") and not pickup
@@ -435,6 +507,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 dec["target"] = round(target, 2)
 
                 dec["why"].append(f"{season.replace('_', ' ').capitalize()} season: start {_fmt(cur, start)}.")
+                if style == "aggressive":
+                    dec["why"].append("Aggressive mode (fill the month): lowers faster and further when selling slowly.")
                 if wk:
                     dec["why"].append(f"{dday.strftime('%A')} night +{wk:.0%}.")
                 if ev_pct:
@@ -541,6 +615,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 if can_write:
                     changed += 1
                     per_rt[rt][1] += 1
+                    if abs(new - current) / current > 0.10:
+                        per_rt[rt][2] += 1
                 dec["why"].append(f"Today: {_fmt(cur, current)} -> {_fmt(cur, new)} ({(new - current) / current:+.0%}).")
 
                 lo_s, hi_s = cfg["safety"]["price_vs_start"]
@@ -569,13 +645,18 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
             stop_rt(rt, msg + ".")
         else:
             warnings.append(msg + "; those dates were left alone.")
-    # run-wide check, over the room types that were not stopped
+    # Run-wide check, over the room types that were not stopped: a big change (more than 10%
+    # in one run, min/max corrections included) on many dates at once looks like a problem
+    # (wrong data, a typo in your prices), not like demand. Small daily steps are the normal
+    # way prices walk to their target and are not counted. Big changes right after you changed
+    # your own minimum/start/maximum (by less than double or half) are allowed.
     considered = sum(v[0] for r, v in per_rt.items() if r not in stopped_rts)
     changed = sum(v[1] for r, v in per_rt.items() if r not in stopped_rts)
-    share = changed / considered if considered else 0.0
+    big = sum(v[2] for r, v in per_rt.items() if r not in stopped_rts and rule_change.get(r) not in ("new", "modest"))
+    share = big / considered if considered else 0.0
     warm = (today - _d(meta["first_run_day"])).days < cfg["safety"].get("warmup_days", 3)
     if share > cfg["safety"]["max_share_changed"]:
-        msg = f"{changed} of {considered} prices would move in one run ({share:.0%})"
+        msg = f"{big} of {considered} prices would change by more than 10% in one run ({share:.0%})"
         if warm:
             warnings.append(msg + "; allowed during the first days after switching on.")
         else:
@@ -623,6 +704,10 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 st["shadow_price"] = dec["current"]
     if main_run and ok:
         meta["last_main_day"] = today_s
+    if ok:
+        for rt, v in per_rt.items():
+            if rt not in stopped_rts and len(v) > 3:
+                seen[rt] = v[3]
 
     for rt in list(state):
         if rt == "_meta":

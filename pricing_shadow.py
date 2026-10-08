@@ -179,6 +179,37 @@ def _season_cell(table, rt, s):
 
 
 LOADER_WARNINGS: list = []
+SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "calm_settings.json")
+OLD_ENGINE_RTS = {"ROOMS", "MAXELA", "BIG_APT", "FREEDOM", "ORBE_1", "ORBE_2"}
+
+
+def load_settings_file(path: str | None = None) -> dict:
+    """calm_settings.json in the repo: which room types are live, their style, protected/aggressive dates."""
+    try:
+        with open(path or SETTINGS_FILE) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as e:
+        LOADER_WARNINGS.append(f"calm_settings.json could not be read ({e}); ignored.")
+        return {}
+
+
+def merge_settings(base: dict, over: dict) -> dict:
+    """Firestore settings (over) win over the file (base); room_types merged per room type; date_rules added."""
+    out = {k: v for k, v in base.items()}
+    for k, v in (over or {}).items():
+        if k == "room_types" and isinstance(v, dict):
+            rts = {rt: dict(x) for rt, x in (out.get("room_types") or {}).items()}
+            for rt, x in v.items():
+                rts.setdefault(rt, {}).update(x or {})
+            out["room_types"] = rts
+        elif k == "date_rules" and isinstance(v, list):
+            out["date_rules"] = list(out.get("date_rules") or []) + v
+        else:
+            out[k] = v
+    return out
 
 
 def load_rules(db, repo_config: dict) -> tuple[dict, dict]:
@@ -215,7 +246,7 @@ def load_rules(db, repo_config: dict) -> tuple[dict, dict]:
                     rules.setdefault(rt, {}).setdefault(cur, {})[s] = vals
                 else:
                     LOADER_WARNINGS.append(f"engine_v2 rules {rt} {cur} {s}: incomplete, ignored.")
-    settings = v2.get("settings") or {}
+    settings = merge_settings(load_settings_file(), v2.get("settings") or {})
     # season months and exact date ranges from the pricing page
     if page.get("dateOverrides") is not None:
         settings["date_overrides"] = page["dateOverrides"]
@@ -266,10 +297,10 @@ def load_events(db) -> dict:
     return events
 
 
-def load_state(db) -> dict:
+def load_state(db, prefix: str = "shadow_") -> dict:
     state = {}
     for rt in list(ROOM_TYPES) + ["_meta"]:
-        snap = db.collection("pricing_engine_state").document(f"shadow_{rt}").get()
+        snap = db.collection("pricing_engine_state").document(f"{prefix}{rt}").get()
         if snap.exists:
             state[rt] = (snap.to_dict() or {}).get("data", {})
     return state
@@ -279,9 +310,10 @@ def load_state(db) -> dict:
 # saving (shadow results only)
 # --------------------------------------------------------------------------
 
-def save(db, now: datetime, state: dict, result: dict, extra: dict | None = None):
+def save(db, now: datetime, state: dict, result: dict, extra: dict | None = None,
+         prefix: str = "shadow_", daily_coll: str = "pricing_shadow_daily", runs_coll: str = "pricing_shadow_runs"):
     for rt, data in state.items():
-        db.collection("pricing_engine_state").document(f"shadow_{rt}").set({"data": data, "ts": now.isoformat()})
+        db.collection("pricing_engine_state").document(f"{prefix}{rt}").set({"data": data, "ts": now.isoformat()})
     day = now.date().isoformat()
     by_rt = {}
     for d in result["decisions"]:
@@ -295,9 +327,9 @@ def save(db, now: datetime, state: dict, result: dict, extra: dict | None = None
             "avail": d["avail"], "kind": d["kind"], "why": d["why"][-4:], "blocked": d["blocked"][:2],
         }
     for rt, dates in by_rt.items():
-        db.collection("pricing_shadow_daily").document(f"{day}_{rt}").set(
+        db.collection(daily_coll).document(f"{day}_{rt}").set(
             {"day": day, "rt": rt, "last_run": now.isoformat(), "dates": dates}, merge=True)
-    db.collection("pricing_shadow_runs").add({
+    db.collection(runs_coll).add({
         "ts": now.isoformat(), "day": day, "ok": result["ok"], "main_run": result["main_run"],
         "stopped_room_types": result.get("stopped_room_types", []),
         "alerts": result["alerts"][:20], "warnings": result["warnings"][:20],
@@ -314,7 +346,9 @@ def build_config(rules: dict, settings: dict, events: dict) -> dict:
     for rt, over in (settings.get("room_types") or {}).items():
         cfg["room_types"].setdefault(rt, {}).update(over)
     # Room types without any minimum/start/maximum are not read or calculated at all.
-    cfg["room_types"] = {rt: v for rt, v in cfg["room_types"].items() if rules.get(rt)}
+    # Room types switched to the live engine are handled by pricing_calm_live.py, not here.
+    cfg["room_types"] = {rt: v for rt, v in cfg["room_types"].items()
+                         if rules.get(rt) and not (v.get("engine") == "live" and rt not in OLD_ENGINE_RTS)}
     cfg["rules"] = rules
     cfg["events"] = {**events, **cfg.get("events", {})}
     # Shadow test: always the fixed default booking timing (a settings document cannot switch it on).

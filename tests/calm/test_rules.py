@@ -248,17 +248,18 @@ def test_stop_when_data_incomplete():
             assert d["proposed"] == d["current"]
 
 
-def test_stop_when_too_many_changes():
+def test_stop_when_too_many_big_changes():
+    """Many prices jumping more than 10% at once (prices unchanged by you) looks like a problem: stop."""
     rts = {"P": {"units": 7, "group": "g", "currencies": ["GEL"], "status": "live"}}
-    cfg = cfg_for(rts, {"P": flat_rules(mn=100, start=255, mx=400)})
-    cfg["safety"]["max_share_changed"] = 0.10
-    old_state = {"_meta": {"first_run_day": "2026-09-01"}}   # switched on long ago
-    res = run(snap(9, {"P": inventory(7, 255, avail_fn=lambda i: 0 if i % 2 else 1)}), cfg, old_state)
-    assert res["changed"] / max(1, res["considered"]) > 0.10
+    rules = {"P": flat_rules(mn=100, start=255, mx=300)}
+    cfg = cfg_for(rts, rules)
+    seen = {"P": {"GEL": {s: [100.0, 255.0, 300.0] for s in ["low", "mid", "high", "peak", "xmas_low", "new_year"]}}}
+    old_state = {"_meta": {"first_run_day": "2026-09-01", "rules_seen": seen}}   # switched on long ago
+    res = run(snap(9, {"P": inventory(7, 400)}), cfg, old_state)        # every price far above the maximum
     assert not res["ok"] and res["writes"] == []
     # first days after switching on: allowed, with a warning
-    res2 = run(snap(9, {"P": inventory(7, 255, avail_fn=lambda i: 0 if i % 2 else 1)}), cfg, {})
-    assert res2["ok"] and res2["warnings"]
+    res2 = run(snap(9, {"P": inventory(7, 400)}), cfg, {})
+    assert res2["ok"] and res2["corrections"] == 91
 
 
 def test_suggest_mode_never_writes():
@@ -656,10 +657,11 @@ def test_decisions_carry_minihotel_price_and_bounds():
 
 def test_stopped_run_reports_the_price_really_kept():
     cfg = _one(rt_units=7, mn=100, start=200, mx=300)
-    s = snap(9, {"S": inventory(7, 200, avail_fn=lambda i: 0 if i % 2 else 1)})
+    s = snap(9, {"S": inventory(7, 400)})                               # prices far above the maximum: big changes
     s["shadow"] = True
     ds = (TODAY + timedelta(days=10)).isoformat()
-    state = {"_meta": {"first_run_day": "2026-01-01"},
+    seen = {"S": {"GEL": {x: [100.0, 200.0, 300.0] for x in ["low", "mid", "high", "peak", "xmas_low", "new_year"]}}}
+    state = {"_meta": {"first_run_day": "2026-01-01", "rules_seen": seen},
              "S": {ds: {"GEL": {"shadow_price": 50}}}}
     cfg["safety"]["max_share_changed"] = 0.05
     res = run(s, cfg, state)
@@ -778,3 +780,140 @@ def test_safe_settings_are_kept():
                   "occupancy_goal": {"vgl": 0.9}})
     assert cfg["calm"]["daily_down"] == 0.04 and cfg["weekend"]["pct"] == 0.10
     assert cfg["occupancy_goal"]["vgl"] == 0.9 and cfg["_settings_warnings"] == []
+
+
+
+# ---------------------------------------------------------------------------
+# Modes and protected dates (8 Oct 2026)
+# ---------------------------------------------------------------------------
+
+def _two_singles(style_a="normal", style_b="aggressive", rules=None):
+    rts = {"A": {"units": 1, "group": "a", "currencies": ["GEL"], "status": "live", "style": style_a},
+           "B": {"units": 1, "group": "b", "currencies": ["GEL"], "status": "live", "style": style_b}}
+    cfg = cfg_for(rts, {"A": flat_rules(mn=100, start=200, mx=300), "B": flat_rules(mn=100, start=200, mx=300)})
+    cfg["safety"]["max_share_changed"] = 1.0
+    cfg["weekend"]["pct"] = 0.0
+    cfg["date_rules"] = rules or []
+    return cfg
+
+
+def _walk(cfg, days=8):
+    """Empty units, the morning run every day: where do the prices end up?"""
+    prices, state = {}, {}
+    for day in range(days):
+        inv = {}
+        for rt in cfg["room_types"]:
+            inv[rt] = {}
+            for i in range(91):
+                ds = (TODAY + timedelta(days=day + i)).isoformat()
+                inv[rt][ds] = {"avail": 1, "prices": {"GEL": prices.get((rt, ds), 200)}}
+        res = run(snap(9, inv, day_offset=day), cfg, state)
+        state = res["state"]
+        for w in res["writes"]:
+            prices[(w["rt"], w["date"])] = w["price"]
+    return prices
+
+
+def test_aggressive_lowers_further_than_normal_but_within_the_rules():
+    cfg = _two_singles()
+    prices = _walk(cfg)
+    ds = (TODAY + timedelta(days=20)).isoformat()
+    a, b = prices.get(("A", ds), 200), prices.get(("B", ds), 200)
+    assert b < a, (a, b)
+    # after 8 mornings this date is 13 days out: band 8-14 = -12% normal, -20% aggressive
+    assert a >= 200 * 0.88 - 5 and b >= 200 * 0.80 - 5
+    for (rt, d), p in prices.items():
+        assert p >= 100
+    far = (TODAY + timedelta(days=75)).isoformat()
+    assert prices.get(("B", far), 200) >= 200 * 0.95 - 5          # far months still only a little
+
+
+def test_aggressive_daily_drop_is_capped():
+    cfg = _two_singles("aggressive", "aggressive")
+    s = snap(9, {"A": inventory(1, 200), "B": inventory(1, 200)})
+    res = run(s, cfg, {})
+    for d in res["decisions"]:
+        if d["kind"] == "move" and d["proposed"] < d["current"] and d["days_out"] > 3:
+            assert (d["current"] - d["proposed"]) / d["current"] <= 0.08 + 1e-9, d
+    assert res["decisions"][0]["proposed"] >= res["decisions"][0]["current"]   # arrival day never lowered
+
+
+def test_aggressive_date_rule_for_one_month_and_one_room():
+    rules = [{"from": (TODAY + timedelta(days=15)).isoformat(), "to": (TODAY + timedelta(days=30)).isoformat(),
+              "rooms": ["A"], "action": "aggressive", "note": "fill November"}]
+    cfg = _two_singles("normal", "normal", rules)
+    res = run(snap(9, {"A": inventory(1, 200), "B": inventory(1, 200)}), cfg, {})
+    a = decision(res, "A", (TODAY + timedelta(days=20)).isoformat())
+    b = decision(res, "B", (TODAY + timedelta(days=20)).isoformat())
+    assert a["style"] == "aggressive" and b["style"] == "normal"
+    assert a["target"] < b["target"]
+    assert decision(res, "A", (TODAY + timedelta(days=40)).isoformat())["style"] == "normal"
+
+
+def test_protected_dates_are_left_completely_alone():
+    ny_from, ny_to = (TODAY + timedelta(days=10)).isoformat(), (TODAY + timedelta(days=12)).isoformat()
+    rules = [{"from": ny_from, "to": ny_to, "rooms": "all", "action": "protect", "note": "New Year"}]
+    cfg = _two_singles("aggressive", "normal", rules)
+    inv = {"A": inventory(1, 200), "B": inventory(1, 200)}
+    inv["A"][ny_from]["prices"]["GEL"] = 999          # far above the maximum: still untouched
+    res = run(snap(9, inv), cfg, {})
+    for rt in ("A", "B"):
+        for k in range(10, 13):
+            d = decision(res, rt, (TODAY + timedelta(days=k)).isoformat())
+            assert d["kind"] == "protected" and d["proposed"] == d["current"] and "New Year" in d["why"][0]
+    assert all(w["date"] not in (ny_from, ny_to) for w in res["writes"])
+
+
+def test_bad_date_rules_and_styles_are_ignored():
+    cfg = merged({"date_rules": [{"from": "2026-12-31", "to": "2026-12-01", "action": "protect"},
+                                 {"from": "2026-12-24", "to": "2027-01-14", "action": "delete everything"},
+                                 {"from": "2026-12-24", "to": "2027-01-14", "action": "protect", "rooms": "all"}],
+                  "room_types": {"XCV_1": {"style": "crazy"}}})
+    assert len(cfg["date_rules"]) == 1 and cfg["date_rules"][0]["action"] == "protect"
+    assert cfg["room_types"]["XCV_1"]["style"] == "normal"
+    assert sum("date_rules" in w for w in cfg["_settings_warnings"]) == 2
+
+
+
+# ---------------------------------------------------------------------------
+# Safety stop counts big jumps only (8 Oct 2026): a slow walk must not freeze
+# ---------------------------------------------------------------------------
+
+def test_slow_daily_walk_is_never_stopped():
+    """An empty single apartment above its normal price walks down a little every morning for weeks."""
+    cfg = _one(rt_units=1, mn=85, start=110, mx=140)
+    cfg["safety"]["max_share_changed"] = 0.40
+    prices, state, stops = {}, {}, 0
+    for day in range(14):
+        inv = {}
+        for i in range(91):
+            ds = (TODAY + timedelta(days=day + i)).isoformat()
+            inv[ds] = {"avail": 1, "prices": {"GEL": prices.get(ds, 200)}}
+        res = run(snap(9, {"S": inv}, day_offset=day), cfg, state)
+        state = res["state"]
+        stops += not res["ok"]
+        for w in res["writes"]:
+            prices[w["date"]] = w["price"]
+    assert stops == 0
+    far = (TODAY + timedelta(days=60)).isoformat()
+    assert prices[far] < 140                         # it kept walking after the first 3 days
+
+
+def test_your_own_rule_change_may_move_prices_at_once():
+    cfg = _one(rt_units=7, mn=100, start=200, mx=300)
+    cfg["safety"]["max_share_changed"] = 0.40
+    seen = {"S": {"GEL": {x: [100.0, 200.0, 400.0] for x in ["low", "mid", "high", "peak", "xmas_low", "new_year"]}}}
+    state = {"_meta": {"first_run_day": "2026-01-01", "rules_seen": seen}}
+    res = run(snap(9, {"S": inventory(7, 380)}), cfg, state)             # you lowered max 400 -> 300
+    assert res["ok"] and res["corrections"] > 0
+    assert any("changed; prices may follow" in w for w in res["warnings"])
+
+
+def test_typo_in_your_prices_is_not_applied_at_once():
+    cfg = _one(rt_units=7, mn=10, start=20, mx=30)                       # typed 10/20/30 instead of 100/200/300
+    cfg["safety"]["max_share_changed"] = 0.40
+    seen = {"S": {"GEL": {x: [100.0, 200.0, 300.0] for x in ["low", "mid", "high", "peak", "xmas_low", "new_year"]}}}
+    state = {"_meta": {"first_run_day": "2026-01-01", "rules_seen": seen}}
+    res = run(snap(9, {"S": inventory(7, 200)}), cfg, state)
+    assert not res["ok"] and res["writes"] == []
+    assert any("more than double or half" in w for w in res["warnings"])

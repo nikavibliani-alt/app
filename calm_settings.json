@@ -1,0 +1,10 @@
+{
+  "_about": "Calm pricing engine settings. engine: live = the new engine sets this room type's prices (never the six the current engine prices). style: normal or aggressive (fills the month: lowers faster and further when selling slowly). date_rules: protect = the engine leaves those dates alone; aggressive / normal = style for those dates only.",
+  "room_types": {
+    "XCV_1": {"engine": "live", "style": "normal", "portals": ["BOOKING", "AIRBNB"]},
+    "XCV_2": {"engine": "live", "style": "normal", "portals": ["BOOKING", "AIRBNB"]}
+  },
+  "date_rules": [
+    {"from": "2026-12-24", "to": "2027-01-14", "rooms": "all", "action": "protect", "note": "New Year, set by hand"}
+  ]
+}

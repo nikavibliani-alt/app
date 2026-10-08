@@ -91,10 +91,39 @@ DEFAULTS = {
         {"name": "xmas_low", "ranges": [["12-01", "12-23"]]},
     ],
     "date_overrides": [],   # [{"from": "MM-DD", "to": "MM-DD", "season": "peak"}]
+    # Date rules, newest wins when several match:
+    #   {"from": "YYYY-MM-DD", "to": "YYYY-MM-DD", "rooms": "all" | ["XCV_1", ...],
+    #    "action": "protect" | "aggressive" | "normal", "note": "New Year"}
+    # protect    = the engine leaves those dates completely alone (you set them by hand)
+    # aggressive = "fill the month": lower faster and further when selling slower than normal
+    "date_rules": [],
     "events": {},           # {"YYYY-MM-DD": {"label": "...", "pct": 0.30}}
     "room_types": {},       # filled by the caller
     "rules": {},            # {rt: {currency: {season: {"min":, "start":, "max":}}}}
 }
+
+
+# "Aggressive" style: used for a room type set to style "aggressive", or for dates covered
+# by an "aggressive" date rule. Lowers faster and further when selling slower than normal,
+# still never below your minimum, never on arrival day, and only in the one lowering run a day.
+AGGRESSIVE = {
+    "bands": [
+        {"from": 61, "to": 10_000, "down": 0.05, "up": 0.08},
+        {"from": 31, "to": 60,     "down": 0.10, "up": 0.12},
+        {"from": 15, "to": 30,     "down": 0.15, "up": 0.15},
+        {"from": 8,  "to": 14,     "down": 0.20, "up": 0.20},
+        {"from": 4,  "to": 7,      "down": 0.25, "up": 0.20},
+        {"from": 1,  "to": 3,      "down": "min", "up": 0.20},
+        {"from": 0,  "to": 0,      "down": "hold", "up": 0.20},
+    ],
+    "target_adj": {"far_ahead": 0.15, "ahead": 0.08, "on_track": -0.03, "behind": -0.12, "far_behind": -0.20},
+    "speed_down": {"far_ahead": 0.0, "ahead": 0.0, "on_track": 0.02, "behind": 0.04, "far_behind": 0.06},
+    "daily_down": 0.08,
+    "min_guard_share": 0.10,
+    "occupancy_goal_floor": 0.92,
+}
+STYLES = ("normal", "aggressive")
+RULE_ACTIONS = ("protect", "aggressive", "normal")
 
 
 # Settings whose keys are numbers of days: replaced as a whole, keys made numeric
@@ -199,6 +228,25 @@ def apply_limits(cfg: dict) -> list:
         cfg["cascade"] = dict(DEFAULTS["cascade"])
     for g, v in list((cfg.get("occupancy_goal") or {}).items()):
         cfg["occupancy_goal"][g] = _check(v, 0.85, 0.5, 0.98, f"occupancy_goal.{g}", problems)
+    # date rules: well-formed or dropped
+    good = []
+    for r in cfg.get("date_rules") or []:
+        try:
+            from datetime import date as _date
+            ok = (isinstance(r, dict) and r.get("action") in RULE_ACTIONS
+                  and _date.fromisoformat(str(r["from"])) <= _date.fromisoformat(str(r["to"]))
+                  and (r.get("rooms", "all") == "all" or isinstance(r.get("rooms"), list)))
+        except (KeyError, TypeError, ValueError):
+            ok = False
+        if ok:
+            good.append(r)
+        else:
+            problems.append(f"setting date_rules entry {r!r} is not valid; ignored.")
+    cfg["date_rules"] = good
+    for rt, info in list((cfg.get("room_types") or {}).items()):
+        if isinstance(info, dict) and info.get("style") not in (None,) + STYLES:
+            problems.append(f"setting room_types.{rt}.style={info.get('style')!r} is not valid; normal used.")
+            info["style"] = "normal"
     return problems
 
 
