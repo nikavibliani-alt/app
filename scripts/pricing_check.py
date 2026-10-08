@@ -712,14 +712,18 @@ def live_report(result):
         if not decs:
             print("  not calculated (no usable prices, or a safety stop)")
             continue
-        full = sum(1 for d in decs if d["avail"] == 0)
-        norules = sum(1 for d in decs if d["avail"] != 0 and d["min"] is None)
+        full_dates = {d["date"] for d in decs if d["avail"] == 0}
+        noprice = {d["date"] for d in decs if d["avail"] != 0 and any("No current price" in w for w in d["why"])}
+        norules = {d["date"] for d in decs if d["avail"] != 0 and any("No minimum/start/maximum" in w or "not in order" in w for w in d["why"])}
         moved = [d for d in decs if d["kind"] in ("move", "correction") and d["proposed"] != d["current"]]
         stopped = [d for d in decs if d["kind"] == "stopped"]
         dates_moved = sorted({d["date"] for d in moved})
         by_cur = {c: sum(1 for d in moved if d["currency"] == c) for c in ("GEL", "USD")}
-        print(f"  Dates seen {len({d['date'] for d in decs})} | fully booked {full // max(1, len({d['currency'] for d in decs}))}"
-              f" | left alone (season has no complete prices) {norules // max(1, len({d['currency'] for d in decs}))}")
+        print(f"  Dates seen {len({d['date'] for d in decs})} | fully booked {len(full_dates)}"
+              f" | left alone, MiniHotel has no price {len(noprice)}"
+              + (f" (first {sorted(noprice)[0]}, last {sorted(noprice)[-1]})" if noprice else "")
+              + f" | left alone, season prices incomplete {len(norules)}"
+              + (f" (first {sorted(norules)[0]}, last {sorted(norules)[-1]})" if norules else ""))
         print(f"  Would change on the first run: {len(dates_moved)} dates "
               f"(Booking GEL prices {by_cur['GEL']}, Airbnb EUR list prices {by_cur['USD']})"
               + (f" | held back by a safety stop: {len(stopped)}" if stopped else ""))
