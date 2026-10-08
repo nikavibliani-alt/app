@@ -581,14 +581,85 @@ def check_dryrun():
 # ---------------------------------------------------------------------------
 # --check shadow: run the calm engine in print-only mode
 # ---------------------------------------------------------------------------
+SHADOW_BANDS = [("0-3", 0, 3), ("4-7", 4, 7), ("8-14", 8, 14), ("15-30", 15, 30), ("31-60", 31, 60), ("61-90", 61, 10 ** 6)]
+SHADOW_STATUSES = ["far_behind", "behind", "on_track", "ahead", "far_ahead"]
+
+
+def _band(days):
+    for name, lo, hi in SHADOW_BANDS:
+        if lo <= days <= hi:
+            return name
+    return None
+
+
+def shadow_summary(result, cfg):
+    """Per room type and currency: up/down/same, bands, demand status, 5 biggest down moves.
+    'Change' = the new engine's price after this run versus the price now in MiniHotel."""
+    hdr("SHADOW SUMMARY (new engine price vs the price now in MiniHotel; nothing saved)")
+    print("Fully booked = no free unit. 'not priced' = no min/start/max set, or no price in MiniHotel.")
+    print("Demand status counts leave out fully booked dates.")
+    groups = defaultdict(list)
+    for d in result["decisions"]:
+        groups[(d["rt"], d["currency"])].append(d)
+    for (rt, cur) in sorted(groups):
+        decs = groups[(rt, cur)]
+        up, down, same, full, unpriced = [], [], [], 0, 0
+        band = {b[0]: {"up": 0, "down": 0, "same": 0, **{st: 0 for st in SHADOW_STATUSES}} for b in SHADOW_BANDS}
+        for d in decs:
+            b = _band(d["days_out"])
+            if d["avail"] == 0:
+                full += 1
+                continue
+            if d["min"] is None or d["mh_price"] <= 0:
+                unpriced += 1
+                continue
+            change = (d["proposed"] - d["mh_price"]) / d["mh_price"] * 100
+            kind = "up" if d["proposed"] > d["mh_price"] else "down" if d["proposed"] < d["mh_price"] else "same"
+            {"up": up, "down": down, "same": same}[kind].append(change)
+            if b:
+                band[b][kind] += 1
+                if d["status"] in SHADOW_STATUSES:
+                    band[b][d["status"]] += 1
+
+        def avg(l):
+            return f"{sum(l) / len(l):+.1f}%" if l else "n/a"
+        print(f"\n=== {rt} {cur} ===  dates {len(decs)}")
+        print(f"  up {len(up)} (avg {avg(up)}) | down {len(down)} (avg {avg(down)}) | same {len(same)} | "
+              f"fully booked {full} | not priced {unpriced}")
+        print(f"  {'days':6} {'up':>4} {'down':>5} {'same':>5} | " + " ".join(f"{st:>10}" for st in SHADOW_STATUSES))
+        for name, _, _ in SHADOW_BANDS:
+            r = band[name]
+            print(f"  {name:6} {r['up']:>4} {r['down']:>5} {r['same']:>5} | " + " ".join(f"{r[st]:>10}" for st in SHADOW_STATUSES))
+        downs = [d for d in decs if d["avail"] != 0 and d["min"] is not None and d["mh_price"] > 0 and d["proposed"] < d["mh_price"]]
+        downs.sort(key=lambda d: (d["proposed"] - d["mh_price"]) / d["mh_price"])
+        if downs:
+            print("  5 biggest down moves: date | days | MiniHotel | new | target | min | start | max | demand | last reasons")
+            for d in downs[:5]:
+                start = ((cfg.get("rules") or {}).get(rt, {}).get(cur, {}).get(d["season"]) or {}).get("start")
+                tgt = d["target"]
+                pct = (d["proposed"] - d["mh_price"]) / d["mh_price"] * 100
+                print(f"    {d['date']} | {d['days_out']} | {d['mh_price']:g} | {d['proposed']:g} ({pct:+.1f}%) | "
+                      f"{'-' if tgt is None else format(tgt, 'g')} | {d['min']:g} | {'-' if start is None else format(start, 'g')} | "
+                      f"{d['max']:g} | {d['status']} | {' / '.join(d['why'][-3:])[:230]}")
+        else:
+            print("  no down moves")
+
 
 def check_shadow():
     hdr("SHADOW CHECK: pricing_shadow.py --print (calculates and prints, saves nothing)")
     import pricing_shadow
+    captured = {}
+    _orig_build = pricing_shadow.build_config
+
+    def _capture(*a, **k):  # keep the engine's config to read the start prices (no extra reads)
+        captured["cfg"] = _orig_build(*a, **k)
+        return captured["cfg"]
+    pricing_shadow.build_config = _capture
     result = pricing_shadow.main(["--print"])
     print(f"\nMiniHotel writes produced by the shadow engine: {len(result['writes'])}")
     print(f"Attempted non-GET requests to MiniHotel (blocked by the check's guard): {len(BLOCKED)}")
     print("Nothing was sent to MiniHotel and nothing was saved (--print).")
+    shadow_summary(result, captured.get("cfg") or {})
     if result["writes"] or BLOCKED:
         sys.exit(1)
 
