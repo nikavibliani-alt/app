@@ -795,6 +795,22 @@ def check_live():
     if result.get("sent") or BLOCKED:
         sys.exit(1)
 
+# ---------------------------------------------------------------------------
+# --check overrides: shape of pricing_config/rules.dateOverrides (read only)
+# ---------------------------------------------------------------------------
+
+def check_overrides():
+    hdr("RULES SHAPE: pricing_config/rules")
+    db = init_firestore()
+    d = db.collection("pricing_config").document("rules").get().to_dict() or {}
+    for k, v in d.items():
+        print(f"  {k}: {type(v).__name__}" + (f" (len {len(v)})" if hasattr(v, "__len__") else ""))
+    ov = d.get("dateOverrides")
+    print("\ndateOverrides type:", type(ov).__name__)
+    print("dateOverrides value:", json.dumps(ov, default=str)[:1500])
+    ms = d.get("monthSeasons")
+    print("monthSeasons value:", json.dumps(ms, default=str)[:500])
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -808,6 +824,9 @@ def main():
         return
     if args.check == "live":
         check_live()
+        return
+    if args.check == "overrides":
+        check_overrides()
         return
     if args.check != "step1":
         raise SystemExit(f"unknown check: {args.check}")
