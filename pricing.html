@@ -116,9 +116,9 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
 .loading{text-align:center;padding:1.5rem;color:var(--text-muted);font-size:.85rem}
 .rng-form,.eng-row2{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
 .dp{position:relative;display:inline-flex;align-items:center}
-.dp svg{position:absolute;left:.55rem;width:18px;height:18px;pointer-events:none;color:var(--text-muted)}
+.dp svg{position:absolute;left:.55rem;width:18px;height:18px;color:var(--text-muted);cursor:pointer}
 .dp input[type=date]{padding:.5rem .5rem .5rem 2.1rem;border:1px solid var(--border);border-radius:var(--radius-el);font-size:16px;font-family:inherit;color:var(--text-main);background:var(--card-bg);min-height:40px;min-width:0;width:11.5rem;accent-color:var(--primary)}
-.dp input[type=date]::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.dp input[type=date]::-webkit-calendar-picker-indicator{display:none}
 .fld{padding:.5rem .6rem;border:1px solid var(--border);border-radius:var(--radius-el);font-size:16px;font-family:inherit;color:var(--text-main);background:var(--card-bg);min-height:40px;accent-color:var(--primary)}
 .btn-add{padding:.5rem 1.1rem;min-height:40px;font-size:.9rem;font-weight:600;color:#fff;background:var(--primary);border:1px solid var(--primary);border-radius:var(--radius-el);cursor:pointer;font-family:inherit}
 .btn-x{background:none;border:0;color:var(--text-muted);cursor:pointer;padding:.35rem;line-height:0;min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center}
@@ -499,6 +499,13 @@ async function loadHistory(){
 }
 
 
+/* ---------- calendar pickers: clicking the icon or the field opens the calendar; typing also works ---------- */
+document.addEventListener("click",e=>{
+  const dp=e.target.closest&&e.target.closest(".dp"); if(!dp) return;
+  const inp=dp.querySelector("input[type=date]"); if(!inp) return;
+  try{ if(inp.showPicker) inp.showPicker(); else inp.focus(); }catch(_){ inp.focus(); }
+});
+
 /* ---------- pause switch (pricing_config/control) ---------- */
 function paintPause(paused){
   $("pauseOn").className = paused ? "" : "on-active";
@@ -746,10 +753,19 @@ const XICON='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke=
 const mdOf=iso=>/^\d{4}-\d{2}-\d{2}$/.test(iso||"")?iso.slice(5):null;
 function setMsg(id,text,cls){ const m=$(id); if(!m) return; m.className=cls||""; m.textContent=text||""; }
 
+// Firestore may hold dateOverrides as a list (normal) or as a map (an empty {} is what the live
+// document has). Always work with a list of {from,to,season}; saving writes a list.
+function ovList(){
+  const src=pendingEdits["dateOverrides"]??rules?.dateOverrides;
+  if(Array.isArray(src)) return src.filter(o=>o&&typeof o==="object");
+  if(src&&typeof src==="object") return Object.values(src).filter(o=>o&&typeof o==="object"&&o.from&&o.to);
+  return [];
+}
+
 function renderDateOverrides(){
   const el=$("dateOverrideList");
   if(!el) return;
-  const overrides=pendingEdits["dateOverrides"]??rules?.dateOverrides??[];
+  const overrides=ovList();
   if(!overrides.length){
     el.innerHTML='<div class="muted" style="font-size:.78rem">No date ranges set</div>';
     return;
@@ -772,25 +788,29 @@ window.updateOrPreview=()=>{
 };
 
 window.addDateOverride=()=>{
-  const f=mdOf($("orFrom").value), t=mdOf($("orTo").value), season=$("orSeason").value;
-  if(!f||!t){ setMsg("orMsg","Pick both dates with the calendar buttons.","msg-err"); return; }
-  const current=[...(pendingEdits["dateOverrides"]??rules?.dateOverrides??[])];
-  if(current.some(o=>o.from===f&&o.to===t&&o.season===season)){ setMsg("orMsg","That range is already in the list.","msg-err"); return; }
-  current.push({from:f,to:t,season});
-  pendingEdits["dateOverrides"]=current;
-  markDirty();
-  $("orFrom").value=""; $("orTo").value=""; $("orPreview").textContent="";
-  setMsg("orMsg","Added. Press Save changes at the bottom to keep it.","msg-ok");
-  renderDateOverrides();
+  try{
+    const f=mdOf($("orFrom").value), t=mdOf($("orTo").value), season=$("orSeason").value;
+    if(!f||!t){ setMsg("orMsg","Pick both dates with the calendar buttons.","msg-err"); return; }
+    const current=[...ovList()];
+    if(current.some(o=>o.from===f&&o.to===t&&o.season===season)){ setMsg("orMsg","That range is already in the list.","msg-err"); return; }
+    current.push({from:f,to:t,season});
+    pendingEdits["dateOverrides"]=current;
+    markDirty();
+    $("orFrom").value=""; $("orTo").value=""; $("orPreview").textContent="";
+    setMsg("orMsg","Added. Press Save changes at the bottom to keep it.","msg-ok");
+    renderDateOverrides();
+  }catch(e){ setMsg("orMsg","Could not add the range: "+e.message,"msg-err"); }
 };
 
 window.removeDateOverride=i=>{
-  const current=[...(pendingEdits["dateOverrides"]??rules?.dateOverrides??[])];
-  current.splice(i,1);
-  pendingEdits["dateOverrides"]=current;
-  markDirty();
-  setMsg("orMsg","Removed. Press Save changes at the bottom to keep it.","msg-ok");
-  renderDateOverrides();
+  try{
+    const current=[...ovList()];
+    current.splice(i,1);
+    pendingEdits["dateOverrides"]=current;
+    markDirty();
+    setMsg("orMsg","Removed. Press Save changes at the bottom to keep it.","msg-ok");
+    renderDateOverrides();
+  }catch(e){ setMsg("orMsg","Could not remove the range: "+e.message,"msg-err"); }
 };
 
 /* ---------- New engine card (pricing_config/engine_v2, field "settings" only) ---------- */
@@ -864,7 +884,7 @@ document.addEventListener("click",e=>{
   engSetBase(code,field,val);
 });
 
-function engRulesNow(){ return pendingEdits["eng|rules"]??engFs?.date_rules??[]; }
+function engRulesNow(){ const v=pendingEdits["eng|rules"]??engFs?.date_rules; return Array.isArray(v)?v.filter(r=>r&&typeof r==="object"):(v&&typeof v==="object"?Object.values(v).filter(r=>r&&typeof r==="object"):[]); }
 function fmtFull(iso){
   const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||"");
   return m? `${parseInt(m[3],10)} ${MONTH_SHORT[parseInt(m[2],10)-1]} ${m[1]}` : String(iso||"");
@@ -879,14 +899,15 @@ function ruleHtml(r,idx){
 }
 function renderEngRules(){
   const el=$("engRuleList"); if(!el) return;
-  const fileRules=engFile?.date_rules??[];
+  const fileRules=Array.isArray(engFile?.date_rules)?engFile.date_rules:[];
   const own=engRulesNow();
   if(!fileRules.length&&!own.length){ el.innerHTML='<div class="muted" style="font-size:.78rem">No date rules</div>'; return; }
   el.innerHTML=fileRules.map(r=>ruleHtml(r,null)).join("")+own.map((r,i)=>ruleHtml(r,i)).join("");
 }
 window.engRoomsMode=()=>{ $("erPick").style.display=$("erRooms").value==="pick"?"flex":"none"; };
 window.engActionHelp=()=>{ const h=$("erHelp"); if(h) h.textContent=ACTION_HELP[$("erAction").value]||""; };
-window.addEngRule=()=>{
+window.addEngRule=()=>{ try{ addEngRuleInner(); }catch(e){ setMsg("erMsg","Could not add the rule: "+e.message,"msg-err"); } };
+function addEngRuleInner(){
   const from=$("erFrom").value, to=$("erTo").value, action=$("erAction").value;
   if(!from||!to){ setMsg("erMsg","Pick both dates with the calendar buttons.","msg-err"); return; }
   if(to<from){ setMsg("erMsg","The end date is before the start date.","msg-err"); return; }
@@ -902,7 +923,7 @@ window.addEngRule=()=>{
   document.querySelectorAll("#erPick input").forEach(i=>i.checked=false);
   setMsg("erMsg","Rule added. Press Save changes at the bottom to keep it.","msg-ok");
   renderEngRules();
-};
+}
 window.removeEngRule=i=>{
   const cur=[...engRulesNow()]; cur.splice(i,1);
   pendingEdits["eng|rules"]=cur;
