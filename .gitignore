@@ -21,3 +21,6 @@ firebase-debug*.log
 design-reference/
 whatsapp-functions/.env.*
 serviceAccountKey.json
+
+__pycache__/
+*.pyc
