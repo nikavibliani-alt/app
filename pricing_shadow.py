@@ -181,6 +181,7 @@ def _season_cell(table, rt, s):
 LOADER_WARNINGS: list = []
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "calm_settings.json")
 OLD_ENGINE_RTS = {"ROOMS", "MAXELA", "BIG_APT", "FREEDOM", "ORBE_1", "ORBE_2"}
+OLD_ENGINE_WINDOW_DAYS = 90
 
 
 def load_settings_file(path: str | None = None) -> dict:
@@ -349,6 +350,10 @@ def build_config(rules: dict, settings: dict, events: dict) -> dict:
     # Room types switched to the live engine are handled by pricing_calm_live.py, not here.
     cfg["room_types"] = {rt: v for rt, v in cfg["room_types"].items()
                          if rules.get(rt) and not (v.get("engine") == "live" and rt not in OLD_ENGINE_RTS)}
+    # The current engine only prices 90 days, so these six always use 90 whatever the settings say.
+    for rt in OLD_ENGINE_RTS:
+        if rt in cfg["room_types"]:
+            cfg["room_types"][rt]["window_days"] = OLD_ENGINE_WINDOW_DAYS
     cfg["rules"] = rules
     cfg["events"] = {**events, **cfg.get("events", {})}
     # Shadow test: always the fixed default booking timing (a settings document cannot switch it on).
@@ -373,7 +378,7 @@ def main(argv=None, db=None, get=requests.get, cookie_fn=None, now=None):
             from minihotel_auth import get_session_cookie
             cookie_fn = get_session_cookie
         live_rts = [rt for rt, v in cfg["room_types"].items() if v.get("status", "live") != "off"]
-        days = max([cfg["window_days"]] + [int(v.get("window_days") or 0) for v in cfg["room_types"].values()])
+        days = max([int(v.get("window_days") or 0) for v in cfg["room_types"].values()] or [OLD_ENGINE_WINDOW_DAYS])
         inventory = fetch_inventory(cookie_fn(), today, days, get=get, room_types=live_rts)
         reservations, skipped = load_reservations(db, today)
         learned = {}

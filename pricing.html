@@ -846,7 +846,7 @@ function engRoomHtml(code,label,canLive,first){
   const eng=engVal(code,"engine"), style=engVal(code,"style"), win=Number(engVal(code,"window_days"));
   const winOpts=WINDOWS.map(([d,l])=>[String(d),l]);
   const custom=WINDOWS.some(([d])=>d===win)?"":`<span class="eng-help">now ${win} days</span>`;
-  const fromFile=["engine","style","window_days"].some(f=>!(`eng|${code}|${f}` in pendingEdits)&&engBase(code,f).src==="file");
+  const fromFile=(canLive?["engine","style","window_days"]:["engine","style"]).some(f=>!(`eng|${code}|${f}` in pendingEdits)&&engBase(code,f).src==="file");
   return `<div class="eng-room ${first?"first":""}">
     <div class="eng-name">${esc(label)} ${fromFile?'<span class="eng-help" style="font-weight:400">· some values come from the settings file</span>':""}</div>
     <div class="eng-controls">
@@ -854,7 +854,7 @@ function engRoomHtml(code,label,canLive,first){
         ? segButtons(code,"engine",[["test","Test",""],["live","Live","good"]],eng)
         : '<span class="eng-help" style="font-size:.8rem;color:var(--text-main)">Test only (current engine sets the price)</span>'}</div>
       <div class="eng-ctl"><span>Mode</span>${segButtons(code,"style",[["normal","Normal",""],["aggressive","Aggressive","warn"]],style)}</div>
-      <div class="eng-ctl"><span>How far ahead</span><div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">${segButtons(code,"window_days",winOpts,String(win))}${custom}</div></div>
+      ${canLive?`<div class="eng-ctl"><span>How far ahead</span><div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">${segButtons(code,"window_days",winOpts,String(win))}${custom}</div></div>`:""}
     </div>
   </div>`;
 }

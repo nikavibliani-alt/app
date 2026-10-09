@@ -392,3 +392,13 @@ def test_real_minihotel_shape_availability_empty_default_has_free_units():
 def test_units_parser():
     assert ps._units("") is None and ps._units(None) is None and ps._units("x") is None
     assert ps._units(0) == 0 and ps._units("3") == 3 and ps._units(2.0) == 2
+
+
+def test_old_engine_rooms_always_use_90_days_whatever_the_settings_say():
+    today = date(2026, 10, 7)
+    db = seeded_db(today)
+    settings = {"window_days": 180, "room_types": {rt: {"window_days": 180} for rt in ps.OLD_ENGINE_RTS}}
+    rules, _ = ps.load_rules(db, ps.json.load(open(os.path.join(ROOT, "config.json"))))
+    cfg = ps.build_config(rules, settings, {})
+    for rt in ps.OLD_ENGINE_RTS:
+        assert cfg["room_types"][rt]["window_days"] == 90
