@@ -796,6 +796,37 @@ def check_live():
         sys.exit(1)
 
 # ---------------------------------------------------------------------------
+# --check xcvscan: XCV_1 / XCV_2, next 180 days: season prices, today's prices, targets (read only)
+# ---------------------------------------------------------------------------
+
+def check_xcvscan():
+    hdr("XCV SCAN: price boxes from the pricing page, then today vs target (nothing is written)")
+    db = init_firestore()
+    page = db.collection("pricing_config").document("rules").get().to_dict() or {}
+
+    def get(table, rt, s):
+        row = (table or {}).get(rt) if isinstance(table, dict) else None
+        c = row.get(s) if isinstance(row, dict) else None
+        return c
+
+    for rt in ("XCV_1", "XCV_2"):
+        for label, sk, rk in (("Booking GEL", "startPrices", "priceRules"), ("Airbnb EUR list", "startPricesEur", "eurRules")):
+            print(f"\n{rt} | {label} | season: min / start / max")
+            for s in LIVE_SEASONS:
+                st = get(page.get(sk), rt, s)
+                r = get(page.get(rk), rt, s)
+                r = r if isinstance(r, dict) else {}
+                print(f"   {s:9} {r.get('min')} / {st} / {r.get('max')}")
+    import pricing_calm_live
+    result = pricing_calm_live.main(["--reset", "XCV_1,XCV_2", "--dry"])
+    print("\n'plain target' = start x weekend x holiday, inside min/max (what the reset uses). "
+          "'engine target' = the same plus the demand adjustment of the normal engine.")
+    print(f"Attempted non-GET requests to MiniHotel (blocked by the check's guard): {len(BLOCKED)}")
+    if result.get("sent") or BLOCKED:
+        sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
 # --check overrides: shape of pricing_config/rules.dateOverrides (read only)
 # ---------------------------------------------------------------------------
 
@@ -824,6 +855,9 @@ def main():
         return
     if args.check == "live":
         check_live()
+        return
+    if args.check == "xcvscan":
+        check_xcvscan()
         return
     if args.check == "overrides":
         check_overrides()

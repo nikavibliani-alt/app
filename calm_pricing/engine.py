@@ -234,6 +234,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
     room_types = cfg["room_types"]
     inventory = snapshot.get("inventory", {})
     shadow = bool(snapshot.get("shadow"))
+    # One-time price reset (snapshot["reset"] = set of room types): see the reset block below.
+    reset_rts = set(snapshot.get("reset") or ()) if not shadow else set()
     calm, dm = cfg["calm"], cfg["demand"]
     cascade = _int_keys(cfg["cascade"])
     alerts, warnings, decisions = [], [], []
@@ -251,6 +253,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
         kind = "main" if (now.hour >= calm.get("main_run_from_hour", 9) and meta.get("last_main_day") != today_s) else "update"
     if kind == "main" and meta.get("last_main_day") == today_s:
         kind = "update"
+    if reset_rts:
+        kind = "update"          # a reset never uses up the day's one lowering run
     main_run = kind == "main"
     meta.setdefault("first_run_day", today_s)
     if main_run and now.hour >= calm.get("main_run_latest_hour", 12):
@@ -332,6 +336,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 priced = [d for d in open_ds if float((inventory[rt][d].get("prices") or {}).get(cur_) or 0) > 0]
                 fill_ok[cur_] = bool(open_ds) and len(priced) / len(open_ds) >= 0.5
         can_write = status_rt == "live"
+        reset_mode = rt in reset_rts
 
         for ds in sorted(inventory[rt]):
             if ds < today_s or ds in missing.get(rt, set()):
@@ -419,6 +424,9 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 if not rules:
                     dec["why"].append(f"No minimum/start/maximum set for {season} season: price left alone.")
                     continue
+                if reset_mode and current <= 0:
+                    dec["why"].append("Reset: no price yet; the normal run gives it a first price. Left alone.")
+                    continue
                 mp = missing_price.setdefault((rt, cur), [0, 0, None])
                 mp[1] += 1
                 if current <= 0:
@@ -455,7 +463,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 baseline = _move_price(moves[0]) if moves else current
 
                 # ---- 1. your minimum and maximum always win ----
-                if current > mx_eff + 1e-9 or current < mn - 1e-9:
+                if not reset_mode and (current > mx_eff + 1e-9 or current < mn - 1e-9):
                     if current > mx_eff:
                         new = _grid_down_to(mx_eff, step, mn)
                         dec["why"].append(f"Above your maximum {_fmt(cur, mx_eff)}: brought down to it.")
@@ -475,7 +483,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                     continue
 
                 # ---- 2. your hand-set prices win (live room types, not in shadow) ----
-                if can_write and not shadow:
+                if can_write and not shadow and not reset_mode:
                     last_eng = st.get("last_engine")
                     lock_until = st.get("manual_until")
                     if last_eng is not None and abs(current - last_eng) >= 0.5 and not lock_until:
@@ -549,6 +557,31 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                     dec["why"].append("A booking for this room type came in nearby in the last 3 days: no drops.")
                 if last_days_behind:
                     dec["why"].append("Last days and still empty: stepping toward your minimum.")
+
+                # ---- 3b. one-time reset: straight down to the plain target, never up ----
+                if reset_mode:
+                    plain = min(max(base, mn), mx_eff)          # start price x weekend x holiday, inside min/max
+                    dec["base_target"] = round(plain, 2)
+                    if days_out < 1:
+                        dec["why"].append("Reset: today is skipped.")
+                        continue
+                    new = round(plain / step) * step if step > 0 else plain
+                    if new < mn - 1e-9:
+                        new = _grid_up_to(mn, step, mx_eff)
+                    elif new > mx_eff + 1e-9:
+                        new = _grid_down_to(mx_eff, step, mn)
+                    new = float(new)
+                    if new >= current - 1e-9:
+                        dec["why"].append(f"Reset: {_fmt(cur, current)} is not above the target {_fmt(cur, new)}; left as it is.")
+                        continue
+                    if st.get("manual_until"):
+                        dec["why"].append("This was a hand-set price; the reset brings it down to the target.")
+                        for k in ("manual_until", "manual_price", "avail_at_manual"):
+                            st.pop(k, None)
+                    dec["proposed"], dec["kind"] = new, "reset"
+                    dec["write"] = can_write and not shadow
+                    dec["why"].append(f"Reset: {_fmt(cur, current)} -> {_fmt(cur, new)} (target: start x weekend x holiday).")
+                    continue
 
                 # ---- 4. direction and speed ----
                 dz = max(calm["dead_zone_pct"] * current, calm["dead_zone_abs"].get(cur, 0))
@@ -657,7 +690,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
 
     # ---- empty dates that get a price: written even when no move was needed ----
     for dec in decisions:
-        if dec.get("fill") and dec["kind"] in ("hold",):
+        if dec.get("fill") and dec["kind"] in ("hold",) and dec["rt"] not in reset_rts:
             dec["kind"] = "fill"
             dec["write"] = room_types[dec["rt"]].get("status", "live") == "live" and not shadow
             dec["why"].append(f"Price set: {_fmt(dec['currency'], dec['proposed'])}.")
@@ -692,7 +725,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
 
     writes, shadow_moves = [], []
     for dec in decisions:
-        if dec["kind"] not in ("move", "correction", "fill"):
+        if dec["kind"] not in ("move", "correction", "fill", "reset"):
             continue
         st = state[dec["rt"]][dec["date"]][dec["currency"]]
         if not ok or dec["rt"] in stopped_rts:

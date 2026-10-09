@@ -18,6 +18,12 @@ Safety:
 Usage:
   python pricing_calm_live.py          # live run (GitHub Actions, after the current engine)
   python pricing_calm_live.py --dry    # calculate and print; write nothing, save nothing
+  python pricing_calm_live.py --reset XCV_1,XCV_2 [--dry]
+      # ONE-TIME price reset for those room types only (see reset_report). Any free date
+      # priced above its plain target (start x weekend x holiday, inside min/max) goes
+      # straight down to it; the daily limits are skipped for this run. Never raises a
+      # price. Skips today, fully booked, protected and out-of-window dates. Other live
+      # room types and the six old ones are not read or written.
 """
 
 from __future__ import annotations
@@ -40,6 +46,8 @@ WRITE_PATH = "/api/ScreenA"
 SYNC_PATH = "/api/ScreenA/Portals/SendPrices"
 DEFAULT_PORTALS = ["BOOKING", "AIRBNB"]
 STATE_PREFIX = "live_"
+RESET_ALLOWED = {"XCV_1", "XCV_2"}          # the one-time reset may only ever touch these
+CUR_LABEL = {"GEL": "Booking GEL", "USD": "Airbnb (EUR list)"}
 
 
 class LiveWriteGuard:
@@ -166,10 +174,75 @@ def push_channels(portals: list, cookie: str, post=None, sleep=time.sleep):
     return failed
 
 
+def parse_reset(text: str) -> set:
+    rts = {x.strip() for x in (text or "").split(",") if x.strip()}
+    bad = rts - RESET_ALLOWED
+    if not rts or bad:
+        raise SystemExit(f"--reset may only name {sorted(RESET_ALLOWED)}; got {sorted(rts) or 'nothing'}")
+    return rts
+
+
+def reset_report(result: dict, rts: set, today) -> dict:
+    """
+    Per month and price list: today's average price vs the reset price (and the engine's
+    own target), dates that change, plus the safety checks. Returns {"checks": {name: bool}}.
+    """
+    from collections import defaultdict
+    decs = [d for d in result.get("decisions", []) if d["rt"] in rts]
+    print("\n" + "=" * 70)
+    print(f"RESET REPORT: {', '.join(sorted(rts))} (free dates only; today, fully booked, protected skipped)")
+    print("=" * 70)
+    for rt in sorted(rts):
+        for cur in ("GEL", "USD"):
+            rows = [d for d in decs if d["rt"] == rt and d["currency"] == cur and d["avail"] > 0
+                    and d["days_out"] >= 1 and d["kind"] != "protected" and d["mh_price"] > 0
+                    and d.get("base_target") is not None]
+            print(f"\n--- {rt} | {CUR_LABEL[cur]} | {len(rows)} free dates with a price ---")
+            if not rows:
+                continue
+            print(f"{'month':8} {'dates':>5} {'change':>6} {'today avg':>10} {'new avg':>9} {'plain target':>13} {'engine target':>14}")
+            by_m = defaultdict(list)
+            for d in rows:
+                by_m[d["date"][:7]].append(d)
+            for m in sorted(by_m):
+                g = by_m[m]
+                n = len(g)
+                ch = sum(1 for d in g if d["kind"] == "reset")
+                avg = lambda xs: sum(xs) / len(xs)
+                today_avg = avg([d["mh_price"] for d in g])
+                new_avg = avg([d["proposed"] if d["kind"] == "reset" else d["current"] for d in g])
+                tgt = [d["target"] for d in g if d.get("target") is not None]
+                plain = avg([d["base_target"] for d in g])
+                print(f"{m:8} {n:>5} {ch:>6} {today_avg:>10.1f} {new_avg:>9.1f} {plain:>13.1f} {(avg(tgt) if tgt else 0):>14.1f}")
+    resets = [d for d in decs if d["kind"] == "reset"]
+    writes = result.get("writes") or []
+    checks = {
+        "every new price is inside min and max": all(d["min"] - 1e-9 <= d["proposed"] <= d["max"] + 1e-9 for d in resets),
+        "nothing was raised": all(d["proposed"] < d["current"] for d in resets)
+                              and {(w["rt"], w["date"], w["currency"]) for w in writes}
+                              == {(d["rt"], d["date"], d["currency"]) for d in resets},
+        "only the reset room types are in the write": {w["rt"] for w in writes} <= set(rts),
+        "no old room type in the write": not ({w["rt"] for w in writes} & ps.OLD_ENGINE_RTS),
+        "today is not in the write": all(w["date"] > today.isoformat() for w in writes),
+        "every write is a reset price": len(writes) == len(resets),
+        "run was not stopped": bool(result.get("ok")) and not result.get("stopped_room_types"),
+    }
+    print(f"\nDates that change: {len({(d['rt'], d['date']) for d in resets})} "
+          f"(price changes: Booking GEL {sum(1 for d in resets if d['currency'] == 'GEL')}, "
+          f"Airbnb {sum(1 for d in resets if d['currency'] == 'USD')})")
+    print("Room types in the write:", sorted({w['rt'] for w in writes}) or "none")
+    for name, okv in checks.items():
+        print(f"  CHECK {'OK  ' if okv else 'FAIL'} {name}")
+    return {"checks": checks, "all_ok": all(checks.values())}
+
+
 def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=None):
     parser = argparse.ArgumentParser(description="Calm pricing engine, live room types")
     parser.add_argument("--dry", action="store_true", help="calculate and print; write and save nothing")
+    parser.add_argument("--reset", default=None, metavar="XCV_1,XCV_2",
+                        help="one-time reset: lower prices above the plain target straight to it (never raises)")
     args = parser.parse_args(argv)
+    reset_rts = parse_reset(args.reset) if args.reset is not None else set()
 
     now = now or datetime.now(ps.TBILISI).replace(tzinfo=None)
     today = now.date()
@@ -181,6 +254,11 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         print("Calm engine live: no room type is switched to live. Nothing to do.")
         return {"ok": True, "writes": [], "sent": False}
 
+    if reset_rts:
+        missing = reset_rts - set(live_rts)
+        if missing:
+            raise SystemExit(f"--reset: {sorted(missing)} is not switched to live with complete prices; nothing done.")
+        live_rts = {rt: v for rt, v in live_rts.items() if rt in reset_rts}      # no other room type is read or written
     cfg = ps.build_config(rules, settings, ps.load_events(db))
     cfg["room_types"] = live_rts
     paused = read_paused(db)
@@ -194,7 +272,10 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         inventory = ps.fetch_inventory(cookie, today, days, get=get, room_types=list(live_rts))
         reservations, skipped = ps.load_reservations(db, today)
         state = ps.load_state(db, prefix=STATE_PREFIX)
-        result = run({"now": now, "inventory": inventory, "reservations": reservations, "shadow": False}, cfg, state)
+        if reset_rts:
+            state = {k: v for k, v in state.items() if k in reset_rts or k == "_meta"}   # others are never saved
+        result = run({"now": now, "inventory": inventory, "reservations": reservations, "shadow": False,
+                      **({"reset": sorted(reset_rts)} if reset_rts else {})}, cfg, state)
 
         writes = result["writes"]
         assert all(w["rt"] in live_rts for w in writes), "write for a room type that is not live"
@@ -210,13 +291,17 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         fills = sum(1 for d in result["decisions"] if d.get("fill") and d["kind"] in ("fill", "move"))
         if fills:
             print(f"  {fills} empty date(s) get a first price from your start price.")
-        for d in [d for d in result["decisions"] if d["kind"] in ("move", "correction", "fill")][:20]:
+        for d in [d for d in result["decisions"] if d["kind"] in ("move", "correction", "fill", "reset")][:20]:
             print(f"  {d['rt']:6} {d['date']} {d['currency']}: {d['current']:.0f} -> {d['proposed']:.0f}  ({d['why'][-1]})")
 
+        report = reset_report(result, reset_rts, today) if reset_rts else None
         if args.dry:
             print("Dry run: nothing written to MiniHotel, nothing saved.")
-            return {**result, "sent": False, "payload": payload}
-        extra = {"hour": now.hour, "paused": paused, "room_types": sorted(live_rts), "writes": len(writes)}
+            return {**result, "sent": False, "payload": payload, "report": report}
+        if report is not None and not report["all_ok"]:
+            print("RESET STOPPED: a safety check failed; nothing written, nothing saved.")
+            raise SystemExit(1)
+        extra = {"hour": now.hour, "paused": paused, **({"reset": sorted(reset_rts)} if reset_rts else {}), "room_types": sorted(live_rts), "writes": len(writes)}
         if paused:
             ps.save(db, now, {}, {**result, "decisions": []}, {**extra, "note": "PAUSED: nothing written"},
                     prefix=STATE_PREFIX, daily_coll="pricing_calm_daily", runs_coll="pricing_calm_runs")
@@ -234,7 +319,7 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
                 prefix=STATE_PREFIX, daily_coll="pricing_calm_daily", runs_coll="pricing_calm_runs")
         print(f"Written: {len(writes)} prices for {sorted({w['rt'] for w in writes})}."
               + (f" Channel push failed for {failed_portals}." if failed_portals else ""))
-        return {**result, "sent": bool(payload), "payload": payload, "failed_portals": failed_portals}
+        return {**result, "sent": bool(payload), "payload": payload, "failed_portals": failed_portals, "report": report}
 
 
 if __name__ == "__main__":

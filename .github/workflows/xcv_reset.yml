@@ -1,0 +1,45 @@
+name: XCV one-time price reset
+
+# Manual only (no schedule). Lowers XCV_1 and XCV_2 prices that are above the plain target
+# (start x weekend x holiday, inside min/max) straight down to it. Never raises a price.
+# "dry" is on by default: it only calculates and prints. Set it to false to write and push.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: 'Dry run (true = calculate and print only; false = write to MiniHotel and push Booking and Airbnb)'
+        required: true
+        default: 'true'
+
+concurrency:
+  group: pricing-calm-live
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests firebase-admin
+
+      - name: XCV reset
+        env:
+          MINIHOTEL_HOTEL:          ${{ secrets.MINIHOTEL_HOTEL }}
+          MINIHOTEL_USER:           ${{ secrets.MINIHOTEL_USER }}
+          MINIHOTEL_PASS:           ${{ secrets.MINIHOTEL_PASS }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          DRY:                      ${{ github.event.inputs.dry }}
+        run: |
+          if [ "$DRY" = "false" ]; then
+            python pricing_calm_live.py --reset XCV_1,XCV_2
+          else
+            python pricing_calm_live.py --reset XCV_1,XCV_2 --dry
+          fi
