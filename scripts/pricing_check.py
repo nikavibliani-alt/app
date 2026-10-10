@@ -788,6 +788,15 @@ def check_live():
     hdr("LIVE CHECK: pricing_calm_live.py --dry (calculates and prints; writes nothing, saves nothing)")
     import pricing_calm_live
     result = pricing_calm_live.main(["--dry"])
+    far = [d for d in result.get("decisions", []) if d["kind"] == "far_reset"]
+    print(f"\nFAR DATES (61+ days) that would go straight to their target: {len(far)} price entries on "
+          f"{len({(d['rt'], d['date']) for d in far})} dates")
+    for rt in sorted({d["rt"] for d in far}):
+        mine = [d for d in far if d["rt"] == rt]
+        print(f"  {rt}: {len(mine)} price entries, dates {min(d['date'] for d in mine)} .. {max(d['date'] for d in mine)}")
+    for d in sorted(far, key=lambda d: (d["rt"], d["date"], d["currency"]))[:40]:
+        print(f"    {d['rt']} {d['date']} {'Booking GEL' if d['currency'] == 'GEL' else 'Airbnb EUR list'}: "
+              f"{d['current']:g} -> {d['proposed']:g}  (target {d.get('base_target'):g}, min {d['min']:g}, max {d['max']:g})")
     print(f"\nPrice changes it would send (not sent): {len(result.get('writes') or [])}")
     print(f"Sent to MiniHotel: {bool(result.get('sent'))}")
     live_report(result)

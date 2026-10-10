@@ -198,7 +198,9 @@ def test_second_day_moves_within_daily_limit(http, settings_file):
             out = (date.fromisoformat(d["Date"]) - day2).days
             lim = 0.15 if out <= 3 else 0.05          # last 3 days walk to the minimum faster
             for r in d["Rates"]:
-                if r["PriceList"] == "GEL":
+                if r["PriceList"] == "GEL" and out >= 61:
+                    assert 85 <= r["Price"] <= 120, d    # far dates go straight to the target (110 / weekend 120)
+                elif r["PriceList"] == "GEL":
                     assert 140 * (1 - lim) - 0.01 <= r["Price"] <= 140, d
 
 

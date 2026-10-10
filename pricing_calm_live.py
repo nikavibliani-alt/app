@@ -236,6 +236,32 @@ def reset_report(result: dict, rts: set, today) -> dict:
     return {"checks": checks, "all_ok": all(checks.values())}
 
 
+def far_reset_counts(result: dict, live_rts) -> dict:
+    """How many far dates (61+ days, above target) went straight to their target, per room type."""
+    out = {rt: 0 for rt in sorted(live_rts)}
+    for d in result.get("decisions", []):
+        if d["kind"] == "far_reset":
+            out[d["rt"]] = out.get(d["rt"], 0) + 1
+    return out
+
+
+def far_reset_problems(result: dict, live_rts) -> list:
+    """Safety check on far resets: only live room types, 61+ days away, strictly lower, inside min and max."""
+    bad = []
+    for d in result.get("decisions", []):
+        if d["kind"] != "far_reset":
+            continue
+        if d["rt"] not in live_rts or d["rt"] in ps.OLD_ENGINE_RTS:
+            bad.append(f"{d['rt']} is not a live room type")
+        if d["days_out"] < 61:
+            bad.append(f"{d['rt']} {d['date']} is only {d['days_out']} days away")
+        if not d["proposed"] < d["current"]:
+            bad.append(f"{d['rt']} {d['date']} {d['currency']} would not go down")
+        if not (d["min"] - 1e-9 <= d["proposed"] <= d["max"] + 1e-9):
+            bad.append(f"{d['rt']} {d['date']} {d['currency']} is outside min/max")
+    return bad
+
+
 def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=None):
     parser = argparse.ArgumentParser(description="Calm pricing engine, live room types")
     parser.add_argument("--dry", action="store_true", help="calculate and print; write and save nothing")
@@ -288,10 +314,19 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
             print("  ALERT:", a)
         for w in result["warnings"][:5]:
             print("  note:", w)
+        far = far_reset_counts(result, live_rts)
+        print("  Far dates (61+ days) sent straight to their target, per room type: "
+              + ", ".join(f"{rt} {n}" for rt, n in far.items()))
+        problems = far_reset_problems(result, live_rts)
+        if problems:
+            print("FAR RESET STOPPED: a safety check failed; nothing written, nothing saved.")
+            for x in problems[:10]:
+                print("   ", x)
+            raise SystemExit(1)
         fills = sum(1 for d in result["decisions"] if d.get("fill") and d["kind"] in ("fill", "move"))
         if fills:
             print(f"  {fills} empty date(s) get a first price from your start price.")
-        for d in [d for d in result["decisions"] if d["kind"] in ("move", "correction", "fill", "reset")][:20]:
+        for d in [d for d in result["decisions"] if d["kind"] in ("move", "correction", "fill", "reset", "far_reset")][:20]:
             print(f"  {d['rt']:6} {d['date']} {d['currency']}: {d['current']:.0f} -> {d['proposed']:.0f}  ({d['why'][-1]})")
 
         report = reset_report(result, reset_rts, today) if reset_rts else None
@@ -301,7 +336,8 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         if report is not None and not report["all_ok"]:
             print("RESET STOPPED: a safety check failed; nothing written, nothing saved.")
             raise SystemExit(1)
-        extra = {"hour": now.hour, "paused": paused, **({"reset": sorted(reset_rts)} if reset_rts else {}), "room_types": sorted(live_rts), "writes": len(writes)}
+        extra = {"hour": now.hour, "paused": paused, **({"reset": sorted(reset_rts)} if reset_rts else {}), "room_types": sorted(live_rts), "writes": len(writes),
+                 "far_reset": far}
         if paused:
             ps.save(db, now, {}, {**result, "decisions": []}, {**extra, "note": "PAUSED: nothing written"},
                     prefix=STATE_PREFIX, daily_coll="pricing_calm_daily", runs_coll="pricing_calm_runs")

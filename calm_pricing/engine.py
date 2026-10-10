@@ -113,6 +113,16 @@ def _grid_move(current: float, proposed: float, step: float, direction: int, bou
     return float(cand) if cand <= bound + 1e-9 and cand > current else current
 
 
+def _plain_target_price(plain: float, mn: float, mx_eff: float, step: float) -> float:
+    """The plain target on the price grid, always inside min and max."""
+    new = round(plain / step) * step if step > 0 else plain
+    if new < mn - 1e-9:
+        new = _grid_up_to(mn, step, mx_eff)
+    elif new > mx_eff + 1e-9:
+        new = _grid_down_to(mx_eff, step, mn)
+    return float(new)
+
+
 def _local(now: datetime, cfg: dict) -> datetime:
     """Engine works in Tbilisi time. A time with a time zone is converted."""
     if now.tzinfo is not None:
@@ -565,12 +575,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                     if days_out < 1:
                         dec["why"].append("Reset: today is skipped.")
                         continue
-                    new = round(plain / step) * step if step > 0 else plain
-                    if new < mn - 1e-9:
-                        new = _grid_up_to(mn, step, mx_eff)
-                    elif new > mx_eff + 1e-9:
-                        new = _grid_down_to(mx_eff, step, mn)
-                    new = float(new)
+                    new = _plain_target_price(plain, mn, mx_eff, step)
                     if new >= current - 1e-9:
                         dec["why"].append(f"Reset: {_fmt(cur, current)} is not above the target {_fmt(cur, new)}; left as it is.")
                         continue
@@ -582,6 +587,22 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                     dec["write"] = can_write and not shadow
                     dec["why"].append(f"Reset: {_fmt(cur, current)} -> {_fmt(cur, new)} (target: start x weekend x holiday).")
                     continue
+
+                # ---- 3c. far dates that are too high go straight to the plain target (live room types only) ----
+                far_from = int(calm.get("far_reset_from_days", 61))
+                if can_write and not shadow and days_out >= far_from and not dec.get("fill"):
+                    plain = min(max(base, mn), mx_eff)
+                    new = _plain_target_price(plain, mn, mx_eff, step)
+                    if new < current - 1e-9:
+                        dec["base_target"] = round(plain, 2)
+                        dec["proposed"], dec["kind"] = new, "far_reset"
+                        dec["write"] = True
+                        changed += 1
+                        per_rt[rt][1] += 1
+                        dec["why"].append(
+                            f"{days_out} days away and above the target: straight down {_fmt(cur, current)} -> {_fmt(cur, new)}; "
+                            "from here on it moves calmly.")
+                        continue
 
                 # ---- 4. direction and speed ----
                 dz = max(calm["dead_zone_pct"] * current, calm["dead_zone_abs"].get(cur, 0))
@@ -725,7 +746,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
 
     writes, shadow_moves = [], []
     for dec in decisions:
-        if dec["kind"] not in ("move", "correction", "fill", "reset"):
+        if dec["kind"] not in ("move", "correction", "fill", "reset", "far_reset"):
             continue
         st = state[dec["rt"]][dec["date"]][dec["currency"]]
         if not ok or dec["rt"] in stopped_rts:
