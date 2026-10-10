@@ -827,6 +827,189 @@ def check_xcvscan():
 
 
 # ---------------------------------------------------------------------------
+# --check recap: what happened since the XCV reset (read only; no names, phones or reservation numbers)
+# ---------------------------------------------------------------------------
+
+RECAP_FROM = "2026-10-09T14:00"          # XCV reset, Tbilisi time
+RECAP_RESET_DAY = "2026-10-09"
+
+
+def _short(x, n=110):
+    x = str(x)
+    return x if len(x) <= n else x[:n - 3] + "..."
+
+
+def recap_reservations(db):
+    import pricing_shadow as ps
+    import pricing_recap as rc
+    hdr("1. RESERVATIONS created since the reset (booking date has no time of day)")
+    since = RECAP_FROM[:10]
+    fields = ["roomCode", "checkin", "nights", "source", "status", "debit", "currency", "creationDate", "syncedAt"]
+    docs = [d.to_dict() or {} for d in db.collection("reservations").where("creationDate", ">=", since).select(fields).stream()]
+    print(f"reservation docs with booking date {since} or later: {len(docs)}")
+    rows = rc.reservation_rows(docs, ps.ROOM_CODE_TO_RT, since)
+    new_rts = set(rc.NEW_ENGINE_RTS)
+
+    def show(title, lst):
+        print(f"\n{title}: {len(lst)}")
+        print(f"  {'room type':10} {'check-in':10} {'nights':>6}  {'channel':14} {'price/night':>14}  {'status':6} booked")
+        for rt, ci, n, src, ppn, st, cr in lst:
+            print(f"  {rt:10} {ci:10} {n:>6}  {src[:14]:14} {ppn:>14}  {st:6} {cr}" + ("   <- NEW ENGINE" if rt in new_rts else ""))
+
+    show("New bookings (not cancelled)", rows["new"])
+    show("Bookings made in the period and already cancelled", rows["cancelled_new"])
+    allr = rows["new"] + rows["cancelled_new"]
+    by = Counter(r[0] for r in allr)
+    print("\nPer room type (new + cancelled):", dict(sorted(by.items())) or "none")
+    print("New engine room types (XCV_1, XCV_2, VGL_ST, VGL_AP):",
+          {rt: by.get(rt, 0) for rt in rc.NEW_ENGINE_RTS})
+    print(f"Booking date {since} is only partly inside the period (the reset was at 14:00): "
+          f"{sum(1 for r in allr if r[6] == since)} of these were booked that day, some may be from before 14:00.")
+    # Older bookings that are cancelled now: the sync stores no cancellation date, so this is only a pointer.
+    cl = [d.to_dict() or {} for d in db.collection("reservations").where("status", "==", "CL").select(fields).stream()]
+    start = datetime.strptime(RECAP_FROM, "%Y-%m-%dT%H:%M").replace(tzinfo=TBILISI)
+    touched = 0
+    for x in cl:
+        t = to_tbilisi(x.get("syncedAt"))
+        if t and t >= start and str(x.get("creationDate") or "")[:10] < since:
+            touched += 1
+    print(f"Cancelled bookings made before the period (any check-in) that the sync touched since the reset: {touched} of "
+          f"{len(cl)} cancelled in total. The sync stores no cancellation date, so a cancellation made in the period cannot be told apart.")
+
+
+def recap_new_engine_runs(db):
+    hdr("2. NEW ENGINE runs (pricing_calm_runs) since the reset")
+    docs = [d.to_dict() or {} for d in db.collection("pricing_calm_runs").where("ts", ">=", RECAP_FROM).stream()]
+    docs.sort(key=lambda x: x.get("ts", ""))
+    print(f"runs: {len(docs)}")
+    for x in docs:
+        al = x.get("alerts") or []
+        print(f"  {str(x.get('ts'))[:16].replace('T', ' ')} Tbilisi | ok={x.get('ok')} | prices written={x.get('writes')} | "
+              f"min/max corrections={x.get('corrections')} | stopped={x.get('stopped_room_types') or 'none'} | "
+              f"paused={x.get('paused')} | channel push failures={x.get('failed_portals') or 'none'}"
+              + (f" | RESET {x.get('reset')}" if x.get("reset") else "")
+              + (f" | note: {x.get('note')}" if x.get("note") else ""))
+        for a in al[:5]:
+            print("       alert:", _short(a))
+    print(f"\nTotals: prices written {sum(int(x.get('writes') or 0) for x in docs)}, "
+          f"corrections {sum(int(x.get('corrections') or 0) for x in docs)}, "
+          f"runs with a stop {sum(1 for x in docs if x.get('stopped_room_types'))}, "
+          f"runs with alerts {sum(1 for x in docs if x.get('alerts'))}, "
+          f"paused runs {sum(1 for x in docs if x.get('paused'))}, "
+          f"runs with channel push failures {sum(1 for x in docs if x.get('failed_portals'))}")
+
+
+def recap_new_engine_prices(db):
+    import io
+    import contextlib
+    import pricing_shadow as ps
+    import pricing_recap as rc
+    hdr("3. NEW ENGINE prices: right after the reset vs now")
+    daily = {}
+    for rt in rc.NEW_ENGINE_RTS:
+        snap = db.collection("pricing_calm_daily").document(f"{RECAP_RESET_DAY}_{rt}").get()
+        daily[rt] = (snap.to_dict() or {}).get("dates", {}) if snap.exists else {}
+        print(f"  reset-day record {rt}: {len(daily[rt])} price entries")
+    before = rc.after_reset_prices(daily)
+    today = datetime.now(TBILISI).date()
+    inv = ps.fetch_inventory(mh_cookie_header(), today, 200, room_types=list(rc.NEW_ENGINE_RTS))
+    now = rc.now_prices(inv)
+    print("'After the reset' is rebuilt from the engine's own day record (the last run of 9 Oct, stepped back if it "
+          "moved the date), so it can include a few small raises made by later runs that evening.")
+    for rt in rc.NEW_ENGINE_RTS:
+        for cur in ("GEL", "USD"):
+            rows = [r for r in rc.month_table(before, now) if r[0] == rt and r[1] == cur]
+            print(f"\n--- {rt} | {rc.CUR_LABEL[cur]} ---")
+            if not rows:
+                print("   no dates in both snapshots")
+                continue
+            print(f"{'month':8} {'dates':>5} {'after reset':>12} {'now':>8} {'dates changed since':>20}")
+            for _, _, m, n, b, a, ch in rows:
+                print(f"{m:8} {n:>5} {b:>12.1f} {a:>8.1f} {ch:>20}")
+    print("\n5 biggest moves since the reset (relative):")
+    for pct_, rt, ds, cur, b, a in rc.biggest_moves(before, now, 5):
+        print(f"   {rt} {ds} {rc.CUR_LABEL[cur]}: {b:g} -> {a:g} ({pct_:+.1f}%)")
+    # Is any XCV date above its plain target again? Same calculation as the reset, dry (writes and saves nothing).
+    import pricing_calm_live
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        res = pricing_calm_live.main(["--reset", "XCV_1,XCV_2", "--dry"])
+    above = [d for d in res.get("decisions", []) if d["kind"] == "reset"]
+    print(f"\nXCV dates (free, not today) priced ABOVE their plain target right now: {len(above)} price entries "
+          f"on {len({(d['rt'], d['date']) for d in above})} dates")
+    for d in sorted(above, key=lambda d: (d["current"] - d["proposed"]) / d["current"], reverse=True)[:10]:
+        print(f"   {d['rt']} {d['date']} {rc.CUR_LABEL[d['currency']]}: now {d['current']:g}, target {d['proposed']:g}")
+    print("Dry check sent to MiniHotel:", bool(res.get("sent")), "| run ok:", res.get("ok"),
+          "| stopped:", res.get("stopped_room_types") or "none")
+
+
+def recap_shadow(db):
+    import pricing_recap as rc
+    hdr("4. SHADOW TEST (six old rooms) since the reset")
+    docs = [d.to_dict() or {} for d in db.collection("pricing_shadow_runs").where("ts", ">=", RECAP_FROM).stream()]
+    docs.sort(key=lambda x: x.get("ts", ""))
+    print(f"shadow runs: {len(docs)}")
+    for x in docs:
+        print(f"  {str(x.get('ts'))[:16].replace('T', ' ')} Tbilisi | ok={x.get('ok')} | lowering run={x.get('main_run')} | "
+              f"virtual moves={x.get('moves')} | stopped={x.get('stopped_room_types') or 'none'} | alerts={len(x.get('alerts') or [])}")
+        for a in (x.get("alerts") or [])[:3]:
+            print("       alert:", _short(a))
+    days = rc.run_days(docs)
+    print("\nPer day (runs, lowering runs):", {d: v for d, v in days.items()})
+    print("Days in the period with NO lowering run:", [d for d, v in days.items() if v[1] == 0] or "none",
+          "(a day that is still running, or only has runs after the morning window, can show up here)")
+    print(f"Runs with a stop: {sum(1 for x in docs if x.get('stopped_room_types'))}")
+    print("\nDistance of the shadow price from the price now in MiniHotel (free dates with a price), latest record per room type:")
+    latest = max([d for d in days] or [None]) if days else None
+    for rt in ["ROOMS", "MAXELA", "BIG_APT", "FREEDOM", "ORBE_1", "ORBE_2"]:
+        snap = db.collection("pricing_shadow_daily").document(f"{latest}_{rt}").get() if latest else None
+        if not snap or not snap.exists:
+            print(f"   {rt}: no record for {latest}")
+            continue
+        for cur, st in sorted(rc.shadow_distance((snap.to_dict() or {}).get("dates", {})).items()):
+            print(f"   {rt:8} {cur}: {st['n']} dates, same {st['same']}, average gap {st['avg']:+.1f}%, "
+                  f"average size of gap {st['avg_abs']:.1f}%, biggest gap {st['max_abs']:.1f}%")
+
+
+def recap_current_engine(db):
+    hdr("5. CURRENT ENGINE (six old rooms): pricing_log since the reset")
+    start = datetime.strptime(RECAP_FROM, "%Y-%m-%dT%H:%M").replace(tzinfo=TBILISI)
+    docs = list(db.collection("pricing_log").where("timestamp", ">=", start.astimezone(timezone.utc)).stream())
+    runs = []
+    for d in docs:
+        x = d.to_dict() or {}
+        t = to_tbilisi(x.get("timestamp"))
+        if t:
+            runs.append((t, x))
+    runs.sort(key=lambda r: r[0])
+    print(f"runs: {len(runs)}")
+    by_day = defaultdict(list)
+    for t, x in runs:
+        by_day[t.date().isoformat()].append((t, x))
+    for day in sorted(by_day):
+        lst = by_day[day]
+        print(f"\n{day}: {len(lst)} runs, {sum(int(x.get('changes_count') or 0) for _, x in lst)} price changes, "
+              f"{sum(1 for _, x in lst if x.get('error'))} with errors")
+        for t, x in lst:
+            print(f"   {t.strftime('%H:%M')} trigger={x.get('trigger')} dry={x.get('dry_run')} paused={x.get('paused', False)} "
+                  f"changes={x.get('changes_count')}" + (f"  ERROR: {_short(x['error'], 90)}" if x.get("error") else ""))
+
+
+def check_recap():
+    hdr(f"RECAP since the XCV reset ({RECAP_FROM} Tbilisi). Read only: no prices and no settings are changed.")
+    db = init_firestore()
+    for name, fn in [("1", recap_reservations), ("2", recap_new_engine_runs), ("3", recap_new_engine_prices),
+                     ("4", recap_shadow), ("5", recap_current_engine)]:
+        try:
+            fn(db)
+        except Exception as e:  # one failed section must not hide the rest
+            print(f"\n[section {name} FAILED] {type(e).__name__}: {str(e)[:300]}")
+    print(f"\nAttempted non-GET requests to MiniHotel (blocked by the check's guard): {len(BLOCKED)}")
+    if BLOCKED:
+        sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
 # --check overrides: shape of pricing_config/rules.dateOverrides (read only)
 # ---------------------------------------------------------------------------
 
@@ -855,6 +1038,9 @@ def main():
         return
     if args.check == "live":
         check_live()
+        return
+    if args.check == "recap":
+        check_recap()
         return
     if args.check == "xcvscan":
         check_xcvscan()
