@@ -1078,6 +1078,12 @@ def check_fsrules():
             j = r.json()
             line += f" | objects at top level: {len(j.get('items', []))} | folders: {[x for x in j.get('prefixes', [])][:12]}"
         print(line)
+    bucket = f"{project}.firebasestorage.app"
+    for prefix in ("passport_uploads/", "hk_damage/", "hk_ready/"):
+        r = requests.get(f"https://firebasestorage.googleapis.com/v0/b/{bucket}/o",
+                         params={"prefix": prefix, "maxResults": 1}, timeout=30)
+        print(f"  not logged in, list folder {prefix}: HTTP {r.status_code}"
+              + (f" (objects returned: {len(r.json().get('items', []))})" if r.status_code == 200 else ""))
     rl = requests.get(f"{api}/projects/{project}/releases", headers=h, params={"pageSize": 100}, timeout=30)
     names = [x for x in rl.json().get("releases", []) if "storage" in x.get("name", "")] if rl.status_code == 200 else []
     print("  storage rule releases:", [x["name"].split("releases/")[-1] for x in names] or f"none found (HTTP {rl.status_code})")
