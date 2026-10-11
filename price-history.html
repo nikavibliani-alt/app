@@ -97,9 +97,14 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, query, where, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { requireOwner } from "./shared/owner-auth.js";
 
 const app = initializeApp({ apiKey:"AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk", authDomain:"sleepy-5c962.firebaseapp.com", projectId:"sleepy-5c962", storageBucket:"sleepy-5c962.firebasestorage.app", messagingSenderId:"152940098906", appId:"1:152940098906:web:bf245230d705c0a62c2f63" });
 const db = getFirestore(app);
+const auth = getAuth(app);
+requireOwner({ auth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut },
+             { onReady: () => {} });
 
 let currentSnapshots = [];
 

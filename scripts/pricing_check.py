@@ -1068,6 +1068,27 @@ def check_fsrules():
             t = line.split("//")[0].rstrip()
             if re.search(r"\bmatch\b|\ballow\b|function|request\.auth|isAdmin|isSignedIn", t):
                 print("   ", t.strip())
+    # 2b. Cloud Storage (guest passport scans live here)
+    print("\nCLOUD STORAGE")
+    for bucket in (f"{project}.firebasestorage.app", f"{project}.appspot.com"):
+        r = requests.get(f"https://firebasestorage.googleapis.com/v0/b/{bucket}/o",
+                         params={"maxResults": 5, "delimiter": "/"}, timeout=30)
+        line = f"  not logged in, list bucket {bucket}: HTTP {r.status_code}"
+        if r.status_code == 200:
+            j = r.json()
+            line += f" | objects at top level: {len(j.get('items', []))} | folders: {[x for x in j.get('prefixes', [])][:12]}"
+        print(line)
+    rl = requests.get(f"{api}/projects/{project}/releases", headers=h, params={"pageSize": 100}, timeout=30)
+    names = [x for x in rl.json().get("releases", []) if "storage" in x.get("name", "")] if rl.status_code == 200 else []
+    print("  storage rule releases:", [x["name"].split("releases/")[-1] for x in names] or f"none found (HTTP {rl.status_code})")
+    for x in names:
+        rs2 = requests.get(f"{api}/{x['rulesetName']}", headers=h, timeout=30).json()
+        print("  ruleset updated:", x.get("updateTime"))
+        for f in (rs2.get("source") or {}).get("files", []):
+            for line in f.get("content", "").splitlines():
+                t = line.split("//")[0].rstrip()
+                if re.search(r"\bmatch\b|\ballow\b|request\.auth|function|size|contentType", t):
+                    print("     ", t.strip())
     # 3. simulations against the live rules (the Rules API runs them on its side; no document is touched)
     users = {"not logged in": None,
              "anonymous sign-in": {"uid": "probe-anon", "token": {"firebase": {"sign_in_provider": "anonymous"}}},

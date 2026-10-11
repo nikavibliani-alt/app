@@ -157,7 +157,12 @@
       "firebase.emulator-lite.json",
       "*.yml",
       "*.patch*",
-      "CNAME"
+      "CNAME",
+      "pricing-old.html",
+      "calm_settings.json",
+      "calm_pricing/**",
+      "sim/**",
+      "tests/**"
     ]
   },
   "functions": [

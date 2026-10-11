@@ -101,18 +101,6 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
 .hist-row:last-child{border-bottom:none}
 .hist-when{color:var(--text-muted);white-space:nowrap;font-size:.72rem}
 .muted{color:var(--text-muted);font-size:.8rem}
-#pinOverlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
-#pinBox{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-card);padding:2rem;text-align:center;box-shadow:var(--shadow)}
-.pin-dots{display:flex;gap:.7rem;justify-content:center;margin:.9rem 0 .8rem}
-.pin-dot{width:13px;height:13px;border-radius:50%;border:2px solid #ccc;background:transparent;transition:background .12s,border-color .12s}
-.pin-dot.filled{background:var(--primary);border-color:var(--primary)}
-.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem;max-width:220px;margin:0 auto}
-.pin-key{font-size:1.25rem;font-weight:600;padding:0;height:56px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);cursor:pointer;touch-action:manipulation;user-select:none;transition:background .1s}
-.pin-key:active{background:#EFEFEF}
-.pin-key-back{font-size:1rem;font-weight:400;color:var(--text-muted)}
-.pin-key-empty{border-color:transparent;background:transparent;pointer-events:none}
-@keyframes pin-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
-.pin-shake{animation:pin-shake .35s ease}
 .loading{text-align:center;padding:1.5rem;color:var(--text-muted);font-size:.85rem}
 .rng-form,.eng-row2{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
 .dp{position:relative;display:inline-flex;align-items:center}
@@ -148,33 +136,6 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
 </style>
 </head>
 <body>
-
-<div id="pinOverlay">
-  <div id="pinBox">
-    <div style="font-weight:600;font-size:1.05rem;margin-bottom:.25rem">Pricing admin</div>
-    <div class="pin-dots" id="pinDots">
-      <span class="pin-dot" id="pd0"></span>
-      <span class="pin-dot" id="pd1"></span>
-      <span class="pin-dot" id="pd2"></span>
-      <span class="pin-dot" id="pd3"></span>
-    </div>
-    <div id="pinErr" style="color:var(--status-red);font-size:.78rem;min-height:1.1em;margin-bottom:.4rem"></div>
-    <div class="pin-grid">
-      <button class="pin-key" onclick="pinKey('1')">1</button>
-      <button class="pin-key" onclick="pinKey('2')">2</button>
-      <button class="pin-key" onclick="pinKey('3')">3</button>
-      <button class="pin-key" onclick="pinKey('4')">4</button>
-      <button class="pin-key" onclick="pinKey('5')">5</button>
-      <button class="pin-key" onclick="pinKey('6')">6</button>
-      <button class="pin-key" onclick="pinKey('7')">7</button>
-      <button class="pin-key" onclick="pinKey('8')">8</button>
-      <button class="pin-key" onclick="pinKey('9')">9</button>
-      <button class="pin-key pin-key-empty" disabled></button>
-      <button class="pin-key" onclick="pinKey('0')">0</button>
-      <button class="pin-key pin-key-back" onclick="pinBack()">⌫</button>
-    </div>
-  </div>
-</div>
 
 <div class="container" id="app" style="display:none">
   <header>
@@ -316,6 +277,8 @@ input.cfg:disabled{background:transparent;border-color:transparent;color:var(--t
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { requireOwner } from "./shared/owner-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -328,6 +291,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 const PROPERTIES = ["ROOMS","MAXELA","BIG_APT","FREEDOM","ORBE_1","ORBE_2","XCV_1","XCV_2","VGL_ST","VGL_AP"];
 // Always shown in both price cards, even with no prices yet (empty boxes to fill in)
@@ -342,85 +306,23 @@ let pendingEdits = {};      // path -> new value
 let snapshots = [];         // loaded date rows
 let locks = {};             // "prop_date" or date -> true
 let listMinimized = false;
-let ADMIN_PIN = null;       // loaded from hk_pins/admin
-
-/* ---------- auth ---------- */
-const AUTH_KEY = "pricing_device_auth";
-const AUTH_TTL = 90 * 24 * 60 * 60 * 1000; // 90 days in ms
-
-function isDeviceAuthed() {
-  try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    if (!raw) return false;
-    const { exp } = JSON.parse(raw);
-    return Date.now() < exp;
-  } catch { return false; }
-}
-
+/* ---------- sign-in (owner's Google account only) ---------- */
+let started = false;
 function grantAccess() {
-  try { localStorage.setItem(AUTH_KEY, JSON.stringify({ exp: Date.now() + AUTH_TTL })); } catch {}
+  if (started) return;
+  started = true;
   document.getElementById("logoutBtn").style.display = "inline-block";
-  document.getElementById("pinOverlay").style.display = "none";
   document.getElementById("app").style.display = "block";
   init();
 }
 
-window.logout = () => {
-  try { localStorage.removeItem(AUTH_KEY); } catch {}
+window.logout = async () => {
+  try { await signOut(auth); } catch {}
   location.reload();
 };
 
-let pinBuf = "";
-
-function renderDots() {
-  for (let i = 0; i < 4; i++) {
-    document.getElementById("pd" + i).classList.toggle("filled", i < pinBuf.length);
-  }
-}
-
-window.pinKey = d => {
-  if (pinBuf.length >= 4) return;
-  pinBuf += d;
-  renderDots();
-  if (pinBuf.length === 4) submitPin();
-};
-
-window.pinBack = () => {
-  pinBuf = pinBuf.slice(0, -1);
-  renderDots();
-  document.getElementById("pinErr").textContent = "";
-};
-
-function submitPin() {
-  if (!ADMIN_PIN || pinBuf === ADMIN_PIN) {
-    grantAccess();
-  } else {
-    const box = document.getElementById("pinBox");
-    box.classList.remove("pin-shake");
-    void box.offsetWidth; // reflow to restart animation
-    box.classList.add("pin-shake");
-    document.getElementById("pinErr").textContent = "Wrong PIN";
-    pinBuf = "";
-    renderDots();
-  }
-}
-
-document.addEventListener("keydown", e => {
-  if (document.getElementById("pinOverlay").style.display === "none") return;
-  if (e.key >= "0" && e.key <= "9") { window.pinKey(e.key); }
-  else if (e.key === "Backspace") { window.pinBack(); }
-});
-
-// Fetch admin PIN from Firestore, then show overlay or app
-(async()=>{
-  try{
-    const pinSnap=await getDoc(doc(db,"hk_pins","admin"));
-    if(pinSnap.exists()) ADMIN_PIN=pinSnap.data().pin||null;
-  }catch(e){/* fail open */}
-  if(!ADMIN_PIN || isDeviceAuthed()){
-    grantAccess();
-  }
-})();
+requireOwner({ auth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut },
+             { onReady: grantAccess });
 
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
