@@ -2667,7 +2667,7 @@ async function _initCompanionFromToken(){
     if(GUEST_API){
       const cr=await GAPI.companion({joinToken:_joinToken});
       if(!cr.found)return;   // unknown token: show the normal search page
-      primary=cr.primary;base=cr.base;res=cr.reservations||[];
+      primary=cr.primary;base=cr.base;res=cr.reservations||[];_findProof=cr.proof||'';
     }else{
     const {getDocs:_getDocs}=await import('https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js');
     const pSnap=await _getDocs(query(collection(db,'checkin_guests'),where('companionToken','==',_joinToken),limit(1)));
@@ -2877,6 +2877,7 @@ async function finishRegistration_(bestRes,formData,opts){
         reservationNumber:String(_companionResNum||bestRes?.reservationNumber||'').trim(),
         profile,
         primaryGuestId:_companionPrimaryId||guestId||null,
+        proof:_findProof,
       }));
       if(!r.ok)throw new Error(r.message||'Companion registration failed');
       docId=r.data.guestToken;
@@ -2895,6 +2896,7 @@ async function finishRegistration_(bestRes,formData,opts){
         guestToken:existing?.id||null,
         profile,
         guestLinkBase:GUEST_APP_URL,
+        proof:_findProof,
       }));
       if(!r.ok)throw new Error(r.message||'Registration failed');
       docId=r.data.guestToken;

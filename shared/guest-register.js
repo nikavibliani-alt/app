@@ -31,6 +31,7 @@ export function buildRegisterPrimaryPayload({
   profile,
   guestToken,
   guestLinkBase,
+  proof,
 }) {
   return {
     mode: 'register_primary',
@@ -38,17 +39,19 @@ export function buildRegisterPrimaryPayload({
     guestToken: guestToken || null,
     guestLinkBase: guestLinkBase || window.location.origin + window.location.pathname,
     profile,
+    proof: proof || '',
     actor: 'guest-sandbox',
   };
 }
 
-export function buildRegisterCompanionPayload({ reservationId, reservationNumber, profile, primaryGuestId }) {
+export function buildRegisterCompanionPayload({ reservationId, reservationNumber, profile, primaryGuestId, proof }) {
   return {
     mode: 'register_companion',
     reservationId: reservationId || null,
     reservationNumber: reservationNumber || null,
     primaryGuestId: primaryGuestId || null,
     profile,
+    proof: proof || '',
     actor: 'guest-sandbox',
   };
 }

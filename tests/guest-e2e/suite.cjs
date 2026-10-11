@@ -21,6 +21,9 @@ const home = (page) => page.evaluate(() => ({ door: document.getElementById('her
     const before = await home(env.page);
     if (!apiOn) console.log('   (old page) code already inside the hidden part of the page before check-in: door=' + before.door + ' wifi=' + before.wifi);
     if (apiOn) {
+      const reg = env.calls.find(c => c.name === 'guestRegister');
+      assert.ok(reg && reg.out.ok === true && reg.data.proof, 'registration went through guestRegister with the signed proof (no direct-write fallback)');
+      assert.equal(env.calls.filter(c => c.name === 'guestRegister' && c.out.ok === false).length, 0, 'no refused registration');
       assert.equal(before.door.includes('—'), true, 'door code hidden before check-in');
       assert.equal(before.wifi.trim(), '—');
       assert.deepEqual(leaky(env.calls), [], 'secrets in a function answer before check-in');

@@ -77,6 +77,7 @@ async function open(browser, { apiOn, startIso, viewport }) {
       findPrimaryGuestForReservation: async (id, num) => { for (const x of [id, num].filter(Boolean)) { const g = col('checkin_guests').find(g => g.matchedReservationId === x && !g.companionGuest && (g.isPrimaryGuest || g.passportUrl)); if (g) return g; } return null; },
       getGuest: async t => docs['checkin_guests/' + t] || null,
       saveGuest: async (t, data, opts = {}) => { await page.evaluate(([p, d, m]) => window.__DBAPI.set(p, d, m), ['checkin_guests/' + t, { ...data, [opts.isCreate ? 'submittedAt' : 'updatedAt']: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 } }, !opts.isCreate]); },
+      verifyProof: t => proof.verify(SECRET, t),
       runGuestUnlock: async () => ({ ok: true }), logRun: async () => {},
     };
   };

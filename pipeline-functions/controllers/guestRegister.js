@@ -12,6 +12,23 @@
 
 const { generateGuestToken, buildGuestLink, isLikelyGuestToken } = require('../lib/guest-token');
 const { runGuestUnlock } = require('./guestUnlock');
+const M = require('../lib/guest-match');
+const proofLib = require('../lib/guest-proof');
+
+/** The signed proof from the find step: valid, unexpired, and listing this booking's base number. */
+function proofPayload(ctx, params) {
+  if (typeof ctx.verifyProof !== 'function') return null; // fail closed
+  const token = typeof params.proof === 'string' ? params.proof.slice(0, 2000) : '';
+  const payload = token ? ctx.verifyProof(token) : null;
+  return payload && Array.isArray(payload.bases) ? payload : null;
+}
+
+function proofCovers(payload, reservation) {
+  const base = M.reservationBaseNum(String(reservation.reservationNumber || reservation.id || '').trim());
+  return !!(payload && base && payload.bases.includes(base));
+}
+
+const FORBIDDEN = { ok: false, errorCode: 'FORBIDDEN', message: 'Booking not verified. Please search for your booking again.' };
 
 function pickProfile(payload) {
   const p = payload.profile || payload;
@@ -83,6 +100,12 @@ async function registerPrimary(ctx, params, input) {
     return { ok: false, errorCode: 'BAD_REQUEST', message: 'reservationId is required' };
   }
 
+  const payload = proofPayload(ctx, params);
+  if (!payload) {
+    await ctx.logRun({ controller: 'GuestRegister', action: 'register_primary', status: 'error', message: 'Missing or invalid proof', input });
+    return FORBIDDEN;
+  }
+
   const reservation = await ctx.getReservation(reservationId);
   if (!reservation) {
     await ctx.logRun({
@@ -93,6 +116,10 @@ async function registerPrimary(ctx, params, input) {
       input,
     });
     return { ok: false, errorCode: 'NOT_FOUND', message: 'Reservation not found' };
+  }
+  if (!proofCovers(payload, reservation)) {
+    await ctx.logRun({ controller: 'GuestRegister', action: 'register_primary', status: 'error', message: 'Proof does not cover this booking', input });
+    return FORBIDDEN;
   }
   if (!isActiveReservation(reservation)) {
     await ctx.logRun({
@@ -194,6 +221,11 @@ async function registerPrimary(ctx, params, input) {
 }
 
 async function registerCompanion(ctx, params, input) {
+  const payload = proofPayload(ctx, params);
+  if (!payload) {
+    await ctx.logRun({ controller: 'GuestRegister', action: 'register_companion', status: 'error', message: 'Missing or invalid proof', input });
+    return FORBIDDEN;
+  }
   const reservationId = params.reservationId;
   let reservation = reservationId ? await ctx.getReservation(reservationId) : null;
 
@@ -209,6 +241,10 @@ async function registerCompanion(ctx, params, input) {
       input,
     });
     return { ok: false, errorCode: 'NOT_FOUND', message: 'Reservation not found' };
+  }
+  if (!proofCovers(payload, reservation)) {
+    await ctx.logRun({ controller: 'GuestRegister', action: 'register_companion', status: 'error', message: 'Proof does not cover this booking', input });
+    return FORBIDDEN;
   }
 
   const profile = pickProfile(params);
@@ -284,7 +320,7 @@ async function updateProfile(ctx, params, input) {
   return { ok: true, errorCode: 'UPDATED', message: 'Profile updated', data: { guestToken } };
 }
 
-function buildLiveCtx() {
+function buildLiveCtx(secrets = {}) {
   const { getFirestore, FieldValue } = require('firebase-admin/firestore');
   const { writeSystemLog } = require('../lib/logging');
   const guestUnlockCtx = require('./guestUnlock').buildLiveCtx();
@@ -292,6 +328,7 @@ function buildLiveCtx() {
   const db = getFirestore();
 
   return {
+    verifyProof: (token) => proofLib.verify(secrets.proofSecret, token),
     getReservation: async (id) => {
       const snap = await db.collection('reservations').doc(id).get();
       return snap.exists ? { id, ...snap.data() } : null;
@@ -349,9 +386,12 @@ function buildLiveCtx() {
 function registerCloudFunction() {
   const { onCall, HttpsError } = require('firebase-functions/v2/https');
 
-  return onCall({ region: 'europe-west1' }, async (request) => {
+  const { defineSecret } = require('firebase-functions/params');
+  const PROOF_SECRET = defineSecret('GUEST_PROOF_SECRET');
+
+  return onCall({ region: 'europe-west1', secrets: [PROOF_SECRET] }, async (request) => {
     const data = request.data || {};
-    const ctx = buildLiveCtx();
+    const ctx = buildLiveCtx({ proofSecret: PROOF_SECRET.value() });
     try {
       return await runGuestRegister(ctx, data);
     } catch (err) {
@@ -360,7 +400,7 @@ function registerCloudFunction() {
         action: data.mode || 'register_primary',
         status: 'error',
         message: err.message || String(err),
-        input: data,
+        input: { mode: data.mode, reservationId: data.reservationId },
       });
       throw new HttpsError('internal', err.message || 'GuestRegister failed');
     }

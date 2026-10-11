@@ -225,8 +225,9 @@ async function runCompanion(ctx, params, meta) {
   for (const rid of primary.relatedReservationIds || []) {
     for (const m of await loadSiblings(ctx, rid)) if (!res.some(x => x.id === m.id)) res.push(m);
   }
+  const proof = ctx.signProof({ bases: [...new Set([base, ...res.map(resBase)].filter(Boolean))] });
   return {
-    ok: true, found: true, base,
+    ok: true, found: true, base, proof,
     primary: { id: primary.id, matchedReservationId: primary.matchedReservationId || null, relatedReservationIds: primary.relatedReservationIds || [] },
     reservations: res.map(pubRes),
   };

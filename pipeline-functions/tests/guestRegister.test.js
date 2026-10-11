@@ -3,6 +3,12 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { generateGuestToken, buildGuestLink, isLikelyGuestToken } = require('../lib/guest-token');
 const { runGuestRegister } = require('../controllers/guestRegister');
+const proofLib = require('../lib/guest-proof');
+const M = require('../lib/guest-match');
+
+const SECRET = 'test-secret';
+/** a find-step proof covering every booking in the ctx (what a real search of that booking would hand out) */
+const proofFor = ctx => proofLib.sign(SECRET, { bases: [...ctx.reservations].map(([id, r]) => M.reservationBaseNum(String(r.reservationNumber || id))) });
 
 test('generateGuestToken is 32 hex chars', () => {
   const t = generateGuestToken();
@@ -51,6 +57,7 @@ function makeCtx(initial = {}) {
       return { ok: true };
     },
     logRun: async (e) => logs.push(e),
+    verifyProof: (t) => proofLib.verify(SECRET, t),
   };
 }
 
@@ -68,6 +75,7 @@ test('register_primary creates guestToken doc with room from reservation', async
   });
 
   const result = await runGuestRegister(ctx, {
+    proof: proofFor(ctx),
     mode: 'register_primary',
     reservationId: 'res1',
     guestLinkBase: 'https://example.com/guest.html',
@@ -101,6 +109,7 @@ test('register_primary reuses existing token for same reservation', async () => 
   });
 
   const result = await runGuestRegister(ctx, {
+    proof: proofFor(ctx),
     reservationId: 'res1',
     profile: { name: 'Bob', passportUrl: 'https://p.jpg', arrivalDate: '2026-09-01' },
   });
@@ -114,6 +123,7 @@ test('register_primary without passport is accepted for an Airbnb booking', asyn
     reservations: { resA: { roomCode: '6-2', checkin: '2026-09-01', checkout: '2026-09-04', reservationNumber: 'R300', status: 'OK2', source: 'airbnb' } },
   });
   const result = await runGuestRegister(ctx, {
+    proof: proofFor(ctx),
     mode: 'register_primary', reservationId: 'resA',
     profile: { name: 'A Guest', passportSkipped: true, skipReason: 'airbnb', arrivalDate: '2026-09-01' },
   });
@@ -129,7 +139,7 @@ test('register_primary without passport is still rejected for Booking.com', asyn
   const ctx = makeCtx({
     reservations: { resB: { roomCode: '6-2', checkin: '2026-09-01', checkout: '2026-09-04', reservationNumber: 'R301', status: 'OK2', source: 'booking' } },
   });
-  const result = await runGuestRegister(ctx, { mode: 'register_primary', reservationId: 'resB', profile: { name: 'B Guest' } });
+  const result = await runGuestRegister(ctx, { proof: proofFor(ctx), mode: 'register_primary', reservationId: 'resB', profile: { name: 'B Guest' } });
   assert.equal(result.ok, false);
   assert.equal(result.errorCode, 'BAD_REQUEST');
 });
@@ -139,6 +149,7 @@ test('register_primary fails without passport', async () => {
     reservations: { res1: { roomCode: '6-1', status: 'CONFIRMED' } },
   });
   const result = await runGuestRegister(ctx, {
+    proof: proofFor(ctx),
     reservationId: 'res1',
     profile: { name: 'X' },
   });
@@ -160,6 +171,7 @@ test('register_companion uses a random token doc id (not room_date)', async () =
   });
 
   const result = await runGuestRegister(ctx, {
+    proof: proofFor(ctx),
     mode: 'register_companion',
     reservationId: 'res1',
     profile: { name: 'Companion', arrivalDate: '2026-09-01' },
@@ -170,4 +182,64 @@ test('register_companion uses a random token doc id (not room_date)', async () =
   assert.notEqual(result.data.guestToken, '6-2_2026-09-01');
   assert.equal(ctx.guests.get(result.data.guestToken).companionGuest, true);
   assert.equal(ctx.guests.get(result.data.guestToken).aptId, '6-2');
+});
+
+const REG = { mode: 'register_primary', reservationId: 'res1', profile: { name: 'X', passportUrl: 'https://storage/p.jpg' } };
+const mk = () => makeCtx({ reservations: {
+  res1: { roomCode: '6-1', reservationNumber: '007004961_001', status: 'CONFIRMED' },
+  res2: { roomCode: '6-2', reservationNumber: '009999999_001', status: 'CONFIRMED' },
+} });
+
+test('register_primary refuses a request with no proof', async () => {
+  const ctx = mk();
+  const r = await runGuestRegister(ctx, REG);
+  assert.equal(r.ok, false);
+  assert.equal(r.errorCode, 'FORBIDDEN');
+  assert.equal(ctx.guests.size, 0);
+});
+
+test('register_primary refuses a forged or expired proof', async () => {
+  const ctx = mk();
+  const forged = proofLib.sign('other-secret', { bases: ['007004961'] });
+  assert.equal((await runGuestRegister(ctx, { ...REG, proof: forged })).errorCode, 'FORBIDDEN');
+  const old = proofLib.sign(SECRET, { bases: ['007004961'] }, Date.now() - 3 * 3600 * 1000);
+  assert.equal((await runGuestRegister(ctx, { ...REG, proof: old })).errorCode, 'FORBIDDEN');
+  assert.equal(ctx.guests.size, 0);
+});
+
+test('register_primary refuses a proof for a different booking', async () => {
+  const ctx = mk();
+  const other = proofLib.sign(SECRET, { bases: ['009999999'] });
+  const r = await runGuestRegister(ctx, { ...REG, proof: other });
+  assert.equal(r.errorCode, 'FORBIDDEN');
+  assert.equal(ctx.guests.size, 0);
+});
+
+test('register_primary accepts a proof that covers the booking', async () => {
+  const ctx = mk();
+  const r = await runGuestRegister(ctx, { ...REG, proof: proofLib.sign(SECRET, { bases: ['007004961'] }) });
+  assert.equal(r.ok, true);
+});
+
+test('register_primary fails closed when the server has no proof checker', async () => {
+  const ctx = mk();
+  delete ctx.verifyProof;
+  const r = await runGuestRegister(ctx, { ...REG, proof: proofLib.sign(SECRET, { bases: ['007004961'] }) });
+  assert.equal(r.errorCode, 'FORBIDDEN');
+});
+
+test('register_companion needs a proof for that booking', async () => {
+  const ctx = mk();
+  const p = { mode: 'register_companion', reservationId: 'res1', profile: { name: 'C' } };
+  assert.equal((await runGuestRegister(ctx, p)).errorCode, 'FORBIDDEN');
+  assert.equal((await runGuestRegister(ctx, { ...p, proof: proofLib.sign(SECRET, { bases: ['009999999'] }) })).errorCode, 'FORBIDDEN');
+  assert.equal(ctx.guests.size, 0);
+  assert.equal((await runGuestRegister(ctx, { ...p, proof: proofLib.sign(SECRET, { bases: ['007004961'] }) })).ok, true);
+});
+
+test('update_profile still works with only the secret guest token', async () => {
+  const ctx = mk();
+  const created = await runGuestRegister(ctx, { ...REG, proof: proofLib.sign(SECRET, { bases: ['007004961'] }) });
+  const r = await runGuestRegister(ctx, { mode: 'update_profile', guestToken: created.data.guestToken, profile: {}, passportScanResult: { valid: true } });
+  assert.equal(r.ok, true);
 });
