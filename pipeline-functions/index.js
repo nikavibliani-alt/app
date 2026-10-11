@@ -21,6 +21,7 @@ const { registerCloudFunctions: registerElevatorCodeSync } = require('./controll
 const { registerCloudFunction: registerAdminAction } = require('./controllers/adminAction');
 const { registerCloudFunction: registerGuestRegister } = require('./controllers/guestRegister');
 const { registerCloudFunctions: registerPushNotifications } = require('./controllers/pushNotifications');
+const { registerCloudFunctions: registerGuestApi } = require('./controllers/guestApi');
 
 exports.elevatorCodeGuard = registerElevatorCodeGuard();
 
@@ -30,6 +31,11 @@ exports.elevatorCodeSyncManual = elevatorCodeSyncManual;
 
 exports.adminAction = registerAdminAction();
 exports.guestRegister = registerGuestRegister();
+
+const { guestFind, guestStay, guestScan } = registerGuestApi();
+exports.guestFind = guestFind;
+exports.guestStay = guestStay;
+exports.guestScan = guestScan;
 
 const { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone, pushOnDamageReport } = registerPushNotifications();
 exports.pushOnFailedSearch = pushOnFailedSearch;

@@ -1122,6 +1122,57 @@ def check_fsrules():
 
 
 # ---------------------------------------------------------------------------
+# --check infra: deployed functions, secrets (names only), Realtime Database exposure, old-style guest ids
+# ---------------------------------------------------------------------------
+
+def check_infra():
+    hdr("INFRASTRUCTURE (read only: names and counts, no values)")
+    import google.auth.transport.requests as gtr
+    from google.oauth2 import service_account
+    info = json.loads(base64.b64decode(os.environ["FIREBASE_SERVICE_ACCOUNT"]).decode())
+    project = info["project_id"]
+    creds = service_account.Credentials.from_service_account_info(info, scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    creds.refresh(gtr.Request())
+    h = {"Authorization": f"Bearer {creds.token}"}
+
+    r = requests.get(f"https://cloudfunctions.googleapis.com/v2/projects/{project}/locations/-/functions", headers=h, params={"pageSize": 200}, timeout=30)
+    print("\nCloud Functions: HTTP", r.status_code)
+    if r.status_code == 200:
+        for f in sorted(r.json().get("functions", []), key=lambda x: x.get("name", "")):
+            name = f["name"].split("/")
+            sec = [x.get("secret") for x in (f.get("serviceConfig", {}).get("secretEnvironmentVariables") or [])]
+            print(f"   {name[3]:14} {name[5]:34} state={f.get('state')} runtime={f.get('buildConfig', {}).get('runtime')} secrets={sec or '-'}")
+    else:
+        print("   cannot list functions with this service account:", r.text[:200])
+
+    r = requests.get(f"https://secretmanager.googleapis.com/v1/projects/{project}/secrets", headers=h, timeout=30)
+    print("\nSecret Manager: HTTP", r.status_code)
+    if r.status_code == 200:
+        print("   secret names:", sorted(x["name"].split("/")[-1] for x in r.json().get("secrets", [])) or "none")
+    else:
+        print("   cannot list secrets with this service account:", r.text[:160])
+
+    rt = "https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app"
+    for path in ("/elevator_code.json", "/.json?shallow=true"):
+        r = requests.get(rt + path, timeout=30)
+        extra = ""
+        if r.status_code == 200:
+            j = r.json()
+            extra = f" | top-level keys: {len(j)}" if isinstance(j, dict) and path.startswith("/.json") else (" | has data" if j else " | empty")
+        print(f"\nRealtime Database, not logged in, GET {path.split('?')[0]}: HTTP {r.status_code}{extra}")
+
+    db = init_firestore()
+    today = datetime.now(TBILISI).date().isoformat()
+    n_all = n_old = 0
+    for d in db.collection("checkin_guests").where("arrivalDate", ">=", today).select(["arrivalDate"]).stream():
+        n_all += 1
+        gid = d.id
+        if not (re.fullmatch(r"[a-f0-9]{32}", gid, re.I) or (gid.startswith("g") and len(gid) > 8)):
+            n_old += 1
+    print(f"\nGuest records with arrival today or later: {n_all}; with an old-style id (not a random token): {n_old}")
+
+
+# ---------------------------------------------------------------------------
 # --check overrides: shape of pricing_config/rules.dateOverrides (read only)
 # ---------------------------------------------------------------------------
 
@@ -1150,6 +1201,9 @@ def main():
         return
     if args.check == "live":
         check_live()
+        return
+    if args.check == "infra":
+        check_infra()
         return
     if args.check == "fsrules":
         check_fsrules()

@@ -1229,6 +1229,7 @@ import{getStorage,ref,uploadBytes,getDownloadURL}from"https://www.gstatic.com/fi
 import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
 import{isGuestUnlocked,tbilisiHour as sharedTbilisiHour}from"./shared/guest-unlock.js";
 import{createPipelineGuestClient}from"./shared/pipeline-guest.js";
+import{createGuestApi,guestApiEnabled}from"./shared/guest-api.js";
 import{buildRegisterPrimaryPayload,buildRegisterCompanionPayload,buildUpdateProfilePayload,isLikelyGuestToken}from"./shared/guest-register.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 import{GUEST_APP_VERSION,GUEST_APP_URL}from"./shared/guest-app-version.js";
@@ -1266,9 +1267,21 @@ async function compressImage(file,maxWidth=1200,quality=0.85){
     img.src=url;
   });
 }
+const PASSPORT_MAX_BYTES=10*1024*1024;
+const PASSPORT_TOO_LARGE_MSG='This photo is too large (over 10 MB). Please take the photo again, or choose a smaller picture.';
+// A photo over 10 MB is shrunk once more; if it is still too big the guest gets a clear message instead of a failed upload.
+async function fitPassportFile(file){
+  if(!file||file.size<=PASSPORT_MAX_BYTES)return file;
+  try{
+    const small=await compressImage(file,1400,0.75);
+    if(small&&small.size<=PASSPORT_MAX_BYTES&&small.size<file.size)return new File([small],'passport.jpg',{type:small.type||'image/jpeg'});
+  }catch(e){}
+  return null;
+}
 async function uploadToFirebaseStorage(file){
   try{
     const compressed=await compressImage(file);
+    if(compressed.size>PASSPORT_MAX_BYTES){const tl=new Error('passport too large');tl.code='passport/too-large';throw tl;}
     const storage=getStorage();
     const path='passport_uploads/'+_safeUUID()+'/'+_safeUUID();
     const storageRef=ref(storage,path);
@@ -1293,9 +1306,16 @@ const guestFns=getFunctions(fb,'europe-west1');
 const _usingPipelineEmulator=connectPipelineFunctionsEmulator(guestFns,connectFunctionsEmulator);
 if(_usingPipelineEmulator){mountEmulatorBanner();console.info('[sandbox] pipeline functions → emulator 127.0.0.1:5001');}
 const pipelineGuest=createPipelineGuestClient(guestFns,httpsCallable);
+// true = the guest page asks the guest functions (guestFind, guestStay, guestScan) instead of reading
+// reservations, apartments, the elevator code and the Gemini key straight from the database.
+// ?api=1 forces it on, ?api=0 forces it off (for testing and for going back).
+const GUEST_API_DEFAULT=false;
+const GUEST_API=guestApiEnabled(window.location.search,GUEST_API_DEFAULT);
+const GAPI=createGuestApi(guestFns,httpsCallable);
+let _findProof='';   // signed proof from a successful booking search (needed to look up an existing guest record)
 
 // Load Gemini key from Firestore globals/config (set via Firebase console: geminiKey field)
-(async function(){try{const cfg=await getDoc(doc(db,'globals','config'));if(cfg.exists())_geminiKey=cfg.data().geminiKey||'';}catch(e){}})();
+if(!GUEST_API)(async function(){try{const cfg=await getDoc(doc(db,'globals','config'));if(cfg.exists())_geminiKey=cfg.data().geminiKey||'';}catch(e){}})();
 
 const WA='995593000724';
 const RTDB_ELEVATOR_URL='https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json';
@@ -1325,6 +1345,21 @@ let _geminiKey='';
 let guestId=null;
 let guestData=null;
 let aptData=null;
+
+// Apartment data. With the guest functions on, the server sends the public part always and the door code,
+// Wi-Fi and door photo only once this guest's own booking is checked in.
+const _aptSnapCache=new Map();
+function aptSnap(id){
+  if(!GUEST_API)return getDoc(doc(db,'checkin_apartments',id));
+  const key=(guestId||'')+'|'+id;
+  const hit=_aptSnapCache.get(key);
+  if(hit&&Date.now()-hit.t<4000)return hit.p;
+  const p=GAPI.stay({guestToken:guestId||'',aptId:id}).then(
+    r=>({exists:()=>!!r.apt,data:()=>r.apt}),
+    ()=>({exists:()=>false,data:()=>null}));
+  _aptSnapCache.set(key,{t:Date.now(),p});
+  return p;
+}
 let _roomMeta=null,_roomMetaFetching='';   // checkin_rooms/{aptId} (site, displayName) for rooms the page doesn't know
 let activeReservation=null; // reservation matching this apt with tuyaPassword
 let isPreview=false; // admin preview mode flag
@@ -1379,6 +1414,13 @@ async function loadSiblingReservations(resIdOrNum){
   try{
     const base=reservationBaseNum(resIdOrNum);
     if(!base)return [];
+    if(GUEST_API){
+      const tok=guestId||guestData?.id||'';
+      if(!tok)return [];
+      const sr=await GAPI.siblings({guestToken:tok,reservationRef:resIdOrNum});
+      window._sibRefCancelled=!!sr.refCancelled;
+      return sr.reservations||[];
+    }
     // (b) confirm the reservation and (c) query its siblings in parallel \u2014 (c) only
     // needs a base derived from resIdOrNum itself, not from (b)'s confirmed doc.
     const [snap,sibSnap]=await Promise.all([
@@ -1468,6 +1510,7 @@ function _buildElevatorMerged(rtdbData,fsData){
   return null;
 }
 async function _syncElevatorFromStores(){
+  if(GUEST_API){await pollStay();return;}
   let rtdbData=null;
   try{
     const r=await fetch(RTDB_ELEVATOR_URL);
@@ -1480,6 +1523,7 @@ async function _syncElevatorFromStores(){
 }
 function _startElevatorSync(){
   _syncElevatorFromStores();
+  if(GUEST_API)return;   // the server sends the code with the stay
   _homeSnaps.push(onSnapshot(doc(db,'globals','elevator_code'),snap=>{
     _elevatorFsData=snap.exists()?snap.data():null;
     _syncElevatorFromStores();
@@ -1645,7 +1689,7 @@ async function _hydrateGuestReservations(){
   }else{
     // no live sibling: if the guest's own booking is cancelled there is no access (and no stale saved list to fall back on)
     try{
-      const own=await getDoc(doc(db,'reservations',ref));
+      const own=GUEST_API?{exists:()=>true,data:()=>({status:window._sibRefCancelled?'CANCELLED':''})}:await getDoc(doc(db,'reservations',ref));
       if(own.exists()&&(own.data().status||'').toUpperCase()==='CANCELLED'){
         _ownCancelled=true;allMatchedReservations=[];activeReservation=null;
         try{localStorage.removeItem('maxela_all_res');}catch(e){}
@@ -1667,7 +1711,7 @@ async function _hydrateGuestReservations(){
     guestData={...guestData,aptId:resRoom};
     localStorage.setItem('maxela_apt_id',resRoom);
     try{
-      const s=await getDoc(doc(db,'checkin_apartments',resRoom));
+      const s=await aptSnap(resRoom);
       if(s.exists())aptData=s.data();
     }catch(e){}
     setDoc(doc(db,'checkin_guests',guestId),{aptId:resRoom},{merge:true}).catch(()=>{});
@@ -2029,8 +2073,53 @@ async function refreshHkToday(){
   if(document.getElementById('page-home')?.classList.contains('active')){syncHomePhase();renderTiles();}
 }
 
+
+// ── Guest functions: keep the stay (apartment, own booking, codes, elevator) fresh ──
+let _stayBusy=false,_lastStayResKey='';
+function _applyRoomChange(newRoom,newApt){   // the booking was moved to another room (same steps the live listener did)
+  const _prev=aptId;
+  aptId=newRoom;
+  guestData={...guestData,aptId:newRoom};
+  localStorage.setItem('maxela_apt_id',newRoom);
+  if(_prev)localStorage.removeItem('maxela_g_'+_prev);
+  setDoc(doc(db,'checkin_guests',guestId),{aptId:newRoom},{merge:true}).catch(()=>{});
+  (async()=>{try{
+    const _exSnap=await getDocs(query(collection(db,'checkin_guests'),where('matchedReservationId','==',guestData.matchedReservationId||''),limit(10)));
+    const _exDoc=_exSnap.docs.find(d=>d.data().aptId===newRoom);
+    const _newDocId=_exDoc?_exDoc.id:generateGuestToken();
+    if(!_exDoc){
+      const {id:_,submittedAt:_s,...baseData}=guestData;
+      await setDoc(doc(db,'checkin_guests',_newDocId),{...baseData,aptId:newRoom,movedFrom:_prev,submittedAt:serverTimestamp()});
+    }
+  }catch(_e){console.error('[RoomFix] new doc error',_e);}})();
+  if(newApt)aptData=newApt;
+  _homeLoading=false;showHome();
+}
+function applyStay(r){
+  if(!r||r.ok===false)return;
+  const c=!!r.ownCancelled;
+  if(c!==_ownCancelled){_ownCancelled=c;try{syncHomePhase();renderTiles();}catch(e){}}
+  if(r.aptId&&r.aptId!==aptId&&guestId&&!window._switchingApt){_applyRoomChange(r.aptId,r.apt);return;}
+  if(r.aptId&&r.aptId!==aptId)return;
+  if(r.apt)aptData=r.apt;
+  if(r.elevator)elevatorData=r.elevator;
+  activeReservation=r.reservation?{...r.reservation}:null;
+  const key=(r.reservation?r.reservation.id+(r.reservation.roomCode||'')+(r.reservation.tuyaPassword?'pw':''):'')+'|'+(r.unlocked?1:0)+'|'+(r.elevator?r.elevator.code||'':'')+'|'+(r.apt&&r.apt.doorCode?1:0);
+  if(key===_lastStayResKey)return;
+  _lastStayResKey=key;
+  if(document.getElementById('page-home')?.classList.contains('active')){try{syncHomePhase();}catch(e){}renderTiles();}
+}
+async function pollStay(){
+  if(!GUEST_API||!guestId||_stayBusy||isPreviewMode())return;
+  _stayBusy=true;
+  try{applyStay(await GAPI.stay({guestToken:guestId,aptId:aptId||''}));}
+  catch(e){/* keep what is on screen; the next poll tries again */}
+  finally{_stayBusy=false;}
+}
+
 function _unlockTick(){
   syncHomePhase();   // flip the hero (waiting -> arriving) when time/HK now unlock the guest
+  if(GUEST_API&&isUnlocked()&&!(aptData&&aptData.wifiPass)&&!_stayBusy)pollStay();   // the door code only comes once the server agrees
   // Auto-dismiss locked subpage if the gate has now opened
   if(isUnlocked()){
     const sp=document.getElementById('cur-sp');
@@ -2042,7 +2131,7 @@ function _unlockTick(){
 function startUnlockPoller(){
   if(_unlockPollTimer)return;
   _unlockPollTimer=setInterval(_unlockTick,30000);  // pure time-check, no Firestore
-  _hkPollTimer=setInterval(()=>{refreshHkToday();if(needsElevatorCode())_syncElevatorFromStores();},60000);
+  _hkPollTimer=setInterval(()=>{refreshHkToday();if(GUEST_API)pollStay();else if(needsElevatorCode())_syncElevatorFromStores();},60000);
 }
 function stopUnlockPoller(){
   if(_unlockPollTimer){clearInterval(_unlockPollTimer);_unlockPollTimer=null;}
@@ -2159,7 +2248,7 @@ function propName(def){const b=brandInfo();return b.mode==='default'?def:b.name;
 function ensureBrand(){
   if(!aptId||_brandFor===aptId)return;
   const id=aptId;_brandFor=id;_aptBrand='';
-  Promise.all([getDoc(doc(db,'checkin_apartments',id)).catch(()=>null),getFullCfg()]).then(([s])=>{
+  Promise.all([aptSnap(id).catch(()=>null),getFullCfg()]).then(([s])=>{
     if(id!==aptId)return;
     _aptBrand=(s&&s.exists()&&s.data().propertyName)||'';
     _brandCfgDone=true;applyPropertyName();
@@ -2253,8 +2342,12 @@ window.setContact=function(type){
   _rc.setAttribute('autocapitalize','none');_rc.setAttribute('autocorrect','off');_rc.setAttribute('spellcheck','false');
 }
 
-window.handlePassport=function(input){
-  const file=input.files[0];if(!file)return;
+window.handlePassport=async function(input){
+  let file=input.files[0];if(!file)return;
+  if(file.size>PASSPORT_MAX_BYTES){
+    file=await fitPassportFile(file);
+    if(!file){toast(PASSPORT_TOO_LARGE_MSG);input.value='';return;}
+  }
   passportFile=file;
   passportScanResult=null;
   const reader=new FileReader();
@@ -2277,6 +2370,17 @@ async function scanPassport(file){
   statusEl.className='scan-status scanning';
   statusEl.innerHTML='<span class="scan-spinner"></span><span>Verifying document...</span>';
   try{
+    if(GUEST_API){   // the Gemini key stays on the server; the photo is shrunk first so it uploads quickly
+      let _scanBlob=file;
+      try{_scanBlob=await compressImage(file,1600,0.9);}catch(e){}
+      const _b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(_scanBlob);});
+      const out=await GAPI.scanPassport({imageBase64:_b64,mimeType:_scanBlob.type||file.type||'image/jpeg'});
+      if(out.skipped){statusEl.style.display='none';return;}   // not configured: skip silently, as before
+      passportScanResult=out.result||{};
+      statusEl.className='scan-status scan-ok';
+      statusEl.innerHTML='<span>'+fi('check',16,2.2)+'</span><span>Document received</span>';
+      return;
+    }
     // Convert to base64
     const base64=await new Promise((res,rej)=>{
       const r=new FileReader();
@@ -2519,6 +2623,10 @@ function buildGuestLink(token){
   return GUEST_APP_URL+'?g='+encodeURIComponent(token);
 }
 async function findExistingPrimaryGuest(resId,resNum){
+  if(GUEST_API){
+    try{const er=await GAPI.existingGuest({reservationId:resId||'',reservationNumber:resNum||'',proof:_findProof});return er.existing||null;}
+    catch(e){console.warn('[findExistingPrimaryGuest]',e);return null;}
+  }
   const ids=[resId,resNum].filter(Boolean);
   for(const id of ids){
     try{
@@ -2555,17 +2663,24 @@ async function _updateParkingButtonVisibility(){
 async function _initCompanionFromToken(){
   if(!_joinToken||_joinToken.length<16)return;
   try{
+    let primary,base,res;
+    if(GUEST_API){
+      const cr=await GAPI.companion({joinToken:_joinToken});
+      if(!cr.found)return;   // unknown token: show the normal search page
+      primary=cr.primary;base=cr.base;res=cr.reservations||[];
+    }else{
     const {getDocs:_getDocs}=await import('https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js');
     const pSnap=await _getDocs(query(collection(db,'checkin_guests'),where('companionToken','==',_joinToken),limit(1)));
-    const primary=pSnap.docs.map(d=>({id:d.id,...d.data()})).find(g=>!g.companionGuest);
+    primary=pSnap.docs.map(d=>({id:d.id,...d.data()})).find(g=>!g.companionGuest);
     if(!primary)return;   // unknown token: show the normal search page
-    const base=reservationBaseNum(primary.matchedReservationId);
+    base=reservationBaseNum(primary.matchedReservationId);
     if(!base)return;
     const snap=await _getDocs(query(collection(db,'reservations'),where('reservationNumber','>=',base),where('reservationNumber','<=',base+'\uf8ff')));
-    const res=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED'&&reservationBaseNum(r.reservationNumber||r.id)===base);
+    res=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>(r.status||'').toUpperCase()!=='CANCELLED'&&reservationBaseNum(r.reservationNumber||r.id)===base);
     if(!res.length)return;
     for(const rid of (primary.relatedReservationIds||[])){   // the primary's other bookings (same group)
       try{(await loadSiblingReservations(rid)).forEach(m=>{if(!res.some(x=>x.id===m.id))res.push(m);});}catch(e){}
+    }
     }
     _companionGuest=true;_companionResNum=base;_companionPrimaryId=primary.id;
     _showCompanionBanner();
@@ -2655,7 +2770,7 @@ window.switchApt=async function(newRoomCode){
 
 
   try{
-    const s=await getDoc(doc(db,'checkin_apartments',aptId));
+    const s=await aptSnap(aptId);
     aptData=s.exists()?s.data():null;
   }catch(e){aptData=null;}
   console.log('[SwitchApt] Now showing room:',aptId,'aptData:',aptData?.wifiName);
@@ -2670,6 +2785,7 @@ window.switchApt=async function(newRoomCode){
   // Restart reservation subscription for the new apt.
   // Capture the room we subscribed for — if aptId changes again before this fires, ignore.
   const _snapRoom=aptId;
+  if(GUEST_API){pollStay();window._switchingApt=false;return;}
   // Pin the reservation ID we selected from allMatchedReservations above so the onSnapshot
   // callback cannot overwrite activeReservation with a different guest's record.
   const _targetResId=activeReservation?.id||null;
@@ -2724,7 +2840,7 @@ async function finishRegistration_(bestRes,formData,opts){
   const {name,guests,nationality,contact,contactType:ct,arrival,expectedCheckInWindow}=formData;
   if(!aptId)aptId=bestRes.roomCode||'';
   if(aptId){
-    try{const s=await getDoc(doc(db,'checkin_apartments',aptId));if(s.exists())aptData=s.data();}catch(e){}
+    try{const s=await aptSnap(aptId);if(s.exists())aptData=s.data();}catch(e){}
     document.getElementById('home-apt-name').textContent=aptDisplayName(aptId);
   }
   const scanPromise=(passportFile&&!passportScanResult&&!_companionGuest&&!skipPassport)?scanPassport(passportFile):Promise.resolve();
@@ -2962,11 +3078,17 @@ window.searchReservation=async function(){
     const _searchCutoffStr=_searchCutoff.toISOString().slice(0,10);
     // Look up the bookings that check in on the EXACT date the guest typed (not the newest-500 list);
     // an exact booking number is looked up separately below and works with any date.
+    let _pool=[],_bestMatch=null,_bestScore=0,_v2=null;
+    if(GUEST_API){
+      // the server does the matching (same rules as below) and never sends phone, e-mail or lock passwords
+      _v2=await GAPI.findBooking({name,arrival,aptHint:params.get('apt')||'',contact,contactType});
+      if(_v2.found){_bestMatch=_v2.best;_bestScore=_v2.score;_findProof=_v2.proof||'';}
+    }else{
     const queryPromise=_getDocs(query(collection(db,'reservations'),where('checkin','==',arrival)));
     const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('Query timeout')),15000));
     const resSnap=await Promise.race([queryPromise,timeoutPromise]);
     // Exact OTA confirmation number: look it up across ALL rooms (an exact number is safe), even on an apartment link.
-    let _pool=[];resSnap.forEach(d=>_pool.push({id:d.id,...d.data()}));
+    resSnap.forEach(d=>_pool.push({id:d.id,...d.data()}));
     if(_looksLikeBookingRef(name)){
       try{
         const _typed=name.trim();
@@ -2977,10 +3099,11 @@ window.searchReservation=async function(){
     }
     const _scored=scoreReservations(name,arrival,_pool);
     const allScored=_scored.allScored;
-    let _bestMatch=_scored.best,_bestScore=_scored.bestScore;
+    _bestMatch=_scored.best;_bestScore=_scored.bestScore;
     console.log('Scored reservations:',allScored.map(r=>({name:r.guest,score:r.score})));
     console.log('[DEBUG] input name:',JSON.stringify(name),'arrival:',arrival);
     console.log('[DEBUG] total docs:',allScored.length,'bestScore:',_bestScore,'bestMatch:',_bestMatch?.guest||'none');
+    }
     // SECURITY: only ONE reservation — the single highest-scoring match — is ever treated
     // as "this guest". We used to also pull in every OTHER reservation that fuzzy-matched
     // the typed name + arrival date (score>=3), intending to catch true multi-room bookings.
@@ -2993,7 +3116,7 @@ window.searchReservation=async function(){
     // reservationNumber only — never by fuzzy name again.
     if(_bestScore<3||!_bestMatch){
       try{
-        await addDoc(collection(db,'search_failures'),{
+        if(!GUEST_API)await addDoc(collection(db,'search_failures'),{
           input_name:name||'',
           input_date:arrival||'',
           input_booking_ref:'',
@@ -3026,10 +3149,10 @@ window.searchReservation=async function(){
       try{renderGreetingApt();}catch(e){}
     }
     // Build the multi-room sibling group by base reservation number (007004961_001 + _002).
-    let group=[_bestMatch];
+    let group=GUEST_API?(_v2.group||[_bestMatch]):[_bestMatch];
     const _primaryRn=String(_bestMatch.reservationNumber||_bestMatch.id||'').trim();
     const _baseRn=reservationBaseNum(_primaryRn);
-    if(_baseRn){
+    if(_baseRn&&!GUEST_API){
       try{
         const sibSnap=await _getDocs(query(
           collection(db,'reservations'),
@@ -3043,9 +3166,9 @@ window.searchReservation=async function(){
       }catch(e){console.warn('[MultiRoom] sibling lookup failed, using single match',e);}
     }
     // other bookings by the same guest (same name + check-in date + phone): show all apartments together
-    _pendingRelatedIds=[];
+    _pendingRelatedIds=GUEST_API?(_v2.relatedIds||[]):[];
     try{
-      const rel=_relatedBookings(_bestMatch,_pool);
+      const rel=GUEST_API?[]:_relatedBookings(_bestMatch,_pool);
       for(const rb of rel){
         const rbase=reservationBaseNum(rb.reservationNumber||rb.id);
         if(group.some(g=>reservationBaseNum(g.reservationNumber||g.id)===rbase))continue;
@@ -3061,7 +3184,7 @@ window.searchReservation=async function(){
     const _regName=(_bestScore===10&&_looksLikeBookingRef(name))?(_stripRoomNum(_bestMatch.guest||_bestMatch.guestName||'')||name):(name||(_bestMatch.guest||''));
     _pendingReg={name:_regName,guests,nationality,contact,contactType,arrival,expectedCheckInWindow:getExpectedCheckInWindow()};
     _pendingMatches=[{res:_bestMatch,score:_bestScore}];
-    const existing=await findExistingPrimaryGuest(_bestMatch.id,_bestMatch.reservationNumber);
+    const existing=GUEST_API?(_v2.existing||null):await findExistingPrimaryGuest(_bestMatch.id,_bestMatch.reservationNumber);
     if(existing&&!_companionGuest){
       guestId=existing.id;
       guestData={...existing,id:existing.id};
@@ -3074,7 +3197,7 @@ window.searchReservation=async function(){
       localStorage.setItem('maxela_all_res',JSON.stringify(group));
       // welcome back: load the BOOKED room's apartment data (the previous room / empty data must not be shown) before home opens
       aptData=null;
-      if(aptId){try{const _as=await getDoc(doc(db,'checkin_apartments',aptId));aptData=_as.exists()?_as.data():null;}catch(e){}}
+      if(aptId){try{const _as=await aptSnap(aptId);aptData=_as.exists()?_as.data():null;}catch(e){}}
       _ownCancelled=false;_brandFor='';   // re-read the property name for this room
       if(_bestMatch.roomCode&&_bestMatch.roomCode!==existing.aptId){
         setDoc(doc(db,'checkin_guests',guestId),{aptId:_bestMatch.roomCode,matchedReservationId:_bestMatch.id||existing.matchedReservationId},{merge:true}).catch(()=>{});
@@ -3094,7 +3217,7 @@ window.searchReservation=async function(){
   }catch(e){
     btn.disabled=false;
     document.getElementById('t-search-btn').textContent='Find my booking';
-    if(!_uploadAborted){toast('Verification failed — please try again.');}
+    if(!_uploadAborted){toast(e&&e.code==='RATE_LIMITED'?(e.message||'Too many attempts. Please wait a few minutes.'):'Verification failed — please try again.');}
   }finally{
     clearTimeout(_searchFailsafe);
   }
@@ -3169,7 +3292,7 @@ window.submitPassport=async function(){
     btn.disabled=false;
     label.textContent='Continue to your stay';
     if(!_uploadAborted){
-      toast('Upload failed — please try again.');
+      toast(e&&e.code==='passport/too-large'?PASSPORT_TOO_LARGE_MSG:'Upload failed — please try again.');
       if(skipLink)skipLink.style.display='';
     }
   }
@@ -3212,8 +3335,10 @@ window.reuploadPassport=async function(input){
 };
 
 window.handleReupload = async function(input) {
-  const file = input.files[0];
+  let file = input.files[0];
   if (!file) return;
+  file = await fitPassportFile(file);
+  if (!file) { toast(PASSPORT_TOO_LARGE_MSG); input.value = ''; return; }
   try {
     const url = await uploadToFirebaseStorage(file);
     await setDoc(doc(db, 'checkin_guests', guestId), { passportUrl: url, passportScanResult: {} }, { merge: true });
@@ -3226,9 +3351,11 @@ window.handleReupload = async function(input) {
 };
 
 window.handlePassportReupload=async function(input){
-  const file=input.files[0];
+  let file=input.files[0];
   if(!file)return;
   input.value='';
+  file=await fitPassportFile(file);
+  if(!file){toast(PASSPORT_TOO_LARGE_MSG);return;}
   const el=document.getElementById('passport-warn-banner');
   if(el)el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon spin-icon">${fi('loader',22,2)}</div><div class="passport-banner__body"><div class="passport-banner__title">Uploading...</div></div></div>`;
   let newUrl=guestData?.passportUrl||null;
@@ -3347,7 +3474,7 @@ function showHome(){
     }));
     // Watch the matched reservation by ID — catches room reassignments in real time
     const _matchedResId=guestData?.matchedReservationId;
-    if(_matchedResId){
+    if(_matchedResId&&!GUEST_API){
       _homeSnaps.push(onSnapshot(doc(db,'reservations',_matchedResId),snap=>{
         if(!snap.exists())return;
         _noteOwnCancelled([{id:snap.id,...snap.data()}]);
@@ -3371,7 +3498,7 @@ function showHome(){
               console.log('[RoomFix] Created new doc',_newDocId);
             }
           }catch(_e){console.error('[RoomFix] new doc error',_e);}})();
-          getDoc(doc(db,'checkin_apartments',_newRoom))
+          aptSnap(_newRoom)
             .then(s=>{if(s.exists())aptData=s.data();})
             .catch(()=>{})
             .finally(()=>{_homeLoading=false;showHome();});
@@ -3382,7 +3509,8 @@ function showHome(){
   // Subscribe to elevator code for floors 6 & 7
   if(needsElevatorCode())_startElevatorSync();
   // Subscribe to reservations for this apartment — find the active one with a Tuya password
-  if(aptId){
+  if(GUEST_API){pollStay();}
+  else if(aptId){
     _homeSnaps.push(onSnapshot(
       query(collection(db,'reservations'),where('roomCode','==',aptId)),
       snap=>{
@@ -3858,7 +3986,7 @@ window.wybToggle=function(){
 async function _getLocationData(){
   const cfg=await getFullCfg();
   const prop=aptPropTypeForConfig();
-  if(aptId&&!aptData){try{const s=await getDoc(doc(db,'checkin_apartments',aptId));if(s.exists())aptData=s.data();}catch(e){}}
+  if(aptId&&!aptData){try{const s=await aptSnap(aptId);if(s.exists())aptData=s.data();}catch(e){}}
   const _own={};
   if(aptData){for(const k of['address','mapsUrl','neighborhood']){if(aptData[k])_own[k]=aptData[k];}}
   const locDefaults={ROOMS:{address:'Zhiuli Shartava St. 37, Tbilisi'},MAXELA:{address:'Zhiuli Shartava St. 37, Tbilisi'},BIG_APT:{address:'Zhiuli Shartava St. 37, Tbilisi'},FREEDOM:{address:'Galaktion Tabidze St. 3/5, Tbilisi'},ORBELIANI:{address:'Atoneli St. 9, Tbilisi'}};
@@ -4647,7 +4775,7 @@ async function init(){
         // for the OLD room and would otherwise silently overwrite the correct data.
         const[hydrateResult,outerApt]=await Promise.all([
           _hydrateGuestReservations(),
-          getDoc(doc(db,'checkin_apartments',aptId)).then(as=>as.exists()?as.data():null).catch(()=>null)
+          aptSnap(aptId).then(as=>as.exists()?as.data():null).catch(()=>null)
         ]);
         if(!hydrateResult?.aptDataFetched&&outerApt)aptData=outerApt;
       }else{
@@ -4656,7 +4784,7 @@ async function init(){
         const hydrateResult=await _hydrateGuestReservations();
         aptId=guestData.aptId||activeReservation?.roomCode||'';
         if(aptId&&!hydrateResult?.aptDataFetched){
-          try{const as=await getDoc(doc(db,'checkin_apartments',aptId));if(as.exists())aptData=as.data();}catch(e){}
+          try{const as=await aptSnap(aptId);if(as.exists())aptData=as.data();}catch(e){}
         }
       }
       localStorage.setItem('maxela_guest_id',guestId);
@@ -4682,7 +4810,7 @@ async function init(){
     aptId=previewApt;
     isPreview=true;
     try{sessionStorage.setItem('maxela_preview','true');sessionStorage.setItem('maxela_preview_apt',previewApt);}catch(e){}
-    try{const s=await getDoc(doc(db,'checkin_apartments',aptId));aptData=s.exists()?s.data():null;}catch(e){}
+    try{const s=await aptSnap(aptId);aptData=s.exists()?s.data():null;}catch(e){}
     document.getElementById('loading').style.display='none';
     document.getElementById('app').style.display='block';
     // Preview banner
@@ -4749,7 +4877,7 @@ async function init(){
         }else{
           const[hydrateResult,outerApt]=await Promise.all([
             _hydrateGuestReservations(),
-            getDoc(doc(db,'checkin_apartments',aptId)).then(as=>as.exists()?as.data():null).catch(()=>null)
+            aptSnap(aptId).then(as=>as.exists()?as.data():null).catch(()=>null)
           ]);
           if(!hydrateResult?.aptDataFetched&&outerApt)aptData=outerApt;
           document.getElementById('loading').style.display='none';
@@ -4766,7 +4894,7 @@ async function init(){
         }
       }else{
         // No checkout date on guestData — proceed to home (can't expire what we don't know)
-        try{const as=await getDoc(doc(db,'checkin_apartments',aptId));if(as.exists())aptData=as.data();}catch(e){}
+        try{const as=await aptSnap(aptId);if(as.exists())aptData=as.data();}catch(e){}
         document.getElementById('loading').style.display='none';
         document.getElementById('app').style.display='block';
         showHome();
@@ -4776,7 +4904,7 @@ async function init(){
   }
   // No valid session — show register page
   if(aptId){
-    try{const snap=await getDoc(doc(db,'checkin_apartments',aptId));if(snap.exists())aptData=snap.data();}catch(e){}
+    try{const snap=await aptSnap(aptId);if(snap.exists())aptData=snap.data();}catch(e){}
     document.getElementById('t-apt-name-reg').textContent=aptDisplayName(aptId);
     _updateRulesForApt();
   }else{
@@ -4951,7 +5079,7 @@ function _renderHeroContent(){
   applyDoorCardVisibility();   // fail open: only hidden once config says smartLock===false for this apartment type
   let doorCode=_doorCodeForGuest();
   if(!doorCode&&aptId&&(!aptData||!aptData.doorCode)){
-    getDoc(doc(db,'checkin_apartments',aptId)).then(s=>{
+    aptSnap(aptId).then(s=>{
       if(s.exists()){
         aptData=s.data();
         const el=document.getElementById('hero-door-code');
