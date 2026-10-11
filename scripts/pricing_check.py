@@ -1019,6 +1019,82 @@ def check_recap():
 
 
 # ---------------------------------------------------------------------------
+# --check fsrules: live Firestore security rules (read only; nothing is deployed or written)
+# ---------------------------------------------------------------------------
+
+FS_PROBES = [  # (label, document path, method)
+    ("read hk_pins", "hk_pins/probe", "get"),
+    ("list hk_pins", "hk_pins/probe", "list"),
+    ("write pricing_config/rules", "pricing_config/rules", "update"),
+    ("write pricing_config/control", "pricing_config/control", "update"),
+    ("write pricing_config/engine_v2", "pricing_config/engine_v2", "update"),
+    ("create pricing_proposals", "pricing_proposals/probe", "create"),
+    ("update pricing_proposals", "pricing_proposals/probe", "update"),
+    ("read pricing_config/rules", "pricing_config/rules", "get"),
+]
+
+
+def check_fsrules():
+    hdr("FIRESTORE SECURITY RULES (read only: nothing is deployed, written or changed)")
+    import google.auth.transport.requests as gtr
+    from google.oauth2 import service_account
+    info = json.loads(base64.b64decode(os.environ["FIREBASE_SERVICE_ACCOUNT"]).decode())
+    project = info["project_id"]
+    print("project:", project)
+    # 1. real requests from outside, no login. Field mask hides every field, so no data is returned.
+    base = f"https://firestore.googleapis.com/v1/projects/{project}/databases/(default)/documents"
+    for coll in ("hk_pins", "pricing_config", "pricing_proposals"):
+        r = requests.get(f"{base}/{coll}", params={"pageSize": 1, "mask.fieldPaths": "_none_"}, timeout=30)
+        print(f"  not logged in, list {coll}: HTTP {r.status_code}"
+              + (f" (documents returned: {len(r.json().get('documents', []))})" if r.status_code == 200 else ""))
+    # 2. the live ruleset
+    creds = service_account.Credentials.from_service_account_info(
+        info, scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    creds.refresh(gtr.Request())
+    h = {"Authorization": f"Bearer {creds.token}"}
+    api = "https://firebaserules.googleapis.com/v1"
+    rel = requests.get(f"{api}/projects/{project}/releases/cloud.firestore", headers=h, timeout=30)
+    print("release:", rel.status_code)
+    if rel.status_code != 200:
+        print("  cannot read the live ruleset with this service account:", rel.text[:300])
+        return
+    rj = rel.json()
+    print("  ruleset:", rj.get("rulesetName", "").split("/")[-1], "| updated:", rj.get("updateTime"))
+    rs = requests.get(f"{api}/{rj['rulesetName']}", headers=h, timeout=30).json()
+    files = (rs.get("source") or {}).get("files") or []
+    print("\nRules (match and allow lines only, comments dropped):")
+    for f in files:
+        for line in f.get("content", "").splitlines():
+            t = line.split("//")[0].rstrip()
+            if re.search(r"\bmatch\b|\ballow\b|function|request\.auth|isAdmin|isSignedIn", t):
+                print("   ", t.strip())
+    # 3. simulations against the live rules (the Rules API runs them on its side; no document is touched)
+    users = {"not logged in": None,
+             "anonymous sign-in": {"uid": "probe-anon", "token": {"firebase": {"sign_in_provider": "anonymous"}}},
+             "email user (not admin)": {"uid": "probe-user", "token": {"email": "someone@example.com", "email_verified": True,
+                                                                       "firebase": {"sign_in_provider": "password"}}}}
+    print("\nSimulated requests against the live rules (ALLOW means the request would be accepted):")
+    for who, auth in users.items():
+        cases = []
+        for label, path, method in FS_PROBES:
+            req = {"path": f"/databases/(default)/documents/{path}", "method": method,
+                   "resource": {"data": {"x": 1}}}
+            if auth is not None:
+                req["auth"] = auth
+            cases.append({"expectation": "ALLOW", "request": req, "resource": {"data": {"x": 1}}})
+        body = {"source": {"files": files}, "testSuite": {"testCases": cases}}
+        tr = requests.post(f"{api}/projects/{project}:test", headers=h, json=body, timeout=60)
+        if tr.status_code != 200:
+            print(f"  {who}: simulation failed HTTP {tr.status_code} {tr.text[:200]}")
+            continue
+        results = tr.json().get("testResults", [])
+        print(f"  {who}:")
+        for (label, _, _), res in zip(FS_PROBES, results):
+            print(f"     {label:34} {'ALLOW' if res.get('state') == 'SUCCESS' else 'DENY '}"
+                  + (f"  ({res['errorPosition']})" if res.get("state") != "SUCCESS" and False else ""))
+
+
+# ---------------------------------------------------------------------------
 # --check overrides: shape of pricing_config/rules.dateOverrides (read only)
 # ---------------------------------------------------------------------------
 
@@ -1047,6 +1123,9 @@ def main():
         return
     if args.check == "live":
         check_live()
+        return
+    if args.check == "fsrules":
+        check_fsrules()
         return
     if args.check == "recap":
         check_recap()
