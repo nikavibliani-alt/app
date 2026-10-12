@@ -1,0 +1,28 @@
+name: Ideas fresh set
+
+# Manual only. Runs the idea maker now (ignoring its once-a-week gate). Every new idea saves its evidence; the
+# ideas that were waiting are marked "Replaced by a newer idea" (kept in the history). No rules or prices change.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: pricing-ideas
+  cancel-in-progress: false
+
+jobs:
+  fresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests firebase-admin anthropic
+      - name: Fresh set of ideas
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          ANTHROPIC_API_KEY:        ${{ secrets.ANTHROPIC_API_KEY }}
+          SHOW_ONE_IDEA:            '1'
+        run: python scripts/ideas_fresh.py

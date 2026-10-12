@@ -1318,13 +1318,13 @@ function ideaInfo(p) {
 // The stretches of the calendar that belong to a season, from today on (the one running now starts on its real first day).
 function seasonStretches(season) {
   const t = today(), runs = []; let cur = null;
-  for (let k = -400; k <= 400; k++) {
+  for (let k = -400; k <= 500; k++) {
     const iso = addDays(t, k);
     if (seasonOnDay(iso) === season) { if (!cur) cur = {from: iso, to: iso}; else cur.to = iso; }
     else if (cur) { runs.push(cur); cur = null; }
   }
   if (cur) runs.push(cur);
-  return runs.filter(x => x.to >= t).map(x => ({...x, nights: diffDays(x.from, x.to) + 1}));
+  return runs.filter(x => x.to >= t && x.from <= addDays(t, 365)).map(x => ({...x, nights: diffDays(x.from, x.to) + 1}));
 }
 const stretchText = x => {
   const a = x.from, b = x.to, ya = a.slice(0, 4), yb = b.slice(0, 4);
@@ -1392,16 +1392,32 @@ function ideaExamples(p, i, ev) {
   }
   return rows;
 }
+// Ideas made after the evidence was added carry it: the dates, booked and empty nights and last year's numbers as they were that day.
+function savedWhy(p, i, e) {
+  const word = e.units > 1 ? "Fully booked" : "Booked", day = e.made_on ? fmtShort(e.made_on) : "that day", out = [];
+  if (e.looked_at) out.push(`Nights looked at: ${fmtShort(e.looked_at.from)} – ${fmtShort(e.looked_at.to)} ${e.looked_at.to.slice(0, 4)} (${e.looked_at.nights} nights from the day it was made).`);
+  if (e.known_nights) out.push(`On ${day}, ${word.toLowerCase()}: ${e.booked_count} of ${e.known_nights} nights${e.booked_count ? " (" + datesText(e.booked) + ")" : ""}.` + (e.empty && e.empty.length ? ` Not booked: ${datesText(e.empty)}.` : ""));
+  if (e.no_price && e.no_price.length) out.push(`No price yet for ${datesText(e.no_price)} (too far ahead for the engine).`);
+  if (e.uses_last_year) {
+    const ly = e.last_year || {};
+    out.push(ly.available
+      ? `Last year (${stretchText(ly)}): ${ly.booked_nights} of ${ly.room_nights} room-nights were booked in the end, and ${ly.booked_by_that_day} were already booked by ${fmtShort(ly.as_of)} ${ly.as_of.slice(0, 4)}.`
+      : `This idea mentions last year, but no stays from last year are stored, so there are no numbers for it.`);
+  }
+  return out;
+}
 function ideaFactsHtml(p, i, full) {
-  const ev = ideaEvidence(p, i), later = ev.runs && ev.runs.slice(1, 3).map(stretchText).join(", ");
-  const dates = ev.none ? "The dates of this season could not be found in your settings."
-    : `${i.season}: ${stretchText(ev.st)} · ${ev.st.nights} nights${later ? ". Also: " + later : ""}`;
+  const ev = ideaEvidence(p, i), e = p.evidence && p.evidence.version === 1 ? p.evidence : null;
+  const runs = e ? (e.stretch ? [e.stretch].concat(e.later || []) : []) : (ev.runs || []);
+  const later = runs.slice(1, 3).map(stretchText).join(", ");
+  const dates = !runs.length ? "The dates of this season could not be found in your settings."
+    : `${i.season}: ${stretchText(runs[0])} · ${(e ? e.stretch : ev.st).nights} nights${later ? ". Also: " + later : ""}`;
   const head = `<div><b>Which dates:</b> ${esc(dates)}</div>
     <div><b>Which price:</b> ${esc(i.what.charAt(0).toUpperCase() + i.what.slice(1))} for ${esc(listName(p.property, i.eur))}, ${esc(roomName(p.property))}</div>`;
   if (!full) return `<div class="tx">${head}</div>`;
-  const why = ideaWhy(p, i, ev), ex = ev.none ? [] : ideaExamples(p, i, ev);
-  const skipped = [ev.booked.length && `${ev.booked.length} booked`, ev.hand.length && `${ev.hand.length} set by hand`, ev.prot.length && `${ev.prot.length} protected`].filter(Boolean).join(", ");
-  const lastYear = /last year|year ago|previous year|same time/i.test(p.reasoning || "");
+  const why = e ? savedWhy(p, i, e) : ideaWhy(p, i, ev), ex = ev.none ? [] : ideaExamples(p, i, ev);
+  const skipped = ev.none ? "" : [ev.booked.length && `${ev.booked.length} booked`, ev.hand.length && `${ev.hand.length} set by hand`, ev.prot.length && `${ev.prot.length} protected`].filter(Boolean).join(", ");
+  const lastYear = !e && /last year|year ago|previous year|same time/i.test(p.reasoning || "");
   return `<div class="tx">${head}
     <div><b>Why:</b>${why.map(w => `<div>${esc(w)}</div>`).join("")}
       <div>${esc(p.reasoning ? "Idea maker’s note: " + p.reasoning : "No reason was given.")}</div>
@@ -1438,12 +1454,13 @@ function viewIdeas() {
   const earlier = S.props.filter(p => p.status !== "pending" && !U.ideaDone[p.id]).slice(0, 8);
   const hist = earlier.map(p => {
     const i = ideaInfo(p); if (!i) return "";
+    const replaced = p.status === "rejected" && p.rejection_reason === "Replaced by a newer idea";
     const applied = p.status === "approved" || p.status === "auto_applied", canUndo = p.status === "approved" && p.previous != null && p.applied_path;
-    return `<div class="hist">${icon(applied ? "check" : "x", 18, 2.2)}<div class="grow"><b>${applied ? (p.status === "auto_applied" ? "Applied by the engine" : "Applied") : "Skipped"}</b> · ${esc(i.where)} · ${esc(i.what)} ${esc(i.fmt(i.cur))} → ${esc(i.fmt(i.sug))}
+    return `<div class="hist">${icon(applied ? "check" : "x", 18, 2.2)}<div class="grow"><b>${applied ? (p.status === "auto_applied" ? "Applied by the engine" : "Applied") : replaced ? "Replaced" : "Skipped"}</b> · ${esc(i.where)} · ${esc(i.what)} ${esc(i.fmt(i.cur))} → ${esc(i.fmt(i.sug))}
       <div style="font-size:13px;color:var(--soft)">${esc(histDates(p, i))}</div>
       <div class="muted" style="font-size:13px">${p.rejection_reason ? esc(p.rejection_reason) + " · " : ""}${esc(whenOf(p.approved_at || p.rejected_at || p.ts))}</div></div>
       ${canUndo ? `<button type="button" aria-label="Undo: ${esc(i.title)}, ${esc(i.where)}" data-act="ideaUndo" data-id="${p.id}">Undo</button>` : ""}
-      ${!applied ? `<button type="button" aria-label="Show this idea again" data-act="ideaAgain" data-id="${p.id}">Show again</button>` : ""}</div>`;
+      ${!applied && !replaced ? `<button type="button" aria-label="Show this idea again" data-act="ideaAgain" data-id="${p.id}">Show again</button>` : ""}</div>`;
   }).join("");
   return `${desk ? "" : `<div class="topbar"><h1>Pricing</h1></div>${tabsHtml(false)}`}${errorsHtml()}
     <section class="sec"><div><h2 class="h2">Waiting for you</h2><p class="sub">Ideas to change a season's minimum, start or maximum. Nothing changes until you tap Apply.</p></div>

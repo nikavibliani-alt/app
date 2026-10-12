@@ -534,9 +534,19 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       assert.ok(!/\b(guard|band|anchor)\b/i.test(await page.$$eval('[data-idea]', els => els.map(e => e.innerText).join(' '))), 'plain words only');
       const fit = await page.evaluate(() => { const bad = []; for (const c of document.querySelectorAll('[data-idea]')) { for (const e of c.querySelectorAll('*')) { if (e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible') bad.push(e.className); } if (c.scrollWidth > c.clientWidth + 1) bad.push('card'); } return {bad, side: document.documentElement.scrollWidth > innerWidth + 1}; });
       assert.deepStrictEqual(fit, {bad: [], side: false});
+      // an idea made with saved evidence shows that evidence
+      const c = await text(page, '[data-idea=ideaC]');
+      assert.ok(/Which dates: High season: 20–27 Dec 2026 · 8 nights\. Also: 1 May – 30 Jun 2027/.test(c), c);
+      assert.ok(/Nights looked at: 20 Dec – 27 Dec 2026 \(8 nights from the day it was made\)/.test(c), c);
+      assert.ok(/On 10 Oct, fully booked: 2 of 8 nights \(22 Dec, 26 Dec\)\. Not booked: 20–21 Dec, 23–25 Dec, 27 Dec\./.test(c), c);
+      assert.ok(/Last year \(20–27 Dec 2025\): 13 of 16 room-nights were booked in the end, and 5 were already booked by 10 Oct 2025\./.test(c), c);
+      assert.ok(!/were not saved with it/.test(c), 'saved evidence replaces the old "not saved" note');
+      assert.ok(/were not saved with it/.test(a), 'older ideas keep the old view and say what is missing');
       // the Earlier list shows the dates of applied and skipped ideas
       const hist = await text(page, '.hist');
       assert.ok(/Low season: 15 Jan – 15 Mar 2027 · 60 nights · Made 6 Oct/.test(await page.$$eval('.hist', els => els.map(e => e.innerText).join(' | '))), hist);
+      const replacedRow = await page.$$eval('.hist', els => els.map(e => e.innerText).find(t => /Replaced/.test(t)) || '');
+      assert.ok(/Replaced/.test(replacedRow) && !/Show again/.test(replacedRow) && /Mid season: 1 Oct – 30 Nov 2026/.test(replacedRow), replacedRow);
       assert.ok(/High season: 20–27 Dec 2026 · 8 nights · Made 5 Oct/.test(await page.$$eval('.hist', els => els.map(e => e.innerText).join(' | '))));
     });
   }

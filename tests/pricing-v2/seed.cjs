@@ -72,8 +72,15 @@ function seedDocs() {
   const r = docs['pricing_config/rules'];
   docs['pricing_proposals/ideaA'] = {type: 'startPrice', property: 'XCV_2', season: 'mid', current: r.startPrices.XCV_2.mid, suggested: 165, change_pct: -6, reasoning: 'Only 2 of 22 November nights are booked. Last year by today: 9.', status: 'pending', ts: '2026-10-10T10:00:00'};
   docs['pricing_proposals/ideaB'] = {type: 'ceilingEur', property: 'VGL_ST', season: 'high', current: r.eurRules.VGL_ST.high.max, suggested: r.eurRules.VGL_ST.high.max + 5, reasoning: '5 High-season nights reached your maximum and were booked within 2 days.', status: 'pending', ts: '2026-10-10T09:00:00'};
-  docs['pricing_proposals/ideaC'] = {type: 'startPriceEur', property: 'VGL_ST', season: 'high', current: r.startPricesEur.VGL_ST.high, suggested: r.startPricesEur.VGL_ST.high + 2, reasoning: '8 of 10 High-season weekends last year were booked more than a month ahead.', status: 'pending', ts: '2026-10-10T08:00:00'};
+  docs['pricing_proposals/ideaC'] = {type: 'startPriceEur', property: 'VGL_ST', season: 'high', current: r.startPricesEur.VGL_ST.high, suggested: r.startPricesEur.VGL_ST.high + 2, reasoning: '8 of 10 High-season weekends last year were booked more than a month ahead.', status: 'pending', ts: '2026-10-10T08:00:00',
+    // an idea made after the evidence was added: what it looked at, as it was that day
+    evidence: {version: 1, made_on: '2026-10-10', uses_last_year: true, stretch: {from: '2026-12-20', to: '2026-12-27', nights: 8},
+      later: [{from: '2027-05-01', to: '2027-06-30'}], looked_at: {from: '2026-12-20', to: '2026-12-27', nights: 8},
+      booked: ['2026-12-22', '2026-12-26'], empty: ['2026-12-20', '2026-12-21', '2026-12-23', '2026-12-24', '2026-12-25', '2026-12-27'], no_price: [],
+      booked_count: 2, known_nights: 8, units: 2,
+      last_year: {available: true, from: '2025-12-20', to: '2025-12-27', as_of: '2025-10-10', nights: 8, room_nights: 16, booked_nights: 13, booked_by_that_day: 5}}};
   docs['pricing_proposals/oldD'] = {type: 'floor', property: 'MAXELA', season: 'low', current: 80, suggested: 85, reasoning: 'x', status: 'approved', approved_at: new Date('2026-10-06T10:00:00Z'), ts: '2026-10-06T08:00:00'};
+  docs['pricing_proposals/oldF'] = {type: 'startPrice', property: 'ROOMS', season: 'mid', current: 95, suggested: 100, reasoning: 'x', status: 'rejected', rejection_reason: 'Replaced by a newer idea', replaced_by: 'fresh_set', rejected_at: new Date('2026-10-09T10:00:00Z'), ts: '2026-10-04T08:00:00'};
   docs['pricing_proposals/oldE'] = {type: 'startPriceEur', property: 'VGL_ST', season: 'high', current: 40, suggested: 45, reasoning: 'x', status: 'rejected', rejection_reason: 'Too early to tell', rejected_at: new Date('2026-10-05T10:00:00Z'), ts: '2026-10-05T08:00:00'};
   return docs;
 }

@@ -19,7 +19,10 @@ from datetime import datetime, timedelta
 
 import anthropic
 
+import idea_evidence
+
 RUN_EVERY_DAYS = 7
+MAKER_PROPERTIES = ["ROOMS", "MAXELA", "BIG_APT", "FREEDOM", "ORBE_1", "ORBE_2"]
 REPLACED_REASON = "Replaced by a newer idea"
 
 SYSTEM_PROMPT = """You are a revenue management analyst for Maxela Apartments in Tbilisi, Georgia.
@@ -60,6 +63,8 @@ RESPONSE FORMAT — return only valid JSON, no markdown fences, no text outside 
 Valid types: startPrice, floor, ceiling, startPriceEur, floorEur, ceilingEur
 Valid properties: ROOMS, MAXELA, BIG_APT, FREEDOM, ORBE_1, ORBE_2
 Only propose changes where you have concrete evidence from booking data.
+You have NO data about last year unless a LAST YEAR block is in the prompt. Mention last year only with numbers from that block, copied exactly. Never invent numbers or dates.
+Write the reasoning as one or two plain sentences.
 change_pct = (suggested - current) / current * 100 (signed: positive = increase)
 Maximum ±30% change for any single proposal. Maximum 10 proposals total."""
 
@@ -185,7 +190,11 @@ def _apply_to_config(config: dict, prop: str, season: str, ptype: str, value):
         config.setdefault("ceiling_prices_eur", {}).setdefault(prop, {})[season] = value
 
 
-def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict:
+def _tbilisi_today() -> str:
+    return (datetime.utcnow() + timedelta(hours=4)).date().isoformat()
+
+
+def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: bool = False) -> dict:
     """
     Weekly strategy analyst: analyzes last 30 days, writes proposals to Firestore.
     Auto-applies proposals ≤5% change to config in Firestore + in memory.
@@ -198,9 +207,9 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict
 
     today = datetime.now().strftime("%Y-%m-%d")
 
-    # Weekly: skip if a run marker exists for today or any of the 6 days before
+    # Weekly: skip if a run marker exists for today or any of the 6 days before (force = a manual fresh set)
     try:
-        for back in range(RUN_EVERY_DAYS):
+        for back in range(0 if force else RUN_EVERY_DAYS):
             day = (datetime.now() - timedelta(days=back)).strftime("%Y-%m-%d")
             if db.collection("pricing_proposals").document(f"run_{day}").get().exists:
                 print(f"  Claude proposals were written on {day} (runs once a week) — skipping.")
@@ -223,8 +232,17 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict
     # Load rejection history so Claude avoids re-proposing recently rejected changes
     rejection_context = _get_rejection_context(db)
 
+    # Real numbers about last year (from the stored stays), so the idea maker never has to guess them
+    ev_today = _tbilisi_today()
+    stays = idea_evidence.load_stays(db, ev_today)
+    try:
+        last_year_context = idea_evidence.last_year_lines(db, config, ev_today, MAKER_PROPERTIES, stays)
+    except Exception as e:
+        print(f"  Warning: could not work out last year's numbers: {e}", file=sys.stderr)
+        last_year_context = ""
+
     # Build prompt and call Claude
-    prompt = build_analyst_prompt(config, learning_context, rejection_context)
+    prompt = build_analyst_prompt(config, learning_context + last_year_context, rejection_context)
     try:
         response = call_claude_analyst(prompt, api_key)
     except Exception as e:
@@ -303,7 +321,14 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict
             })
             batch_count += 1
             replaced += 1
+        # The facts behind the idea, saved now: real dates, booked and empty nights, last year's numbers
+        try:
+            evidence = idea_evidence.collect(db, config, ev_today, prop, season, ptype, reasoning, stays)
+        except Exception as e:
+            print(f"  Warning: no evidence saved for {prop} {season} {ptype}: {e}", file=sys.stderr)
+            evidence = None
         batch.set(prop_ref, {
+            **({"evidence": evidence} if evidence else {}),
             "date":       today,
             "property":   prop,
             "season":     season,
