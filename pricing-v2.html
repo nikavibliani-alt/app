@@ -8,7 +8,7 @@
 :root{
   --ink:#1F1F1F;--page:#F5F4F2;--card:#FFFFFF;--line:#E6E4E0;--line2:#EFEDE9;--muted:#5A5955;--soft:#3E3D3A;
   --green:#2E6B34;--green-bg:#E3F1DF;--green-ink:#1F4D25;--red:#9B2C2C;--red-bg:#FBE4E4;--red-ink:#7A1F1F;
-  --chip:#E9E7E3;--sel:#F0EEEA;--btn-line:#CFCCC6;--off:#8C8A85;--bar-h:0px;--head-h:64px;
+  --amber-bg:#FFF1D0;--amber-ink:#6B4500;--chip:#E9E7E3;--sel:#F0EEEA;--btn-line:#CFCCC6;--off:#8C8A85;--bar-h:0px;--head-h:64px;
   --bg:#F5F4F2;--card-bg:#FFFFFF;--border:#E6E4E0;--text-main:#1F1F1F;--text-muted:#5A5955;--status-red:#9B2C2C;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -100,6 +100,8 @@ svg{flex-shrink:0}
 .ibtn{width:48px;height:48px;color:var(--soft);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .tag{font-size:12px;font-weight:600;color:var(--muted)}
 .beta{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;border:1px solid var(--btn-line);background:#FFFFFF;color:var(--soft);font-size:12px;font-weight:600;vertical-align:middle}
+.verdict{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:700;margin-right:6px}
+.verdict.right{background:var(--green-bg);color:var(--green-ink)}.verdict.wrong{background:var(--red-bg);color:var(--red-ink)}.verdict.unclear{background:var(--amber-bg);color:var(--amber-ink)}.verdict.run{background:var(--chip);color:var(--soft)}
 .scorebar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px}
 .scorebar b{font-size:16px}
 .pill{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 14px;border-radius:999px;font-weight:600;font-size:14px;background:#FFFFFF;color:var(--ink);border:1px solid var(--btn-line)}
@@ -450,7 +452,7 @@ const S = {
   paused: null, controlErr: false,
   rules: {}, eng: {}, file: FILE_DEFAULTS, fileLoaded: false,
   calmRun: null, oldRun: null, watch: null, events: [], props: [], locks: {},
-  daily: {}, errors: {}, beta: {auto_apply: false}, score: null, weekly: [],
+  daily: {}, errors: {}, beta: {auto_apply: false}, score: null, cards: {}, weekly: [],
 };
 // Everything typed but not yet saved. Nothing here is written before Save.
 const P = {room: {}, seasons: {}, holAdd: [], holDel: [], ruleAdd: [], ruleDel: []};
@@ -504,6 +506,7 @@ async function loadEvents() {
 async function loadBeta() {
   try { const b = await getDoc(betaRef()); S.beta = {auto_apply: !!(b.exists() && b.data().auto_apply)}; } catch (e) { /* stays off */ }
   try { const c = await getDoc(doc(db, "pricing_scorecard", "_summary")); S.score = c.exists() ? c.data() : null; } catch (e) { S.score = null; }
+  try { const q = await getDocs(query(collection(db, "pricing_scorecard"), limit(200))); S.cards = {}; q.docs.forEach(d => { if (d.id !== "_summary") S.cards[d.id] = d.data(); }); } catch (e) { S.cards = {}; }
 }
 async function loadProposals() {
   try {
@@ -1459,6 +1462,12 @@ const histDates = (p, i) => {
   const runs = seasonStretches(p.season);
   return (runs.length ? `${i.season}: ${stretchText(runs[0])} · ${runs[0].nights} nights` : `${i.season}: dates not found in your settings`) + (madeText(p) ? " · " + madeText(p) : "");
 };
+function cardHtml(id) {
+  const c = S.cards[id]; if (!c || c.status === "no_dates") return "";
+  if (c.status === "tracking") return `<div style="font-size:13px;margin-top:4px"><span class="verdict run">Checking</span>${esc(c.reason)}</div>`;
+  const v = {right: "Right", wrong: "Wrong", unclear: "Unclear"}[c.verdict] || "";
+  return `<div style="font-size:13px;margin-top:4px"><span class="verdict ${esc(c.verdict)}">${v}</span>${esc((c.reason || "").replace(/ → (Right|Wrong|Unclear)$/, ""))}</div>`;
+}
 function scoreText() {
   const c = S.score;
   if (!c || !c.finished) return `<b>No finished ideas yet</b><div class="muted" style="font-size:13px">An idea is judged when all its nights have passed.</div>`;
@@ -1475,7 +1484,7 @@ function viewIdeas() {
     const replaced = p.status === "rejected" && p.rejection_reason === "Replaced by a newer idea";
     const applied = p.status === "approved" || p.status === "auto_applied", canUndo = (p.status === "approved" || p.status === "auto_applied") && p.previous != null && p.applied_path;
     return `<div class="hist">${icon(applied ? "check" : "x", 18, 2.2)}<div class="grow"><b>${applied ? (p.status === "auto_applied" ? "Applied by the engine" : "Applied") : replaced ? "Replaced" : "Skipped"}</b> · ${esc(i.where)} · ${esc(i.what)} ${esc(i.fmt(i.cur))} → ${esc(i.fmt(i.sug))}
-      <div style="font-size:13px;color:var(--soft)">${esc(histDates(p, i))}</div>
+      <div style="font-size:13px;color:var(--soft)">${esc(histDates(p, i))}</div>${cardHtml(p.id)}
       <div class="muted" style="font-size:13px">${p.rejection_reason ? esc(p.rejection_reason) + " · " : ""}${esc(whenOf(p.approved_at || p.rejected_at || p.ts))}</div></div>
       ${canUndo ? `<button type="button" aria-label="Undo: ${esc(i.title)}, ${esc(i.where)}" data-act="ideaUndo" data-id="${p.id}">Undo</button>` : ""}
       ${!applied && !replaced ? `<button type="button" aria-label="Show this idea again" data-act="ideaAgain" data-id="${p.id}">Show again</button>` : ""}</div>`;

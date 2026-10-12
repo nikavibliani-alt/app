@@ -1,10 +1,9 @@
 name: History log daily
 
-# Every night: snapshot, booking and setting events, export to Cloud Storage, prune Firestore after a verified export.
+# Runs by itself from the last job of pricing_engine.yml (scripts/after_run.py, once a day). This file is for a manual run only.
+# Snapshot, booking and setting events, export to Cloud Storage, prune Firestore after a verified export.
 # Reads MiniHotel (GET only) and writes only pmslog_* in Firestore and the history bucket. No prices change.
 on:
-  schedule:
-    - cron: '15 2 * * *'
   workflow_dispatch:
     inputs:
       dry:

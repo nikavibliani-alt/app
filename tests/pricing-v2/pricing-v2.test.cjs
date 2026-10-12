@@ -554,6 +554,23 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
     });
   }
 
+  // ---- scorecard on finished ideas ----
+  for (const [w, hh] of SIZES) {
+    await test('scorecard: finished ideas show Right / Wrong / Unclear with the reason; running ones say Checking', w, hh, async ({page}) => {
+      await go(page, '#/ideas');
+      const rows = await page.$$eval('.hist', els => els.map(e => e.innerText));
+      const d = rows.find(t => /Maxela|MAXELA/i.test(t) && /minimum/.test(t)) || '';
+      assert.ok(/Wrong/.test(d) && /18 of 20 nights that were empty when the idea was made got a booking anyway at your price/.test(d) && !/→ Wrong/.test(d), d);
+      const f = rows.find(t => /Rooms|ROOMS/i.test(t) && /start price/.test(t)) || '';
+      assert.ok(/Checking/.test(f) && /Still running: 11 nights to go/.test(f), f);
+      const color = await page.$eval('.verdict.wrong', e => getComputedStyle(e).color);
+      assert.ok(color !== 'rgb(0, 0, 255)');
+    }, {mutate: d => {
+      d['pricing_scorecard/oldD'] = {status: 'final', verdict: 'wrong', reason: 'Said raise the minimum for Maxela (Low season, 1–20 Nov 2026). You skipped it. 18 of 20 nights that were empty when the idea was made got a booking anyway at your price. → Wrong'};
+      d['pricing_scorecard/oldF'] = {status: 'tracking', verdict: null, reason: 'Still running: 11 nights to go (until 20 Nov 2026).'};
+    }});
+  }
+
   // ---- layout switch ----
   await test('layout switches at 900 px', 899, 800, async ({page}) => { assert.strictEqual(await page.evaluate(() => document.body.dataset.layout), 'phone'); assert.ok(await page.$('a.tab[href="#/rooms"]')); });
   await test('layout switches at 900 px (desk side)', 900, 800, async ({page}) => { assert.strictEqual(await page.evaluate(() => document.body.dataset.layout), 'desk'); assert.ok(await page.$('a.tab[href="#/calendar"]')); });

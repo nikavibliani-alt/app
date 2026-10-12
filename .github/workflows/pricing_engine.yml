@@ -128,3 +128,31 @@ jobs:
           META_ACCESS_TOKEN:        ${{ secrets.META_ACCESS_TOKEN }}
           META_PHONE_NUMBER_ID:     ${{ secrets.META_PHONE_NUMBER_ID }}
         run: python scripts/price_watchdog.py
+
+  after_run:
+    # The twin (every run), then what is due: nightly (history log, scorecard) and weekly (review bots). Sends nothing to channels.
+    needs: calm_live
+    if: ${{ always() && github.event.inputs.urgent != 'true' }}
+    concurrency:
+      group: pricing-after-run
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests firebase-admin google-cloud-storage anthropic
+      - name: Twin, nightly and weekly tasks
+        env:
+          MINIHOTEL_HOTEL:          ${{ secrets.MINIHOTEL_HOTEL }}
+          MINIHOTEL_USER:           ${{ secrets.MINIHOTEL_USER }}
+          MINIHOTEL_PASS:           ${{ secrets.MINIHOTEL_PASS }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          ANTHROPIC_API_KEY:        ${{ secrets.ANTHROPIC_API_KEY }}
+          META_ACCESS_TOKEN:        ${{ secrets.META_ACCESS_TOKEN }}
+          META_PHONE_NUMBER_ID:     ${{ secrets.META_PHONE_NUMBER_ID }}
+        run: python scripts/after_run.py
