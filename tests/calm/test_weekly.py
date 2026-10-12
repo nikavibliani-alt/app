@@ -33,11 +33,12 @@ def sample():
     stays = [{"rt": "M", "checkin": "2026-10-12", "checkout": "2026-10-13", "created": "2026-10-12", "per_night": 100.0, "currency": "GEL"},
              {"rt": "M", "checkin": "2026-10-13", "checkout": "2026-10-15", "created": "2026-10-12", "per_night": 130.0, "currency": "GEL"},
              {"rt": "M", "checkin": "2026-10-01", "checkout": "2026-10-03", "created": "2026-09-20", "per_night": 90.0, "currency": "GEL"}]
-    return {"price_events": pe, "booking_events": [{"rt": "M", "day": "2026-10-09", "event": "cancellation"}, {"rt": "M", "day": "2026-10-10", "event": "booking"}],
+    return {"price_events": pe, "booking_events": [{"rt": "M", "day": "2026-10-09", "event": "cancellation"}, {"rt": "M", "day": "2026-10-10", "event": "booking"},
+                                                                                                      {"rt": "M", "day": "2026-10-12", "event": "cancellation"}],
             "runs": [{"day": "2026-10-07", "failed_portals": ["EXPEDIA"]}, {"day": "2026-10-08", "failed_portals": []}, {"day": "2026-10-09", "urgent": True, "stopped_room_types": ["M"]}],
             "watchdog_days": {"2026-10-07": "red", "2026-10-08": "green"}, "stays": stays, "limits": lambda rt, n: (150, 100, 200),
             "scorecard": {"finished": 14, "right": 9, "wrong": 3, "unclear": 2, "tracking": 1}, "twin_results": [{"status": "final", "diff_pct": -10}, {"status": "final", "diff_pct": 20}],
-            "events": [{"status": "approved", "date": "2026-10-20"}, {"status": "pending", "date": "2026-12-01"}], "room_ids": ["M", "N"], "since": "2026-10-12"}
+            "events": [{"status": "approved", "date": "2026-10-20"}, {"status": "pending", "date": "2026-12-01"}], "room_ids": ["M", "N"], "since": "2026-10-09"}
 
 
 def test_numbers_count_the_week_only_and_are_exact():

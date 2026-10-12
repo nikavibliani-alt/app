@@ -38,7 +38,8 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
     rooms = {rt: {} for rt in data.get("room_ids", [])}
     nights_of_week = set(_days(week_from, week_to))
     pe = [e for e in data.get("price_events", []) if week_from <= e.get("day", "") <= week_to]
-    be = [e for e in data.get("booking_events", []) if week_from <= e.get("day", "") <= week_to]
+    # The history log loaded every old booking and cancellation at once on its first day (LOG_START): those are not "this week".
+    be = [e for e in data.get("booking_events", []) if week_from <= e.get("day", "") <= week_to and e.get("day", "") > data.get("since", LOG_START)]
     stays = data.get("stays", [])
     limits = data.get("limits") or (lambda rt, night: None)
 
@@ -111,6 +112,8 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
         notes.append(f"The history log of price changes only exists since {since or 'today'}, so price moves, drops and cancellations before that are not counted.")
     if all_["watchdog_days_recorded"] < len(nights_of_week):
         notes.append(f"The watchdog result was recorded for {all_['watchdog_days_recorded']} of {len(nights_of_week)} days this week.")
+    if (data.get("since") or LOG_START) >= week_from:
+        notes.append(f"Cancellations and the booking log are counted from {(date.fromisoformat(data.get('since') or LOG_START) + timedelta(days=1)).isoformat()}: the older ones were loaded all at once when the log began.")
     if not all_["ideas"]["finished"]:
         notes.append("No idea has finished yet, so the scorecard has nothing to judge.")
     if not tw:
