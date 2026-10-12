@@ -1060,6 +1060,62 @@ def check_serpapi():
         print("  could not ask SerpAPI:", type(e).__name__)
 
 
+def check_serpapi_probe():
+    """Read-only (uses 2 SerpAPI searches). Shows what SerpAPI answers to the scanner's request. Never prints the key."""
+    hdr("SERPAPI PROBE (the scanner's request, and the same with a location)")
+    key = os.environ.get("SERPAPI_KEY", "")
+    if not key:
+        print("  SERPAPI_KEY: MISSING")
+        return
+    import requests as rq
+    q = f"concerts in Tbilisi Georgia {datetime.now().year}"
+    for label, extra in (("as the scanner sends it", {}), ("with location Tbilisi", {"location": "Tbilisi, Georgia"}), ("with gl=ge", {"gl": "ge"})):
+        params = {"engine": "google_events", "q": q, "hl": "en", "api_key": key, **extra}
+        try:
+            r = rq.get("https://serpapi.com/search.json", params=params, timeout=30)
+            body = r.text.replace(key, "***")
+            try:
+                j = r.json()
+            except ValueError:
+                j = {}
+            print(f"  [{label}] HTTP {r.status_code} | events_results: {len(j.get('events_results', []) or [])} | error: {str(j.get('error', ''))[:200]} | body start: {body[:160]!r}")
+        except Exception as e:  # noqa: BLE001
+            print(f"  [{label}] request failed: {type(e).__name__}")
+
+
+def check_urgentdry():
+    """Dry run of a cancellation run for one REAL cancelled stay (room type and nights only, no guest data). Writes nothing."""
+    hdr("CANCELLATION RUN, DRY: one real cancelled stay")
+    import pricing_calm_live
+    import pricing_shadow as ps
+    db = init_firestore()
+    today = datetime.now(timezone(timedelta(hours=4))).date().isoformat()
+    best = None
+    for d in db.collection("reservations").where("status", "==", "CANCELLED").stream():
+        x = d.to_dict() or {}
+        rt = ps.ROOM_CODE_TO_RT.get(x.get("roomCode", ""))
+        ci, co = str(x.get("checkin", "")), str(x.get("checkout", ""))
+        if rt and ci >= today and co > ci and (best is None or ci < best[1]):
+            best = (rt, ci, co)
+    if not best:
+        print("  no cancelled stay with a future check-in was found")
+        return
+    rt, ci, co = best
+    nights = []
+    d = datetime.fromisoformat(ci).date()
+    while d < datetime.fromisoformat(co).date() and len(nights) < 14:
+        nights.append(d.isoformat())
+        d += timedelta(days=1)
+    print(f"  cancelled stay: room type {rt}, check-in {ci}, check-out {co} -> nights {nights}")
+    result = pricing_calm_live.main(["--urgent", "--rooms", rt, "--dates", ",".join(nights), "--dry"])
+    print(f"  decisions for those nights: {len(result.get('decisions', []))} | price changes: {len(result.get('writes', []))} | sent: {bool(result.get('sent'))}")
+    for dd in result.get("decisions", [])[:12]:
+        print(f"   {dd['date']} {dd['currency']}: {dd['current']:.0f} -> {dd['proposed']:.0f} ({dd['kind']}) {dd['why'][-1] if dd.get('why') else ''}"[:200])
+    print(f"Attempted non-GET requests to MiniHotel (blocked by the check's guard): {len(BLOCKED)}")
+    if result.get("sent") or BLOCKED:
+        sys.exit(1)
+
+
 def check_moveold():
     hdr("MOVE OF THE 6 OLD ROOMS TO THE NEW ENGINE: dry run (calculates and prints; nothing sent, nothing saved)")
     import pricing_calm_live
@@ -1526,6 +1582,12 @@ def main():
         return
     if args.check == "serpapi":
         check_serpapi()
+        return
+    if args.check == "serpapi_probe":
+        check_serpapi_probe()
+        return
+    if args.check == "urgentdry":
+        check_urgentdry()
         return
     if args.check == "watchdog":
         # re-read today's saved run and prices and refresh pricing_watchdog/latest (never sends a WhatsApp)
