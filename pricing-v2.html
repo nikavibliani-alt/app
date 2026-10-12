@@ -1344,7 +1344,8 @@ const roomPortals = rt => S.eng?.settings?.room_types?.[rt]?.portals || S.file?.
 const listName = (rt, eur) => eur ? "Airbnb ($)" : (roomPortals(rt).includes("EXPEDIA") ? "Booking and Expedia (₾)" : "Booking (₾)");
 // What the nights of the next stretch of this idea's season look like today (from the saved prices of the last run).
 function ideaEvidence(p, i) {
-  const rt = p.property, cur = i.eur ? "USD" : "GEL", runs = seasonStretches(p.season);
+  const rt = p.property, cur = i.eur ? "USD" : "GEL", saved = p.evidence && p.evidence.version === 1 && p.evidence.stretch;
+  const runs = saved ? [saved] : seasonStretches(p.season);          // an idea with saved evidence keeps the dates it was made for
   if (!runs.length) return {runs, none: true};
   const st = runs[0], t = today(), from = st.from > t ? st.from : t;
   const nights = Array.from({length: diffDays(from, st.to) + 1}, (_, k) => addDays(from, k));
