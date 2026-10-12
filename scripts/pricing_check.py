@@ -973,6 +973,93 @@ def check_secrets():
     print(f"  globals/config.ownerPhone: {'set (%d digits)' % len(phone) if phone else 'MISSING'}")
 
 
+def check_urgent_events():
+    """Read-only. Cancellation (urgent) runs and the event scanner's saved events, last 14 days. No guest data."""
+    hdr("URGENT RUNS AND EVENTS (read only)")
+    db = init_firestore()
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=14)
+    print("\n1. pricing_log, last 14 days, by trigger")
+    by = Counter()
+    canc = []
+    for d in db.collection("pricing_log").stream():
+        x = d.to_dict() or {}
+        ts = x.get("timestamp")
+        if not ts or getattr(ts, "tzinfo", None) is None and False:
+            continue
+        try:
+            if ts < cutoff:
+                continue
+        except TypeError:
+            continue
+        by[x.get("trigger", "?")] += 1
+        if x.get("trigger") == "cancellation":
+            canc.append((ts, x.get("message", ""), bool(x.get("error"))))
+    print("  ", dict(by) or "no entries")
+    for ts, m, e in sorted(canc):
+        print(f"   cancellation run {ts:%Y-%m-%d %H:%M} UTC: {m}{' (error)' if e else ''}")
+    print("\n2. pricing_changes type urgent_run, last 14 days")
+    n = 0
+    for d in db.collection("pricing_changes").where("type", "==", "urgent_run").stream():
+        x = d.to_dict() or {}
+        ts = x.get("ts")
+        try:
+            if ts and ts >= cutoff:
+                n += 1
+                print(f"   {ts:%Y-%m-%d %H:%M}: {x.get('detail')}")
+        except TypeError:
+            pass
+    print("   total", n)
+    print("\n3. reservations cancelled in the last 14 days (counts only)")
+    tot = near = 0
+    today_s = now.date().isoformat()
+    for d in db.collection("reservations").where("status", "==", "CANCELLED").stream():
+        x = d.to_dict() or {}
+        ts = x.get("syncedAt")
+        try:
+            if ts and ts >= cutoff:
+                tot += 1
+                if str(x.get("checkin", "")) >= today_s:
+                    near += 1
+        except TypeError:
+            pass
+    print(f"   marked cancelled by the sync in 14 days: {tot} (still in the future: {near})")
+    print("\n4. pricing_events (the event scanner)")
+    ev = Counter()
+    rows = []
+    for d in db.collection("pricing_events").stream():
+        x = d.to_dict() or {}
+        if d.id == "last_scan":
+            print(f"   last_scan: {x}")
+            continue
+        ev[(x.get("status"), x.get("source", "manual"))] += 1
+        rows.append((str(x.get("date") or d.id.replace("event_", "")), x.get("status"), x.get("label", "")[:50], x.get("multiplier"), str(x.get("found_at", ""))[:10]))
+    print("   by (status, source):", dict(ev) or "none")
+    for r in sorted(rows)[-25:]:
+        print("   ", r)
+
+
+def check_serpapi():
+    """Read-only. Asks SerpAPI how many searches are left (this call does not use a search). Never prints the key."""
+    hdr("SERPAPI ACCOUNT (names and numbers only)")
+    key = os.environ.get("SERPAPI_KEY", "")
+    print("  SERPAPI_KEY:", "set" if key else "MISSING")
+    if not key:
+        return
+    import requests as rq
+    try:
+        r = rq.get("https://serpapi.com/account", params={"api_key": key}, timeout=20)
+        print("  HTTP", r.status_code)
+        j = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+        for k in ("account_status", "plan_name", "searches_per_month", "this_month_usage", "plan_searches_left", "extra_credits", "total_searches_left", "this_hour_searches", "account_rate_limit_per_hour"):
+            if k in j:
+                print(f"   {k}: {j[k]}")
+        if j.get("error"):
+            print("   error:", str(j["error"])[:120])
+    except Exception as e:  # noqa: BLE001
+        print("  could not ask SerpAPI:", type(e).__name__)
+
+
 def check_moveold():
     hdr("MOVE OF THE 6 OLD ROOMS TO THE NEW ENGINE: dry run (calculates and prints; nothing sent, nothing saved)")
     import pricing_calm_live
@@ -1433,6 +1520,12 @@ def main():
         return
     if args.check == "secrets":
         check_secrets()
+        return
+    if args.check == "urgent_events":
+        check_urgent_events()
+        return
+    if args.check == "serpapi":
+        check_serpapi()
         return
     if args.check == "watchdog":
         # re-read today's saved run and prices and refresh pricing_watchdog/latest (never sends a WhatsApp)

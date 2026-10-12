@@ -33,4 +33,5 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           META_ACCESS_TOKEN:        ${{ secrets.META_ACCESS_TOKEN }}
           META_PHONE_NUMBER_ID:     ${{ secrets.META_PHONE_NUMBER_ID }}
+          SERPAPI_KEY:              ${{ secrets.SERPAPI_KEY }}
         run: python scripts/pricing_check.py --check ${{ inputs.check }}
