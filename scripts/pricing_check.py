@@ -962,6 +962,17 @@ def holiday_table(decs, rts, first="2026-12-20", last="2027-01-14"):
     return {"outside": outside}
 
 
+def check_secrets():
+    """Names only. Never prints a value."""
+    hdr("SECRETS AND SETTINGS (names only)")
+    for n in ("META_ACCESS_TOKEN", "META_PHONE_NUMBER_ID", "FIREBASE_SERVICE_ACCOUNT", "MINIHOTEL_HOTEL"):
+        print(f"  {n}: {'set' if os.environ.get(n) else 'MISSING'}")
+    db = init_firestore()
+    snap = db.collection("globals").document("config").get()
+    phone = "".join(c for c in str((snap.to_dict() or {}).get("ownerPhone") or "") if c.isdigit()) if snap.exists else ""
+    print(f"  globals/config.ownerPhone: {'set (%d digits)' % len(phone) if phone else 'MISSING'}")
+
+
 def check_moveold():
     hdr("MOVE OF THE 6 OLD ROOMS TO THE NEW ENGINE: dry run (calculates and prints; nothing sent, nothing saved)")
     import pricing_calm_live
@@ -1419,6 +1430,14 @@ def main():
         return
     if args.check == "overrides":
         check_overrides()
+        return
+    if args.check == "secrets":
+        check_secrets()
+        return
+    if args.check in ("movedsettings", "movedsettings_apply"):
+        # one-off for the go-live of the six rooms: the same script as the "Moved rooms settings" workflow
+        import moved_rooms_settings
+        moved_rooms_settings.main(["--apply"] if args.check.endswith("_apply") else [])
         return
     if args.check != "step1":
         raise SystemExit(f"unknown check: {args.check}")
