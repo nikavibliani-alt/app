@@ -96,3 +96,29 @@ jobs:
           MINIHOTEL_PASS:           ${{ secrets.MINIHOTEL_PASS }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: python pricing_calm_live.py
+
+  watchdog:
+    needs: calm_live
+    if: ${{ always() && github.event.inputs.urgent != 'true' }}
+    concurrency:
+      group: pricing-watchdog
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests firebase-admin
+      - name: Price watchdog (reads the run, saves the card, WhatsApp only when red)
+        env:
+          MINIHOTEL_HOTEL:          ${{ secrets.MINIHOTEL_HOTEL }}
+          MINIHOTEL_USER:           ${{ secrets.MINIHOTEL_USER }}
+          MINIHOTEL_PASS:           ${{ secrets.MINIHOTEL_PASS }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          META_ACCESS_TOKEN:        ${{ secrets.META_ACCESS_TOKEN }}
+          META_PHONE_NUMBER_ID:     ${{ secrets.META_PHONE_NUMBER_ID }}
+        run: python scripts/price_watchdog.py
