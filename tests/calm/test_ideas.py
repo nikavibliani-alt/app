@@ -1,5 +1,6 @@
 """Ideas: closing out-of-date pending ideas, the weekly idea maker, and replacing older pending ideas."""
 
+import copy
 import os
 import sys
 from datetime import date, datetime, timedelta
@@ -210,3 +211,22 @@ def test_new_idea_replaces_the_older_pending_one_for_the_same_room_season_field(
     assert p["done"]["status"] == "approved"
     assert p["run_2026-10-12"]["replaced"] == 2
     assert db.store["pricing_config"]["rules"] == RULES, "the idea maker never changes the rules"
+
+
+def test_beta_switch_off_changes_nothing_and_on_applies_only_up_to_date_ideas(monkeypatch):
+    def ideas_of(db):
+        return [v for k, v in db.store["pricing_proposals"].items() if not k.startswith("run_")]
+    db = FakeDB(rules=copy.deepcopy(RULES))
+    run_maker(db, [new_idea("MAXELA", "low", "startPrice", 100, 108)], monkeypatch)
+    assert db.store["pricing_config"]["rules"] == RULES and [v["status"] for v in ideas_of(db)] == ["pending"]
+    db = FakeDB(rules=copy.deepcopy(RULES))
+    db.store["pricing_config"]["ideas_beta"] = {"auto_apply": True}
+    run_maker(db, [new_idea("MAXELA", "low", "startPrice", 100, 108)], monkeypatch)
+    done = ideas_of(db)
+    assert len(done) == 1 and done[0]["status"] == "auto_applied" and done[0]["previous"] == 100
+    assert done[0]["applied_path"] == "startPrices.MAXELA.low" and done[0]["property_id"] == "maxela" and done[0]["auto"] is True
+    assert db.store["pricing_config"]["rules"]["startPrices.MAXELA.low"] == 108             # written to the rules
+    db = FakeDB(rules=copy.deepcopy(RULES))
+    db.store["pricing_config"]["ideas_beta"] = {"auto_apply": True}
+    run_maker(db, [new_idea("ROOMS", "mid", "floor", 99, 80)], monkeypatch)                  # the number is 70, not 99: out of date
+    assert [v["status"] for v in ideas_of(db)] == ["pending"] and db.store["pricing_config"]["rules"] == RULES

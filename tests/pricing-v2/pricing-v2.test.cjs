@@ -558,6 +558,27 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
   await test('layout switches at 900 px', 899, 800, async ({page}) => { assert.strictEqual(await page.evaluate(() => document.body.dataset.layout), 'phone'); assert.ok(await page.$('a.tab[href="#/rooms"]')); });
   await test('layout switches at 900 px (desk side)', 900, 800, async ({page}) => { assert.strictEqual(await page.evaluate(() => document.body.dataset.layout), 'desk'); assert.ok(await page.$('a.tab[href="#/calendar"]')); });
 
+  // ---- ideas Beta: label, switch (off by default, confirm to turn on), score ----
+  for (const [w, hh] of SIZES) {
+    await test('ideas Beta: label, switch off by default, confirm before turning on, score line', w, hh, async ({page}) => {
+      await go(page, '#/ideas');
+      assert.ok(/Beta/.test(await text(page, 'a.tab[href="#/ideas"]')), 'Beta on the tab');
+      const sw = '[data-act=toggleAuto]';
+      assert.strictEqual(await page.getAttribute(sw, 'aria-checked'), 'false', 'off by default');
+      assert.ok(/Right 9 of 14 so far/.test(await text(page, '.scorebar')) && /3 wrong, 2 unclear/.test(await text(page, '.scorebar')), await text(page, '.scorebar'));
+      await page.click(sw);
+      assert.strictEqual((await h.writes(page)).length, 0, 'nothing written before confirming');
+      await page.click('[data-act=closeDialog]');
+      assert.strictEqual(await page.getAttribute(sw, 'aria-checked'), 'false');
+      await page.click(sw); await page.click('[data-act=autoOn]'); await page.waitForTimeout(100);
+      assert.strictEqual(await page.getAttribute(sw, 'aria-checked'), 'true');
+      assert.strictEqual((await writesTo(page, 'pricing_config/ideas_beta')).length, 1);
+      assert.strictEqual((await h.doc(page, 'pricing_config/ideas_beta')).auto_apply, true);
+      await page.click(sw); await page.waitForTimeout(100);                  // turning it off needs no confirm
+      assert.strictEqual((await h.doc(page, 'pricing_config/ideas_beta')).auto_apply, false);
+    }, {mutate: d => { d['pricing_scorecard/_summary'] = {finished: 14, right: 9, wrong: 3, unclear: 2, tracking: 4}; }});
+  }
+
   // ---- 8 + design rules, on every screen at every size ----
   const SCREENS = ['#/rooms', '#/room/XCV_2', '#/test/MAXELA', '#/seasons', '#/dates', '#/ideas'];
   for (const [w, hh] of SIZES) {

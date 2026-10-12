@@ -169,6 +169,49 @@ def parse_analyst_reply(text: str) -> dict:
         raise ValueError(f"the reply had no JSON ({len(text)} characters, starts with: {text[:60]!r})")
 
 
+def idea_path(prop: str, season: str, ptype: str):
+    """Where an idea's number lives in pricing_config/rules (the same places the Ideas tab changes)."""
+    t = str(ptype)
+    eur = t.lower().endswith("eur")
+    base = t[:-3] if eur else t
+    return {"startPrice": f"{'startPricesEur' if eur else 'startPrices'}.{prop}.{season}",
+            "floor": f"{'eurRules' if eur else 'priceRules'}.{prop}.{season}.min",
+            "ceiling": f"{'eurRules' if eur else 'priceRules'}.{prop}.{season}.max"}.get(base)
+
+
+def _get_path(data: dict, path: str):
+    cur = data
+    for part in path.split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return None
+        cur = cur[part]
+    return cur
+
+
+def auto_apply_on(db) -> bool:
+    """The Beta switch on the Ideas tab (pricing_config/ideas_beta.auto_apply). Off unless it was turned on."""
+    try:
+        snap = db.collection("pricing_config").document("ideas_beta").get()
+        return bool(snap.exists and (snap.to_dict() or {}).get("auto_apply"))
+    except Exception:
+        return False
+
+
+def try_auto_apply(db, rules_data: dict, prop, season, ptype, current, suggested):
+    """Apply one new idea to the rules, only when the number is still the one the idea saw. Returns the fields to save on
+    the idea (status auto_applied, previous, applied_path) or None when it was not applied."""
+    path = idea_path(prop, season, ptype)
+    if not path:
+        return None
+    now = _get_path(rules_data, path)
+    if not isinstance(now, (int, float)) or abs(now - current) > 0.0001:
+        return None
+    db.collection("pricing_config").document("rules").update({path: suggested})
+    _apply_to_rules_data(rules_data, prop, season, ptype, suggested)
+    return {"status": "auto_applied", "previous": now, "applied_path": path, "applied_value": suggested,
+            "approved_at": datetime.now(), "auto": True}
+
+
 def _apply_to_rules_data(rules_data: dict, prop: str, season: str, ptype: str, value):
     """Apply a proposal to the rules_data dict (Firestore format) in place."""
     if ptype == "startPrice":
@@ -275,6 +318,8 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
         print(f"  Warning: could not read rules for auto-apply: {e}", file=sys.stderr)
         rules_data = {}
 
+    auto_on = auto_apply_on(db)
+    auto_labels = []
     auto_applied = 0
     pending_count = 0
     batch = db.batch()
@@ -320,8 +365,16 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
         else:
             actual_pct = 100.0
 
-        # Auto-apply is OFF: every proposal waits for manual approval in pricing.html
+        # Every idea waits for your Apply tap, unless the Beta switch "Apply ideas automatically" is on
         status = "pending"
+        applied_fields = None
+        if auto_on:
+            try:
+                applied_fields = try_auto_apply(db, rules_data, prop, season, ptype, current_val, suggested)
+            except Exception as e:
+                print(f"  Warning: could not apply an idea automatically: {type(e).__name__}", file=sys.stderr)
+            if applied_fields:
+                status = "auto_applied"
 
         # Save proposal doc
         prop_ref = db.collection("pricing_proposals").document()
@@ -349,7 +402,9 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
             "change_pct": round(actual_pct, 1),
             "reasoning":  reasoning,
             "status":     status,
+            "property_id": "maxela",
             "ts":         datetime.now().isoformat(),
+            **(applied_fields or {}),
         })
         batch_count += 1
 
@@ -357,6 +412,7 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
             _apply_to_rules_data(rules_data, prop, season, ptype, suggested)
             _apply_to_config(config, prop, season, ptype, suggested)
             auto_applied += 1
+            auto_labels.append(f"{prop} {season} {ptype} {current_val}→{suggested}")
         else:
             pending_count += 1
 
@@ -384,18 +440,11 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
 
     # Log auto-applied proposals to pricing_changes for history card
     if auto_applied:
-        auto_labels = [
-            f"{p.get('property')} {p.get('season')} {p.get('type')} {p.get('current')}→{p.get('suggested')}"
-            for p in proposals if (
-                p.get("property") and p.get("season") and p.get("type")
-                and abs((p.get("suggested", 0) - p.get("current", 1)) / (p.get("current", 1) or 1) * 100) <= 5.0
-            )
-        ]
         try:
             db.collection("pricing_changes").add({
                 "ts":     datetime.now(),
                 "type":   "auto_applied",
-                "detail": f"Auto-applied {auto_applied} Claude proposal(s): {', '.join(auto_labels[:5])}",
+                "by": "ideas Beta", "detail": f"Auto-applied {auto_applied} Claude proposal(s): {', '.join(auto_labels[:5])}",
             })
         except Exception:
             pass
