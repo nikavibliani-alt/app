@@ -1,0 +1,33 @@
+name: Expedia retry (one-off)
+
+# Manual. Reads three nights in MiniHotel, then pushes EXPEDIA once with a 60 second timeout.
+on:
+  workflow_dispatch:
+    inputs:
+      push:
+        description: 'true = also push EXPEDIA; false = read only'
+        required: true
+        default: 'true'
+
+concurrency:
+  group: pricing-calm-live
+  cancel-in-progress: false
+
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests firebase-admin
+      - name: Expedia retry
+        env:
+          MINIHOTEL_HOTEL: ${{ secrets.MINIHOTEL_HOTEL }}
+          MINIHOTEL_USER:  ${{ secrets.MINIHOTEL_USER }}
+          MINIHOTEL_PASS:  ${{ secrets.MINIHOTEL_PASS }}
+          PUSH:            ${{ github.event.inputs.push }}
+        run: |
+          if [ "$PUSH" = "true" ]; then python scripts/expedia_retry.py; else python scripts/expedia_retry.py --no-push; fi

@@ -179,14 +179,17 @@ def send_prices(payload: list, cookie: str, post=None):
     resp.raise_for_status()
 
 
-def push_channels(portals: list, cookie: str, post=None, sleep=time.sleep):
+PUSH_TIMEOUT = 60          # seconds per try; Expedia took longer than 20 s
+
+
+def push_channels(portals: list, cookie: str, post=None, sleep=time.sleep, timeout=None):
     post = post or requests.post
     failed = []
     for portal in portals:
         for attempt in range(3):
             try:
                 resp = post(f"{BASE_URL}{SYNC_PATH}?Portal={portal}", json={"portal": portal},
-                            headers=headers(cookie), timeout=20)
+                            headers=headers(cookie), timeout=timeout or PUSH_TIMEOUT)
                 resp.raise_for_status()
                 break
             except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError):
