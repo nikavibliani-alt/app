@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Client for the guest functions (guestFind, guestStay, guestScan).
+ * Client for the guest functions (guestFind, guestStay).
  * They replace what the guest page used to read straight from Firestore.
  */
 
@@ -15,7 +15,6 @@ export function guestApiEnabled(search, defaultOn) {
 export function createGuestApi(functions, httpsCallable) {
   const find = httpsCallable(functions, 'guestFind');
   const stay = httpsCallable(functions, 'guestStay');
-  const scan = httpsCallable(functions, 'guestScan');
   const call = async (fn, payload) => {
     const { data } = await fn(payload);
     if (!data || data.ok === false) {
@@ -31,6 +30,5 @@ export function createGuestApi(functions, httpsCallable) {
     siblings: p => call(find, { mode: 'siblings', ...p }),
     companion: p => call(find, { mode: 'companion', ...p }),
     stay: p => call(stay, p || {}),
-    scanPassport: p => call(scan, p),
   };
 }

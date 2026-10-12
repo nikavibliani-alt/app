@@ -32,10 +32,9 @@ exports.elevatorCodeSyncManual = elevatorCodeSyncManual;
 exports.adminAction = registerAdminAction();
 exports.guestRegister = registerGuestRegister();
 
-const { guestFind, guestStay, guestScan } = registerGuestApi();
+const { guestFind, guestStay } = registerGuestApi();
 exports.guestFind = guestFind;
 exports.guestStay = guestStay;
-exports.guestScan = guestScan;
 
 const { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone, pushOnDamageReport } = registerPushNotifications();
 exports.pushOnFailedSearch = pushOnFailedSearch;

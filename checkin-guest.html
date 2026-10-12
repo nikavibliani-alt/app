@@ -1230,7 +1230,7 @@ import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gsta
 import{isGuestUnlocked,tbilisiHour as sharedTbilisiHour}from"./shared/guest-unlock.js";
 import{createPipelineGuestClient}from"./shared/pipeline-guest.js";
 import{createGuestApi,guestApiEnabled}from"./shared/guest-api.js";
-import{buildRegisterPrimaryPayload,buildRegisterCompanionPayload,buildUpdateProfilePayload,isLikelyGuestToken}from"./shared/guest-register.js";
+import{buildRegisterPrimaryPayload,buildRegisterCompanionPayload,isLikelyGuestToken}from"./shared/guest-register.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 import{GUEST_APP_VERSION,GUEST_APP_URL}from"./shared/guest-app-version.js";
 import{featherIcon}from"./shared/feather-icons.js";
@@ -1306,16 +1306,14 @@ const guestFns=getFunctions(fb,'europe-west1');
 const _usingPipelineEmulator=connectPipelineFunctionsEmulator(guestFns,connectFunctionsEmulator);
 if(_usingPipelineEmulator){mountEmulatorBanner();console.info('[sandbox] pipeline functions → emulator 127.0.0.1:5001');}
 const pipelineGuest=createPipelineGuestClient(guestFns,httpsCallable);
-// true = the guest page asks the guest functions (guestFind, guestStay, guestScan) instead of reading
-// reservations, apartments, the elevator code and the Gemini key straight from the database.
+// true = the guest page asks the guest functions (guestFind, guestStay) instead of reading
+// reservations, apartments and the elevator code straight from the database.
 // ?api=1 forces it on, ?api=0 forces it off (for testing and for going back).
 const GUEST_API_DEFAULT=false;
 const GUEST_API=guestApiEnabled(window.location.search,GUEST_API_DEFAULT);
 const GAPI=createGuestApi(guestFns,httpsCallable);
 let _findProof='';   // signed proof from a successful booking search (needed to look up an existing guest record)
 
-// Load Gemini key from Firestore globals/config (set via Firebase console: geminiKey field)
-if(!GUEST_API)(async function(){try{const cfg=await getDoc(doc(db,'globals','config'));if(cfg.exists())_geminiKey=cfg.data().geminiKey||'';}catch(e){}})();
 
 const WA='995593000724';
 const RTDB_ELEVATOR_URL='https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app/elevator_code.json';
@@ -1341,7 +1339,6 @@ let passportFile=null;
 let passportScanResult=null;
 let _uploadResetTimer=null;
 let _uploadAborted=false;
-let _geminiKey='';
 let guestId=null;
 let guestData=null;
 let aptData=null;
@@ -2358,66 +2355,17 @@ window.handlePassport=async function(input){
     document.getElementById('t-passport-hint').textContent='Photo selected';
     const pcb=document.getElementById('passport-continue-btn');
     if(pcb)pcb.disabled=false;
-    scanPassport(file);
+    scanPassport();
   };
   reader.readAsDataURL(file);
 }
 
-async function scanPassport(file){
+function scanPassport(){   // no automatic check any more: the guest just sees that the photo was received (admin approves or rejects)
   const statusEl=document.getElementById('passport-scan-status');
   if(!statusEl)return;
   statusEl.style.display='';
-  statusEl.className='scan-status scanning';
-  statusEl.innerHTML='<span class="scan-spinner"></span><span>Verifying document...</span>';
-  try{
-    if(GUEST_API){   // the Gemini key stays on the server; the photo is shrunk first so it uploads quickly
-      let _scanBlob=file;
-      try{_scanBlob=await compressImage(file,1600,0.9);}catch(e){}
-      const _b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(_scanBlob);});
-      const out=await GAPI.scanPassport({imageBase64:_b64,mimeType:_scanBlob.type||file.type||'image/jpeg'});
-      if(out.skipped){statusEl.style.display='none';return;}   // not configured: skip silently, as before
-      passportScanResult=out.result||{};
-      statusEl.className='scan-status scan-ok';
-      statusEl.innerHTML='<span>'+fi('check',16,2.2)+'</span><span>Document received</span>';
-      return;
-    }
-    // Convert to base64
-    const base64=await new Promise((res,rej)=>{
-      const r=new FileReader();
-      r.onload=e=>res(e.target.result.split(',')[1]);
-      r.onerror=rej;
-      r.readAsDataURL(file);
-    });
-    // Fetch API key if not already loaded
-    let apiKey=_geminiKey;
-    if(!apiKey){
-      const cfg=await getDoc(doc(db,'globals','config'));
-      if(cfg.exists())apiKey=cfg.data().geminiKey||'';
-      if(apiKey)_geminiKey=apiKey;
-    }
-    if(!apiKey){statusEl.style.display='none';return;} // key not configured — skip silently
-    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        contents:[{parts:[
-          {inlineData:{mimeType:file.type||'image/jpeg',data:base64}},
-          {text:'Look at this image. Is this a valid passport or government-issued ID document? Check: 1) Is it actually a passport/ID? 2) Are all expected fields visible (name, DOB, expiry, MRZ)? 3) Does it look unaltered? Reply ONLY in JSON: {"valid": true/false, "confidence": "high/medium/low", "reason": "...", "isPassport": true/false}'}
-        ]}]
-      })
-    });
-    const rdata=await resp.json();
-    const raw=rdata.candidates?.[0]?.content?.parts?.[0]?.text||'';
-    let result;
-    try{const m=raw.match(/\{[\s\S]*?\}/);result=JSON.parse(m?.[0]||'{}');}
-    catch(pe){result={valid:false,confidence:'low',reason:'Unable to parse result',isPassport:false};}
-    passportScanResult=result;
-    statusEl.className='scan-status scan-ok';
-    statusEl.innerHTML='<span>'+fi('check',16,2.2)+'</span><span>Document received</span>';
-  }catch(e){
-    passportScanResult={valid:false,reason:'Scan failed',confidence:'low'};
-    statusEl.style.display='none';
-  }
+  statusEl.className='scan-status scan-ok';
+  statusEl.innerHTML='<span>'+fi('check',16,2.2)+'</span><span>Document received</span>';
 }
 
 // ── Reservation matching helpers ──────────────────────────────────────────────
@@ -2843,7 +2791,6 @@ async function finishRegistration_(bestRes,formData,opts){
     try{const s=await aptSnap(aptId);if(s.exists())aptData=s.data();}catch(e){}
     document.getElementById('home-apt-name').textContent=aptDisplayName(aptId);
   }
-  const scanPromise=(passportFile&&!passportScanResult&&!_companionGuest&&!skipPassport)?scanPassport(passportFile):Promise.resolve();
   let passportUrl='';
   if(_companionGuest||skipPassport){
     passportUrl='';
@@ -2983,20 +2930,6 @@ async function finishRegistration_(bestRes,formData,opts){
   clearTimeout(_uploadResetTimer);_uploadResetTimer=null;
   const _sb=document.getElementById('passport-continue-btn');const _st=document.getElementById('t-passport-submit-btn');
   if(_sb)_sb.disabled=false;if(_st)_st.textContent='Continue to your stay';
-  // Update Firestore with real scan result once AI finishes (background)
-  scanPromise.then(async()=>{
-    if(!passportScanResult)return;
-    try{
-      if(usedPipeline){
-        await pipelineGuest(buildUpdateProfilePayload({guestToken:docId,profile:{},passportScanResult}));
-      }else{
-        await setDoc(doc(db,'checkin_guests',docId),{passportScanResult},{merge:true});
-      }
-      if(passportScanResult.valid===false){
-        await setDoc(doc(db,'passport_alerts',`${aptId}_${Date.now()}`),{aptId,guestName:name,passportUrl,scanResult:passportScanResult,reason:passportScanResult.reason||'',createdAt:serverTimestamp()});
-      }
-    }catch(e){}
-  });
 }
 
 window.searchReservation=async function(){
@@ -3344,11 +3277,7 @@ window.handleReupload = async function(input) {
   try {
     const url = await uploadToFirebaseStorage(file);
     await setDoc(doc(db, 'checkin_guests', guestId), { passportUrl: url, passportScanResult: {} }, { merge: true });
-    toast('Document received — verifying...');
-    scanPassport(file).then(async()=>{
-      if(!passportScanResult)return;
-      try{await setDoc(doc(db,'checkin_guests',guestId),{passportScanResult},{merge:true});}catch(e){}
-    });
+    toast('Document received');
   } catch(e) { if(!_uploadAborted)toast('Upload failed'); }
 };
 
@@ -3367,16 +3296,8 @@ window.handlePassportReupload=async function(input){
     try{await setDoc(doc(db,'checkin_guests',guestId),update,{merge:true});}catch(e){}
     guestData={...guestData,...update};
   }
-  if(el)el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon spin-icon">${fi('loader',22,2)}</div><div class="passport-banner__body"><div class="passport-banner__title">Verifying your document...</div></div></div>`;
+  if(el)el.innerHTML=`<div class="passport-banner info"><div class="passport-banner__icon spin-icon">${fi('loader',22,2)}</div><div class="passport-banner__body"><div class="passport-banner__title">Document received</div></div></div>`;
   renderPassportBanner();
-  // Run AI scan in background and update Firestore when done
-  scanPassport(file).then(async()=>{
-    if(!passportScanResult||!guestId)return;
-    try{
-      await setDoc(doc(db,'checkin_guests',guestId),{passportScanResult},{merge:true});
-      guestData={...guestData,passportScanResult};
-    }catch(e){}
-  });
 };
 
 function _saveSession(){

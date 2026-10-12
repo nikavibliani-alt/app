@@ -56,12 +56,11 @@ export function buildRegisterCompanionPayload({ reservationId, reservationNumber
   };
 }
 
-export function buildUpdateProfilePayload({ guestToken, profile, passportScanResult }) {
+export function buildUpdateProfilePayload({ guestToken, profile }) {
   return {
     mode: 'update_profile',
     guestToken,
     profile,
-    passportScanResult: passportScanResult || null,
     actor: 'guest-sandbox',
   };
 }

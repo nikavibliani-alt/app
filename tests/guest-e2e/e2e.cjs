@@ -64,8 +64,6 @@ async function open(browser, { apiOn, startIso, viewport }) {
       addSearchFailure: async d => state.failures.push(d),
       rateLimit: async (key, max) => { state.counters[key] = (state.counters[key] || 0) + 1; return state.counters[key] > max; },
       signProof: p => proof.sign(SECRET, p), verifyProof: t => proof.verify(SECRET, t),
-      hasGeminiKey: () => true,
-      callGemini: async () => '{"valid": true, "confidence": "high", "reason": "ok", "isPassport": true}',
     };
   };
   const regCtx = docs => {
@@ -88,7 +86,6 @@ async function open(browser, { apiOn, startIso, viewport }) {
     try {
       if (name === 'guestFind') out = await api.runGuestFind(ctxFor(docs), data, meta);
       else if (name === 'guestStay') out = await api.runGuestStay(ctxFor(docs), data, meta);
-      else if (name === 'guestScan') out = await api.runGuestScan(ctxFor(docs), data, meta);
       else if (name === 'guestRegister') out = await regc.runGuestRegister(regCtx(docs), data);
       else out = { __error: { code: 'not-found', message: 'unknown function ' + name } };
     } catch (e) { out = { __error: { code: 'internal', message: e.message } }; }
@@ -123,7 +120,7 @@ async function register(env, { apiOn }) {
   await page.click('#rules-continue-btn');
   await page.waitForFunction(() => document.getElementById('page-passport')?.classList.contains('active') || document.getElementById('passport-input'), null, { timeout: 10000 });
   await page.setInputFiles('#passport-input', { name: 'passport.jpg', mimeType: 'image/jpeg', buffer: TINY_JPG });
-  await page.waitForFunction(() => /Document received|Verifying/.test(document.getElementById('passport-scan-status')?.textContent || '') || !document.getElementById('passport-continue-btn').disabled, null, { timeout: 10000 });
+  await page.waitForFunction(() => /Document received/.test(document.getElementById('passport-scan-status')?.textContent || '') || !document.getElementById('passport-continue-btn').disabled, null, { timeout: 10000 });
   await page.waitForFunction(() => !document.getElementById('passport-continue-btn').disabled, null, { timeout: 10000 });
   await page.click('#passport-continue-btn');
   await page.waitForFunction(() => document.getElementById('page-home')?.classList.contains('active'), null, { timeout: 20000 });

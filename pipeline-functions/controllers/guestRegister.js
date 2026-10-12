@@ -40,7 +40,7 @@ function pickProfile(payload) {
     contact: p.contact || '',
     contactType: p.contactType || '',
     passportUrl: p.passportUrl || '',
-    passportScanResult: p.passportScanResult || {},
+    passportScanResult: {},   // only the admin's Approve/Reject ever sets this; the guest cannot send it
     passportSkipped: p.passportSkipped === true,
     skipReason: p.skipReason || '',
     arrivalDate: p.arrivalDate || '',
@@ -305,7 +305,7 @@ async function updateProfile(ctx, params, input) {
   for (const [k, v] of Object.entries(profile)) {
     if (v !== '' && v != null) patch[k] = v;
   }
-  if (params.passportScanResult) patch.passportScanResult = params.passportScanResult;
+  delete patch.passportScanResult;
 
   await ctx.saveGuest(guestToken, patch, { isCreate: false, mergeOnly: true });
 

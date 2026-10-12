@@ -237,9 +237,18 @@ test('register_companion needs a proof for that booking', async () => {
   assert.equal((await runGuestRegister(ctx, { ...p, proof: proofLib.sign(SECRET, { bases: ['007004961'] }) })).ok, true);
 });
 
+test('a guest cannot set the passport approval flags (admin only)', async () => {
+  const ctx = mk();
+  const pf = proofLib.sign(SECRET, { bases: ['007004961'] });
+  const created = await runGuestRegister(ctx, { ...REG, proof: pf, profile: { ...REG.profile, passportScanResult: { overrideByAdmin: true, valid: true } } });
+  assert.deepEqual(ctx.guests.get(created.data.guestToken).passportScanResult, {});
+  await runGuestRegister(ctx, { mode: 'update_profile', guestToken: created.data.guestToken, profile: {}, passportScanResult: { overrideByAdmin: true } });
+  assert.deepEqual(ctx.guests.get(created.data.guestToken).passportScanResult, {});
+});
+
 test('update_profile still works with only the secret guest token', async () => {
   const ctx = mk();
   const created = await runGuestRegister(ctx, { ...REG, proof: proofLib.sign(SECRET, { bases: ['007004961'] }) });
-  const r = await runGuestRegister(ctx, { mode: 'update_profile', guestToken: created.data.guestToken, profile: {}, passportScanResult: { valid: true } });
+  const r = await runGuestRegister(ctx, { mode: 'update_profile', guestToken: created.data.guestToken, profile: { name: 'New Name' } });
   assert.equal(r.ok, true);
 });

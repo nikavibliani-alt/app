@@ -7,7 +7,6 @@
  *   guestStay   the guest's own apartment, own reservations and elevator code.
  *               Door code, Wi-Fi, door photo, smart-lock password and elevator code are only included
  *               when this guest's own booking is checked in (same rule as shared/guest-unlock.js).
- *   guestScan   passport check with Gemini. The API key stays on the server (Secret Manager).
  *
  * All data access goes through `ctx`, so the logic is tested with a fake database.
  */
@@ -19,12 +18,6 @@ const { isLikelyGuestToken } = require('../lib/guest-token');
 const PUBLIC_RES_FIELDS = ['reservationNumber', 'roomCode', 'checkin', 'checkIn', 'checkout', 'checkOut', 'status', 'guest', 'guestName', 'source'];
 const APT_ALWAYS_REMOVE = ['tuyaDeviceId', 'updatedAt'];
 const APT_LOCKED_REMOVE = ['doorCode', 'wifiName', 'wifiPass', 'doorPhotoUrl', 'videoUrl'];
-const GEMINI_PROMPT =
-  'Look at this image. Is this a valid passport or government-issued ID document? Check: 1) Is it actually a passport/ID? ' +
-  '2) Are all expected fields visible (name, DOB, expiry, MRZ)? 3) Does it look unaltered? Reply ONLY in JSON: ' +
-  '{"valid": true/false, "confidence": "high/medium/low", "reason": "...", "isPassport": true/false}';
-const SCAN_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-const SCAN_MAX_BASE64 = 7 * 1024 * 1024;     // about 5 MB of image
 
 // ---------------------------------------------------------------- helpers
 
@@ -316,32 +309,6 @@ async function runGuestStay(ctx, params, meta = {}) {
   };
 }
 
-// --------------------------------------------------------------- guestScan
-
-async function runGuestScan(ctx, params, meta = {}) {
-  const base64 = typeof params.imageBase64 === 'string' ? params.imageBase64 : '';
-  const mime = SCAN_MIME.includes(params.mimeType) ? params.mimeType : 'image/jpeg';
-  if (!base64 || base64.length > SCAN_MAX_BASE64 || !/^[A-Za-z0-9+/=\r\n]+$/.test(base64.slice(0, 200))) return bad('BAD_REQUEST', 'image missing or too large');
-  if (await limited(ctx, 'scan-ip:' + (meta.ip || '?'), 10, 600)) return bad('RATE_LIMITED', 'Too many scans. Please wait a few minutes.');
-  if (await limited(ctx, 'scan-all', 800, 86400)) return bad('RATE_LIMITED', 'Scan limit reached for today.');
-  if (!ctx.hasGeminiKey()) return { ok: true, skipped: true };
-
-  let text = '';
-  try {
-    text = await ctx.callGemini({ base64, mime, prompt: GEMINI_PROMPT });
-  } catch (e) {
-    return { ok: true, result: { valid: false, reason: 'Scan failed', confidence: 'low' } };
-  }
-  let result;
-  try {
-    const m = String(text || '').match(/\{[\s\S]*?\}/);
-    result = JSON.parse((m && m[0]) || '{}');
-  } catch (e) {
-    result = { valid: false, confidence: 'low', reason: 'Unable to parse result', isPassport: false };
-  }
-  return { ok: true, result };
-}
-
 // ------------------------------------------------------------- live wiring
 
 function buildLiveCtx(secrets = {}) {
@@ -387,17 +354,6 @@ function buildLiveCtx(secrets = {}) {
     },
     signProof: payload => proof.sign(secrets.proofSecret, payload),
     verifyProof: token => proof.verify(secrets.proofSecret, token),
-    hasGeminiKey: () => !!secrets.geminiKey,
-    callGemini: async ({ base64, mime, prompt }) => {
-      const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': secrets.geminiKey },
-        body: JSON.stringify({ contents: [{ parts: [{ inlineData: { mimeType: mime, data: base64 } }, { text: prompt }] }] }),
-      });
-      const data = await resp.json();
-      return data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts &&
-        data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text || '' : '';
-    },
   };
 }
 
@@ -410,7 +366,6 @@ function clientIp(request) {
 function registerCloudFunctions() {
   const { onCall, HttpsError } = require('firebase-functions/v2/https');
   const { defineSecret } = require('firebase-functions/params');
-  const GEMINI_KEY = defineSecret('GEMINI_API_KEY');
   const PROOF_SECRET = defineSecret('GUEST_PROOF_SECRET');
   const base = { region: 'europe-west1', timeoutSeconds: 30, maxInstances: 10 };
 
@@ -427,12 +382,10 @@ function registerCloudFunctions() {
   return {
     guestFind: onCall({ ...base, secrets: [PROOF_SECRET] }, wrap(runGuestFind, () => ({ proofSecret: PROOF_SECRET.value() }))),
     guestStay: onCall({ ...base }, wrap(runGuestStay, () => ({}))),
-    guestScan: onCall({ ...base, timeoutSeconds: 60, memory: '512MiB', maxInstances: 5, secrets: [GEMINI_KEY] },
-      wrap(runGuestScan, () => ({ geminiKey: GEMINI_KEY.value() }))),
   };
 }
 
 module.exports = {
-  runGuestFind, runGuestStay, runGuestScan, registerCloudFunctions, buildLiveCtx,
-  filterApt, pubRes, plain, maskDigits, GEMINI_PROMPT,
+  runGuestFind, runGuestStay, registerCloudFunctions, buildLiveCtx,
+  filterApt, pubRes, plain, maskDigits,
 };

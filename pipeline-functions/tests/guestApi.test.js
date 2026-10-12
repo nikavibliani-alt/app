@@ -59,8 +59,6 @@ function makeCtx(over = {}) {
     rateLimit: async (key, max) => { data.counters[key] = (data.counters[key] || 0) + 1; return data.counters[key] > max; },
     signProof: p => proof.sign(SECRET, p),
     verifyProof: t => proof.verify(SECRET, t),
-    hasGeminiKey: () => true,
-    callGemini: async () => '```json\n{"valid": true, "confidence": "high", "reason": "ok", "isPassport": true}\n```',
   };
   return Object.assign(ctx, over.ctx || {});
 }
@@ -236,31 +234,13 @@ test('stay: the clock cannot be set from the request', async () => {
   assert.equal(r.unlocked, false);
 });
 
-// ------------------------------------------------------------------ scan
+// ------------------------------------------------------------------ no Gemini
 
-test('scan: the key stays on the server, the page gets only the parsed result', async () => {
-  const ctx = makeCtx();
-  const r = await api.runGuestScan(ctx, { imageBase64: 'QUJD', mimeType: 'image/jpeg' }, IP);
-  assert.equal(r.result.valid, true);
-  assert.equal(r.result.isPassport, true);
-  const noKey = makeCtx({ ctx: { hasGeminiKey: () => false } });
-  assert.equal((await api.runGuestScan(noKey, { imageBase64: 'QUJD' }, IP)).skipped, true);
-});
-
-test('scan: refuses huge or empty uploads, is rate limited, and survives Gemini errors and odd answers', async () => {
-  const ctx = makeCtx();
-  assert.equal((await api.runGuestScan(ctx, { imageBase64: '' }, IP)).errorCode, 'BAD_REQUEST');
-  assert.equal((await api.runGuestScan(ctx, { imageBase64: 'A'.repeat(8 * 1024 * 1024) }, IP)).errorCode, 'BAD_REQUEST');
-  assert.equal((await api.runGuestScan(ctx, { imageBase64: '<script>' }, IP)).errorCode, 'BAD_REQUEST');
-  let last;
-  for (let i = 0; i < 12; i++) last = await api.runGuestScan(ctx, { imageBase64: 'QUJD' }, IP);
-  assert.equal(last.errorCode, 'RATE_LIMITED');
-  const broken = makeCtx({ ctx: { callGemini: async () => { throw new Error('boom'); } } });
-  assert.equal((await api.runGuestScan(broken, { imageBase64: 'QUJD' }, IP)).result.reason, 'Scan failed');
-  const odd = makeCtx({ ctx: { callGemini: async () => 'not json at all' } });
-  assert.deepEqual((await api.runGuestScan(odd, { imageBase64: 'QUJD' }, IP)).result, {});   // same as the page did: an empty result
-  const half = makeCtx({ ctx: { callGemini: async () => '{valid: tru}' } });
-  assert.equal((await api.runGuestScan(half, { imageBase64: 'QUJD' }, IP)).result.reason, 'Unable to parse result');
+test('the guest functions no longer include any passport scan or Gemini call', () => {
+  assert.equal(api.runGuestScan, undefined);
+  assert.equal(typeof api.registerCloudFunctions, 'function');
+  const src = require('fs').readFileSync(require.resolve('../controllers/guestApi.js'), 'utf8');
+  assert.equal(/gemini|guestScan/i.test(src), false);
 });
 
 // ----------------------------------------------------------- helpers

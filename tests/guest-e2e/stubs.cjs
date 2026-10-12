@@ -6,8 +6,11 @@ const nowTs = () => ({seconds:Math.floor(Date.now()/1000), nanoseconds:0});
 export const serverTimestamp = () => ({__s:'ts'});
 export const arrayUnion = (...items) => ({__s:'union', items});
 export const increment = n => ({__s:'inc', n});
+export const runTransaction = async (db, fn) => fn({ get: async r => dsnap(r), set: (r,d,o)=>setDoc(r,d,o), update: (r,d)=>updateDoc(r,d), delete: r=>deleteDoc(r) });
+export const deleteField = () => ({__s:'del'});
 export const getFirestore = () => ({});
 const resolve = (data, old) => { const out = {}; for (const [k,v] of Object.entries(data||{})) {
+  if (v && v.__s==='del') continue;
   if (v && v.__s==='ts') out[k]=nowTs();
   else if (v && v.__s==='union') { const cur=Array.isArray(old&&old[k])?old[k]:[]; out[k]=[...cur, ...v.items.filter(i=>!cur.some(c=>JSON.stringify(c)===JSON.stringify(i)))]; }
   else if (v && v.__s==='inc') out[k]=((old&&old[k])||0)+v.n;
@@ -34,7 +37,7 @@ export const getDocs = async q => qsnap(q);
 const notify = () => setTimeout(()=>S.listeners.forEach(fire),0);
 export const setDoc = async (ref, data, opts) => { S.calls.push({op:'setDoc', path:ref.path});
   if (opts && opts.merge) S.docs[ref.path] = Object.assign({}, S.docs[ref.path]||{}, resolve(data, S.docs[ref.path]||{})); else S.docs[ref.path]=resolve(data,{}); notify(); };
-export const updateDoc = async (ref, upd) => { S.calls.push({op:'updateDoc', path:ref.path}); S.docs[ref.path]=Object.assign({}, S.docs[ref.path]||{}, resolve(upd, S.docs[ref.path]||{})); notify(); };
+export const updateDoc = async (ref, upd) => { S.calls.push({op:'updateDoc', path:ref.path}); const cur=clone(S.docs[ref.path]||{}); for (const [k,v] of Object.entries(resolve(upd, cur))) { const parts=k.split('.'); let o=cur; for (const q of parts.slice(0,-1)) { if (!o[q]||typeof o[q]!=='object') o[q]={}; o=o[q]; } o[parts[parts.length-1]]=v; } S.docs[ref.path]=cur; notify(); };
 export const addDoc = async (c, data) => { const ref=doc({__col:c.__col}); S.calls.push({op:'addDoc', path:ref.path}); S.docs[ref.path]=resolve(data,{}); notify(); return ref; };
 export const deleteDoc = async ref => { delete S.docs[ref.path]; notify(); };
 function fire(l) { const snap = l.ref.__doc ? dsnap(l.ref) : qsnap(l.ref); const sig = JSON.stringify(l.ref.__doc ? (snap.exists()?snap.data():null) : snap.docs.map(d=>[d.id,d.data()])); if (sig===l.last) return; l.last=sig; try { l.cb(snap); } catch(e) { console.error('snapshot cb', e); } }
@@ -46,6 +49,8 @@ const S = (window.__DB = window.__DB || {docs:{}, listeners:[], calls:[], upload
 export const getStorage = () => ({});
 export const ref = (st, path) => ({path});
 export const uploadBytes = async (r, blob) => { S.uploads.push({path:r.path, size:blob.size, type:blob.type}); };
+export const getMetadata = async () => ({});
+export const uploadBytesResumable = (r, blob) => { S.uploads.push({path:r.path, size:blob.size, type:blob.type}); return Object.assign(Promise.resolve({ref:r}), {on:(e,p,er,done)=>{ setTimeout(()=>done&&done(),0); }, snapshot:{ref:r}}); };
 export const getDownloadURL = async r => 'https://storage.test/' + r.path + '?token=t';
 `;
 exports.FUNCTIONS = `
