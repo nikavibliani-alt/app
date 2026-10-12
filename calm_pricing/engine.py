@@ -278,6 +278,9 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
     only = snapshot.get("only") or {}
     only_rooms = set(only["rooms"]) if only.get("rooms") else None
     only_dates = set(only["dates"]) if only.get("dates") else None
+    # Cancellation run only: a night freed TONIGHT goes straight to the room's minimum (the one exception to
+    # "arrival day is never lowered"). Protect, hold, holiday dates and hand-set prices still win.
+    tonight_drop = bool(snapshot.get("tonight_drop")) and only_dates is not None
     # One-time price reset (snapshot["reset"] = set of room types): see the reset block below.
     reset_rts = set(snapshot.get("reset") or ()) if not shadow else set()
     calm, dm = cfg["calm"], cfg["demand"]
@@ -565,6 +568,18 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                         # not a new starting point for the daily limits
                         dec["why"].append("Hand-set price released" + (" after a booking." if booked_since else " (time is up)."))
 
+                # ---- 2b. a night freed tonight (cancellation run): straight down to the minimum ----
+                if tonight_drop and ds == today_s and hol_kind is None and can_write and not shadow and not reset_mode:
+                    if current > mn + 1e-9:
+                        new = _grid_up_to(mn, step, mx_eff)
+                        dec["proposed"], dec["kind"] = new, "tonight"
+                        dec["write"] = True
+                        dec["why"].append(f"A booking for tonight was cancelled: lowered straight to your minimum {_fmt(cur, mn)} "
+                                          f"({_fmt(cur, current)} -> {_fmt(cur, new)}).")
+                    else:
+                        dec["why"].append("A booking for tonight was cancelled: the price is already at your minimum.")
+                    continue
+
                 # ---- 3. target ----
                 base = start * (1 + wk) * (1 + ev_pct)
                 adj = dm["target_adj"][status]
@@ -831,7 +846,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
 
     writes, shadow_moves = [], []
     for dec in decisions:
-        if dec["kind"] not in ("move", "correction", "fill", "reset", "far_reset"):
+        if dec["kind"] not in ("move", "correction", "fill", "reset", "far_reset", "tonight"):
             continue
         st = state[dec["rt"]][dec["date"]][dec["currency"]]
         if not ok or dec["rt"] in stopped_rts:

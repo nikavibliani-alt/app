@@ -353,7 +353,7 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         result = run({"now": now, "inventory": inventory, "reservations": reservations, "shadow": False,
                       **({"reset": sorted(reset_rts)} if reset_rts else {}),
                       # a cancellation run never uses up the day's one lowering run, and only looks at its nights
-                      **({"run_kind": "update", "only": only} if only else {})}, cfg, state)
+                      **({"run_kind": "update", "only": only, "tonight_drop": True} if only else {})}, cfg, state)
 
         writes = result["writes"]
         assert all(w["rt"] in live_rts for w in writes), "write for a room type that is not live"
@@ -378,7 +378,7 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         fills = sum(1 for d in result["decisions"] if d.get("fill") and d["kind"] in ("fill", "move"))
         if fills:
             print(f"  {fills} empty date(s) get a first price from your start price.")
-        for d in [d for d in result["decisions"] if d["kind"] in ("move", "correction", "fill", "reset", "far_reset")][:20]:
+        for d in [d for d in result["decisions"] if d["kind"] in ("move", "correction", "fill", "reset", "far_reset", "tonight")][:20]:
             print(f"  {d['rt']:6} {d['date']} {d['currency']}: {d['current']:.0f} -> {d['proposed']:.0f}  ({d['why'][-1]})")
 
         report = reset_report(result, reset_rts, today) if reset_rts else None

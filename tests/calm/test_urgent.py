@@ -139,3 +139,76 @@ def test_the_sync_names_every_room_type_and_every_freed_night():
     assert props == ["MAXELA", "ROOMS", "XCV_1"]
     want = [(today + timedelta(days=k)).isoformat() for k in (0, 2, 3, 4, 9)]
     assert nights == sorted(want)                                          # nights from today on; check-out night is not freed
+
+
+# ---------------- a night freed TONIGHT goes straight to the minimum ----------------
+
+def tonight_run(cfg, inv, today_offset=0, only_dates=None, state=None, urgent=True):
+    now = datetime.combine(TODAY, datetime.min.time()) + timedelta(hours=15)
+    only = {"rooms": ["X"], "dates": only_dates or [D(0)]}
+    snap = {"run_kind": "update", "only": only, "tonight_drop": True} if urgent else {}
+    return run({"now": now, "inventory": {"X": inv}, "reservations": [], **snap}, cfg, state if state is not None else {})
+
+
+def test_tonight_goes_straight_to_the_minimum_on_every_currency():
+    cfg = mkcfg(1, mn=150, start=230, mx=300, holiday=False)
+    res = tonight_run(cfg, inv_of(1, 230))
+    d = [x for x in res["decisions"] if x["date"] == D(0)][0]
+    assert d["kind"] == "tonight" and d["proposed"] == 150 and d["write"] is True
+    assert [(w["date"], w["price"]) for w in res["writes"]] == [(D(0), 150)]
+    assert "cancelled" in d["why"][-1] and res["ok"]
+    cfg2 = mkcfg(1, mn=150, start=230, mx=300, holiday=False)
+    cfg2["room_types"]["X"]["currencies"] = ["GEL", "USD"]
+    cfg2["rules"]["X"]["USD"] = cfg2["rules"]["X"]["GEL"]
+    inv = {ds: {"avail": 1, "prices": {"GEL": 230, "USD": 230}} for ds in inv_of(1, 230)}
+    res2 = tonight_run(cfg2, inv)
+    assert sorted((w["currency"], w["price"]) for w in res2["writes"] if w["date"] == D(0)) == [("GEL", 150), ("USD", 150)]
+
+
+def test_a_freed_future_night_is_not_lowered_by_the_urgent_run():
+    cfg = mkcfg(1, mn=150, start=230, mx=300, holiday=False)
+    res = tonight_run(cfg, inv_of(1, 290), only_dates=[D(5), D(6)])
+    assert all(w["price"] >= 290 for w in res["writes"]) and all(d["kind"] != "tonight" for d in res["decisions"])
+    assert not any(d["date"] == D(0) for d in res["decisions"])                      # tonight was not named: not looked at
+
+
+def test_protect_hold_and_holiday_win_over_the_tonight_drop():
+    inv = inv_of(1, 230)
+    protect = mkcfg(1, mn=150, start=230, mx=300, holiday=False, rules=[{"from": D(0), "to": D(0), "rooms": "all", "action": "protect"}])
+    assert tonight_run(protect, inv)["writes"] == []
+    hold = mkcfg(1, mn=150, start=230, mx=300, holiday=False, rules=[{"from": D(0), "to": D(0), "rooms": "all", "action": "hold"}])
+    r = tonight_run(hold, inv)
+    assert all(d["kind"] != "tonight" for d in r["decisions"]) and not [w for w in r["writes"] if w["price"] == 150]
+    hol = mkcfg(1, mn=150, start=230, mx=300)
+    hol["date_overrides"] = [{"from": "10-01", "to": "10-20", "season": "high"}]          # tonight is a holiday date
+    r = tonight_run(hol, inv)
+    assert all(d["kind"] != "tonight" for d in r["decisions"]) and not [w for w in r["writes"] if w["price"] == 150]
+
+
+def test_a_hand_set_price_and_a_price_at_the_minimum_are_left_alone_tonight():
+    cfg = mkcfg(1, mn=150, start=230, mx=300, holiday=False)
+    state = {"X": {D(0): {"GEL": {"last_engine": 200.0}}}}                          # MiniHotel shows 230: set by hand
+    r = tonight_run(cfg, inv_of(1, 230), state=state)
+    d = [x for x in r["decisions"] if x["date"] == D(0)][0]
+    assert d["kind"] == "manual" and r["writes"] == []
+    r2 = tonight_run(cfg, inv_of(1, 150))
+    assert r2["writes"] == [] and "already at your minimum" in [x for x in r2["decisions"] if x["date"] == D(0)][0]["why"][-1]
+
+
+def test_a_normal_run_never_does_the_tonight_drop():
+    cfg = mkcfg(1, mn=150, start=230, mx=300, holiday=False)
+    res = tonight_run(cfg, inv_of(1, 230), urgent=False)
+    assert all(d["kind"] != "tonight" for d in res["decisions"]) and not [w for w in res["writes"] if w["date"] == D(0) and w["price"] == 150]
+
+
+def test_runner_tonight_cancellation_writes_the_minimum_and_pushes_the_rooms_channels(http):
+    rules, _ = ps.load_rules(FakeDB(), json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config.json"))))
+    mn = rules["MAXELA"]["GEL"]["mid"]["min"]
+    db = FakeDB()
+    res = live.main(["--urgent", "--rooms", "MAXELA", "--dates", f"{TODAY.isoformat()},{DAYS[0]}"], db=db, get=minihotel(prices_near_start),
+                    cookie_fn=lambda: "c", now=NOW)
+    w = price_writes(http)
+    assert w and [x["roomTypeCode"] for x in w[0]] == ["MAXELA"]
+    tonight = [d for x in w[0] for d in x["Dates"] if d["Date"][:10] == TODAY.isoformat()]
+    assert tonight and {r["Price"] for r in tonight[0]["Rates"]} == {mn}                     # tonight at the minimum
+    assert pushes(http) == ["BOOKING", "EXPEDIA"]

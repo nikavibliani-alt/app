@@ -1095,6 +1095,21 @@ def check_eventscan():
         print("   error:", e)
 
 
+def check_urgenttonight():
+    """Dry run: what a cancellation of TONIGHT would do for each room type (real MiniHotel prices). Writes nothing."""
+    hdr("CANCELLATION OF TONIGHT, DRY (what each room would do; nothing is written)")
+    import pricing_calm_live
+    today = datetime.now(timezone(timedelta(hours=4))).date().isoformat()
+    for rt in ("ROOMS", "MAXELA", "BIG_APT", "FREEDOM", "ORBE_1", "ORBE_2", "XCV_1", "XCV_2", "VGL_ST", "VGL_AP"):
+        res = pricing_calm_live.main(["--urgent", "--rooms", rt, "--dates", today, "--dry"])
+        for dd in res.get("decisions", []):
+            if dd["date"] == today:
+                print(f"  RESULT {rt} {dd['currency']}: {dd['current']:.0f} -> {dd['proposed']:.0f} ({dd['kind']}; avail {dd['avail']}) {dd['why'][-1] if dd.get('why') else ''}"[:220])
+    print(f"Attempted non-GET requests to MiniHotel (blocked by the check's guard): {len(BLOCKED)}")
+    if BLOCKED:
+        sys.exit(1)
+
+
 def check_urgentdry():
     """Dry run of a cancellation run for one REAL cancelled stay (room type and nights only, no guest data). Writes nothing."""
     hdr("CANCELLATION RUN, DRY: one real cancelled stay")
@@ -1600,6 +1615,9 @@ def main():
         return
     if args.check == "eventscan":
         check_eventscan()
+        return
+    if args.check == "urgenttonight":
+        check_urgenttonight()
         return
     if args.check == "urgentdry":
         check_urgentdry()
