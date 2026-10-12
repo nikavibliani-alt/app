@@ -104,6 +104,11 @@ svg{flex-shrink:0}
 .pill .pd{width:9px;height:9px;border-radius:50%;display:inline-block}
 .pills{display:flex;flex-wrap:wrap;gap:8px}
 .num{width:100%;height:44px;padding:0 8px;border:1px solid var(--btn-line);border-radius:10px;font:600 16px system-ui,sans-serif;color:var(--ink);background:#FFFFFF;text-align:center}
+.hgrid{display:grid;grid-template-columns:72px repeat(3,minmax(0,1fr));gap:8px 6px;align-items:center}
+.hgrid .hch{font-size:12px;font-weight:600;color:var(--soft);text-align:center;line-height:1.25}
+.hgrid .hrl{font-size:13px;font-weight:600;line-height:1.25}
+.hgrid .num{padding:0 2px}
+.wlist{margin:0;padding-left:18px;font-size:14px;line-height:1.5}
 .num.bad{border:2px solid var(--red);color:var(--red)}
 .num:disabled{background:var(--sel);color:var(--off)}
 .cell2{padding:10px 12px;font-size:14px}
@@ -361,10 +366,16 @@ const MODES = [
 const modeByStyle = s => MODES.find(m => m.style === (s === "aggressive" ? "aggressive" : "normal"));
 const RULE_CHOICES = [
   {id:"protect", label:"Don’t change the price", help:"The engine never touches these dates. You set the price yourself in MiniHotel."},
+  {id:"hold", label:"Small moves only, more active closer to the date", help:"On these dates only: the price stays close to where it is now and moves more freely as the date gets closer."},
   {id:"aggressive", label:"Fill fast", help:"On these dates only: lowers earlier and further if they sell slowly."},
   {id:"normal", label:"Balanced", help:"On these dates only: the normal calm rules, whatever the room’s mode is."},
 ];
 const ruleLabel = a => (RULE_CHOICES.find(r => r.id === a) || {label: String(a)}).label;
+const HOL_ROWS = [["far", "More than 30 days"], ["mid", "30 to 21 days"], ["near", "20 to 15 days"]];
+const HOL_COLS = [["down_multi", "Down, several rooms"], ["down_single", "Down, single apartments"], ["up_single", "Up, single apartments"]];
+const HOL_REC = {far: {down_multi: 0.05, down_single: 0.03, up_single: 0.03}, mid: {down_multi: 0.08, down_single: 0.05, up_single: 0.05},
+  near: {down_multi: 0.10, down_single: 0.08, up_single: 0.08}};
+const HOL_MAX_PCT = 20;
 const AHEAD = [[90,"3 months"],[180,"6 months"],[365,"1 year"]];
 const aheadLabel = d => (AHEAD.find(a => a[0] === Number(d)) || [0, d + " days"])[1];
 const STATUS_TEXT = {far_ahead:"Selling much faster than usual", ahead:"Selling faster than usual", on_track:"Selling as usual",
@@ -425,7 +436,7 @@ const icon = (n, s = 18, w = 2, extra = "") => `<svg width="${s}" height="${s}" 
 const S = {
   paused: null, controlErr: false,
   rules: {}, eng: {}, file: FILE_DEFAULTS, fileLoaded: false,
-  calmRun: null, oldRun: null, events: [], props: [], locks: {},
+  calmRun: null, oldRun: null, watch: null, events: [], props: [], locks: {},
   daily: {}, errors: {},
 };
 // Everything typed but not yet saved. Nothing here is written before Save.
@@ -463,6 +474,8 @@ async function loadRuns() {
     const q = await getDocs(query(collection(db, "pricing_calm_runs"), orderBy("ts", "desc"), limit(1)));
     S.calmRun = q.empty ? null : q.docs[0].data();
   } catch (e) { S.errors.calmRun = e.message; }
+  try { const s = await getDoc(doc(db, "pricing_watchdog", "latest")); S.watch = s.exists() ? s.data() : null; }
+  catch (e) { S.watch = null; }
   try {
     const q = await getDocs(query(collection(db, "pricing_log"), orderBy("timestamp", "desc"), limit(1)));
     S.oldRun = q.empty ? null : q.docs[0].data();
@@ -739,7 +752,25 @@ function switchHtml() {
   const on = !S.paused;
   return `<button type="button" class="sw" role="switch" aria-checked="${on}" aria-label="Automatic prices for all rooms" data-act="togglePause">${on ? "Automatic" : "Paused"}<span class="track"></span></button>`;
 }
+function watchdogHtml(desk) {
+  const w = S.watch;
+  if (!w) return "";
+  const stale = w.day !== today();
+  const red = w.status === "red" && !stale;
+  const when = w.ts ? runWhen(w.ts) : "";
+  const wrap = h => desk ? `<div style="padding:12px 24px 0">${h}</div>` : `<div class="page" style="padding-bottom:0;gap:0">${h}</div>`;
+  if (stale) return wrap(`<div class="card status"><div class="l1"><b>Price check</b><span class="muted" style="font-size:13px">No result yet today</span></div></div>`);
+  if (!red) return wrap(`<div class="card status"><div class="l1"><b>Price check</b><span class="ok">${icon("check", 16, 2.4)}All good · ${esc(when)}</span></div></div>`);
+  const shown = (w.issues || []).slice(0, 8);
+  const list = shown.map(i => `<li>${esc(i.text)}</li>`).join("");
+  const more = Math.max(0, (w.total_issues || (w.issues || []).length) - shown.length);
+  return wrap(`<div class="card status" style="border-color:var(--red)" role="alert"><div class="l1"><b>Price check</b><span class="ok bad">${icon("x", 16, 2.4)}Needs a look · ${esc(when)}</span></div>
+    <ul class="wlist">${list}</ul>${more ? `<div class="muted" style="font-size:13px">and ${more} more</div>` : ""}</div>`);
+}
 function pausedBannerHtml(desk) {
+  return pausedBannerCore(desk) + watchdogHtml(desk);
+}
+function pausedBannerCore(desk) {
   const warn = desk ? statusModel().warn.map(w => `<div class="warnbox" role="alert" style="margin:12px 24px 0">${esc(w)}</div>`).join("") : "";
   if (!S.paused) return warn;
   const msg = S.controlErr
@@ -1150,9 +1181,101 @@ function addFormHtml() {
     ${overlap ? `<div role="alert" style="background:var(--red-bg);color:var(--red-ink);border-radius:10px;padding:10px 12px;font-size:14px">Some of these days already have holiday prices (${clashes.map(o => fmtRange(o.from, o.to) + ", " + (SEASONS[o.season] || {label: o.season}).label).join("; ")}). Remove ${clashes.length > 1 ? "those" : "that one"} first, or pick other days.</div>` : ""}
     <button type="button" class="btn full ${ready ? "dark" : "off"}" data-act="dpAdd" aria-disabled="${!ready}">${esc(label)}</button></section>`;
 }
+/* ---------- holiday rule: small moves far ahead ---------- */
+const pctText = f => String(Math.round(f * 1000) / 10).replace(/\.0$/, "");
+const holSaved = (row, col) => {
+  const v = S.eng?.settings?.holiday?.limits?.[row]?.[col];
+  return typeof v === "number" && isFinite(v) ? v : HOL_REC[row][col];
+};
+const holRaw = (row, col) => S.eng?.settings?.holiday?.limits?.[row]?.[col];
+function holidayRuleCardHtml() {
+  const f = holSaved("far", "down_multi"), g = holSaved("far", "down_single"), u = holSaved("far", "up_single");
+  return `<div class="card" style="margin-top:10px"><div class="lrow"><div class="grow"><div class="t">Holiday rule: small moves far ahead</div>
+    <div class="s">More than 30 days before arrival a holiday night moves down at most ${pctText(f)}% (several rooms) or ${pctText(g)}% (single apartments), up at most ${pctText(u)}% (single apartments).</div></div>
+    <button type="button" class="btn light small" data-act="holRule" style="margin-right:12px">Change</button></div></div>`;
+}
+let HD = null;                              // the open holiday-rule window: values when it opened
+function holCellInputs() { return [...document.querySelectorAll('#overlay input[data-inp="hol"]')]; }
+function holidayRuleDialog() {
+  HD = {open: {}, raw: {}};
+  HOL_ROWS.forEach(([r]) => HOL_COLS.forEach(([c]) => { HD.raw[r + "|" + c] = holRaw(r, c); }));
+  const cells = HOL_ROWS.map(([r, rl]) => `<div class="hrl">${esc(rl)}</div>` + HOL_COLS.map(([c, cl]) => {
+    const k = r + "|" + c; HD.open[k] = pctText(holSaved(r, c));
+    return `<input class="num" type="text" inputmode="decimal" value="${HD.open[k]}" data-inp="hol" data-k="${k}" aria-label="${esc(rl)}, ${esc(cl)}, percent">`;
+  }).join("")).join("");
+  openDialog(`<div class="dh"><h3>Holiday rule: small moves far ahead</h3>
+    <button type="button" class="ibtn" aria-label="Close" data-act="closeDialog" style="margin-right:-12px;color:var(--ink)">${icon("x", 22)}</button></div>
+    <p>How much a holiday night may move before 14 days before arrival</p>
+    <div class="hgrid"><div></div>${HOL_COLS.map(([, cl]) => `<div class="hch">${esc(cl)}</div>`).join("")}${cells}</div>
+    <div class="fine">Percent of the price the night had when it joined the holiday rule. A night closer to the date may move at least as much as one farther away.</div>
+    <div id="holMsg" role="alert"></div>
+    <button type="button" class="btn dark full" data-act="holSave" id="holSaveBtn" aria-disabled="true">Save</button>
+    <button type="button" class="btn light full" data-act="holUndo">Undo</button>
+    <button type="button" class="btn light full" data-act="holRec">Back to recommended</button>`, "Holiday rule: small moves far ahead");
+  holCheck();
+}
+function holParse(t) {
+  const x = String(t).trim().replace(",", ".");
+  if (!/^\d+(\.\d+)?$/.test(x)) return null;
+  return Number(x);
+}
+function holCheck() {
+  const inputs = holCellInputs(), vals = {}, bad = new Set(); let msg = "";
+  inputs.forEach(i => {
+    const v = holParse(i.value);
+    vals[i.dataset.k] = v;
+    if (v === null || v < 0 || v > HOL_MAX_PCT) bad.add(i.dataset.k);
+  });
+  if (bad.size) msg = `Each number must be between 0 and ${HOL_MAX_PCT}%.`;
+  else {
+    for (const [c, cl] of HOL_COLS) {
+      const a = vals["far|" + c], b = vals["mid|" + c], d = vals["near|" + c];
+      if (b < a || d < b) { msg = `${cl}: a night closer to the date must be allowed to move at least as much as one farther away.`; [b < a ? "mid|" + c : "near|" + c].forEach(k => bad.add(k)); break; }
+    }
+  }
+  inputs.forEach(i => { i.classList.toggle("bad", bad.has(i.dataset.k)); i.setAttribute("aria-invalid", bad.has(i.dataset.k)); });
+  const changed = inputs.some(i => holParse(i.value) !== holParse(HD.open[i.dataset.k]));
+  const m = $("holMsg"); if (m) m.innerHTML = msg ? `<div class="warnbox">${esc(msg)}</div>` : "";
+  const b = $("holSaveBtn"); if (b) { const off = !!msg || !changed; b.setAttribute("aria-disabled", off); b.className = "btn full " + (off ? "off" : "dark"); }
+  return {ok: !msg, vals, changed};
+}
+async function holSave() {
+  const {ok, vals, changed} = holCheck();
+  if (!ok || !changed || U.saving) return;
+  U.saving = true;
+  try {
+    const es = await getDoc(engRef()), fe = es.exists() ? es.data() : {};
+    const getRaw = (r, c) => fe?.settings?.holiday?.limits?.[r]?.[c];
+    const todo = [], conflicts = [];
+    for (const [r, rl] of HOL_ROWS) for (const [c, cl] of HOL_COLS) {
+      const k = r + "|" + c;
+      if (holParse(HD.open[k]) === vals[k]) continue;
+      const open = holRawAtOpen(k);
+      if (!sameRaw(getRaw(r, c), open)) conflicts.push(`${rl}, ${cl}`);
+      todo.push([r, c, vals[k]]);
+    }
+    if (conflicts.length) {
+      S.eng = fe; closeDialog();
+      message("Nothing was saved", `Changed somewhere else since you opened this window: ${conflicts.join("; ")}. I reloaded it. Check the new numbers and change them again if you still want to.`);
+      render(); return;
+    }
+    const fields = {};
+    todo.forEach(([r, c, v]) => { fields[`settings.holiday.limits.${r}.${c}`] = Math.round(v * 10) / 1000; });
+    await writeFields(engRef(), fields);
+    logChange("engine_edit", "Pricing page: holiday rule " + todo.map(([r, c, v]) => `${r} ${c} ${v}%`).join(", "));
+    await loadConfig();
+    closeDialog();
+    U.saved = true; U.notice = "Saved. Used from the next price update.";
+    render();
+  } catch (e) {
+    message("Save failed", `${e.message || e}. Nothing may have been saved. Reload the page to check.`);
+  } finally { U.saving = false; }
+}
+// the raw stored value (a fraction or nothing) each cell had when the window opened
+function holRawAtOpen(k) { return HD.raw[k]; }
 function viewDates() {
   const desk = isDesk();
-  const lists = `<section class="sec"><div><h2 class="h2">Holiday dates</h2><p class="sub">These dates use another season's prices. They repeat every year, for all rooms, on both ways.</p></div><div class="card" style="overflow:hidden" id="holList">${holidayRowsHtml()}</div></section>
+  const lists = `<section class="sec"><div><h2 class="h2">Holiday dates</h2><p class="sub">These dates use another season's prices. They repeat every year, for all rooms, on both ways.</p></div><div class="card" style="overflow:hidden" id="holList">${holidayRowsHtml()}</div>${holidayRuleCardHtml()}</section>
     <section class="sec"><div><h2 class="h2">Date rules</h2><p class="sub">Leave some dates alone, or use another mode on them. Only for the dates you pick, not every year. Only rooms on the new way follow them.</p></div><div class="card" style="overflow:hidden" id="ruleList">${ruleRowsHtml()}</div></section>
     <section class="sec"><div><h2 class="h2">Events</h2><p class="sub">Big events in Tbilisi. An event you approve raises the price and the maximum on that date, for rooms on the new way.</p></div><div class="card" style="overflow:hidden">${eventRowsHtml()}</div></section>`;
   return `${desk ? "" : `<div class="topbar"><h1>Pricing</h1></div>${tabsHtml(false)}`}${errorsHtml()}
@@ -1567,6 +1690,10 @@ document.addEventListener("click", async e => {
     case "resume": doPause(false); break;
     case "how": howDialog(); break;
     case "closeDialog": closeDialog(); break;
+    case "holRule": holidayRuleDialog(); break;
+    case "holSave": if (t.getAttribute("aria-disabled") === "true") { holCheck(); break; } holSave(); break;
+    case "holUndo": holCellInputs().forEach(i => { i.value = HD.open[i.dataset.k]; }); holCheck(); break;
+    case "holRec": holCellInputs().forEach(i => { const [r, c] = i.dataset.k.split("|"); i.value = pctText(HOL_REC[r][c]); }); holCheck(); break;
     case "dialogYes": if (DIALOG_YES) DIALOG_YES(); break;
     case "logout": try { await signOut(auth); } catch (er) { /* ignore */ } location.reload(); break;
     case "soon": break;
@@ -1649,6 +1776,7 @@ document.addEventListener("click", async e => {
 const modeById = id => MODES.find(m => m.id === id);
 document.addEventListener("input", e => {
   const t = e.target;
+  if (t.dataset && t.dataset.inp === "hol") { holCheck(); return; }
   if (t.dataset && t.dataset.inp === "season") {
     const [rt, season, cur, field] = t.dataset.k.split("|");
     setSeason(rt, season, cur, field, t.value); touch(); refreshSeasonUi();

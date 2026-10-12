@@ -395,6 +395,93 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
     }, {mutate: MOVED});
   }
 
+  // ---- holiday rule card and window; the "hold" action; the price check card ----
+  const holGrid = page => page.$$eval('#overlay input[data-inp=hol]', els => Object.fromEntries(els.map(e => [e.dataset.k, e.value])));
+  const holSaveOff = page => page.$eval('#holSaveBtn', e => e.getAttribute('aria-disabled') === 'true');
+  const ENG = page => h.doc(page, 'pricing_config/engine_v2');
+  for (const [w, hh] of SIZES) {
+    await test('holiday rule: the card sits under Holiday dates and the window shows the table', w, hh, async ({page}, desk) => {
+      await go(page, '#/dates');
+      const t = await text(page, '#holList + .card');
+      assert.ok(/Holiday rule: small moves far ahead/.test(t) && /down at most 5%/.test(t) && /up at most 3%/.test(t), t);
+      assert.ok(await page.$('#holList + .card [data-act=holRule]'));
+      await page.click('[data-act=holRule]');
+      assert.ok(await dlgOpen(page) && await focusInDialog(page));
+      const d = await text(page, '.dlg');
+      for (const x of ['How much a holiday night may move before 14 days before arrival', 'More than 30 days', '30 to 21 days', '20 to 15 days', 'Down, several rooms', 'Down, single apartments', 'Up, single apartments', 'Save', 'Undo', 'Back to recommended']) assert.ok(d.includes(x), 'missing: ' + x);
+      assert.deepStrictEqual(await holGrid(page), {'far|down_multi': '5', 'far|down_single': '3', 'far|up_single': '3', 'mid|down_multi': '8', 'mid|down_single': '5', 'mid|up_single': '5', 'near|down_multi': '10', 'near|down_single': '8', 'near|up_single': '8'});
+      assert.ok(await holSaveOff(page), 'Save is off until something changes');
+      const fit = await page.evaluate(() => { const o = document.querySelector('.dlg'); return {side: o.scrollWidth > o.clientWidth + 1, body: document.documentElement.scrollWidth > innerWidth + 1, small: [...o.querySelectorAll('input')].filter(e => e.getBoundingClientRect().height < 44).length}; });
+      assert.ok(!fit.side && !fit.body && fit.small === 0, JSON.stringify(fit));
+      assert.strictEqual((await h.writes(page)).length, 0);
+    });
+    await test('holiday rule: out-of-range and wrong-order numbers show a red message and cannot be saved', w, hh, async ({page}) => {
+      await go(page, '#/dates'); await page.click('[data-act=holRule]');
+      await fill(page, 'input[data-k="far|down_single"]', '25');
+      assert.ok(/between 0 and 20%/.test(await text(page, '#holMsg')) && await holSaveOff(page));
+      assert.ok(await page.$eval('input[data-k="far|down_single"]', e => e.classList.contains('bad')));
+      assert.strictEqual(await page.$eval('#holMsg .warnbox', e => getComputedStyle(e).color), 'rgb(122, 31, 31)');
+      await page.$eval('#holSaveBtn', e => e.click()); assert.strictEqual((await h.writes(page)).length, 0, 'a click on the dimmed Save writes nothing');
+      await fill(page, 'input[data-k="far|down_single"]', 'abc'); assert.ok(/between 0 and 20%/.test(await text(page, '#holMsg')));
+      await fill(page, 'input[data-k="far|down_single"]', '3'); assert.strictEqual(await text(page, '#holMsg'), '');
+      await fill(page, 'input[data-k="mid|up_single"]', '2');       // closer to the date must allow at least as much
+      assert.ok(/at least as much as one farther away/.test(await text(page, '#holMsg')) && await holSaveOff(page));
+      await fill(page, 'input[data-k="far|up_single"]', '1.5'); await fill(page, 'input[data-k="mid|up_single"]', '4');
+      assert.strictEqual(await text(page, '#holMsg'), ''); assert.ok(!(await holSaveOff(page)));
+    });
+    await test('holiday rule: Undo, Back to recommended, then Save writes only the changed field paths', w, hh, async ({page}) => {
+      await go(page, '#/dates'); await page.click('[data-act=holRule]');
+      await fill(page, 'input[data-k="far|down_multi"]', '6'); await fill(page, 'input[data-k="near|up_single"]', '9,5');
+      assert.ok(!(await holSaveOff(page)));
+      await page.click('[data-act=holUndo]');
+      assert.strictEqual((await holGrid(page))['far|down_multi'], '5'); assert.ok(await holSaveOff(page));
+      await fill(page, 'input[data-k="far|down_multi"]', '7');
+      await page.click('[data-act=holRec]');
+      assert.strictEqual((await holGrid(page))['far|down_multi'], '5'); assert.strictEqual((await holGrid(page))['near|down_multi'], '10');
+      await fill(page, 'input[data-k="far|down_multi"]', '6'); await fill(page, 'input[data-k="near|up_single"]', '9.5');
+      await page.click('#holSaveBtn');
+      await page.waitForFunction(() => document.getElementById('overlay').hidden);
+      const wr = await writesTo(page, 'pricing_config/engine_v2');
+      assert.strictEqual(wr.length, 1); assert.strictEqual(wr[0].op, 'updateDoc');
+      assert.deepStrictEqual(wr[0].fields, {'settings.holiday.limits.far.down_multi': 0.06, 'settings.holiday.limits.near.up_single': 0.095});
+      const e = await ENG(page); assert.strictEqual(e.settings.holiday.limits.far.down_multi, 0.06); assert.ok(e.settings.date_rules, 'other settings untouched');
+      assert.ok(/down at most 6%/.test(await text(page, '#holList + .card')), 'the card shows the new number');
+      assert.ok(/Saved/.test(await text(page, 'body')));
+      await page.click('[data-act=holRule]');
+      assert.strictEqual((await holGrid(page))['near|up_single'], '9.5');
+    });
+    await test('holiday rule: a number changed somewhere else is not overwritten', w, hh, async ({page}) => {
+      await go(page, '#/dates'); await page.click('[data-act=holRule]');
+      await fill(page, 'input[data-k="far|down_multi"]', '6');
+      await page.evaluate(() => { const d = window.__FS.docs['pricing_config/engine_v2']; d.settings.holiday = {limits: {far: {down_multi: 0.04}}}; });
+      await page.click('#holSaveBtn');
+      await page.waitForSelector('.dlg:has-text("Nothing was saved")');
+      assert.strictEqual((await writesTo(page, 'pricing_config/engine_v2')).length, 0);
+    });
+    await test('hold: the new date rule choice has its plain label on the Dates tab', w, hh, async ({page}) => {
+      await go(page, '#/dates'); await page.click('[data-act=dpKind][data-k=rule]');
+      const labels = await page.$$eval('[data-act=dpChoice]', els => els.map(e => e.innerText.trim()));
+      assert.ok(labels.includes('Small moves only, more active closer to the date') && labels.includes('Don’t change the price'), labels.join('|'));
+    });
+    await test('hold: a saved hold rule is listed with its label', w, hh, async ({page}) => {
+      await go(page, '#/dates');
+      assert.ok(/Small moves only, more active closer to the date/.test(await text(page, '#ruleList')));
+    }, {mutate: d => { d['pricing_config/engine_v2'].settings.date_rules = [{from: '2026-12-20', to: '2027-01-02', rooms: 'all', action: 'hold'}]; }});
+    await test('price check: green card when all is good, red card with the list, quiet when stale', w, hh, async ({page}) => {
+      const t = await text(page, '#pausedBar');
+      assert.ok(/Price check/.test(t) && /All good/.test(t) && !(await page.$('#pausedBar .ok.bad')), t);
+    }, {mutate: d => { d['pricing_watchdog/latest'] = {day: '2026-10-11', ts: '2026-10-11T09:12:00', status: 'green', issues: [], counts: {}}; }});
+    await test('price check: red card lists the problems', w, hh, async ({page}) => {
+      const t = await text(page, '#pausedBar');
+      assert.ok(/Needs a look/.test(t) && /XCV_1 2026-11-01 GEL: price 310 is above the maximum 300/.test(t) && /The push to Expedia failed/.test(t) && /and 3 more/.test(t), t);
+      assert.ok(await page.$('#pausedBar [role=alert]'));
+    }, {mutate: d => { d['pricing_watchdog/latest'] = {day: '2026-10-11', ts: '2026-10-11T09:12:00', status: 'red', total_issues: 5, counts: {out_of_range: 1, channel_failed: 1},
+      issues: [{code: 'out_of_range', text: 'XCV_1 2026-11-01 GEL: price 310 is above the maximum 300.'}, {code: 'channel_failed', text: 'The push to Expedia failed.'}]}; }});
+    await test('price check: an old result is not shown as good', w, hh, async ({page}) => {
+      const t = await text(page, '#pausedBar'); assert.ok(/No result yet today/.test(t) && !/All good/.test(t), t);
+    }, {mutate: d => { d['pricing_watchdog/latest'] = {day: '2026-10-09', ts: '2026-10-09T09:12:00', status: 'green', issues: []}; }});
+  }
+
   // ---- layout switch ----
   await test('layout switches at 900 px', 899, 800, async ({page}) => { assert.strictEqual(await page.evaluate(() => document.body.dataset.layout), 'phone'); assert.ok(await page.$('a.tab[href="#/rooms"]')); });
   await test('layout switches at 900 px (desk side)', 900, 800, async ({page}) => { assert.strictEqual(await page.evaluate(() => document.body.dataset.layout), 'desk'); assert.ok(await page.$('a.tab[href="#/calendar"]')); });
