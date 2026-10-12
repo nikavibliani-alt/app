@@ -219,13 +219,13 @@ def get_bucket(name: str = BUCKET_DEFAULT, create: bool = True):
         from firebase_admin import storage
         client = storage.bucket(name).client
         b = client.bucket(name)
-        if b.exists():
+        if b.exists(timeout=20):
             return b, "exists"
         if not create:
             return None, "missing"
-        b = client.create_bucket(name, location=BUCKET_LOCATION)
+        b = client.create_bucket(name, location=BUCKET_LOCATION, timeout=30)
         b.versioning_enabled = True
-        b.patch()
+        b.patch(timeout=30)
         return b, "created"
     except Exception as e:  # noqa: BLE001
         return None, f"{type(e).__name__}: {str(e)[:160]}"

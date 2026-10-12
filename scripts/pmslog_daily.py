@@ -59,6 +59,7 @@ def main(argv=None, db=None, now=None, cookie_fn=None, get=None, bucket=None):
         report["snapshot_rooms"], report["snapshot_nights"] = len(docs), sum(d["night_count"] for d in docs.values())
         if not args.dry:
             pmslog.write_events(db, "snapshots", list(docs.values()), overwrite=True)
+            print("  step: snapshots saved", flush=True)
 
     stays = stays_for_log(db, today)
     bk = pmslog.booking_events(stays, lambda c: ps.ROOM_CODE_TO_RT.get(c), today, now)
@@ -72,12 +73,16 @@ def main(argv=None, db=None, now=None, cookie_fn=None, get=None, bucket=None):
     st = pmslog.settings_events(changes, now)
     report["settings_events"] = len(st)
     if not args.dry:
+        print("  step: writing booking events", flush=True)
         report["booking_new"] = pmslog.write_events(db, "booking_events", bk)
+        print("  step: booking events saved", flush=True)
         report["settings_new"] = pmslog.write_events(db, "settings_events", st)
 
     yesterday = (today - timedelta(days=1)).isoformat()
     if bucket is None and not args.dry:
+        print("  step: bucket", flush=True)
         bucket, note = pmslog.get_bucket()
+        print("  step: bucket", note[:80], flush=True)
         report["bucket"] = note
     if args.dry:
         report["export"] = {s: {k: v for k, v in e.items() if k in ("rows", "bytes")}
