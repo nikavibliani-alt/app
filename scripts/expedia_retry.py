@@ -51,8 +51,8 @@ def main():
         if args.no_push:
             return
         t = time.time()
-        failed = live.push_channels(["EXPEDIA"], cookie, timeout=60)
-        print(f"  EXPEDIA push (60 s timeout, up to 3 tries): {'FAILED' if failed else 'OK'} after {time.time() - t:.0f} s")
+        failed = live.push_channels(["EXPEDIA"], cookie, timeout=120)
+        print(f"  EXPEDIA push (120 s timeout, up to 3 tries): {'FAILED' if failed else 'OK'} after {time.time() - t:.0f} s")
         if failed:
             sys.exit(1)
 

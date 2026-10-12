@@ -179,7 +179,7 @@ def send_prices(payload: list, cookie: str, post=None):
     resp.raise_for_status()
 
 
-PUSH_TIMEOUT = 60          # seconds per try; Expedia took longer than 20 s
+PUSH_TIMEOUT = 120         # seconds per try; the Expedia push takes about 60 s
 
 
 def push_channels(portals: list, cookie: str, post=None, sleep=time.sleep, timeout=None):
