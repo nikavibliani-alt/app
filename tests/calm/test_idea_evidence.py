@@ -190,3 +190,15 @@ def test_fresh_set_replaces_the_waiting_ideas_only_when_new_ones_were_made(monke
     monkeypatch.setattr(cp, "call_claude_analyst", lambda prompt, key: {"proposals": [], "daily_summary": ""})
     r2 = fresh.run(db2, {**CONFIG, "startPrices": {}})
     assert r2["new"] == 0 and r2["replaced"] == 0 and db2.store["pricing_proposals"]["a"]["status"] == "pending"
+
+
+def test_the_reply_is_read_even_with_text_around_the_json():
+    j = '{"proposals": [], "daily_summary": "s"}'
+    assert cp.parse_analyst_reply(j)["daily_summary"] == "s"
+    assert cp.parse_analyst_reply("```json\n" + j + "\n```")["proposals"] == []
+    assert cp.parse_analyst_reply("Here is my analysis.\n" + j + "\nHope it helps.")["proposals"] == []
+    try:
+        cp.parse_analyst_reply("")
+        assert False
+    except ValueError as e:
+        assert "no JSON" in str(e)

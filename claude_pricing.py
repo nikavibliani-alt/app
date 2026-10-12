@@ -148,14 +148,25 @@ def call_claude_analyst(prompt: str, api_key: str, timeout: float = 45.0) -> dic
     client = anthropic.Anthropic(api_key=api_key, timeout=timeout)
     msg = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=2048,
+        max_tokens=4096,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": prompt}],
     )
-    text = msg.content[0].text.strip()
+    return parse_analyst_reply("".join(getattr(b, "text", "") for b in msg.content))
+
+
+def parse_analyst_reply(text: str) -> dict:
+    """The JSON object in the reply, even when the model wraps it in a code fence or adds a sentence around it."""
+    text = (text or "").strip()
     if text.startswith("```"):
         text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-    return json.loads(text)
+    try:
+        return json.loads(text)
+    except ValueError:
+        a, b = text.find("{"), text.rfind("}")
+        if a >= 0 and b > a:
+            return json.loads(text[a:b + 1])
+        raise ValueError(f"the reply had no JSON ({len(text)} characters, starts with: {text[:60]!r})")
 
 
 def _apply_to_rules_data(rules_data: dict, prop: str, season: str, ptype: str, value):
