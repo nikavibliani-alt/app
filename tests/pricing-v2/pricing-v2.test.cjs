@@ -478,6 +478,9 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       assert.ok(await page.$('#pausedBar [role=alert]'));
     }, {mutate: d => { d['pricing_watchdog/latest'] = {day: '2026-10-11', ts: '2026-10-11T09:12:00', status: 'red', total_issues: 5, counts: {out_of_range: 1, channel_failed: 1},
       issues: [{code: 'out_of_range', text: 'XCV_1 2026-11-01 GEL: price 310 is above the maximum 300.'}, {code: 'channel_failed', text: 'The push to Expedia failed.'}]}; }});
+    await test('price check: "waiting" (no run yet today) is quiet, not red', w, hh, async ({page}) => {
+      const t = await text(page, '#pausedBar'); assert.ok(/No result yet today/.test(t) && !/Needs a look/.test(t), t);
+    }, {mutate: d => { d['pricing_watchdog/latest'] = {day: '2026-10-11', ts: '2026-10-11T00:18:00', status: 'waiting', issues: []}; }});
     await test('price check: an old result is not shown as good', w, hh, async ({page}) => {
       const t = await text(page, '#pausedBar'); assert.ok(/No result yet today/.test(t) && !/All good/.test(t), t);
     }, {mutate: d => { d['pricing_watchdog/latest'] = {day: '2026-10-09', ts: '2026-10-09T09:12:00', status: 'green', issues: []}; }});

@@ -174,3 +174,12 @@ def test_a_clean_run_after_a_failed_push_turns_the_card_green(monkeypatch):
                                             "failed_portals": [], "stopped_room_types": []})
     run_wd(db, Posted(), monkeypatch)
     assert db.store["pricing_watchdog"]["latest"]["status"] == "green"
+
+
+def test_no_run_yet_today_is_waiting_not_red(monkeypatch):
+    db = FakeDB()
+    db.collection("globals").document("config").set({"ownerPhone": "+995 555 000 111"})
+    post = Posted()
+    run_wd(db, post, monkeypatch)
+    doc = db.store["pricing_watchdog"]["latest"]
+    assert doc["status"] == "waiting" and doc["issues"] == [] and post.calls == []

@@ -100,6 +100,12 @@ def main(argv=None, db=None, post=requests.post, now=None, env=os.environ):
         run_view = {"ok": last.get("ok") is not False,
                     "failed_portals": sorted(last.get("failed_portals") or []),
                     "stopped_room_types": sorted(last.get("stopped_room_types") or [])}
+    if not runs:                                  # nothing has run yet today (for example just after midnight): nothing to judge
+        doc = {"ts": now.isoformat(), "day": today, "status": "waiting", "counts": {}, "checked": 0, "issues": [], "total_issues": 0,
+               "main_run_done": False, "rooms": sorted(live_rts), "paused": False}
+        print("Watchdog: waiting | no run yet today, nothing checked")
+        db.collection("pricing_watchdog").document("latest").set(doc)
+        return {"result": {"status": "waiting", "issues": [], "counts": {}, "checked": 0}, "doc": doc}
     result = check(daily, states, run_view, cfg, now, live_rts=list(live_rts))
     paused = bool(last and last.get("paused"))
 

@@ -764,7 +764,7 @@ function switchHtml() {
 function watchdogHtml(desk) {
   const w = S.watch;
   if (!w) return "";
-  const stale = w.day !== today();
+  const stale = w.day !== today() || w.status === "waiting";
   const red = w.status === "red" && !stale;
   const when = w.ts ? runWhen(w.ts) : "";
   const wrap = h => desk ? `<div style="padding:12px 24px 0">${h}</div>` : `<div class="page" style="padding-bottom:0;gap:0">${h}</div>`;
