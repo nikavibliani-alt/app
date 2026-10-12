@@ -509,6 +509,10 @@ async function loadBeta() {
   try { const q = await getDocs(query(collection(db, "pricing_twin_results"), limit(200))); S.twin = {}; q.docs.forEach(d => { S.twin[d.id] = d.data(); }); } catch (e) { S.twin = {}; }
   try { const q = await getDocs(query(collection(db, "pricing_scorecard"), limit(200))); S.cards = {}; q.docs.forEach(d => { if (d.id !== "_summary") S.cards[d.id] = d.data(); }); } catch (e) { S.cards = {}; }
 }
+async function loadWeekly() {
+  try { const q = await getDocs(query(collection(db, "pricing_weekly"), orderBy("ts", "desc"), limit(60))); S.weekly = q.docs.map(d => ({id: d.id, ...d.data()})); }
+  catch (e) { S.weekly = []; }
+}
 async function loadProposals() {
   try {
     const q = await getDocs(query(collection(db, "pricing_proposals"), orderBy("ts", "desc"), limit(40)));
@@ -814,7 +818,7 @@ const badgeCount = () => S.props.filter(p => p.status === "pending").length;
 function tabsHtml(desk) {
   const cur = U.route.name;
   const first = desk ? ["calendar", "Calendar"] : ["rooms", "Rooms"];
-  const items = [first, ["seasons", "Seasons"], ["dates", "Dates"], ["ideas", "Ideas"]];
+  const items = [first, ["seasons", "Seasons"], ["dates", "Dates"], ["ideas", "Ideas"], ["weekly", "Weekly report"]];
   const active = (cur === "room" || cur === "test") ? "rooms" : (cur === "calendar" ? "calendar" : cur);
   return `<nav class="tabs" aria-label="Pricing">${items.map(([id, label]) => {
     const n = id === "ideas" ? badgeCount() : 0;
@@ -1473,6 +1477,39 @@ function cardHtml(id) {
   const v = {right: "Right", wrong: "Wrong", unclear: "Unclear"}[c.verdict] || "";
   return `<div style="font-size:13px;margin-top:4px"><span class="verdict ${esc(c.verdict)}">${v}</span>${esc((c.reason || "").replace(/ → (Right|Wrong|Unclear)$/, ""))}</div>` + twinHtml(id);
 }
+const WEEK_ROWS = [["bookings_made", "Bookings made"], ["nights_sold", "Nights sold"], ["avg_sold_price_gel", "Average price sold (₾)"], ["avg_start_gel", "Average start price (₾)"],
+  ["price_up", "Price rises"], ["price_down", "Price drops"], ["nights_hit_min", "Nights at your minimum"], ["nights_hit_max", "Nights at your maximum"],
+  ["last3_drops", "Drops in the last 3 days"], ["last3_drops_sold", "…that then sold"], ["cancel_drops_tonight", "Cancelled tonight, lowered"], ["cancel_drops_tonight_sold", "…that then sold"],
+  ["cancel_drops_tomorrow", "Cancelled tomorrow, lowered"], ["cancel_drops_tomorrow_sold", "…that then sold"], ["cancellations", "Cancellations"],
+  ["holiday_rule_moves", "Holiday-rule moves"], ["blocked_by_protect", "Kept by protect"], ["blocked_by_hold", "Kept by hold"], ["stopped_by_safety_check", "Stopped by a safety check"]];
+const weekRange = w => `${fmtShort(w.from)} – ${fmtShort(w.to)} ${w.to.slice(0, 4)}`;
+function weekList(title, items) {
+  return `<section class="sec"><h2 class="h2">${title}</h2>${items && items.length
+    ? `<div class="card" style="overflow:hidden">${items.map(i => `<div class="hist"><div class="grow">${esc(i.text)}${i.edited ? ' <span class="muted" style="font-size:13px">(shortened by the checker)</span>' : ""}</div></div>`).join("")}</div>`
+    : `<div class="card empty">Nothing to report here.</div>`}</section>`;
+}
+function viewWeekly() {
+  const desk = isDesk(), list = S.weekly, w = list.find(x => x.id === U.weekKey) || list[0];
+  const head = `${desk ? "" : `<div class="topbar"><h1>Pricing</h1></div>${tabsHtml(false)}`}${errorsHtml()}`;
+  if (!w) return head + `<section class="sec"><h2 class="h2">Weekly report</h2><div class="card empty">No weekly report yet. The first one is made on Sunday evening.</div></section>`;
+  const r = w.report || {}, n = w.numbers || {}, rooms = Object.entries(n.rooms || {}).filter(([, v]) => v.nights_sold || v.price_up || v.price_down || v.cancellations || v.bookings);
+  const past = list.length > 1 ? `<section class="sec"><h2 class="h2">Past weeks</h2><div class="pills">${list.map(x => `<button type="button" class="pill" aria-pressed="${x.id === w.id}" data-act="weekPick" data-k="${esc(x.id)}">${esc(weekRange(x))}</button>`).join("")}</div></section>` : "";
+  const notes = (n.data_notes || []).length ? `<section class="sec"><h2 class="h2">What the data cannot show yet</h2><div class="card pad" style="font-size:14px;line-height:1.5">${n.data_notes.map(x => `<div>${esc(x)}</div>`).join("")}</div></section>` : "";
+  const roomCards = rooms.map(([id, v]) => `<div class="card pad"><b>${esc(roomName(id))}</b><div style="display:grid;grid-template-columns:1fr auto;gap:2px 12px;font-size:14px;margin-top:6px">${WEEK_ROWS.filter(([k]) => v[k] !== undefined && v[k] !== null).map(([k, l]) => `<span class="muted">${l}</span><b>${v[k]}</b>`).join("")}</div></div>`).join("");
+  const a = n.all || {}, id = a.ideas || {}, fails = Object.entries(a.channel_push_failures || {}).map(([k, c]) => `${k} ${c}`).join(", ");
+  const whole = `<div class="card pad" style="font-size:14px;line-height:1.55">
+    <div>Price updates this week: <b>${a.runs ?? 0}</b>, cancellation updates: <b>${a.urgent_runs ?? 0}</b></div>
+    <div>Channel push failures: <b>${fails || "none"}</b></div>
+    <div>Days the price check was red: <b>${a.watchdog_red_days ?? 0}</b> of ${a.watchdog_days_recorded ?? 0} recorded</div>
+    <div>Ideas scorecard: <b>${id.finished ? `Right ${id.right} of ${id.finished}` : "no finished ideas yet"}</b></div>
+    <div>What-if twin: <b>${(a.twin || {}).finished ? `${a.twin.finished} compared, its prices ${a.twin.avg_difference_pct > 0 ? "higher" : a.twin.avg_difference_pct < 0 ? "lower" : "the same"} on average` : "nothing to compare yet"}</b></div></div>`;
+  const check = r.checked ? `Checked by a second reader: ${(r.removed || []).length} claim${(r.removed || []).length === 1 ? "" : "s"} removed, ${r.edited || 0} shortened.` : "The second reader did not run, so no written claim is shown.";
+  return head + `<section class="sec"><div><h2 class="h2">Weekly report</h2><p class="sub">${esc(weekRange(w))}. Suggestions only: nothing here changed a price.</p></div>
+      <div class="card pad" style="font-size:16px;line-height:1.5"><b>${esc(r.headline || "")}</b><div class="muted" style="font-size:13px;margin-top:6px">${esc(check)}</div></div></section>
+    <div class="${desk ? "cards2" : ""}" style="${desk ? "" : "display:flex;flex-direction:column;gap:18px"}">${weekList("What worked", r.worked)}${weekList("What did not work", r.didnt)}${weekList("Possible upgrades", r.upgrades)}</div>
+    ${notes}
+    <section class="sec"><h2 class="h2">The numbers</h2>${whole}<div class="${desk ? "cards2" : ""}" style="${desk ? "" : "display:flex;flex-direction:column;gap:12px"}">${roomCards || '<div class="card empty">No room had activity this week.</div>'}</div></section>${past}`;
+}
 function scoreText() {
   const c = S.score;
   if (!c || !c.finished) return `<b>No finished ideas yet</b><div class="muted" style="font-size:13px">An idea is judged when all its nights have passed.</div>`;
@@ -1673,14 +1710,16 @@ function render() {
     if (name === "calendar") body = viewCalendar();
     else if (name === "seasons") body = viewSeasons();
     else if (name === "dates") body = viewDates();
+    else if (name === "weekly") body = viewWeekly();
     else body = viewIdeas();
-    html = `<div class="page"><div class="dwrap"><div class="dmain ${name === "calendar" ? "" : "narrow"}" ${name === "seasons" || name === "ideas" ? 'style="max-width:none"' : ""}>${body}${footerHtml()}</div>${name === "calendar" ? panelHtml() : ""}</div></div>`;
+    html = `<div class="page"><div class="dwrap"><div class="dmain ${name === "calendar" ? "" : "narrow"}" ${name === "seasons" || name === "ideas" || name === "weekly" ? 'style="max-width:none"' : ""}>${body}${footerHtml()}</div>${name === "calendar" ? panelHtml() : ""}</div></div>`;
   } else if (r.name === "rooms") html = viewRooms() + `<div class="page" style="padding-top:0">${footerHtml()}</div>`;
   else if (r.name === "room" && roomById(r.id) && !isOld(r.id)) html = viewRoom(r.id);
   else if (r.name === "test" && roomById(r.id) && isOld(r.id)) html = viewTest(r.id);
   else if (r.name === "seasons") html = `<div class="page">${viewSeasons()}${footerHtml()}</div>`;
   else if (r.name === "dates") html = `<div class="page">${viewDates()}${footerHtml()}</div>`;
   else if (r.name === "ideas") html = `<div class="page">${viewIdeas()}${footerHtml()}</div>`;
+  else if (r.name === "weekly") html = `<div class="page">${viewWeekly()}${footerHtml()}</div>`;
   else html = viewRooms();
   $("root").innerHTML = html;
   if (keep && $("cwrap")) { $("cwrap").scrollLeft = keep[0]; $("cwrap").scrollTop = keep[1]; }
@@ -1692,7 +1731,7 @@ function applyRoute() {
   let route = {name: "rooms"};
   if (h[0] === "room" && roomById(h[1]) && !isOld(h[1])) route = {name: "room", id: h[1]};
   else if (h[0] === "test" && roomById(h[1]) && isOld(h[1])) route = {name: "test", id: h[1]};
-  else if (["rooms", "calendar", "seasons", "dates", "ideas"].includes(h[0])) route = {name: h[0]};
+  else if (["rooms", "calendar", "seasons", "dates", "ideas", "weekly"].includes(h[0])) route = {name: h[0]};
   U.route = route; U.saved = false; U.notice = "";
   if (isDesk() && (route.name === "room" || route.name === "test")) U.panel = {type: route.name, rt: route.id};
   if (route.name === "test") loadBigMove(route.id);
@@ -1867,6 +1906,7 @@ document.addEventListener("click", async e => {
   if (!t) return;
   const d = t.dataset, a = d.act;
   switch (a) {
+    case "weekPick": U.weekKey = d.k; render(); break;
     case "toggleAuto":
       if (S.beta.auto_apply) setAuto(false);
       else openDialog(`<div class="dh"><h3>Apply ideas automatically?</h3></div><p>New ideas would change your season prices on their own, with no Apply tap from you. Each change shows in Earlier with Undo. This is a Beta feature.</p>
@@ -1986,7 +2026,7 @@ async function start() {
   $("root").innerHTML = `<div class="page"><p class="muted">Loading…</p></div>`;
   await Promise.all([loadControl(), loadConfig()]);
   applyRoute();
-  await Promise.all([loadRuns(), loadEvents(), loadProposals(), loadLocks(), loadDaily(), loadBeta()]);
+  await Promise.all([loadRuns(), loadEvents(), loadProposals(), loadLocks(), loadDaily(), loadBeta(), loadWeekly()]);
   render();
   window.__pricingReady = true;
 }

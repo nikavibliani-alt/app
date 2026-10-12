@@ -573,6 +573,23 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
     }});
   }
 
+  // ---- weekly report ----
+  for (const [w, hh] of SIZES) {
+    await test('weekly report: headline, three lists, numbers per room, notes, past weeks', w, hh, async ({page}) => {
+      await go(page, '#/weekly');
+      const t = await text(page, '.page');
+      assert.ok(/Weekly report/.test(await text(page, 'a.tab[href="#/weekly"]')));
+      assert.ok(/6 Oct – 12 Oct 2026/.test(t) && /A calm week: 11 nights sold in Maxela/.test(t), t.slice(0, 300));
+      assert.ok(/What worked/.test(t) && /What did not work/.test(t) && /Possible upgrades/.test(t) && /nothing here changed a price/i.test(t));
+      assert.ok(/The tonight drop sold: 1 of 1/.test(t) && /shortened by the checker/.test(t) && /1 claim removed, 1 shortened/.test(t), 'checker line');
+      assert.ok(/What the data cannot show yet/.test(t) && /only exists since 2026-10-12/.test(t));
+      assert.ok(/Maxela|MAXELA/i.test(t) && /Nights sold\s*11/.test(t) && !/XCV 2\s*Bookings made/.test(t), 'numbers per room, quiet rooms left out');
+      assert.ok(/Right 9 of 14/.test(t) && /Expedia 1/i.test(t));
+      await page.click('[data-act=weekPick][data-k="2026-W41"]');
+      assert.ok(/Thin week\./.test(await text(page, '.page')) && /did not run/.test(await text(page, '.page')));
+    });
+  }
+
   // ---- layout switch ----
   await test('layout switches at 900 px', 899, 800, async ({page}) => { assert.strictEqual(await page.evaluate(() => document.body.dataset.layout), 'phone'); assert.ok(await page.$('a.tab[href="#/rooms"]')); });
   await test('layout switches at 900 px (desk side)', 900, 800, async ({page}) => { assert.strictEqual(await page.evaluate(() => document.body.dataset.layout), 'desk'); assert.ok(await page.$('a.tab[href="#/calendar"]')); });
@@ -599,7 +616,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
   }
 
   // ---- 8 + design rules, on every screen at every size ----
-  const SCREENS = ['#/rooms', '#/room/XCV_2', '#/test/MAXELA', '#/seasons', '#/dates', '#/ideas'];
+  const SCREENS = ['#/rooms', '#/room/XCV_2', '#/test/MAXELA', '#/seasons', '#/dates', '#/ideas', '#/weekly'];
   for (const [w, hh] of SIZES) {
     await test('8 + design rules on every screen: no console errors, no sideways scroll, no cut-off text, text 12px+, no emoji, no blue, 44px targets (phone)', w, hh, async ({page}, desk) => {
       const dialogs = [async () => { await page.$eval('[data-act=togglePause]', e => e.click()); }, async () => { await page.$eval('[data-act=how]', e => e.click()); }];

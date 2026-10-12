@@ -49,14 +49,14 @@ def load_inputs(db, today: str, live_rts):
     return daily, states, runs
 
 
-def whatsapp_payload(to, issue, language):
+def whatsapp_payload(to, issue, language, label=GUEST_LABEL):
     return {"messaging_product": "whatsapp", "to": to, "type": "template",
             "template": {"name": "owner_alert", "language": {"code": language},
-                         "components": [{"type": "body", "parameters": [{"type": "text", "text": GUEST_LABEL},
+                         "components": [{"type": "body", "parameters": [{"type": "text", "text": label},
                                                                           {"type": "text", "text": issue}]}]}}
 
 
-def send_alert(to, issue, post=requests.post, env=os.environ):
+def send_alert(to, issue, post=requests.post, env=os.environ, label=GUEST_LABEL):
     """Template first (any hour), free text as the fallback. Returns the message id or None."""
     token, pid = env.get("META_ACCESS_TOKEN", ""), env.get("META_PHONE_NUMBER_ID", "")
     if not (token and pid and to):
@@ -64,9 +64,9 @@ def send_alert(to, issue, post=requests.post, env=os.environ):
         return None
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     issue = " ".join(issue.split())[:480]
-    bodies = [whatsapp_payload(to, issue, lang) for lang in LANGUAGES]
+    bodies = [whatsapp_payload(to, issue, lang, label) for lang in LANGUAGES]
     bodies.append({"messaging_product": "whatsapp", "to": to, "type": "text",
-                   "text": {"body": f"New alert from your Maxela bot. Guest: {GUEST_LABEL}. Issue: {issue}. Please check the WhatsApp chat."}})
+                   "text": {"body": f"New alert from your Maxela bot. Guest: {label}. Issue: {issue}. Please check the WhatsApp chat."}})
     for body in bodies:
         try:
             r = post(META_SEND_URL.format(pid=pid), json=body, headers=headers, timeout=15)
@@ -135,6 +135,14 @@ def main(argv=None, db=None, post=requests.post, now=None, env=os.environ):
         else:
             doc["whatsapp_failed_at"] = now.isoformat()
     ref.set(doc)
+    try:                                                    # one line per day for the weekly review: red if it was red at any point that day
+        hist = db.collection("pricing_watchdog_days").document(today)
+        prev = hist.get()
+        was_red = prev.exists and (prev.to_dict() or {}).get("status") == "red"
+        hist.set({"property_id": "maxela", "day": today, "status": "red" if (result["status"] == "red" or was_red) else result["status"],
+                  "last": result["status"], "ts": now.isoformat()})
+    except Exception:
+        pass
     return {"result": result, "doc": doc}
 
 

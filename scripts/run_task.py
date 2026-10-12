@@ -22,7 +22,7 @@ def main(task, dry):
         return m.compare(dry=bool(flag))
     if task == "weekly":
         import weekly_review as m
-        return m.main(flag + ["--now"])
+        return m.main(flag + ["--no-send"])
     raise SystemExit(f"unknown task {task}")
 
 

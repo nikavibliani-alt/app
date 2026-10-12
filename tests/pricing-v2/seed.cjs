@@ -70,6 +70,15 @@ function seedDocs() {
   docs['pricing_events/event_2026-11-14'] = {label: 'Concert', multiplier: 1.15, status: 'pending'};
   docs['pricing_locks/XCV_1_2026-10-17'] = {manual_lock: true};
   const r = docs['pricing_config/rules'];
+  docs['pricing_weekly/2026-W42'] = {property_id: 'maxela', week_key: '2026-W42', from: '2026-10-06', to: '2026-10-12', ts: '2026-10-12T21:00:00',
+    numbers: {data_notes: ['The history log of price changes only exists since 2026-10-12, so price moves, drops and cancellations before that are not counted.'],
+      rooms: {MAXELA: {bookings_made: 6, nights_sold: 11, avg_sold_price_gel: 142, avg_start_gel: 150, price_up: 9, price_down: 14, nights_hit_min: 2, last3_drops: 3, last3_drops_sold: 2, cancel_drops_tonight: 1, cancel_drops_tonight_sold: 1, cancellations: 2},
+              XCV_2: {bookings_made: 0, nights_sold: 0}},
+      all: {runs: 18, urgent_runs: 1, channel_push_failures: {EXPEDIA: 1}, watchdog_red_days: 1, watchdog_days_recorded: 5, ideas: {finished: 14, right: 9, wrong: 3, unclear: 2, tracking: 4}, twin: {finished: 2, avg_difference_pct: 5}}},
+    report: {headline: 'A calm week: 11 nights sold in Maxela and one Expedia push failed.', checked: true, edited: 1, removed: [{id: 'worked.1', text: 'x', why: 'y'}],
+      worked: [{text: 'The tonight drop sold: 1 of 1 cancelled nights was rebooked.', refs: []}], didnt: [{text: 'The Expedia push failed 1 time.', refs: []}],
+      upgrades: [{text: 'Look at why Expedia failed (1 failure this week).', refs: [], edited: true}]}};
+  docs['pricing_weekly/2026-W41'] = {property_id: 'maxela', week_key: '2026-W41', from: '2026-09-29', to: '2026-10-05', ts: '2026-10-05T21:00:00', numbers: {rooms: {}, all: {}, data_notes: []}, report: {headline: 'Thin week.', checked: false, worked: [], didnt: [], upgrades: []}};
   docs['pricing_proposals/ideaA'] = {type: 'startPrice', property: 'XCV_2', season: 'mid', current: r.startPrices.XCV_2.mid, suggested: 165, change_pct: -6, reasoning: 'Only 2 of 22 November nights are booked. Last year by today: 9.', status: 'pending', ts: '2026-10-10T10:00:00'};
   docs['pricing_proposals/ideaB'] = {type: 'ceilingEur', property: 'VGL_ST', season: 'high', current: r.eurRules.VGL_ST.high.max, suggested: r.eurRules.VGL_ST.high.max + 5, reasoning: '5 High-season nights reached your maximum and were booked within 2 days.', status: 'pending', ts: '2026-10-10T09:00:00'};
   docs['pricing_proposals/ideaC'] = {type: 'startPriceEur', property: 'VGL_ST', season: 'high', current: r.startPricesEur.VGL_ST.high, suggested: r.startPricesEur.VGL_ST.high + 2, reasoning: '8 of 10 High-season weekends last year were booked more than a month ahead.', status: 'pending', ts: '2026-10-10T08:00:00',
