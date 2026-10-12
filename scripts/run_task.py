@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 def main(task, dry):
     flag = ["--dry"] if str(dry).lower() == "true" else []
     if task == "scorecard":
-        import idea_scorecard as m
+        import scorecard_job as m
         return m.main(flag)
     if task == "history":
         import pmslog_daily as m

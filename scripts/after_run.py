@@ -78,7 +78,7 @@ def main(db=None, now=None, tasks=None):
     t = tasks or {
         "twin": task("twin_run", "main", [], db=db, now=now),
         "history": task("pmslog_daily", "main", [], db=db, now=now),
-        "scorecard": task("idea_scorecard", "main", [], db=db, now=now),
+        "scorecard": task("scorecard_job", "main", [], db=db, now=now),
         "twin_compare": task("twin_run", "compare", db=db, now=now),
         "weekly": task("weekly_review", "main", [], db=db, now=now),
     }

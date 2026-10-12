@@ -75,9 +75,8 @@ def test_pending_ideas_are_not_followed_and_summary_counts():
 
 def test_runner_saves_cards_keeps_final_verdicts_and_writes_the_summary(monkeypatch):
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts"))
-    import idea_scorecard as runner_mod  # noqa: F401  (the script module shares the name; load it by path)
     import importlib.util
-    spec = importlib.util.spec_from_file_location("idea_scorecard_script", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts", "idea_scorecard.py"))
+    spec = importlib.util.spec_from_file_location("scorecard_job", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts", "scorecard_job.py"))
     script = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(script)
     db = DB()

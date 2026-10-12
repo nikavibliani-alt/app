@@ -3,8 +3,8 @@ Idea scorecard runner (part of the nightly job). Reads the ideas and the stored 
 whose nights have all passed, saves pricing_scorecard/<idea id> and pricing_scorecard/_summary.
 Prints counts only. Never changes a price, a rule or an idea.
 
-  python scripts/idea_scorecard.py        # judge and save
-  python scripts/idea_scorecard.py --dry  # judge and print counts; save nothing
+  python scripts/scorecard_job.py        # judge and save
+  python scripts/scorecard_job.py --dry  # judge and print counts; save nothing
 """
 
 import argparse
