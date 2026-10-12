@@ -822,6 +822,7 @@ def moveold_report(result, rules, settings, repo_cfg, FS_ROOMS):
     checks = {}
     pct = lambda a, b: (b - a) / a * 100 if a else 0.0
     would_portals = set()
+    todo = []
     for rt in KNOWN_ROOM_TYPES:
         info = live_rts.get(rt)
         print(f"\n=== {rt} ===")
@@ -831,31 +832,38 @@ def moveold_report(result, rules, settings, repo_cfg, FS_ROOMS):
             continue
         fs = FS_ROOMS.get(rt) or {}
         diff = {k: fs[k] for k in ("engine", "style", "window_days", "portals") if k in fs}
-        print(f"  settings: engine {info.get('status')}, style {info.get('style', 'normal')}, {info.get('window_days', 90)} days ahead, "
+        print(f"  settings used in this dry run: engine {info.get('status')}, style {info.get('style', 'normal')}, {info.get('window_days', 90)} days ahead, "
               f"channels {'+'.join(info.get('portals') or live.DEFAULT_PORTALS)}"
               + (f" | saved on the pricing page (wins over the file): {json.dumps(diff)}" if diff else " | from calm_settings.json"))
+        want = {"engine": "live", "style": "normal", "window_days": 90}
+        wrong = {k: diff[k] for k in want if k in diff and diff[k] != want[k]}
+        if wrong:
+            todo.append(f"{rt}: Firestore says {json.dumps(wrong)}; it must be {json.dumps({k: want[k] for k in wrong})}")
         mine = [d for d in decs if d["rt"] == rt]
         free = {d["date"] for d in mine if d["avail"] > 0}
         applied = [d for d in mine if d["kind"] in ("move", "correction", "fill", "reset", "far_reset")]
         halted = [d for d in mine if d["kind"] == "stopped"]
         change_rows = [(d, d["proposed"]) for d in applied] + [(d, d.get("rejected")) for d in halted if d.get("rejected") is not None]
+        firsts = [(d, p) for d, p in change_rows if not d["current"] or d["current"] <= 0]        # no price in MiniHotel yet
+        existing = [(d, p) for d, p in change_rows if d["current"] and d["current"] > 0]
         dates_change = {d["date"] for d, _ in change_rows}
         by_cur = Counter(d["currency"] for d, _ in change_rows)
         print(f"  dates read: {len({d['date'] for d in mine})} | free: {len(free)} | dates that change in the first run: {len(dates_change)} "
               f"(Booking GEL {by_cur.get('GEL', 0)}, Airbnb {by_cur.get('USD', 0)})")
+        print(f"  of those price entries: {len(existing)} change a price that is in MiniHotel now, {len(firsts)} are first prices for dates that have none")
         if rt in stopped or halted:
             print(f"  STOPPED by a safety check: {len(halted)} calculated changes were NOT applied (the numbers below are what it wanted to do).")
         for cur, label in (("GEL", "Booking GEL"), ("USD", "Airbnb")):
-            rows = [(d, p) for d, p in change_rows if d["currency"] == cur]
+            rows = [(d, p) for d, p in existing if d["currency"] == cur]
             if rows:
                 avg = sum(pct(d["current"], p) for d, p in rows) / len(rows)
-                print(f"  {label}: {len(rows)} changes, average {avg:+.1f}%, lowered {sum(1 for d, p in rows if p < d['current'])}, raised {sum(1 for d, p in rows if p > d['current'])}")
+                print(f"  {label}: {len(rows)} existing prices change, average {avg:+.1f}%, lowered {sum(1 for d, p in rows if p < d['current'])}, raised {sum(1 for d, p in rows if p > d['current'])}")
         per_date = defaultdict(dict)
-        for d, p in change_rows:
+        for d, p in existing:
             per_date[d["date"]][d["currency"]] = (d["current"], p)
         top = sorted(per_date.items(), key=lambda kv: -max(abs(pct(a, b)) for a, b in kv[1].values()))[:10]
         if top:
-            print("  10 biggest changes (date | Booking GEL old -> new | Airbnb old -> new):")
+            print("  10 biggest changes of existing prices (date | Booking GEL old -> new | Airbnb old -> new):")
             for ds, v in top:
                 g = f"{v['GEL'][0]:.0f} -> {v['GEL'][1]:.0f} ({pct(*v['GEL']):+.0f}%)" if "GEL" in v else "-"
                 a = f"{v['USD'][0]:.0f} -> {v['USD'][1]:.0f} ({pct(*v['USD']):+.0f}%)" if "USD" in v else "-"
@@ -890,6 +898,16 @@ def moveold_report(result, rules, settings, repo_cfg, FS_ROOMS):
         print("  ALERT:", a)
     for w in result.get("warnings", [])[:20]:
         print("  note:", w)
+    print("\n" + "=" * 70)
+    print("BEFORE GOING LIVE")
+    print("=" * 70)
+    if todo:
+        print("  Values saved in Firestore (pricing page) win over calm_settings.json. They differ from what you asked for:")
+        for t in todo:
+            print("   TODO", t)
+        print("  (This dry run used the values you asked for: live, normal, 90 days. Live would use the Firestore values until they are changed.)")
+    else:
+        print("  Nothing: Firestore has no saved values that differ from live, normal, 90 days.")
     checks["old engine room list is empty"] = pricing_engine.ROOM_TYPES == []
     checks["OLD_ENGINE_RTS is empty"] = not ps.OLD_ENGINE_RTS
     checks["no room type is on both engines"] = not (set(pricing_engine.ROOM_TYPES) & set(live_rts))
@@ -903,17 +921,28 @@ def check_moveold():
     hdr("MOVE OF THE 6 OLD ROOMS TO THE NEW ENGINE: dry run (calculates and prints; nothing sent, nothing saved)")
     import pricing_calm_live
     import pricing_shadow as ps
-    result = pricing_calm_live.main(["--dry"])
-    db = init_firestore()
-    repo_cfg = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config.json")))
-    rules, settings = ps.load_rules(db, repo_cfg)
+    orig_load = ps.load_rules
+
+    def requested(db, repo_config):
+        """The dry run uses what was asked for (live, normal, 90 days) even if Firestore says otherwise; the report lists the differences."""
+        rules, settings = orig_load(db, repo_config)
+        for rt in KNOWN_ROOM_TYPES:
+            settings.setdefault("room_types", {}).setdefault(rt, {}).update({"engine": "live", "style": "normal", "window_days": 90})
+        return rules, settings
+    ps.load_rules = requested
+    try:
+        result = pricing_calm_live.main(["--dry"])
+        db = init_firestore()
+        repo_cfg = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config.json")))
+        rules, settings = requested(db, repo_cfg)
+    finally:
+        ps.load_rules = orig_load
     fs = (db.collection("pricing_config").document("engine_v2").get().to_dict() or {}).get("settings", {}).get("room_types", {})
     checks = moveold_report(result, rules, settings, repo_cfg, fs)
     print(f"\nSent to MiniHotel: {bool(result.get('sent'))}")
     print(f"Attempted non-GET requests to MiniHotel (blocked by the check's guard): {len(BLOCKED)}")
     if result.get("sent") or BLOCKED or not all(checks.values()):
         sys.exit(1)
-
 
 # ---------------------------------------------------------------------------
 # --check xcvscan: XCV_1 / XCV_2, next 180 days: season prices, today's prices, targets (read only)

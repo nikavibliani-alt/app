@@ -217,3 +217,64 @@ def test_dry_run_report_for_the_six_rooms(http, capsys):
     capsys.readouterr()
     pc.moveold_report(res, rules, settings, CONFIG, {"MAXELA": {"style": "aggressive"}})
     assert 'saved on the pricing page (wins over the file): {"style": "aggressive"}' in capsys.readouterr().out
+
+
+def test_report_lists_firestore_values_that_differ_and_separates_first_prices(http, capsys):
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    orig = requests.Session.request
+    try:
+        import pricing_check as pc
+    finally:
+        requests.Session.request = orig
+    db = FakeDB()
+    res = live.main(["--dry"], db=db, get=minihotel(prices_near_start), cookie_fn=lambda: "c", now=NOW)
+    rules, settings = real_rules(db)
+    capsys.readouterr()
+    pc.moveold_report(res, rules, settings, CONFIG, {"MAXELA": {"window_days": 180}, "ROOMS": {"style": "aggressive", "window_days": 90}})
+    out = capsys.readouterr().out
+    assert 'TODO MAXELA: Firestore says {"window_days": 180}; it must be {"window_days": 90}' in out
+    assert 'TODO ROOMS: Firestore says {"style": "aggressive"}; it must be {"style": "normal"}' in out
+    assert "first prices for dates that have none" in out and "10 biggest changes of existing prices" in out
+    capsys.readouterr()
+    pc.moveold_report(res, rules, settings, CONFIG, {})
+    assert "Nothing: Firestore has no saved values that differ" in capsys.readouterr().out
+
+
+def test_moved_rooms_settings_changes_only_saved_values_that_differ():
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    import moved_rooms_settings as m
+
+    class Ref:
+        def __init__(self, data):
+            self.data, self.updates = data, None
+
+        def get(self):
+            d = self.data
+
+            class S:
+                exists = True
+
+                def to_dict(self):
+                    return d
+            return S()
+
+        def update(self, upd):
+            self.updates = upd
+
+    class DB:
+        def __init__(self, data):
+            self.ref = Ref(data)
+
+        def collection(self, n):
+            return self
+
+        def document(self, n):
+            return self.ref
+    saved = {"settings": {"room_types": {"ROOMS": {"window_days": 180, "style": "normal"}, "MAXELA": {"window_days": 90},
+                                         "BIG_APT": {"style": "aggressive"}, "XCV_1": {"window_days": 180}}}}
+    db = DB(saved)
+    assert m.run(db, apply=False) == {"settings.room_types.ROOMS.window_days": 90, "settings.room_types.BIG_APT.style": "normal"}
+    assert db.ref.updates is None, "print only"
+    m.run(db, apply=True)
+    assert db.ref.updates == {"settings.room_types.ROOMS.window_days": 90, "settings.room_types.BIG_APT.style": "normal"}
+    assert m.run(DB({"settings": {"room_types": {}}}), apply=True) == {}

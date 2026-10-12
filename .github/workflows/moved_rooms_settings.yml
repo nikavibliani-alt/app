@@ -1,0 +1,38 @@
+name: Moved rooms settings
+
+# Manual only. Makes the values saved in Firestore for the six rooms that move to the new engine agree with
+# live, normal, 90 days (field-path updates, only values that already exist and differ). "apply" is false by default.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'false = print only; true = write the field paths'
+        required: true
+        default: 'false'
+
+concurrency:
+  group: pricing-calm-live
+  cancel-in-progress: false
+
+jobs:
+  settings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests firebase-admin
+      - name: Settings
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          APPLY:                    ${{ github.event.inputs.apply }}
+        run: |
+          if [ "$APPLY" = "true" ]; then
+            python scripts/moved_rooms_settings.py --apply
+          else
+            python scripts/moved_rooms_settings.py
+          fi
