@@ -9,6 +9,11 @@ on:
     branches:
       - main
 
+# The sync starts the cancellation (urgent) pricing run through the GitHub API, which needs this permission.
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   sync:
     runs-on: ubuntu-latest

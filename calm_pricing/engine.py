@@ -273,6 +273,11 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
     room_types = cfg["room_types"]
     inventory = snapshot.get("inventory", {})
     shadow = bool(snapshot.get("shadow"))
+    # A cancellation (urgent) run looks only at the rooms and nights named in snapshot["only"]; every other
+    # night is left exactly as it is (no decision, no memory change).
+    only = snapshot.get("only") or {}
+    only_rooms = set(only["rooms"]) if only.get("rooms") else None
+    only_dates = set(only["dates"]) if only.get("dates") else None
     # One-time price reset (snapshot["reset"] = set of room types): see the reset block below.
     reset_rts = set(snapshot.get("reset") or ()) if not shadow else set()
     calm, dm = cfg["calm"], cfg["demand"]
@@ -358,6 +363,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
         status_rt = info.get("status", "live")
         if status_rt == "off" or rt not in inventory:
             continue
+        if only_rooms is not None and rt not in only_rooms:
+            continue
         units = max(1, int(info["units"]))
         group = info.get("group")
         mode = info.get("mode") or _mode(units)
@@ -379,6 +386,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
 
         for ds in sorted(inventory[rt]):
             if ds < today_s or ds in missing.get(rt, set()):
+                continue
+            if only_dates is not None and ds not in only_dates:
                 continue
             cell = inventory[rt][ds]
             dday = _d(ds)
@@ -808,7 +817,10 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
     big = sum(v[2] for r, v in per_rt.items() if r not in stopped_rts and rule_change.get(r) not in ("new", "modest"))
     share = big / considered if considered else 0.0
     warm = (today - _d(meta["first_run_day"])).days < cfg["safety"].get("warmup_days", 3)
-    if share > cfg["safety"]["max_share_changed"]:
+    if only_dates is not None and share > cfg["safety"]["max_share_changed"]:
+        # a cancellation run looks at a handful of nights: a percentage of so few says nothing about bad data
+        warnings.append(f"{big} of {considered} prices would change by more than 10% in this cancellation run.")
+    elif share > cfg["safety"]["max_share_changed"]:
         msg = f"{big} of {considered} prices would change by more than 10% in one run ({share:.0%})"
         if warm:
             warnings.append(msg + "; allowed during the first days after switching on.")

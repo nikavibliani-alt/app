@@ -22,6 +22,8 @@ concurrency:
 
 jobs:
   pricing:
+    # The old engine prices no rooms any more. A cancellation (urgent) run goes straight to the new engine.
+    if: ${{ github.event.inputs.urgent != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -76,7 +78,8 @@ jobs:
 
   calm_live:
     needs: pricing
-    if: ${{ always() && github.event.inputs.urgent != 'true' }}
+    # also for a cancellation run (urgent=true): then only the named rooms and nights are looked at
+    if: ${{ always() }}
     concurrency:
       group: pricing-calm-live
       cancel-in-progress: false
@@ -95,6 +98,9 @@ jobs:
           MINIHOTEL_USER:           ${{ secrets.MINIHOTEL_USER }}
           MINIHOTEL_PASS:           ${{ secrets.MINIHOTEL_PASS }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PRICING_URGENT:           ${{ github.event.inputs.urgent }}
+          PRICING_PROPERTIES:       ${{ github.event.inputs.property_types }}
+          PRICING_DATES:            ${{ github.event.inputs.dates }}
         run: python pricing_calm_live.py
 
   watchdog:

@@ -49,8 +49,10 @@ ROOM_TO_PROPERTY["orb-2"] = "ORBE_1"
 ROOM_TO_PROPERTY["orb-3"] = "ORBE_2"
 for _i in [1, 2, 4]:
     ROOM_TO_PROPERTY[f"7-{_i}"] = "MAXELA"
+# The pricing engine's room types (the same names the new engine uses): VGL studios and apartments, XCV 1 and 2.
 for _code, _ptype in [
-    ('vgl-st1', 'VGL'), ('vgl-st2', 'VGL'), ('vgl-ap3', 'VGL'), ('vgl-ap4', 'VGL'),
+    ('vgl-st1', 'VGL_ST'), ('vgl-st2', 'VGL_ST'), ('vgl-ap3', 'VGL_AP'), ('vgl-ap4', 'VGL_AP'),
+    ('xcv-1', 'XCV_1'), ('xcv-2', 'XCV_2'),
 ]:
     ROOM_TO_PROPERTY[_code] = _ptype
 
@@ -611,6 +613,7 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
                 if prop_type and checkin and checkin <= cutoff_14d:
                     near_term_cancellations.append({
                         'checkin': checkin,
+                        'checkout': data.get('checkout', ''),
                         'property_type': prop_type,
                     })
         else:
@@ -703,6 +706,23 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
     print(f"Cleaned {deleted} old non-API docs with no API equivalent")
 
 
+def urgent_inputs(cancellations: list, today) -> tuple:
+    """Room types and the nights that a cancellation frees (check-in up to the night before check-out), from today on."""
+    props = sorted(set(c['property_type'] for c in cancellations if c.get('property_type')))
+    nights = set()
+    for c in cancellations:
+        try:
+            ci = datetime.date.fromisoformat(c.get('checkin', ''))
+            co = datetime.date.fromisoformat(c.get('checkout') or '') if c.get('checkout') else ci + datetime.timedelta(days=1)
+        except ValueError:
+            continue
+        d = max(ci, today)
+        while d < co and len(nights) < 60:
+            nights.add(d.isoformat())
+            d += datetime.timedelta(days=1)
+    return props, sorted(nights)
+
+
 def trigger_urgent_pricing(cancellations: list):
     """Trigger pricing_engine workflow for near-term cancellations via GitHub API."""
     if not cancellations:
@@ -713,10 +733,9 @@ def trigger_urgent_pricing(cancellations: list):
         print('  No GITHUB_TOKEN — skipping urgent pricing trigger')
         return
 
-    affected_props = sorted(set(c['property_type'] for c in cancellations if c.get('property_type')))
-    affected_dates = sorted(set(c['checkin'] for c in cancellations if c.get('checkin')))
+    affected_props, affected_dates = urgent_inputs(cancellations, datetime.datetime.utcnow().date())
 
-    if not affected_props:
+    if not affected_props or not affected_dates:
         return
 
     gh_repo = os.environ.get('GITHUB_REPOSITORY', 'nikavibliani-alt/app')

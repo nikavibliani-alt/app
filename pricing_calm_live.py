@@ -293,7 +293,13 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
     parser.add_argument("--dry", action="store_true", help="calculate and print; write and save nothing")
     parser.add_argument("--reset", default=None, metavar="XCV_1,XCV_2",
                         help="one-time reset: lower prices above the plain target straight to it (never raises)")
+    parser.add_argument("--urgent", action="store_true", help="cancellation run: only --rooms and --dates (also PRICING_URGENT=true)")
+    parser.add_argument("--rooms", default=None, help="urgent: room types, e.g. MAXELA,ROOMS (also PRICING_PROPERTIES)")
+    parser.add_argument("--dates", default=None, help="urgent: nights YYYY-MM-DD,... (also PRICING_DATES)")
     args = parser.parse_args(argv)
+    urgent = args.urgent or os.environ.get("PRICING_URGENT", "").lower() == "true"
+    urgent_rooms = [x.strip() for x in (args.rooms if args.rooms is not None else os.environ.get("PRICING_PROPERTIES", "")).split(",") if x.strip()]
+    urgent_dates = [x.strip() for x in (args.dates if args.dates is not None else os.environ.get("PRICING_DATES", "")).split(",") if x.strip()]
     reset_rts = parse_reset(args.reset) if args.reset is not None else set()
 
     now = now or datetime.now(ps.TBILISI).replace(tzinfo=None)
@@ -305,6 +311,22 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
     if not live_rts:
         print("Calm engine live: no room type is switched to live. Nothing to do.")
         return {"ok": True, "writes": [], "sent": False}
+
+    only = None
+    if urgent:
+        if reset_rts:
+            raise SystemExit("--urgent and --reset cannot be used together.")
+        urgent_dates = sorted({d for d in urgent_dates if d >= today.isoformat() and len(d) == 10})
+        wanted = [r for r in urgent_rooms if r in live_rts]
+        for r in urgent_rooms:
+            if r not in live_rts:
+                print(f"  Cancellation run: {r} is not a live room type of the new engine; skipped.")
+        if not wanted or not urgent_dates:
+            print("Cancellation run: no live room type or no future night to look at. Nothing to do.")
+            return {"ok": True, "writes": [], "sent": False, "urgent": True}
+        live_rts = {rt: v for rt, v in live_rts.items() if rt in wanted}
+        only = {"rooms": wanted, "dates": urgent_dates}
+        print(f"Cancellation run: rooms {wanted}, nights {urgent_dates[:8]}{' ...' if len(urgent_dates) > 8 else ''}")
 
     if reset_rts:
         missing = reset_rts - set(live_rts)
@@ -326,8 +348,12 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         state = ps.load_state(db, prefix=STATE_PREFIX)
         if reset_rts:
             state = {k: v for k, v in state.items() if k in reset_rts or k == "_meta"}   # others are never saved
+        if only:
+            state = {k: v for k, v in state.items() if k in only["rooms"] or k == "_meta"}      # other rooms are never saved
         result = run({"now": now, "inventory": inventory, "reservations": reservations, "shadow": False,
-                      **({"reset": sorted(reset_rts)} if reset_rts else {})}, cfg, state)
+                      **({"reset": sorted(reset_rts)} if reset_rts else {}),
+                      # a cancellation run never uses up the day's one lowering run, and only looks at its nights
+                      **({"run_kind": "update", "only": only} if only else {})}, cfg, state)
 
         writes = result["writes"]
         assert all(w["rt"] in live_rts for w in writes), "write for a room type that is not live"
@@ -365,7 +391,7 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         if report is not None and not report["all_ok"]:
             print("RESET STOPPED: a safety check failed; nothing written, nothing saved.")
             raise SystemExit(1)
-        extra = {"hour": now.hour, "paused": paused, **({"reset": sorted(reset_rts)} if reset_rts else {}), "room_types": sorted(live_rts), "writes": len(writes),
+        extra = {"hour": now.hour, "paused": paused, **({"urgent": True, "urgent_rooms": only["rooms"], "urgent_dates": only["dates"]} if only else {}), **({"reset": sorted(reset_rts)} if reset_rts else {}), "room_types": sorted(live_rts), "writes": len(writes),
                  "far_reset": far}
         if paused:
             ps.save(db, now, {}, {**result, "decisions": []}, {**extra, "note": "PAUSED: nothing written"},
