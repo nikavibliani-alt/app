@@ -344,9 +344,10 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
         await page.click('[data-act=undoAll]');
       }
     });
-    await test('computer calendar: Airbnb $, Shift range adds a rule, "don’t change this night"', w, hh, async ({page}) => {
-      await page.click('[data-act=cur][data-v=USD]');
-      assert.ok(/\$\d+/.test(await text(page, '.cell[data-rt=XCV_2][data-iso="2026-10-14"]')));
+    await test('computer calendar: Airbnb $ under the ₾ price, Shift range adds a rule, "don’t change this night"', w, hh, async ({page}) => {
+      assert.ok(!(await page.$('[data-act=cur]')), 'no currency switch: both prices are always shown');
+      const c = await text(page, '.cell[data-rt=XCV_2][data-iso="2026-10-14"]');
+      assert.ok(/\d+ ₾/.test(c) && /\$\d+/.test(c) && c.indexOf('₾') < c.indexOf('$'), c);
       await page.click('.cell[data-rt=XCV_1][data-iso="2026-10-20"]');
       await page.click('.cell[data-rt=XCV_1][data-iso="2026-10-22"]', {modifiers: ['Shift']});
       assert.ok(/3 nights selected/.test(await text(page, '.panel')));
@@ -480,6 +481,64 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
     await test('price check: an old result is not shown as good', w, hh, async ({page}) => {
       const t = await text(page, '#pausedBar'); assert.ok(/No result yet today/.test(t) && !/All good/.test(t), t);
     }, {mutate: d => { d['pricing_watchdog/latest'] = {day: '2026-10-09', ts: '2026-10-09T09:12:00', status: 'green', issues: []}; }});
+  }
+
+  // ---- both prices on every night; ideas with real dates ----
+  for (const [w, hh] of SIZES) {
+    await test('Airbnb $ is shown under the ₾ price on every night (list on the phone, grid on the computer), "–" when missing', w, hh, async ({page}, desk) => {
+      if (!desk) {
+        await go(page, '#/room/XCV_2'); await page.click('[data-act=allNights]');
+        const rows = await page.$$eval('.night', els => els.map(e => ({g: (e.querySelector('.pr b') || {}).innerText, u: (e.querySelector('.pr i') || {}).innerText, aria: e.getAttribute('aria-label')})));
+        assert.strictEqual(rows.length, 28);
+        for (const r of rows) assert.ok(/ ₾$/.test(r.g) && /^\$\d+$/.test(r.u), JSON.stringify(r));
+        assert.ok(rows.some(r => /Airbnb \$/.test(r.aria)));
+        const geom = await page.$eval('.night .pr', e => { const [b, i] = [e.querySelector('b').getBoundingClientRect(), e.querySelector('i').getBoundingClientRect()]; return {below: i.top >= b.bottom - 1, small: parseFloat(getComputedStyle(e.querySelector('i')).fontSize) < parseFloat(getComputedStyle(e.querySelector('b')).fontSize), grey: getComputedStyle(e.querySelector('i')).color}; });
+        assert.ok(geom.below && geom.small && geom.grey !== 'rgb(31, 31, 31)', JSON.stringify(geom));
+        await go(page, '#/room/ROOMS');                                  // no Airbnb price list
+        assert.ok((await page.$$eval('.night .pr i', els => els.map(e => e.innerText))).every(t => t === '–'));
+        await go(page, '#/room/ORBE_2');                                 // Airbnb only: no Booking price
+        const o = await page.$$eval('.night .pr', els => els.map(e => [e.querySelector('b').innerText, e.querySelector('i').innerText]));
+        assert.ok(o.every(([g, u]) => g === '–' && /^\$\d+$/.test(u)), JSON.stringify(o.slice(0, 3)));
+        await go(page, '#/room/XCV_2'); await page.click('.night[data-iso="2026-10-14"]');
+        const d = await text(page, '.dlg'); assert.ok(/Booking/.test(d) && /Airbnb/.test(d) && /\$\d+/.test(d) && /₾/.test(d), d);
+        assert.strictEqual(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, 'no sideways scroll');
+      } else {
+        for (const [rt, iso] of [['XCV_2', '2026-10-14'], ['VGL_ST', '2026-10-22'], ['BIG_APT', '2026-10-25']]) {
+          const c = await text(page, `.cell[data-rt=${rt}][data-iso="${iso}"]`); assert.ok(/₾/.test(c) && /\$\d+/.test(c) && c.indexOf('₾') < c.indexOf('$'), rt + ': ' + c);
+        }
+        const rooms = await text(page, '.cell[data-rt=ROOMS][data-iso="2026-10-14"]'); assert.ok(/₾/.test(rooms) && /–/.test(rooms) && !/\$/.test(rooms), rooms);
+        const o2 = await text(page, '.cell[data-rt=ORBE_2][data-iso="2026-10-14"]'); assert.ok(/\$\d+/.test(o2) && /–/.test(o2) && !/₾/.test(o2), o2);
+        const full = await text(page, '.cell[data-rt=XCV_2][data-iso="2026-10-12"]'); assert.ok(/Booked/.test(full) && /\$\d+/.test(full), full);
+        const g = await page.$eval('.cell[data-rt=XCV_2][data-iso="2026-10-14"]', e => { const em = e.querySelector('em'), b = e.querySelector('b'); return {below: em.getBoundingClientRect().top >= b.getBoundingClientRect().bottom - 1, fit: e.scrollHeight <= e.clientHeight + 1, size: parseFloat(getComputedStyle(em).fontSize)}; });
+        assert.ok(g.below && g.fit && g.size >= 12, JSON.stringify(g));
+        await page.click('.cell[data-rt=XCV_2][data-iso="2026-10-14"]');
+        const panel = await text(page, '.panel'); assert.ok(/Booking/.test(panel) && /Airbnb/.test(panel) && /\$\d+/.test(panel), panel);
+      }
+    });
+    await test('ideas: every card names the dates, room, price, why with real nights, example nights and when it was made', w, hh, async ({page}, desk) => {
+      await go(page, '#/ideas');
+      const a = await text(page, '[data-idea=ideaA]');
+      assert.ok(/XCV 2/.test(a) && /Booking \(₾\)/.test(a), a);
+      assert.ok(/Which dates: Mid season: 1 Oct – 30 Nov 2026 · 61 nights/.test(a), 'dates: ' + a);
+      assert.ok(/Which price: Start price for Booking \(₾\), XCV 2/.test(a), a);
+      assert.ok(/Booked so far: \d+ of \d+ nights \(\d+–\d+ Oct/.test(a) && /Not booked: /.test(a), 'real nights: ' + a);
+      assert.ok(/Idea maker’s note: Only 2 of 22 November nights are booked\. Last year by today: 9\./.test(a));
+      assert.ok(/compares with last year, but last year’s dates and numbers were not saved/.test(a), 'says what is missing');
+      assert.ok(/Example nights/.test(a) && /(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d+ Oct: \d+ → \d+ ₾/.test(a), 'example nights: ' + a);
+      assert.ok(/Booked nights and nights you set by hand do not change\. Nights you protected stay protected\./.test(a));
+      assert.ok(/Made 10 Oct/.test(a), a);
+      const b = await text(page, '[data-idea=ideaB]');       // Airbnb maximum, High season: dates far ahead, no prices yet
+      assert.ok(/VGL studios/.test(b) && /Airbnb \(\$\)/.test(b) && /Which dates: High season: 20–27 Dec 2026 · 8 nights\. Also: 1 May – 30 Jun 2027/.test(b) && /Maximum for Airbnb \(\$\)/.test(b), b);
+      assert.ok(/Fully booked so far: 0 of 8 nights\. Not booked: 20–27 Dec\./.test(b), b);
+      const all = await text(page, 'body');
+      assert.ok(!/\b(guard|band|anchor)\b/i.test(await page.$$eval('[data-idea]', els => els.map(e => e.innerText).join(' '))), 'plain words only');
+      const fit = await page.evaluate(() => { const bad = []; for (const c of document.querySelectorAll('[data-idea]')) { for (const e of c.querySelectorAll('*')) { if (e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible') bad.push(e.className); } if (c.scrollWidth > c.clientWidth + 1) bad.push('card'); } return {bad, side: document.documentElement.scrollWidth > innerWidth + 1}; });
+      assert.deepStrictEqual(fit, {bad: [], side: false});
+      // the Earlier list shows the dates of applied and skipped ideas
+      const hist = await text(page, '.hist');
+      assert.ok(/Low season: 15 Jan – 15 Mar 2027 · 60 nights · Made 6 Oct/.test(await page.$$eval('.hist', els => els.map(e => e.innerText).join(' | '))), hist);
+      assert.ok(/High season: 20–27 Dec 2026 · 8 nights · Made 5 Oct/.test(await page.$$eval('.hist', els => els.map(e => e.innerText).join(' | '))));
+    });
   }
 
   // ---- layout switch ----

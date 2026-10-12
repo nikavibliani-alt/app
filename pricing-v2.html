@@ -160,8 +160,9 @@ svg{flex-shrink:0}
 .night .d{width:92px;font-size:14px;font-weight:600}
 .night .w{flex:1;font-size:14px;color:var(--soft)}
 .night .w.bk{color:var(--green)}
-.night .g{font-size:15px;font-weight:700}
-.night .u{width:44px;text-align:right;font-size:13px;color:var(--muted)}
+.night .pr{display:flex;flex-direction:column;align-items:flex-end;min-width:64px;line-height:1.25}
+.night .pr b{font-size:15px;font-weight:700}
+.night .pr i{font-style:normal;font-size:12px;color:var(--muted)}
 .tiles3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .tile{background:#FFFFFF;border:1px solid var(--line);border-radius:12px;padding:12px}
 .tile .k{font-size:12px;font-weight:600;color:var(--muted)}
@@ -195,7 +196,8 @@ svg{flex-shrink:0}
 .idea .ch .a{font-size:22px;font-weight:600;color:#6B6964;text-decoration:line-through}
 .idea .ch .b{font-size:26px;font-weight:700}
 .idea .ch .c{font-size:14px;font-weight:600;color:var(--soft)}
-.idea .tx{display:flex;flex-direction:column;gap:6px;font-size:15px;line-height:1.45}
+.idea .tx{display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.45;overflow-wrap:anywhere}
+.idea .tx .ex{margin:4px 0 0;padding-left:18px;font-size:14px}
 .idea .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .idea .done{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 6px 6px 12px;border-radius:10px;font-size:14px;font-weight:600}
 .idea .done.g{background:var(--green-bg);color:var(--green-ink)}
@@ -232,7 +234,7 @@ body[data-layout="desk"] .dhead{display:flex;align-items:center;gap:16px;flex-wr
 .cwrap{background:#FFFFFF;border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:70vh}
 .cgrid{display:inline-flex;flex-direction:column;min-width:100%}
 .crow{display:flex}
-.cname{width:220px;min-width:220px;height:58px;padding:6px 12px;text-align:left;background:#FFFFFF;border-right:1px solid var(--line);border-bottom:1px solid var(--line2);display:flex;flex-direction:column;justify-content:center;position:sticky;left:0;z-index:2;color:var(--ink)}
+.cname{width:220px;min-width:220px;height:70px;padding:6px 12px;text-align:left;background:#FFFFFF;border-right:1px solid var(--line);border-bottom:1px solid var(--line2);display:flex;flex-direction:column;justify-content:center;position:sticky;left:0;z-index:2;color:var(--ink)}
 .cname:hover,.cname.on{background:#EFEDE9}
 .cname b{font-size:14px;font-weight:700}
 .cname span{font-size:12px;color:var(--muted)}
@@ -240,10 +242,17 @@ body[data-layout="desk"] .dhead{display:flex;align-items:center;gap:16px;flex-wr
 .chead .m{font-size:12px}
 .chead .n{font-size:15px;font-weight:700;color:var(--ink)}
 .chead .bd{height:4px;margin-top:3px;border-radius:2px}
-.cell{width:70px;min-width:70px;height:58px;padding:6px 4px;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;position:relative;background:#FFFFFF;color:var(--ink)}
+.cell{width:70px;min-width:70px;height:70px;padding:6px 4px;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;position:relative;background:#FFFFFF;color:var(--ink)}
 .cell:hover{outline:2px solid var(--ink);outline-offset:-2px;z-index:1}
 .cell b{font-size:14px;font-weight:700}
 .cell span{font-size:12px}
+.both{display:flex;gap:10px}
+.both span{flex:1;min-width:0;background:var(--page);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column}
+.both small{font-size:12px;font-weight:600;color:var(--soft)}
+.both b{font-size:18px;font-weight:700}
+.cell em{font-style:normal;font-size:12px;color:var(--muted)}
+.cell.bk em{color:var(--soft)}
+.cell.sel em{color:#E3E1DC}
 .cell.bk{background:#E3E1DC;color:var(--ink)}
 .cell.bk b{font-weight:500}
 .cell.sel{background:var(--ink);color:#FFFFFF}
@@ -326,11 +335,11 @@ const RUN_HOURS_UTC = [0, 5, 9, 12, 18];     // 04:00, 09:00, 13:00, 16:00, 22:0
 // keeps a copy (update it when the file changes); a value saved from this page in Firestore always wins.
 const FILE_DEFAULTS = {
   room_types: {
-    XCV_1:{engine:"live",style:"normal",window_days:180}, XCV_2:{engine:"live",style:"normal",window_days:180},
-    VGL_ST:{engine:"live",style:"normal",window_days:180}, VGL_AP:{engine:"live",style:"normal",window_days:180},
-    ROOMS:{engine:"live",style:"normal",window_days:90}, MAXELA:{engine:"live",style:"normal",window_days:90},
-    BIG_APT:{engine:"live",style:"normal",window_days:90}, FREEDOM:{engine:"live",style:"normal",window_days:90},
-    ORBE_1:{engine:"live",style:"normal",window_days:90}, ORBE_2:{engine:"live",style:"normal",window_days:90},
+    XCV_1:{engine:"live",style:"normal",window_days:180,portals:["BOOKING","AIRBNB"]}, XCV_2:{engine:"live",style:"normal",window_days:180,portals:["BOOKING","AIRBNB"]},
+    VGL_ST:{engine:"live",style:"normal",window_days:180,portals:["BOOKING","AIRBNB"]}, VGL_AP:{engine:"live",style:"normal",window_days:180,portals:["BOOKING","AIRBNB"]},
+    ROOMS:{engine:"live",style:"normal",window_days:90,portals:["BOOKING","EXPEDIA"]}, MAXELA:{engine:"live",style:"normal",window_days:90,portals:["BOOKING","EXPEDIA"]},
+    BIG_APT:{engine:"live",style:"normal",window_days:90,portals:["BOOKING","EXPEDIA","AIRBNB"]}, FREEDOM:{engine:"live",style:"normal",window_days:90,portals:["BOOKING","EXPEDIA","AIRBNB"]},
+    ORBE_1:{engine:"live",style:"normal",window_days:90,portals:["BOOKING","AIRBNB"]}, ORBE_2:{engine:"live",style:"normal",window_days:90,portals:["AIRBNB"]},
   },
   date_rules: [],
 };
@@ -601,7 +610,7 @@ const protectedBy = (rt, iso) => fileRules().concat(rulesNow()).some(r => r.acti
    ===================================================================== */
 function nightsOf(rt) {
   const r = roomById(rt), t = today(), out = [];
-  const cur = curFor(r, U.cur);
+  const cur = curFor(r, "GEL");
   for (let i = 0; i < 28; i++) {
     const iso = addDays(t, i), g = rec(rt, iso, cur), u = rec(rt, iso, "USD"), gg = rec(rt, iso, "GEL");
     out.push({iso, rec: g, gel: gg, usd: u, cur});
@@ -811,8 +820,10 @@ function errorsHtml() {
 function whyModel(rt, iso, cur) {
   const r = roomById(rt), old = isOld(rt);
   const rc = rec(rt, iso, cur), title = fmtDay(iso);
-  if (!rc) return {title: `${r.short}, ${title}`, price: "–", head: "No price has been calculated for this night yet.", steps: [], old, booked: false};
-  if (rc.avail === 0) return {title: `${title}: booked`, price: "", head: "Booked. The engine does not change booked nights.", steps: [], old, booked: true};
+  const pg = rec(rt, iso, "GEL"), pu = rec(rt, iso, "USD"), pick = x => (x ? (old ? x.mh : x.new) : null);
+  const both = {gel: pick(pg) ? gel(pick(pg)) : "–", usd: pick(pu) ? usd(pick(pu)) : "–"};
+  if (!rc) return {title: `${r.short}, ${title}`, price: "–", both, head: "No price has been calculated for this night yet.", steps: [], old, booked: false};
+  if (rc.avail === 0) return {title: `${title}: booked`, price: "", both, head: "Booked. The engine does not change booked nights.", steps: [], old, booked: true};
   const shown = old ? rc.mh : rc.new, p = money(shown, cur);
   let head = KIND_HEAD[rc.kind] || "";
   if (!head) head = old ? "This is the price the old way has set now." : "The engine calculated this price from your start price and how the room is selling.";
@@ -828,11 +839,12 @@ function whyModel(rt, iso, cur) {
     if (rc.min && rc.max) steps.push({what: "Your minimum and maximum for this night", price: `${Math.round(rc.min)} to ${money(rc.max, cur)}`});
   }
   if (typeof rc.avail === "number" && roomById(rt).units > 1) steps.push({what: "Rooms still free", price: `${rc.avail} of ${roomById(rt).units}`});
-  return {title: `Why ${p} on ${title}`, price: p, head, steps, old, booked: false, newPrice: old && rc.new ? money(rc.new, cur) : ""};
+  return {title: `Why ${p} on ${title}`, price: p, both, head, steps, old, booked: false, newPrice: old && rc.new ? money(rc.new, cur) : ""};
 }
 function whyInner(m, rt, iso, desk) {
   const canRule = !m.old && !m.booked && !protectedBy(rt, iso);
-  return `<p style="font-size:${desk ? 14 : 15}px;line-height:1.45">${esc(m.head)}</p>
+  return `<div class="both"><span><small>Booking</small><b>${esc(m.both.gel)}</b></span><span><small>Airbnb</small><b>${esc(m.both.usd)}</b></span></div>
+    <p style="font-size:${desk ? 14 : 15}px;line-height:1.45">${esc(m.head)}</p>
     ${m.steps.length ? `<ol class="steps">${m.steps.map(st => `<li><span>${esc(st.what)}</span><b>${esc(st.price)}</b></li>`).join("")}</ol>` : ""}
     ${m.old && m.newPrice ? `<p class="warnline">This room is still on the old way. The new way would ask <b>${esc(m.newPrice)}</b> for this night. Nothing from the new way is sent yet.</p>` : ""}
     ${!m.old && !m.booked && roomById(rt) ? `<p class="fine muted" style="font-size:13px">Airbnb follows the same steps with your Airbnb minimum, start and maximum in dollars.</p>` : ""}
@@ -840,7 +852,7 @@ function whyInner(m, rt, iso, desk) {
        <p class="muted" style="font-size:12px;margin-top:-6px">Adds a date rule. You then set the price yourself in MiniHotel. Remove it any time in Dates.</p>` : ""}`;
 }
 function openWhy(rt, iso) {
-  const cur = curFor(roomById(rt), U.cur), m = whyModel(rt, iso, cur);
+  const cur = curFor(roomById(rt), "GEL"), m = whyModel(rt, iso, cur);
   openDialog(`<div class="grab"></div><div class="dh"><h3>${esc(m.title)}</h3>
     <button type="button" class="ibtn" aria-label="Close" data-act="closeDialog" style="margin-right:-12px;color:var(--ink)">${icon("x", 22)}</button></div>
     ${whyInner(m, rt, iso, false)}
@@ -940,11 +952,10 @@ function nightsCardHtml(rt) {
     else {
       const hand = isHandSet(rt, n.iso, g);
       if (hand) what = "Set by hand"; else if (isEventDay(n.iso)) what = "Empty · event"; else if (r.units > 1) what = `${g.avail} of ${r.units} free`;
-      gp = n.gel ? gel(n.gel.new) : ""; up = n.usd ? usd(n.usd.new) : "";
-      if (!r.cur.includes("GEL")) gp = "";
     }
-    return `<button type="button" class="night" data-act="night" data-rt="${rt}" data-iso="${n.iso}" aria-label="${esc(fmtDay(n.iso) + (cls ? ", booked" : ", " + what.toLowerCase() + (gp ? ", " + gp : "") + ", show why"))}">
-      <span class="d">${fmtDay(n.iso)}</span><span class="w ${cls}">${what}</span><span class="g">${gp}</span><span class="u">${up}</span></button>`;
+    gp = n.gel ? gel(n.gel.new) : ""; up = n.usd ? usd(n.usd.new) : "";
+    return `<button type="button" class="night" data-act="night" data-rt="${rt}" data-iso="${n.iso}" aria-label="${esc(fmtDay(n.iso) + (cls ? ", booked" : ", " + what.toLowerCase() + (gp ? ", Booking " + gp : "") + (up ? ", Airbnb " + up : ", no Airbnb price") + ", show why"))}">
+      <span class="d">${fmtDay(n.iso)}</span><span class="w ${cls}">${what}</span><span class="pr"><b>${gp || "–"}</b><i>${up || "–"}</i></span></button>`;
   }).join("");
   return `<section class="sec"><div><h2 class="h2">Next nights</h2><p class="sub">Tap an empty night to see why it has this price.</p></div>
     <div class="card" style="overflow:hidden">${rows}</div>
@@ -1296,13 +1307,111 @@ function ideaInfo(p) {
   const fmt = v => (v === null ? "?" : eur ? usd(v) : gel(v));
   const what = {startprice: "start price", floor: "minimum", ceiling: "maximum"}[base];
   const dir = sug !== null && cur !== null && sug < cur ? "Lower" : "Raise";
-  const sl = (SEASONS[season] || {label: season}).label;
+  const sl = (SEASONS[season] || {label: season}).label + (season === "xmas_low" || !SEASONS[season] ? "" : " season");
   const effect = base === "startprice" ? `${sl} nights start from ${fmt(sug)} instead of ${fmt(cur)}. Your minimum and maximum stay.`
     : base === "floor" ? `The lowest price the engine may use in ${sl} becomes ${fmt(sug)} instead of ${fmt(cur)}.`
     : `The highest price in ${sl} becomes ${fmt(sug)} instead of ${fmt(cur)}. Quiet nights do not change.`;
   const pct = p.change_pct != null ? `${p.change_pct > 0 ? "+" : "−"}${Math.abs(Math.round(p.change_pct))}%` : (cur && sug !== null ? `${sug >= cur ? "+" : "−"}${Math.abs(Math.round((sug - cur) / cur * 100))}%` : "");
   return {path, cur, sug, fmt, what, eur, title: `${dir} the ${what}`, effect, pct, where: `${roomName(rt)} · ${eur ? "Airbnb" : "Booking"}`, season: sl + (season === "xmas_low" ? "" : " season")};
 }
+/* ---------- the real dates behind an idea ---------- */
+// The stretches of the calendar that belong to a season, from today on (the one running now starts on its real first day).
+function seasonStretches(season) {
+  const t = today(), runs = []; let cur = null;
+  for (let k = -400; k <= 400; k++) {
+    const iso = addDays(t, k);
+    if (seasonOnDay(iso) === season) { if (!cur) cur = {from: iso, to: iso}; else cur.to = iso; }
+    else if (cur) { runs.push(cur); cur = null; }
+  }
+  if (cur) runs.push(cur);
+  return runs.filter(x => x.to >= t).map(x => ({...x, nights: diffDays(x.from, x.to) + 1}));
+}
+const stretchText = x => {
+  const a = x.from, b = x.to, ya = a.slice(0, 4), yb = b.slice(0, 4);
+  if (ya === yb && a.slice(5, 7) === b.slice(5, 7)) return `${+a.slice(8)}–${fmtShort(b)} ${yb}`;
+  return `${fmtShort(a)}${ya !== yb ? " " + ya : ""} – ${fmtShort(b)} ${yb}`;
+};
+// "1–4 Nov, 6–11 Nov" from a list of dates
+function datesText(list, max = 6) {
+  const d = [...new Set(list)].sort(), runs = [];
+  d.forEach(iso => { const l = runs[runs.length - 1]; if (l && diffDays(l.to, iso) === 1) l.to = iso; else runs.push({from: iso, to: iso}); });
+  const one = x => x.from === x.to ? fmtShort(x.from)
+    : x.from.slice(0, 7) === x.to.slice(0, 7) ? `${+x.from.slice(8)}–${fmtShort(x.to)}` : `${fmtShort(x.from)} – ${fmtShort(x.to)}`;
+  const shown = runs.slice(0, max).map(one).join(", ");
+  return runs.length > max ? `${shown} and ${runs.length - max} more` : shown;
+}
+const roomPortals = rt => S.eng?.settings?.room_types?.[rt]?.portals || S.file?.room_types?.[rt]?.portals || ["BOOKING", "AIRBNB"];
+const listName = (rt, eur) => eur ? "Airbnb ($)" : (roomPortals(rt).includes("EXPEDIA") ? "Booking and Expedia (₾)" : "Booking (₾)");
+// What the nights of the next stretch of this idea's season look like today (from the saved prices of the last run).
+function ideaEvidence(p, i) {
+  const rt = p.property, cur = i.eur ? "USD" : "GEL", runs = seasonStretches(p.season);
+  if (!runs.length) return {runs, none: true};
+  const st = runs[0], t = today(), from = st.from > t ? st.from : t;
+  const nights = Array.from({length: diffDays(from, st.to) + 1}, (_, k) => addDays(from, k));
+  const ev = {runs, st, rt, cur, ahead: nights.length, booked: [], empty: [], hand: [], prot: [], unknown: [], free: []};
+  nights.forEach(iso => {
+    const rc = rec(rt, iso, cur);
+    if (!rc) { ev.unknown.push(iso); return; }
+    if (rc.avail === 0) { ev.booked.push(iso); return; }
+    ev.empty.push(iso);
+    if (protectedBy(rt, iso) || rc.kind === "protected") ev.prot.push(iso);
+    else if (isHandSet(rt, iso, rc)) ev.hand.push(iso);
+    else ev.free.push({iso, rc});
+  });
+  return ev;
+}
+function ideaWhy(p, i, ev) {
+  const r = roomById(p.property), word = r && r.units > 1 ? "Fully booked" : "Booked";
+  const out = [];
+  if (!ev.none) {
+    const known = ev.ahead - ev.unknown.length;
+    if (known) out.push(`${word} so far: ${ev.booked.length} of ${known} nights${ev.booked.length ? " (" + datesText(ev.booked) + ")" : ""}.` + (ev.empty.length ? ` Not booked: ${datesText(ev.empty)}.` : ""));
+    if (ev.unknown.length) out.push(`No price yet for ${datesText(ev.unknown)} (too far ahead for the engine).`);
+  }
+  return out;
+}
+function ideaExamples(p, i, ev) {
+  const cur = ev.cur, rnd = v => (cur === "GEL" ? Math.round(v / 5) * 5 : Math.round(v)), pair = (a, b) => (cur === "GEL" ? `${a} → ${b} ₾` : `$${a} → $${b}`);
+  const base = (p.type || p.field || "").replace(/Eur$/i, "").toLowerCase();
+  if (i.cur === null || i.sug === null) return [];
+  const rows = [];
+  const pool = ev.free.slice().sort((a, b) => ([5, 6].includes(dow(b.iso)) - [5, 6].includes(dow(a.iso))) || a.iso.localeCompare(b.iso));
+  for (const {iso, rc} of pool) {
+    if (rows.length >= 3) break;
+    const now = rc.new, tg = rc.target;
+    if (base === "startprice" && tg) {
+      const to = Math.min(rc.max ?? Infinity, Math.max(rc.min ?? 0, rnd(tg * i.sug / i.cur)));
+      if (Math.abs(to - tg) >= 1) rows.push(`${fmtDay(iso)}: ${pair(Math.round(tg), to)}`);
+    } else if (base === "floor") {
+      if (i.sug > i.cur && now < i.sug) rows.push(`${fmtDay(iso)}: ${pair(Math.round(now), i.sug)}`);
+      else if (i.sug < i.cur && now <= i.cur + 0.5) rows.push(`${fmtDay(iso)}: ${cur === "GEL" ? Math.round(now) + " ₾" : "$" + Math.round(now)} now, may go down to ${i.fmt(i.sug)}`);
+    } else if (base === "ceiling") {
+      if (i.sug > i.cur && now >= (rc.max ?? i.cur) - 0.5) rows.push(`${fmtDay(iso)}: ${cur === "GEL" ? Math.round(now) + " ₾" : "$" + Math.round(now)} now, may go up to ${i.fmt(i.sug)}`);
+      else if (i.sug < i.cur && now > i.sug) rows.push(`${fmtDay(iso)}: ${pair(Math.round(now), i.sug)}`);
+    }
+  }
+  return rows;
+}
+function ideaFactsHtml(p, i, full) {
+  const ev = ideaEvidence(p, i), later = ev.runs && ev.runs.slice(1, 3).map(stretchText).join(", ");
+  const dates = ev.none ? "The dates of this season could not be found in your settings."
+    : `${i.season}: ${stretchText(ev.st)} · ${ev.st.nights} nights${later ? ". Also: " + later : ""}`;
+  const head = `<div><b>Which dates:</b> ${esc(dates)}</div>
+    <div><b>Which price:</b> ${esc(i.what.charAt(0).toUpperCase() + i.what.slice(1))} for ${esc(listName(p.property, i.eur))}, ${esc(roomName(p.property))}</div>`;
+  if (!full) return `<div class="tx">${head}</div>`;
+  const why = ideaWhy(p, i, ev), ex = ev.none ? [] : ideaExamples(p, i, ev);
+  const skipped = [ev.booked.length && `${ev.booked.length} booked`, ev.hand.length && `${ev.hand.length} set by hand`, ev.prot.length && `${ev.prot.length} protected`].filter(Boolean).join(", ");
+  const lastYear = /last year|year ago|previous year|same time/i.test(p.reasoning || "");
+  return `<div class="tx">${head}
+    <div><b>Why:</b>${why.map(w => `<div>${esc(w)}</div>`).join("")}
+      <div>${esc(p.reasoning ? "Idea maker’s note: " + p.reasoning : "No reason was given.")}</div>
+      ${lastYear ? `<div class="muted" style="font-size:13px">This idea compares with last year, but last year’s dates and numbers were not saved with it.</div>` : ""}</div>
+    <div><b>What changes:</b> ${esc(i.effect)}
+      ${ex.length ? `<div style="margin-top:4px">Example nights${/startprice/i.test(p.type || p.field || "") ? " (the price the engine is heading for)" : ""}:</div><ul class="ex">${ex.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<div class="muted" style="font-size:14px">${ev.none ? "" : "None of the nights ahead would change right now."}</div>`}
+      <div class="muted" style="font-size:13px">Booked nights and nights you set by hand do not change. Nights you protected stay protected.${skipped ? " Left alone here: " + esc(skipped) + "." : ""}</div></div>
+    <div class="muted" style="font-size:13px">${esc(madeText(p))}</div></div>`;
+}
+const madeText = p => { const d = toDate(p.ts); return d && !isNaN(d) ? "Made " + fmtShort(tbIso(d)) : ""; };
 function ideaCardHtml(p) {
   const i = ideaInfo(p); if (!i) return "";
   const st = U.ideaState[p.id] || "open", done = U.ideaDone?.[p.id];
@@ -1314,10 +1423,14 @@ function ideaCardHtml(p) {
       <div class="two"><button type="button" class="btn light" data-act="ideaBack" data-id="${p.id}">Back</button><button type="button" class="btn dark" data-act="ideaSkip" data-id="${p.id}" data-reason="">Skip</button></div></div>`;
   else foot = `<div class="two"><button type="button" class="btn light" data-act="ideaAskSkip" data-id="${p.id}">Skip</button><button type="button" class="btn dark" data-act="ideaApply" data-id="${p.id}">Apply</button></div>`;
   const msg = U.ideaMsg[p.id] ? `<div class="warnbox" role="alert">${esc(U.ideaMsg[p.id])}</div>` : "";
-  return `<article class="card idea" data-idea="${p.id}"><div class="where"><span>${esc(i.where)}</span><span class="chip">${esc(i.season)}</span></div><h3>${esc(i.title)}</h3>
+  return `<article class="card idea" data-idea="${p.id}"><div class="where"><span>${esc(roomName(p.property))}</span><span class="chip">${esc(listName(p.property, i.eur))}</span></div><h3>${esc(i.title)}</h3>
     <div class="ch"><span class="a">${esc(i.fmt(i.cur))}</span>${icon("arrow", 20)}<span class="b">${esc(i.fmt(i.sug))}</span><span class="c">${esc(i.pct)}</span></div>
-    <div class="tx"><div><b>Why:</b> ${esc(p.reasoning || "No reason was given.")}</div><div><b>What changes:</b> ${esc(i.effect)}</div></div>${msg}${foot}</article>`;
+    ${ideaFactsHtml(p, i, true)}${msg}${foot}</article>`;
 }
+const histDates = (p, i) => {
+  const runs = seasonStretches(p.season);
+  return (runs.length ? `${i.season}: ${stretchText(runs[0])} · ${runs[0].nights} nights` : `${i.season}: dates not found in your settings`) + (madeText(p) ? " · " + madeText(p) : "");
+};
 function viewIdeas() {
   U.ideaDone = U.ideaDone || {};
   const desk = isDesk();
@@ -1326,7 +1439,8 @@ function viewIdeas() {
   const hist = earlier.map(p => {
     const i = ideaInfo(p); if (!i) return "";
     const applied = p.status === "approved" || p.status === "auto_applied", canUndo = p.status === "approved" && p.previous != null && p.applied_path;
-    return `<div class="hist">${icon(applied ? "check" : "x", 18, 2.2)}<div class="grow"><b>${applied ? (p.status === "auto_applied" ? "Applied by the engine" : "Applied") : "Skipped"}</b> · ${esc(i.where)} · ${esc(i.season)} · ${esc(i.what)} ${esc(i.fmt(i.cur))} → ${esc(i.fmt(i.sug))}
+    return `<div class="hist">${icon(applied ? "check" : "x", 18, 2.2)}<div class="grow"><b>${applied ? (p.status === "auto_applied" ? "Applied by the engine" : "Applied") : "Skipped"}</b> · ${esc(i.where)} · ${esc(i.what)} ${esc(i.fmt(i.cur))} → ${esc(i.fmt(i.sug))}
+      <div style="font-size:13px;color:var(--soft)">${esc(histDates(p, i))}</div>
       <div class="muted" style="font-size:13px">${p.rejection_reason ? esc(p.rejection_reason) + " · " : ""}${esc(whenOf(p.approved_at || p.rejected_at || p.ts))}</div></div>
       ${canUndo ? `<button type="button" aria-label="Undo: ${esc(i.title)}, ${esc(i.where)}" data-act="ideaUndo" data-id="${p.id}">Undo</button>` : ""}
       ${!applied ? `<button type="button" aria-label="Show this idea again" data-act="ideaAgain" data-id="${p.id}">Show again</button>` : ""}</div>`;
@@ -1354,12 +1468,13 @@ function winLabel() {
   return `${fmtShort(s)} – ${fmtShort(e)}`;
 }
 function cellHtml(r, iso, j) {
-  const cur = curFor(r, U.cur), rc = rec(r.id, iso, cur), old = isOld(r.id);
+  const cur = curFor(r, "GEL"), rc = rec(r.id, iso, cur), old = isOld(r.id);
+  const ab = rec(r.id, iso, "USD"), abText = ab && (old ? ab.mh : ab.new) ? usd(old ? ab.mh : ab.new) : "–";
   const sel = U.sel && U.sel.rt === r.id && (U.sel2 ? (j >= Math.min(U.sel.j, U.sel2.j) && j <= Math.max(U.sel.j, U.sel2.j)) : j === U.sel.j);
   const base = `data-act="cell" data-rt="${r.id}" data-j="${j}" data-iso="${iso}"`;
-  if (!rc) return `<button type="button" class="cell ${sel ? "sel" : ""}" ${base} aria-label="${esc(r.name)}, ${fmtDay(iso)}: no price yet"><b>–</b></button>`;
+  if (!rc) return `<button type="button" class="cell ${sel ? "sel" : ""}" ${base} aria-label="${esc(r.name)}, ${fmtDay(iso)}: no price yet"><b>–</b><em>–</em></button>`;
   const full = rc.avail === 0, shown = old ? rc.mh : rc.new, hand = isHandSet(r.id, iso, rc);
-  const main = full ? "Booked" : money(shown, cur);
+  const main = full ? "Booked" : (cur === "GEL" ? money(shown, cur) : "–");
   let sub = "";
   if (!full) {
     if (old) sub = rc.new ? "new " + (cur === "USD" ? usd(rc.new) : Math.round(rc.new)) : "";
@@ -1367,8 +1482,8 @@ function cellHtml(r, iso, j) {
     else if (r.units > 1) sub = `${rc.avail} of ${r.units} free`;
   }
   const edge = !full && (shown === rc.min || shown === rc.max);
-  return `<button type="button" class="cell ${full ? "bk" : ""} ${sel ? "sel" : ""}" ${base} aria-label="${esc(r.name + ", " + fmtDay(iso) + ": " + (full ? "booked" : money(shown, cur)))}">
-    <b>${main}</b><span>${sub}</span>${edge ? '<i class="eb"></i>' : ""}${!full && hand ? `<span class="lk">${icon("lock", 11, 2.6)}</span>` : ""}${isEventDay(iso) ? '<i class="ev"></i>' : ""}</button>`;
+  return `<button type="button" class="cell ${full ? "bk" : ""} ${sel ? "sel" : ""}" ${base} aria-label="${esc(r.name + ", " + fmtDay(iso) + ": " + (full ? "booked" : (cur === "GEL" ? "Booking " + money(shown, cur) : "no Booking price")) + ", " + (abText === "–" ? "no Airbnb price" : "Airbnb " + abText))}">
+    <b>${main}</b><em>${abText}</em><span>${sub}</span>${edge ? '<i class="eb"></i>' : ""}${!full && hand ? `<span class="lk">${icon("lock", 11, 2.6)}</span>` : ""}${isEventDay(iso) ? '<i class="ev"></i>' : ""}</button>`;
 }
 function calRowHtml(r, dates) {
   const old = isOld(r.id), on = U.panel && (U.panel.type === "room" || U.panel.type === "test") && U.panel.rt === r.id;
@@ -1380,10 +1495,9 @@ function viewCalendar() {
   const heads = dates.map(iso => { const se = seasonOnDay(iso); return `<div class="chead" style="${[5, 6].includes(dow(iso)) ? "background:#FAF9F7" : ""}" title="${esc(SEASONS[se].label + (isEventDay(iso) ? " · event" : ""))}"><div style="font-weight:600">${WD[dow(iso)]}</div><div class="n">${+iso.slice(8)}</div><div class="m">${MN[+iso.slice(5, 7) - 1]}</div><div class="bd" style="background:${SEASONS[se].dot}"></div></div>`; }).join("");
   const win = [["now", "Next 4 weeks"], ["next", MNL[(+today().slice(5, 7)) % 12]], ["hol", "Holidays"]];
   return `${errorsHtml()}<div class="ctrl">
-      <div class="seg d" role="radiogroup" aria-label="Show prices for">${[["GEL", "Booking ₾"], ["USD", "Airbnb $"]].map(([c, l]) => `<button type="button" class="segb ${U.cur === c ? "on" : ""}" role="radio" aria-checked="${U.cur === c}" data-act="cur" data-v="${c}">${l}</button>`).join("")}</div>
       <div class="seg d" role="radiogroup" aria-label="Which dates">${win.map(([w, l]) => `<button type="button" class="segb ${U.win === w ? "on" : ""}" role="radio" aria-checked="${U.win === w}" data-act="win" data-v="${w}">${l}</button>`).join("")}</div>
       <div class="legend"><span><i style="width:14px;height:14px;background:#E3E1DC;border-radius:3px;display:inline-block"></i>Booked</span><span><i style="width:14px;height:3px;background:#1F1F1F;display:inline-block"></i>At your min or max</span><span>${icon("lock", 12, 2.4)}Set by hand or "don't change"</span><span><i style="width:7px;height:7px;border-radius:50%;background:#1F1F1F;display:inline-block"></i>Event</span></div></div>
-    <p class="muted" style="font-size:13px">Click a night for why. Click two nights with Shift for a range. Click a room for its settings.</p>
+    <p class="muted" style="font-size:13px">Booking price (₾) on top, Airbnb price ($) below it. Click a night for why. Click two nights with Shift for a range. Click a room for its settings.</p>
     <div class="cwrap" id="cwrap"><div class="cgrid"><div class="crow" style="position:sticky;top:0;z-index:3"><div class="cname" style="height:auto;cursor:default;font-size:12px;font-weight:700;color:var(--soft);z-index:4">Room · ${esc(winLabel())}</div>${heads}</div>
       <div class="gtitle"><span>${oldRooms().length ? "New way" : "Rooms"}</span></div>${newRooms().map(r => calRowHtml(r, dates)).join("")}
       ${oldRooms().length ? `<div class="gtitle"><span>Old way, new way being tested</span></div>${oldRooms().map(r => calRowHtml(r, dates)).join("")}` : ""}</div></div>`;
@@ -1392,13 +1506,13 @@ function panelHtml() {
   const p = U.panel; if (!p) return "";
   const close = `<button type="button" class="x" data-act="closePanel" aria-label="Close">${icon("x", 20)}</button>`;
   if (p.type === "why") {
-    const r = roomById(p.rt), cur = curFor(r, U.cur), m = whyModel(p.rt, p.iso, cur);
+    const r = roomById(p.rt), cur = curFor(r, "GEL"), m = whyModel(p.rt, p.iso, cur);
     return `<aside class="panel" aria-label="Details"><div class="ph"><div><div class="muted" style="font-size:13px;font-weight:600">${esc(r.name)} · ${fmtDay(p.iso)}</div><div class="big">${esc(m.price || (m.booked ? "Booked" : "–"))}</div></div>${close}</div>
       ${whyInner(m, p.rt, p.iso, true)}${p.done ? `<div role="status" class="banner green" style="font-size:13px;padding:10px">Rule added: the engine will not change this night. Press Save to keep it.</div>` : ""}</aside>`;
   }
   if (p.type === "range") {
     const r = roomById(p.rt), a = p.a < p.b ? p.a : p.b, b = p.a < p.b ? p.b : p.a, n = diffDays(a, b) + 1;
-    let free = 0; for (let i = 0; i < n; i++) { const rc = rec(p.rt, addDays(a, i), curFor(r, U.cur)); if (!rc || rc.avail !== 0) free++; }
+    let free = 0; for (let i = 0; i < n; i++) { const rc = rec(p.rt, addDays(a, i), curFor(r, "GEL")); if (!rc || rc.avail !== 0) free++; }
     const ch = U.rangeChoice || "protect";
     return `<aside class="panel" aria-label="Details"><div class="ph"><div><div class="muted" style="font-size:13px;font-weight:600">${esc(r.name)}</div><h2>${fmtShort(a)} – ${fmtShort(b)}</h2></div>${close}</div>
       <p class="muted" style="font-size:13px">${n} nights selected, ${free} still empty.</p>
