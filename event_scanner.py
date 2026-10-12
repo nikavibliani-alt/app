@@ -250,9 +250,13 @@ def scan_and_update(config_path: str = "config.json", dry_run: bool = False) -> 
     queries = search_queries(today)
     LAST_ERRORS.clear()
 
-    for query in queries:
-        print(f"  Searching: '{query}'...")
-        events = fetch_events(query)
+    # The searches are slow (up to a minute each), so they run side by side; the results are read in order.
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        fetched = list(pool.map(fetch_events, queries))
+
+    for query, events in zip(queries, fetched):
+        print(f"  Searched: '{query}'...")
         for event in events:
             if not is_major_event(event):
                 continue
