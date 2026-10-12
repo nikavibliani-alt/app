@@ -1,0 +1,1670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pricing, new page - Maxela</title>
+<style>
+:root{
+  --ink:#1F1F1F;--page:#F5F4F2;--card:#FFFFFF;--line:#E6E4E0;--line2:#EFEDE9;--muted:#5A5955;--soft:#3E3D3A;
+  --green:#2E6B34;--green-bg:#E3F1DF;--green-ink:#1F4D25;--red:#9B2C2C;--red-bg:#FBE4E4;--red-ink:#7A1F1F;
+  --chip:#E9E7E3;--sel:#F0EEEA;--btn-line:#CFCCC6;--off:#8C8A85;--bar-h:0px;--head-h:64px;
+  --bg:#F5F4F2;--card-bg:#FFFFFF;--border:#E6E4E0;--text-main:#1F1F1F;--text-muted:#5A5955;--status-red:#9B2C2C;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--page);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.4;font-size:15px}
+button{font:inherit;color:var(--ink);background:transparent;border:0;padding:0;cursor:pointer;touch-action:manipulation}
+button:disabled,[aria-disabled="true"]{cursor:not-allowed}
+a{color:var(--ink);text-decoration:none}
+a:focus-visible,button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid #3E3D3A;outline-offset:2px}
+h1,h2,h3,p{margin:0}
+.muted{color:var(--muted)}
+.hide,[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+svg{flex-shrink:0}
+
+/* ---------- shell ---------- */
+#app{min-height:100vh}
+.page{padding:20px 16px calc(32px + var(--bar-h));display:flex;flex-direction:column;gap:18px;max-width:640px;margin:0 auto}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.topbar h1{font-size:28px;font-weight:700}
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:4px;background:var(--chip);border-radius:12px}
+.tab{display:flex;align-items:center;justify-content:center;gap:5px;height:44px;border-radius:9px;font-size:14px;font-weight:500;color:var(--muted);background:transparent;border:0}
+.tab[aria-current="page"]{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.badge{min-width:20px;height:20px;border-radius:10px;background:var(--ink);color:#FFFFFF;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px}
+.sec{display:flex;flex-direction:column;gap:10px}
+.h2{font-size:17px;font-weight:700}
+.sub{margin-top:2px;font-size:13px;color:var(--muted);line-height:1.4}
+.banner{border-radius:12px;padding:10px 8px 10px 14px;display:flex;align-items:center;gap:10px;font-size:14px}
+.banner.red{background:var(--red);color:#FFFFFF}
+.banner.green{background:var(--green-bg);color:var(--green-ink)}
+.banner button{min-height:44px;padding:0 14px;border-radius:10px;background:#FFFFFF;color:var(--red);font-weight:700}
+.sw{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 6px 0 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-weight:600;font-size:14px}
+.sw .track{width:44px;height:28px;border-radius:14px;position:relative;display:inline-block;background:var(--green)}
+.sw .track::after{content:"";position:absolute;top:3px;left:19px;width:22px;height:22px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.sw[aria-checked="false"] .track{background:var(--off)}
+.sw[aria-checked="false"] .track::after{left:3px}
+.status{padding:14px 16px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.status .l1{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.status .chs{display:flex;gap:14px;flex-wrap:wrap}
+.ok{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:600;color:var(--green-ink)}
+.ok.bad{color:var(--red)}
+.warnbox{font-size:13px;color:var(--red-ink);background:var(--red-bg);border-radius:8px;padding:8px 10px}
+.link{min-height:44px;padding:0;text-decoration:underline;font-weight:600;font-size:14px;display:inline-flex;align-items:center;color:var(--ink)}
+.linkb{align-self:flex-start}
+
+/* ---------- lists and rows ---------- */
+.row{display:flex;align-items:center;gap:12px;padding:12px 16px;min-height:60px;border-bottom:1px solid var(--line2);width:100%;text-align:left;color:var(--ink)}
+.row:last-child{border-bottom:0}
+.row .grow{flex:1;min-width:0}
+.row .t{font-size:15px;font-weight:600}
+.row .s{font-size:13px;color:var(--muted)}
+.row .r{text-align:right}
+.row .r b{font-size:15px;font-weight:700;display:block}
+.row .r span{font-size:12px;color:var(--muted)}
+.lrow{display:flex;align-items:center;gap:12px;padding:10px 4px 10px 16px;min-height:60px;border-bottom:1px solid var(--line2)}
+.lrow:last-child{border-bottom:0}
+.lrow .grow{flex:1;min-width:0}
+.lrow .t{font-size:15px;font-weight:600}
+.lrow .s{font-size:13px;color:var(--muted)}
+.lrow.pending{background:#FAF9F7}
+.x{width:48px;height:48px;color:var(--soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:8px}
+.x:hover{background:var(--sel)}
+.dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;display:inline-block}
+.empty{padding:16px;font-size:14px;color:var(--muted)}
+
+/* ---------- controls ---------- */
+.btn{height:52px;border-radius:12px;font-weight:600;font-size:15px;padding:0 16px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.dark{background:var(--ink);color:#FFFFFF}
+.btn.light{background:#FFFFFF;color:var(--ink);border:1px solid var(--btn-line)}
+.btn.red{background:var(--red);color:#FFFFFF}
+.btn.off,.btn[aria-disabled="true"]{background:#E3E1DC;color:#6B6964}
+.btn.small{height:44px;border-radius:10px;font-size:14px}
+.btn.full{width:100%}
+.seg{display:grid;gap:4px;padding:4px;background:var(--chip);border-radius:12px}
+.segb{height:44px;border-radius:9px;font-size:14px;font-weight:500;color:var(--soft);background:transparent;padding:0 6px}
+.segb.on{background:var(--ink);color:#FFFFFF;font-weight:600}
+.opt{display:flex;align-items:flex-start;gap:12px;width:100%;padding:14px 16px;min-height:60px;text-align:left;color:var(--ink);background:transparent}
+.opt .rad{width:22px;height:22px;margin-top:1px;border-radius:50%;border:2px solid var(--off);flex-shrink:0}
+.opt[aria-checked="true"] .rad{border:7px solid var(--ink)}
+.opt .tx{flex:1;display:flex;flex-direction:column;gap:2px}
+.opt .tx b{font-size:15px;font-weight:600}
+.opt .tx span{font-size:13px;color:var(--muted)}
+.opt[aria-disabled="true"]{color:#6B6964}
+.opt[aria-disabled="true"] .rad{border-color:#C9C7C2}
+.optrow{display:flex;align-items:center;border-bottom:1px solid var(--line2)}
+.optrow:last-child{border-bottom:0}
+.optrow.on{background:var(--sel)}
+.ibtn{width:48px;height:48px;color:var(--soft);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tag{font-size:12px;font-weight:600;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 14px;border-radius:999px;font-weight:600;font-size:14px;background:#FFFFFF;color:var(--ink);border:1px solid var(--btn-line)}
+.pill[aria-checked="true"],.pill[aria-pressed="true"]{background:var(--ink);color:#FFFFFF;border-color:var(--ink)}
+.pill .pd{width:9px;height:9px;border-radius:50%;display:inline-block}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.num{width:100%;height:44px;padding:0 8px;border:1px solid var(--btn-line);border-radius:10px;font:600 16px system-ui,sans-serif;color:var(--ink);background:#FFFFFF;text-align:center}
+.num.bad{border:2px solid var(--red);color:var(--red)}
+.num:disabled{background:var(--sel);color:var(--off)}
+.cell2{padding:10px 12px;font-size:14px}
+.lab{font-size:12px;font-weight:600;color:var(--muted);text-align:center}
+.fld{width:100%;height:44px;border:1px solid var(--btn-line);border-radius:10px;padding:0 10px;font:16px system-ui,sans-serif;color:var(--ink);background:#FFFFFF}
+
+/* ---------- save bar, toast, dialogs ---------- */
+#bar{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#FFFFFF;border-top:1px solid var(--line);box-shadow:0 -4px 16px rgba(0,0,0,.06);padding:12px 16px 18px}
+#bar .in{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+#bar .msg{font-size:14px}
+#bar .msg .n{font-size:13px;color:var(--muted)}
+#bar .msg .n.bad{color:var(--red)}
+#bar .btns{display:flex;gap:10px}
+#bar .btns .btn{flex:1}
+#bar .btns .btn.dark,#bar .btns .btn.off{flex:2}
+#bar.done{background:var(--green-bg);border-top-color:var(--green-bg)}
+#bar.done .msg{color:var(--green-ink);font-weight:600}
+#toast{position:fixed;left:16px;right:16px;bottom:calc(16px + var(--bar-h));z-index:70;max-width:608px;margin:0 auto;display:flex;align-items:center;gap:10px;background:var(--ink);color:#FFFFFF;border-radius:12px;padding:4px 6px 4px 16px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+#toast button{min-height:44px;padding:0 14px;color:#FFFFFF;font-weight:700;text-decoration:underline}
+#overlay{position:fixed;inset:0;z-index:100;background:rgba(20,20,18,.45);display:flex;align-items:flex-end;justify-content:center}
+.dlg{background:#FFFFFF;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:10px 20px 24px;display:flex;flex-direction:column;gap:12px}
+.dlg .grab{width:40px;height:4px;border-radius:2px;background:var(--btn-line);align-self:center}
+.dlg .dh{display:flex;align-items:center;justify-content:space-between}
+.dlg h3{font-size:20px;font-weight:700}
+.dlg p{font-size:15px;line-height:1.45}
+.dlg ul{margin:0;padding-left:18px;font-size:14px;line-height:1.5}
+.dlg .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.dlg .tiles div{background:var(--page);border-radius:12px;padding:10px 12px}
+.dlg .tiles .k{font-size:12px;font-weight:600;color:var(--soft)}
+.dlg .tiles .v{font-size:18px;font-weight:700}
+.dlg .tiles .u{font-size:12px;color:var(--soft)}
+.dlg figure{margin:0;background:var(--page);border-radius:12px;padding:12px 12px 10px}
+.dlg figcaption{font-size:13px;font-weight:600;color:var(--soft);margin-bottom:6px}
+.dlg .fine{font-size:13px;color:var(--soft);line-height:1.45}
+.steps{margin:0;padding:0;list-style:none}
+.steps li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line2);font-size:14px}
+.steps li b{white-space:nowrap}
+
+/* ---------- seasons ---------- */
+.card.pad{padding:14px 16px}
+.pgrid{display:grid;grid-template-columns:70px repeat(3,minmax(0,1fr));gap:8px;align-items:center}
+.rline{display:flex;align-items:center;gap:10px;font-size:15px}
+.errline{font-size:13px;font-weight:600;color:var(--red)}
+.warnline{font-size:13px;color:var(--soft);background:var(--sel);border-radius:8px;padding:8px 10px}
+
+/* ---------- nights, tiles ---------- */
+.night{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 16px;border-bottom:1px solid var(--line2);background:#FFFFFF;color:var(--ink);text-align:left}
+.night:last-child{border-bottom:0}
+.night .d{width:92px;font-size:14px;font-weight:600}
+.night .w{flex:1;font-size:14px;color:var(--soft)}
+.night .w.bk{color:var(--green)}
+.night .g{font-size:15px;font-weight:700}
+.night .u{width:44px;text-align:right;font-size:13px;color:var(--muted)}
+.tiles3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tile{background:#FFFFFF;border:1px solid var(--line);border-radius:12px;padding:12px}
+.tile .k{font-size:12px;font-weight:600;color:var(--muted)}
+.tile .v{font-size:22px;font-weight:700}
+.tile .u{font-size:12px;color:var(--muted)}
+.tr3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:12px 16px;border-bottom:1px solid var(--line2);font-size:14px}
+.tr3:last-child{border-bottom:0}
+.tr3.h{font-size:13px;font-weight:600;color:var(--muted)}
+.backl{display:inline-flex;align-items:center;gap:4px;min-height:44px;font-size:15px;color:var(--soft);align-self:flex-start}
+
+/* ---------- date picker ---------- */
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));row-gap:4px}
+.cal .wd{font-size:12px;font-weight:700;color:var(--soft);text-align:center;padding:4px 0}
+.day{height:46px;font-size:15px;font-weight:500;position:relative;border-radius:10px;color:var(--ink);background:transparent;padding:0}
+.day.in{background:#E3E1DC;border-radius:0}
+.day.end{background:var(--ink);color:#FFFFFF;font-weight:700}
+.day:disabled{color:#767470;cursor:not-allowed}
+.day .hd{position:absolute;left:50%;bottom:5px;width:6px;height:6px;margin-left:-3px;border-radius:50%}
+.fromto{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.fromto div{border-radius:12px;padding:10px 12px;background:var(--sel);color:var(--ink)}
+.fromto div.act{background:var(--ink);color:#FFFFFF}
+.fromto .k{font-size:12px;font-weight:600}
+.fromto .v{font-size:16px;font-weight:700}
+
+/* ---------- ideas ---------- */
+.idea{padding:16px;display:flex;flex-direction:column;gap:12px}
+.idea .where{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;font-weight:600;color:var(--soft)}
+.idea .chip{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--sel);color:var(--soft)}
+.idea h3{font-size:18px;font-weight:700}
+.idea .ch{display:flex;align-items:center;gap:10px}
+.idea .ch .a{font-size:22px;font-weight:600;color:#6B6964;text-decoration:line-through}
+.idea .ch .b{font-size:26px;font-weight:700}
+.idea .ch .c{font-size:14px;font-weight:600;color:var(--soft)}
+.idea .tx{display:flex;flex-direction:column;gap:6px;font-size:15px;line-height:1.45}
+.idea .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.idea .done{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 6px 6px 12px;border-radius:10px;font-size:14px;font-weight:600}
+.idea .done.g{background:var(--green-bg);color:var(--green-ink)}
+.idea .done.n{background:var(--sel);color:var(--soft)}
+.idea .done button{min-height:44px;padding:0 8px;font-weight:700;text-decoration:underline;color:inherit}
+.hist{display:flex;align-items:center;gap:12px;padding:8px 6px 8px 16px;border-bottom:1px solid var(--line2);min-height:60px;font-size:14px;line-height:1.4}
+.hist:last-child{border-bottom:0}
+.hist .grow{flex:1}
+.hist button{min-height:44px;padding:0 8px;font-weight:700;text-decoration:underline;color:var(--ink)}
+
+/* ---------- computer layout ---------- */
+body[data-layout="desk"] .page{max-width:none;padding:20px 24px calc(32px + var(--bar-h))}
+body[data-layout="desk"] .topbar{display:none}
+.dhead{display:none}
+body[data-layout="desk"] .dhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 24px;background:#FFFFFF;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50;min-height:var(--head-h)}
+.dhead h1{font-size:22px;font-weight:700}
+.dhead .tabs{display:flex}
+.dhead .tab{height:40px;padding:0 14px}
+.dhead .sp{flex:1}
+.dhead .st{display:flex;align-items:center;gap:12px;font-size:13px;flex-wrap:wrap}
+.dhead .sw{min-height:40px;font-size:13px}
+.dhead .sw .track{width:40px;height:24px}
+.dhead .sw .track::after{width:18px;height:18px;top:3px;left:19px}
+.dhead .sw[aria-checked="false"] .track::after{left:3px}
+.dhead .link{min-height:40px;font-size:13px}
+.dwrap{display:flex;align-items:flex-start;gap:20px}
+.dmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.panel{width:400px;flex-shrink:0;position:sticky;top:calc(var(--head-h) + 12px);max-height:calc(100vh - var(--head-h) - var(--bar-h) - 24px);overflow-y:auto;background:#FFFFFF;border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.panel .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.panel h2{font-size:20px;font-weight:700}
+.panel .big{font-size:26px;font-weight:700;margin-top:2px}
+.panel .lbl{font-size:12px;font-weight:700;color:var(--soft);margin:0 0 6px}
+.panel .steps li{font-size:13px;padding:8px 0}
+.cwrap{background:#FFFFFF;border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:70vh}
+.cgrid{display:inline-flex;flex-direction:column;min-width:100%}
+.crow{display:flex}
+.cname{width:220px;min-width:220px;height:58px;padding:6px 12px;text-align:left;background:#FFFFFF;border-right:1px solid var(--line);border-bottom:1px solid var(--line2);display:flex;flex-direction:column;justify-content:center;position:sticky;left:0;z-index:2;color:var(--ink)}
+.cname:hover,.cname.on{background:#EFEDE9}
+.cname b{font-size:14px;font-weight:700}
+.cname span{font-size:12px;color:var(--muted)}
+.chead{width:70px;min-width:70px;padding:6px 4px;text-align:center;font-size:12px;color:var(--soft);background:#FFFFFF;border-right:1px solid var(--line2);border-bottom:1px solid var(--line)}
+.chead .m{font-size:12px}
+.chead .n{font-size:15px;font-weight:700;color:var(--ink)}
+.chead .bd{height:4px;margin-top:3px;border-radius:2px}
+.cell{width:70px;min-width:70px;height:58px;padding:6px 4px;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;position:relative;background:#FFFFFF;color:var(--ink)}
+.cell:hover{outline:2px solid var(--ink);outline-offset:-2px;z-index:1}
+.cell b{font-size:14px;font-weight:700}
+.cell span{font-size:12px}
+.cell.bk{background:#E3E1DC;color:var(--ink)}
+.cell.bk b{font-weight:500}
+.cell.sel{background:var(--ink);color:#FFFFFF}
+.cell .eb{position:absolute;left:10px;right:10px;bottom:4px;height:3px;background:var(--ink)}
+.cell.sel .eb{background:transparent}
+.cell .lk{position:absolute;top:4px;right:5px}
+.cell .ev{position:absolute;top:5px;left:6px;width:6px;height:6px;border-radius:50%;background:var(--ink)}
+.cell.sel .ev{background:#FFFFFF}
+.gtitle{background:var(--page);border-bottom:1px solid var(--line);position:sticky;left:0}
+.gtitle span{position:sticky;left:0;display:inline-block;padding:10px 12px 6px;font-size:12px;font-weight:700;color:var(--soft)}
+.legend{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--soft);flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.ctrl{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+body[data-layout="desk"] .seg.d{display:inline-grid;grid-auto-flow:column}
+body[data-layout="desk"] .seg.d .segb{height:36px;padding:0 12px;font-size:13px}
+body[data-layout="desk"] .cards2{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;align-items:start}
+body[data-layout="desk"] .cols2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+body[data-layout="desk"] .narrow{max-width:760px}
+body[data-layout="desk"] #overlay{align-items:center}
+body[data-layout="desk"] .dlg{border-radius:16px;max-width:480px;padding:22px}
+body[data-layout="desk"] .dlg .grab{display:none}
+body[data-layout="desk"] #bar .in{max-width:none;flex-direction:row;align-items:center;justify-content:space-between;padding:0 12px}
+body[data-layout="desk"] #bar{padding:12px 24px}
+body[data-layout="desk"] #bar .btns{min-width:300px}
+@media(max-width:899px){.dhead{display:none!important}}
+</style>
+</head>
+<body data-layout="phone">
+<div id="app" hidden>
+  <header class="dhead" id="dhead"></header>
+  <div id="pausedBar"></div>
+  <div id="root"></div>
+  <div id="bar" hidden></div>
+  <div id="toast" hidden></div>
+</div>
+<div id="overlay" hidden></div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, orderBy, limit, getDocs, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { requireOwner } from "./shared/owner-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
+  authDomain: "sleepy-5c962.firebaseapp.com",
+  projectId: "sleepy-5c962",
+  storageBucket: "sleepy-5c962.firebasestorage.app",
+  messagingSenderId: "152940098906",
+  appId: "1:152940098906:web:bf245230d705c0a62c2f63"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+/* =====================================================================
+   Constants (the same room list, season dates and defaults as the engines)
+   ===================================================================== */
+const ROOMS = [
+  {id:"XCV_1", name:"XCV 1 · small",        short:"XCV 1",          units:1, cur:["GEL","USD"], sub:"1 room"},
+  {id:"XCV_2", name:"XCV 2 · balcony",      short:"XCV 2",          units:1, cur:["GEL","USD"], sub:"1 room"},
+  {id:"VGL_ST",name:"VGL studios (2)",           short:"VGL studios",    units:2, cur:["GEL","USD"], sub:"2 rooms"},
+  {id:"VGL_AP",name:"VGL apartments (2)",        short:"VGL apartments", units:2, cur:["GEL","USD"], sub:"2 rooms"},
+  {id:"ROOMS", name:"Rooms, Shartava (5)",       short:"Rooms, Shartava",units:5, cur:["GEL"],       sub:"5 rooms · Booking, Expedia"},
+  {id:"MAXELA",name:"Maxela (7)",                short:"Maxela",         units:7, cur:["GEL"],       sub:"7 rooms · Booking, Expedia"},
+  {id:"BIG_APT",name:"Big apartment",            short:"Big apartment",  units:1, cur:["GEL","USD"], sub:"1 room"},
+  {id:"FREEDOM",name:"Freedom studios (3)",      short:"Freedom studios",units:3, cur:["GEL","USD"], sub:"3 rooms"},
+  {id:"ORBE_1",name:"Orbeliani 1 (2)",           short:"Orbeliani 1",    units:2, cur:["GEL","USD"], sub:"2 rooms"},
+  {id:"ORBE_2",name:"Orbeliani 2",              short:"Orbeliani 2",    units:1, cur:["USD"],       sub:"1 room · Airbnb only"},
+];
+const OLD_IDS = ["ROOMS","MAXELA","BIG_APT","FREEDOM","ORBE_1","ORBE_2"];
+const roomById = id => ROOMS.find(r => r.id === id);
+const isOld = id => OLD_IDS.includes(id);
+const NEW_ROOMS = ROOMS.filter(r => !isOld(r.id));
+const OLD_ROOMS = ROOMS.filter(r => isOld(r.id));
+const TEST_ENDS = "23 Oct";
+const RUN_HOURS_UTC = [0, 5, 9, 12, 18];     // 04:00, 09:00, 13:00, 16:00, 22:00 Tbilisi
+
+// Settings the new engine reads from calm_settings.json. The website does not serve that file, so the page
+// keeps a copy (update it when the file changes); a value saved from this page in Firestore always wins.
+const FILE_DEFAULTS = {
+  room_types: {
+    XCV_1:{engine:"live",style:"normal",window_days:180}, XCV_2:{engine:"live",style:"normal",window_days:180},
+    VGL_ST:{engine:"live",style:"normal",window_days:180}, VGL_AP:{engine:"live",style:"normal",window_days:180},
+  },
+  date_rules: [],
+};
+
+const SEASONS = {
+  low:{label:"Low", dot:"#8A8984"}, mid:{label:"Mid", dot:"#6E8B6A"}, xmas_low:{label:"Early December", dot:"#7A6F64"},
+  high:{label:"High", dot:"#2E6B34"}, peak:{label:"Peak", dot:"#9B2C2C"}, new_year:{label:"New Year", dot:"#5E4A6E"},
+};
+const SEASON_ORDER = ["low","mid","xmas_low","high","peak","new_year"];
+// config.json "seasons" (fixed, every year, all rooms)
+const FIXED = [["new_year","01-01","01-14"],["low","01-15","03-15"],["mid","03-16","04-30"],["high","05-01","06-30"],
+  ["peak","07-01","08-31"],["high","09-01","09-30"],["mid","10-01","11-30"],["xmas_low","12-01","12-23"],["new_year","12-24","12-31"]];
+const SEASON_TEXT = {
+  low:["15 Jan – 15 Mar"], mid:["16 Mar – 30 Apr","1 Oct – 30 Nov"], xmas_low:["1 – 23 Dec"],
+  high:["1 May – 30 Jun","1 – 30 Sep"], peak:["1 Jul – 31 Aug"], new_year:["24 Dec – 14 Jan"],
+};
+
+const MODES = [
+  {id:"fillfast", style:"aggressive", name:"Fill fast", line:"Lowers early and far when a month sells slowly.",
+   below:20, above:15, guard:0.10, p:[10,15,20,20],
+   best:"a slow month, when a guest at a lower price is better than an empty room.",
+   does:["Lowers a little even 1 to 2 months ahead if bookings are behind.","Lowers about 6% a day, never more than 8%.","Before the last 3 days an empty night stays at least 10% of the way from your minimum up to your start price."],
+   watch:"you earn less per night."},
+  {id:"fill", name:"Fill a bit faster", line:"Lowers a little sooner than Balanced.", soon:true},
+  {id:"balanced", style:"normal", name:"Balanced", tag:"recommended", line:"Calm moves around your start price.",
+   below:12, above:15, guard:0.25, p:[5,8,12,12],
+   best:"most rooms, most of the year.",
+   does:["Months far away move only a few percent.","Lowers 2 to 4% a day, never more than 5%, in the first update after 09:00.","Raises when nights sell faster than usual."],
+   watch:"a slow month fills a bit later than with Fill fast."},
+  {id:"earn", name:"Earn more", line:"Raises sooner, lowers later and less.", soon:true},
+  {id:"steady", name:"Steady", line:"Stays close to your start price.", soon:true, divider:true},
+];
+const modeByStyle = s => MODES.find(m => m.style === (s === "aggressive" ? "aggressive" : "normal"));
+const RULE_CHOICES = [
+  {id:"protect", label:"Don’t change the price", help:"The engine never touches these dates. You set the price yourself in MiniHotel."},
+  {id:"aggressive", label:"Fill fast", help:"On these dates only: lowers earlier and further if they sell slowly."},
+  {id:"normal", label:"Balanced", help:"On these dates only: the normal calm rules, whatever the room’s mode is."},
+];
+const ruleLabel = a => (RULE_CHOICES.find(r => r.id === a) || {label: String(a)}).label;
+const AHEAD = [[90,"3 months"],[180,"6 months"],[365,"1 year"]];
+const aheadLabel = d => (AHEAD.find(a => a[0] === Number(d)) || [0, d + " days"])[1];
+const STATUS_TEXT = {far_ahead:"Selling much faster than usual", ahead:"Selling faster than usual", on_track:"Selling as usual",
+  behind:"Selling slower than usual", far_behind:"Selling much slower than usual"};
+const KIND_HEAD = {
+  manual:"You set this price by hand. The engine leaves it alone for 48 hours, or until a booking comes in. Only a price under your minimum or over your maximum is corrected.",
+  protected:"You told the engine not to change this date (a date rule). You set the price yourself in MiniHotel.",
+  correction:"The price was outside your minimum or maximum, so it was moved back inside.",
+  reset:"The price was set again from your start price.",
+  far_reset:"This night is more than 2 months away and was above your start price, so it went straight to the start price.",
+  fill:"First price for this date, set from your start price.",
+  move:"The engine moved this price a little.",
+  hold:"The engine kept this price as it is.",
+  stopped:"A safety check stopped the last move, so the price stays as it was.",
+};
+const REASONS = ["Too early to tell","I want my price","Other reason"];
+
+/* =====================================================================
+   Small helpers
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clone = o => (o === undefined ? undefined : JSON.parse(JSON.stringify(o)));
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const NOW = () => (window.__PRICING_NOW ? new Date(window.__PRICING_NOW) : new Date());
+const TZ = "Asia/Tbilisi";
+const tbIso = d => new Intl.DateTimeFormat("en-CA", {timeZone:TZ, year:"numeric", month:"2-digit", day:"2-digit"}).format(d);
+const tbHM = d => new Intl.DateTimeFormat("en-GB", {timeZone:TZ, hour:"2-digit", minute:"2-digit", hour12:false}).format(d);
+const today = () => tbIso(NOW());
+const addDays = (iso, n) => { const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const diffDays = (a, b) => Math.round((new Date(b + "T00:00:00Z") - new Date(a + "T00:00:00Z")) / 86400000);
+const WD = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const MN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MNL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const dow = iso => new Date(iso + "T00:00:00Z").getUTCDay();
+const fmtShort = iso => `${+iso.slice(8)} ${MN[+iso.slice(5, 7) - 1]}`;
+const fmtDay = iso => `${WD[dow(iso)]} ${fmtShort(iso)}`;
+const fmtMD = md => `${+md.slice(3)} ${MN[+md.slice(0, 2) - 1]}`;
+const fmtRange = (a, b) => `${fmtMD(a)} – ${fmtMD(b)}`;
+const gel = n => `${Math.round(n)} ₾`;
+const usd = n => `$${Math.round(n)}`;
+const money = (n, cur) => (cur === "USD" ? usd(n) : gel(n));
+const num = v => { const n = typeof v === "string" ? parseFloat(v.replace(",", ".")) : v; return typeof n === "number" && isFinite(n) ? n : null; };
+const getPath = (o, p) => p.split(".").reduce((a, k) => (a == null ? undefined : a[k]), o);
+const toDate = ts => (ts && ts.toDate ? ts.toDate() : ts ? new Date(ts) : null);
+const roomName = id => (roomById(id) || {name: id}).name;
+
+const ICON = {
+  right:'<path d="m9 18 6-6-6-6"/>', left:'<path d="m15 18-6-6 6-6"/>', check:'<path d="M20 6 9 17l-5-5"/>', x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>', lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  trash:'<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>', arrow:'<path d="M5 12h14M12 5l7 7-7 7"/>',
+};
+const icon = (n, s = 18, w = 2, extra = "") => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${ICON[n]}</svg>`;
+
+/* =====================================================================
+   State
+   ===================================================================== */
+const S = {
+  paused: null, controlErr: false,
+  rules: {}, eng: {}, file: FILE_DEFAULTS, fileLoaded: false,
+  calmRun: null, oldRun: null, events: [], props: [], locks: {},
+  daily: {}, errors: {},
+};
+// Everything typed but not yet saved. Nothing here is written before Save.
+const P = {room: {}, seasons: {}, holAdd: [], holDel: [], ruleAdd: [], ruleDel: []};
+const U = {
+  route: {name: "rooms"}, cur: "GEL", win: "now", sel: null, sel2: null, panel: null, allNights: false,
+  season: "mid", showOld: false, undo: null, saved: false, notice: "",
+  dp: {kind: "season", from: null, to: null, choice: "high", rooms: [], y: 0, m: 0},
+  ideaState: {}, ideaMsg: {}, testStats: {},
+};
+let SCOPE_DIALOG = null;
+const isDesk = () => window.matchMedia("(min-width: 900px)").matches;
+
+/* =====================================================================
+   Reading data
+   ===================================================================== */
+const rulesRef = () => doc(db, "pricing_config", "rules");
+const engRef = () => doc(db, "pricing_config", "engine_v2");
+const controlRef = () => doc(db, "pricing_config", "control");
+
+async function loadControl() {
+  try {
+    const s = await getDoc(controlRef());
+    S.paused = s.exists() && s.data().paused === true; S.controlErr = false;
+  } catch (e) { S.paused = true; S.controlErr = true; }      // a read error counts as paused
+}
+async function loadConfig() {
+  try { const s = await getDoc(rulesRef()); S.rules = s.exists() ? s.data() : {}; S.errors.rules = ""; }
+  catch (e) { S.errors.rules = e.message; }
+  try { const s = await getDoc(engRef()); S.eng = s.exists() ? s.data() : {}; S.errors.eng = ""; }
+  catch (e) { S.errors.eng = e.message; }
+}
+async function loadRuns() {
+  try {
+    const q = await getDocs(query(collection(db, "pricing_calm_runs"), orderBy("ts", "desc"), limit(1)));
+    S.calmRun = q.empty ? null : q.docs[0].data();
+  } catch (e) { S.errors.calmRun = e.message; }
+  try {
+    const q = await getDocs(query(collection(db, "pricing_log"), orderBy("timestamp", "desc"), limit(1)));
+    S.oldRun = q.empty ? null : q.docs[0].data();
+  } catch (e) { S.errors.oldRun = e.message; }
+}
+async function loadEvents() {
+  try {
+    const q = await getDocs(query(collection(db, "pricing_events"), limit(60)));
+    S.events = q.docs.map(d => { const x = {id: d.id, ...d.data()}; if (!x.date) x.date = d.id.replace(/^event_/, ""); return x; });
+  } catch (e) { S.errors.events = e.message; }
+}
+async function loadProposals() {
+  try {
+    const q = await getDocs(query(collection(db, "pricing_proposals"), orderBy("ts", "desc"), limit(40)));
+    S.props = q.docs.map(d => ({id: d.id, ...d.data()})).filter(x => x.type !== "run_marker");
+  } catch (e) { S.errors.props = e.message; }
+}
+async function loadLocks() {
+  try {
+    const q = await getDocs(collection(db, "pricing_locks"));
+    q.docs.forEach(d => { const x = d.data(); if (x.manual_lock) S.locks[d.id] = true; });
+  } catch (e) { /* the collection may not exist yet */ }
+}
+async function loadDaily() {
+  const t = today(), y = addDays(t, -1);
+  await Promise.all(ROOMS.map(async r => {
+    const coll = isOld(r.id) ? "pricing_shadow_daily" : "pricing_calm_daily";
+    for (const day of [t, y]) {
+      try {
+        const s = await getDoc(doc(db, coll, `${day}_${r.id}`));
+        if (s.exists()) { S.daily[r.id] = {day, dates: s.data().dates || {}}; return; }
+      } catch (e) { S.errors["daily_" + r.id] = e.message; return; }
+    }
+    S.daily[r.id] = {day: null, dates: {}};
+  }));
+}
+const rec = (rt, iso, cur) => S.daily[rt]?.dates?.[`${iso}|${cur}`] || null;
+const curFor = (r, want) => (r.cur.includes(want) ? want : r.cur[0]);
+
+/* =====================================================================
+   Settings: saved value, or the value waiting in P
+   ===================================================================== */
+function savedRoom(rt, field) {
+  const fs = S.eng?.settings?.room_types?.[rt]?.[field];
+  if (fs !== undefined && fs !== null) return fs;
+  const f = S.file?.room_types?.[rt]?.[field];
+  if (f !== undefined && f !== null) return f;
+  return field === "engine" ? "test" : field === "style" ? "normal" : 90;
+}
+const rawRoom = (rt, field) => S.eng?.settings?.room_types?.[rt]?.[field];
+const effRoom = (rt, field) => (P.room[rt] && field in P.room[rt] ? P.room[rt][field].v : savedRoom(rt, field));
+function setRoom(rt, field, v) {
+  const cur = P.room[rt]?.[field];
+  const base = savedRoom(rt, field);
+  if (String(v) === String(base)) { if (cur) { delete P.room[rt][field]; if (!Object.keys(P.room[rt]).length) delete P.room[rt]; } }
+  else (P.room[rt] ??= {})[field] = {v: field === "window_days" ? Number(v) : v, raw: cur ? cur.raw : rawRoom(rt, field), from: cur ? cur.from : base};
+}
+const seasonPath = (rt, season, cur, field) => cur === "GEL"
+  ? (field === "start" ? `startPrices.${rt}.${season}` : `priceRules.${rt}.${season}.${field === "min" ? "min" : "max"}`)
+  : (field === "start" ? `startPricesEur.${rt}.${season}` : `eurRules.${rt}.${season}.${field === "min" ? "min" : "max"}`);
+const skey = (rt, season, cur, field) => `${rt}|${season}|${cur}|${field}`;
+function savedSeason(rt, season, cur, field) {
+  let v = num(getPath(S.rules, seasonPath(rt, season, cur, field)));
+  if (v === null && field === "start") {
+    const t = cur === "GEL" ? S.rules.startPrices?.[rt] : S.rules.startPricesEur?.[rt];
+    if (typeof t === "number") v = t;
+  }
+  return v;
+}
+const effSeason = (rt, season, cur, field) => { const k = skey(rt, season, cur, field); return k in P.seasons ? P.seasons[k].v : savedSeason(rt, season, cur, field); };
+function setSeason(rt, season, cur, field, text) {
+  const k = skey(rt, season, cur, field), path = seasonPath(rt, season, cur, field);
+  const t = text.trim();
+  const v = t === "" ? null : (num(t) === null ? NaN : num(t));
+  const saved = savedSeason(rt, season, cur, field);
+  if ((v === null && saved === null) || v === saved) delete P.seasons[k];
+  else P.seasons[k] = {v, raw: getPath(S.rules, path), path, text};
+}
+function seasonOverride(rt) {            // engine_v2.rules replaces the numbers of a room: say so
+  const o = S.eng?.rules?.[rt];
+  if (!o || typeof o !== "object") return false;
+  return Object.values(o).some(byCur => byCur && typeof byCur === "object" && Object.values(byCur).some(r => r && r.min && r.start && r.max));
+}
+
+/* seasons by calendar day */
+const mdOf = iso => iso.slice(5);
+function mdDays(from, to) {              // every MM-DD from..to, every year (a range may run over New Year)
+  const out = []; let d = new Date(Date.UTC(2001, +from.slice(0, 2) - 1, +from.slice(3)));
+  const end = new Date(Date.UTC(2001, +to.slice(0, 2) - 1, +to.slice(3)));
+  for (let i = 0; i < 400; i++) {
+    out.push(d.toISOString().slice(5, 10));
+    if (d.getTime() === end.getTime()) break;
+    d = new Date(d.getTime() + 86400000); if (d.getUTCFullYear() > 2001) d = new Date(Date.UTC(2001, 0, 1));
+  }
+  return out;
+}
+const inMdRange = (md, a, b) => (a <= b ? md >= a && md <= b : md >= a || md <= b);
+function ovListRaw(src) {
+  if (Array.isArray(src)) return src.filter(o => o && typeof o === "object");
+  if (src && typeof src === "object") return Object.values(src).filter(o => o && typeof o === "object" && o.from && o.to);
+  return [];
+}
+const savedHolidays = () => ovListRaw(S.rules.dateOverrides);
+const holidaysNow = () => {
+  const gone = P.holDel, list = savedHolidays().filter(o => !gone.some(g => same(g, o)));
+  return list.concat(P.holAdd);
+};
+function seasonOnDay(iso) {
+  const md = mdOf(iso);
+  const hol = holidaysNow().find(o => inMdRange(md, o.from, o.to));
+  if (hol && SEASONS[hol.season]) return hol.season;
+  const f = FIXED.find(x => inMdRange(md, x[1], x[2]));
+  return f ? f[0] : "mid";
+}
+const savedRules = () => ovListRaw(S.eng?.settings?.date_rules);
+const fileRules = () => (Array.isArray(S.file?.date_rules) ? S.file.date_rules : []);
+const rulesNow = () => savedRules().filter(r => !P.ruleDel.some(g => same(g, r))).concat(P.ruleAdd);
+const ruleCovers = (r, rt, iso) => iso >= r.from && iso <= r.to && (r.rooms === "all" || r.rooms === undefined || (Array.isArray(r.rooms) && r.rooms.includes(rt)));
+const protectedBy = (rt, iso) => fileRules().concat(rulesNow()).some(r => r.action === "protect" && ruleCovers(r, rt, iso));
+
+/* =====================================================================
+   Numbers shown on the screens
+   ===================================================================== */
+function nightsOf(rt) {
+  const r = roomById(rt), t = today(), out = [];
+  const cur = curFor(r, U.cur);
+  for (let i = 0; i < 28; i++) {
+    const iso = addDays(t, i), g = rec(rt, iso, cur), u = rec(rt, iso, "USD"), gg = rec(rt, iso, "GEL");
+    out.push({iso, rec: g, gel: gg, usd: u, cur});
+  }
+  return out;
+}
+function isEventDay(iso) { return S.events.some(e => e.date === iso && (e.status === "approved" || e.status === "manual")); }
+function isHandSet(rt, iso, rc) {
+  return !!(rc && (rc.kind === "manual" || rc.kind === "protected")) || !!S.locks[`${rt}_${iso}`] || protectedBy(rt, iso);
+}
+function bookedShare(rt) {
+  const r = roomById(rt), t = today(); let tot = 0, booked = 0;
+  for (let i = 0; i < 30; i++) {
+    const g = rec(rt, addDays(t, i), curFor(r, "GEL"));
+    if (g && typeof g.avail === "number") { tot += r.units; booked += Math.max(0, r.units - g.avail); }
+  }
+  return tot ? Math.round((booked / tot) * 100) : null;
+}
+function tonight(rt) {
+  const r = roomById(rt), g = rec(rt, today(), curFor(r, "GEL"));
+  if (!g) return {text: "–", full: false};
+  if (g.avail === 0) return {text: "full", full: true};
+  const p = isOld(rt) ? g.mh : g.new;
+  return {text: p ? money(p, curFor(r, "GEL")) : "–", full: false};
+}
+function testStats(rt) {                  // old room: new way compared with the old way, empty nights, next 3 months
+  const r = roomById(rt), cur = curFor(r, "GEL"), t = today();
+  let cheaper = 0, dearer = 0, so = 0, sn = 0, n = 0;
+  for (let i = 0; i < 90; i++) {
+    const g = rec(rt, addDays(t, i), cur);
+    if (!g || !(g.avail > 0) || !g.mh || !g.new) continue;
+    n++; so += g.mh; sn += g.new;
+    if (g.new < g.mh - 0.5) cheaper++; else if (g.new > g.mh + 0.5) dearer++;
+  }
+  return {n, cheaper, dearer, avg: n ? (sn - so) / so : null, cur};
+}
+function gapText(rt) {
+  const s = testStats(rt);
+  if (s.avg === null) return "no numbers yet";
+  const p = Math.round(Math.abs(s.avg) * 100);
+  return p === 0 ? "about the same" : `${p}% ${s.avg > 0 ? "higher" : "lower"}`;
+}
+function nextRun() {
+  const now = NOW();
+  for (const h of RUN_HOURS_UTC) {
+    const t = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h, 0, 0));
+    if (t > now) return t;
+  }
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, RUN_HOURS_UTC[0]));
+}
+function runWhen(ts) {                    // "Today 09:03" from a Tbilisi-time text or a Timestamp
+  let d = null, isoDay = null, hm = null;
+  if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(ts)) { isoDay = ts.slice(0, 10); hm = ts.slice(11, 16); }
+  else { d = toDate(ts); if (d && !isNaN(d)) { isoDay = tbIso(d); hm = tbHM(d); } }
+  if (!isoDay) return "";
+  const t = today();
+  const day = isoDay === t ? "Today" : isoDay === addDays(t, -1) ? "Yesterday" : fmtShort(isoDay);
+  return `${day} ${hm}`;
+}
+function statusModel() {
+  const run = S.calmRun, old = S.oldRun;
+  const failed = (run && Array.isArray(run.failed_portals)) ? run.failed_portals.map(x => String(x).toUpperCase()) : [];
+  const oldErr = old && old.error ? String(old.error) : "";
+  const when = run ? runWhen(run.ts) : "";
+  let main = "No run yet", bad = false;
+  if (S.paused) main = "Paused";
+  else if (run) {
+    bad = failed.length > 0 || run.ok === false;
+    main = when + (bad ? ": some prices were not sent" : ": all prices sent");
+  }
+  if (oldErr) bad = true;
+  const channels = [
+    {name: "Booking", ok: !failed.includes("BOOKING")},
+    {name: "Expedia", ok: !oldErr},
+    {name: "Airbnb", ok: !failed.includes("AIRBNB")},
+  ];
+  const warn = [];
+  if (failed.includes("AIRBNB")) warn.push(`Airbnb did not take the ${run ? runWhen(run.ts).split(" ").pop() : ""} prices. The next update tries again.`);
+  if (failed.includes("BOOKING")) warn.push("Booking did not take the last prices. The next update tries again.");
+  if (oldErr) warn.push("The old way reported a problem in its last run: " + oldErr);
+  return {main, next: S.paused ? "no updates until you resume" : `next about ${tbHM(nextRun())}`, channels, warn, bad};
+}
+
+/* =====================================================================
+   Not-saved bar: what is waiting, and is it allowed to be saved
+   ===================================================================== */
+function seasonErrors() {
+  const groups = new Set();
+  Object.keys(P.seasons).forEach(k => groups.add(k.split("|").slice(0, 3).join("|")));
+  const errs = {}, bad = new Set();
+  const ok = v => typeof v === "number" && isFinite(v) && v > 0;
+  groups.forEach(g => {
+    const [rt, season, cur] = g.split("|");
+    const m = effSeason(rt, season, cur, "min"), s = effSeason(rt, season, cur, "start"), x = effSeason(rt, season, cur, "max");
+    const nm = cur === "GEL" ? "Booking" : "Airbnb";
+    let msg = "";
+    if (!ok(m) || !ok(s) || !ok(x)) msg = `${nm}: fill in all three numbers.`;
+    else if (!(m <= s && s <= x)) msg = `${nm}: minimum ≤ start ≤ maximum, please.`;
+    if (msg) { errs[g] = msg; bad.add(season); }
+  });
+  return {errs, bad};
+}
+function changeLines() {
+  const L = [];
+  for (const [rt, f] of Object.entries(P.room)) {
+    const nm = roomById(rt).short;
+    if (f.style) L.push(`${nm} mode ${modeByStyle(f.style.from).name} → ${modeByStyle(f.style.v).name}`);
+    if (f.engine) L.push(`${nm} automatic prices ${f.engine.from === "live" ? "Send prices" : "Only calculate"} → ${f.engine.v === "live" ? "Send prices" : "Only calculate"}`);
+    if (f.window_days) L.push(`${nm} how far ahead ${aheadLabel(f.window_days.from)} → ${aheadLabel(f.window_days.v)}`);
+  }
+  const ss = [...new Set(Object.keys(P.seasons).map(k => k.split("|")[1]))];
+  if (ss.length) L.push(ss.map(id => SEASONS[id].label).join(", ") + " prices changed");
+  P.holAdd.forEach(o => L.push(`holiday dates ${fmtRange(o.from, o.to)} (${SEASONS[o.season].label}) added`));
+  P.holDel.forEach(o => L.push(`holiday dates ${fmtRange(o.from, o.to)} removed`));
+  P.ruleAdd.forEach(r => L.push(`date rule ${fmtShort(r.from)}${r.to !== r.from ? " – " + fmtShort(r.to) : ""} (${ruleLabel(r.action)}) added`));
+  P.ruleDel.forEach(r => L.push(`date rule ${fmtShort(r.from)}${r.to !== r.from ? " – " + fmtShort(r.to) : ""} removed`));
+  return L;
+}
+const dirty = () => changeLines().length > 0;
+function paintBar() {
+  const bar = $("bar"), L = changeLines();
+  if (!L.length && !U.saved && !U.notice) { bar.hidden = true; bar.className = ""; bar.innerHTML = ""; document.documentElement.style.setProperty("--bar-h", "0px"); return; }
+  bar.hidden = false;
+  if (!L.length) {
+    bar.className = "done";
+    bar.innerHTML = `<div class="in"><div class="msg" role="status">${esc(U.notice || "Saved. Used from the next price update.")}</div></div>`;
+  } else {
+    const {errs, bad} = seasonErrors();
+    const blocked = Object.keys(errs).length > 0;
+    let note = "Starts at the next price update after you save.";
+    if (blocked) {
+      const others = [...bad].filter(x => x !== U.season).map(x => SEASONS[x].label);
+      note = "Fix the red boxes first" + (others.length ? ` (also in ${others.join(", ")})` : "") + ".";
+    }
+    bar.className = "";
+    bar.innerHTML = `<div class="in"><div class="msg"><b>Not saved:</b> ${esc(L.join(", "))}.<div class="n ${blocked ? "bad" : ""}">${esc(note)}</div></div>
+      <div class="btns"><button type="button" class="btn light" data-act="undoAll">Undo</button>
+      <button type="button" class="btn ${blocked ? "off" : "dark"}" data-act="save" aria-disabled="${blocked}">Save</button></div></div>`;
+  }
+  requestAnimationFrame(() => document.documentElement.style.setProperty("--bar-h", bar.hidden ? "0px" : bar.offsetHeight + "px"));
+}
+function touch() { U.saved = false; U.notice = ""; }
+
+/* =====================================================================
+   Pieces used by several screens
+   ===================================================================== */
+function switchHtml() {
+  const on = !S.paused;
+  return `<button type="button" class="sw" role="switch" aria-checked="${on}" aria-label="Automatic prices for all rooms" data-act="togglePause">${on ? "Automatic" : "Paused"}<span class="track"></span></button>`;
+}
+function pausedBannerHtml(desk) {
+  const warn = desk ? statusModel().warn.map(w => `<div class="warnbox" role="alert" style="margin:12px 24px 0">${esc(w)}</div>`).join("") : "";
+  if (!S.paused) return warn;
+  const msg = S.controlErr
+    ? `<b>Paused.</b> I could not read the pause switch, so nothing is sent until it can be read and you resume.`
+    : desk ? `<b>Paused.</b> Both ways are stopped for all 10 rooms. Booking, Expedia and Airbnb keep today's prices until you resume.`
+           : `<b>Paused.</b> Booking, Expedia and Airbnb keep today's prices until you resume.`;
+  const b = `<div class="banner red" role="status"><span style="flex:1">${msg}</span><button type="button" data-act="resume">Resume</button></div>`;
+  return warn + (desk ? `<div style="padding:12px 24px 0">${b}</div>` : `<div class="page" style="padding-bottom:0;gap:0">${b}</div>`);
+}
+function statusCardHtml() {
+  const m = statusModel();
+  return `<div class="card status">
+    <div class="l1"><b>${esc(m.main)}</b><span class="muted" style="font-size:13px">${esc(m.next)}</span></div>
+    <div class="chs">${m.channels.map(c => `<span class="ok ${c.ok ? "" : "bad"}">${icon(c.ok ? "check" : "x", 16, 2.4)}${c.name}${c.ok ? "" : " (not sent)"}</span>`).join("")}</div>
+    ${m.warn.map(w => `<div class="warnbox" role="alert">${esc(w)}</div>`).join("")}
+    <button type="button" class="link linkb" data-act="how">When do prices change?</button></div>`;
+}
+const badgeCount = () => S.props.filter(p => p.status === "pending").length;
+function tabsHtml(desk) {
+  const cur = U.route.name;
+  const first = desk ? ["calendar", "Calendar"] : ["rooms", "Rooms"];
+  const items = [first, ["seasons", "Seasons"], ["dates", "Dates"], ["ideas", "Ideas"]];
+  const active = (cur === "room" || cur === "test") ? "rooms" : (cur === "calendar" ? "calendar" : cur);
+  return `<nav class="tabs" aria-label="Pricing">${items.map(([id, label]) => {
+    const n = id === "ideas" ? badgeCount() : 0;
+    return `<a class="tab" href="#/${id}" ${id === active ? 'aria-current="page"' : ""}>${label}${n ? ` <span class="badge" aria-label="${n} waiting">${n}</span>` : ""}</a>`;
+  }).join("")}</nav>`;
+}
+function errorsHtml() {
+  const bad = Object.entries(S.errors).filter(([, v]) => v);
+  if (!bad.length) return "";
+  return `<div class="warnbox" role="alert">Some things could not be loaded (${esc(bad.map(([k]) => k).join(", "))}). ${esc(bad[0][1])}</div>`;
+}
+
+/* =====================================================================
+   Why a night has its price
+   ===================================================================== */
+function whyModel(rt, iso, cur) {
+  const r = roomById(rt), old = isOld(rt);
+  const rc = rec(rt, iso, cur), title = fmtDay(iso);
+  if (!rc) return {title: `${r.short}, ${title}`, price: "–", head: "No price has been calculated for this night yet.", steps: [], old, booked: false};
+  if (rc.avail === 0) return {title: `${title}: booked`, price: "", head: "Booked. The engine does not change booked nights.", steps: [], old, booked: true};
+  const shown = old ? rc.mh : rc.new, p = money(shown, cur);
+  let head = KIND_HEAD[rc.kind] || "";
+  if (!head) head = old ? "This is the price the old way has set now." : "The engine calculated this price from your start price and how the room is selling.";
+  if (isEventDay(iso)) head += " An event you approved raises this night, and its maximum.";
+  if (protectedBy(rt, iso) && rc.kind !== "protected") head = KIND_HEAD.protected;
+  const steps = [];
+  if (!old) {
+    (rc.why || []).forEach(w => steps.push({what: String(w), price: ""}));
+    if (rc.status && STATUS_TEXT[rc.status]) steps.push({what: STATUS_TEXT[rc.status], price: ""});
+    if (rc.target) steps.push({what: "Where the engine is heading", price: money(rc.target, cur)});
+    if (rc.min && rc.max) steps.push({what: "Your minimum and maximum for this night", price: `${Math.round(rc.min)} to ${money(rc.max, cur)}`});
+  } else {
+    if (rc.min && rc.max) steps.push({what: "Your minimum and maximum for this night", price: `${Math.round(rc.min)} to ${money(rc.max, cur)}`});
+  }
+  if (typeof rc.avail === "number" && roomById(rt).units > 1) steps.push({what: "Rooms still free", price: `${rc.avail} of ${roomById(rt).units}`});
+  return {title: `Why ${p} on ${title}`, price: p, head, steps, old, booked: false, newPrice: old && rc.new ? money(rc.new, cur) : ""};
+}
+function whyInner(m, rt, iso, desk) {
+  const canRule = !m.old && !m.booked && !protectedBy(rt, iso);
+  return `<p style="font-size:${desk ? 14 : 15}px;line-height:1.45">${esc(m.head)}</p>
+    ${m.steps.length ? `<ol class="steps">${m.steps.map(st => `<li><span>${esc(st.what)}</span><b>${esc(st.price)}</b></li>`).join("")}</ol>` : ""}
+    ${m.old && m.newPrice ? `<p class="warnline">This room is still on the old way. The new way would ask <b>${esc(m.newPrice)}</b> for this night. Nothing from the new way is sent yet.</p>` : ""}
+    ${!m.old && !m.booked && roomById(rt) ? `<p class="fine muted" style="font-size:13px">Airbnb follows the same steps with your Airbnb minimum, start and maximum in dollars.</p>` : ""}
+    ${canRule ? `<button type="button" class="btn light full ${desk ? "small" : ""}" data-act="ruleNight" data-rt="${rt}" data-iso="${iso}">Don't change this night's price</button>
+       <p class="muted" style="font-size:12px;margin-top:-6px">Adds a date rule. You then set the price yourself in MiniHotel. Remove it any time in Dates.</p>` : ""}`;
+}
+function openWhy(rt, iso) {
+  const cur = curFor(roomById(rt), U.cur), m = whyModel(rt, iso, cur);
+  openDialog(`<div class="grab"></div><div class="dh"><h3>${esc(m.title)}</h3>
+    <button type="button" class="ibtn" aria-label="Close" data-act="closeDialog" style="margin-right:-12px;color:var(--ink)">${icon("x", 22)}</button></div>
+    ${whyInner(m, rt, iso, false)}
+    <button type="button" class="btn light full" data-act="closeDialog" data-autofocus>Close</button>`, "Why this price");
+}
+
+/* =====================================================================
+   One room, new way
+   ===================================================================== */
+const y25 = p => Math.round(20 + (p / 25) * 84);
+const pts = p => { const y7 = y25(p[3]); return `40,${y25(p[0])} 110,${y25(p[1])} 180,${y25(p[2])} 240,${y7} 290,${Math.round((y7 + 104) / 2)} 318,104`; };
+function todaysRange(rt) {
+  const season = seasonOnDay(today());
+  const r = roomById(rt); const cur = curFor(r, "GEL");
+  const g = {min: savedSeason(rt, season, "GEL", "min"), start: savedSeason(rt, season, "GEL", "start"), max: savedSeason(rt, season, "GEL", "max")};
+  const a = {min: savedSeason(rt, season, "USD", "min"), start: savedSeason(rt, season, "USD", "start"), max: savedSeason(rt, season, "USD", "max")};
+  return {season, g: r.cur.includes("GEL") ? g : null, a: r.cur.includes("USD") ? a : null, cur};
+}
+function modeSheet(rt, modeId) {
+  const m = MODES.find(x => x.id === modeId), bal = MODES.find(x => x.id === "balanced");
+  const tr = todaysRange(rt), g = tr.g;
+  const have = g && g.min && g.start && g.max;
+  const low = have ? Math.ceil(Math.max(g.start * (1 - m.below / 100), g.min + m.guard * (g.start - g.min)) / 5) * 5 : 0;
+  const high = have ? Math.min(g.max, Math.round(g.start * (1 + m.above / 100) / 5) * 5) : 0;
+  const cur = effRoom(rt, "style") === m.style;
+  const showRef = m.id !== "balanced";
+  const aria = `${m.name}: the price stays near start far away, goes down to ${m.below}% under start a week before if empty, then steps down to the minimum by the day before.`;
+  openDialog(`<div class="grab"></div><div class="dh"><h3>${esc(m.name)}</h3>
+    <button type="button" class="ibtn" aria-label="Close" data-act="closeDialog" style="margin-right:-12px;color:var(--ink)">${icon("x", 22)}</button></div>
+    <p><b>Good for:</b> ${esc(m.best)}</p>
+    <figure><figcaption>A night that stays empty and sells slower than usual</figcaption>
+      <svg width="100%" viewBox="0 0 326 132" role="img" aria-label="${esc(aria)}">
+        <line x1="40" y1="20" x2="318" y2="20" stroke="#D8D5D0"/><line x1="40" y1="104" x2="318" y2="104" stroke="#D8D5D0"/>
+        <text x="0" y="24" font-size="12" fill="#3E3D3A">Start</text><text x="0" y="108" font-size="12" fill="#3E3D3A">Min</text>
+        ${showRef ? `<polyline points="${pts(bal.p)}" fill="none" stroke="#9A9893" stroke-width="2.5" stroke-dasharray="5 4"/>` : ""}
+        <polyline points="${pts(m.p)}" fill="none" stroke="#1F1F1F" stroke-width="3"/>
+        <text x="40" y="126" font-size="12" fill="#3E3D3A">60 days</text><text x="110" y="126" font-size="12" fill="#3E3D3A">30</text>
+        <text x="176" y="126" font-size="12" fill="#3E3D3A">14</text><text x="236" y="126" font-size="12" fill="#3E3D3A">7</text>
+        <text x="318" y="126" font-size="12" fill="#3E3D3A" text-anchor="end">day before</text></svg>
+      ${showRef ? `<div style="display:flex;gap:16px;font-size:12px;color:#3E3D3A;padding-top:4px"><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:18px;height:3px;background:#1F1F1F"></span>${esc(m.name)}</span><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:18px;border-top:2.5px dashed #9A9893"></span>Balanced</span></div>` : ""}
+    </figure>
+    ${have ? `<div class="tiles"><div><div class="k">Lowest it goes</div><div class="v">down to ${low} ₾</div><div class="u">before the last 3 days</div></div>
+      <div><div class="k">When it sells fast</div><div class="v">up to ${high} ₾</div><div class="u">never over your maximum</div></div></div>
+      <p class="fine">With ${esc(roomById(rt).short)}’s ${esc(SEASONS[tr.season].label)} numbers: minimum ${g.min}, start ${g.start}, maximum ${g.max} ₾. Friday and Saturday get +8% on top.</p>` : ""}
+    <ul>${m.does.map(d => `<li>${esc(d)}</li>`).join("")}</ul>
+    <p style="font-size:14px"><b>But:</b> ${esc(m.watch)}</p>
+    <p class="fine">Always, in every mode: never under your minimum or over your maximum. The arrival day is never lowered. In the last 3 days an empty night steps down to your minimum, reaching it the day before. The mode is for every date of this room.</p>
+    <button type="button" class="btn dark full" data-act="useMode" data-rt="${rt}" data-mode="${m.id}" data-autofocus>${cur ? "Close" : "Choose " + esc(m.name)}</button>`, m.name + " explained");
+}
+function roomSettingsHtml(rt, desk) {
+  const r = roomById(rt), style = effRoom(rt, "style"), eng = effRoom(rt, "engine"), ahead = Number(effRoom(rt, "window_days"));
+  const tr = todaysRange(rt);
+  const modeRows = MODES.map(m => {
+    const on = !m.soon && m.style === style;
+    const row = m.soon
+      ? `<div class="optrow"><button type="button" class="opt" role="radio" aria-checked="false" aria-disabled="true" data-act="soon"><span class="rad"></span><span class="tx"><b>${esc(m.name)} <span class="tag">coming soon</span></b><span>Coming soon. Not available yet.</span></span></button></div>`
+      : `<div class="optrow ${on ? "on" : ""}"><button type="button" class="opt" role="radio" aria-checked="${on}" data-act="mode" data-rt="${rt}" data-mode="${m.id}"><span class="rad"></span><span class="tx"><b>${esc(m.name)} ${m.tag ? `<span class="tag">${esc(m.tag)}</span>` : ""}</b><span>${esc(m.line)}</span></span></button>
+         <button type="button" class="ibtn" aria-label="What ${esc(m.name)} does" data-act="info" data-rt="${rt}" data-mode="${m.id}">${icon("info", 22)}</button></div>`;
+    return (m.divider ? `<div style="padding:12px 16px 0;border-top:1px solid var(--line);font-size:12px;font-weight:700;color:var(--soft)">Or keep it simple</div>` : "") + row;
+  }).join("");
+  const grid = ["GEL", "USD"].map(c => {
+    const v = c === "GEL" ? tr.g : tr.a; if (!v) return "";
+    const f = x => (x ? (c === "GEL" ? gel(x) : usd(x)) : "–");
+    return `<div class="cell2" style="font-weight:600;border-top:1px solid var(--line2)">${c === "GEL" ? "Booking" : "Airbnb"}</div><div class="cell2" style="border-top:1px solid var(--line2)">${f(v.min)}</div><div class="cell2" style="border-top:1px solid var(--line2);font-weight:700">${f(v.start)}</div><div class="cell2" style="border-top:1px solid var(--line2)">${f(v.max)}</div>`;
+  }).join("");
+  const help = eng === "live"
+    ? "Send prices: the engine sets this room’s prices and sends them to Booking and Airbnb."
+    : "Only calculate: the engine only calculates and shows what it would do. Nothing is sent. The prices in MiniHotel stay as they are until you change them.";
+  return `<section class="sec"><div><h2 class="h2">Mode</h2><p class="sub">How hard the engine works to fill empty nights. Tap the i to see what a mode does.</p></div>
+      <div class="card" style="overflow:hidden" role="radiogroup" aria-label="Mode">
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--soft);padding:10px 16px 0"><span>More bookings</span><span>Higher price</span></div>${modeRows}</div>
+      <p class="sub" style="margin:0">The mode is for every date of this room. For only some dates (a slow week, the holidays) use a date rule.</p>
+      <a href="#/dates" class="btn light full small" data-act="goDates">Add a date rule</a></section>
+    <section class="sec"><div><h2 class="h2">Who sets minimum, start and maximum</h2><p class="sub">The engine always keeps daily prices between the minimum and maximum. This decides who changes those three numbers.</p></div>
+      <div class="card" style="overflow:hidden" role="radiogroup" aria-label="Who sets minimum, start and maximum">
+        <div class="optrow on"><button type="button" class="opt" role="radio" aria-checked="true"><span class="rad"></span><span class="tx"><b>Me</b><span>You set them in Seasons. The engine moves daily prices inside them.</span></span></button></div>
+        <div class="optrow"><button type="button" class="opt" role="radio" aria-checked="false" aria-disabled="true" data-act="soon"><span class="rad"></span><span class="tx"><b>The engine suggests, I approve <span class="tag">coming soon</span></b><span>Coming soon for this room.</span></span></button></div>
+        <div class="optrow"><button type="button" class="opt" role="radio" aria-checked="false" aria-disabled="true" data-act="soon"><span class="rad"></span><span class="tx"><b>The engine decides <span class="tag">coming later</span></b><span>Coming later. Not available yet.</span></span></button></div></div></section>
+    <section class="sec"><div><h2 class="h2">How far ahead</h2><p class="sub">Dates further away keep the price they have now in MiniHotel.</p></div>
+      <div class="seg" style="grid-template-columns:repeat(3,minmax(0,1fr))" role="radiogroup" aria-label="How far ahead">${AHEAD.map(([d, l]) => `<button type="button" class="segb ${ahead === d ? "on" : ""}" role="radio" aria-checked="${ahead === d}" data-act="ahead" data-rt="${rt}" data-d="${d}">${l}</button>`).join("")}
+        </div>${AHEAD.some(a => a[0] === ahead) ? "" : `<p class="sub">Now ${ahead} days.</p>`}</section>
+    <section class="sec"><div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px"><div><h2 class="h2">${esc(SEASONS[tr.season].label)}: your range</h2><p class="sub">Today’s season. Other seasons are in Seasons.</p></div>
+        <a href="#/seasons" class="link" data-act="goSeason" data-season="${tr.season}" style="font-weight:700">Change</a></div>
+      ${seasonOverride(rt) ? `<p class="warnline">The engine uses other numbers for this room (set outside this page). Changes in Seasons are ignored for it until those are removed.</p>` : ""}
+      <div class="card" style="overflow:hidden;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))"><div class="cell2"></div><div class="cell2 muted" style="font-size:13px;font-weight:600">Minimum</div><div class="cell2 muted" style="font-size:13px;font-weight:600">Start</div><div class="cell2 muted" style="font-size:13px;font-weight:600">Maximum</div>${grid}</div></section>
+    <section class="sec"><h2 class="h2">Automatic prices for this room</h2>
+      <div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))" role="radiogroup" aria-label="Automatic prices for this room">
+        ${[["live", "Send prices"], ["test", "Only calculate"]].map(([v, l]) => `<button type="button" class="segb ${eng === v ? "on" : ""}" role="radio" aria-checked="${eng === v}" data-act="engine" data-rt="${rt}" data-v="${v}">${l}</button>`).join("")}</div>
+      <p class="sub" style="font-size:14px;color:var(--soft)">${esc(help)}</p></section>`;
+}
+function nightsCardHtml(rt) {
+  const r = roomById(rt), list = nightsOf(rt).slice(0, U.allNights ? 28 : 7);
+  const rows = list.map(n => {
+    const g = n.rec; let what = "Empty", cls = "", gp = "", up = "";
+    if (!g) { what = "No price yet"; }
+    else if (g.avail === 0) { what = "Booked"; cls = "bk"; }
+    else {
+      const hand = isHandSet(rt, n.iso, g);
+      if (hand) what = "Set by hand"; else if (isEventDay(n.iso)) what = "Empty · event"; else if (r.units > 1) what = `${g.avail} of ${r.units} free`;
+      gp = n.gel ? gel(n.gel.new) : ""; up = n.usd ? usd(n.usd.new) : "";
+      if (!r.cur.includes("GEL")) gp = "";
+    }
+    return `<button type="button" class="night" data-act="night" data-rt="${rt}" data-iso="${n.iso}" aria-label="${esc(fmtDay(n.iso) + (cls ? ", booked" : ", " + what.toLowerCase() + (gp ? ", " + gp : "") + ", show why"))}">
+      <span class="d">${fmtDay(n.iso)}</span><span class="w ${cls}">${what}</span><span class="g">${gp}</span><span class="u">${up}</span></button>`;
+  }).join("");
+  return `<section class="sec"><div><h2 class="h2">Next nights</h2><p class="sub">Tap an empty night to see why it has this price.</p></div>
+    <div class="card" style="overflow:hidden">${rows}</div>
+    <button type="button" class="btn light full small" data-act="allNights">${U.allNights ? "Show fewer nights" : "Show 4 weeks"}</button></section>`;
+}
+function viewRoom(rt) {
+  const r = roomById(rt);
+  const eng = effRoom(rt, "engine");
+  const line = savedRoom(rt, "engine") === "live" ? "Automatic prices on. Sent to Booking and Airbnb." : "Test only. Nothing is sent.";
+  return `<div class="page"><div style="display:flex;flex-direction:column;gap:4px"><a class="backl" href="#/rooms">${icon("left")}Rooms</a>
+    <h1 style="font-size:26px;font-weight:700">${esc(r.name)}</h1><p class="sub" style="font-size:14px">${S.paused ? "Paused. " : ""}${line}</p></div>
+    ${nightsCardHtml(rt)}${roomSettingsHtml(rt, false)}</div>`;
+}
+
+/* =====================================================================
+   One room, old way (test)
+   ===================================================================== */
+function testInner(rt) {
+  const st = testStats(rt), r = roomById(rt), cur = st.cur;
+  const rows = [];
+  for (let i = 0; i < 5; i++) {
+    const iso = addDays(today(), i), g = rec(rt, iso, cur);
+    rows.push(`<div class="tr3"><span style="font-weight:600">${fmtDay(iso)}</span><span>${g && g.avail === 0 ? "booked" : g && g.mh ? money(g.mh, cur) : "–"}</span><span style="font-weight:700">${g && g.avail === 0 ? "" : g && g.new ? money(g.new, cur) : "–"}</span></div>`);
+  }
+  const big = U.testStats[rt];
+  const sign = v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.round(Math.abs(v) * 100) + "%";
+  return {st, rows, big, sign, r};
+}
+function testHtml(rt, desk) {
+  const {st, rows, big, sign, r} = testInner(rt);
+  return `<section class="sec"><div><h2 class="h2">Try-out so far</h2><p class="sub">The new way compared with the old way, for the empty nights in the next 3 months. ${st.cur === "USD" ? "Airbnb" : "Booking"} prices.</p></div>
+    <div class="tiles3"><div class="tile"><div class="k">Cheaper</div><div class="v">${st.n ? st.cheaper : "–"}</div><div class="u">nights</div></div>
+      <div class="tile"><div class="k">More expensive</div><div class="v">${st.n ? st.dearer : "–"}</div><div class="u">nights</div></div>
+      <div class="tile"><div class="k">On average</div><div class="v">${st.avg === null ? "–" : sign(st.avg)}</div><div class="u">per night</div></div></div>
+    ${big ? `<div class="card pad" style="font-size:14px;line-height:1.45">Biggest one-day move in the last 2 weeks: old way <b>${sign(big.old)}</b>, new way <b>${sign(big.new)}</b>.</div>` : ""}
+    <div class="card pad" style="font-size:14px;line-height:1.45"><b>Calmer:</b> the old way often sits at your minimum or maximum and jumps between them. The new way stays near your start price and, in Balanced, lowers at most 5% a day before the last 3 days.</div></section>
+    <section class="sec"><h2 class="h2">Next nights, ${st.cur === "USD" ? "Airbnb" : "Booking"}</h2>
+      <div class="card" style="overflow:hidden"><div class="tr3 h"><span>Night</span><span>Old way</span><span>New way</span></div>${rows.join("")}</div></section>
+    <section class="sec"><h2 class="h2">Your choice</h2>
+      <p class="warnline">You can switch ${esc(r.short)} to the new way after the test, from ${TEST_ENDS}. The switch is not on this page yet.</p></section>`;
+}
+async function loadBigMove(rt) {
+  if (U.testStats[rt] !== undefined) return;
+  U.testStats[rt] = null;
+  const r = roomById(rt), cur = curFor(r, "GEL"), t = today(), days = [];
+  for (let i = 13; i >= 0; i--) days.push(addDays(t, -i));
+  const docs = await Promise.all(days.map(async d => { try { const s = await getDoc(doc(db, "pricing_shadow_daily", `${d}_${rt}`)); return s.exists() ? s.data().dates || {} : null; } catch (e) { return null; } }));
+  const keys = new Set(); docs.forEach(d => d && Object.keys(d).forEach(k => k.endsWith("|" + cur) && keys.add(k)));
+  let bo = 0, bn = 0;
+  keys.forEach(k => {
+    for (const [side, setter] of [["mh", v => (bo = Math.max(bo, v))], ["new", v => (bn = Math.max(bn, v))]]) {
+      let last = null;
+      docs.forEach(d => { const x = d && d[k] && d[k][side]; if (!x) return; if (last && Math.abs(x - last) >= 0.5) setter(Math.abs(x - last) / last); last = x; });
+    }
+  });
+  if (bo || bn) { U.testStats[rt] = {old: bo, new: bn}; render(); }
+}
+function viewTest(rt) {
+  const r = roomById(rt);
+  return `<div class="page"><div style="display:flex;flex-direction:column;gap:4px"><a class="backl" href="#/rooms">${icon("left")}Rooms</a>
+    <h1 style="font-size:26px;font-weight:700">${esc(r.short)} <span style="font-size:16px;font-weight:500;color:var(--muted)">${r.sub.split(" · ")[0]}</span></h1>
+    <p class="sub" style="font-size:14px">Old way. The new way only calculates. Test ends ${TEST_ENDS}.</p></div>${testHtml(rt, false)}</div>`;
+}
+
+/* =====================================================================
+   Rooms (phone)
+   ===================================================================== */
+function modeName(rt) { return modeByStyle(savedRoom(rt, "style")).name; }
+function viewRooms() {
+  const live = NEW_ROOMS.map(r => {
+    const t = tonight(r.id), b = bookedShare(r.id), only = savedRoom(r.id, "engine") !== "live";
+    return `<a href="#/room/${r.id}" class="row"><div class="grow"><div class="t">${esc(r.name)}</div>
+      <div class="s">${modeName(r.id)}${only ? " · only calculating" : ""} · next 30 nights ${b === null ? "–" : b + "%"} booked</div></div>
+      <div class="r"><b>${esc(t.text)}</b><span>tonight</span></div>${icon("right")}</a>`;
+  }).join("");
+  const test = OLD_ROOMS.map(r => `<a href="#/test/${r.id}" class="row"><div class="grow"><div class="t">${esc(r.name)}</div>
+      <div class="s">New way would be ${esc(gapText(r.id))} on average</div></div>${icon("right")}</a>`).join("");
+  return `<div class="page">
+    <div class="topbar"><h1>Pricing</h1>${switchHtml()}</div>
+    ${statusCardHtml()}${errorsHtml()}${tabsHtml(false)}
+    <section class="sec"><div><h2 class="h2">${S.paused ? "New way (paused)" : "New way, prices sent"}</h2><p class="sub">Tap a room to see its nights and how it is priced.</p></div>
+      <div class="card" style="overflow:hidden">${live}</div></section>
+    <section class="sec"><div><h2 class="h2">Old way, new way being tested</h2><p class="sub">These rooms still get the old prices. The new way only calculates. The test ends ${TEST_ENDS}; then you choose, room by room.</p></div>
+      <div class="card" style="overflow:hidden">${test}</div></section></div>`;
+}
+
+/* =====================================================================
+   Seasons
+   ===================================================================== */
+function seasonCardHtml(r) {
+  const sid = U.season, old = isOld(r.id);
+  const row = cur => {
+    const has = r.cur.includes(cur), nm = cur === "GEL" ? "Booking" : "Airbnb", sub = cur === "GEL" ? "lari ₾" : "dollars $", word = cur === "GEL" ? "in lari" : "in dollars";
+    const box = f => {
+      if (!has) return `<input class="num" type="text" disabled value="–" aria-label="${esc(r.name)} ${nm} ${f} not used">`;
+      const k = skey(r.id, sid, cur, f), v = k in P.seasons ? (P.seasons[k].text ?? "") : (savedSeason(r.id, sid, cur, f) ?? "");
+      const bad = seasonErrors().errs[`${r.id}|${sid}|${cur}`] ? "bad" : "";
+      return `<input class="num ${bad}" type="text" inputmode="numeric" value="${esc(v)}" data-inp="season" data-k="${k}" style="${f === "start" ? "font-weight:800" : ""}" aria-label="${esc(r.name)} ${nm} ${{min: "minimum", start: "start", max: "maximum"}[f]} ${word}">`;
+    };
+    return `<span style="font-size:13px;font-weight:600;line-height:1.2">${nm}<br>${sub}</span>${box("min")}${box("start")}${box("max")}`;
+  };
+  return `<div class="card pad" data-room="${r.id}" style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:15px;font-weight:700">${esc(r.name)} ${old ? '<span class="tag">old way</span>' : ""}</div>
+    <div class="pgrid"><span></span><span class="lab">Minimum</span><span class="lab">Start</span><span class="lab">Maximum</span>${row("GEL")}${row("USD")}</div>
+    <div class="errline" role="alert" data-err="${r.id}">${esc(seasonErrorText(r.id))}</div>
+    ${seasonOverride(r.id) ? `<div class="warnline">The engine uses other numbers for this room (set outside this page). What you type here is ignored for it until those are removed.</div>` : ""}</div>`;
+}
+function seasonErrorText(rt) {
+  const {errs} = seasonErrors();
+  return ["GEL", "USD"].map(c => errs[`${rt}|${U.season}|${c}`]).filter(Boolean).join(" ");
+}
+function seasonChipsHtml() {
+  const {bad} = seasonErrors();
+  return SEASON_ORDER.map(id => {
+    const on = id === U.season, s = SEASONS[id];
+    return `<button type="button" class="pill" role="radio" aria-checked="${on}" data-act="season" data-season="${id}"><span class="pd" style="background:${on ? "#FFFFFF" : s.dot}"></span>${s.label}${bad.has(id) ? " (fix)" : ""}</button>`;
+  }).join("");
+}
+function viewSeasons() {
+  const s = SEASONS[U.season], rooms = NEW_ROOMS.concat(U.showOld ? OLD_ROOMS : []);
+  const desk = isDesk();
+  return `${desk ? "" : `<div class="topbar"><h1>Pricing</h1></div>${tabsHtml(false)}`}${errorsHtml()}
+    <section class="sec"><div><h2 class="h2">Pick a season</h2><p class="sub">Each season has its own minimum, start and maximum for every room.</p></div>
+      <div class="pills" role="radiogroup" aria-label="Season" id="seasonChips">${seasonChipsHtml()}</div></section>
+    <section class="card pad sec"><div style="font-size:15px;font-weight:700">When is ${esc(s.label)}?</div>
+      <div style="display:flex;flex-direction:column;gap:6px">${SEASON_TEXT[U.season].map(t => `<div class="rline"><span class="dot" style="width:10px;height:10px;background:${s.dot}"></span>${t}</div>`).join("")}</div>
+      <p class="sub" style="margin:0">Every year, all rooms. These dates are fixed. Holiday dates can give some days another season, for example 20 to 27 Dec High.</p>
+      <a href="#/dates" class="btn light small full" style="color:var(--ink)">Holiday dates</a></section>
+    <section class="sec"><div><h2 class="h2">${esc(s.label)} prices</h2><p class="sub">The engine moves each night between minimum and maximum, around the start price.</p></div>
+      <div class="${desk ? "cards2" : ""}" style="${desk ? "" : "display:flex;flex-direction:column;gap:10px"}">${rooms.map(seasonCardHtml).join("")}</div>
+      <button type="button" class="btn light full small" data-act="toggleOld">${U.showOld ? "Hide the 6 rooms on the old way" : "Show the 6 rooms on the old way"}</button></section>`;
+}
+function refreshSeasonUi() {
+  const {errs} = seasonErrors();
+  document.querySelectorAll('input[data-inp="season"]').forEach(inp => {
+    const [rt, season, cur] = inp.dataset.k.split("|");
+    inp.classList.toggle("bad", !!errs[`${rt}|${season}|${cur}`]);
+  });
+  document.querySelectorAll("[data-err]").forEach(el => { el.textContent = seasonErrorText(el.dataset.err); });
+  const chips = $("seasonChips"); if (chips) chips.innerHTML = seasonChipsHtml();
+  paintBar();
+}
+
+/* =====================================================================
+   Dates: holiday dates, date rules, events, add form
+   ===================================================================== */
+const mdSortKey = md => (md < "07-01" ? "1" : "0") + md;
+function holidayRowsHtml() {
+  const rows = holidaysNow().map(o => ({o, pending: P.holAdd.some(a => same(a, o))})).sort((a, b) => mdSortKey(a.o.from).localeCompare(mdSortKey(b.o.from)));
+  U._holRows = rows;
+  if (!rows.length) return `<div class="empty">No holiday dates.</div>`;
+  return rows.map((x, i) => { const s = SEASONS[x.o.season] || {label: x.o.season, dot: "#8A8984"}, r = fmtRange(x.o.from, x.o.to);
+    return `<div class="lrow ${x.pending ? "pending" : ""}"><span class="dot" style="background:${s.dot}"></span><div class="grow"><div class="t">${r}</div><div class="s">${esc(s.label)} prices · all rooms · every year${x.pending ? " · not saved" : ""}</div></div>
+      <button type="button" class="x" aria-label="Remove ${r}" data-act="delHol" data-i="${i}">${icon("trash", 20)}</button></div>`; }).join("");
+}
+function ruleRoomsText(r) { return r.rooms === "all" || r.rooms === undefined ? "all rooms" : (Array.isArray(r.rooms) ? r.rooms.map(id => roomById(id) ? roomById(id).short : id).join(", ") : "?"); }
+function ruleRowsHtml() {
+  const t = today();
+  const file = fileRules().filter(r => r.to >= t).map(r => ({r, file: true}));
+  const own = rulesNow().filter(r => r.to >= t).map(r => ({r, pending: P.ruleAdd.some(a => same(a, r))}));
+  U._ruleRows = own;
+  if (!file.length && !own.length) return `<div class="empty">No date rules yet.</div>`;
+  const line = r => `${fmtShort(r.from)}${r.to !== r.from ? " – " + fmtShort(r.to) : ""} ${r.to.slice(0, 4)}`;
+  return file.map(x => `<div class="lrow"><span class="dot" style="background:var(--ink);border-radius:3px"></span><div class="grow"><div class="t">${line(x.r)}</div><div class="s">${esc(ruleLabel(x.r.action))} · ${esc(ruleRoomsText(x.r))} · set in the settings file</div></div></div>`).join("")
+    + own.map((x, i) => `<div class="lrow ${x.pending ? "pending" : ""}"><span class="dot" style="background:var(--ink);border-radius:3px"></span><div class="grow"><div class="t">${line(x.r)}</div><div class="s">${esc(ruleLabel(x.r.action))} · ${esc(ruleRoomsText(x.r))} · only this time${x.pending ? " · not saved" : ""}${x.r.note ? " · " + esc(x.r.note) : ""}</div></div>
+      <button type="button" class="x" aria-label="Remove ${line(x.r)}" data-act="delRule" data-i="${i}">${icon("trash", 20)}</button></div>`).join("");
+}
+function eventRowsHtml() {
+  const t = today();
+  const up = S.events.filter(e => e.date >= t && e.status !== "dismissed").sort((a, b) => a.date.localeCompare(b.date)).slice(0, 12);
+  if (!up.length) return `<div class="empty">No upcoming events.</div>`;
+  return up.map(e => {
+    const pct = Math.round(((Number(e.multiplier) || 1.35) - 1) * 100), st = e.status;
+    const decided = st === "approved" || st === "manual" || st === "rejected";
+    const state = st === "approved" || st === "manual" ? "approved" : st === "rejected" ? "ignored" : "waiting for you";
+    return `<div class="lrow" style="flex-wrap:wrap;padding-right:12px"><div class="grow" style="min-width:160px"><div class="t">${esc(e.label || e.name || "Event")}</div><div class="s">${fmtDay(e.date)} · +${pct}% · ${state}</div></div>
+      ${decided ? `<button type="button" class="link" data-act="eventSet" data-id="${esc(e.id)}" data-v="pending" style="font-size:13px">Change</button>`
+        : `<div style="display:flex;gap:8px"><button type="button" class="btn light small" data-act="eventSet" data-id="${esc(e.id)}" data-v="rejected">Ignore</button><button type="button" class="btn dark small" data-act="eventSet" data-id="${esc(e.id)}" data-v="approved">Approve</button></div>`}</div>`;
+  }).join("");
+}
+function dpInit() {
+  if (U.dp.y) return;
+  const t = today(); U.dp.y = +t.slice(0, 4); U.dp.m = +t.slice(5, 7) - 1;
+}
+function overlapClashes() {
+  const d = U.dp; if (d.kind !== "season" || !d.from || !d.to) return [];
+  const set = new Set(mdDays(mdOf(d.from), mdOf(d.to)));
+  return holidaysNow().filter(o => mdDays(o.from, o.to).some(x => set.has(x)));
+}
+function calendarHtml() {
+  dpInit();
+  const d = U.dp, y = d.y, m = d.m, first = new Date(Date.UTC(y, m, 1)).getUTCDay(), lead = (first + 6) % 7, count = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const t = today(); let cells = "";
+  for (let i = 0; i < lead; i++) cells += "<div></div>";
+  for (let n = 1; n <= count; n++) {
+    const iso = `${y}-${String(m + 1).padStart(2, "0")}-${String(n).padStart(2, "0")}`;
+    const end = iso === d.from || iso === d.to, inside = d.from && d.to && iso > d.from && iso < d.to;
+    const past = iso < t || (d.from && !d.to && iso < d.from);
+    const hs = holidaysNow().find(o => inMdRange(mdOf(iso), o.from, o.to));
+    const dot = hs && !end ? (SEASONS[hs.season] || {dot: "#8A8984"}).dot : "transparent";
+    cells += `<button type="button" class="day ${end ? "end" : inside ? "in" : ""}" data-act="pickDay" data-iso="${iso}" ${iso < t ? "disabled" : ""} aria-pressed="${!!(end || inside)}" aria-label="${n} ${MNL[m]} ${y}${hs ? ", " + (SEASONS[hs.season] || {label: hs.season}).label + " prices" : ""}${iso < t ? ", past" : ""}">${n}<span class="hd" style="background:${dot}"></span></button>`;
+  }
+  return `<div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <button type="button" class="x" style="margin-left:-12px" aria-label="Previous month" data-act="monthPrev">${icon("left", 22)}</button>
+      <div style="font-size:16px;font-weight:700" aria-live="polite">${MNL[m]} ${y}</div>
+      <button type="button" class="x" style="margin-right:-12px" aria-label="Next month" data-act="monthNext">${icon("right", 22)}</button></div>
+    <div class="cal">${["Mo","Tu","We","Th","Fr","Sa","Su"].map(w => `<div class="wd">${w}</div>`).join("")}${cells}</div>
+    <p class="sub" style="margin-top:6px">A dot under a day means it already has holiday prices.</p></div>`;
+}
+function addFormHtml() {
+  const d = U.dp, isRule = d.kind === "rule";
+  const list = isRule ? RULE_CHOICES.map(c => ({id: c.id, label: c.label, help: c.help, dot: "#8A8984"})) : SEASON_ORDER.map(id => ({id, label: SEASONS[id].label, dot: SEASONS[id].dot, help: {low: "Your cheapest prices.", mid: "Your normal prices.", xmas_low: "Your early-December prices.", high: "Your busy-season prices.", peak: "Your top-season prices.", new_year: "Your highest prices, for the New Year nights."}[id]}));
+  const cur = list.find(x => x.id === d.choice) || list[0];
+  const clashes = overlapClashes(), overlap = clashes.length > 0;
+  const ready = !!(d.from && d.to) && !overlap;
+  const waiting = d.from && !d.to;
+  const roomsText = d.rooms.length ? d.rooms.map(id => roomById(id).short).join(", ") : "all rooms";
+  const hint = !d.from ? "Tap the first day in the calendar." : waiting ? "Now tap the last day. It can be in the next month." : `${fmtShort(d.from)} to ${fmtShort(d.to)}. Tap a day to start again.`;
+  const label = overlap ? "Pick other days" : ready ? `Add ${fmtShort(d.from)} – ${fmtShort(d.to)}: ${isRule ? cur.label + ", " + roomsText : cur.label + " prices"}` : "Pick the first and last day";
+  return `<section class="card pad sec" id="addForm"><h2 class="h2">Add dates</h2>
+    <div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))" role="radiogroup" aria-label="What to add">
+      ${[["season", "Holiday prices"], ["rule", "Date rule"]].map(([k, l]) => `<button type="button" class="segb ${d.kind === k ? "on" : ""}" role="radio" aria-checked="${d.kind === k}" data-act="dpKind" data-k="${k}">${l}</button>`).join("")}</div>
+    <div class="fromto"><div class="${!d.from || d.to ? (d.from ? "" : "act") : ""}"><div class="k">First day</div><div class="v">${d.from ? fmtShort(d.from) : "Tap a day"}</div></div>
+      <div class="${waiting ? "act" : ""}"><div class="k">Last day</div><div class="v">${d.to ? fmtShort(d.to) : waiting ? "Tap a day" : "–"}</div></div></div>
+    <p style="margin:-4px 0 0;font-size:14px;color:var(--soft)">${hint}</p>
+    ${calendarHtml()}
+    <div style="display:flex;flex-direction:column;gap:8px"><div style="font-size:15px;font-weight:700">${isRule ? "What should the engine do?" : "Which prices on these dates?"}</div>
+      <div class="pills" role="radiogroup" aria-label="${isRule ? "What should the engine do?" : "Which prices on these dates?"}">${list.map(c => `<button type="button" class="pill" role="radio" aria-checked="${c.id === cur.id}" data-act="dpChoice" data-id="${c.id}"><span class="pd" style="background:${c.id === cur.id ? "#FFFFFF" : c.dot}"></span>${esc(c.label)}</button>`).join("")}</div>
+      <p style="margin:0;font-size:14px;color:var(--soft)">${esc(cur.help)}</p></div>
+    ${isRule ? `<div style="display:flex;flex-direction:column;gap:8px"><div style="font-size:15px;font-weight:700">Which rooms?</div><div class="pills">
+      <button type="button" class="pill" aria-pressed="${d.rooms.length === 0}" data-act="dpRoom" data-id="all">All rooms</button>
+      ${NEW_ROOMS.map(r => `<button type="button" class="pill" aria-pressed="${d.rooms.includes(r.id)}" data-act="dpRoom" data-id="${r.id}">${esc(r.short)}</button>`).join("")}</div>
+      <p class="sub" style="margin:0">Only rooms on the new way follow date rules.</p></div>` : ""}
+    ${overlap ? `<div role="alert" style="background:var(--red-bg);color:var(--red-ink);border-radius:10px;padding:10px 12px;font-size:14px">Some of these days already have holiday prices (${clashes.map(o => fmtRange(o.from, o.to) + ", " + (SEASONS[o.season] || {label: o.season}).label).join("; ")}). Remove ${clashes.length > 1 ? "those" : "that one"} first, or pick other days.</div>` : ""}
+    <button type="button" class="btn full ${ready ? "dark" : "off"}" data-act="dpAdd" aria-disabled="${!ready}">${esc(label)}</button></section>`;
+}
+function viewDates() {
+  const desk = isDesk();
+  const lists = `<section class="sec"><div><h2 class="h2">Holiday dates</h2><p class="sub">These dates use another season's prices. They repeat every year, for all rooms, on both ways.</p></div><div class="card" style="overflow:hidden" id="holList">${holidayRowsHtml()}</div></section>
+    <section class="sec"><div><h2 class="h2">Date rules</h2><p class="sub">Leave some dates alone, or use another mode on them. Only for the dates you pick, not every year. Only rooms on the new way follow them.</p></div><div class="card" style="overflow:hidden" id="ruleList">${ruleRowsHtml()}</div></section>
+    <section class="sec"><div><h2 class="h2">Events</h2><p class="sub">Big events in Tbilisi. An event you approve raises the price and the maximum on that date, for rooms on the new way.</p></div><div class="card" style="overflow:hidden">${eventRowsHtml()}</div></section>`;
+  return `${desk ? "" : `<div class="topbar"><h1>Pricing</h1></div>${tabsHtml(false)}`}${errorsHtml()}
+    ${desk ? `<div class="cols2"><div style="display:flex;flex-direction:column;gap:18px">${lists}</div>${addFormHtml()}</div>` : lists + addFormHtml()}`;
+}
+
+/* =====================================================================
+   Ideas
+   ===================================================================== */
+function ideaInfo(p) {
+  const t = p.type || p.field || "", eur = /eur$/i.test(t), base = t.replace(/Eur$/i, "").toLowerCase();
+  const rt = p.property, season = p.season;
+  const path = {startprice: eur ? `startPricesEur.${rt}.${season}` : `startPrices.${rt}.${season}`,
+    floor: eur ? `eurRules.${rt}.${season}.min` : `priceRules.${rt}.${season}.min`,
+    ceiling: eur ? `eurRules.${rt}.${season}.max` : `priceRules.${rt}.${season}.max`}[base];
+  if (!path) return null;
+  const cur = num(p.current ?? p.current_value), sug = num(p.suggested ?? p.proposed_value);
+  const fmt = v => (v === null ? "?" : eur ? usd(v) : gel(v));
+  const what = {startprice: "start price", floor: "minimum", ceiling: "maximum"}[base];
+  const dir = sug !== null && cur !== null && sug < cur ? "Lower" : "Raise";
+  const sl = (SEASONS[season] || {label: season}).label;
+  const effect = base === "startprice" ? `${sl} nights start from ${fmt(sug)} instead of ${fmt(cur)}. Your minimum and maximum stay.`
+    : base === "floor" ? `The lowest price the engine may use in ${sl} becomes ${fmt(sug)} instead of ${fmt(cur)}.`
+    : `The highest price in ${sl} becomes ${fmt(sug)} instead of ${fmt(cur)}. Quiet nights do not change.`;
+  const pct = p.change_pct != null ? `${p.change_pct > 0 ? "+" : "−"}${Math.abs(Math.round(p.change_pct))}%` : (cur && sug !== null ? `${sug >= cur ? "+" : "−"}${Math.abs(Math.round((sug - cur) / cur * 100))}%` : "");
+  return {path, cur, sug, fmt, what, eur, title: `${dir} the ${what}`, effect, pct, where: `${roomName(rt)} · ${eur ? "Airbnb" : "Booking"}`, season: sl + (season === "xmas_low" ? "" : " season")};
+}
+function ideaCardHtml(p) {
+  const i = ideaInfo(p); if (!i) return "";
+  const st = U.ideaState[p.id] || "open", done = U.ideaDone?.[p.id];
+  let foot = "";
+  if (done === "applied") foot = `<div class="done g" role="status"><span>Applied. Used from the next price update, about ${tbHM(nextRun())}.</span><button type="button" aria-label="Undo: ${esc(i.title)}, ${esc(i.where)}" data-act="ideaUndo" data-id="${p.id}">Undo</button></div>`;
+  else if (done === "skipped") foot = `<div class="done n" role="status"><span>Skipped. It may come back next week if it still fits.</span><button type="button" aria-label="Show again: ${esc(i.title)}" data-act="ideaAgain" data-id="${p.id}">Undo</button></div>`;
+  else if (st === "reasons") foot = `<div style="display:flex;flex-direction:column;gap:10px"><div style="font-size:14px;font-weight:600">Why skip? You can leave this out.</div>
+      <div class="pills">${REASONS.map(r => `<button type="button" class="pill" data-act="ideaSkip" data-id="${p.id}" data-reason="${esc(r)}">${esc(r)}</button>`).join("")}</div>
+      <div class="two"><button type="button" class="btn light" data-act="ideaBack" data-id="${p.id}">Back</button><button type="button" class="btn dark" data-act="ideaSkip" data-id="${p.id}" data-reason="">Skip</button></div></div>`;
+  else foot = `<div class="two"><button type="button" class="btn light" data-act="ideaAskSkip" data-id="${p.id}">Skip</button><button type="button" class="btn dark" data-act="ideaApply" data-id="${p.id}">Apply</button></div>`;
+  const msg = U.ideaMsg[p.id] ? `<div class="warnbox" role="alert">${esc(U.ideaMsg[p.id])}</div>` : "";
+  return `<article class="card idea" data-idea="${p.id}"><div class="where"><span>${esc(i.where)}</span><span class="chip">${esc(i.season)}</span></div><h3>${esc(i.title)}</h3>
+    <div class="ch"><span class="a">${esc(i.fmt(i.cur))}</span>${icon("arrow", 20)}<span class="b">${esc(i.fmt(i.sug))}</span><span class="c">${esc(i.pct)}</span></div>
+    <div class="tx"><div><b>Why:</b> ${esc(p.reasoning || "No reason was given.")}</div><div><b>What changes:</b> ${esc(i.effect)}</div></div>${msg}${foot}</article>`;
+}
+function viewIdeas() {
+  U.ideaDone = U.ideaDone || {};
+  const desk = isDesk();
+  const waiting = S.props.filter(p => p.status === "pending" || U.ideaDone[p.id]);
+  const earlier = S.props.filter(p => p.status !== "pending" && !U.ideaDone[p.id]).slice(0, 8);
+  const hist = earlier.map(p => {
+    const i = ideaInfo(p); if (!i) return "";
+    const applied = p.status === "approved" || p.status === "auto_applied", canUndo = p.status === "approved" && p.previous != null && p.applied_path;
+    return `<div class="hist">${icon(applied ? "check" : "x", 18, 2.2)}<div class="grow"><b>${applied ? (p.status === "auto_applied" ? "Applied by the engine" : "Applied") : "Skipped"}</b> · ${esc(i.where)} · ${esc(i.season)} · ${esc(i.what)} ${esc(i.fmt(i.cur))} → ${esc(i.fmt(i.sug))}
+      <div class="muted" style="font-size:13px">${p.rejection_reason ? esc(p.rejection_reason) + " · " : ""}${esc(whenOf(p.approved_at || p.rejected_at || p.ts))}</div></div>
+      ${canUndo ? `<button type="button" aria-label="Undo: ${esc(i.title)}, ${esc(i.where)}" data-act="ideaUndo" data-id="${p.id}">Undo</button>` : ""}
+      ${!applied ? `<button type="button" aria-label="Show this idea again" data-act="ideaAgain" data-id="${p.id}">Show again</button>` : ""}</div>`;
+  }).join("");
+  return `${desk ? "" : `<div class="topbar"><h1>Pricing</h1></div>${tabsHtml(false)}`}${errorsHtml()}
+    <section class="sec"><div><h2 class="h2">Waiting for you</h2><p class="sub">Ideas to change a season's minimum, start or maximum. Nothing changes until you tap Apply.</p></div>
+      ${waiting.length ? `<div class="${desk ? "cards2" : ""}" style="${desk ? "" : "display:flex;flex-direction:column;gap:12px"}">${waiting.map(ideaCardHtml).join("")}</div>` : `<div class="card empty">No ideas waiting. New ones appear here when the engine finds something.</div>`}</section>
+    <section class="sec"><div><h2 class="h2">Changed by the engine</h2><p class="sub">Only for rooms where you chose "The engine decides". Undo puts your old number back.</p></div>
+      <div class="card pad" style="font-size:14px;color:var(--soft);line-height:1.45">"The engine decides" is coming later, so the engine changes nothing by itself yet. When it does, every change will show here, with Undo.</div></section>
+    <section class="sec"><h2 class="h2">Earlier</h2><div class="card" style="overflow:hidden">${hist || '<div class="empty">Nothing yet.</div>'}</div></section>`;
+}
+const whenOf = ts => { const d = toDate(ts); return d && !isNaN(d) ? runWhen(`${tbIso(d)}T${tbHM(d)}`) : ""; };
+
+/* =====================================================================
+   Computer: calendar grid and side panel
+   ===================================================================== */
+function winStart() {
+  const t = today();
+  if (U.win === "now") return t;
+  if (U.win === "next") { const y = +t.slice(0, 4), m = +t.slice(5, 7); return `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`; }
+  const d = `${t.slice(0, 4)}-12-14`; return t > d ? t : d;
+}
+function winLabel() {
+  const s = winStart(), e = addDays(s, 27);
+  return `${fmtShort(s)} – ${fmtShort(e)}`;
+}
+function cellHtml(r, iso, j) {
+  const cur = curFor(r, U.cur), rc = rec(r.id, iso, cur), old = isOld(r.id);
+  const sel = U.sel && U.sel.rt === r.id && (U.sel2 ? (j >= Math.min(U.sel.j, U.sel2.j) && j <= Math.max(U.sel.j, U.sel2.j)) : j === U.sel.j);
+  const base = `data-act="cell" data-rt="${r.id}" data-j="${j}" data-iso="${iso}"`;
+  if (!rc) return `<button type="button" class="cell ${sel ? "sel" : ""}" ${base} aria-label="${esc(r.name)}, ${fmtDay(iso)}: no price yet"><b>–</b></button>`;
+  const full = rc.avail === 0, shown = old ? rc.mh : rc.new, hand = isHandSet(r.id, iso, rc);
+  const main = full ? "Booked" : money(shown, cur);
+  let sub = "";
+  if (!full) {
+    if (old) sub = rc.new ? "new " + (cur === "USD" ? usd(rc.new) : Math.round(rc.new)) : "";
+    else if (hand) sub = protectedBy(r.id, iso) && rc.kind !== "manual" ? "no change" : "by hand";
+    else if (r.units > 1) sub = `${rc.avail} of ${r.units} free`;
+  }
+  const edge = !full && (shown === rc.min || shown === rc.max);
+  return `<button type="button" class="cell ${full ? "bk" : ""} ${sel ? "sel" : ""}" ${base} aria-label="${esc(r.name + ", " + fmtDay(iso) + ": " + (full ? "booked" : money(shown, cur)))}">
+    <b>${main}</b><span>${sub}</span>${edge ? '<i class="eb"></i>' : ""}${!full && hand ? `<span class="lk">${icon("lock", 11, 2.6)}</span>` : ""}${isEventDay(iso) ? '<i class="ev"></i>' : ""}</button>`;
+}
+function calRowHtml(r, dates) {
+  const old = isOld(r.id), on = U.panel && (U.panel.type === "room" || U.panel.type === "test") && U.panel.rt === r.id;
+  const sub = old ? r.sub : `${modeName(r.id)} · ${r.sub}`;
+  return `<div class="crow"><button type="button" class="cname ${on ? "on" : ""}" data-act="roomOpen" data-rt="${r.id}" aria-label="Settings for ${esc(r.name)}"><b>${esc(r.name)}</b><span>${esc(sub)}</span></button>${dates.map((iso, j) => cellHtml(r, iso, j)).join("")}</div>`;
+}
+function viewCalendar() {
+  const s = winStart(), dates = Array.from({length: 28}, (_, i) => addDays(s, i));
+  const heads = dates.map(iso => { const se = seasonOnDay(iso); return `<div class="chead" style="${[5, 6].includes(dow(iso)) ? "background:#FAF9F7" : ""}" title="${esc(SEASONS[se].label + (isEventDay(iso) ? " · event" : ""))}"><div style="font-weight:600">${WD[dow(iso)]}</div><div class="n">${+iso.slice(8)}</div><div class="m">${MN[+iso.slice(5, 7) - 1]}</div><div class="bd" style="background:${SEASONS[se].dot}"></div></div>`; }).join("");
+  const win = [["now", "Next 4 weeks"], ["next", MNL[(+today().slice(5, 7)) % 12]], ["hol", "Holidays"]];
+  return `${errorsHtml()}<div class="ctrl">
+      <div class="seg d" role="radiogroup" aria-label="Show prices for">${[["GEL", "Booking ₾"], ["USD", "Airbnb $"]].map(([c, l]) => `<button type="button" class="segb ${U.cur === c ? "on" : ""}" role="radio" aria-checked="${U.cur === c}" data-act="cur" data-v="${c}">${l}</button>`).join("")}</div>
+      <div class="seg d" role="radiogroup" aria-label="Which dates">${win.map(([w, l]) => `<button type="button" class="segb ${U.win === w ? "on" : ""}" role="radio" aria-checked="${U.win === w}" data-act="win" data-v="${w}">${l}</button>`).join("")}</div>
+      <div class="legend"><span><i style="width:14px;height:14px;background:#E3E1DC;border-radius:3px;display:inline-block"></i>Booked</span><span><i style="width:14px;height:3px;background:#1F1F1F;display:inline-block"></i>At your min or max</span><span>${icon("lock", 12, 2.4)}Set by hand or "don't change"</span><span><i style="width:7px;height:7px;border-radius:50%;background:#1F1F1F;display:inline-block"></i>Event</span></div></div>
+    <p class="muted" style="font-size:13px">Click a night for why. Click two nights with Shift for a range. Click a room for its settings.</p>
+    <div class="cwrap" id="cwrap"><div class="cgrid"><div class="crow" style="position:sticky;top:0;z-index:3"><div class="cname" style="height:auto;cursor:default;font-size:12px;font-weight:700;color:var(--soft);z-index:4">Room · ${esc(winLabel())}</div>${heads}</div>
+      <div class="gtitle"><span>New way</span></div>${NEW_ROOMS.map(r => calRowHtml(r, dates)).join("")}
+      <div class="gtitle"><span>Old way, new way being tested</span></div>${OLD_ROOMS.map(r => calRowHtml(r, dates)).join("")}</div></div>`;
+}
+function panelHtml() {
+  const p = U.panel; if (!p) return "";
+  const close = `<button type="button" class="x" data-act="closePanel" aria-label="Close">${icon("x", 20)}</button>`;
+  if (p.type === "why") {
+    const r = roomById(p.rt), cur = curFor(r, U.cur), m = whyModel(p.rt, p.iso, cur);
+    return `<aside class="panel" aria-label="Details"><div class="ph"><div><div class="muted" style="font-size:13px;font-weight:600">${esc(r.name)} · ${fmtDay(p.iso)}</div><div class="big">${esc(m.price || (m.booked ? "Booked" : "–"))}</div></div>${close}</div>
+      ${whyInner(m, p.rt, p.iso, true)}${p.done ? `<div role="status" class="banner green" style="font-size:13px;padding:10px">Rule added: the engine will not change this night. Press Save to keep it.</div>` : ""}</aside>`;
+  }
+  if (p.type === "range") {
+    const r = roomById(p.rt), a = p.a < p.b ? p.a : p.b, b = p.a < p.b ? p.b : p.a, n = diffDays(a, b) + 1;
+    let free = 0; for (let i = 0; i < n; i++) { const rc = rec(p.rt, addDays(a, i), curFor(r, U.cur)); if (!rc || rc.avail !== 0) free++; }
+    const ch = U.rangeChoice || "protect";
+    return `<aside class="panel" aria-label="Details"><div class="ph"><div><div class="muted" style="font-size:13px;font-weight:600">${esc(r.name)}</div><h2>${fmtShort(a)} – ${fmtShort(b)}</h2></div>${close}</div>
+      <p class="muted" style="font-size:13px">${n} nights selected, ${free} still empty.</p>
+      ${isOld(p.rt) ? `<p class="warnline" style="font-size:14px">Date rules only work for rooms on the new way. This room is still on the old way.</p>`
+        : `<div><div class="lbl">What should the engine do on these nights?</div><div class="card" style="overflow:hidden" role="radiogroup" aria-label="Rule for these nights">${RULE_CHOICES.map(c => `<div class="optrow ${ch === c.id ? "on" : ""}"><button type="button" class="opt" style="padding:10px 12px;min-height:0" role="radio" aria-checked="${ch === c.id}" data-act="rangeChoice" data-id="${c.id}"><span class="rad"></span><span class="tx"><b>${esc(c.label)}</b><span>${esc(c.help)}</span></span></button></div>`).join("")}</div></div>
+           <button type="button" class="btn dark full small" data-act="rangeAdd" data-rt="${p.rt}" data-a="${a}" data-b="${b}">Add a rule for ${fmtShort(a)} – ${fmtShort(b)}</button>`}
+      ${p.done ? `<div role="status" class="banner green" style="font-size:13px;padding:10px">Rule added for ${fmtShort(a)} – ${fmtShort(b)}. Press Save to keep it.</div>` : ""}</aside>`;
+  }
+  if (p.type === "room") {
+    const r = roomById(p.rt), line = savedRoom(p.rt, "engine") === "live" ? "Automatic prices on. Sent to Booking and Airbnb." : "Test only. Nothing is sent.";
+    return `<aside class="panel" aria-label="Details"><div class="ph"><div><h2>${esc(r.name)}</h2><div class="muted" style="font-size:13px">${S.paused ? "Paused. " : ""}${line}</div></div>${close}</div>${roomSettingsHtml(p.rt, true)}</aside>`;
+  }
+  const r = roomById(p.rt);
+  return `<aside class="panel" aria-label="Details"><div class="ph"><div><h2>${esc(r.name)}</h2><div class="muted" style="font-size:13px">Old way. The new way only calculates. Test ends ${TEST_ENDS}.</div></div>${close}</div>${testHtml(p.rt, true)}</aside>`;
+}
+
+/* =====================================================================
+   Dialogs
+   ===================================================================== */
+let lastFocus = null;
+function openDialog(html, label) {
+  const o = $("overlay");
+  lastFocus = document.activeElement;
+  o.innerHTML = `<div class="dlg" role="dialog" aria-modal="true" aria-label="${esc(label)}" tabindex="-1">${html}</div>`;
+  o.hidden = false;
+  const d = o.firstElementChild;
+  (d.querySelector("[data-autofocus]") || d).focus();
+}
+function closeDialog() {
+  const o = $("overlay"); if (o.hidden) return;
+  o.hidden = true; o.innerHTML = "";
+  if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+  if (SCOPE_DIALOG) { const f = SCOPE_DIALOG; SCOPE_DIALOG = null; f(false); }
+}
+function message(title, text) {
+  openDialog(`<div class="dh"><h3>${esc(title)}</h3></div><p>${esc(text)}</p><button type="button" class="btn dark full" data-act="closeDialog" data-autofocus>OK</button>`, title);
+}
+function confirmDialog(title, text, yes, no, red) {
+  return new Promise(res => {
+    openDialog(`<div class="dh"><h3>${esc(title)}</h3></div><p>${esc(text)}</p>
+      <button type="button" class="btn ${red ? "red" : "dark"} full" data-act="dialogYes">${esc(yes)}</button>
+      <button type="button" class="btn light full" data-act="closeDialog" data-autofocus>${esc(no)}</button>`, title);
+    SCOPE_DIALOG = res; DIALOG_YES = () => { SCOPE_DIALOG = null; closeDialog(); res(true); };
+  });
+}
+let DIALOG_YES = null;
+document.addEventListener("keydown", e => {
+  const o = $("overlay");
+  if (o.hidden) return;
+  if (e.key === "Escape") { e.preventDefault(); closeDialog(); return; }
+  if (e.key === "Tab") {
+    const f = [...o.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),[tabindex="0"]')];
+    const d = o.firstElementChild;
+    if (!f.length) { e.preventDefault(); d.focus(); return; }
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === d)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    else if (!o.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  }
+});
+function howDialog() {
+  openDialog(`<div class="grab"></div><div class="dh"><h3>When do prices change?</h3></div>
+    <p>There are 5 updates a day, at about 04:00, 09:00, 13:00, 16:00 and 22:00.</p>
+    <div style="font-size:15px;line-height:1.5"><b>New way (XCV, VGL)</b><ul style="margin:4px 0 0"><li>Prices go down in the first update after 09:00, a few % a day (Balanced at most 5%, Fill fast up to 8%).</li><li>Other updates can raise prices, fix any price outside your minimum or maximum, and give first prices to empty dates.</li><li>Nights more than 2 months away go straight to your start price if they are above it (plus 8% on Friday and Saturday).</li><li>The arrival day is never lowered.</li></ul></div>
+    <div style="font-size:15px;line-height:1.5"><b>Old way (the other 6 rooms)</b><ul style="margin:4px 0 0"><li>Prices can go up or down in every update.</li><li>Empty nights can drop to the minimum on the arrival day.</li><li>It sends Booking, Expedia (Rooms, Maxela, Big apartment, Freedom) and Airbnb.</li></ul></div>
+    <button type="button" class="btn light full" data-act="closeDialog" data-autofocus>Close</button>`, "When prices change");
+}
+function showToast(text, undoFn) {
+  U.undo = undoFn; const t = $("toast");
+  t.hidden = false; t.innerHTML = `<span style="flex:1" role="status">${esc(text)}</span>${undoFn ? '<button type="button" data-act="toastUndo">Undo</button>' : ""}`;
+  clearTimeout(showToast.t); showToast.t = setTimeout(() => { t.hidden = true; U.undo = null; }, 9000);
+}
+
+/* =====================================================================
+   Drawing the page
+   ===================================================================== */
+function deskHeadHtml() {
+  const m = statusModel();
+  return `<h1>Pricing</h1>${tabsHtml(true)}<div class="sp"></div><div class="st"><span><b>${esc(m.main)}</b> <span class="muted">· ${esc(m.next)}</span></span>
+    ${m.channels.map(c => `<span class="ok ${c.ok ? "" : "bad"}">${icon(c.ok ? "check" : "x", 16, 2.4)}${c.name}${c.ok ? "" : " (not sent)"}</span>`).join("")}
+    <button type="button" class="link" data-act="how">When do prices change?</button>${switchHtml()}</div>`;
+}
+function footerHtml() {
+  const me = auth.currentUser && auth.currentUser.email ? auth.currentUser.email : "the owner";
+  return `<p class="muted" style="font-size:13px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">Signed in as ${esc(me)}<a href="pricing.html" class="link" style="min-height:44px;font-size:13px">Old pricing page</a><button type="button" class="link" data-act="logout" style="font-size:13px">Log out</button></p>`;
+}
+function currentRoute() {
+  const desk = isDesk(); let r = {...U.route};
+  if (desk && r.name === "rooms") r = {name: "calendar"};
+  if (!desk && r.name === "calendar") r = {name: "rooms"};
+  return r;
+}
+function render() {
+  const desk = isDesk();
+  document.body.dataset.layout = desk ? "desk" : "phone";
+  const r = currentRoute();
+  const keep = $("cwrap") ? [$("cwrap").scrollLeft, $("cwrap").scrollTop] : null;
+  $("dhead").innerHTML = desk ? deskHeadHtml() : "";
+  $("pausedBar").innerHTML = pausedBannerHtml(desk);
+  let html = "";
+  if (desk) {
+    let body = "";
+    const name = (r.name === "room" || r.name === "test") ? "calendar" : r.name;
+    if (name === "calendar") body = viewCalendar();
+    else if (name === "seasons") body = viewSeasons();
+    else if (name === "dates") body = viewDates();
+    else body = viewIdeas();
+    html = `<div class="page"><div class="dwrap"><div class="dmain ${name === "calendar" ? "" : "narrow"}" ${name === "seasons" || name === "ideas" ? 'style="max-width:none"' : ""}>${body}${footerHtml()}</div>${name === "calendar" ? panelHtml() : ""}</div></div>`;
+  } else if (r.name === "rooms") html = viewRooms() + `<div class="page" style="padding-top:0">${footerHtml()}</div>`;
+  else if (r.name === "room" && roomById(r.id) && !isOld(r.id)) html = viewRoom(r.id);
+  else if (r.name === "test" && roomById(r.id) && isOld(r.id)) html = viewTest(r.id);
+  else if (r.name === "seasons") html = `<div class="page">${viewSeasons()}${footerHtml()}</div>`;
+  else if (r.name === "dates") html = `<div class="page">${viewDates()}${footerHtml()}</div>`;
+  else if (r.name === "ideas") html = `<div class="page">${viewIdeas()}${footerHtml()}</div>`;
+  else html = viewRooms();
+  $("root").innerHTML = html;
+  if (keep && $("cwrap")) { $("cwrap").scrollLeft = keep[0]; $("cwrap").scrollTop = keep[1]; }
+  if (desk) { const h = $("dhead").offsetHeight; if (h) document.documentElement.style.setProperty("--head-h", h + "px"); }
+  paintBar();
+}
+function applyRoute() {
+  const h = (location.hash || "#/rooms").replace(/^#\/?/, "").split("/");
+  let route = {name: "rooms"};
+  if (h[0] === "room" && roomById(h[1]) && !isOld(h[1])) route = {name: "room", id: h[1]};
+  else if (h[0] === "test" && roomById(h[1]) && isOld(h[1])) route = {name: "test", id: h[1]};
+  else if (["rooms", "calendar", "seasons", "dates", "ideas"].includes(h[0])) route = {name: h[0]};
+  U.route = route; U.saved = false; U.notice = "";
+  if (isDesk() && (route.name === "room" || route.name === "test")) U.panel = {type: route.name, rt: route.id};
+  if (route.name === "test") loadBigMove(route.id);
+  closeDialog(); render(); window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", applyRoute);
+window.matchMedia("(min-width: 900px)").addEventListener("change", () => { closeDialog(); render(); });
+
+/* =====================================================================
+   Writing (field paths only; re-read first)
+   ===================================================================== */
+async function logChange(type, detail) {
+  try { await setDoc(doc(collection(db, "pricing_changes")), {ts: new Date(), type, detail}); } catch (e) { /* history only */ }
+}
+function expandDotted(fields) {
+  const out = {};
+  for (const [k, v] of Object.entries(fields)) { let o = out; const parts = k.split("."); parts.slice(0, -1).forEach(p => { o = o[p] ??= {}; }); o[parts[parts.length - 1]] = v; }
+  return out;
+}
+async function writeFields(ref, fields) {
+  if (!Object.keys(fields).length) return;
+  try { await updateDoc(ref, fields); }
+  catch (e) { if (e && (e.code === "not-found" || /no document/i.test(e.message || ""))) await setDoc(ref, expandDotted(fields), {merge: true}); else throw e; }
+}
+async function writeList(ref, path, freshList, rawField, adds, dels) {
+  if (!adds.length && !dels.length) return;
+  if (rawField && !Array.isArray(rawField) && typeof rawField === "object" && Object.keys(rawField).length) {   // an old-style map: write it once as a list
+    const keep = freshList.filter(o => !dels.some(d => same(d, o)));
+    await writeFields(ref, {[path]: keep.concat(adds)}); return;
+  }
+  if (dels.length) await writeFields(ref, {[path]: arrayRemove(...dels)});
+  if (adds.length) await writeFields(ref, {[path]: arrayUnion(...adds)});
+}
+const sameRaw = (a, b) => (a == null && b == null) || a === b || (num(a) !== null && num(a) === num(b));
+
+async function saveAll() {
+  if (U.saving) return;
+  const {errs} = seasonErrors();
+  if (Object.keys(errs).length) { paintBar(); return; }
+  const live = Object.entries(P.room).filter(([, f]) => f.engine && f.engine.v === "live" && f.engine.from !== "live").map(([rt]) => roomById(rt).short);
+  if (live.length && !(await confirmDialog("Send prices?", `${live.join(", ")} will start getting prices written to Booking and Airbnb at the next update. Save?`, "Yes, save", "Not yet"))) return;
+  U.saving = true;
+  try {
+    const [rs, es] = await Promise.all([getDoc(rulesRef()), getDoc(engRef())]);
+    const fr = rs.exists() ? rs.data() : {}, fe = es.exists() ? es.data() : {};
+    const conflicts = [];
+    for (const [k, e] of Object.entries(P.seasons)) if (!sameRaw(getPath(fr, e.path), e.raw)) conflicts.push({kind: "season", k, text: `${roomName(k.split("|")[0])} ${SEASONS[k.split("|")[1]].label} ${k.split("|")[2] === "GEL" ? "Booking" : "Airbnb"} ${{min: "minimum", start: "start", max: "maximum"}[k.split("|")[3]]}`});
+    for (const [rt, f] of Object.entries(P.room)) for (const [field, e] of Object.entries(f)) if (!sameRaw(getPath(fe, `settings.room_types.${rt}.${field}`), e.raw)) conflicts.push({kind: "room", rt, field, text: `${roomById(rt).short} ${{style: "mode", engine: "automatic prices", window_days: "how far ahead"}[field]}`});
+    const freshHol = ovListRaw(fr.dateOverrides);
+    for (const a of P.holAdd) {
+      const set = new Set(mdDays(a.from, a.to));
+      if (freshHol.some(o => !P.holDel.some(d => same(d, o)) && mdDays(o.from, o.to).some(x => set.has(x)))) conflicts.push({kind: "hol", item: a, text: `holiday dates ${fmtRange(a.from, a.to)} (another range now covers some of these days)`});
+    }
+    if (conflicts.length) {
+      S.rules = fr; S.eng = fe;
+      conflicts.forEach(c => {
+        if (c.kind === "season") delete P.seasons[c.k];
+        else if (c.kind === "room") { delete P.room[c.rt][c.field]; if (!Object.keys(P.room[c.rt]).length) delete P.room[c.rt]; }
+        else P.holAdd = P.holAdd.filter(x => x !== c.item);
+      });
+      render();
+      message("Nothing was saved", `Changed somewhere else since you opened this page: ${conflicts.map(c => c.text).join("; ")}. I reloaded ${conflicts.length > 1 ? "them" : "it"}. Check the new value and change it again if you still want to.`);
+      return;
+    }
+    const rf = {}, ef = {};
+    Object.values(P.seasons).forEach(e => { rf[e.path] = e.v; });
+    for (const [rt, f] of Object.entries(P.room)) for (const [field, e] of Object.entries(f)) ef[`settings.room_types.${rt}.${field}`] = e.v;
+    const holDel = P.holDel.filter(d => freshHol.some(o => same(o, d)));
+    await writeFields(rulesRef(), rf);
+    await writeList(rulesRef(), "dateOverrides", freshHol, fr.dateOverrides, P.holAdd, holDel);
+    await writeFields(engRef(), ef);
+    const freshRules = ovListRaw(fe.settings && fe.settings.date_rules);
+    const ruleDel = P.ruleDel.filter(d => freshRules.some(o => same(o, d)));
+    await writeList(engRef(), "settings.date_rules", freshRules, fe.settings && fe.settings.date_rules, P.ruleAdd, ruleDel);
+    const lines = changeLines();
+    if (Object.keys(rf).length || P.holAdd.length || holDel.length) logChange("rules_edit", "Pricing page: " + lines.join(", "));
+    if (Object.keys(ef).length || P.ruleAdd.length || ruleDel.length) logChange("engine_edit", "Pricing page: " + lines.join(", "));
+    P.room = {}; P.seasons = {}; P.holAdd = []; P.holDel = []; P.ruleAdd = []; P.ruleDel = [];
+    await loadConfig();
+    U.saved = true; U.notice = "Saved. Used from the next price update.";
+    render();
+  } catch (e) {
+    await loadConfig();
+    message("Save failed", `${e.message || e}. Some changes may not have been saved. Reload the page to check.`);
+    render();
+  } finally { U.saving = false; }
+}
+
+async function doPause(paused) {
+  try {
+    await writeFields(controlRef(), {paused, updatedAt: new Date()});
+    S.paused = paused; S.controlErr = false;
+    logChange("engine_switch", paused ? "Pricing paused (all rooms)" : "Pricing switched on (all rooms)");
+  } catch (e) { message("The switch did not change", e.message || String(e)); await loadControl(); }
+  render();
+}
+
+/* ---------- ideas ---------- */
+async function applyIdea(id) {
+  const p = S.props.find(x => x.id === id), i = p && ideaInfo(p);
+  if (!i || i.sug === null || i.cur === null) { U.ideaMsg[id] = "This idea is incomplete, so it cannot be applied."; render(); return; }
+  try {
+    const snap = await getDoc(rulesRef()), now = num(getPath(snap.exists() ? snap.data() : {}, i.path));
+    if (now === null || Math.abs(now - i.cur) > 0.0001) {
+      U.ideaMsg[id] = `This idea is out of date: the number is now ${now === null ? "not set" : i.fmt(now)}, not ${i.fmt(i.cur)}. Nothing was changed. Skip it.`;
+      render(); return;
+    }
+    await writeFields(rulesRef(), {[i.path]: i.sug});
+    await writeFields(doc(db, "pricing_proposals", id), {status: "approved", approved_at: new Date(), previous: now, applied_path: i.path, applied_value: i.sug});
+    logChange("proposal_approved", `Approved: ${i.where} ${i.season} ${i.what} ${i.fmt(i.cur)} → ${i.fmt(i.sug)}`);
+    p.status = "approved"; p.previous = now; p.applied_path = i.path; delete U.ideaMsg[id]; (U.ideaDone ??= {})[id] = "applied";
+    await loadConfig();
+  } catch (e) { U.ideaMsg[id] = "Could not apply: " + (e.message || e); }
+  render();
+}
+async function undoIdea(id) {
+  const p = S.props.find(x => x.id === id), i = p && ideaInfo(p);
+  if (!i || p.previous == null) return;
+  try {
+    const path = p.applied_path || i.path, snap = await getDoc(rulesRef()), now = num(getPath(snap.exists() ? snap.data() : {}, path));
+    if (now === null || Math.abs(now - i.sug) > 0.0001) { U.ideaMsg[id] = `The number was changed again since (now ${now === null ? "not set" : i.fmt(now)}), so I did not put the old one back.`; render(); return; }
+    await writeFields(rulesRef(), {[path]: p.previous});
+    await writeFields(doc(db, "pricing_proposals", id), {status: "pending", undone_at: new Date()});
+    logChange("proposal_undone", `Undone: ${i.where} ${i.season} ${i.what} back to ${i.fmt(Number(p.previous))}`);
+    p.status = "pending"; delete (U.ideaDone ??= {})[id]; delete U.ideaMsg[id]; U.ideaState[id] = "open";
+    await loadConfig();
+  } catch (e) { U.ideaMsg[id] = "Could not undo: " + (e.message || e); }
+  render();
+}
+async function skipIdea(id, reason) {
+  const p = S.props.find(x => x.id === id); if (!p) return;
+  try {
+    const f = {status: "rejected", rejected_at: new Date()}; if (reason) f.rejection_reason = reason;
+    await writeFields(doc(db, "pricing_proposals", id), f);
+    logChange("proposal_rejected", "Skipped" + (reason ? " (" + reason + ")" : ""));
+    p.status = "rejected"; (U.ideaDone ??= {})[id] = "skipped"; delete U.ideaState[id];
+  } catch (e) { U.ideaMsg[id] = "Could not skip: " + (e.message || e); }
+  render();
+}
+async function againIdea(id) {
+  const p = S.props.find(x => x.id === id); if (!p) return;
+  try { await writeFields(doc(db, "pricing_proposals", id), {status: "pending"}); p.status = "pending"; delete (U.ideaDone ??= {})[id]; U.ideaState[id] = "open"; }
+  catch (e) { U.ideaMsg[id] = "Could not show it again: " + (e.message || e); }
+  render();
+}
+
+/* =====================================================================
+   Clicks and typing
+   ===================================================================== */
+document.addEventListener("click", async e => {
+  const t = e.target.closest("[data-act]");
+  if (!t) return;
+  const d = t.dataset, a = d.act;
+  switch (a) {
+    case "togglePause":
+      if (S.paused) doPause(false);
+      else openDialog(`<div class="dh"><h3>Pause all automatic prices?</h3></div><p>Both the old and the new way stop for all 10 rooms. Booking, Expedia and Airbnb keep today's prices until you resume. You can still change prices by hand in MiniHotel.</p>
+        <button type="button" class="btn red full" data-act="pauseNow">Pause all</button><button type="button" class="btn light full" data-act="closeDialog" data-autofocus>Keep running</button>`, "Pause all prices");
+      break;
+    case "pauseNow": closeDialog(); doPause(true); break;
+    case "resume": doPause(false); break;
+    case "how": howDialog(); break;
+    case "closeDialog": closeDialog(); break;
+    case "dialogYes": if (DIALOG_YES) DIALOG_YES(); break;
+    case "logout": try { await signOut(auth); } catch (er) { /* ignore */ } location.reload(); break;
+    case "soon": break;
+    case "mode": setRoom(d.rt, "style", modeById(d.mode).style); touch(); render(); break;
+    case "info": modeSheet(d.rt, d.mode); break;
+    case "useMode": { const m = modeById(d.mode); closeDialog(); if (m.style) { setRoom(d.rt, "style", m.style); touch(); render(); } break; }
+    case "ahead": setRoom(d.rt, "window_days", Number(d.d)); touch(); render(); break;
+    case "engine": setRoom(d.rt, "engine", d.v); touch(); render(); break;
+    case "night": if (!isDesk()) openWhy(d.rt, d.iso); break;
+    case "allNights": U.allNights = !U.allNights; render(); break;
+    case "goDates": break;
+    case "goSeason": U.season = d.season; break;
+    case "season": U.season = d.season; render(); break;
+    case "toggleOld": U.showOld = !U.showOld; render(); break;
+    case "undoAll": P.room = {}; P.seasons = {}; P.holAdd = []; P.holDel = []; P.ruleAdd = []; P.ruleDel = []; touch(); render(); break;
+    case "save": if (t.getAttribute("aria-disabled") === "true") { paintBar(); break; } saveAll(); break;
+    case "cur": U.cur = d.v; render(); break;
+    case "win": U.win = d.v; U.sel = U.sel2 = null; U.panel = null; render(); break;
+    case "cell": {
+      const j = +d.j;
+      if (e.shiftKey && U.sel && U.sel.rt === d.rt && U.sel.j !== j) { U.sel2 = {rt: d.rt, j}; U.panel = {type: "range", rt: d.rt, a: addDays(winStart(), U.sel.j), b: addDays(winStart(), j)}; }
+      else { U.sel = {rt: d.rt, j}; U.sel2 = null; U.panel = {type: "why", rt: d.rt, iso: d.iso}; }
+      render(); break;
+    }
+    case "roomOpen": U.panel = {type: isOld(d.rt) ? "test" : "room", rt: d.rt}; U.sel = U.sel2 = null; if (isOld(d.rt)) loadBigMove(d.rt); render(); break;
+    case "closePanel": U.panel = null; U.sel = U.sel2 = null; render(); break;
+    case "rangeChoice": U.rangeChoice = d.id; render(); break;
+    case "rangeAdd": P.ruleAdd.push({from: d.a, to: d.b, rooms: [d.rt], action: U.rangeChoice || "protect"}); U.panel.done = true; touch(); render(); break;
+    case "ruleNight": {
+      P.ruleAdd.push({from: d.iso, to: d.iso, rooms: [d.rt], action: "protect", note: "from the calendar"}); touch();
+      if (isDesk() && U.panel) U.panel.done = true; else closeDialog();
+      render(); break;
+    }
+    case "delHol": {
+      const o = U._holRows[+d.i].o, pend = P.holAdd.some(x => same(x, o));
+      if (pend) P.holAdd = P.holAdd.filter(x => !same(x, o)); else P.holDel.push(o);
+      touch(); render();
+      showToast(`Removed ${fmtRange(o.from, o.to)}.`, () => { if (pend) P.holAdd.push(o); else P.holDel = P.holDel.filter(x => !same(x, o)); touch(); render(); });
+      break;
+    }
+    case "delRule": {
+      const o = U._ruleRows[+d.i].r, pend = P.ruleAdd.some(x => same(x, o));
+      if (pend) P.ruleAdd = P.ruleAdd.filter(x => !same(x, o)); else P.ruleDel.push(o);
+      touch(); render();
+      showToast(`Removed the rule for ${fmtShort(o.from)}.`, () => { if (pend) P.ruleAdd.push(o); else P.ruleDel = P.ruleDel.filter(x => !same(x, o)); touch(); render(); });
+      break;
+    }
+    case "toastUndo": if (U.undo) { const f = U.undo; U.undo = null; $("toast").hidden = true; f(); } break;
+    case "eventSet":
+      try { await writeFields(doc(db, "pricing_events", d.id), {status: d.v}); const ev = S.events.find(x => x.id === d.id); if (ev) ev.status = d.v; } catch (er) { message("Could not save", er.message || String(er)); }
+      render(); break;
+    case "dpKind": U.dp.kind = d.k; U.dp.choice = d.k === "season" ? "high" : "protect"; U.dp.rooms = []; render(); break;
+    case "dpChoice": U.dp.choice = d.id; render(); break;
+    case "dpRoom": if (d.id === "all") U.dp.rooms = []; else { const i = U.dp.rooms.indexOf(d.id); if (i >= 0) U.dp.rooms.splice(i, 1); else U.dp.rooms.push(d.id); } render(); break;
+    case "monthPrev": U.dp.m--; if (U.dp.m < 0) { U.dp.m = 11; U.dp.y--; } render(); break;
+    case "monthNext": U.dp.m++; if (U.dp.m > 11) { U.dp.m = 0; U.dp.y++; } render(); break;
+    case "pickDay": {
+      const dp = U.dp, iso = d.iso;
+      if (!dp.from || dp.to) { dp.from = iso; dp.to = null; } else if (iso < dp.from) dp.from = iso; else dp.to = iso;
+      render(); break;
+    }
+    case "dpAdd": {
+      if (t.getAttribute("aria-disabled") === "true") break;
+      const dp = U.dp;
+      if (dp.kind === "season") {
+        if (diffDays(dp.from, dp.to) >= 365) { message("Too long", "A holiday range can be at most one year."); break; }
+        P.holAdd.push({from: mdOf(dp.from), to: mdOf(dp.to), season: dp.choice});
+      } else P.ruleAdd.push({from: dp.from, to: dp.to, rooms: dp.rooms.length ? dp.rooms.slice() : "all", action: dp.choice});
+      dp.from = dp.to = null; touch(); render(); break;
+    }
+    case "ideaApply": applyIdea(d.id); break;
+    case "ideaAskSkip": U.ideaState[d.id] = "reasons"; render(); break;
+    case "ideaBack": U.ideaState[d.id] = "open"; render(); break;
+    case "ideaSkip": skipIdea(d.id, d.reason || ""); break;
+    case "ideaUndo": undoIdea(d.id); break;
+    case "ideaAgain": againIdea(d.id); break;
+    default: break;
+  }
+});
+const modeById = id => MODES.find(m => m.id === id);
+document.addEventListener("input", e => {
+  const t = e.target;
+  if (t.dataset && t.dataset.inp === "season") {
+    const [rt, season, cur, field] = t.dataset.k.split("|");
+    setSeason(rt, season, cur, field, t.value); touch(); refreshSeasonUi();
+  }
+});
+$("overlay").addEventListener("click", e => { if (e.target === $("overlay")) closeDialog(); });
+
+/* =====================================================================
+   Start
+   ===================================================================== */
+let started = false;
+async function start() {
+  if (started) return; started = true;
+  $("app").hidden = false;
+  $("root").innerHTML = `<div class="page"><p class="muted">Loading…</p></div>`;
+  await Promise.all([loadControl(), loadConfig()]);
+  applyRoute();
+  await Promise.all([loadRuns(), loadEvents(), loadProposals(), loadLocks(), loadDaily()]);
+  render();
+  window.__pricingReady = true;
+}
+requireOwner({auth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut}, {onReady: start});
+</script>
+</body>
+</html>
