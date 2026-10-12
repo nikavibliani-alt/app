@@ -1083,6 +1083,18 @@ def check_serpapi_probe():
             print(f"  [{label}] request failed: {type(e).__name__}")
 
 
+def check_eventscan():
+    """Read-only: the event scanner as the pricing run runs it, but nothing is saved (dry run). Uses about 10 SerpAPI searches."""
+    hdr("EVENT SCANNER, DRY RUN (nothing saved)")
+    import event_scanner as es
+    print("  Search words:", es.search_queries())
+    print("  Key set:", bool(es.SERP_API_KEY))
+    found = es.scan_and_update(dry_run=True)
+    print(f"  Events found: {len(found)}; search errors: {len(es.LAST_ERRORS)}")
+    for e in es.LAST_ERRORS[:3]:
+        print("   error:", e)
+
+
 def check_urgentdry():
     """Dry run of a cancellation run for one REAL cancelled stay (room type and nights only, no guest data). Writes nothing."""
     hdr("CANCELLATION RUN, DRY: one real cancelled stay")
@@ -1585,6 +1597,9 @@ def main():
         return
     if args.check == "serpapi_probe":
         check_serpapi_probe()
+        return
+    if args.check == "eventscan":
+        check_eventscan()
         return
     if args.check == "urgentdry":
         check_urgentdry()

@@ -26,15 +26,31 @@ FROM_EMAIL     = "nikavibliani@gmail.com"
 SERPAPI_URL    = "https://serpapi.com/search.json"
 SENDGRID_URL   = "https://api.sendgrid.com/v3/mail/send"
 
-SEARCH_QUERIES = [
-    "concerts in Tbilisi Georgia 2026",
-    "festivals in Tbilisi Georgia 2026",
-    "concerts Rustavi International Motorpark 2026",
-    "major events Tbilisi 2026",
-    "international concerts Tbilisi 2026",
-    "Ricky Martin Tbilisi 2026",
-    "Till Lindemann Tbilisi 2026",
+# Search words. {year} is filled in by search_queries(): the current year, and the next year as soon as the
+# 90-day search window reaches it. No artist names: the scanner finds whatever is coming.
+QUERY_TEMPLATES = [
+    "concerts in Tbilisi Georgia {year}",
+    "festivals in Tbilisi Georgia {year}",
+    "concerts Rustavi International Motorpark {year}",
+    "major events Tbilisi {year}",
+    "international concerts Tbilisi {year}",
 ]
+SEARCH_DAYS_AHEAD = 90
+# The free SerpAPI plan has 250 searches a month. 10 searches every 2 days is about 150 a month.
+SCAN_EVERY_DAYS = 2
+
+
+def search_queries(today=None) -> list:
+    """The search words for today: every template for the current year, and for the next year once the
+    search window (90 days ahead) reaches into it."""
+    today = today or datetime.now().date()
+    years = [today.year]
+    if (today + timedelta(days=SEARCH_DAYS_AHEAD)).year > today.year:
+        years.append(today.year + 1)
+    return [t.format(year=y) for y in years for t in QUERY_TEMPLATES]
+
+
+SEARCH_QUERIES = search_queries()          # kept for anything that still imports the old name
 
 # Known major venues — any event here is significant regardless of ticket count
 MAJOR_VENUES = [
@@ -111,6 +127,17 @@ def send_email(subject: str, body: str):
 # FETCH EVENTS
 # ---------------------------------------------------------------------------
 
+def _clean(text: str) -> str:
+    """An error text that is safe to print: the API key is never shown."""
+    text = re.sub(r"api_key=[^&\s'\"]+", "api_key=***", str(text))
+    if SERP_API_KEY:
+        text = text.replace(SERP_API_KEY, "***")
+    return text
+
+
+LAST_ERRORS = []        # the errors of the current scan (key removed)
+
+
 def fetch_events(query: str) -> list:
     params = {
         "engine":  "google_events",
@@ -119,11 +146,21 @@ def fetch_events(query: str) -> list:
         "api_key": SERP_API_KEY,
     }
     try:
-        resp = requests.get(SERPAPI_URL, params=params, timeout=15)
-        resp.raise_for_status()
-        return resp.json().get("events_results", [])
+        resp = requests.get(SERPAPI_URL, params=params, timeout=60)
+        if resp.status_code >= 400:
+            body = _clean(resp.text)[:200].replace("\n", " ")
+            raise RuntimeError(f"HTTP {resp.status_code}: {body}")
+        data = resp.json()
+        if data.get("error") and not data.get("events_results"):
+            # SerpAPI says "Google hasn't returned any results" when there is simply nothing: not a failure
+            if "hasn't returned any results" in str(data["error"]):
+                return []
+            raise RuntimeError(str(data["error"])[:200])
+        return data.get("events_results", [])
     except Exception as e:
-        print(f"  Warning: SerpAPI '{query}' failed: {e}", file=sys.stderr)
+        msg = _clean(e)
+        LAST_ERRORS.append(msg)
+        print(f"  Warning: SerpAPI '{query}' failed: {msg}", file=sys.stderr)
         return []
 
 
@@ -197,20 +234,23 @@ def scan_and_update(config_path: str = "config.json", dry_run: bool = False) -> 
     today_str = today.strftime("%Y-%m-%d")
     max_date  = today + timedelta(days=90)
 
-    # Once-per-day gate: skip if already scanned today
+    # Gate: once every SCAN_EVERY_DAYS days (keeps the searches inside the free plan)
     if not dry_run:
         try:
             _db = get_firestore_client()
             _ls = _db.collection("pricing_events").document("last_scan").get()
-            if _ls.exists and _ls.to_dict().get("scanned_at") == today_str:
-                print(f"  Already scanned today ({today_str}) — skipping SerpAPI calls.")
+            _at = (_ls.to_dict() or {}).get("scanned_at") if _ls.exists else None
+            if _at and (today - datetime.strptime(_at, "%Y-%m-%d").date()).days < SCAN_EVERY_DAYS:
+                print(f"  Already scanned on {_at} (every {SCAN_EVERY_DAYS} days) — skipping SerpAPI calls.")
                 return {}
         except Exception as _e:
             print(f"  Warning: could not check last_scan: {_e}", file=sys.stderr)
 
     found_events = {}
+    queries = search_queries(today)
+    LAST_ERRORS.clear()
 
-    for query in SEARCH_QUERIES:
+    for query in queries:
         print(f"  Searching: '{query}'...")
         events = fetch_events(query)
         for event in events:
@@ -241,13 +281,29 @@ def scan_and_update(config_path: str = "config.json", dry_run: bool = False) -> 
                 }
                 print(f"  ✓ {date_str}: {title[:50]} ({ticket_count} ticket sources, ×{multiplier})")
 
+    failed = len(LAST_ERRORS)
+    if failed:
+        print(f"  SCANNER PROBLEM: {failed} of {len(queries)} searches failed. First error: {LAST_ERRORS[0]}", file=sys.stderr)
+    if failed >= len(queries):
+        # Every search failed: this is NOT "no events". Say so, and do not mark the scan as done, so the next run tries again.
+        if not dry_run:
+            try:
+                _c = get_firestore_client().collection("pricing_events").document("last_scan_error")
+                _p = _c.get()
+                _days = ((_p.to_dict() or {}).get("failed_runs", 0) if _p.exists else 0) + 1
+                _c.set({"error": LAST_ERRORS[0], "at": datetime.now().isoformat(), "failed_runs": _days, "queries": len(queries)})
+            except Exception:
+                pass
+        return {}
     if not found_events:
         print("  No major events found.")
         if not dry_run:
             try:
-                get_firestore_client().collection("pricing_events").document("last_scan").set(
-                    {"scanned_at": today_str, "ts": datetime.now().isoformat()}
+                _db2 = get_firestore_client()
+                _db2.collection("pricing_events").document("last_scan").set(
+                    {"scanned_at": today_str, "ts": datetime.now().isoformat(), "searches": len(queries), "failed": failed}
                 )
+                _db2.collection("pricing_events").document("last_scan_error").set({"failed_runs": 0, "at": datetime.now().isoformat(), "error": ""})
             except Exception:
                 pass
         return {}
@@ -294,7 +350,8 @@ def scan_and_update(config_path: str = "config.json", dry_run: bool = False) -> 
                 )
             )
 
-        collection.document("last_scan").set({"scanned_at": today_str, "ts": datetime.now().isoformat()})
+        collection.document("last_scan").set({"scanned_at": today_str, "ts": datetime.now().isoformat(), "searches": len(queries), "failed": failed})
+        collection.document("last_scan_error").set({"failed_runs": 0, "at": datetime.now().isoformat(), "error": ""})
         print(f"  Scan gate updated: scanned_at = {today_str}")
 
     except Exception as e:
