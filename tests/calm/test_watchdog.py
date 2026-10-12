@@ -164,3 +164,13 @@ def test_runner_falls_back_to_text_when_the_template_is_refused(monkeypatch):
         return R()
     run_wd(seeded(), post, monkeypatch)
     assert calls == ["template", "template", "text"]
+
+
+def test_a_clean_run_after_a_failed_push_turns_the_card_green(monkeypatch):
+    db = seeded(bad=False)
+    db.collection("pricing_calm_runs").add({"ts": "2026-10-07T09:02:00", "day": "2026-10-07", "ok": True, "main_run": False,
+                                            "failed_portals": ["EXPEDIA"], "stopped_room_types": []})
+    db.collection("pricing_calm_runs").add({"ts": "2026-10-07T12:05:00", "day": "2026-10-07", "ok": True, "main_run": False,
+                                            "failed_portals": [], "stopped_room_types": []})
+    run_wd(db, Posted(), monkeypatch)
+    assert db.store["pricing_watchdog"]["latest"]["status"] == "green"

@@ -1434,6 +1434,11 @@ def main():
     if args.check == "secrets":
         check_secrets()
         return
+    if args.check == "watchdog":
+        # re-read today's saved run and prices and refresh pricing_watchdog/latest (never sends a WhatsApp)
+        import price_watchdog
+        price_watchdog.main(["--no-send"])
+        return
     if args.check in ("pause", "resume"):
         # the same switch the pricing page uses: pricing_config/control.paused
         db = init_firestore()

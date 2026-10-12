@@ -94,12 +94,12 @@ def main(argv=None, db=None, post=requests.post, now=None, env=os.environ):
     daily, states, runs = load_inputs(db, today, live_rts)
     last = runs[-1] if runs else None
     main_done = any(r.get("main_run") for r in runs)
-    # failures anywhere today count, a later good run does not hide a failed push earlier in the morning
+    # The channel push and the safety stops are judged on the LAST run: a clean run after a failed one clears them.
     run_view = None
     if last:
-        run_view = {"ok": all(r.get("ok") is not False for r in runs),
-                    "failed_portals": sorted({p for r in runs for p in (r.get("failed_portals") or [])}),
-                    "stopped_room_types": sorted({rt for r in runs for rt in (r.get("stopped_room_types") or [])})}
+        run_view = {"ok": last.get("ok") is not False,
+                    "failed_portals": sorted(last.get("failed_portals") or []),
+                    "stopped_room_types": sorted(last.get("stopped_room_types") or [])}
     result = check(daily, states, run_view, cfg, now, live_rts=list(live_rts))
     paused = bool(last and last.get("paused"))
 
