@@ -1,8 +1,10 @@
 """
 Claude AI Pricing Strategy Analyst
 ====================================
-Runs once per day. Analyzes last 30 days of booking outcomes and current
-pricing config, then writes strategic proposals to Firestore pricing_proposals.
+Runs once a week (the pricing run calls it every time; it skips itself when it already ran in the
+last 7 days). Analyzes last 30 days of booking outcomes and current pricing config, then writes
+strategic proposals to Firestore pricing_proposals. A new idea replaces the older PENDING idea for the
+same room, season and field (the older one is closed as skipped: "Replaced by a newer idea").
 
 Auto-applies proposals within ±5% of current value to pricing_config/rules.
 Larger changes are queued for manager approval in pricing.html.
@@ -16,6 +18,9 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 import anthropic
+
+RUN_EVERY_DAYS = 7
+REPLACED_REASON = "Replaced by a newer idea"
 
 SYSTEM_PROMPT = """You are a revenue management analyst for Maxela Apartments in Tbilisi, Georgia.
 
@@ -182,10 +187,10 @@ def _apply_to_config(config: dict, prop: str, season: str, ptype: str, value):
 
 def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict:
     """
-    Daily strategy analyst: analyzes last 30 days, writes proposals to Firestore.
+    Weekly strategy analyst: analyzes last 30 days, writes proposals to Firestore.
     Auto-applies proposals ≤5% change to config in Firestore + in memory.
     Returns updated config dict.
-    Skips if already ran today or if ANTHROPIC_API_KEY is missing.
+    Skips if it already ran in the last 7 days or if ANTHROPIC_API_KEY is missing.
     """
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
@@ -193,12 +198,13 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict
 
     today = datetime.now().strftime("%Y-%m-%d")
 
-    # Dedup: skip if already ran today
+    # Weekly: skip if a run marker exists for today or any of the 6 days before
     try:
-        run_marker = db.collection("pricing_proposals").document(f"run_{today}").get()
-        if run_marker.exists:
-            print("  Claude proposals already written today — skipping.")
-            return config
+        for back in range(RUN_EVERY_DAYS):
+            day = (datetime.now() - timedelta(days=back)).strftime("%Y-%m-%d")
+            if db.collection("pricing_proposals").document(f"run_{day}").get().exists:
+                print(f"  Claude proposals were written on {day} (runs once a week) — skipping.")
+                return config
     except Exception:
         pass
 
@@ -244,6 +250,17 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict
     pending_count = 0
     batch = db.batch()
     batch_count = 0
+    # older pending ideas of ours, by (room, season, field): a new idea for the same key replaces them
+    older_pending = {}
+    try:
+        for snap in db.collection("pricing_proposals").where("status", "==", "pending").stream():
+            d = snap.to_dict() or {}
+            if d.get("type") == "run_marker":
+                continue
+            older_pending.setdefault((d.get("property"), d.get("season"), d.get("type")), []).append(snap.id)
+    except Exception as e:
+        print(f"  Warning: could not read older pending ideas: {e}", file=sys.stderr)
+    replaced = 0
 
     if not isinstance(proposals, list):
         proposals = []
@@ -279,6 +296,13 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict
 
         # Save proposal doc
         prop_ref = db.collection("pricing_proposals").document()
+        for old_id in older_pending.pop((prop, season, ptype), []):
+            batch.update(db.collection("pricing_proposals").document(old_id), {
+                "status": "rejected", "rejection_reason": REPLACED_REASON, "rejected_at": datetime.now(),
+                "replaced_by": prop_ref.id,
+            })
+            batch_count += 1
+            replaced += 1
         batch.set(prop_ref, {
             "date":       today,
             "property":   prop,
@@ -314,6 +338,7 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict
         "proposal_count": len(proposals),
         "auto_applied":   auto_applied,
         "pending":        pending_count,
+        "replaced":       replaced,
         "ts":             datetime.now().isoformat(),
     })
 
@@ -339,6 +364,8 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None) -> dict
         except Exception:
             pass
 
+    if replaced:
+        print(f"  {replaced} older pending idea(s) replaced by newer ones for the same room, season and field.")
     if pending_count:
         print(f"  {pending_count} proposals queued for manual approval in pricing.html.")
 

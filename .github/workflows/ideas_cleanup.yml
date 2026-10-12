@@ -1,0 +1,39 @@
+name: Ideas cleanup
+
+# Manual only. Closes pending ideas that are out of date (older than 7 days, or whose "current"
+# number no longer matches the rules). It only changes the ideas themselves, never pricing_config/rules.
+# "apply" is false by default: it only prints a summary.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 'false = summary only; true = close the out-of-date ideas'
+        required: true
+        default: 'false'
+
+concurrency:
+  group: pricing-ideas
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests firebase-admin
+      - name: Ideas cleanup
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          APPLY:                    ${{ github.event.inputs.apply }}
+        run: |
+          if [ "$APPLY" = "true" ]; then
+            python scripts/ideas_cleanup.py --apply
+          else
+            python scripts/ideas_cleanup.py
+          fi
