@@ -917,6 +917,51 @@ def moveold_report(result, rules, settings, repo_cfg, FS_ROOMS):
     return checks
 
 
+def holiday_table(decs, rts, first="2026-12-20", last="2027-01-14"):
+    """Old price (MiniHotel now) and new price (first run) for each room and each night from `first` to `last`.
+    Pure function of the dry-run decisions. Returns {"outside": number of nights outside the holiday band}."""
+    pct = lambda a, b: (b - a) / a * 100 if a else 0.0
+    outside = 0
+    by_rt = defaultdict(lambda: defaultdict(dict))
+    for d in decs:
+        if first <= d["date"] <= last:
+            by_rt[d["rt"]][d["date"]][d["currency"]] = d
+    for rt in rts:
+        rows = by_rt.get(rt) or {}
+        print(f"\n=== {rt}: {first} to {last} (old = MiniHotel now, new = after the first run) ===")
+        if not rows:
+            print("  no nights read for these dates")
+            continue
+        shown = 0
+        for ds in sorted(rows):
+            cells, tag, band = [], "  ", ""
+            for cur, label in (("GEL", "Booking GEL"), ("USD", "Airbnb")):
+                d = rows[ds].get(cur)
+                if not d:
+                    continue
+                old = d["current"] if d["current"] and d["current"] > 0 else None
+                new = d.get("proposed") if d["kind"] != "stopped" else d.get("rejected", d.get("proposed"))
+                if d["avail"] <= 0:
+                    cells.append(f"{label} booked")
+                    continue
+                cells.append(f"{label} " + (f"{old:.0f} -> {new:.0f} ({pct(old, new):+.0f}%)" if old is not None and new is not None
+                                           else (f"none -> {new:.0f} (first price)" if new is not None else "-")))
+                h = d.get("holiday")
+                if h:
+                    tag = "H "
+                    if h.get("window") and new is not None and d["kind"] != "correction":
+                        lo, hi = h.get("lo"), h.get("hi")
+                        if (lo is not None and new < lo - 1) or (hi is not None and new > hi + 1):
+                            outside += 1
+                            band += " OUTSIDE BAND"
+                        elif cur == "GEL":
+                            band = f" [{h['window']} window, anchor {h['anchor']:.0f}, band {lo:.0f}-{(str(round(hi)) if hi is not None else 'no upper limit')}]"
+            shown += 1
+            print(f"  {ds} {tag}| " + " | ".join(cells) + band)
+    print(f"\nH = holiday date or date rule. Nights outside the holiday band: {outside}")
+    return {"outside": outside}
+
+
 def check_moveold():
     hdr("MOVE OF THE 6 OLD ROOMS TO THE NEW ENGINE: dry run (calculates and prints; nothing sent, nothing saved)")
     import pricing_calm_live
@@ -940,8 +985,23 @@ def check_moveold():
     fs = (db.collection("pricing_config").document("engine_v2").get().to_dict() or {}).get("settings", {}).get("room_types", {})
     checks = moveold_report(result, rules, settings, repo_cfg, fs)
     print(f"\nSent to MiniHotel: {bool(result.get('sent'))}")
+    # Holiday nights 20 Dec - 14 Jan per room. The real window is 90 days (reaches about 10 Jan); this second
+    # calculation reads 120 days so the last nights can be seen too. Nothing is sent or saved.
+    hdr("HOLIDAY NIGHTS 20 DEC - 14 JAN: old price and new price per room (dry run, window 120 days for this table only)")
+
+    def wide(db_, repo_config):
+        rules_, settings_ = requested(db_, repo_config)
+        for rt in KNOWN_ROOM_TYPES:
+            settings_["room_types"][rt]["window_days"] = 120
+        return rules_, settings_
+    ps.load_rules = wide
+    try:
+        result2 = pricing_calm_live.main(["--dry"])
+    finally:
+        ps.load_rules = orig_load
+    ht = holiday_table(result2.get("decisions", []), KNOWN_ROOM_TYPES)
     print(f"Attempted non-GET requests to MiniHotel (blocked by the check's guard): {len(BLOCKED)}")
-    if result.get("sent") or BLOCKED or not all(checks.values()):
+    if result.get("sent") or result2.get("sent") or BLOCKED or ht["outside"] or not all(checks.values()):
         sys.exit(1)
 
 # ---------------------------------------------------------------------------

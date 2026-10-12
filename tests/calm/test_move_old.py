@@ -278,3 +278,26 @@ def test_moved_rooms_settings_changes_only_saved_values_that_differ():
     m.run(db, apply=True)
     assert db.ref.updates == {"settings.room_types.ROOMS.window_days": 90, "settings.room_types.BIG_APT.style": "normal"}
     assert m.run(DB({"settings": {"room_types": {}}}), apply=True) == {}
+
+
+def test_holiday_table_prints_old_and_new_per_room_and_flags_nights_outside_the_band(capsys):
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    orig = requests.Session.request
+    try:
+        import pricing_check as pc
+    finally:
+        requests.Session.request = orig
+
+    def dec(date, cur, old, new, hol=None, avail=1, kind="move"):
+        return {"rt": "MAXELA", "date": date, "currency": cur, "current": old, "proposed": new, "avail": avail, "kind": kind,
+                **({"holiday": hol} if hol else {})}
+    band = {"kind": "holiday", "anchor": 200, "window": "far", "lo": 194, "hi": 206}
+    decs = [dec("2026-12-24", "GEL", 200, 198, band), dec("2026-12-24", "USD", 70, 69),
+            dec("2026-12-31", "GEL", 200, 190, band), dec("2027-01-12", "GEL", 0, 210, None, kind="fill"),
+            dec("2026-12-26", "GEL", 200, 200, None, avail=0, kind="hold"), dec("2026-12-10", "GEL", 100, 90)]
+    out = pc.holiday_table(decs, ["MAXELA", "ROOMS"])
+    text = capsys.readouterr().out
+    assert out["outside"] == 1 and "OUTSIDE BAND" in text
+    assert "2026-12-24 H | Booking GEL 200 -> 198 (-1%)" in text and "Airbnb 70 -> 69" in text
+    assert "none -> 210 (first price)" in text and "Booking GEL booked" in text
+    assert "2026-12-10" not in text and "=== ROOMS" in text and "no nights read" in text
