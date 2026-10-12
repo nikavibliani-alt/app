@@ -1434,6 +1434,12 @@ def main():
     if args.check == "secrets":
         check_secrets()
         return
+    if args.check in ("pause", "resume"):
+        # the same switch the pricing page uses: pricing_config/control.paused
+        db = init_firestore()
+        db.collection("pricing_config").document("control").set({"paused": args.check == "pause", "updatedAt": datetime.now(timezone.utc)}, merge=True)
+        print(f"pricing_config/control.paused = {args.check == 'pause'}")
+        return
     if args.check in ("movedsettings", "movedsettings_apply"):
         # one-off for the go-live of the six rooms: the same script as the "Moved rooms settings" workflow
         import moved_rooms_settings
