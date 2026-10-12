@@ -30,6 +30,7 @@ STREAMS = {
     "snapshots": "pmslog_snapshots",
     "booking_events": "pmslog_booking_events",
     "settings_events": "pmslog_settings_events",
+    "twin": "pricing_twin",                    # the "what if" twin: its prices next to the real ones, night by night
 }
 WRITE_KINDS = ("move", "correction", "fill", "reset", "far_reset", "tonight")
 BUCKET_DEFAULT = "sleepy-5c962-pms-history"

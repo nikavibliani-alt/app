@@ -561,12 +561,14 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       const rows = await page.$$eval('.hist', els => els.map(e => e.innerText));
       const d = rows.find(t => /Maxela|MAXELA/i.test(t) && /minimum/.test(t)) || '';
       assert.ok(/Wrong/.test(d) && /18 of 20 nights that were empty when the idea was made got a booking anyway at your price/.test(d) && !/→ Wrong/.test(d), d);
+      assert.ok(/What if: With the idea applied, the twin priced these 20 nights/.test(d) && /evidence, not proof/.test(d), 'twin line: ' + d);
       const f = rows.find(t => /Rooms|ROOMS/i.test(t) && /start price/.test(t)) || '';
       assert.ok(/Checking/.test(f) && /Still running: 11 nights to go/.test(f), f);
       const color = await page.$eval('.verdict.wrong', e => getComputedStyle(e).color);
       assert.ok(color !== 'rgb(0, 0, 255)');
     }, {mutate: d => {
       d['pricing_scorecard/oldD'] = {status: 'final', verdict: 'wrong', reason: 'Said raise the minimum for Maxela (Low season, 1–20 Nov 2026). You skipped it. 18 of 20 nights that were empty when the idea was made got a booking anyway at your price. → Wrong'};
+      d['pricing_twin_results/oldD'] = {status: 'final', text: 'With the idea applied, the twin priced these 20 nights at 120 ₾ on average, 20% higher than your real 100 ₾. In real life 18 of 20 sold, at about 105 ₾ a night. The twin cannot know if a guest would have booked at its price: this is evidence, not proof.'};
       d['pricing_scorecard/oldF'] = {status: 'tracking', verdict: null, reason: 'Still running: 11 nights to go (until 20 Nov 2026).'};
     }});
   }

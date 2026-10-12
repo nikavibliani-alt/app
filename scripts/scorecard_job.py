@@ -38,6 +38,8 @@ def run(db, today: str, dry: bool = False) -> dict:
         c = sc.judge(p, stays, today, name_of)
         c["updated"] = today
         cards.append(c)
+        if c["status"] == "no_dates":                            # made before dates were saved: counted, not saved
+            continue
         if not dry:
             db.collection("pricing_scorecard").document(p["id"]).set(c)
             saved += 1
