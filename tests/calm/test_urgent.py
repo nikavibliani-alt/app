@@ -192,7 +192,7 @@ def test_a_hand_set_price_and_a_price_at_the_minimum_are_left_alone_tonight():
     d = [x for x in r["decisions"] if x["date"] == D(0)][0]
     assert d["kind"] == "manual" and r["writes"] == []
     r2 = tonight_run(cfg, inv_of(1, 150))
-    assert r2["writes"] == [] and "already at your minimum" in [x for x in r2["decisions"] if x["date"] == D(0)][0]["why"][-1]
+    assert r2["writes"] == [] and "as low as this step allows" in [x for x in r2["decisions"] if x["date"] == D(0)][0]["why"][-1]
 
 
 def test_a_normal_run_never_does_the_tonight_drop():
@@ -212,3 +212,35 @@ def test_runner_tonight_cancellation_writes_the_minimum_and_pushes_the_rooms_cha
     tonight = [d for x in w[0] for d in x["Dates"] if d["Date"][:10] == TODAY.isoformat()]
     assert tonight and {r["Price"] for r in tonight[0]["Rates"]} == {mn}                     # tonight at the minimum
     assert pushes(http) == ["BOOKING", "EXPEDIA"]
+
+
+def test_tomorrow_goes_halfway_to_the_minimum_and_never_up():
+    cfg = mkcfg(1, mn=150, start=230, mx=300, holiday=False)
+    res = tonight_run(cfg, inv_of(1, 230), only_dates=[D(1)])
+    d = [x for x in res["decisions"] if x["date"] == D(1)][0]
+    assert d["kind"] == "tonight" and d["proposed"] == 190 and "halfway" in d["why"][-1]       # 150 + (230-150)/2
+    assert [(w["date"], w["price"]) for w in res["writes"]] == [(D(1), 190)]
+    low = tonight_run(mkcfg(1, mn=150, start=230, mx=300, holiday=False), inv_of(1, 150), only_dates=[D(1)])
+    assert low["writes"] == []                                                                  # at the minimum: nothing, never up
+    under = tonight_run(mkcfg(1, mn=150, start=230, mx=300, holiday=False), inv_of(1, 140), only_dates=[D(1)])
+    assert all(d["kind"] != "tonight" for d in under["decisions"])                              # below the minimum: the min rule, not this step
+
+
+def test_tomorrow_respects_protect_hold_and_holiday():
+    inv = inv_of(1, 230)
+    protect = mkcfg(1, mn=150, start=230, mx=300, holiday=False, rules=[{"from": D(1), "to": D(1), "rooms": "all", "action": "protect"}])
+    assert tonight_run(protect, inv, only_dates=[D(1)])["writes"] == []
+    hold = mkcfg(1, mn=150, start=230, mx=300, holiday=False, rules=[{"from": D(1), "to": D(1), "rooms": "all", "action": "hold"}])
+    assert all(d["kind"] != "tonight" for d in tonight_run(hold, inv, only_dates=[D(1)])["decisions"])
+    hol = mkcfg(1, mn=150, start=230, mx=300)
+    hol["date_overrides"] = [{"from": "10-01", "to": "10-31", "season": "high"}]
+    assert all(d["kind"] != "tonight" for d in tonight_run(hol, inv, only_dates=[D(1)])["decisions"])
+
+
+def test_a_fake_14_night_cancellation_starting_today_lowers_only_two_nights():
+    cfg = mkcfg(1, mn=150, start=230, mx=300, holiday=False)
+    nights = [D(i) for i in range(14)]
+    res = tonight_run(cfg, inv_of(1, 230), only_dates=nights)
+    lowered = {w["date"]: w["price"] for w in res["writes"] if w["price"] < 230}
+    assert lowered == {D(0): 150, D(1): 190}
+    assert all(w["price"] >= 230 for w in res["writes"] if w["date"] not in (D(0), D(1)))

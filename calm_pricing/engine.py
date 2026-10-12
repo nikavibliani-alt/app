@@ -281,6 +281,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
     # Cancellation run only: a night freed TONIGHT goes straight to the room's minimum (the one exception to
     # "arrival day is never lowered"). Protect, hold, holiday dates and hand-set prices still win.
     tonight_drop = bool(snapshot.get("tonight_drop")) and only_dates is not None
+    tomorrow_s = (today + timedelta(days=1)).isoformat()
     # One-time price reset (snapshot["reset"] = set of room types): see the reset block below.
     reset_rts = set(snapshot.get("reset") or ()) if not shadow else set()
     calm, dm = cfg["calm"], cfg["demand"]
@@ -568,16 +569,25 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                         # not a new starting point for the daily limits
                         dec["why"].append("Hand-set price released" + (" after a booking." if booked_since else " (time is up)."))
 
-                # ---- 2b. a night freed tonight (cancellation run): straight down to the minimum ----
-                if tonight_drop and ds == today_s and hol_kind is None and can_write and not shadow and not reset_mode:
+                # ---- 2b. a night freed tonight or tomorrow (cancellation run): lowered at once ----
+                # tonight: straight to the minimum; tomorrow: halfway between its price and the minimum.
+                if tonight_drop and ds in (today_s, tomorrow_s) and hol_kind is None and can_write and not shadow and not reset_mode:
+                    is_tonight = ds == today_s
+                    when = "tonight" if is_tonight else "tomorrow"
+                    new = None
                     if current > mn + 1e-9:
-                        new = _grid_up_to(mn, step, mx_eff)
+                        goal = mn if is_tonight else mn + (current - mn) / 2
+                        new = _grid_up_to(goal, step, mx_eff)
+                        if new >= current - 1e-9:
+                            new = None
+                    if new is not None:
                         dec["proposed"], dec["kind"] = new, "tonight"
                         dec["write"] = True
-                        dec["why"].append(f"A booking for tonight was cancelled: lowered straight to your minimum {_fmt(cur, mn)} "
-                                          f"({_fmt(cur, current)} -> {_fmt(cur, new)}).")
+                        dec["why"].append(f"A booking for {when} was cancelled: lowered "
+                                          + (f"straight to your minimum {_fmt(cur, mn)} " if is_tonight else f"halfway to your minimum {_fmt(cur, mn)} ")
+                                          + f"({_fmt(cur, current)} -> {_fmt(cur, new)}).")
                     else:
-                        dec["why"].append("A booking for tonight was cancelled: the price is already at your minimum.")
+                        dec["why"].append(f"A booking for {when} was cancelled: the price is already as low as this step allows.")
                     continue
 
                 # ---- 3. target ----
