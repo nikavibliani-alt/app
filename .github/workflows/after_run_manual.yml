@@ -1,0 +1,42 @@
+name: Run one after-run task by hand
+
+# Manual only. Runs one task of scripts/after_run.py now (dry run by default: counts only, nothing saved or sent).
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'scorecard, twin, twin_compare, weekly or history'
+        required: true
+        default: 'scorecard'
+      dry:
+        description: 'Dry run'
+        type: boolean
+        default: true
+
+concurrency:
+  group: pricing-after-run
+  cancel-in-progress: false
+
+jobs:
+  task:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests firebase-admin google-cloud-storage anthropic
+      - name: Run the task
+        env:
+          MINIHOTEL_HOTEL:          ${{ secrets.MINIHOTEL_HOTEL }}
+          MINIHOTEL_USER:           ${{ secrets.MINIHOTEL_USER }}
+          MINIHOTEL_PASS:           ${{ secrets.MINIHOTEL_PASS }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          ANTHROPIC_API_KEY:        ${{ secrets.ANTHROPIC_API_KEY }}
+          META_ACCESS_TOKEN:        ${{ secrets.META_ACCESS_TOKEN }}
+          META_PHONE_NUMBER_ID:     ${{ secrets.META_PHONE_NUMBER_ID }}
+          TASK: ${{ github.event.inputs.task }}
+          DRY: ${{ github.event.inputs.dry }}
+        run: python scripts/run_task.py "$TASK" "$DRY"
