@@ -288,6 +288,18 @@ def far_reset_problems(result: dict, live_rts) -> list:
     return bad
 
 
+def log_price_events(db, result, now, portals, cfg, sent):
+    """History log (pmslog): one record per changed, blocked or stopped price. Never stops or slows a run."""
+    try:
+        import pmslog
+        run_id = now.strftime("%Y%m%d%H%M%S") + ("u" if result.get("only") else "")
+        ev = pmslog.price_events(result, now, run_id, portals, pmslog.engine_version(), pmslog.settings_version(cfg.get("calm"), cfg.get("rules")), sent)
+        n = pmslog.write_events(db, "price_events", ev)
+        print(f"  History log: {n} price events saved.")
+    except Exception as e:  # noqa: BLE001
+        print(f"  History log skipped: {type(e).__name__}")
+
+
 def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=None):
     parser = argparse.ArgumentParser(description="Calm pricing engine, live room types")
     parser.add_argument("--dry", action="store_true", help="calculate and print; write and save nothing")
@@ -406,6 +418,7 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         extra["failed_portals"] = failed_portals
         ps.save(db, now, result["state"], result, extra,
                 prefix=STATE_PREFIX, daily_coll="pricing_calm_daily", runs_coll="pricing_calm_runs")
+        log_price_events(db, result, now, {rt: portals_for(v, rt) for rt, v in live_rts.items()}, cfg, bool(payload))
         print(f"Written: {len(writes)} prices for {sorted({w['rt'] for w in writes})}."
               + (f" Channel push failed for {failed_portals}." if failed_portals else ""))
         return {**result, "sent": bool(payload), "payload": payload, "portals": portals, "failed_portals": failed_portals, "report": report}

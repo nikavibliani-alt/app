@@ -1,0 +1,38 @@
+name: History log daily
+
+# Every night: snapshot, booking and setting events, export to Cloud Storage, prune Firestore after a verified export.
+# Reads MiniHotel (GET only) and writes only pmslog_* in Firestore and the history bucket. No prices change.
+on:
+  schedule:
+    - cron: '15 2 * * *'
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: 'Dry run (count only, write nothing)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: pmslog-daily
+  cancel-in-progress: false
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests firebase-admin google-cloud-storage
+      - name: History log
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          MINIHOTEL_HOTEL: ${{ secrets.MINIHOTEL_HOTEL }}
+          MINIHOTEL_USER: ${{ secrets.MINIHOTEL_USER }}
+          MINIHOTEL_PASS: ${{ secrets.MINIHOTEL_PASS }}
+          DRY: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry == 'true' }}
+        run: |
+          if [ "$DRY" = "true" ]; then python scripts/pmslog_daily.py --dry; else python scripts/pmslog_daily.py; fi

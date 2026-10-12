@@ -1274,7 +1274,9 @@ async function holSave() {
     const fields = {};
     todo.forEach(([r, c, v]) => { fields[`settings.holiday.limits.${r}.${c}`] = Math.round(v * 10) / 1000; });
     await writeFields(engRef(), fields);
-    logChange("engine_edit", "Pricing page: holiday rule " + todo.map(([r, c, v]) => `${r} ${c} ${v}%`).join(", "));
+    const holFields = {};
+    todo.forEach(([r, c, v]) => { holFields[`holiday.limits.${r}.${c}`] = {old: null, new: Math.round(v * 10) / 1000}; });
+    logChange("engine_edit", "Pricing page: holiday rule " + todo.map(([r, c, v]) => `${r} ${c} ${v}%`).join(", "), holFields);
     await loadConfig();
     closeDialog();
     U.saved = true; U.notice = "Saved. Used from the next price update.";
@@ -1671,8 +1673,12 @@ window.matchMedia("(min-width: 900px)").addEventListener("change", () => { close
 /* =====================================================================
    Writing (field paths only; re-read first)
    ===================================================================== */
-async function logChange(type, detail) {
-  try { await setDoc(doc(collection(db, "pricing_changes")), {ts: new Date(), type, detail}); } catch (e) { /* history only */ }
+async function logChange(type, detail, fields) {
+  // fields: {path: {old, new}} so the history can say exactly what changed; by: who did it
+  const by = auth.currentUser && auth.currentUser.email ? auth.currentUser.email : null;
+  const clean = {};
+  Object.entries(fields || {}).forEach(([k, f]) => { clean[k.replace(/\./g, "/")] = {old: f.old ?? null, new: f.new ?? null}; });
+  try { await setDoc(doc(collection(db, "pricing_changes")), {ts: new Date(), type, detail, by, ...(Object.keys(clean).length ? {fields: clean} : {})}); } catch (e) { /* history only */ }
 }
 function expandDotted(fields) {
   const out = {};
@@ -1735,8 +1741,15 @@ async function saveAll() {
     const ruleDel = P.ruleDel.filter(d => freshRules.some(o => same(o, d)));
     await writeList(engRef(), "settings.date_rules", freshRules, fe.settings && fe.settings.date_rules, P.ruleAdd, ruleDel);
     const lines = changeLines();
-    if (Object.keys(rf).length || P.holAdd.length || holDel.length) logChange("rules_edit", "Pricing page: " + lines.join(", "));
-    if (Object.keys(ef).length || P.ruleAdd.length || ruleDel.length) logChange("engine_edit", "Pricing page: " + lines.join(", "));
+    const rFields = {}, eFields = {};
+    Object.values(P.seasons).forEach(e => { rFields[e.path] = {old: e.raw, new: e.v}; });
+    for (const [rt, f] of Object.entries(P.room)) for (const [field, e] of Object.entries(f)) eFields[`room_types.${rt}.${field}`] = {old: e.raw ?? e.from, new: e.v};
+    P.holAdd.forEach((o, i) => { rFields[`dateOverrides.add.${i}`] = {old: null, new: `${o.from}..${o.to} ${o.season}`}; });
+    holDel.forEach((o, i) => { rFields[`dateOverrides.remove.${i}`] = {old: `${o.from}..${o.to} ${o.season}`, new: null}; });
+    P.ruleAdd.forEach((r, i) => { eFields[`date_rules.add.${i}`] = {old: null, new: `${r.from}..${r.to} ${r.action}`}; });
+    ruleDel.forEach((r, i) => { eFields[`date_rules.remove.${i}`] = {old: `${r.from}..${r.to} ${r.action}`, new: null}; });
+    if (Object.keys(rf).length || P.holAdd.length || holDel.length) logChange("rules_edit", "Pricing page: " + lines.join(", "), rFields);
+    if (Object.keys(ef).length || P.ruleAdd.length || ruleDel.length) logChange("engine_edit", "Pricing page: " + lines.join(", "), eFields);
     P.room = {}; P.seasons = {}; P.holAdd = []; P.holDel = []; P.ruleAdd = []; P.ruleDel = [];
     await loadConfig();
     U.saved = true; U.notice = "Saved. Used from the next price update.";
