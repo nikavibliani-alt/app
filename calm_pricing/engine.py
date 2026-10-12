@@ -29,7 +29,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import copy
 
-from .config import season_of, AGGRESSIVE
+from .config import season_of, AGGRESSIVE, is_holiday
 from .curve import interpolate
 
 STATUS_WORDS = {
@@ -159,6 +159,35 @@ def _date_rule(rt: str, ds: str, rules: list):
         if str(r["from"]) <= ds <= str(r["to"]) and (rooms == "all" or rt in rooms):
             found = r
     return found
+
+
+def _holiday_window(days_out: int, h: dict):
+    """'far' / 'mid' / 'near' while the holiday limits apply, None from normal_upto days before arrival on."""
+    d = h["days"]
+    if days_out <= d["normal_upto"]:
+        return None
+    if days_out > d["far_above"]:
+        return "far"
+    return "mid" if days_out > d["mid_above"] else "near"
+
+
+def _holiday_band(anchor: float, units: int, window: str, h: dict):
+    """(lowest, highest or None, down share, up share or None) around the anchor. Several rooms: no upper limit."""
+    lim = h["limits"][window]
+    single = units <= 1
+    down = float(lim["down_single"] if single else lim["down_multi"])
+    up = float(lim["up_single"]) if single else None
+    return anchor * (1 - down), (anchor * (1 + up) if up is not None else None), down, up
+
+
+def _track_anchor(st: dict, kind, price: float, now: datetime):
+    """Store the price a date has when it first enters the holiday rule; forget it when the date leaves the rule."""
+    if kind:
+        if st.get("holiday_anchor") is None and price > 0:
+            st["holiday_anchor"], st["holiday_anchor_at"], st["holiday_anchor_by"] = price, now.isoformat(), kind
+    else:
+        for k in ("holiday_anchor", "holiday_anchor_at", "holiday_anchor_by"):
+            st.pop(k, None)
 
 
 def _int_keys(d: dict) -> dict:
@@ -372,7 +401,12 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                                       "kind": "protected", "style": None, "blocked": [],
                                       "why": [f"Protected date ({rule.get('note') or 'date rule'}): left alone."]})
                 continue
-            style = (rule["action"] if rule else None) or info.get("style") or "normal"
+            style = (rule["action"] if rule and rule["action"] != "hold" else None) or info.get("style") or "normal"
+            hol_kind = None                      # "holiday" (a holiday date) or "hold" (a date rule): small moves only
+            if rule and rule["action"] == "hold":
+                hol_kind = "hold"
+            elif cfg["holiday"].get("enabled", True) and is_holiday(ds, cfg):
+                hol_kind = "holiday"
             pc = profiles.get(style, cfg)
             dm, calm = pc["demand"], pc["calm"]
             goal_d = max(goal, AGGRESSIVE["occupancy_goal_floor"]) if style == "aggressive" else goal
@@ -422,6 +456,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                        "target": None, "status": status, "write": False, "kind": "hold",
                        "why": [], "blocked": []}
                 decisions.append(dec)
+                _track_anchor(st, hol_kind, current, now)
 
                 if avail == 0:
                     if st.get("manual_until") and avail < st.get("avail_at_manual", avail):
@@ -445,6 +480,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                         current = float(rules["start"])
                         dec["current"] = dec["proposed"] = current
                         dec["fill"] = True
+                        _track_anchor(st, hol_kind, current, now)
                         dec["why"].append("No price in MiniHotel yet: the engine sets one from your start price.")
                     else:
                         mp[0] += 1
@@ -590,7 +626,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
 
                 # ---- 3c. far dates that are too high go straight to the plain target (live room types only) ----
                 far_from = int(calm.get("far_reset_from_days", 61))
-                if can_write and not shadow and days_out >= far_from and not dec.get("fill"):
+                if can_write and not shadow and days_out >= far_from and not dec.get("fill") and not hol_kind:
                     plain = min(max(base, mn), mx_eff)
                     new = _plain_target_price(plain, mn, mx_eff, step)
                     if new < current - 1e-9:
@@ -603,6 +639,23 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                             f"{days_out} days away and above the target: straight down {_fmt(cur, current)} -> {_fmt(cur, new)}; "
                             "from here on it moves calmly.")
                         continue
+
+                # ---- 3d. holiday rule: where may this date go? (small moves around the anchor, until normal_upto days before) ----
+                hol_win, hol_lo, hol_hi = None, None, None
+                anchor = st.get("holiday_anchor")
+                if hol_kind and anchor:
+                    hol_win = _holiday_window(days_out, cfg["holiday"])
+                    if hol_win:
+                        hol_lo, hol_hi, h_down, h_up = _holiday_band(float(anchor), units, hol_win, cfg["holiday"])
+                        dec["holiday"] = {"kind": hol_kind, "anchor": float(anchor), "window": hol_win, "lo": round(hol_lo, 2),
+                                          "hi": None if hol_hi is None else round(hol_hi, 2)}
+                        dec["why"].append(
+                            f"{'Date rule: small moves only' if hol_kind == 'hold' else 'Holiday date'}: anchor {_fmt(cur, float(anchor))}; "
+                            f"{days_out} days before arrival it may be {_fmt(cur, hol_lo)} to "
+                            + (f"{_fmt(cur, hol_hi)}." if hol_hi is not None else "as high as the normal rules allow."))
+                    else:
+                        dec["holiday"] = {"kind": hol_kind, "anchor": float(anchor), "window": None}
+                        dec["why"].append(f"{days_out} days or fewer before arrival: the normal rules apply again.")
 
                 # ---- 4. direction and speed ----
                 dz = max(calm["dead_zone_pct"] * current, calm["dead_zone_abs"].get(cur, 0))
@@ -626,6 +679,22 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                     if pickup:
                         sp = 0.0
                     proposed = max(target, current * (1 - sp))
+
+                if hol_win:
+                    if direction > 0 and hol_hi is not None:
+                        if current >= hol_hi - 1e-9:
+                            dec["blocked"].append(f"Holiday rule: at most {h_up:.0%} above the anchor ({_fmt(cur, hol_hi)}).")
+                            continue
+                        if proposed > hol_hi:
+                            dec["blocked"].append(f"Holiday rule: at most {h_up:.0%} above the anchor ({_fmt(cur, hol_hi)}).")
+                            proposed = hol_hi
+                    elif direction < 0:
+                        if current <= hol_lo + 1e-9:
+                            dec["blocked"].append(f"Holiday rule: at most {h_down:.0%} below the anchor ({_fmt(cur, hol_lo)}).")
+                            continue
+                        if proposed < hol_lo:
+                            dec["blocked"].append(f"Holiday rule: at most {h_down:.0%} below the anchor ({_fmt(cur, hol_lo)}).")
+                            proposed = hol_lo
 
                 # ---- 5. calm rules (only ever block; never reverse a move) ----
                 reason = None
@@ -664,6 +733,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                         dec["blocked"].append(f"Limit: at most -{lim:.0%} in 24 hours.")
                         proposed = floor_24h
                     bound = max(target, floor_24h, mn)
+                    if hol_win:
+                        bound = max(bound, hol_lo)
                 else:
                     lim = calm["daily_up_hot"] if (status == "far_ahead" and days_out <= 14) else calm["daily_up"]
                     ceil_24h = baseline * (1 + lim)
@@ -671,6 +742,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                         dec["blocked"].append(f"Limit: at most +{lim:.0%} in 24 hours.")
                         proposed = ceil_24h
                     bound = min(target, ceil_24h, mx_eff)
+                    if hol_win and hol_hi is not None:
+                        bound = min(bound, hol_hi)
                 if (direction < 0 and bound >= current) or (direction > 0 and bound <= current):
                     if not dec["blocked"]:
                         dec["blocked"].append("No room to move within the 24-hour limits.")
@@ -766,6 +839,9 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
             writes.append({"rt": dec["rt"], "date": dec["date"], "currency": dec["currency"], "price": dec["proposed"]})
             st["last_engine"] = dec["proposed"]
         st.setdefault("moves", []).append({"t": now.isoformat(), "p": dec["current"]})
+        dirs = [x for x in st.get("dirs", []) if now - datetime.fromisoformat(x["t"]) < timedelta(hours=72)]
+        dirs.append({"t": now.isoformat(), "d": direction, "k": dec["kind"], "p": dec["proposed"]})
+        st["dirs"] = dirs                                 # kept 72 hours: lets the watchdog spot up-down-up
         st["last_change_dir"] = direction
         st["last_change_ts"] = now.isoformat()
         st["avail_at_change"] = dec["avail"]

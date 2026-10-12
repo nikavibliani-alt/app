@@ -90,12 +90,28 @@ DEFAULTS = {
         {"name": "peak", "ranges": [["07-01", "08-31"]]},
         {"name": "xmas_low", "ranges": [["12-01", "12-23"]]},
     ],
-    "date_overrides": [],   # [{"from": "MM-DD", "to": "MM-DD", "season": "peak"}]
+    "date_overrides": [],   # [{"from": "MM-DD", "to": "MM-DD", "season": "peak"}]  = the holiday dates, every year
+    # Holiday rule: on every holiday date (every range in date_overrides) and on dates under a "hold" date rule,
+    # the price may only move a little away from its ANCHOR (the price the date had when it first entered the
+    # rule, stored in the engine memory), and only until "normal_upto" days before arrival; after that the normal
+    # rules apply. Single-unit rooms: up and down limits. Rooms with 2+ units: down limits only; going up
+    # follows the normal rules (demand, daily caps). No far reset on these dates. Shares of the anchor:
+    #   far  = more than far_above days before arrival,  mid = more than mid_above days,  near = more than normal_upto days
+    "holiday": {
+        "enabled": True,
+        "days": {"far_above": 30, "mid_above": 20, "normal_upto": 14},
+        "limits": {
+            "far":  {"down_multi": 0.05, "down_single": 0.03, "up_single": 0.03},
+            "mid":  {"down_multi": 0.08, "down_single": 0.05, "up_single": 0.05},
+            "near": {"down_multi": 0.10, "down_single": 0.08, "up_single": 0.08},
+        },
+    },
     # Date rules, newest wins when several match:
     #   {"from": "YYYY-MM-DD", "to": "YYYY-MM-DD", "rooms": "all" | ["XCV_1", ...],
-    #    "action": "protect" | "aggressive" | "normal", "note": "New Year"}
+    #    "action": "protect" | "aggressive" | "normal" | "hold", "note": "New Year"}
     # protect    = the engine leaves those dates completely alone (you set them by hand)
     # aggressive = "fill the month": lower faster and further when selling slower than normal
+    # hold       = small moves only, more active closer to the date: the holiday rule above, for these dates
     "date_rules": [],
     "events": {},           # {"YYYY-MM-DD": {"label": "...", "pct": 0.30}}
     "room_types": {},       # filled by the caller
@@ -123,7 +139,7 @@ AGGRESSIVE = {
     "occupancy_goal_floor": 0.92,
 }
 STYLES = ("normal", "aggressive")
-RULE_ACTIONS = ("protect", "aggressive", "normal")
+RULE_ACTIONS = ("protect", "aggressive", "normal", "hold")
 
 
 # Settings whose keys are numbers of days: replaced as a whole, keys made numeric
@@ -156,7 +172,16 @@ HARD_LIMITS = {
     ("last_units", "one_left"): (0.0, 0.25),
     ("min_guard_share",): (0.0, 0.5),
     ("tz_offset_hours",): (3, 5),
+    ("holiday", "days", "far_above"): (25, 45),
+    ("holiday", "days", "mid_above"): (15, 29),
+    ("holiday", "days", "normal_upto"): (7, 21),
 }
+HOLIDAY_COLUMNS = ("down_multi", "down_single", "up_single")
+HOLIDAY_ROWS = ("far", "mid", "near")
+HOLIDAY_LIMIT = (0.0, 0.20)       # every holiday percentage: from 0% (the price may not move) to 20%
+for _row in HOLIDAY_ROWS:
+    for _col in HOLIDAY_COLUMNS:
+        HARD_LIMITS[("holiday", "limits", _row, _col)] = HOLIDAY_LIMIT
 BAND_LIMITS = {"down": (0.0, 0.25), "up": (0.0, 0.35)}
 DEMAND_LIMITS = {"target_adj": (-0.20, 0.25), "speed_up": (0.0, 0.15), "speed_down": (0.0, 0.10)}
 
@@ -243,6 +268,23 @@ def apply_limits(cfg: dict) -> list:
         else:
             problems.append(f"setting date_rules entry {r!r} is not valid; ignored.")
     cfg["date_rules"] = good
+    h = cfg.get("holiday")
+    if not isinstance(h, dict):
+        problems.append("setting holiday is not valid; defaults used.")
+        h = cfg["holiday"] = copy.deepcopy(DEFAULTS["holiday"])
+    if not isinstance(h.get("enabled"), bool):
+        h["enabled"] = True
+    d = h["days"]
+    if not (d["normal_upto"] < d["mid_above"] < d["far_above"]):
+        problems.append("setting holiday.days are not in order (normal_upto < mid_above < far_above); defaults used.")
+        h["days"] = dict(DEFAULTS["holiday"]["days"])
+    # closer to the date must allow at least as much as further away
+    for col in HOLIDAY_COLUMNS:
+        vals = [h["limits"][r][col] for r in HOLIDAY_ROWS]
+        if not (vals[0] <= vals[1] <= vals[2]):
+            problems.append(f"setting holiday.limits {col}: closer to the date must allow at least as much as further away; defaults used.")
+            h["limits"] = copy.deepcopy(DEFAULTS["holiday"]["limits"])
+            break
     for rt, info in list((cfg.get("room_types") or {}).items()):
         if isinstance(info, dict) and "window_days" in info:
             info["window_days"] = _check(info["window_days"], cfg["window_days"], 30, 400,
@@ -254,6 +296,25 @@ def apply_limits(cfg: dict) -> list:
     return problems
 
 
+def _deep_merge(base: dict, over: dict) -> dict:
+    out = copy.deepcopy(base)
+    for k, v in over.items():
+        out[k] = _deep_merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else copy.deepcopy(v)
+    return out
+
+
+def holiday_ranges(cfg: dict) -> list:
+    """Every holiday range, (from "MM-DD", to "MM-DD"): the ranges in date_overrides (a list, or an old-style map)."""
+    src = cfg.get("date_overrides")
+    items = list(src.values()) if isinstance(src, dict) else (src or [])
+    return [(o["from"], o["to"]) for o in items if isinstance(o, dict) and o.get("from") and o.get("to")]
+
+
+def is_holiday(date_str: str, cfg: dict) -> bool:
+    md = date_str[5:]
+    return any((a <= md <= b) if a <= b else (md >= a or md <= b) for a, b in holiday_ranges(cfg))
+
+
 def merged(overrides: dict | None = None) -> dict:
     """
     Return a deep copy of DEFAULTS with overrides merged in (one level deep per key).
@@ -263,6 +324,9 @@ def merged(overrides: dict | None = None) -> dict:
     for k, v in (overrides or {}).items():
         if k in WHOLE_DAY_TABLES and isinstance(v, dict):
             cfg[k] = {int(kk): vv for kk, vv in v.items()}
+            continue
+        if k == "holiday" and isinstance(v, dict):
+            cfg[k] = _deep_merge(cfg[k], v)
             continue
         if isinstance(v, dict) and isinstance(cfg.get(k), dict):
             for k2, v2 in v.items():

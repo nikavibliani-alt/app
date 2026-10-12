@@ -329,6 +329,8 @@ def save(db, now: datetime, state: dict, result: dict, extra: dict | None = None
             "rejected": d.get("rejected"),            # a move calculated but not kept because the run stopped
             "target": d["target"], "min": d["min"], "max": d["max"], "status": d["status"],
             "avail": d["avail"], "kind": d["kind"], "why": d["why"][-4:], "blocked": d["blocked"][:2],
+            "do": d["days_out"], "units": d["units"],
+            **({"hol": d["holiday"]} if d.get("holiday") else {}),      # holiday rule: kind, anchor, window, lowest, highest
         }
     for rt, dates in by_rt.items():
         db.collection(daily_coll).document(f"{day}_{rt}").set(
