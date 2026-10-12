@@ -1312,7 +1312,7 @@ function ideaInfo(p) {
     : base === "floor" ? `The lowest price the engine may use in ${sl} becomes ${fmt(sug)} instead of ${fmt(cur)}.`
     : `The highest price in ${sl} becomes ${fmt(sug)} instead of ${fmt(cur)}. Quiet nights do not change.`;
   const pct = p.change_pct != null ? `${p.change_pct > 0 ? "+" : "−"}${Math.abs(Math.round(p.change_pct))}%` : (cur && sug !== null ? `${sug >= cur ? "+" : "−"}${Math.abs(Math.round((sug - cur) / cur * 100))}%` : "");
-  return {path, cur, sug, fmt, what, eur, title: `${dir} the ${what}`, effect, pct, where: `${roomName(rt)} · ${eur ? "Airbnb" : "Booking"}`, season: sl + (season === "xmas_low" ? "" : " season")};
+  return {path, cur, sug, fmt, what, eur, title: `${dir} the ${what}`, effect, pct, where: `${roomName(rt)} · ${eur ? "Airbnb" : "Booking"}`, season: sl};
 }
 /* ---------- the real dates behind an idea ---------- */
 // The stretches of the calendar that belong to a season, from today on (the one running now starts on its real first day).
