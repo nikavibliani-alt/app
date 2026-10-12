@@ -89,7 +89,7 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: pip install requests firebase-admin
-      - name: New engine, live room types (XCV)
+      - name: New engine, all live room types (all 10 rooms)
         env:
           MINIHOTEL_HOTEL:          ${{ secrets.MINIHOTEL_HOTEL }}
           MINIHOTEL_USER:           ${{ secrets.MINIHOTEL_USER }}

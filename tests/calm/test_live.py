@@ -101,7 +101,8 @@ def test_live_writes_only_xcv_with_the_current_engine_format(http, settings_file
     assert "pricing_calm_runs" in db.store and res["sent"]
 
 
-def test_room_types_of_the_current_engine_can_never_go_live(http, settings_file):
+def test_room_types_still_on_the_old_engine_can_never_go_live(http, settings_file, monkeypatch):
+    monkeypatch.setattr(ps, "OLD_ENGINE_RTS", {"MAXELA", "ROOMS"})        # none today; the guard must still hold if one comes back
     settings_file({"room_types": {"MAXELA": {"engine": "live"}, "ROOMS": {"engine": "live"}}})
     db = xcv_db()
     db.store["pricing_config"]["engine_v2"]["rules"]["MAXELA"] = db.store["pricing_config"]["engine_v2"]["rules"]["XCV_1"]
@@ -130,7 +131,8 @@ def test_dry_run_writes_and_saves_nothing(http, settings_file):
     assert json.dumps(db.store, sort_keys=True, default=str) == before
 
 
-def test_guard_refuses_other_room_types_and_other_writes(http):
+def test_guard_refuses_other_room_types_and_other_writes(http, monkeypatch):
+    monkeypatch.setattr(ps, "OLD_ENGINE_RTS", {"MAXELA"})
     with live.LiveWriteGuard({"XCV_1", "MAXELA"}):        # MAXELA is dropped from the allowed set
         for body in ([{"roomTypeCode": "MAXELA", "Dates": []}], [{"roomTypeCode": "XCV_1"}, {"roomTypeCode": "ROOMS"}]):
             with pytest.raises(RuntimeError):

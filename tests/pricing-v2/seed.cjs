@@ -57,7 +57,9 @@ function seedDocs() {
   docs['pricing_config/rules'] = rulesDoc();
   docs['pricing_config/engine_v2'] = {settings: {room_types: {
     XCV_1: {engine: 'live', style: 'normal', window_days: 180}, XCV_2: {engine: 'live', style: 'normal', window_days: 180},
-    VGL_ST: {engine: 'live', style: 'normal', window_days: 180}, VGL_AP: {engine: 'live', style: 'normal', window_days: 180}}, date_rules: []}};
+    VGL_ST: {engine: 'live', style: 'normal', window_days: 180}, VGL_AP: {engine: 'live', style: 'normal', window_days: 180},
+    // the six old rooms are "only calculating" here, so the old-way screens stay testable
+    ROOMS: {engine: 'test'}, MAXELA: {engine: 'test'}, BIG_APT: {engine: 'test'}, FREEDOM: {engine: 'test'}, ORBE_1: {engine: 'test'}, ORBE_2: {engine: 'test'}}, date_rules: []}};
   docs['pricing_calm_runs/r1'] = {ts: TODAY + 'T09:03:00', ok: true, paused: false, failed_portals: [], writes: 4};
   docs['pricing_log/l1'] = {timestamp: new Date('2026-10-11T08:55:00Z'), changes_count: 3};
   for (const rt of Object.keys(BASE)) {

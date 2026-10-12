@@ -363,6 +363,38 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
     });
   }
 
+
+  // ---- the six old rooms moved to the new engine: every room is "new way" ----
+  const MOVED = d => {
+    for (const rt of ['ROOMS', 'MAXELA', 'BIG_APT', 'FREEDOM', 'ORBE_1', 'ORBE_2']) {
+      delete d['pricing_config/engine_v2'].settings.room_types[rt];               // calm_settings.json says live
+      d[`pricing_calm_daily/2026-10-11_${rt}`] = d[`pricing_shadow_daily/2026-10-11_${rt}`]; delete d[`pricing_shadow_daily/2026-10-11_${rt}`];
+    }
+  };
+  for (const [w, hh] of SIZES) {
+    await test('moved: all 10 rooms are on the new way (no old-way section, no test screens)', w, hh, async (env, desk) => {
+      const {page} = env;
+      if (!desk) {
+        const t = await text(page, 'body');
+        assert.ok(!/Old way, new way being tested/.test(t) && !/New way would be/.test(t), 'no old-way section');
+        assert.strictEqual((await page.$$('a.row[href^="#/room/"]')).length, 10);
+        await go(page, '#/room/MAXELA');
+        assert.ok(/Mode/.test(await text(page, 'body')) && await page.$('[data-act=mode][data-rt=MAXELA]'), 'MAXELA has the room settings');
+        await go(page, '#/test/MAXELA'); assert.ok(!(await page.$('text=Try-out so far')), 'no test screen for a live room');
+        await go(page, '#/seasons'); assert.ok(!(await page.$('[data-act=toggleOld]')), 'no old-room toggle');
+        assert.strictEqual((await page.$$('[data-room]')).length, 10);
+      } else {
+        assert.ok(!/Old way, new way being tested/.test(await text(page, '#cwrap')));
+        await page.click('.cname[data-rt=MAXELA]'); await page.waitForSelector('.panel');
+        assert.ok(await page.$('.panel [data-act=mode][data-rt=MAXELA]'), 'MAXELA opens the room settings');
+      }
+      await go(page, '#/dates'); await page.click('[data-act=dpKind][data-k=rule]');
+      assert.strictEqual((await page.$$('[data-act=dpRoom]')).length, 11, 'date rules can name all 10 rooms');
+      await go(page, desk ? '#/calendar' : '#/rooms'); await page.click('[data-act=how]');
+      const how = await text(page, '.dlg'); assert.ok(/All 10 rooms/.test(how) && /Expedia/.test(how) && !/Old way \(/.test(how));
+    }, {mutate: MOVED});
+  }
+
   // ---- layout switch ----
   await test('layout switches at 900 px', 899, 800, async ({page}) => { assert.strictEqual(await page.evaluate(() => document.body.dataset.layout), 'phone'); assert.ok(await page.$('a.tab[href="#/rooms"]')); });
   await test('layout switches at 900 px (desk side)', 900, 800, async ({page}) => { assert.strictEqual(await page.evaluate(() => document.body.dataset.layout), 'desk'); assert.ok(await page.$('a.tab[href="#/calendar"]')); });

@@ -107,7 +107,8 @@ def test_paused_and_dry_write_nothing(http, settings_file):
     assert not res["sent"] and not posts(http) and "pricing_engine_state" not in db.store
 
 
-def test_old_rooms_are_never_touched(http, settings_file):
+def test_rooms_still_on_the_old_engine_are_never_touched(http, settings_file, monkeypatch):
+    monkeypatch.setattr(ps, "OLD_ENGINE_RTS", {"MAXELA", "ROOMS"})        # none today; the guard must still hold if one comes back
     s = {"room_types": {**SETTINGS["room_types"], "MAXELA": {"engine": "live"}, "ROOMS": {"engine": "live"}}}
     db = xcv_db()
     db.store["pricing_config"]["engine_v2"]["rules"]["MAXELA"] = db.store["pricing_config"]["engine_v2"]["rules"]["XCV_1"]

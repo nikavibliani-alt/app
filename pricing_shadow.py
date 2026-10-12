@@ -180,7 +180,10 @@ def _season_cell(table, rt, s):
 
 LOADER_WARNINGS: list = []
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "calm_settings.json")
-OLD_ENGINE_RTS = {"ROOMS", "MAXELA", "BIG_APT", "FREEDOM", "ORBE_1", "ORBE_2"}
+# Room types still priced by the old (velocity) engine. Empty since all six moved to the new engine
+# (they are live in calm_settings.json). A room type is never on both engines: it leaves this set and
+# the old engine's own room list (pricing_engine.ROOM_TYPES) in the same change.
+OLD_ENGINE_RTS: set = set()
 OLD_ENGINE_WINDOW_DAYS = 90
 
 
@@ -350,7 +353,7 @@ def build_config(rules: dict, settings: dict, events: dict) -> dict:
     # Room types switched to the live engine are handled by pricing_calm_live.py, not here.
     cfg["room_types"] = {rt: v for rt, v in cfg["room_types"].items()
                          if rules.get(rt) and not (v.get("engine") == "live" and rt not in OLD_ENGINE_RTS)}
-    # The current engine only prices 90 days, so these six always use 90 whatever the settings say.
+    # Room types still on the old engine only price 90 days, so they always use 90 whatever the settings say.
     for rt in OLD_ENGINE_RTS:
         if rt in cfg["room_types"]:
             cfg["room_types"][rt]["window_days"] = OLD_ENGINE_WINDOW_DAYS
@@ -374,6 +377,10 @@ def main(argv=None, db=None, get=requests.get, cookie_fn=None, now=None):
         rules, settings = load_rules(db, repo_config)
         events = load_events(db)
         cfg = build_config(rules, settings, events)
+        if not cfg["room_types"]:
+            print("Shadow run: every room type is live in the new engine, nothing to calculate in the test.")
+            return {"ok": True, "decisions": [], "writes": [], "shadow_moves": [], "alerts": [], "warnings": [],
+                    "main_run": False, "considered": 0, "corrections": 0}
         if cookie_fn is None:
             from minihotel_auth import get_session_cookie
             cookie_fn = get_session_cookie

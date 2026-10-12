@@ -805,6 +805,117 @@ def check_live():
         sys.exit(1)
 
 # ---------------------------------------------------------------------------
+# --check moveold: the six old rooms on the new engine, dry run (nothing sent, nothing saved)
+# ---------------------------------------------------------------------------
+
+def moveold_report(result, rules, settings, repo_cfg, FS_ROOMS):
+    """Plain report per room. Pure function of the dry-run result so it can be tested."""
+    import pricing_engine
+    import pricing_calm_live as live
+    import pricing_shadow as ps
+    matrix = pricing_engine.CHANNEL_MATRIX
+    old_portals = {rt: [p for p, k in (("BOOKING", "booking"), ("EXPEDIA", "expedia"), ("AIRBNB", "airbnb")) if m.get(k)]
+                   for rt, m in matrix.items()}
+    live_rts = live.live_room_types(rules, settings)
+    decs = result.get("decisions", [])
+    stopped = set(result.get("stopped_room_types") or [])
+    checks = {}
+    pct = lambda a, b: (b - a) / a * 100 if a else 0.0
+    would_portals = set()
+    for rt in KNOWN_ROOM_TYPES:
+        info = live_rts.get(rt)
+        print(f"\n=== {rt} ===")
+        if not info:
+            print("  NOT LIVE in the new engine (or no complete minimum/start/maximum): it would be priced by nobody.")
+            checks[f"{rt} is live"] = False
+            continue
+        fs = FS_ROOMS.get(rt) or {}
+        diff = {k: fs[k] for k in ("engine", "style", "window_days", "portals") if k in fs}
+        print(f"  settings: engine {info.get('status')}, style {info.get('style', 'normal')}, {info.get('window_days', 90)} days ahead, "
+              f"channels {'+'.join(info.get('portals') or live.DEFAULT_PORTALS)}"
+              + (f" | saved on the pricing page (wins over the file): {json.dumps(diff)}" if diff else " | from calm_settings.json"))
+        mine = [d for d in decs if d["rt"] == rt]
+        free = {d["date"] for d in mine if d["avail"] > 0}
+        applied = [d for d in mine if d["kind"] in ("move", "correction", "fill", "reset", "far_reset")]
+        halted = [d for d in mine if d["kind"] == "stopped"]
+        change_rows = [(d, d["proposed"]) for d in applied] + [(d, d.get("rejected")) for d in halted if d.get("rejected") is not None]
+        dates_change = {d["date"] for d, _ in change_rows}
+        by_cur = Counter(d["currency"] for d, _ in change_rows)
+        print(f"  dates read: {len({d['date'] for d in mine})} | free: {len(free)} | dates that change in the first run: {len(dates_change)} "
+              f"(Booking GEL {by_cur.get('GEL', 0)}, Airbnb {by_cur.get('USD', 0)})")
+        if rt in stopped or halted:
+            print(f"  STOPPED by a safety check: {len(halted)} calculated changes were NOT applied (the numbers below are what it wanted to do).")
+        for cur, label in (("GEL", "Booking GEL"), ("USD", "Airbnb")):
+            rows = [(d, p) for d, p in change_rows if d["currency"] == cur]
+            if rows:
+                avg = sum(pct(d["current"], p) for d, p in rows) / len(rows)
+                print(f"  {label}: {len(rows)} changes, average {avg:+.1f}%, lowered {sum(1 for d, p in rows if p < d['current'])}, raised {sum(1 for d, p in rows if p > d['current'])}")
+        per_date = defaultdict(dict)
+        for d, p in change_rows:
+            per_date[d["date"]][d["currency"]] = (d["current"], p)
+        top = sorted(per_date.items(), key=lambda kv: -max(abs(pct(a, b)) for a, b in kv[1].values()))[:10]
+        if top:
+            print("  10 biggest changes (date | Booking GEL old -> new | Airbnb old -> new):")
+            for ds, v in top:
+                g = f"{v['GEL'][0]:.0f} -> {v['GEL'][1]:.0f} ({pct(*v['GEL']):+.0f}%)" if "GEL" in v else "-"
+                a = f"{v['USD'][0]:.0f} -> {v['USD'][1]:.0f} ({pct(*v['USD']):+.0f}%)" if "USD" in v else "-"
+                print(f"    {ds} | {g:22} | {a}")
+        if dates_change:
+            would_portals |= set(live.portals_for(info, rt))
+        # the price lists it writes must be the ones the old engine wrote
+        cur_expected = set()
+        if matrix[rt].get("booking") or matrix[rt].get("expedia"):
+            cur_expected.add("GEL")
+        if matrix[rt].get("airbnb"):
+            cur_expected.add("USD")
+        seen_cur = {d["currency"] for d in mine}
+        checks[f"{rt}: price lists = old engine's ({'+'.join(sorted(cur_expected))})"] = seen_cur <= cur_expected and bool(seen_cur)
+        checks[f"{rt}: channels = old engine's ({'+'.join(old_portals[rt])})"] = live.portals_for(info, rt) == old_portals[rt]
+        checks[f"{rt}: live, style normal, 90 days"] = info.get("status") == "live" and info.get("style", "normal") == "normal" and info.get("window_days", 90) == 90
+    print("\n" + "=" * 70)
+    print("CHANNEL PUSH")
+    print("=" * 70)
+    portals = result.get("portals") or []
+    print(f"  Pushed after the write in this run: {', '.join(portals) if portals else 'nothing'}")
+    print(f"  Would push if no room were stopped: {', '.join(p for p in live.VALID_PORTALS if p in would_portals) or 'nothing'}")
+    exp_rooms = [rt for rt in KNOWN_ROOM_TYPES if "EXPEDIA" in old_portals[rt]]
+    print(f"  EXPEDIA is pushed for: {', '.join(exp_rooms)} (same rooms as the old engine)")
+    wr = result.get("writes") or []
+    print(f"  Price writes in this run (after safety stops): {len(wr)} on room types {sorted({w['rt'] for w in wr}) or 'none'}")
+    print("\n" + "=" * 70)
+    print("STOPPED / ALERTS")
+    print("=" * 70)
+    print(f"  Room types stopped by a safety check: {sorted(stopped) or 'none'}")
+    for a in result.get("alerts", [])[:20]:
+        print("  ALERT:", a)
+    for w in result.get("warnings", [])[:20]:
+        print("  note:", w)
+    checks["old engine room list is empty"] = pricing_engine.ROOM_TYPES == []
+    checks["OLD_ENGINE_RTS is empty"] = not ps.OLD_ENGINE_RTS
+    checks["no room type is on both engines"] = not (set(pricing_engine.ROOM_TYPES) & set(live_rts))
+    print()
+    for name, okv in checks.items():
+        print(f"  CHECK {'OK  ' if okv else 'FAIL'} {name}")
+    return checks
+
+
+def check_moveold():
+    hdr("MOVE OF THE 6 OLD ROOMS TO THE NEW ENGINE: dry run (calculates and prints; nothing sent, nothing saved)")
+    import pricing_calm_live
+    import pricing_shadow as ps
+    result = pricing_calm_live.main(["--dry"])
+    db = init_firestore()
+    repo_cfg = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config.json")))
+    rules, settings = ps.load_rules(db, repo_cfg)
+    fs = (db.collection("pricing_config").document("engine_v2").get().to_dict() or {}).get("settings", {}).get("room_types", {})
+    checks = moveold_report(result, rules, settings, repo_cfg, fs)
+    print(f"\nSent to MiniHotel: {bool(result.get('sent'))}")
+    print(f"Attempted non-GET requests to MiniHotel (blocked by the check's guard): {len(BLOCKED)}")
+    if result.get("sent") or BLOCKED or not all(checks.values()):
+        sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
 # --check xcvscan: XCV_1 / XCV_2, next 180 days: season prices, today's prices, targets (read only)
 # ---------------------------------------------------------------------------
 
@@ -1213,6 +1324,9 @@ def main():
         return
     if args.check == "xcvscan":
         check_xcvscan()
+        return
+    if args.check == "moveold":
+        check_moveold()
         return
     if args.check == "overrides":
         check_overrides()

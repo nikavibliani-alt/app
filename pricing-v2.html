@@ -310,9 +310,10 @@ const ROOMS = [
 ];
 const OLD_IDS = ["ROOMS","MAXELA","BIG_APT","FREEDOM","ORBE_1","ORBE_2"];
 const roomById = id => ROOMS.find(r => r.id === id);
-const isOld = id => OLD_IDS.includes(id);
-const NEW_ROOMS = ROOMS.filter(r => !isOld(r.id));
-const OLD_ROOMS = ROOMS.filter(r => isOld(r.id));
+// A room is on the old way only while the new engine is not live for it (calm_settings.json, or a value saved here).
+const isOld = id => OLD_IDS.includes(id) && savedRoom(id, "engine") !== "live";
+const newRooms = () => ROOMS.filter(r => !isOld(r.id));
+const oldRooms = () => ROOMS.filter(r => isOld(r.id));
 const TEST_ENDS = "23 Oct";
 const RUN_HOURS_UTC = [0, 5, 9, 12, 18];     // 04:00, 09:00, 13:00, 16:00, 22:00 Tbilisi
 
@@ -322,6 +323,9 @@ const FILE_DEFAULTS = {
   room_types: {
     XCV_1:{engine:"live",style:"normal",window_days:180}, XCV_2:{engine:"live",style:"normal",window_days:180},
     VGL_ST:{engine:"live",style:"normal",window_days:180}, VGL_AP:{engine:"live",style:"normal",window_days:180},
+    ROOMS:{engine:"live",style:"normal",window_days:90}, MAXELA:{engine:"live",style:"normal",window_days:90},
+    BIG_APT:{engine:"live",style:"normal",window_days:90}, FREEDOM:{engine:"live",style:"normal",window_days:90},
+    ORBE_1:{engine:"live",style:"normal",window_days:90}, ORBE_2:{engine:"live",style:"normal",window_days:90},
   },
   date_rules: [],
 };
@@ -979,21 +983,21 @@ function viewTest(rt) {
    ===================================================================== */
 function modeName(rt) { return modeByStyle(savedRoom(rt, "style")).name; }
 function viewRooms() {
-  const live = NEW_ROOMS.map(r => {
+  const live = newRooms().map(r => {
     const t = tonight(r.id), b = bookedShare(r.id), only = savedRoom(r.id, "engine") !== "live";
     return `<a href="#/room/${r.id}" class="row"><div class="grow"><div class="t">${esc(r.name)}</div>
       <div class="s">${modeName(r.id)}${only ? " · only calculating" : ""} · next 30 nights ${b === null ? "–" : b + "%"} booked</div></div>
       <div class="r"><b>${esc(t.text)}</b><span>tonight</span></div>${icon("right")}</a>`;
   }).join("");
-  const test = OLD_ROOMS.map(r => `<a href="#/test/${r.id}" class="row"><div class="grow"><div class="t">${esc(r.name)}</div>
+  const test = oldRooms().map(r => `<a href="#/test/${r.id}" class="row"><div class="grow"><div class="t">${esc(r.name)}</div>
       <div class="s">New way would be ${esc(gapText(r.id))} on average</div></div>${icon("right")}</a>`).join("");
   return `<div class="page">
     <div class="topbar"><h1>Pricing</h1>${switchHtml()}</div>
     ${statusCardHtml()}${errorsHtml()}${tabsHtml(false)}
-    <section class="sec"><div><h2 class="h2">${S.paused ? "New way (paused)" : "New way, prices sent"}</h2><p class="sub">Tap a room to see its nights and how it is priced.</p></div>
+    <section class="sec"><div><h2 class="h2">${S.paused ? "Rooms (paused)" : "Rooms, prices sent"}</h2><p class="sub">Tap a room to see its nights and how it is priced.</p></div>
       <div class="card" style="overflow:hidden">${live}</div></section>
-    <section class="sec"><div><h2 class="h2">Old way, new way being tested</h2><p class="sub">These rooms still get the old prices. The new way only calculates. The test ends ${TEST_ENDS}; then you choose, room by room.</p></div>
-      <div class="card" style="overflow:hidden">${test}</div></section></div>`;
+    ${oldRooms().length ? `<section class="sec"><div><h2 class="h2">Old way, new way being tested</h2><p class="sub">These rooms still get the old prices. The new way only calculates. The test ends ${TEST_ENDS}; then you choose, room by room.</p></div>
+      <div class="card" style="overflow:hidden">${test}</div></section>` : ""}</div>`;
 }
 
 /* =====================================================================
@@ -1029,7 +1033,7 @@ function seasonChipsHtml() {
   }).join("");
 }
 function viewSeasons() {
-  const s = SEASONS[U.season], rooms = NEW_ROOMS.concat(U.showOld ? OLD_ROOMS : []);
+  const s = SEASONS[U.season], rooms = newRooms().concat(U.showOld ? oldRooms() : []);
   const desk = isDesk();
   return `${desk ? "" : `<div class="topbar"><h1>Pricing</h1></div>${tabsHtml(false)}`}${errorsHtml()}
     <section class="sec"><div><h2 class="h2">Pick a season</h2><p class="sub">Each season has its own minimum, start and maximum for every room.</p></div>
@@ -1040,7 +1044,7 @@ function viewSeasons() {
       <a href="#/dates" class="btn light small full" style="color:var(--ink)">Holiday dates</a></section>
     <section class="sec"><div><h2 class="h2">${esc(s.label)} prices</h2><p class="sub">The engine moves each night between minimum and maximum, around the start price.</p></div>
       <div class="${desk ? "cards2" : ""}" style="${desk ? "" : "display:flex;flex-direction:column;gap:10px"}">${rooms.map(seasonCardHtml).join("")}</div>
-      <button type="button" class="btn light full small" data-act="toggleOld">${U.showOld ? "Hide the 6 rooms on the old way" : "Show the 6 rooms on the old way"}</button></section>`;
+      ${oldRooms().length ? `<button type="button" class="btn light full small" data-act="toggleOld">${U.showOld ? `Hide the ${oldRooms().length} rooms on the old way` : `Show the ${oldRooms().length} rooms on the old way`}</button>` : ""}</section>`;
 }
 function refreshSeasonUi() {
   const {errs} = seasonErrors();
@@ -1141,7 +1145,7 @@ function addFormHtml() {
       <p style="margin:0;font-size:14px;color:var(--soft)">${esc(cur.help)}</p></div>
     ${isRule ? `<div style="display:flex;flex-direction:column;gap:8px"><div style="font-size:15px;font-weight:700">Which rooms?</div><div class="pills">
       <button type="button" class="pill" aria-pressed="${d.rooms.length === 0}" data-act="dpRoom" data-id="all">All rooms</button>
-      ${NEW_ROOMS.map(r => `<button type="button" class="pill" aria-pressed="${d.rooms.includes(r.id)}" data-act="dpRoom" data-id="${r.id}">${esc(r.short)}</button>`).join("")}</div>
+      ${newRooms().map(r => `<button type="button" class="pill" aria-pressed="${d.rooms.includes(r.id)}" data-act="dpRoom" data-id="${r.id}">${esc(r.short)}</button>`).join("")}</div>
       <p class="sub" style="margin:0">Only rooms on the new way follow date rules.</p></div>` : ""}
     ${overlap ? `<div role="alert" style="background:var(--red-bg);color:var(--red-ink);border-radius:10px;padding:10px 12px;font-size:14px">Some of these days already have holiday prices (${clashes.map(o => fmtRange(o.from, o.to) + ", " + (SEASONS[o.season] || {label: o.season}).label).join("; ")}). Remove ${clashes.length > 1 ? "those" : "that one"} first, or pick other days.</div>` : ""}
     <button type="button" class="btn full ${ready ? "dark" : "off"}" data-act="dpAdd" aria-disabled="${!ready}">${esc(label)}</button></section>`;
@@ -1258,8 +1262,8 @@ function viewCalendar() {
       <div class="legend"><span><i style="width:14px;height:14px;background:#E3E1DC;border-radius:3px;display:inline-block"></i>Booked</span><span><i style="width:14px;height:3px;background:#1F1F1F;display:inline-block"></i>At your min or max</span><span>${icon("lock", 12, 2.4)}Set by hand or "don't change"</span><span><i style="width:7px;height:7px;border-radius:50%;background:#1F1F1F;display:inline-block"></i>Event</span></div></div>
     <p class="muted" style="font-size:13px">Click a night for why. Click two nights with Shift for a range. Click a room for its settings.</p>
     <div class="cwrap" id="cwrap"><div class="cgrid"><div class="crow" style="position:sticky;top:0;z-index:3"><div class="cname" style="height:auto;cursor:default;font-size:12px;font-weight:700;color:var(--soft);z-index:4">Room · ${esc(winLabel())}</div>${heads}</div>
-      <div class="gtitle"><span>New way</span></div>${NEW_ROOMS.map(r => calRowHtml(r, dates)).join("")}
-      <div class="gtitle"><span>Old way, new way being tested</span></div>${OLD_ROOMS.map(r => calRowHtml(r, dates)).join("")}</div></div>`;
+      <div class="gtitle"><span>${oldRooms().length ? "New way" : "Rooms"}</span></div>${newRooms().map(r => calRowHtml(r, dates)).join("")}
+      ${oldRooms().length ? `<div class="gtitle"><span>Old way, new way being tested</span></div>${oldRooms().map(r => calRowHtml(r, dates)).join("")}` : ""}</div></div>`;
 }
 function panelHtml() {
   const p = U.panel; if (!p) return "";
@@ -1333,10 +1337,12 @@ document.addEventListener("keydown", e => {
   }
 });
 function howDialog() {
+  const oldN = oldRooms().length, newN = newRooms().length;
+  const oldBlock = oldN ? `<div style="font-size:15px;line-height:1.5"><b>Old way (${oldN} rooms)</b><ul style="margin:4px 0 0"><li>Prices can go up or down in every update.</li><li>Empty nights can drop to the minimum on the arrival day.</li><li>It sends Booking, Expedia (Rooms, Maxela, Big apartment, Freedom) and Airbnb.</li></ul></div>` : "";
   openDialog(`<div class="grab"></div><div class="dh"><h3>When do prices change?</h3></div>
     <p>There are 5 updates a day, at about 04:00, 09:00, 13:00, 16:00 and 22:00.</p>
-    <div style="font-size:15px;line-height:1.5"><b>New way (XCV, VGL)</b><ul style="margin:4px 0 0"><li>Prices go down in the first update after 09:00, a few % a day (Balanced at most 5%, Fill fast up to 8%).</li><li>Other updates can raise prices, fix any price outside your minimum or maximum, and give first prices to empty dates.</li><li>Nights more than 2 months away go straight to your start price if they are above it (plus 8% on Friday and Saturday).</li><li>The arrival day is never lowered.</li></ul></div>
-    <div style="font-size:15px;line-height:1.5"><b>Old way (the other 6 rooms)</b><ul style="margin:4px 0 0"><li>Prices can go up or down in every update.</li><li>Empty nights can drop to the minimum on the arrival day.</li><li>It sends Booking, Expedia (Rooms, Maxela, Big apartment, Freedom) and Airbnb.</li></ul></div>
+    <div style="font-size:15px;line-height:1.5"><b>${oldN ? `New way (${newN} rooms)` : "All 10 rooms (the new way)"}</b><ul style="margin:4px 0 0"><li>Prices go down in the first update after 09:00, a few % a day (Balanced at most 5%, Fill fast up to 8%).</li><li>Other updates can raise prices, fix any price outside your minimum or maximum, and give first prices to empty dates.</li><li>Nights more than 2 months away go straight to your start price if they are above it (plus 8% on Friday and Saturday).</li><li>The arrival day is never lowered.</li><li>Each room is sent to its own channels: Booking, Expedia (Rooms, Maxela, Big apartment, Freedom) and Airbnb.</li></ul></div>
+    ${oldBlock}
     <button type="button" class="btn light full" data-act="closeDialog" data-autofocus>Close</button>`, "When prices change");
 }
 function showToast(text, undoFn) {

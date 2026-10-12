@@ -1,12 +1,13 @@
 """
 Calm pricing engine, LIVE for the room types switched on in calm_settings.json
-(first: XCV_1 and XCV_2). It writes their prices to MiniHotel and pushes them
-to the channels, the same way the current engine does.
+(XCV, VGL and, since the move, ROOMS, MAXELA, BIG_APT, FREEDOM, ORBE_1, ORBE_2). It writes their
+prices to MiniHotel and pushes them to each room type's channels (BOOKING, EXPEDIA, AIRBNB), the
+same way the old engine did.
 
 Safety:
-  * Only room types with "engine": "live" in the settings are written, and NEVER
-    the six room types the current engine still prices (ROOMS, MAXELA, BIG_APT,
-    FREEDOM, ORBE_1, ORBE_2): two engines can never write the same room type.
+  * Only room types with "engine": "live" in the settings are written, and NEVER a room type
+    listed in pricing_shadow.OLD_ENGINE_RTS (room types still on the old engine; empty now):
+    two engines can never write the same room type.
   * A guard refuses any write to MiniHotel except the price write for those live
     room types, the channel push and the login.
   * The pause switch on the pricing page (pricing_config/control) stops all writes.
@@ -45,6 +46,7 @@ BASE_URL = "https://ssl20.minihotelpms.com"
 WRITE_PATH = "/api/ScreenA"
 SYNC_PATH = "/api/ScreenA/Portals/SendPrices"
 DEFAULT_PORTALS = ["BOOKING", "AIRBNB"]
+VALID_PORTALS = ("BOOKING", "EXPEDIA", "AIRBNB")      # the channels MiniHotel can push to
 STATE_PREFIX = "live_"
 RESET_ALLOWED = {"XCV_1", "XCV_2"}          # the one-time reset may only ever touch these
 CUR_LABEL = {"GEL": "Booking GEL", "USD": "Airbnb (EUR list)"}
@@ -124,10 +126,31 @@ def live_room_types(rules: dict, settings: dict) -> dict:
                 print(f"  {rt}: window_days {out[rt]['window_days']!r} is outside 30-400; 90 used.")
                 w = 90
             out[rt]["window_days"] = w
+        if "portals" in out[rt]:
+            out[rt]["portals"] = portals_for(out[rt], rt)
         if out[rt].get("style") not in (None, "normal", "aggressive"):
             print(f"  {rt}: style {out[rt]['style']!r} is not valid; normal used.")
             out[rt]["style"] = "normal"
     return out
+
+
+def portals_for(info: dict, rt: str = "?") -> list:
+    """The channels to push for a room type: its "portals" setting, only valid names, in a fixed order."""
+    raw = info.get("portals")
+    if raw is None:
+        return list(DEFAULT_PORTALS)
+    names = [str(x).strip().upper() for x in raw] if isinstance(raw, (list, tuple)) else []
+    good = [p for p in VALID_PORTALS if p in names]
+    bad = [n for n in names if n not in VALID_PORTALS]
+    if bad or not good:
+        print(f"  {rt}: portals {raw!r} are not all valid ({', '.join(VALID_PORTALS)}); "
+              + (f"ignoring {bad}." if good else f"{'/'.join(DEFAULT_PORTALS)} used."))
+    return good or list(DEFAULT_PORTALS)
+
+
+def portals_to_push(writes: list, live_rts: dict) -> list:
+    """Channels to push after this run: the channels of every room type that has a price change."""
+    return sorted({p for rt in {w["rt"] for w in writes} for p in portals_for(live_rts[rt], rt)}, key=VALID_PORTALS.index)
 
 
 def build_payload(writes: list) -> list:
@@ -330,9 +353,12 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
             print(f"  {d['rt']:6} {d['date']} {d['currency']}: {d['current']:.0f} -> {d['proposed']:.0f}  ({d['why'][-1]})")
 
         report = reset_report(result, reset_rts, today) if reset_rts else None
+        portals = portals_to_push(writes, live_rts)
+        print("  Channels it pushes after the write: " + (", ".join(portals) if portals else "none (no price change)")
+              + ("  (not sent)" if args.dry else ""))
         if args.dry:
             print("Dry run: nothing written to MiniHotel, nothing saved.")
-            return {**result, "sent": False, "payload": payload, "report": report}
+            return {**result, "sent": False, "payload": payload, "portals": portals, "report": report}
         if report is not None and not report["all_ok"]:
             print("RESET STOPPED: a safety check failed; nothing written, nothing saved.")
             raise SystemExit(1)
@@ -342,20 +368,18 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
             ps.save(db, now, {}, {**result, "decisions": []}, {**extra, "note": "PAUSED: nothing written"},
                     prefix=STATE_PREFIX, daily_coll="pricing_calm_daily", runs_coll="pricing_calm_runs")
             print(f"PAUSED: {len(writes)} price changes not written.")
-            return {**result, "sent": False, "payload": payload}
+            return {**result, "sent": False, "payload": payload, "portals": portals}
 
         failed_portals = []
         if payload:
             send_prices(payload, cookie, post=post)              # raises on error: memory is then NOT saved
-            portals = sorted({p for rt in {w["rt"] for w in writes}
-                              for p in (live_rts[rt].get("portals") or DEFAULT_PORTALS)})
             failed_portals = push_channels(portals, cookie, post=post)
         extra["failed_portals"] = failed_portals
         ps.save(db, now, result["state"], result, extra,
                 prefix=STATE_PREFIX, daily_coll="pricing_calm_daily", runs_coll="pricing_calm_runs")
         print(f"Written: {len(writes)} prices for {sorted({w['rt'] for w in writes})}."
               + (f" Channel push failed for {failed_portals}." if failed_portals else ""))
-        return {**result, "sent": bool(payload), "payload": payload, "failed_portals": failed_portals, "report": report}
+        return {**result, "sent": bool(payload), "payload": payload, "portals": portals, "failed_portals": failed_portals, "report": report}
 
 
 if __name__ == "__main__":

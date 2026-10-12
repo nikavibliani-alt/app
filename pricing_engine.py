@@ -50,8 +50,13 @@ DATA_ENDPOINT  = f"{BASE_URL}/api/ScreenA/Data"
 WRITE_ENDPOINT = f"{BASE_URL}/api/ScreenA"
 SYNC_ENDPOINT  = f"{BASE_URL}/api/ScreenA/Portals/SendPrices"
 
-ROOM_TYPES = ["ROOMS", "MAXELA", "BIG_APT", "FREEDOM", "ORBE_1", "ORBE_2"]
+# The six room types (ROOMS, MAXELA, BIG_APT, FREEDOM, ORBE_1, ORBE_2) moved to the new engine
+# (pricing_calm_live.py, set to live in calm_settings.json). Nothing is priced here any more, so a room type
+# is never on both engines. This script still scans events and runs the weekly idea maker (see housekeeping()).
+ROOM_TYPES = []
 
+# The channels each of those room types used on the old engine. Kept as the reference: the "portals" in
+# calm_settings.json must equal this (a test checks it).
 CHANNEL_MATRIX = {
     "ROOMS":   {"booking": True,  "expedia": True,  "airbnb": False},
     "MAXELA":  {"booking": True,  "expedia": True,  "airbnb": False},
@@ -710,6 +715,61 @@ def print_table(results: dict):
 # MAIN
 # ---------------------------------------------------------------------------
 
+def load_firestore_rules(db, config: dict):
+    """Copy the rules saved from the pricing page into config. Returns an error text, or None when it worked."""
+    try:
+        rules_snap = db.collection("pricing_config").document("rules").get()
+        rules_data = rules_snap.to_dict() if rules_snap.exists else {}
+        if rules_data.get("base_price_pct"):
+            config["base_price_pct"] = rules_data["base_price_pct"]
+        # A null / missing / non-numeric start, min or max is ignored (the config.json
+        # value stays). It must never become 0, which means "no limit".
+        def _ok(v):
+            return isinstance(v, (int, float)) and not isinstance(v, bool)
+        for _key in ("startPrices", "startPricesEur"):
+            for rt, seasons in (rules_data.get(_key) or {}).items():
+                for s, v in (seasons or {}).items():
+                    if _ok(v):
+                        config.setdefault(_key, {}).setdefault(rt, {})[s] = v
+        for _rkey, _fkey, _ckey in (("priceRules", "floor_prices_gel", "ceiling_prices_gel"),
+                                    ("eurRules", "floor_prices_eur", "ceiling_prices_eur")):
+            for rt, seasons in (rules_data.get(_rkey) or {}).items():
+                for s, vals in (seasons or {}).items():
+                    vals = vals or {}
+                    if _ok(vals.get("min")):
+                        config.setdefault(_fkey, {}).setdefault(rt, {})[s] = vals["min"]
+                    if _ok(vals.get("max")):
+                        config.setdefault(_ckey, {}).setdefault(rt, {})[s] = vals["max"]
+        if rules_data.get("dateOverrides") is not None:
+            config["dateOverrides"] = rules_data["dateOverrides"]
+        print(f"  Loaded pricing rules from Firestore.")
+        return None
+    except Exception as _bpe:
+        print(f"  Warning: could not load pricing rules: {_bpe}", file=sys.stderr)
+        return f"could not load pricing rules from Firestore: {_bpe}"
+
+
+def housekeeping(config: dict, urgent: bool, read_only: bool):
+    """No room is priced by this engine any more: only the weekly idea maker is left (events are scanned in main)."""
+    print("No room types are priced by the old engine any more (they all moved to the new engine).")
+    if urgent:
+        print("Urgent run: nothing to reprice here.")
+        return
+    if read_only:
+        print("Read-only run: the idea maker is skipped.")
+        return
+    db = _firestore_client()
+    if db is None:
+        print("No Firestore credentials: the idea maker is skipped.")
+        return
+    err = load_firestore_rules(db, config)
+    if err:
+        print(f"Idea maker skipped: {err}", file=sys.stderr)
+        return
+    print("  Running Claude strategy analyst (once a week)...")
+    claude_write_daily_proposal(config, db, {})
+
+
 def main():
     global _COOKIE
 
@@ -757,6 +817,10 @@ def main():
         scan_events()
     print()
 
+    if not ROOM_TYPES:
+        housekeeping(config, urgent, read_only)
+        return
+
     # Auto-login — no manual cookie needed
     print("Logging into MiniHotel...")
     _COOKIE = get_session_cookie()
@@ -801,35 +865,7 @@ def main():
 
     # Load pricing rules from Firestore (set from pricing page)
     if _db_for_ai:
-        try:
-            rules_snap = _db_for_ai.collection("pricing_config").document("rules").get()
-            rules_data = rules_snap.to_dict() if rules_snap.exists else {}
-            if rules_data.get("base_price_pct"):
-                config["base_price_pct"] = rules_data["base_price_pct"]
-            # A null / missing / non-numeric start, min or max is ignored (the config.json
-            # value stays). It must never become 0, which means "no limit".
-            def _ok(v):
-                return isinstance(v, (int, float)) and not isinstance(v, bool)
-            for _key in ("startPrices", "startPricesEur"):
-                for rt, seasons in (rules_data.get(_key) or {}).items():
-                    for s, v in (seasons or {}).items():
-                        if _ok(v):
-                            config.setdefault(_key, {}).setdefault(rt, {})[s] = v
-            for _rkey, _fkey, _ckey in (("priceRules", "floor_prices_gel", "ceiling_prices_gel"),
-                                        ("eurRules", "floor_prices_eur", "ceiling_prices_eur")):
-                for rt, seasons in (rules_data.get(_rkey) or {}).items():
-                    for s, vals in (seasons or {}).items():
-                        vals = vals or {}
-                        if _ok(vals.get("min")):
-                            config.setdefault(_fkey, {}).setdefault(rt, {})[s] = vals["min"]
-                        if _ok(vals.get("max")):
-                            config.setdefault(_ckey, {}).setdefault(rt, {})[s] = vals["max"]
-            if rules_data.get("dateOverrides") is not None:
-                config["dateOverrides"] = rules_data["dateOverrides"]
-            print(f"  Loaded pricing rules from Firestore.")
-        except Exception as _bpe:
-            print(f"  Warning: could not load pricing rules: {_bpe}", file=sys.stderr)
-            _data_error = f"could not load pricing rules from Firestore: {_bpe}"
+        _data_error = load_firestore_rules(_db_for_ai, config)
 
     print("Computing prices...")
 

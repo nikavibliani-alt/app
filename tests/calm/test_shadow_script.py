@@ -394,7 +394,8 @@ def test_units_parser():
     assert ps._units(0) == 0 and ps._units("3") == 3 and ps._units(2.0) == 2
 
 
-def test_old_engine_rooms_always_use_90_days_whatever_the_settings_say():
+def test_old_engine_rooms_always_use_90_days_whatever_the_settings_say(monkeypatch):
+    monkeypatch.setattr(ps, "OLD_ENGINE_RTS", {"ROOMS", "MAXELA", "BIG_APT", "FREEDOM", "ORBE_1", "ORBE_2"})   # empty today
     today = date(2026, 10, 7)
     db = seeded_db(today)
     settings = {"window_days": 180, "room_types": {rt: {"window_days": 180} for rt in ps.OLD_ENGINE_RTS}}

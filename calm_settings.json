@@ -1,10 +1,16 @@
 {
-  "_about": "Calm pricing engine settings. engine: live = the new engine sets this room type's prices (never the six the current engine prices). style: normal or aggressive (fills the month: lowers faster and further when selling slowly). date_rules: protect = the engine leaves those dates alone; aggressive / normal = style for those dates only.",
+  "_about": "Calm pricing engine settings. engine: live = the new engine sets this room type's prices (and only the new engine: a room type is never on two engines). style: normal or aggressive (fills the month: lowers faster and further when selling slowly). portals: the channels pushed after a price write (BOOKING, EXPEDIA, AIRBNB). date_rules: protect = the engine leaves those dates alone; aggressive / normal = style for those dates only.",
   "room_types": {
     "XCV_1": {"engine": "live", "style": "normal", "portals": ["BOOKING", "AIRBNB"], "window_days": 180},
     "XCV_2": {"engine": "live", "style": "normal", "portals": ["BOOKING", "AIRBNB"], "window_days": 180},
     "VGL_ST": {"engine": "live", "style": "normal", "portals": ["BOOKING", "AIRBNB"], "window_days": 180},
-    "VGL_AP": {"engine": "live", "style": "normal", "portals": ["BOOKING", "AIRBNB"], "window_days": 180}
+    "VGL_AP": {"engine": "live", "style": "normal", "portals": ["BOOKING", "AIRBNB"], "window_days": 180},
+    "ROOMS": {"engine": "live", "style": "normal", "portals": ["BOOKING", "EXPEDIA"], "window_days": 90},
+    "MAXELA": {"engine": "live", "style": "normal", "portals": ["BOOKING", "EXPEDIA"], "window_days": 90},
+    "BIG_APT": {"engine": "live", "style": "normal", "portals": ["BOOKING", "EXPEDIA", "AIRBNB"], "window_days": 90},
+    "FREEDOM": {"engine": "live", "style": "normal", "portals": ["BOOKING", "EXPEDIA", "AIRBNB"], "window_days": 90},
+    "ORBE_1": {"engine": "live", "style": "normal", "portals": ["BOOKING", "AIRBNB"], "window_days": 90},
+    "ORBE_2": {"engine": "live", "style": "normal", "portals": ["AIRBNB"], "window_days": 90}
   },
   "date_rules": []
 }
