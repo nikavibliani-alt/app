@@ -40,6 +40,14 @@ def run(db, config: dict) -> dict:
                 "status": "rejected", "rejection_reason": cp.REPLACED_REASON, "rejected_at": datetime.now(),
                 "replaced_by": "fresh_set"})
             closed += 1
+    import idea_effect
+    for pid in sorted(new, key=lambda x: (db.collection("pricing_proposals").document(x).get().to_dict() or {}).get("property", "")):
+        d = db.collection("pricing_proposals").document(pid).get().to_dict() or {}
+        eff = ((d.get("evidence") or {}).get("effect")) or {}
+        groups = eff.get("groups") or []
+        print(f"  NEW IDEA: {d.get('property')} | {d.get('season')} | {eff.get('price_list') or '?'} | {d.get('type')} {d.get('current')} -> {d.get('suggested')} | "
+              f"changes {eff.get('changed_count', '?')} sellable nights: {idea_effect.dates_text(groups) if groups else 'n/a'}"
+              + (f" (+{eff['groups_total'] - len(groups)} more periods)" if eff.get("groups_total", 0) > len(groups) else ""))
     withev = sum(1 for pid in new if (db.collection("pricing_proposals").document(pid).get().to_dict() or {}).get("evidence"))
     print(f"Ideas waiting before: {len(before)} | new ideas: {len(new)} (with saved evidence: {withev}) | "
           f"older ideas marked replaced: {len(before - after) + closed}"

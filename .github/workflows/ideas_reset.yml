@@ -1,0 +1,40 @@
+name: Ideas reset and fresh set
+
+# Manual only. Backs up EVERY document of pricing_proposals to the history bucket (verified), deletes them all, then makes a fresh set
+# of ideas with the new rules (each idea is tested against the engine: it must change the price of at least 3 sellable nights).
+# Dry run by default: counts only, nothing backed up, deleted or made.
+on:
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: 'Dry run (count only)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: pricing-ideas
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests firebase-admin google-cloud-storage anthropic
+      - name: Back up and delete every idea
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          DRY: ${{ github.event.inputs.dry }}
+        run: |
+          if [ "$DRY" = "true" ]; then python scripts/ideas_reset.py --dry; else python scripts/ideas_reset.py; fi
+      - name: Make a fresh set of ideas
+        if: ${{ github.event.inputs.dry != 'true' }}
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          ANTHROPIC_API_KEY:        ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/ideas_fresh.py

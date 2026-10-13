@@ -40,9 +40,16 @@ class Batch:
     def set(self, ref, data):
         self.ops.append((ref, data))
 
+    def delete(self, ref):
+        self.ops.append((ref, None))
+
     def commit(self):
         for ref, data in self.ops:
-            ref.set(data)
+            if data is None:
+                ref.delete()
+            else:
+                ref.set(data)
+        self.ops = []
 
 
 class DB(FakeDB):

@@ -1354,6 +1354,7 @@ function seasonStretches(season) {
 }
 const stretchText = x => {
   const a = x.from, b = x.to, ya = a.slice(0, 4), yb = b.slice(0, 4);
+  if (a === b) return `${fmtShort(a)} ${ya}`;
   if (ya === yb && a.slice(5, 7) === b.slice(5, 7)) return `${+a.slice(8)}–${fmtShort(b)} ${yb}`;
   return `${fmtShort(a)}${ya !== yb ? " " + ya : ""} – ${fmtShort(b)} ${yb}`;
 };
@@ -1422,6 +1423,7 @@ function ideaExamples(p, i, ev) {
 // Ideas made after the evidence was added carry it: the dates, booked and empty nights and last year's numbers as they were that day.
 function savedWhy(p, i, e) {
   const word = e.units > 1 ? "Fully booked" : "Booked", day = e.made_on ? fmtShort(e.made_on) : "that day", out = [];
+  if (e.effect && e.effect.version === 2) out.push(`Tested against the engine on ${day}: it would change the price of ${e.effect.changed_count} night${e.effect.changed_count === 1 ? "" : "s"} that can still be sold.`);
   if (e.looked_at) out.push(`Nights looked at: ${fmtShort(e.looked_at.from)} – ${fmtShort(e.looked_at.to)} ${e.looked_at.to.slice(0, 4)} (${e.looked_at.nights} nights from the day it was made).`);
   if (e.known_nights) out.push(`On ${day}, ${word.toLowerCase()}: ${e.booked_count} of ${e.known_nights} nights${e.booked_count ? " (" + datesText(e.booked) + ")" : ""}.` + (e.empty && e.empty.length ? ` Not booked: ${datesText(e.empty)}.` : ""));
   if (e.no_price && e.no_price.length) out.push(`No price yet for ${datesText(e.no_price)} (too far ahead for the engine).`);
@@ -1435,14 +1437,26 @@ function savedWhy(p, i, e) {
 }
 function ideaFactsHtml(p, i, full) {
   const ev = ideaEvidence(p, i), e = p.evidence && p.evidence.version === 1 ? p.evidence : null;
+  const eff = e && e.effect && e.effect.version === 2 && e.effect.changed_count ? e.effect : null;     // ideas tested against the engine
   const runs = e ? (e.stretch ? [e.stretch].concat(e.later || []) : []) : (ev.runs || []);
   const later = runs.slice(1, 3).map(stretchText).join(", ");
-  const dates = !runs.length ? "The dates of this season could not be found in your settings."
-    : `${i.season}: ${stretchText(runs[0])} · ${(e ? e.stretch : ev.st).nights} nights${later ? ". Also: " + later : ""}`;
-  const head = `<div><b>Which dates:</b> ${esc(dates)}</div>
+  const plural = n => `${n} night${n === 1 ? "" : "s"}`;
+  let datesBlock;
+  if (eff) {
+    const g = eff.groups, more = (eff.groups_total || g.length) - g.length;
+    datesBlock = `<div><b>Which dates:</b> ${esc(stretchText(g[0]))} · ${plural(g[0].nights)}</div>
+      ${e.stretch ? `<div class="muted" style="font-size:13px">${esc(i.season)}: ${esc(stretchText(e.stretch))} · ${e.stretch.nights} nights</div>` : ""}
+      ${g.length > 1 ? `<div><b>This also changes:</b> ${esc(g.slice(1).map(stretchText).join(", "))}${more > 0 ? esc(" and " + more + " more") : ""}</div>` : ""}`;
+  } else {
+    const dates = !runs.length ? "The dates of this season could not be found in your settings."
+      : `${i.season}: ${stretchText(runs[0])} · ${(e ? e.stretch : ev.st).nights} nights${later ? ". Also: " + later : ""}`;
+    datesBlock = `<div><b>Which dates:</b> ${esc(dates)}</div>`;
+  }
+  const head = `${datesBlock}
     <div><b>Which price:</b> ${esc(i.what.charAt(0).toUpperCase() + i.what.slice(1))} for ${esc(listName(p.property, i.eur))}, ${esc(roomName(p.property))}</div>`;
   if (!full) return `<div class="tx">${head}</div>`;
-  const why = e ? savedWhy(p, i, e) : ideaWhy(p, i, ev), ex = ev.none ? [] : ideaExamples(p, i, ev);
+  const why = e ? savedWhy(p, i, e) : ideaWhy(p, i, ev);
+  const ex = eff ? eff.examples.map(x => `${fmtDay(x.date)}: ${i.fmt(x.without)} → ${i.fmt(x.with)}`) : (ev.none ? [] : ideaExamples(p, i, ev));
   const skipped = ev.none ? "" : [ev.booked.length && `${ev.booked.length} booked`, ev.hand.length && `${ev.hand.length} set by hand`, ev.prot.length && `${ev.prot.length} protected`].filter(Boolean).join(", ");
   const lastYear = !e && /last year|year ago|previous year|same time/i.test(p.reasoning || "");
   return `<div class="tx">${head}

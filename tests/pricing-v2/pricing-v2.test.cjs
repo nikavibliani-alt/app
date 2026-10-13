@@ -518,6 +518,23 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
         const panel = await text(page, '.panel'); assert.ok(/Booking/.test(panel) && /Airbnb/.test(panel) && /\$\d+/.test(panel), panel);
       }
     });
+    await test('ideas tested against the engine: headline = only the nights whose price changes, season range small, other stretches named', w, hh, async ({page}) => {
+      await go(page, '#/ideas');
+      const e = await text(page, '[data-idea=ideaE]');
+      assert.ok(/Which dates: 23–25 Dec 2026 · 3 nights/.test(e), e);
+      assert.ok(/High season: 20–27 Dec 2026 · 8 nights/.test(e), 'season range as small text: ' + e);
+      assert.ok(/This also changes: 2 Jan 2027, 1 May – 30 Jun 2027/.test(e), e);
+      assert.ok(/Tested against the engine on 10 Oct: it would change the price of 64 nights that can still be sold\./.test(e), e);
+      assert.ok(/Example nights/.test(e) && /23 Dec: 400 ₾ → 430 ₾/.test(e) && /24 Dec: 410 ₾ → 430 ₾/.test(e), 'examples from the engine test: ' + e.replace(/\n/g, ' | '));
+      const size = await page.$eval('[data-idea=ideaE] .muted', el => parseFloat(getComputedStyle(el).fontSize));
+      assert.ok(size >= 12);
+    }, {mutate: d => {
+      d['pricing_proposals/ideaE'] = {type: 'startPrice', property: 'FREEDOM', season: 'high', current: 400, suggested: 430, reasoning: 'High-season weekends fill early.', status: 'pending', ts: '2026-10-10T07:00:00',
+    evidence: {version: 1, made_on: '2026-10-10', uses_last_year: false, stretch: {from: '2026-12-20', to: '2026-12-27', nights: 8}, later: [], looked_at: {from: '2026-12-20', to: '2026-12-27', nights: 8},
+      booked: [], empty: ['2026-12-20', '2026-12-21', '2026-12-22', '2026-12-23', '2026-12-24', '2026-12-25', '2026-12-26', '2026-12-27'], no_price: [], booked_count: 0, known_nights: 8, units: 3,
+      effect: {version: 2, changed_count: 64, groups: [{from: '2026-12-23', to: '2026-12-25', nights: 3}, {from: '2027-01-02', to: '2027-01-02', nights: 1}, {from: '2027-05-01', to: '2027-06-30', nights: 61}], groups_total: 3,
+        examples: [{date: '2026-12-23', without: 400, with: 430}, {date: '2026-12-24', without: 410, with: 430}], sellable: 70, gap_nights_ignored: 0, price_list: 'GEL'}}};
+    }});
     await test('ideas: every card names the dates, room, price, why with real nights, example nights and when it was made', w, hh, async ({page}, desk) => {
       await go(page, '#/ideas');
       const a = await text(page, '[data-idea=ideaA]');

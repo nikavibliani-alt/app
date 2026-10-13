@@ -112,7 +112,7 @@ def test_the_prompt_lists_all_rooms_and_only_what_can_still_be_sold(monkeypatch)
     block = prompt[prompt.index("SELLABLE NIGHTS"):]
     for rt in ps.ROOM_TYPES:
         if rt != "XCV_2":
-            assert f"\n{rt} (booked" in block, rt                           # every room with something to sell is there
+            assert f"\n{rt} (" in block and "unit" in block, rt                           # every room with something to sell is there
     assert "  low:" in block and "  mid:" not in block                      # fully booked seasons are not offered
     assert "XCV_2" in block.split("Rooms with nothing left")[-1]
 

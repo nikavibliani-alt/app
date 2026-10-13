@@ -282,12 +282,19 @@ def room_facts(db, config: dict, rules_data: dict, today: str, props: list, stay
             first_dates = f"{max(r0['from'], today)} to {r0['to']}"
             room_lines.append(f"  {season}: {sl['count']} sellable nights of {sl['total']} in its next stretch ({first_dates}); start {sp}, min {rule.get('min')}, max {rule.get('max')} (GEL, Booking)")
         if room_lines:
-            lines.append(f"{prop} (booked in the last 60 days: {len(recent)} stays, {sold_nights} nights)")
+            try:
+                import pricing_shadow as ps_
+                units = (ps_.ROOM_TYPES.get(prop) or {}).get("units")
+            except Exception:
+                units = None
+            lines.append(f"{prop} ({units} unit{'s' if units != 1 else ''}; booked in the last 60 days: {len(recent)} stays, {sold_nights} nights)")
             lines += room_lines
         else:
             no_numbers.append(prop)
     head = ("\nSELLABLE NIGHTS PER ROOM AND SEASON (nights from today that still have a free unit, are not hand-set and not protected). "
-            "Only propose ideas for the rooms and seasons listed here (an idea must change at least 3 sellable nights); a room or season that is not listed has too little left to sell:\n")
+            "Look at EVERY room listed. Only propose ideas for the rooms and seasons listed here. Each idea is tested against the engine and thrown away unless it "
+            "changes the final price of at least 3 sellable nights, so propose a change big enough to move prices. For a room with 1 unit NEVER suggest raising a price. "
+            "At most one idea per room + season + price list (Booking in GEL, or Airbnb in EUR/USD); you may name your best two per room:\n")
     tail = f"\nRooms with nothing left to sell or no changeable numbers: {', '.join(no_numbers) or 'none'}."
     return head + "\n".join(lines) + tail if lines else ""
 

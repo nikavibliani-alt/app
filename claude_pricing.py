@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 
 import anthropic
 
+import idea_effect
 import idea_evidence
 
 RUN_EVERY_DAYS = 7
@@ -256,6 +257,44 @@ def _tbilisi_today() -> str:
     return (datetime.utcnow() + timedelta(hours=4)).date().isoformat()
 
 
+def _checked_proposals(db, proposals, is_num):
+    """Keep an idea only if it really changes the price of at least 3 sellable nights (the engine is run with and without it), never
+    raises prices of a 1-unit room, and is the best one for its room + season + price list. Returns (kept, dropped_for_effect, repeats)."""
+    import pricing_shadow as ps
+    try:
+        repo_config = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")))
+        ctx = idea_effect.build_context(db, repo_config)
+    except Exception as e:  # noqa: BLE001
+        print(f"  Cannot test ideas against the engine ({type(e).__name__}): no idea is made.", file=sys.stderr)
+        return [], len([x for x in proposals if isinstance(x, dict)]), 0
+    best, dropped = {}, 0
+    for p in proposals if isinstance(proposals, list) else []:
+        if not isinstance(p, dict) or not all([p.get("property"), p.get("season"), p.get("type")]) or not is_num(p.get("suggested")) or not is_num(p.get("current")):
+            continue
+        prop, season, ptype = p["property"], p["season"], p["type"]
+        units = int(((ctx.live_rts.get(prop) or {}).get("units")) or (ps.ROOM_TYPES.get(prop) or {}).get("units") or 1)
+        if units == 1 and p["suggested"] > p["current"]:
+            dropped += 1
+            print(f"  Dropped {prop} {season}: no price rises for a 1-unit room.")
+            continue
+        try:
+            m = idea_effect.measure(ctx, p)
+        except Exception as e:  # noqa: BLE001
+            m = {"error": type(e).__name__}
+        if "error" in m or len(m["changed"]) < idea_effect.MIN_NIGHTS:
+            dropped += 1
+            print(f"  Dropped {prop} {season} ({idea_evidence.price_list_of(ptype)}): " + (m["error"] if "error" in m else f"it changes only {len(m['changed'])} sellable night(s); at least {idea_effect.MIN_NIGHTS} needed."))
+            continue
+        key = (prop, season, idea_evidence.price_list_of(ptype))
+        if key in best:
+            dropped += 0
+        if key not in best or len(m["changed"]) > len(best[key]["_effect"]["changed"]):
+            best[key] = {**p, "_effect": m}
+    kept = list(best.values())
+    n_ok = sum(1 for x in (proposals if isinstance(proposals, list) else []) if isinstance(x, dict))
+    return kept, dropped, max(0, n_ok - dropped - len(kept))
+
+
 def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: bool = False) -> dict:
     """
     Weekly strategy analyst: analyzes last 30 days, writes proposals to Firestore.
@@ -349,15 +388,14 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
     except Exception as e:
         print(f"  Warning: could not read older pending ideas: {e}", file=sys.stderr)
     replaced = 0
-    skipped_empty, skipped_dup, seen_keys = 0, 0, set()
-    locks = idea_evidence.locked_nights(db)
-    daily_cache = {}
 
     if not isinstance(proposals, list):
         proposals = []
 
     def _is_num(v):
         return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+    proposals, skipped_empty, skipped_dup = _checked_proposals(db, proposals, _is_num)
 
     for p in proposals:
         if not isinstance(p, dict):
@@ -376,23 +414,9 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
             print(f"  Skipping proposal with a missing/non-numeric value: {prop} {season} {ptype}")
             continue
 
-        # Nothing left to sell (every unit booked, past, hand-set or protected) -> no idea. One idea per room + season + price list.
-        try:
-            if prop not in daily_cache:
-                daily_cache[prop] = idea_evidence.load_daily(db, prop, ev_today)
-            sell = idea_evidence.sellable(db, config, ev_today, prop, season, ptype, locks, daily_cache[prop])
-        except Exception as e:
-            print(f"  Warning: could not count sellable nights for {prop} {season}: {e}", file=sys.stderr)
-            sell = None
-        if sell is not None and sell["count"] < idea_evidence.MIN_SELLABLE_NIGHTS:
-            skipped_empty += 1
-            print(f"  Skipped an idea for {prop} {season} ({idea_evidence.price_list_of(ptype)}): only {sell['count']} sellable night(s), at least {idea_evidence.MIN_SELLABLE_NIGHTS} needed.")
-            continue
         key = (prop, season, idea_evidence.price_list_of(ptype))
-        if key in seen_keys:
-            skipped_dup += 1
-            continue
-        seen_keys.add(key)
+        sell = None
+        eff = p.get("_effect")
 
         # Compute actual change_pct ourselves to verify (don't trust Claude's math)
         if current_val != 0:
@@ -426,8 +450,8 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
         except Exception as e:
             print(f"  Warning: no evidence saved for {prop} {season} {ptype}: {e}", file=sys.stderr)
             evidence = None
-        if evidence is not None and sell is not None:
-            evidence["sellable"] = {"count": sell["count"], "total": sell["total"], **sell["skipped"]}
+        if evidence is not None and eff:
+            evidence["effect"] = idea_effect.effect_record(eff)
         batch.set(prop_ref, {
             **({"evidence": evidence} if evidence else {}),
             "date":       today,
@@ -487,7 +511,7 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
             pass
 
     if skipped_empty or skipped_dup:
-        print(f"  Not made: {skipped_empty} idea(s) with fewer than 3 sellable nights, {skipped_dup} repeat(s) for the same room, season and price list.")
+        print(f"  Not made: {skipped_empty} idea(s) that would not change at least 3 sellable nights, {skipped_dup} repeat(s) for the same room, season and price list.")
     if replaced:
         print(f"  {replaced} older pending idea(s) replaced by newer ones for the same room, season and field.")
     if pending_count:
