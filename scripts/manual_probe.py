@@ -10,6 +10,9 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pricing_shadow as ps  # noqa: E402
+import pricing_calm_live as live  # noqa: E402
+
+STATE_PREFIX = live.STATE_PREFIX
 
 
 def main(argv=None, db=None, now=None):
@@ -29,6 +32,16 @@ def main(argv=None, db=None, now=None):
             for key, r in ((snap.to_dict() or {}).get("dates") or {}).items():
                 if key.endswith("|USD") and r.get("kind") == "correction":
                     rows.append(("daily", day, rt, key.split("|")[0], "USD", r.get("virtual_before"), r.get("new"), r.get("min"), " / ".join(r.get("why") or [])[-160:]))
+    # how many nights are held by hand right now, per room (engine memory) - a sudden big number would mean false "hand-set" flags
+    held = {}
+    for rt in ps.ROOM_TYPES:
+        snap = db.collection("pricing_engine_state").document(f"calm_live_{rt}").get()
+        if not snap.exists:
+            snap = db.collection("pricing_engine_state").document(f"{STATE_PREFIX}{rt}").get()
+        data = (snap.to_dict() or {}).get("data") or {} if snap.exists else {}
+        n = sum(1 for dates in [data] for _d, curs in dates.items() if isinstance(curs, dict) for _c, st in curs.items() if isinstance(st, dict) and st.get("manual_until"))
+        held[rt] = n
+    print("Nights held by hand right now (engine memory):", {k: v for k, v in held.items()})
     rows.sort(key=lambda x: (str(x[1]), str(x[2]), str(x[3])))
     print(f"Corrections found: {len(rows)}")
     for src, day, rt, date, cur, old, new, mn, why in rows[:60]:
