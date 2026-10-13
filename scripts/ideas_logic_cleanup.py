@@ -70,7 +70,9 @@ def run(db, today: str, repo_config: dict, dry: bool = False) -> dict:
               f"{p['_sell']['count']} sellable nights: {ie.ranges_text(p['_sell']['nights'])}")
     by_room = dict(sorted(Counter(p["property"] for p in keep).items()))
     out = {"checked": len(ideas), "not_useful": len(not_useful), "repeats": len(repeats), "left": len(keep), "by_room": by_room}
-    print(f"Ideas clean-up: {len(ideas)} waiting checked | not useful {len(not_useful)} (nothing left {sum(1 for p in not_useful if p["_why"] == ie.NOT_USEFUL)}, too few {sum(1 for p in not_useful if p["_why"] == ie.NOT_USEFUL_FEW)}) | repeats {len(repeats)} | "
+    n_none = sum(1 for p in not_useful if p["_why"] == ie.NOT_USEFUL)
+    n_few = sum(1 for p in not_useful if p["_why"] == ie.NOT_USEFUL_FEW)
+    print(f"Ideas clean-up: {len(ideas)} waiting checked | not useful {len(not_useful)} (nothing left {n_none}, too few {n_few}) | repeats {len(repeats)} | "
           f"left {len(keep)} | rooms {by_room or 'none'}" + (" | DRY" if dry else ""))
     return out
 
