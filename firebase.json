@@ -129,6 +129,7 @@
       "node_modules/**",
       "tuya-functions/**",
       "pipeline-functions/**",
+      "apps-script/**",
       "whatsapp-functions/**",
       "sandbox_rebuild/**",
       "scripts/**",
