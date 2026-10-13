@@ -384,9 +384,9 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
         except Exception as e:
             print(f"  Warning: could not count sellable nights for {prop} {season}: {e}", file=sys.stderr)
             sell = None
-        if sell is not None and sell["count"] == 0:
+        if sell is not None and sell["count"] < idea_evidence.MIN_SELLABLE_NIGHTS:
             skipped_empty += 1
-            print(f"  Skipped an idea for {prop} {season} ({idea_evidence.price_list_of(ptype)}): no sellable night left.")
+            print(f"  Skipped an idea for {prop} {season} ({idea_evidence.price_list_of(ptype)}): only {sell['count']} sellable night(s), at least {idea_evidence.MIN_SELLABLE_NIGHTS} needed.")
             continue
         key = (prop, season, idea_evidence.price_list_of(ptype))
         if key in seen_keys:
@@ -487,7 +487,7 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
             pass
 
     if skipped_empty or skipped_dup:
-        print(f"  Not made: {skipped_empty} idea(s) with nothing left to sell, {skipped_dup} repeat(s) for the same room, season and price list.")
+        print(f"  Not made: {skipped_empty} idea(s) with fewer than 3 sellable nights, {skipped_dup} repeat(s) for the same room, season and price list.")
     if replaced:
         print(f"  {replaced} older pending idea(s) replaced by newer ones for the same room, season and field.")
     if pending_count:

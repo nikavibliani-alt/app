@@ -169,6 +169,18 @@ def unsupported_numbers(text: str, numbers: dict) -> list:
 
 # ---------------------------------------------------------------- reading Firestore
 
+def first_log_day(db) -> str:
+    """The first day the history log has anything (the day it loaded every old booking and cancellation at once). Those rows are
+    not 'this week': counting starts the day after."""
+    days = []
+    try:
+        days = [(d.to_dict() or {}).get("day") for d in db.collection("pmslog_booking_events").stream()]
+    except Exception:
+        pass
+    days = [d for d in days if d]
+    return min(days) if days else LOG_START
+
+
 def load(db, now: datetime) -> dict:
     """Read one week of facts. Never writes."""
     import idea_scorecard as sc
@@ -206,4 +218,4 @@ def load(db, now: datetime) -> dict:
             "limits": limits, "scorecard": ssum.to_dict() if ssum.exists else {},
             "twin_results": [d.to_dict() or {} for d in db.collection("pricing_twin_results").stream()],
             "events": [dict(d.to_dict() or {}, date=(d.to_dict() or {}).get("date") or d.id.replace("event_", "")) for d in db.collection("pricing_events").stream()],
-            "room_ids": sorted((ps.ROOM_TYPES or {}).keys()), "since": LOG_START}, week_from, week_to
+            "room_ids": sorted((ps.ROOM_TYPES or {}).keys()), "since": first_log_day(db)}, week_from, week_to

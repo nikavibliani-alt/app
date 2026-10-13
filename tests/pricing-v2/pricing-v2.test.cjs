@@ -71,7 +71,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
           const t = await text(page, '.dlg');
           assert.ok(t.length > 40, 'has text for ' + night.iso);
           if (night.what === 'Booked') assert.ok(/Booked\. The engine does not change booked nights/.test(t));
-          if (night.iso === '2026-10-17') assert.ok(/You set this price by hand/.test(t));
+          if (night.iso === '2026-10-17') assert.ok(/Set by you\. The engine never changes this price/.test(t) && /Give this night back to the engine/.test(t));
           if (night.iso === '2026-10-19') assert.ok(/told the engine not to change/.test(t));
           if (night.iso === '2026-10-31') { assert.ok(/event you approved/.test(t)); assert.strictEqual(night.what, 'Empty · event'); }
           await page.keyboard.press('Escape');
@@ -86,7 +86,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
           const t = await text(page, '.panel');
           assert.ok(t.length > 30, 'panel text ' + c.iso);
           if (c.bk) assert.ok(/Booked\. The engine does not change booked nights/.test(t));
-          if (c.iso === '2026-10-17') { assert.ok(c.lock && /You set this price by hand/.test(t)); }
+          if (c.iso === '2026-10-17') { assert.ok(c.lock && /Set by you\. The engine never changes this price/.test(t) && /Give this night back to the engine/.test(t)); }
           if (c.iso === '2026-10-19') assert.ok(c.lock && /told the engine not to change/.test(t));
           if (c.iso === '2026-10-31') assert.ok(c.ev && /event you approved/.test(t));
         }
@@ -571,6 +571,33 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       d['pricing_twin_results/oldD'] = {status: 'final', text: 'With the idea applied, the twin priced these 20 nights at 120 ₾ on average, 20% higher than your real 100 ₾. In real life 18 of 20 sold, at about 105 ₾ a night. The twin cannot know if a guest would have booked at its price: this is evidence, not proof.'};
       d['pricing_scorecard/oldF'] = {status: 'tracking', verdict: null, reason: 'Still running: 11 nights to go (until 20 Nov 2026).'};
     }});
+  }
+
+  // ---- nights you set by hand: shown as "Set by you", with a button to give the night back ----
+  for (const [w, hh] of SIZES) {
+    await test('hand-set night: "Set by you" label, give back writes the request, other nights have no such button', w, hh, async ({page}, desk) => {
+      if (desk) {
+        const sub = await page.$eval('.cell[data-rt="XCV_2"][data-iso="2026-10-17"]', e => e.innerText);
+        assert.ok(/Set by you/.test(sub), sub);
+        await page.click('.cell[data-rt="XCV_2"][data-iso="2026-10-17"]'); await page.waitForSelector('.panel');
+      } else {
+        await go(page, '#/room/XCV_2'); await page.click('[data-act=allNights]');
+        const row = await page.$eval('.night[data-iso="2026-10-17"]', e => e.innerText);
+        assert.ok(/Set by you/.test(row), row);
+        await page.click('.night[data-iso="2026-10-17"]');
+      }
+      assert.ok(/Set by you\. The engine never changes this price/.test(await text(page, desk ? '.panel' : '.dlg')));
+      assert.strictEqual((await h.writes(page)).length, 0, 'nothing is written before the button');
+      await page.click('[data-act=giveBack]'); await page.waitForTimeout(150);
+      const ctl = await h.doc(page, 'pricing_config/control');
+      assert.ok(Array.isArray(ctl.release) && ctl.release.includes('XCV_2|2026-10-17'), JSON.stringify(ctl));
+      assert.ok(/Given back/.test(await text(page, desk ? '.panel' : '.dlg')) || /Given back/.test(await text(page, '#toast')), 'confirms');
+    });
+    await test('a normal night has no give-back button', w, hh, async ({page}, desk) => {
+      if (desk) { await page.click('.cell[data-rt="XCV_2"][data-iso="2026-10-20"]'); await page.waitForSelector('.panel'); }
+      else { await go(page, '#/room/XCV_2'); await page.click('[data-act=allNights]'); await page.click('.night[data-iso="2026-10-20"]'); }
+      assert.ok(!(await page.$('[data-act=giveBack]')));
+    });
   }
 
   // ---- weekly report ----

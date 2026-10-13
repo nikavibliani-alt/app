@@ -203,6 +203,8 @@ def last_year_lines(db, config: dict, today: str, props: list, stays: list | Non
 # ---------------------------------------------------------------- what an idea could still change
 
 NOT_USEFUL = "Not useful: nothing left to sell"
+NOT_USEFUL_FEW = "Not useful: too few nights to sell"
+MIN_SELLABLE_NIGHTS = 3             # an idea must change at least this many sellable nights
 HAND_SET_KINDS = ("manual", "protected")
 
 
@@ -272,7 +274,7 @@ def room_facts(db, config: dict, rules_data: dict, today: str, props: list, stay
             sl = sellable(db, config, today, prop, season, "startPrice", locks, daily)
             if sl["total"] == 0:
                 continue
-            if sl["count"] == 0:
+            if sl["count"] < MIN_SELLABLE_NIGHTS:
                 nothing += 1
                 continue
             offered += 1
@@ -285,6 +287,29 @@ def room_facts(db, config: dict, rules_data: dict, today: str, props: list, stay
         else:
             no_numbers.append(prop)
     head = ("\nSELLABLE NIGHTS PER ROOM AND SEASON (nights from today that still have a free unit, are not hand-set and not protected). "
-            "Only propose ideas for the rooms and seasons listed here; a room or season that is not listed has nothing left to sell:\n")
+            "Only propose ideas for the rooms and seasons listed here (an idea must change at least 3 sellable nights); a room or season that is not listed has too little left to sell:\n")
     tail = f"\nRooms with nothing left to sell or no changeable numbers: {', '.join(no_numbers) or 'none'}."
     return head + "\n".join(lines) + tail if lines else ""
+
+
+def ranges_text(nights: list) -> str:
+    """Exact dates as short ranges: ['2026-12-20','2026-12-21','2026-12-23'] -> '20-21 Dec 2026, 23 Dec 2026'."""
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    out, run_ = [], []
+    for n in sorted(nights):
+        if run_ and (date.fromisoformat(n) - date.fromisoformat(run_[-1])).days == 1:
+            run_.append(n)
+        else:
+            if run_:
+                out.append(run_)
+            run_ = [n]
+    if run_:
+        out.append(run_)
+    def fmt(r):
+        a, b = date.fromisoformat(r[0]), date.fromisoformat(r[-1])
+        if a == b:
+            return f"{a.day} {months[a.month - 1]} {a.year}"
+        if (a.year, a.month) == (b.year, b.month):
+            return f"{a.day}-{b.day} {months[b.month - 1]} {b.year}"
+        return f"{a.day} {months[a.month - 1]} {a.year} - {b.day} {months[b.month - 1]} {b.year}"
+    return ", ".join(fmt(r) for r in out)

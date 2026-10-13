@@ -223,7 +223,7 @@ def test_manual_price_respected_then_released_after_booking():
     inv["P"][ds]["prices"]["GEL"] = 300
     r2 = run(snap(13, inv), cfg, state)
     d = decision(r2, "P", ds)
-    assert d["proposed"] == 300 and "hand-set" in " ".join(d["why"])
+    assert d["proposed"] == 300 and "Set by you" in " ".join(d["why"])
     # a booking comes in on that date -> engine takes over again from your price
     inv["P"][ds]["avail"] = 2
     r3 = run(snap(16, inv), cfg, r2["state"])
@@ -489,14 +489,15 @@ def test_time_zone_aware_time_is_converted():
     assert min(d["date"] for d in res["decisions"]) == "2026-10-07"
 
 
-def test_hand_set_price_below_minimum_is_corrected():
+def test_hand_set_price_below_minimum_is_kept():                 # the rule changed: hand-set prices beat your minimum and maximum
     cfg = _one(rt_units=3, mn=180, start=255, mx=320)
     ds = (TODAY + timedelta(days=10)).isoformat()
     r1 = run(snap(9, {"S": inventory(3, 255)}), cfg, {})
     inv = {"S": inventory(3, 255)}
     inv["S"][ds]["prices"]["GEL"] = 150
     r2 = run(snap(13, inv), cfg, r1["state"])
-    assert decision(r2, "S", ds)["proposed"] == 180
+    d = decision(r2, "S", ds)
+    assert d["proposed"] == 150 and d["kind"] == "manual" and not d["write"]
 
 
 def test_shadow_mode_never_writes_and_tracks_its_own_prices():

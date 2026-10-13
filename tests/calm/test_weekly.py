@@ -161,3 +161,11 @@ def test_runner_saves_one_report_per_week_and_sends_one_whatsapp(monkeypatch):
     assert "numbers" in d
     wr.main(["--no-send"], db=DB(), now=now, send=lambda *a: sent.append("x"), env={})
     assert len(sent) == 1
+
+
+def test_the_log_start_is_found_from_the_data_not_guessed():
+    db = DB()
+    for i, day in enumerate(("2026-10-13", "2026-10-13", "2026-10-15")):
+        db.collection("pmslog_booking_events").document(f"e{i}").set({"day": day})
+    assert wn.first_log_day(db) == "2026-10-13"
+    assert wn.first_log_day(DB()) == wn.LOG_START

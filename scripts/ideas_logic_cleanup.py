@@ -1,7 +1,7 @@
 """
 One-off (and safe to repeat) clean-up of the WAITING ideas after the ideas-logic change. Changes no price and no rule.
   - an idea with no sellable night left (every unit booked, past, hand-set or protected) -> rejected with the reason
-    "Not useful: nothing left to sell"
+    "Not useful: nothing left to sell"; with only 1 or 2 sellable nights -> "Not useful: too few nights to sell"
   - more than one waiting idea for the same room + season + price list -> the newest stays, older ones are marked
     "Replaced by a newer idea"
 Nothing is deleted: the ideas stay in the history. Prints counts only.
@@ -43,7 +43,12 @@ def run(db, today: str, repo_config: dict, dry: bool = False) -> dict:
         if p["property"] not in daily:
             daily[p["property"]] = ie.load_daily(db, p["property"], today)
         sl = ie.sellable(db, config, today, p["property"], p["season"], p["type"], locks, daily[p["property"]])
-        (useful if sl["count"] > 0 else not_useful).append(p)
+        p["_sell"] = sl
+        if sl["count"] >= ie.MIN_SELLABLE_NIGHTS:
+            useful.append(p)
+        else:
+            p["_why"] = ie.NOT_USEFUL if sl["count"] == 0 else ie.NOT_USEFUL_FEW
+            not_useful.append(p)
     groups = {}
     for p in useful:
         groups.setdefault((p["property"], p["season"], ie.price_list_of(p["type"])), []).append(p)
@@ -56,13 +61,16 @@ def run(db, today: str, repo_config: dict, dry: bool = False) -> dict:
     if not dry:
         for p in not_useful:
             db.collection("pricing_proposals").document(p["id"]).update(
-                {"status": "rejected", "rejection_reason": ie.NOT_USEFUL, "rejected_at": now, "closed_by": "ideas_logic_cleanup"})
+                {"status": "rejected", "rejection_reason": p["_why"], "rejected_at": now, "closed_by": "ideas_logic_cleanup"})
         for p, newest in repeats:
             db.collection("pricing_proposals").document(p["id"]).update(
                 {"status": "rejected", "rejection_reason": REPLACED_REASON, "rejected_at": now, "replaced_by": newest, "closed_by": "ideas_logic_cleanup"})
+    for p in sorted(keep, key=lambda x: (x["property"], x["season"])):
+        print(f"  LEFT: {p['property']} | {p['season']} | {ie.price_list_of(p['type'])} | {p['type']} {p.get('current')} -> {p.get('suggested')} | "
+              f"{p['_sell']['count']} sellable nights: {ie.ranges_text(p['_sell']['nights'])}")
     by_room = dict(sorted(Counter(p["property"] for p in keep).items()))
     out = {"checked": len(ideas), "not_useful": len(not_useful), "repeats": len(repeats), "left": len(keep), "by_room": by_room}
-    print(f"Ideas clean-up: {len(ideas)} waiting checked | not useful (nothing left to sell) {len(not_useful)} | repeats {len(repeats)} | "
+    print(f"Ideas clean-up: {len(ideas)} waiting checked | not useful {len(not_useful)} (nothing left {sum(1 for p in not_useful if p["_why"] == ie.NOT_USEFUL)}, too few {sum(1 for p in not_useful if p["_why"] == ie.NOT_USEFUL_FEW)}) | repeats {len(repeats)} | "
           f"left {len(keep)} | rooms {by_room or 'none'}" + (" | DRY" if dry else ""))
     return out
 

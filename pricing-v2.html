@@ -395,7 +395,7 @@ const aheadLabel = d => (AHEAD.find(a => a[0] === Number(d)) || [0, d + " days"]
 const STATUS_TEXT = {far_ahead:"Selling much faster than usual", ahead:"Selling faster than usual", on_track:"Selling as usual",
   behind:"Selling slower than usual", far_behind:"Selling much slower than usual"};
 const KIND_HEAD = {
-  manual:"You set this price by hand. The engine leaves it alone for 48 hours, or until a booking comes in. Only a price under your minimum or over your maximum is corrected.",
+  manual:"Set by you. The engine never changes this price, even if it is under your minimum or over your maximum. It stays until the night is booked, or until you give the night back to the engine.",
   protected:"You told the engine not to change this date (a date rule). You set the price yourself in MiniHotel.",
   correction:"The price was outside your minimum or maximum, so it was moved back inside.",
   reset:"The price was set again from your start price.",
@@ -860,12 +860,19 @@ function whyModel(rt, iso, cur) {
 }
 function whyInner(m, rt, iso, desk) {
   const canRule = !m.old && !m.booked && !protectedBy(rt, iso);
+  const mine = !m.old && !m.booked && ["GEL", "USD"].some(c => (rec(rt, iso, c) || {}).kind === "manual");
+  const gave = (U.gaveBack ??= {})[`${rt}|${iso}`];
+  const giveBack = mine ? (gave
+    ? `<p class="muted" style="font-size:13px">Given back. The engine takes this night over at the next price update.</p>`
+    : `<button type="button" class="btn dark full ${desk ? "small" : ""}" data-act="giveBack" data-rt="${rt}" data-iso="${iso}">Give this night back to the engine</button>
+       <p class="muted" style="font-size:12px;margin-top:-6px">Until then the price stays exactly as you set it.</p>`) : "";
   return `<div class="both"><span><small>Booking</small><b>${esc(m.both.gel)}</b></span><span><small>Airbnb</small><b>${esc(m.both.usd)}</b></span></div>
     <p style="font-size:${desk ? 14 : 15}px;line-height:1.45">${esc(m.head)}</p>
     ${m.steps.length ? `<ol class="steps">${m.steps.map(st => `<li><span>${esc(st.what)}</span><b>${esc(st.price)}</b></li>`).join("")}</ol>` : ""}
     ${m.old && m.newPrice ? `<p class="warnline">This room is still on the old way. The new way would ask <b>${esc(m.newPrice)}</b> for this night. Nothing from the new way is sent yet.</p>` : ""}
     ${!m.old && !m.booked && roomById(rt) ? `<p class="fine muted" style="font-size:13px">Airbnb follows the same steps with your Airbnb minimum, start and maximum in dollars.</p>` : ""}
-    ${canRule ? `<button type="button" class="btn light full ${desk ? "small" : ""}" data-act="ruleNight" data-rt="${rt}" data-iso="${iso}">Don't change this night's price</button>
+    ${giveBack}
+    ${canRule && !mine ? `<button type="button" class="btn light full ${desk ? "small" : ""}" data-act="ruleNight" data-rt="${rt}" data-iso="${iso}">Don't change this night's price</button>
        <p class="muted" style="font-size:12px;margin-top:-6px">Adds a date rule. You then set the price yourself in MiniHotel. Remove it any time in Dates.</p>` : ""}`;
 }
 function openWhy(rt, iso) {
@@ -968,7 +975,7 @@ function nightsCardHtml(rt) {
     else if (g.avail === 0) { what = "Booked"; cls = "bk"; }
     else {
       const hand = isHandSet(rt, n.iso, g);
-      if (hand) what = "Set by hand"; else if (isEventDay(n.iso)) what = "Empty · event"; else if (r.units > 1) what = `${g.avail} of ${r.units} free`;
+      if (hand) what = g.kind === "manual" ? "Set by you" : "Set by hand"; else if (isEventDay(n.iso)) what = "Empty · event"; else if (r.units > 1) what = `${g.avail} of ${r.units} free`;
     }
     gp = n.gel ? gel(n.gel.new) : ""; up = n.usd ? usd(n.usd.new) : "";
     return `<button type="button" class="night" data-act="night" data-rt="${rt}" data-iso="${n.iso}" aria-label="${esc(fmtDay(n.iso) + (cls ? ", booked" : ", " + what.toLowerCase() + (gp ? ", Booking " + gp : "") + (up ? ", Airbnb " + up : ", no Airbnb price") + ", show why"))}">
@@ -1567,7 +1574,7 @@ function cellHtml(r, iso, j) {
   let sub = "";
   if (!full) {
     if (old) sub = rc.new ? "new " + (cur === "USD" ? usd(rc.new) : Math.round(rc.new)) : "";
-    else if (hand) sub = protectedBy(r.id, iso) && rc.kind !== "manual" ? "no change" : "by hand";
+    else if (hand) sub = protectedBy(r.id, iso) && rc.kind !== "manual" ? "no change" : rc.kind === "manual" ? "Set by you" : "by hand";
     else if (r.units > 1) sub = `${rc.avail} of ${r.units} free`;
   }
   const edge = !full && (shown === rc.min || shown === rc.max);
@@ -1585,7 +1592,7 @@ function viewCalendar() {
   const win = [["now", "Next 4 weeks"], ["next", MNL[(+today().slice(5, 7)) % 12]], ["hol", "Holidays"]];
   return `${errorsHtml()}<div class="ctrl">
       <div class="seg d" role="radiogroup" aria-label="Which dates">${win.map(([w, l]) => `<button type="button" class="segb ${U.win === w ? "on" : ""}" role="radio" aria-checked="${U.win === w}" data-act="win" data-v="${w}">${l}</button>`).join("")}</div>
-      <div class="legend"><span><i style="width:14px;height:14px;background:#E3E1DC;border-radius:3px;display:inline-block"></i>Booked</span><span><i style="width:14px;height:3px;background:#1F1F1F;display:inline-block"></i>At your min or max</span><span>${icon("lock", 12, 2.4)}Set by hand or "don't change"</span><span><i style="width:7px;height:7px;border-radius:50%;background:#1F1F1F;display:inline-block"></i>Event</span></div></div>
+      <div class="legend"><span><i style="width:14px;height:14px;background:#E3E1DC;border-radius:3px;display:inline-block"></i>Booked</span><span><i style="width:14px;height:3px;background:#1F1F1F;display:inline-block"></i>At your min or max</span><span>${icon("lock", 12, 2.4)}Set by you or "don't change"</span><span><i style="width:7px;height:7px;border-radius:50%;background:#1F1F1F;display:inline-block"></i>Event</span></div></div>
     <p class="muted" style="font-size:13px">Booking price (₾) on top, Airbnb price ($) below it. Click a night for why. Click two nights with Shift for a range. Click a room for its settings.</p>
     <div class="cwrap" id="cwrap"><div class="cgrid"><div class="crow" style="position:sticky;top:0;z-index:3"><div class="cname" style="height:auto;cursor:default;font-size:12px;font-weight:700;color:var(--soft);z-index:4">Room · ${esc(winLabel())}</div>${heads}</div>
       <div class="gtitle"><span>${oldRooms().length ? "New way" : "Rooms"}</span></div>${newRooms().map(r => calRowHtml(r, dates)).join("")}
@@ -1954,6 +1961,16 @@ document.addEventListener("click", async e => {
     case "closePanel": U.panel = null; U.sel = U.sel2 = null; render(); break;
     case "rangeChoice": U.rangeChoice = d.id; render(); break;
     case "rangeAdd": P.ruleAdd.push({from: d.a, to: d.b, rooms: [d.rt], action: U.rangeChoice || "protect"}); U.panel.done = true; touch(); render(); break;
+    case "giveBack": {
+      const key = `${d.rt}|${d.iso}`;
+      try {
+        await setDoc(controlRef(), {release: arrayUnion(key)}, {merge: true});
+        (U.gaveBack ??= {})[key] = true;
+        logChange("manual_released", `Gave a hand-set night back to the engine: ${roomName(d.rt)} ${d.iso}`, {[`manual/${key}`]: {old: "set by you", new: "engine"}});
+        showToast("Given back. The engine takes it over at the next price update.");
+      } catch (er) { message("Could not give the night back", (er && er.message) || String(er)); }
+      render(); break;
+    }
     case "ruleNight": {
       P.ruleAdd.push({from: d.iso, to: d.iso, rooms: [d.rt], action: "protect", note: "from the calendar"}); touch();
       if (isDesk() && U.panel) U.panel.done = true; else closeDialog();

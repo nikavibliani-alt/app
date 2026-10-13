@@ -50,7 +50,7 @@ def check(daily, states, run, cfg, now, live_rts=None):
             kind = r.get("kind")
             avail = r.get("avail") or 0
             who = f"{rt} {date} {cur}"
-            if kind == "protected":
+            if kind in ("protected", "manual"):               # protected nights and prices you set by hand are never a problem
                 continue
             if avail > 0 and not new:
                 issues.append({"code": "no_price", "rt": rt, "date": date, "text": f"{who}: free but has no price."})

@@ -163,3 +163,51 @@ def test_only_the_next_stretch_counts_because_that_is_what_the_card_names():
         if runs[0]["from"] <= iso <= runs[0]["to"]:
             days[f"{iso}|GEL"]["avail"] = 0                                   # this stretch is full; the next one (months away) is free
     assert ie.sellable(db, CONFIG, TODAY, "MAXELA", "mid", "startPrice", set())["count"] == 0
+
+
+def test_an_idea_must_change_at_least_three_sellable_nights(monkeypatch):
+    # book every night of the next "low" stretch except two: 2 sellable nights is too few
+    runs = ie.stretches("low", CONFIG, TODAY)
+    db = db_with()
+    days = db.store["pricing_calm_daily"][f"{TODAY}_MAXELA"]["dates"]
+    nights = [ie._add(runs[0]["from"], k) for k in range(runs[0]["nights"])]
+    for i, n in enumerate(nights):
+        for cur in ("GEL", "USD"):
+            if n in days or f"{n}|{cur}" in days:
+                days[f"{n}|{cur}"]["avail"] = 1 if i < 2 else 0
+    assert ie.sellable(db, CONFIG, TODAY, "MAXELA", "low", "startPrice", set())["count"] == 2
+    maker(db, [idea("MAXELA", "low")], monkeypatch)
+    assert made(db) == []
+    db.store["pricing_proposals"].pop(f"run_{TODAY}", None)                  # the idea maker runs once a week: allow a second run
+    for cur in ("GEL", "USD"):
+        days[f"{nights[2]}|{cur}"]["avail"] = 1                              # three sellable nights: now it is made
+    maker(db, [idea("MAXELA", "low")], monkeypatch)
+    assert len(made(db)) == 1
+
+
+def test_the_cleanup_uses_two_reasons_and_prints_exact_sellable_dates(monkeypatch, capsys):
+    m = cleanup_module()
+    db = db_with()
+    runs = ie.stretches("low", CONFIG, TODAY)
+    nights = [ie._add(runs[0]["from"], k) for k in range(runs[0]["nights"])]
+    days = db.store["pricing_calm_daily"][f"{TODAY}_ROOMS"]["dates"]
+    for i, n in enumerate(nights):
+        for cur in ("GEL", "USD"):
+            days[f"{n}|{cur}"]["avail"] = 1 if i < 2 else 0                  # ROOMS low: 2 sellable nights
+    days_b = db.store["pricing_calm_daily"][f"{TODAY}_MAXELA"]["dates"]
+    for n in nights:
+        for cur in ("GEL", "USD"):
+            days_b[f"{n}|{cur}"]["avail"] = 0                                # MAXELA low: nothing left
+    db.store["pricing_proposals"] = {"few": pending("ROOMS", "low"), "none": pending("MAXELA", "low"), "ok": pending("FREEDOM", "low")}
+    out = m.run(db, TODAY, CONFIG)
+    p = db.store["pricing_proposals"]
+    assert p["few"]["rejection_reason"] == "Not useful: too few nights to sell" and p["none"]["rejection_reason"] == "Not useful: nothing left to sell"
+    assert p["ok"]["status"] == "pending" and out["left"] == 1
+    printed = capsys.readouterr().out
+    assert "LEFT: FREEDOM | low | GEL" in printed and " sellable nights: " in printed
+    import idea_scorecard as sc
+    assert sc.decision_of(p["few"]) is None and sc.decision_of(p["none"]) is None
+
+
+def test_ranges_text_gives_exact_short_dates():
+    assert ie.ranges_text(["2026-12-20", "2026-12-21", "2026-12-23", "2026-12-31", "2027-01-01"]) == "20-21 Dec 2026, 23 Dec 2026, 31 Dec 2026 - 1 Jan 2027"

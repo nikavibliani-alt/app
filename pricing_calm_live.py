@@ -105,6 +105,29 @@ def read_paused(db) -> bool:
         return True
 
 
+def read_release(db) -> set:
+    """Nights you gave back to the engine on the pricing page: pricing_config/control.release = ["ROOM|YYYY-MM-DD", ...]."""
+    try:
+        snap = db.collection("pricing_config").document("control").get()
+        raw = (snap.to_dict() or {}).get("release") if snap.exists else None
+    except Exception:
+        return set()
+    return {x for x in (raw or []) if isinstance(x, str) and "|" in x}
+
+
+def clear_release(db, done: set):
+    """Take the nights the run has handled off the list (read again first, so a night given back meanwhile is not lost)."""
+    if not done:
+        return
+    try:
+        ref = db.collection("pricing_config").document("control")
+        snap = ref.get()
+        cur = [x for x in ((snap.to_dict() or {}).get("release") or [])] if snap.exists else []
+        ref.set({"release": [x for x in cur if x not in done]}, merge=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"  Could not clear the give-back list: {type(e).__name__}")
+
+
 def live_room_types(rules: dict, settings: dict) -> dict:
     out = {}
     for rt, over in (settings.get("room_types") or {}).items():
@@ -362,7 +385,8 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
             state = {k: v for k, v in state.items() if k in reset_rts or k == "_meta"}   # others are never saved
         if only:
             state = {k: v for k, v in state.items() if k in only["rooms"] or k == "_meta"}      # other rooms are never saved
-        result = run({"now": now, "inventory": inventory, "reservations": reservations, "shadow": False,
+        release = {x for x in read_release(db) if x.split("|")[0] in live_rts and (not only or (x.split("|")[0] in only["rooms"] and x.split("|")[1] in only["dates"]))}
+        result = run({"now": now, "inventory": inventory, "reservations": reservations, "shadow": False, "release_manual": sorted(release),
                       **({"reset": sorted(reset_rts)} if reset_rts else {}),
                       # a cancellation run never uses up the day's one lowering run, and only looks at its nights
                       **({"run_kind": "update", "only": only, "tonight_drop": True} if only else {})}, cfg, state)
@@ -418,6 +442,7 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         extra["failed_portals"] = failed_portals
         ps.save(db, now, result["state"], result, extra,
                 prefix=STATE_PREFIX, daily_coll="pricing_calm_daily", runs_coll="pricing_calm_runs")
+        clear_release(db, release)                                # the nights you gave back are handled: take them off the list
         log_price_events(db, result, now, {rt: portals_for(v, rt) for rt, v in live_rts.items()}, cfg, bool(payload))
         print(f"Written: {len(writes)} prices for {sorted({w['rt'] for w in writes})}."
               + (f" Channel push failed for {failed_portals}." if failed_portals else ""))

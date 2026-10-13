@@ -81,6 +81,9 @@ def _fmt(cur: str, v: float) -> str:
     return f"{v:,.0f} {sym}" if cur == "GEL" else f"{sym}{v:,.0f}"
 
 
+MANUAL_FOREVER = "2999-12-31T00:00:00"       # a hand-set price has no end time: it stays until the night is booked or is given back
+
+
 def _grid_down_to(limit: float, step: float, floor_: float) -> float:
     """Highest grid price <= limit; if it falls under floor_, use limit itself."""
     r = math.floor(limit / step + 1e-9) * step if step > 0 else limit
@@ -281,6 +284,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
     # Cancellation run only: a night freed TONIGHT goes straight to the room's minimum (the one exception to
     # "arrival day is never lowered"). Protect, hold, holiday dates and hand-set prices still win.
     tonight_drop = bool(snapshot.get("tonight_drop")) and only_dates is not None
+    release_set = set(snapshot.get("release_manual") or ())          # "ROOM|YYYY-MM-DD" nights you gave back to the engine
     tomorrow_s = (today + timedelta(days=1)).isoformat()
     # One-time price reset (snapshot["reset"] = set of room types): see the reset block below.
     reset_rts = set(snapshot.get("reset") or ()) if not shadow else set()
@@ -521,6 +525,35 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 st["moves"] = moves
                 baseline = _move_price(moves[0]) if moves else current
 
+                # ---- 1. your hand-set prices win over EVERYTHING, even your minimum and maximum (live room types, not in shadow) ----
+                # A price that is not the one the engine wrote last is yours. It stays until that night is booked or you give it
+                # back on the pricing page ("release_manual"). Cancellation drops, the holiday rule and ideas all skip it.
+                if can_write and not shadow and not reset_mode:
+                    if f"{rt}|{ds}" in release_set:
+                        for k in ("manual_until", "manual_price", "avail_at_manual"):
+                            st.pop(k, None)
+                        st["last_engine"] = current
+                        dec["why"].append("You gave this night back to the engine.")
+                    last_eng = st.get("last_engine")
+                    if last_eng is not None and abs(current - last_eng) >= 0.5 and not st.get("manual_until"):
+                        st["manual_until"] = MANUAL_FOREVER
+                        st["manual_price"] = current
+                        st["avail_at_manual"] = avail
+                    if st.get("manual_until"):
+                        if abs(current - st.get("manual_price", current)) >= 0.5:      # you set it again
+                            st["manual_price"] = current
+                            st["avail_at_manual"] = avail
+                        if avail >= st.get("avail_at_manual", avail):
+                            dec["why"].append(
+                                f"Set by you: {_fmt(cur, current)} stays as it is, even outside your minimum and maximum, "
+                                f"until the night is booked or you give it back to the engine.")
+                            dec["kind"] = "manual"
+                            continue
+                        for k in ("manual_until", "manual_price", "avail_at_manual"):
+                            st.pop(k, None)
+                        st["last_engine"] = current
+                        dec["why"].append("Hand-set price released after a booking.")
+
                 # ---- 1. your minimum and maximum always win ----
                 if not reset_mode and (current > mx_eff + 1e-9 or current < mn - 1e-9):
                     if current > mx_eff:
@@ -529,10 +562,6 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                     else:
                         new = _grid_up_to(mn, step, mx_eff)
                         dec["why"].append(f"Below your minimum {_fmt(cur, mn)}: brought up to it.")
-                    if st.get("manual_until"):
-                        dec["why"].append("This was a hand-set price; your minimum/maximum win over it.")
-                        for k in ("manual_until", "manual_price", "avail_at_manual"):
-                            st.pop(k, None)
                     dec["proposed"], dec["kind"] = new, "correction"
                     dec["write"] = can_write and not shadow
                     corrections += 1
@@ -540,34 +569,6 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                         per_rt[rt][2] += 1
                     dec["why"].append(f"Today: {_fmt(cur, current)} -> {_fmt(cur, new)}.")
                     continue
-
-                # ---- 2. your hand-set prices win (live room types, not in shadow) ----
-                if can_write and not shadow and not reset_mode:
-                    last_eng = st.get("last_engine")
-                    lock_until = st.get("manual_until")
-                    if last_eng is not None and abs(current - last_eng) >= 0.5 and not lock_until:
-                        st["manual_until"] = (now + timedelta(hours=calm["manual_lock_h"])).isoformat()
-                        st["manual_price"] = current
-                        st["avail_at_manual"] = avail
-                        lock_until = st["manual_until"]
-                    if lock_until:
-                        if abs(current - st.get("manual_price", current)) >= 0.5:
-                            st["manual_until"] = (now + timedelta(hours=calm["manual_lock_h"])).isoformat()
-                            st["manual_price"] = current
-                            st["avail_at_manual"] = avail
-                        booked_since = avail < st.get("avail_at_manual", avail)
-                        if now < datetime.fromisoformat(st["manual_until"]) and not booked_since:
-                            dec["why"].append(
-                                f"Your hand-set price {_fmt(cur, current)} is kept until "
-                                f"{st['manual_until'][:16].replace('T', ' ')}.")
-                            dec["kind"] = "manual"
-                            continue
-                        for k in ("manual_until", "manual_price", "avail_at_manual"):
-                            st.pop(k, None)
-                        st["last_engine"] = current
-                        # keep the 24-hour memory: the hand price is the new current price,
-                        # not a new starting point for the daily limits
-                        dec["why"].append("Hand-set price released" + (" after a booking." if booked_since else " (time is up)."))
 
                 # ---- 2b. a night freed tonight or tomorrow (cancellation run): lowered at once ----
                 # tonight: straight to the minimum; tomorrow: halfway between its price and the minimum.
