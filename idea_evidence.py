@@ -224,14 +224,14 @@ def locked_nights(db) -> set:
 
 
 def sellable(db, config: dict, today: str, prop: str, season: str, ptype: str, locks: set | None = None, daily: tuple | None = None) -> dict:
-    """The nights of this room's season (every stretch from today on) that an idea could still change: not past, at least one unit
-    still free, no hand-set price, not protected. Uses the prices the new engine saved at its last run."""
+    """The nights of the NEXT stretch of this room's season (the dates the idea card names) that an idea could still change: not past,
+    at least one unit still free, no hand-set price, not protected. Uses the prices the new engine saved at its last run."""
     cur = price_list_of(ptype)
     other = "GEL" if cur == "USD" else "USD"
     locks = locks if locks is not None else locked_nights(db)
     day, dates = daily if daily is not None else load_daily(db, prop, today)
     out, total, skipped = [], 0, {"no_price": 0, "full": 0, "hand_set": 0}
-    for run_ in stretches(season, config, today):
+    for run_ in stretches(season, config, today)[:1]:
         start = max(run_["from"], today)
         for k in range((date.fromisoformat(run_["to"]) - date.fromisoformat(start)).days + 1):
             iso = _add(start, k)
@@ -276,7 +276,9 @@ def room_facts(db, config: dict, rules_data: dict, today: str, props: list, stay
                 nothing += 1
                 continue
             offered += 1
-            room_lines.append(f"  {season}: {sl['count']} sellable nights of {sl['total']} ahead; start {sp}, min {rule.get('min')}, max {rule.get('max')} (GEL, Booking)")
+            r0 = stretches(season, config, today)[0]
+            first_dates = f"{max(r0['from'], today)} to {r0['to']}"
+            room_lines.append(f"  {season}: {sl['count']} sellable nights of {sl['total']} in its next stretch ({first_dates}); start {sp}, min {rule.get('min')}, max {rule.get('max')} (GEL, Booking)")
         if room_lines:
             lines.append(f"{prop} (booked in the last 60 days: {len(recent)} stays, {sold_nights} nights)")
             lines += room_lines

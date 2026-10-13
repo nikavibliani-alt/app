@@ -151,3 +151,15 @@ def test_a_not_useful_idea_is_not_followed_by_the_scorecard_or_the_twin():
     assert sc.decision_of({"status": "rejected", "rejection_reason": "Not useful: nothing left to sell"}) is None
     assert sc.decision_of({"status": "rejected", "rejection_reason": "Replaced by a newer idea"}) == "replaced"
     assert sc.decision_of({"status": "rejected"}) == "skipped"
+
+
+def test_only_the_next_stretch_counts_because_that_is_what_the_card_names():
+    db = db_with()
+    runs = ie.stretches("mid", CONFIG, TODAY)
+    assert len(runs) > 1
+    days = db.store["pricing_calm_daily"][f"{TODAY}_MAXELA"]["dates"]
+    for k in range(400):
+        iso = D(k)
+        if runs[0]["from"] <= iso <= runs[0]["to"]:
+            days[f"{iso}|GEL"]["avail"] = 0                                   # this stretch is full; the next one (months away) is free
+    assert ie.sellable(db, CONFIG, TODAY, "MAXELA", "mid", "startPrice", set())["count"] == 0
