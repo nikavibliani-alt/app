@@ -23,6 +23,15 @@ def main(task, dry):
     if task == "weekly":
         import weekly_review as m
         return m.main(flag + ["--no-send"])
+    if task == "weekly_show":
+        import weekly_show as m
+        return m.main()
+    if task == "manual_probe":
+        import manual_probe as m
+        return m.main()
+    if task == "ideas_cleanup":
+        import ideas_logic_cleanup as m
+        return m.main(flag)
     raise SystemExit(f"unknown task {task}")
 
 
