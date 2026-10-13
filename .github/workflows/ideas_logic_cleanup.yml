@@ -1,0 +1,33 @@
+name: Ideas logic clean-up
+
+# Manual only. Marks waiting ideas that have nothing left to sell as "Not useful: nothing left to sell" and older repeats as
+# "Replaced by a newer idea". Nothing is deleted; no price or rule changes. Dry run by default (counts only).
+on:
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: 'Dry run (count only)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: pricing-ideas
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests firebase-admin
+      - name: Clean up waiting ideas
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          DRY: ${{ github.event.inputs.dry }}
+        run: |
+          if [ "$DRY" = "true" ]; then python scripts/ideas_logic_cleanup.py --dry; else python scripts/ideas_logic_cleanup.py; fi

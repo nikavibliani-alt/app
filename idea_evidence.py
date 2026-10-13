@@ -198,3 +198,91 @@ def last_year_lines(db, config: dict, today: str, props: list, stays: list | Non
     if not lines:
         return ""
     return "\nLAST YEAR (real numbers from stored stays; the ONLY last-year numbers you may use):\n" + "\n".join(lines)
+
+
+# ---------------------------------------------------------------- what an idea could still change
+
+NOT_USEFUL = "Not useful: nothing left to sell"
+HAND_SET_KINDS = ("manual", "protected")
+
+
+def price_list_of(ptype: str) -> str:
+    """Booking (GEL) or Airbnb (USD): the price list an idea changes."""
+    return "USD" if str(ptype).lower().endswith("eur") else "GEL"
+
+
+def locked_nights(db) -> set:
+    """Nights held by hand in the page ("rt_date" keys of pricing_locks with manual_lock)."""
+    out = set()
+    try:
+        for d in db.collection("pricing_locks").stream():
+            if (d.to_dict() or {}).get("manual_lock"):
+                out.add(d.id)
+    except Exception:
+        pass
+    return out
+
+
+def sellable(db, config: dict, today: str, prop: str, season: str, ptype: str, locks: set | None = None, daily: tuple | None = None) -> dict:
+    """The nights of this room's season (every stretch from today on) that an idea could still change: not past, at least one unit
+    still free, no hand-set price, not protected. Uses the prices the new engine saved at its last run."""
+    cur = price_list_of(ptype)
+    other = "GEL" if cur == "USD" else "USD"
+    locks = locks if locks is not None else locked_nights(db)
+    day, dates = daily if daily is not None else load_daily(db, prop, today)
+    out, total, skipped = [], 0, {"no_price": 0, "full": 0, "hand_set": 0}
+    for run_ in stretches(season, config, today):
+        start = max(run_["from"], today)
+        for k in range((date.fromisoformat(run_["to"]) - date.fromisoformat(start)).days + 1):
+            iso = _add(start, k)
+            total += 1
+            rc = dates.get(f"{iso}|{cur}") or dates.get(f"{iso}|{other}")
+            if not rc:
+                skipped["no_price"] += 1
+            elif (rc.get("avail") or 0) <= 0:
+                skipped["full"] += 1
+            elif rc.get("kind") in HAND_SET_KINDS or f"{prop}_{iso}" in locks:
+                skipped["hand_set"] += 1
+            else:
+                out.append(iso)
+    return {"count": len(out), "nights": out, "total": total, "skipped": skipped, "source_day": day}
+
+
+def room_facts(db, config: dict, rules_data: dict, today: str, props: list, stays: list) -> str:
+    """Text for the idea maker: for EVERY room and season that can still be changed, what is sellable and the numbers an idea may
+    change (read from the same place the Apply button checks). Rooms and seasons with nothing left to sell are not offered."""
+    locks = locked_nights(db)
+    names = []
+    for s in config.get("seasons", []):
+        names.append(s["name"])
+    for o in _overrides(config):
+        if o.get("season") and o["season"] not in names:
+            names.append(o["season"])
+    lines, offered, nothing, no_numbers = [], 0, 0, []
+    for prop in props:
+        daily = load_daily(db, prop, today)
+        recent = [s for s in stays if s["rt"] == prop and s.get("created") and s["created"] >= _add(today, -60)]
+        sold_nights = sum((date.fromisoformat(s["checkout"]) - date.fromisoformat(s["checkin"])).days for s in recent)
+        room_lines = []
+        for season in names:
+            sp = ((rules_data.get("startPrices") or {}).get(prop) or {}).get(season)
+            rule = ((rules_data.get("priceRules") or {}).get(prop) or {}).get(season) or {}
+            if sp is None and not rule:
+                continue
+            sl = sellable(db, config, today, prop, season, "startPrice", locks, daily)
+            if sl["total"] == 0:
+                continue
+            if sl["count"] == 0:
+                nothing += 1
+                continue
+            offered += 1
+            room_lines.append(f"  {season}: {sl['count']} sellable nights of {sl['total']} ahead; start {sp}, min {rule.get('min')}, max {rule.get('max')} (GEL, Booking)")
+        if room_lines:
+            lines.append(f"{prop} (booked in the last 60 days: {len(recent)} stays, {sold_nights} nights)")
+            lines += room_lines
+        else:
+            no_numbers.append(prop)
+    head = ("\nSELLABLE NIGHTS PER ROOM AND SEASON (nights from today that still have a free unit, are not hand-set and not protected). "
+            "Only propose ideas for the rooms and seasons listed here; a room or season that is not listed has nothing left to sell:\n")
+    tail = f"\nRooms with nothing left to sell or no changeable numbers: {', '.join(no_numbers) or 'none'}."
+    return head + "\n".join(lines) + tail if lines else ""

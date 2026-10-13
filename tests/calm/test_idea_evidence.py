@@ -153,7 +153,7 @@ def test_new_ideas_save_their_evidence_and_the_prompt_carries_last_year(monkeypa
 
 
 def test_an_idea_still_saves_when_the_evidence_cannot_be_worked_out(monkeypatch):
-    db = DB()
+    db = DB(daily=daily("ROOMS"))
     monkeypatch.setattr(ie, "collect", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
     run_maker(db, [{"property": "ROOMS", "season": "mid", "type": "floor", "current": 70, "suggested": 75, "reasoning": "x"}], monkeypatch)
     docs = [d for k, d in db.store["pricing_proposals"].items() if not k.startswith("run_")]

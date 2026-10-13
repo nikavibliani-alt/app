@@ -169,6 +169,14 @@ def parse_analyst_reply(text: str) -> dict:
         raise ValueError(f"the reply had no JSON ({len(text)} characters, starts with: {text[:60]!r})")
 
 
+def _all_room_types() -> list:
+    try:
+        import pricing_shadow as ps
+        return list(ps.ROOM_TYPES)
+    except Exception:
+        return list(MAKER_PROPERTIES)
+
+
 def idea_path(prop: str, season: str, ptype: str):
     """Where an idea's number lives in pricing_config/rules (the same places the Ideas tab changes)."""
     t = str(ptype)
@@ -271,7 +279,7 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
     except Exception:
         pass
 
-    # Need booking history to make recommendations
+    # Booking history of the old engine (may be empty) ...
     try:
         from price_tracker import get_learning_context
         learning_context = get_learning_context(db, days_back=30)
@@ -279,9 +287,13 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
         print(f"  Warning: could not load learning context: {e}", file=sys.stderr)
         learning_context = ""
 
-    if not learning_context:
-        print("  No booking history yet — skipping Claude analyst.")
-        return config
+    # ... and the rules the Apply button checks, read first so the maker only offers numbers that can really be changed
+    try:
+        rules_snap = db.collection("pricing_config").document("rules").get()
+        rules_data = rules_snap.to_dict() if rules_snap.exists else {}
+    except Exception as e:
+        print(f"  Warning: could not read rules: {e}", file=sys.stderr)
+        rules_data = {}
 
     # Load rejection history so Claude avoids re-proposing recently rejected changes
     rejection_context = _get_rejection_context(db)
@@ -295,8 +307,19 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
         print(f"  Warning: could not work out last year's numbers: {e}", file=sys.stderr)
         last_year_context = ""
 
+    # EVERY room (all 10), with the nights that can still be sold: nothing is offered where there is nothing left to sell
+    all_rooms = _all_room_types()
+    try:
+        facts = idea_evidence.room_facts(db, config, rules_data, ev_today, all_rooms, stays)
+    except Exception as e:
+        print(f"  Warning: could not work out the sellable nights: {e}", file=sys.stderr)
+        facts = ""
+    if not learning_context and not facts:
+        print("  No booking history and no sellable nights found — skipping Claude analyst.")
+        return config
+
     # Build prompt and call Claude
-    prompt = build_analyst_prompt(config, learning_context + last_year_context, rejection_context)
+    prompt = build_analyst_prompt(config, learning_context + facts + last_year_context, rejection_context)
     try:
         response = call_claude_analyst(prompt, api_key)
     except Exception as e:
@@ -309,32 +332,26 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
     if summary:
         print(f"  Strategy: {summary[:120]}")
 
-    # Read current Firestore rules for auto-apply
-    try:
-        rules_ref = db.collection("pricing_config").document("rules")
-        rules_snap = rules_ref.get()
-        rules_data = rules_snap.to_dict() if rules_snap.exists else {}
-    except Exception as e:
-        print(f"  Warning: could not read rules for auto-apply: {e}", file=sys.stderr)
-        rules_data = {}
-
     auto_on = auto_apply_on(db)
     auto_labels = []
     auto_applied = 0
     pending_count = 0
     batch = db.batch()
     batch_count = 0
-    # older pending ideas of ours, by (room, season, field): a new idea for the same key replaces them
+    # older pending ideas of ours, by (room, season, price list): a new idea for the same key replaces them (one waiting idea per key)
     older_pending = {}
     try:
         for snap in db.collection("pricing_proposals").where("status", "==", "pending").stream():
             d = snap.to_dict() or {}
             if d.get("type") == "run_marker":
                 continue
-            older_pending.setdefault((d.get("property"), d.get("season"), d.get("type")), []).append(snap.id)
+            older_pending.setdefault((d.get("property"), d.get("season"), idea_evidence.price_list_of(d.get("type"))), []).append(snap.id)
     except Exception as e:
         print(f"  Warning: could not read older pending ideas: {e}", file=sys.stderr)
     replaced = 0
+    skipped_empty, skipped_dup, seen_keys = 0, 0, set()
+    locks = idea_evidence.locked_nights(db)
+    daily_cache = {}
 
     if not isinstance(proposals, list):
         proposals = []
@@ -359,6 +376,24 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
             print(f"  Skipping proposal with a missing/non-numeric value: {prop} {season} {ptype}")
             continue
 
+        # Nothing left to sell (every unit booked, past, hand-set or protected) -> no idea. One idea per room + season + price list.
+        try:
+            if prop not in daily_cache:
+                daily_cache[prop] = idea_evidence.load_daily(db, prop, ev_today)
+            sell = idea_evidence.sellable(db, config, ev_today, prop, season, ptype, locks, daily_cache[prop])
+        except Exception as e:
+            print(f"  Warning: could not count sellable nights for {prop} {season}: {e}", file=sys.stderr)
+            sell = None
+        if sell is not None and sell["count"] == 0:
+            skipped_empty += 1
+            print(f"  Skipped an idea for {prop} {season} ({idea_evidence.price_list_of(ptype)}): no sellable night left.")
+            continue
+        key = (prop, season, idea_evidence.price_list_of(ptype))
+        if key in seen_keys:
+            skipped_dup += 1
+            continue
+        seen_keys.add(key)
+
         # Compute actual change_pct ourselves to verify (don't trust Claude's math)
         if current_val != 0:
             actual_pct = (suggested - current_val) / abs(current_val) * 100
@@ -378,7 +413,7 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
 
         # Save proposal doc
         prop_ref = db.collection("pricing_proposals").document()
-        for old_id in older_pending.pop((prop, season, ptype), []):
+        for old_id in older_pending.pop(key, []):
             batch.update(db.collection("pricing_proposals").document(old_id), {
                 "status": "rejected", "rejection_reason": REPLACED_REASON, "rejected_at": datetime.now(),
                 "replaced_by": prop_ref.id,
@@ -391,6 +426,8 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
         except Exception as e:
             print(f"  Warning: no evidence saved for {prop} {season} {ptype}: {e}", file=sys.stderr)
             evidence = None
+        if evidence is not None and sell is not None:
+            evidence["sellable"] = {"count": sell["count"], "total": sell["total"], **sell["skipped"]}
         batch.set(prop_ref, {
             **({"evidence": evidence} if evidence else {}),
             "date":       today,
@@ -449,6 +486,8 @@ def claude_write_daily_proposal(config: dict, db, velocity: dict = None, force: 
         except Exception:
             pass
 
+    if skipped_empty or skipped_dup:
+        print(f"  Not made: {skipped_empty} idea(s) with nothing left to sell, {skipped_dup} repeat(s) for the same room, season and price list.")
     if replaced:
         print(f"  {replaced} older pending idea(s) replaced by newer ones for the same room, season and field.")
     if pending_count:

@@ -1,6 +1,7 @@
 """Ideas: closing out-of-date pending ideas, the weekly idea maker, and replacing older pending ideas."""
 
 import copy
+import json
 import os
 import sys
 from datetime import date, datetime, timedelta
@@ -63,6 +64,10 @@ class Doc:
         c[self.id].update(data)
 
 
+import itertools  # noqa: E402
+_IDS = itertools.count(1)
+
+
 class Batch:
     def __init__(self):
         self.ops = []
@@ -87,7 +92,7 @@ class Coll(Query):
     def document(self, id_=None):
         if id_ is None:
             self._n += 1
-            id_ = f"new{len(self.store.get(self.coll, {}))}_{self._n}_{id(self)}"
+            id_ = f"new{next(_IDS)}"
         return Doc(self.store, self.coll, id_)
 
     def add(self, data):
@@ -162,18 +167,43 @@ def test_summary_changes_nothing_and_apply_closes_only_out_of_date(capsys):
 
 # ---------------- idea maker ----------------
 
+CONFIG = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config.json")))
+
+
+def with_daily(db, now=NOW, days=400, booked=(), skip_rooms=()):
+    """Saved prices of the new engine for every room: one free unit on every night, unless booked."""
+    import pricing_shadow as ps_
+    for rt in ps_.ROOM_TYPES:
+        if rt in skip_rooms:
+            continue
+        dates = {}
+        for k in range(days):
+            iso = (now.date() + timedelta(days=k)).isoformat()
+            dates[f"{iso}|GEL"] = {"avail": 0 if iso in booked else 1}
+            dates[f"{iso}|USD"] = {"avail": 0 if iso in booked else 1}
+        db.store.setdefault("pricing_calm_daily", {})[f"{now.date().isoformat()}_{rt}"] = {"dates": dates}
+    return db
+
+
 def run_maker(db, proposals, monkeypatch, now=NOW):
+    if "pricing_calm_daily" not in db.store:
+        with_daily(db, now)
+
     class FakeDT(datetime):
         @classmethod
         def now(cls, tz=None):
             return now
+
+        @classmethod
+        def utcnow(cls):
+            return now - timedelta(hours=4)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
     monkeypatch.setattr(cp, "datetime", FakeDT)
     import price_tracker
     monkeypatch.setattr(price_tracker, "get_learning_context", lambda db, days_back=30: "some history")
     calls = []
     monkeypatch.setattr(cp, "call_claude_analyst", lambda prompt, key: (calls.append(1), {"proposals": proposals, "daily_summary": "s"})[1])
-    cp.claude_write_daily_proposal({"startPrices": {}}, db, {})
+    cp.claude_write_daily_proposal({**CONFIG, "startPrices": {}}, db, {})
     return calls
 
 
@@ -194,7 +224,8 @@ def test_new_idea_replaces_the_older_pending_one_for_the_same_room_season_field(
     ideas = {
         "old1": idea("MAXELA", "low", "startPrice", 100, 105, 9),             # same key: replaced
         "old2": idea("MAXELA", "low", "startPrice", 100, 110, 20),            # same key again: replaced
-        "other_field": idea("MAXELA", "low", "floor", 80, 85, 9),             # other field: stays
+        "other_field": idea("MAXELA", "low", "floor", 80, 85, 9),             # other field, same room, season and price list: replaced too (one waiting idea)
+        "other_list": idea("MAXELA", "low", "startPriceEur", 80, 85, 9),      # other price list (Airbnb): stays
         "other_season": idea("MAXELA", "mid", "startPrice", 130, 135, 9),     # other season: stays
         "other_room": idea("ROOMS", "low", "startPrice", 100, 105, 9),        # other room: stays
         "done": idea("MAXELA", "low", "startPrice", 100, 103, 30, status="approved"),   # not pending: untouched
@@ -204,12 +235,12 @@ def test_new_idea_replaces_the_older_pending_one_for_the_same_room_season_field(
     p = db.store["pricing_proposals"]
     new_ids = [k for k, v in p.items() if v.get("suggested") == 108]
     assert len(new_ids) == 1 and p[new_ids[0]]["status"] == "pending"
-    for k in ("old1", "old2"):
+    for k in ("old1", "old2", "other_field"):
         assert p[k]["status"] == "rejected" and p[k]["rejection_reason"] == "Replaced by a newer idea" and p[k]["replaced_by"] == new_ids[0]
-    for k in ("other_field", "other_season", "other_room"):
+    for k in ("other_list", "other_season", "other_room"):
         assert p[k]["status"] == "pending", k
     assert p["done"]["status"] == "approved"
-    assert p["run_2026-10-12"]["replaced"] == 2
+    assert p["run_2026-10-12"]["replaced"] == 3
     assert db.store["pricing_config"]["rules"] == RULES, "the idea maker never changes the rules"
 
 

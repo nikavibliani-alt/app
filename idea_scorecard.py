@@ -25,6 +25,7 @@ MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", 
 WHAT = {"startprice": "start price", "floor": "minimum", "ceiling": "maximum"}
 SEASON_NAMES = {"xmas_low": "low Christmas", "low": "Low season", "mid": "Mid season", "high": "High season", "peak": "Peak season"}
 REPLACED = "Replaced by a newer idea"
+NOT_USEFUL = "Not useful: nothing left to sell"
 
 
 def _d(iso):
@@ -48,6 +49,8 @@ def decision_of(p: dict):
     st = p.get("status")
     if st in ("approved", "auto_applied"):
         return "applied"
+    if st == "rejected" and p.get("rejection_reason") == NOT_USEFUL:
+        return None                                     # never a real choice: nothing was left to sell, so it is not followed
     if st == "rejected":
         return "replaced" if p.get("rejection_reason") == REPLACED else "skipped"
     return None
