@@ -116,9 +116,9 @@ body[data-layout="phone"] .mbar{grid-template-columns:repeat(6,1fr)}
 .sleg i{width:12px;height:12px;border-radius:3px;display:inline-block}
 .srow{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;padding:12px 14px;border-bottom:1px solid var(--line2)}
 .srow:last-child{border-bottom:0}
-.srow .fld{display:flex;flex-direction:column;gap:3px}
-.srow .fld>span{font-size:12px;font-weight:600;color:var(--soft)}
-.srow .two{display:flex;gap:6px}
+.srow .sfld{display:flex;flex-direction:column;gap:3px;padding:0;border:0;background:transparent;min-height:0}
+.srow .sfld>span{font-size:12px;font-weight:600;color:var(--soft)}
+.srow .spair{display:flex;gap:6px}
 .srow select{min-height:44px;padding:0 10px;border-radius:10px;border:1px solid var(--btn-line);background:#FFFFFF;color:var(--ink);font:inherit;font-size:15px}
 .srow .x{margin-left:auto}
 .srow.bad{background:var(--red-bg)}
@@ -879,7 +879,7 @@ const badgeCount = () => S.props.filter(p => p.status === "pending").length;
 function tabsHtml(desk) {
   const cur = U.route.name;
   const first = desk ? ["calendar", "Calendar"] : ["rooms", "Rooms"];
-  const items = [first, ["seasons", "Seasons"], ["dates", "Dates"], ["ideas", "Ideas"], ["weekly", "Weekly report"]];
+  const items = [first, ["seasons", "Seasons"], ["dates", "Dates"], ["ideas", "Ideas"], ["weekly", "Weekly"]];
   const active = (cur === "room" || cur === "test") ? "rooms" : (cur === "calendar" ? "calendar" : cur);
   return `<nav class="tabs" aria-label="Pricing">${items.map(([id, label]) => {
     const n = id === "ideas" ? badgeCount() : 0;
@@ -1201,11 +1201,11 @@ function rangeRowHtml(r, i, bad) {
   const dayOpts = (mi, sel) => Array.from({length: MONTH_DAYS[mi]}, (_, d) => `<option value="${d + 1}" ${d + 1 === sel ? "selected" : ""}>${d + 1}</option>`).join("");
   const monOpts = sel => MNL.map((m, k) => `<option value="${k + 1}" ${k + 1 === sel ? "selected" : ""}>${m}</option>`).join("");
   const part = (which, md) => { const mi = +md.slice(0, 2) - 1, dd = +md.slice(3);
-    return `<div class="fld"><span>${which === "from" ? "From" : "To"}</span><div class="two">
+    return `<div class="sfld"><span>${which === "from" ? "From" : "To"}</span><div class="spair">
       <select aria-label="${which === "from" ? "From" : "To"} day, range ${i + 1}" data-sr="${which}-d" data-i="${i}">${dayOpts(mi, dd)}</select>
       <select aria-label="${which === "from" ? "From" : "To"} month, range ${i + 1}" data-sr="${which}-m" data-i="${i}">${monOpts(mi + 1)}</select></div></div>`; };
   return `<div class="srow ${bad ? "bad" : ""}" data-range="${i}">${part("from", r.from)}${part("to", r.to)}
-    <div class="fld"><span>Season</span><select aria-label="Season, range ${i + 1}" data-sr="season" data-i="${i}">${SEASON_ORDER.map(id => `<option value="${id}" ${id === r.season ? "selected" : ""}>${SEASONS[id].label}</option>`).join("")}</select></div>
+    <div class="sfld"><span>Season</span><select aria-label="Season, range ${i + 1}" data-sr="season" data-i="${i}">${SEASON_ORDER.map(id => `<option value="${id}" ${id === r.season ? "selected" : ""}>${SEASONS[id].label}</option>`).join("")}</select></div>
     <button type="button" class="x" aria-label="Remove range ${i + 1}: ${esc(fmtRange(r.from, r.to))} ${esc(SEASONS[r.season].label)}" data-act="srDel" data-i="${i}">${icon("trash", 20)}</button></div>`;
 }
 function seasonDatesInner() {

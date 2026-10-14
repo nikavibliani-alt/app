@@ -688,7 +688,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
     await test('weekly report: headline, three lists, numbers per room, notes, past weeks', w, hh, async ({page}) => {
       await go(page, '#/weekly');
       const t = await text(page, '.page');
-      assert.ok(/Weekly report/.test(await text(page, 'a.tab[href="#/weekly"]')));
+      assert.ok(/Weekly/.test(await text(page, 'a.tab[href="#/weekly"]')));
       assert.ok(/6 Oct – 12 Oct 2026/.test(t) && /A calm week: 11 nights sold in Maxela/.test(t), t.slice(0, 300));
       assert.ok(/What worked/.test(t) && /What did not work/.test(t) && /Possible upgrades/.test(t) && /nothing here changed a price/i.test(t));
       assert.ok(/The tonight drop sold: 1 of 1/.test(t) && /shortened by the checker/.test(t) && /1 claim removed, 1 shortened/.test(t), 'checker line');
