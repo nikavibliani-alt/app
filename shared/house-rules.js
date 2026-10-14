@@ -24,9 +24,9 @@ const CUSTOM_ICONS = {
   'rule-card': { stroke: 1.8, inner: '<path d="m2 21 9.6-9.6"></path><path d="m7.5 15.5 2.3 2.3a1 1 0 0 1 0 1.4l-2.1 2.1a1 1 0 0 1-1.4 0L4 19"></path><circle cx="15.5" cy="7.5" r="5.5"></circle>' },
 };
 /* icons offered in the admin picker (names that exist in feather-icons.js are kept) */
-const ICON_WISH = ['rule-noise', 'volume-x', 'cigarette-off', 'rule-care', 'rule-card', 'key-round', 'key', 'dog', 'paw-print',
+const ICON_WISH = ['rule-noise', 'cigarette-off', 'rule-care', 'rule-card', 'dog', 'paw-print',
   'party-popper', 'flame', 'users', 'clock', 'moon', 'trash-2', 'footprints', 'door-closed', 'wine-off', 'car', 'baby',
-  'camera-off', 'droplets', 'zap', 'shield-alert', 'home', 'lock', 'wifi', 'info'];
+  'camera-off', 'droplets', 'zap', 'shield-alert', 'lock', 'wifi', 'info'];
 export const ICON_CHOICES = ICON_WISH.filter((n) => CUSTOM_ICONS[n] || FEATHER_ICONS[n]);
 
 const TEXT = {
@@ -58,16 +58,17 @@ export function pick(obj, lang) {
 
 export function defaultHouseRules(group, opts = {}) {
   const entranceCard = opts.entranceCard === undefined ? group === 'FREEDOM' : !!opts.entranceCard;
-  const rule = (id, extra = {}) => ({
-    id, title: clone(RULE_TEXT[id].title), desc: clone(RULE_TEXT[id].desc),
-    icon: '', iconImage: '', notAllowed: false, required: true, highlight: false, apartments: [], ...extra,
+  const rule = (id, extra = {}, textKey = id) => ({
+    id, title: clone(RULE_TEXT[textKey].title), desc: clone(RULE_TEXT[textKey].desc),
+    icon: '', iconImage: '', notAllowed: false, required: true, highlight: false, scope: 'all', apartments: [], ...extra,
   });
   const rules = [];
   if (group === 'MAXELA') {
-    rules.push(rule('noise', { icon: 'rule-noise', apartments: MAXELA_ROOMS.filter((r) => r !== '6-4') }));
-    rules.push(rule('noise', { icon: 'rule-noise', highlight: true, desc: clone(NOISE_HIGHLIGHT_DESC), apartments: ['6-4'] }));
+    /* the normal noise rule is "all except 6-4", so a new Maxela apartment gets it automatically */
+    rules.push(rule('noise', { icon: 'rule-noise', scope: 'except', apartments: ['6-4'] }));
+    rules.push(rule('noise-quiet', { icon: 'rule-noise', highlight: true, desc: clone(NOISE_HIGHLIGHT_DESC), scope: 'only', apartments: ['6-4'] }, 'noise'));
   } else if (group === 'BIG_APT') {
-    rules.push(rule('noise', { icon: 'rule-noise', highlight: true, desc: clone(NOISE_HIGHLIGHT_DESC) }));
+    rules.push(rule('noise-quiet', { icon: 'rule-noise', highlight: true, desc: clone(NOISE_HIGHLIGHT_DESC) }, 'noise'));
   } else {
     rules.push(rule('noise', { icon: 'rule-noise' }));
   }
@@ -77,17 +78,45 @@ export function defaultHouseRules(group, opts = {}) {
   return { texts: clone(TEXT), signature: true, rules, version: 'default' };
 }
 
+/* scope of a rule: 'all' | 'only' | 'except' (older saved rules: a non-empty apartments list means 'only') */
+export function ruleScope(r) {
+  const apts = Array.isArray(r.apartments) ? r.apartments : [];
+  if (r.scope === 'all' || r.scope === 'only' || r.scope === 'except') return r.scope;
+  return apts.length ? 'only' : 'all';
+}
+export function ruleShownIn(r, room) {
+  const apts = Array.isArray(r.apartments) ? r.apartments : [];
+  const sc = ruleScope(r);
+  if (sc === 'only') return apts.includes(room);
+  if (sc === 'except') return !apts.includes(room);
+  return true;
+}
+/* give repeated rule ids new ids (edits the list in place); returns true when something changed */
+export function uniqueRuleIds(rules) {
+  const seen = new Set();
+  let changed = false;
+  (rules || []).forEach((r, i) => {
+    let id = String(r.id || '').trim() || ('r' + (i + 1));
+    if (seen.has(id)) {
+      let n = 2;
+      while (seen.has(id + '-' + n)) n++;
+      id = id + '-' + n;
+    }
+    if (id !== r.id) { r.id = id; changed = true; }
+    seen.add(id);
+  });
+  return changed;
+}
+
 /* config + group + booking room code -> page texts + the rules shown for that room, in order */
 export function resolveHouseRules(cfg, group, room, opts = {}) {
   const saved = cfg && cfg.houseRules && cfg.houseRules[group];
   const hasSaved = !!(saved && Array.isArray(saved.rules));
   const base = hasSaved ? saved : defaultHouseRules(group, opts);
   const texts = { ...clone(TEXT), ...(hasSaved && saved.texts ? saved.texts : {}) };
-  const all = Array.isArray(base.rules) ? base.rules : [];
-  const rules = all.filter((r) => {
-    const apts = Array.isArray(r.apartments) ? r.apartments : [];
-    return !apts.length || apts.includes(room);
-  });
+  const all = clone(Array.isArray(base.rules) ? base.rules : []);
+  uniqueRuleIds(all);
+  const rules = all.filter((r) => ruleShownIn(r, room));
   return {
     texts,
     signature: base.signature !== false,
