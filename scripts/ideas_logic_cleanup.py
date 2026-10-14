@@ -32,6 +32,10 @@ def run(db, today: str, repo_config: dict, dry: bool = False) -> dict:
     config = copy.deepcopy(repo_config)
     if rules.get("dateOverrides") is not None:
         config["dateOverrides"] = rules["dateOverrides"]
+    from calm_pricing import seasons as season_ranges
+    table, _src, _problems = season_ranges.from_rules(rules, config.get("seasons") or [])
+    if table:
+        config["seasons"] = table
     locks = ie.locked_nights(db)
     ideas = []
     for doc in db.collection("pricing_proposals").where("status", "==", "pending").stream():

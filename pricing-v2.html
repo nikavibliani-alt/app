@@ -102,6 +102,28 @@ svg{flex-shrink:0}
 .beta{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;border:1px solid var(--btn-line);background:#FFFFFF;color:var(--soft);font-size:12px;font-weight:600;vertical-align:middle}
 .verdict{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:700;margin-right:6px}
 .verdict.right{background:var(--green-bg);color:var(--green-ink)}.verdict.wrong{background:var(--red-bg);color:var(--red-ink)}.verdict.unclear{background:var(--amber-bg);color:var(--amber-ink)}.verdict.run{background:var(--chip);color:var(--soft)}
+
+.mbar{display:grid;grid-template-columns:repeat(12,1fr);gap:6px}
+body[data-layout="phone"] .mbar{grid-template-columns:repeat(6,1fr)}
+.mbar .mo{display:flex;flex-direction:column;gap:3px;min-width:0}
+.mbar .mo b{font-size:12px;font-weight:600;color:var(--soft)}
+.mbar .days{display:flex;height:20px;border-radius:5px;overflow:hidden;border:1px solid var(--line);background:#fff}
+.mbar .days i{flex:1 1 0;min-width:0;display:block}
+.mbar .days i.gap{background:repeating-linear-gradient(45deg,#fff,#fff 2px,#CFCCC6 2px,#CFCCC6 4px);outline:1px solid var(--red);outline-offset:-1px}
+.mbar .days i.dup{background:var(--red)}
+.sleg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--soft)}
+.sleg span{display:inline-flex;align-items:center;gap:6px}
+.sleg i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.srow{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;padding:12px 14px;border-bottom:1px solid var(--line2)}
+.srow:last-child{border-bottom:0}
+.srow .fld{display:flex;flex-direction:column;gap:3px}
+.srow .fld>span{font-size:12px;font-weight:600;color:var(--soft)}
+.srow .two{display:flex;gap:6px}
+.srow select{min-height:44px;padding:0 10px;border-radius:10px;border:1px solid var(--btn-line);background:#FFFFFF;color:var(--ink);font:inherit;font-size:15px}
+.srow .x{margin-left:auto}
+.srow.bad{background:var(--red-bg)}
+.rangeerr{padding:10px 14px;border-radius:10px;background:var(--red-bg);border:1px solid var(--red);color:var(--red-ink);font-size:14px;line-height:1.45}
+.impact li{margin:0 0 8px 0}
 .scorebar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px}
 .scorebar b{font-size:16px}
 .pill{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 14px;border-radius:999px;font-weight:600;font-size:14px;background:#FFFFFF;color:var(--ink);border:1px solid var(--btn-line)}
@@ -455,7 +477,7 @@ const S = {
   daily: {}, errors: {}, beta: {auto_apply: false}, score: null, cards: {}, twin: {}, weekly: [],
 };
 // Everything typed but not yet saved. Nothing here is written before Save.
-const P = {room: {}, seasons: {}, holAdd: [], holDel: [], ruleAdd: [], ruleDel: []};
+const P = {room: {}, seasons: {}, holAdd: [], holDel: [], ruleAdd: [], ruleDel: [], seasonRanges: null};
 const U = {
   route: {name: "rooms"}, cur: "GEL", win: "now", sel: null, sel2: null, panel: null, allNights: false,
   season: "mid", showOld: false, undo: null, saved: false, notice: "",
@@ -609,12 +631,49 @@ const holidaysNow = () => {
   const gone = P.holDel, list = savedHolidays().filter(o => !gone.some(g => same(g, o)));
   return list.concat(P.holAdd);
 };
+
+/* ---------- season date ranges (pricing_config/rules.seasonRanges; today's ranges until the first save) ---------- */
+const DEFAULT_RANGES = () => FIXED.map(([season, from, to]) => ({from, to, season}));
+const rangeKey = list => JSON.stringify(list.map(r => [r.from, r.to, r.season]).sort());
+const rangesSaved = () => {
+  const r = S.rules && S.rules.seasonRanges;
+  return Array.isArray(r) && r.length ? r.filter(x => x && x.from && x.to && SEASONS[x.season]).map(x => ({from: x.from, to: x.to, season: x.season})) : DEFAULT_RANGES();
+};
+const rangesNow = () => P.seasonRanges || rangesSaved();
+const ALL_MD = mdDays("01-01", "12-31").concat(["02-29"]).sort();
+const seasonIn = (md, ranges) => { const f = ranges.find(x => inMdRange(md, x.from, x.to)); return f ? f.season : "mid"; };
+function mdRunsText(days) {                                // ["12-01","12-02"] -> "1–2 Dec"; runs over New Year are joined
+  const idx = d => ALL_MD.indexOf(d), sorted = [...new Set(days)].sort((a, b) => idx(a) - idx(b)), runs = [];
+  sorted.forEach(md => { const l = runs[runs.length - 1]; if (l && idx(md) - idx(l[l.length - 1]) === 1) l.push(md); else runs.push([md]); });
+  if (runs.length > 1 && runs[0][0] === "01-01" && runs[runs.length - 1].slice(-1)[0] === "12-31") runs[0] = runs.pop().concat(runs[0]);
+  return runs.map(r => r.length === 1 ? fmtMD(r[0]) : r[0].slice(0, 2) === r[r.length - 1].slice(0, 2) ? `${+r[0].slice(3)}–${fmtMD(r[r.length - 1])}` : `${fmtMD(r[0])} – ${fmtMD(r[r.length - 1])}`).join(", ");
+}
+function mdSpan(from, to) { const a = ALL_MD.indexOf(from), b = ALL_MD.indexOf(to); if (a < 0 || b < 0) return []; return a <= b ? ALL_MD.slice(a, b + 1) : ALL_MD.slice(a).concat(ALL_MD.slice(0, b + 1)); }
+function rangeCoverage(ranges) {
+  const cov = {}; ALL_MD.forEach(md => { cov[md] = []; });
+  ranges.forEach(r => { mdSpan(r.from, r.to).forEach(md => { cov[md].push(r.season); }); });
+  return cov;
+}
+function rangeProblems(ranges) {
+  if (!ranges) return [];
+  const cov = rangeCoverage(ranges), out = [];
+  const gaps = ALL_MD.filter(md => !cov[md].length);
+  if (gaps.length) out.push("No season for: " + mdRunsText(gaps) + ".");
+  const pairs = {};
+  ALL_MD.forEach(md => { if (cov[md].length > 1) { const k = [...new Set(cov[md])].map(x => SEASONS[x].label).join(" and ") || ""; (pairs[cov[md][0] === cov[md][1] ? SEASONS[cov[md][0]].label + " twice" : k] ??= []).push(md); } });
+  Object.entries(pairs).forEach(([k, days]) => out.push(`More than one season on: ${mdRunsText(days)} (${k}).`));
+  return out;
+}
+function seasonTextFor(id) {
+  const list = rangesSaved().filter(r => r.season === id).sort((a, b) => ALL_MD.indexOf(a.from) - ALL_MD.indexOf(b.from));
+  return list.length ? list.map(r => r.from === r.to ? fmtMD(r.from) : fmtRange(r.from, r.to)) : ["No dates yet"];
+}
+const rangeStrings = list => list.slice().sort((a, b) => ALL_MD.indexOf(a.from) - ALL_MD.indexOf(b.from)).map(r => `${r.from}..${r.to} ${r.season}`);
 function seasonOnDay(iso) {
   const md = mdOf(iso);
   const hol = holidaysNow().find(o => inMdRange(md, o.from, o.to));
   if (hol && SEASONS[hol.season]) return hol.season;
-  const f = FIXED.find(x => inMdRange(md, x[1], x[2]));
-  return f ? f[0] : "mid";
+  return seasonIn(md, rangesSaved());
 }
 const savedRules = () => ovListRaw(S.eng?.settings?.date_rules);
 const fileRules = () => (Array.isArray(S.file?.date_rules) ? S.file.date_rules : []);
@@ -738,6 +797,7 @@ function changeLines() {
     if (f.engine) L.push(`${nm} automatic prices ${f.engine.from === "live" ? "Send prices" : "Only calculate"} → ${f.engine.v === "live" ? "Send prices" : "Only calculate"}`);
     if (f.window_days) L.push(`${nm} how far ahead ${aheadLabel(f.window_days.from)} → ${aheadLabel(f.window_days.v)}`);
   }
+  if (P.seasonRanges) L.push("season dates changed");
   const ss = [...new Set(Object.keys(P.seasons).map(k => k.split("|")[1]))];
   if (ss.length) L.push(ss.map(id => SEASONS[id].label).join(", ") + " prices changed");
   P.holAdd.forEach(o => L.push(`holiday dates ${fmtRange(o.from, o.to)} (${SEASONS[o.season].label}) added`));
@@ -756,9 +816,10 @@ function paintBar() {
     bar.innerHTML = `<div class="in"><div class="msg" role="status">${esc(U.notice || "Saved. Used from the next price update.")}</div></div>`;
   } else {
     const {errs, bad} = seasonErrors();
-    const blocked = Object.keys(errs).length > 0;
+    const rp = rangeProblems(P.seasonRanges), blocked = Object.keys(errs).length > 0 || rp.length > 0;
     let note = "Starts at the next price update after you save.";
-    if (blocked) {
+    if (rp.length) note = "Fix the season dates first: " + rp[0];
+    else if (blocked) {
       const others = [...bad].filter(x => x !== U.season).map(x => SEASONS[x].label);
       note = "Fix the red boxes first" + (others.length ? ` (also in ${others.join(", ")})` : "") + ".";
     }
@@ -1102,11 +1163,13 @@ function viewSeasons() {
   const s = SEASONS[U.season], rooms = newRooms().concat(U.showOld ? oldRooms() : []);
   const desk = isDesk();
   return `${desk ? "" : `<div class="topbar"><h1>Pricing</h1></div>${tabsHtml(false)}`}${errorsHtml()}
+    <section class="sec"><div><h2 class="h2">Season dates</h2><p class="sub">Every year, all rooms. Each day has exactly one season. A range can run over New Year, for example 28 Dec – 6 Jan.</p></div>
+      <div class="sec" id="seasonDates">${seasonDatesInner()}</div></section>
     <section class="sec"><div><h2 class="h2">Pick a season</h2><p class="sub">Each season has its own minimum, start and maximum for every room.</p></div>
       <div class="pills" role="radiogroup" aria-label="Season" id="seasonChips">${seasonChipsHtml()}</div></section>
     <section class="card pad sec"><div style="font-size:15px;font-weight:700">When is ${esc(s.label)}?</div>
-      <div style="display:flex;flex-direction:column;gap:6px">${SEASON_TEXT[U.season].map(t => `<div class="rline"><span class="dot" style="width:10px;height:10px;background:${s.dot}"></span>${t}</div>`).join("")}</div>
-      <p class="sub" style="margin:0">Every year, all rooms. These dates are fixed. Holiday dates can give some days another season, for example 20 to 27 Dec High.</p>
+      <div style="display:flex;flex-direction:column;gap:6px">${seasonTextFor(U.season).map(t => `<div class="rline"><span class="dot" style="width:10px;height:10px;background:${s.dot}"></span>${t}</div>`).join("")}</div>
+      <p class="sub" style="margin:0">Every year, all rooms. Change the dates under Season dates above. Holiday dates can give some days another season, for example 20 to 27 Dec High.</p>
       <a href="#/dates" class="btn light small full" style="color:var(--ink)">Holiday dates</a></section>
     <section class="sec"><div><h2 class="h2">${esc(s.label)} prices</h2><p class="sub">The engine moves each night between minimum and maximum, around the start price.</p></div>
       <div class="${desk ? "cards2" : ""}" style="${desk ? "" : "display:flex;flex-direction:column;gap:10px"}">${rooms.map(seasonCardHtml).join("")}</div>
@@ -1121,6 +1184,77 @@ function refreshSeasonUi() {
   document.querySelectorAll("[data-err]").forEach(el => { el.textContent = seasonErrorText(el.dataset.err); });
   const chips = $("seasonChips"); if (chips) chips.innerHTML = seasonChipsHtml();
   paintBar();
+}
+
+
+/* ---------- the Seasons tab: season dates (bar + list of ranges) ---------- */
+const MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+function monthBarHtml(ranges) {
+  const cov = rangeCoverage(ranges);
+  return `<div class="mbar" role="img" aria-label="The year by season: ${esc(SEASON_ORDER.map(id => SEASONS[id].label + " " + (seasonTextForRanges(ranges, id)).join(", ")).join("; "))}">` + MN.map((m, mi) => {
+    const cells = Array.from({length: MONTH_DAYS[mi]}, (_, d) => { const md = String(mi + 1).padStart(2, "0") + "-" + String(d + 1).padStart(2, "0"), c = cov[md];
+      return c.length === 0 ? `<i class="gap" title="${esc(fmtMD(md))}: no season"></i>` : c.length > 1 ? `<i class="dup" title="${esc(fmtMD(md))}: more than one season"></i>` : `<i style="background:${SEASONS[c[0]].dot}" title="${esc(fmtMD(md) + ": " + SEASONS[c[0]].label)}"></i>`; }).join("");
+    return `<div class="mo"><b>${m}</b><div class="days">${cells}</div></div>`; }).join("") + `</div>`;
+}
+function seasonTextForRanges(ranges, id) { const l = ranges.filter(r => r.season === id); return l.length ? l.map(r => r.from === r.to ? fmtMD(r.from) : fmtRange(r.from, r.to)) : ["–"]; }
+function rangeRowHtml(r, i, bad) {
+  const dayOpts = (mi, sel) => Array.from({length: MONTH_DAYS[mi]}, (_, d) => `<option value="${d + 1}" ${d + 1 === sel ? "selected" : ""}>${d + 1}</option>`).join("");
+  const monOpts = sel => MNL.map((m, k) => `<option value="${k + 1}" ${k + 1 === sel ? "selected" : ""}>${m}</option>`).join("");
+  const part = (which, md) => { const mi = +md.slice(0, 2) - 1, dd = +md.slice(3);
+    return `<div class="fld"><span>${which === "from" ? "From" : "To"}</span><div class="two">
+      <select aria-label="${which === "from" ? "From" : "To"} day, range ${i + 1}" data-sr="${which}-d" data-i="${i}">${dayOpts(mi, dd)}</select>
+      <select aria-label="${which === "from" ? "From" : "To"} month, range ${i + 1}" data-sr="${which}-m" data-i="${i}">${monOpts(mi + 1)}</select></div></div>`; };
+  return `<div class="srow ${bad ? "bad" : ""}" data-range="${i}">${part("from", r.from)}${part("to", r.to)}
+    <div class="fld"><span>Season</span><select aria-label="Season, range ${i + 1}" data-sr="season" data-i="${i}">${SEASON_ORDER.map(id => `<option value="${id}" ${id === r.season ? "selected" : ""}>${SEASONS[id].label}</option>`).join("")}</select></div>
+    <button type="button" class="x" aria-label="Remove range ${i + 1}: ${esc(fmtRange(r.from, r.to))} ${esc(SEASONS[r.season].label)}" data-act="srDel" data-i="${i}">${icon("trash", 20)}</button></div>`;
+}
+function seasonDatesInner() {
+  const ranges = rangesNow(), problems = rangeProblems(P.seasonRanges ? ranges : null), cov = rangeCoverage(ranges);
+  const badRow = r => mdSpan(r.from, r.to).some(md => cov[md].length > 1);
+  return `${monthBarHtml(ranges)}
+    <div class="sleg">${SEASON_ORDER.map(id => `<span><i style="background:${SEASONS[id].dot}"></i>${SEASONS[id].label}</span>`).join("")}</div>
+    ${problems.length ? `<div class="rangeerr" role="alert">${problems.map(x => `<div>${esc(x)}</div>`).join("")}</div>` : ""}
+    <div class="card" style="overflow:hidden">${ranges.map((r, i) => rangeRowHtml(r, i, badRow(r))).join("") || '<div class="empty">No ranges.</div>'}</div>
+    <button type="button" class="btn light full small" data-act="srAdd" style="color:var(--ink)">Add a range</button>`;
+}
+function refreshSeasonDates() {
+  const el = $("seasonDates"); if (el) el.innerHTML = seasonDatesInner();
+  paintBar();
+}
+function editRanges(fn) {
+  const list = (P.seasonRanges || rangesSaved()).map(r => ({...r}));
+  fn(list);
+  P.seasonRanges = rangeKey(list) === rangeKey(rangesSaved()) ? null : list;
+  touch(); refreshSeasonDates();
+}
+function seasonImpact(oldR, newR) {
+  const t = today(), out = [];
+  for (const r of newRooms()) {
+    const ahead = Number(effRoom(r.id, "window_days")) || 90, groups = {};
+    for (let k = 0; k <= ahead; k++) {
+      const iso = addDays(t, k), md = mdOf(iso), hol = holidaysNow().find(o => inMdRange(md, o.from, o.to));
+      if (hol) continue;                                                       // holiday dates keep their season
+      const a = seasonIn(md, oldR), b = seasonIn(md, newR); if (a === b) continue;
+      const rc = rec(r.id, iso, "GEL") || rec(r.id, iso, "USD");
+      if (!rc || rc.avail === 0 || isHandSet(r.id, iso, rc)) continue;       // booked, hand-set and protected nights are not touched
+      (groups[a + ">" + b] ??= []).push(iso);
+    }
+    const parts = Object.entries(groups).map(([k, isos]) => {
+      const [a, b] = k.split(">"), g1 = savedSeason(r.id, a, "GEL", "start"), g2 = savedSeason(r.id, b, "GEL", "start"), u1 = savedSeason(r.id, a, "USD", "start"), u2 = savedSeason(r.id, b, "USD", "start");
+      const price = [g1 !== null && g2 !== null && g1 !== g2 ? `start price ${gel(g1)} → ${gel(g2)}` : "", u1 !== null && u2 !== null && u1 !== u2 ? `Airbnb start ${usd(u1)} → ${usd(u2)}` : ""].filter(Boolean).join(", ");
+      return `${datesText(isos)} (${isos.length} night${isos.length === 1 ? "" : "s"}) ${SEASONS[a].label} → ${SEASONS[b].label}${price ? ": " + price : ": same prices"}`;
+    });
+    if (parts.length) out.push({room: r.short, parts});
+  }
+  return out;
+}
+function confirmHtml(title, bodyHtml, yes, no) {
+  return new Promise(res => {
+    openDialog(`<div class="dh"><h3>${esc(title)}</h3></div>${bodyHtml}
+      <button type="button" class="btn dark full" data-act="dialogYes">${esc(yes)}</button>
+      <button type="button" class="btn light full" data-act="closeDialog" data-autofocus>${esc(no)}</button>`, title);
+    SCOPE_DIALOG = res; DIALOG_YES = () => { SCOPE_DIALOG = null; closeDialog(); res(true); };
+  });
 }
 
 /* =====================================================================
@@ -1522,6 +1656,7 @@ function viewWeekly() {
     <div>Price updates this week: <b>${a.runs ?? 0}</b>, cancellation updates: <b>${a.urgent_runs ?? 0}</b></div>
     <div>Channel push failures: <b>${fails || "none"}</b></div>
     <div>Days the price check was red: <b>${a.watchdog_red_days ?? 0}</b> of ${a.watchdog_days_recorded ?? 0} recorded</div>
+    <div>Season date changes: <b>${(a.season_date_changes || {}).count || 0}</b></div>
     <div>Ideas scorecard: <b>${id.finished ? `Right ${id.right} of ${id.finished}` : "no finished ideas yet"}</b></div>
     <div>What-if twin: <b>${(a.twin || {}).finished ? `${a.twin.finished} compared, its prices ${a.twin.avg_difference_pct > 0 ? "higher" : a.twin.avg_difference_pct < 0 ? "lower" : "the same"} on average` : "nothing to compare yet"}</b></div></div>`;
   const check = r.checked ? `Checked by a second reader: ${(r.removed || []).length} claim${(r.removed || []).length === 1 ? "" : "s"} removed, ${r.edited || 0} shortened.` : "The second reader did not run, so no written claim is shown.";
@@ -1795,7 +1930,14 @@ const sameRaw = (a, b) => (a == null && b == null) || a === b || (num(a) !== nul
 async function saveAll() {
   if (U.saving) return;
   const {errs} = seasonErrors();
-  if (Object.keys(errs).length) { paintBar(); return; }
+  if (Object.keys(errs).length || rangeProblems(P.seasonRanges).length) { paintBar(); return; }
+  if (P.seasonRanges) {                                                       // show what the new dates change before anything is written
+    const imp = seasonImpact(rangesSaved(), P.seasonRanges);
+    const body = imp.length
+      ? `<p>These nights move to another season:</p><ul class="impact" style="padding-left:18px;font-size:14px;line-height:1.45">${imp.map(x => `<li><b>${esc(x.room)}</b>: ${x.parts.map(esc).join("; ")}</li>`).join("")}</ul>`
+      : `<p>No empty night within the price window changes season.</p>`;
+    if (!(await confirmHtml("Check what changes", body + `<p class="muted" style="font-size:13px">Booked, hand-set and protected nights are not touched. Holiday dates keep working as now. Starts at the next price update.</p>`, "Save", "Go back"))) return;
+  }
   const live = Object.entries(P.room).filter(([, f]) => f.engine && f.engine.v === "live" && f.engine.from !== "live").map(([rt]) => roomById(rt).short);
   if (live.length && !(await confirmDialog("Send prices?", `${live.join(", ")} will start getting prices written to Booking and Airbnb at the next update. Save?`, "Yes, save", "Not yet"))) return;
   U.saving = true;
@@ -1805,6 +1947,10 @@ async function saveAll() {
     const conflicts = [];
     for (const [k, e] of Object.entries(P.seasons)) if (!sameRaw(getPath(fr, e.path), e.raw)) conflicts.push({kind: "season", k, text: `${roomName(k.split("|")[0])} ${SEASONS[k.split("|")[1]].label} ${k.split("|")[2] === "GEL" ? "Booking" : "Airbnb"} ${{min: "minimum", start: "start", max: "maximum"}[k.split("|")[3]]}`});
     for (const [rt, f] of Object.entries(P.room)) for (const [field, e] of Object.entries(f)) if (!sameRaw(getPath(fe, `settings.room_types.${rt}.${field}`), e.raw)) conflicts.push({kind: "room", rt, field, text: `${roomById(rt).short} ${{style: "mode", engine: "automatic prices", window_days: "how far ahead"}[field]}`});
+    if (P.seasonRanges) {
+      const was = Array.isArray(fr.seasonRanges) && fr.seasonRanges.length ? fr.seasonRanges : DEFAULT_RANGES();
+      if (rangeKey(was) !== rangeKey(rangesSaved())) conflicts.push({kind: "ranges", text: "the season dates"});
+    }
     const freshHol = ovListRaw(fr.dateOverrides);
     for (const a of P.holAdd) {
       const set = new Set(mdDays(a.from, a.to));
@@ -1815,6 +1961,7 @@ async function saveAll() {
       conflicts.forEach(c => {
         if (c.kind === "season") delete P.seasons[c.k];
         else if (c.kind === "room") { delete P.room[c.rt][c.field]; if (!Object.keys(P.room[c.rt]).length) delete P.room[c.rt]; }
+        else if (c.kind === "ranges") P.seasonRanges = null;
         else P.holAdd = P.holAdd.filter(x => x !== c.item);
       });
       render();
@@ -1822,6 +1969,8 @@ async function saveAll() {
       return;
     }
     const rf = {}, ef = {};
+    const oldRanges = rangesSaved(), newRanges = P.seasonRanges ? P.seasonRanges.slice().sort((a, b) => ALL_MD.indexOf(a.from) - ALL_MD.indexOf(b.from)) : null;
+    if (newRanges) rf.seasonRanges = newRanges;
     Object.values(P.seasons).forEach(e => { rf[e.path] = e.v; });
     for (const [rt, f] of Object.entries(P.room)) for (const [field, e] of Object.entries(f)) ef[`settings.room_types.${rt}.${field}`] = e.v;
     const holDel = P.holDel.filter(d => freshHol.some(o => same(o, d)));
@@ -1839,9 +1988,10 @@ async function saveAll() {
     holDel.forEach((o, i) => { rFields[`dateOverrides.remove.${i}`] = {old: `${o.from}..${o.to} ${o.season}`, new: null}; });
     P.ruleAdd.forEach((r, i) => { eFields[`date_rules.add.${i}`] = {old: null, new: `${r.from}..${r.to} ${r.action}`}; });
     ruleDel.forEach((r, i) => { eFields[`date_rules.remove.${i}`] = {old: `${r.from}..${r.to} ${r.action}`, new: null}; });
-    if (Object.keys(rf).length || P.holAdd.length || holDel.length) logChange("rules_edit", "Pricing page: " + lines.join(", "), rFields);
+    if (newRanges) logChange("season_dates", "Season dates changed: " + rangeStrings(newRanges).join(", "), {season_ranges: {old: rangeStrings(oldRanges), new: rangeStrings(newRanges)}});
+    if (Object.keys(rf).filter(k => k !== "seasonRanges").length || P.holAdd.length || holDel.length) logChange("rules_edit", "Pricing page: " + lines.join(", "), rFields);
     if (Object.keys(ef).length || P.ruleAdd.length || ruleDel.length) logChange("engine_edit", "Pricing page: " + lines.join(", "), eFields);
-    P.room = {}; P.seasons = {}; P.holAdd = []; P.holDel = []; P.ruleAdd = []; P.ruleDel = [];
+    P.room = {}; P.seasons = {}; P.holAdd = []; P.holDel = []; P.ruleAdd = []; P.ruleDel = []; P.seasonRanges = null;
     await loadConfig();
     U.saved = true; U.notice = "Saved. Used from the next price update.";
     render();
@@ -1961,7 +2111,9 @@ document.addEventListener("click", async e => {
     case "goSeason": U.season = d.season; break;
     case "season": U.season = d.season; render(); break;
     case "toggleOld": U.showOld = !U.showOld; render(); break;
-    case "undoAll": P.room = {}; P.seasons = {}; P.holAdd = []; P.holDel = []; P.ruleAdd = []; P.ruleDel = []; touch(); render(); break;
+    case "undoAll": P.room = {}; P.seasons = {}; P.holAdd = []; P.holDel = []; P.ruleAdd = []; P.ruleDel = []; P.seasonRanges = null; touch(); render(); break;
+    case "srAdd": editRanges(l => { const cov = rangeCoverage(l), gap = ALL_MD.find(md => !cov[md].length) || "01-01"; l.push({from: gap, to: gap, season: "mid"}); }); break;
+    case "srDel": editRanges(l => { l.splice(+d.i, 1); }); break;
     case "save": if (t.getAttribute("aria-disabled") === "true") { paintBar(); break; } saveAll(); break;
     case "cur": U.cur = d.v; render(); break;
     case "win": U.win = d.v; U.sel = U.sel2 = null; U.panel = null; render(); break;
@@ -2037,6 +2189,19 @@ document.addEventListener("click", async e => {
   }
 });
 const modeById = id => MODES.find(m => m.id === id);
+document.addEventListener("change", e => {
+  const t = e.target, sr = t.dataset && t.dataset.sr;
+  if (!sr) return;
+  const i = +t.dataset.i, v = t.value;
+  editRanges(l => {
+    const r = l[i]; if (!r) return;
+    if (sr === "season") { r.season = v; return; }
+    const [which, part] = sr.split("-"), cur = r[which], mi = part === "m" ? +v - 1 : +cur.slice(0, 2) - 1;
+    let dd = part === "d" ? +v : +cur.slice(3);
+    dd = Math.min(dd, MONTH_DAYS[mi]);
+    r[which] = String(mi + 1).padStart(2, "0") + "-" + String(dd).padStart(2, "0");
+  });
+});
 document.addEventListener("input", e => {
   const t = e.target;
   if (t.dataset && t.dataset.inp === "hol") { holCheck(); return; }

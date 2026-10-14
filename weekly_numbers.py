@@ -97,6 +97,12 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
     all_ = {"runs": len(runs), "urgent_runs": sum(1 for x in runs if x.get("urgent")), "channel_push_failures": fails,
             "runs_with_stopped_rooms": sum(1 for x in runs if x.get("stopped_room_types")),
             "watchdog_days_recorded": len(wd), "watchdog_red_days": sum(1 for s in wd.values() if s == "red")}
+    changes = []
+    for c in data.get("season_changes", []):
+        day = str(c.get("day", ""))[:10]
+        if week_from <= day <= week_to:
+            changes.append({"day": day, "old": c.get("old"), "new": c.get("new")})
+    all_["season_date_changes"] = {"count": len(changes), "list": changes[:5]}
     sc = data.get("scorecard") or {}
     all_["ideas"] = {k: sc.get(k, 0) for k in ("finished", "right", "wrong", "unclear", "tracking")}
     tw = [t for t in data.get("twin_results", []) if t.get("status") == "final"]
@@ -212,10 +218,19 @@ def load(db, now: datetime) -> dict:
         snap = db.collection("pricing_watchdog_days").document(d).get()
         if snap.exists:
             wd[d] = (snap.to_dict() or {}).get("status")
+    season_changes = []
+    try:
+        for d in db.collection("pricing_changes").where("type", "==", "season_dates").stream():
+            c = d.to_dict() or {}
+            ts = c.get("ts")
+            f = (c.get("fields") or {}).get("season_ranges") or {}
+            season_changes.append({"day": (ts.isoformat() if hasattr(ts, "isoformat") else str(ts or ""))[:10], "old": f.get("old"), "new": f.get("new")})
+    except Exception:
+        pass
     ssum = db.collection("pricing_scorecard").document("_summary").get()
     return {"price_events": by_day("pmslog_price_events"), "booking_events": by_day("pmslog_booking_events"),
             "runs": by_day("pricing_calm_runs"), "watchdog_days": wd, "stays": sc.priced_stays(db, today, back_days=120),
-            "limits": limits, "scorecard": ssum.to_dict() if ssum.exists else {},
+            "limits": limits, "season_changes": season_changes, "scorecard": ssum.to_dict() if ssum.exists else {},
             "twin_results": [d.to_dict() or {} for d in db.collection("pricing_twin_results").stream()],
             "events": [dict(d.to_dict() or {}, date=(d.to_dict() or {}).get("date") or d.id.replace("event_", "")) for d in db.collection("pricing_events").stream()],
             "room_ids": sorted((ps.ROOM_TYPES or {}).keys()), "since": first_log_day(db)}, week_from, week_to

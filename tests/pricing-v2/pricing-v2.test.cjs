@@ -197,7 +197,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
     });
     await test('4d warning when engine_v2 overrides a room; fixed season dates shown', w, hh, async ({page}) => {
       await go(page, '#/seasons');
-      assert.ok(/These dates are fixed/.test(await text(page, 'body')) && /16 Mar – 30 Apr/.test(await text(page, 'body')));
+      assert.ok(/Change the dates under Season dates above/.test(await text(page, 'body')) && /16 Mar – 30 Apr/.test(await text(page, 'body')));
       assert.ok(/set outside this page/.test(await text(page, '[data-room="VGL_ST"]')));
       assert.ok(!/set outside this page/.test(await text(page, '[data-room="XCV_1"]')));
       assert.ok(!(await page.$('text=month')) || true);
@@ -588,6 +588,72 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       d['pricing_twin_results/oldD'] = {status: 'final', text: 'With the idea applied, the twin priced these 20 nights at 120 ₾ on average, 20% higher than your real 100 ₾. In real life 18 of 20 sold, at about 105 ₾ a night. The twin cannot know if a guest would have booked at its price: this is evidence, not proof.'};
       d['pricing_scorecard/oldF'] = {status: 'tracking', verdict: null, reason: 'Still running: 11 nights to go (until 20 Nov 2026).'};
     }});
+  }
+
+  // ---- season dates: bar, list, checks, review before saving, save, log ----
+  for (const [w, hh] of SIZES) {
+    await test('season dates: 12-month bar and the list show today\'s ranges; edits update the bar live; gaps and overlaps block Save in red', w, hh, async ({page}) => {
+      await go(page, '#/seasons');
+      const rows = await page.$$eval('#seasonDates .srow', els => els.length);
+      assert.strictEqual(rows, 9, 'nine ranges today');
+      assert.strictEqual(await page.$$eval('#seasonDates .mbar .mo', els => els.length), 12);
+      assert.strictEqual(await page.$$eval('#seasonDates .mbar .days i', els => els.length), 366);
+      assert.strictEqual(await page.$$eval('#seasonDates .mbar .days i.gap, #seasonDates .mbar .days i.dup', els => els.length), 0);
+      assert.strictEqual(await page.$eval('#seasonDates .srow:nth-child(1) select[data-sr="season"]', e => e.value), 'new_year');
+      assert.ok(!(await page.$('#bar:not([hidden]) .btns')), 'nothing to save yet');
+      // make a gap: the Early December range (1-23 Dec) now ends on 19 Dec -> 20-23 Dec has no season
+      const idx = await page.$$eval('#seasonDates .srow', els => els.findIndex(e => e.querySelector('select[data-sr="season"]').value === 'xmas_low'));
+      await page.selectOption(`select[data-sr="to-d"][data-i="${idx}"]`, '19');
+      assert.ok(/No season for: 20–23 Dec\./.test(await text(page, '#seasonDates .rangeerr')), await text(page, '#seasonDates'));
+      assert.strictEqual(await page.$$eval('#seasonDates .mbar .days i.gap', els => els.length), 4, 'four grey days in the bar');
+      const bar = await text(page, '#bar');
+      assert.ok(/Not saved/.test(bar) && /Fix the season dates first: No season for: 20–23 Dec/.test(bar), bar);
+      assert.strictEqual(await page.getAttribute('#bar [data-act=save]', 'aria-disabled'), 'true');
+      await page.click('#bar [data-act=save]', {force: true}); await page.waitForTimeout(100);
+      assert.strictEqual((await h.writes(page)).length, 0, 'blocked: nothing written');
+      // overlap: make it end on 27 Dec -> 24-27 Dec is Early December and New Year
+      await page.selectOption(`select[data-sr="to-d"][data-i="${idx}"]`, '27');
+      assert.ok(/More than one season on: 24–27 Dec \(.*New Year.*\)/.test(await text(page, '#seasonDates .rangeerr')), await text(page, '#seasonDates .rangeerr'));
+      assert.ok(await page.$$eval('#seasonDates .mbar .days i.dup', els => els.length) === 4);
+      // back to the saved values: nothing to save again
+      await page.selectOption(`select[data-sr="to-d"][data-i="${idx}"]`, '23');
+      assert.ok(!(await page.$('#seasonDates .rangeerr')));
+      assert.ok(await page.$eval('#bar', e => e.hidden || !/Not saved/.test(e.innerText)), 'same as saved: no Not saved bar');
+    });
+    await test('season dates: a range can cross New Year; the review shows the moved nights; Save writes the list and logs old and new', w, hh, async ({page}) => {
+      await go(page, '#/seasons');
+      const find = async season => page.$$eval('#seasonDates .srow', (els, s) => els.map((e, i) => [i, e.querySelector('select[data-sr="season"]').value, e.querySelector('select[data-sr="from-m"]').value, e.querySelector('select[data-sr="from-d"]').value]).filter(x => x[1] === s), season);
+      const ny = await find('new_year');                                    // [Jan 1-14, Dec 24-31] in the list order
+      const dec = ny.find(x => x[2] === '12'), jan = ny.find(x => x[2] === '1');
+      // New Year becomes 28 Dec - 6 Jan: the December row starts on 28 and ends on 6 Jan; the January row goes away
+      await page.selectOption(`select[data-sr="from-d"][data-i="${dec[0]}"]`, '28');
+      await page.selectOption(`select[data-sr="to-m"][data-i="${dec[0]}"]`, '1');
+      await page.selectOption(`select[data-sr="to-d"][data-i="${dec[0]}"]`, '6');
+      await page.click(`[data-act=srDel][data-i="${jan[0]}"]`);
+      assert.ok(/No season for: 7–14 Jan/.test(await text(page, '#seasonDates .rangeerr')) || true);
+      let err = await text(page, '#seasonDates .rangeerr');
+      assert.ok(/24–27 Dec/.test(err) && /7–14 Jan/.test(err), err);       // two gaps to fill
+      const low = (await find('low'))[0], early = (await find('xmas_low'))[0];
+      await page.selectOption(`select[data-sr="to-d"][data-i="${early[0]}"]`, '27');          // Early December: 1-27 Dec
+      await page.selectOption(`select[data-sr="from-d"][data-i="${(await find('low'))[0][0]}"]`, '7');   // Low: 7 Jan - 15 Mar
+      assert.ok(!(await page.$('#seasonDates .rangeerr')), await text(page, '#seasonDates'));
+      assert.strictEqual(await page.getAttribute('#bar [data-act=save]', 'aria-disabled'), 'false');
+      await page.click('#bar [data-act=save]'); await page.waitForSelector('.dlg');
+      const dlg = await text(page, '.dlg');
+      assert.ok(/Check what changes/.test(dlg) && /These nights move to another season/.test(dlg) && /Booked, hand-set and protected nights are not touched/.test(dlg), dlg);
+      assert.strictEqual((await h.writes(page)).filter(x => x.path === 'pricing_config/rules').length, 0, 'nothing written before the review is accepted');
+      await page.click('[data-act=closeDialog]');                              // go back: still not saved
+      assert.ok(/Not saved/.test(await text(page, '#bar')));
+      await page.click('#bar [data-act=save]'); await page.waitForSelector('.dlg'); await page.click('[data-act=dialogYes]');
+      await page.waitForFunction(() => /Saved/.test(document.getElementById('bar').innerText), null, {timeout: 6000});
+      const rules = await h.doc(page, 'pricing_config/rules');
+      assert.ok(Array.isArray(rules.seasonRanges) && rules.seasonRanges.length === 8, JSON.stringify(rules.seasonRanges));
+      assert.ok(rules.seasonRanges.some(r => r.from === '12-28' && r.to === '01-06' && r.season === 'new_year'), 'the range that crosses New Year is saved as one range');
+      const log = (await h.writes(page)).filter(x => x.path.startsWith('pricing_changes/'));
+      const rec = log.map(x => x.data).find(x => x.type === 'season_dates');
+      assert.ok(rec && rec.fields.season_ranges.old.includes('12-24..12-31 new_year') && rec.fields.season_ranges.new.includes('12-28..01-06 new_year'), JSON.stringify(rec));
+      assert.ok(rec.by !== undefined && rec.ts, 'who and when');
+    });
   }
 
   // ---- nights you set by hand: shown as "Set by you", with a button to give the night back ----

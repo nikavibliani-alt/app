@@ -179,6 +179,7 @@ def test_fresh_set_replaces_the_waiting_ideas_only_when_new_ones_were_made(monke
     import price_tracker
     monkeypatch.setattr(price_tracker, "get_learning_context", lambda db, days_back=30: "some history")
     monkeypatch.setattr(cp, "call_claude_analyst", lambda prompt, key: {"proposals": p, "daily_summary": "s"})
+    monkeypatch.setattr(cp, "_tbilisi_today", lambda: TODAY)                      # the saved prices in this test are from TODAY, not from the real clock
     r = fresh.run(db, {**CONFIG, "startPrices": {}})
     docs = db.store["pricing_proposals"]
     assert r == {"before": 2, "new": 1, "with_evidence": 1, "replaced": 2}

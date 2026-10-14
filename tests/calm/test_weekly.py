@@ -169,3 +169,11 @@ def test_the_log_start_is_found_from_the_data_not_guessed():
         db.collection("pmslog_booking_events").document(f"e{i}").set({"day": day})
     assert wn.first_log_day(db) == "2026-10-13"
     assert wn.first_log_day(DB()) == wn.LOG_START
+
+
+def test_season_date_changes_are_part_of_the_weekly_numbers():
+    d = sample()
+    d["season_changes"] = [{"day": "2026-10-09", "old": ["12-01..12-23 xmas_low"], "new": ["12-01..12-19 mid"]}, {"day": "2026-09-01", "old": [], "new": []}]
+    a = wn.build(d, FROM, TO)["all"]["season_date_changes"]
+    assert a["count"] == 1 and a["list"][0]["day"] == "2026-10-09" and a["list"][0]["new"] == ["12-01..12-19 mid"]
+    assert wn.build(sample(), FROM, TO)["all"]["season_date_changes"] == {"count": 0, "list": []}

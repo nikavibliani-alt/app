@@ -25,6 +25,7 @@ from urllib.parse import urlparse
 
 import requests
 
+from calm_pricing import seasons as season_ranges
 from calm_pricing import run, merged, learn_shape
 
 TBILISI = timezone(timedelta(hours=4))
@@ -254,6 +255,12 @@ def load_rules(db, repo_config: dict) -> tuple[dict, dict]:
     # season months and exact date ranges from the pricing page
     if page.get("dateOverrides") is not None:
         settings["date_overrides"] = page["dateOverrides"]
+    # season date ranges: the list saved on the pricing page; config.json (today's ranges) only when it is missing or not valid
+    table, source, problems = season_ranges.from_rules(page, repo_config.get("seasons") or [])
+    if table:
+        settings["seasons"] = table
+    for pr in problems:
+        LOADER_WARNINGS.append(f"season dates: {pr} Using config.json.")
     return rules, settings
 
 
