@@ -758,7 +758,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1014a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1014b · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -951,7 +951,11 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
     <button class="detail-back" onclick="closeHrEditor()" aria-label="Back"><svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6L9 12l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <div class="detail-title" id="hr-title">Check-in rules</div>
   </div>
-  <div class="apt-ed-body" id="hr-body"></div>
+  <div class="apt-ed-body" id="hr-body" style="flex:1 0 auto"></div>
+  <div id="hr-savebar" style="display:none;position:sticky;bottom:0;z-index:2;background:var(--ink);padding:10px 14px;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 -4px 20px rgba(0,0,0,.12)">
+    <span style="font-size:13px;font-weight:600;color:#fff">Unsaved changes</span>
+    <button type="button" onclick="hrSave()" style="min-height:40px;padding:0 20px;border-radius:var(--rs);border:1px solid rgba(255,255,255,.5);background:#fff;color:var(--ink);font-weight:700;font-size:14px;font-family:var(--sans);cursor:pointer">Save</button>
+  </div>
 </div>
 
 <div id="gp-editor-overlay">
@@ -1030,7 +1034,7 @@ import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gsta
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour,normalizeStayDate}from"./shared/guest-unlock.js";
 import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON,hkPropertyGroupForRoom}from"./shared/hk-bedding.js";
 import{DEFAULT_ROOMS_SEED,ROOM_SITES}from"./shared/room-registry.js";
-import{HR_LANGS,HR_GROUPS,ICON_CHOICES,NO_SMOKING_IMG,defaultHouseRules,resolveHouseRules,renderRulesList,ruleIconHtml,emptyLangs,pick}from"./shared/house-rules.js";
+import{HR_LANGS,HR_GROUPS,ICON_CHOICES,NO_SMOKING_IMG,defaultHouseRules,resolveHouseRules,renderRulesList,ruleIconHtml,emptyLangs,pick,ruleScope,uniqueRuleIds}from"./shared/house-rules.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 import{featherIcon}from"./shared/feather-icons.js";
@@ -1854,6 +1858,7 @@ let _gpEditCtx=null;
 async function loadGuestSettings(){
   try{
     const snap=await getDoc(doc(db,'checkin_admin','config'));
+    if(!snap.exists())gsHouseRules={};
     if(snap.exists()){
       const d=snap.data();
       if(d.visibility)gsVisibility={...JSON.parse(JSON.stringify(SECTION_DEFAULTS)),...d.visibility};
@@ -1868,7 +1873,7 @@ async function loadGuestSettings(){
       if(d.locationInfo)gsLocationInfo=d.locationInfo;
       if(d.parkingInfo)gsParkingInfo=d.parkingInfo;
       if(d.shuttleInfo)gsShuttleInfo=d.shuttleInfo;
-      if(d.houseRules)gsHouseRules=d.houseRules;
+      gsHouseRules=d.houseRules||{};
       if(d.waitingTabs){
         const wt={...WAITING_TABS_DEFAULTS,...d.waitingTabs};
         delete wt.shuttle;
@@ -1888,9 +1893,11 @@ async function loadGuestSettings(){
   gsLoaded=true;
   waLoaded=true;
 }
-function gsMarkDirty(){gsDirty=true;document.getElementById('gs-save-bar')?.classList.add('show');}
-window.gsDiscard=async function(){gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');gsLoaded=false;await loadGuestSettings();renderGuestSettings();toast('Discarded');};
+function gsMarkDirty(){gsDirty=true;document.getElementById('gs-save-bar')?.classList.add('show');if(window.hrUpdateSave)hrUpdateSave();}
+window.gsDiscard=async function(){gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');if(window.hrUpdateSave)hrUpdateSave();gsLoaded=false;await loadGuestSettings();renderGuestSettings();toast('Discarded');};
 window.gsSaveAll=async function(){
+  const bad=window.hrFindInvalid?hrFindInvalid():null;
+  if(bad){toast('Tick at least one apartment for the rule "'+bad.title+'" ('+bad.group+')');return;}
   try{
     const waitingTabs={...gsWaitingTabs};
     delete waitingTabs.shuttle;
@@ -1899,7 +1906,7 @@ window.gsSaveAll=async function(){
       roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,parkingInfo:gsParkingInfo,shuttleInfo:gsShuttleInfo,houseRules:gsHouseRules,waitingTabs,
       updatedAt:serverTimestamp()
     },{merge:true});
-    gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');
+    gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');if(window.hrUpdateSave)hrUpdateSave();
     toast('Guest page saved ✓');
   }catch(e){toast('Save failed: '+e.message);}
 };
@@ -1972,7 +1979,7 @@ function renderGuestSettings(){
 
 /* ── Check-in rules editor (per listing). Data: config.houseRules[GROUP] — see shared/house-rules.js ── */
 let gsHouseRules={};
-const _hr={group:'ROOMS',lang:'en',draft:null,view:'main',editId:null,previewRoom:''};
+const _hr={group:'ROOMS',lang:'en',draft:null,view:'main',editIdx:-1,previewRoom:''};
 const HR_LANG_LABEL={en:'EN',ka:'ქარ',ru:'RU',ar:'ع'};
 const HR_TEXT_FIELDS=[['title','Title','input'],['intro','Intro line','input'],['signLabel','Signature label','input'],['button','Button text','input'],['disclaimer','Small print','textarea']];
 function hrClone(o){return JSON.parse(JSON.stringify(o));}
@@ -1980,7 +1987,8 @@ function hrEntranceOn(group){const v=gsVisibility[group]||{};return v.entranceCa
 function hrGroupLabel(g){const x=HR_GROUPS.find(p=>p.id===g);return x?x.label:g;}
 function hrBase(group){
   const saved=gsHouseRules[group];
-  if(saved&&Array.isArray(saved.rules))return hrClone(saved);
+  if(saved&&Array.isArray(saved.rules)){const c=hrClone(saved);_hr.idsFixed=uniqueRuleIds(c.rules);return c;}
+  _hr.idsFixed=false;
   return defaultHouseRules(group,{entranceCard:hrEntranceOn(group)});   // first open: today's page (pre-filled from the old switch)
 }
 function hrRooms(group){
@@ -1997,17 +2005,18 @@ function hrTouch(){   // the user changed something: the working page becomes th
 }
 window.openHrEditor=function(group){
   _hr.group=group||gsProp||'ROOMS';
-  _hr.lang='en';_hr.view='main';_hr.editId=null;
+  _hr.lang='en';_hr.view='main';_hr.editIdx=-1;
   _hr.draft=hrBase(_hr.group);
+  if(_hr.idsFixed){hrTouch();}   // repeated rule ids were given new ids
   const rooms=hrRooms(_hr.group);
   _hr.previewRoom=rooms[0]?rooms[0].roomCode:'';
   document.getElementById('hr-editor-overlay').classList.add('open');
-  hrRender();
+  hrRender();hrUpdateSave();
 };
 window.closeHrEditor=function(){
-  if(_hr.view==='rule'){_hr.view='main';_hr.editId=null;hrRender();return;}
+  if(_hr.view==='rule'){_hr.view='main';_hr.editIdx=-1;hrRender();return;}
   document.getElementById('hr-editor-overlay')?.classList.remove('open');
-  renderGuestSettings();
+  hrUpdateSave();renderGuestSettings();
 };
 function hrLangChips(){
   return`<div class="hr-langs">${HR_LANGS.map(l=>`<button type="button" class="hr-lang${_hr.lang===l?' active':''}" onclick="hrSetLang('${l}')">${HR_LANG_LABEL[l]}</button>`).join('')}</div>
@@ -2032,7 +2041,7 @@ function hrCardsHtml(){
   const rules=_hr.draft.rules;
   if(!rules.length)return'<div class="hr-empty">No rules yet.</div>';
   return rules.map((r,i)=>{
-    const lim=(r.apartments||[]).length?'Only: '+(r.apartments||[]).map(esc).join(', '):'All apartments';
+    const sc=ruleScope(r),al=(r.apartments||[]).map(esc).join(', ');const lim=sc==='only'?(al?'Only: '+al:'No apartment ticked'):sc==='except'?'All except: '+(al||'none'):'All apartments';
     return`<div class="hr-card">
       <div class="hr-card__top">
         <div class="hr-card__icon">${ruleIconHtml(r)}</div>
@@ -2081,10 +2090,11 @@ function hrMainHtml(){
     </div></div>`;
 }
 function hrRuleHtml(){
-  const r=_hr.draft.rules.find(x=>x.id===_hr.editId);
+  const r=_hr.draft.rules[_hr.editIdx];
   if(!r)return'';
   const rooms=hrRooms(_hr.group);
   const sel=new Set(r.apartments||[]);
+  const sc=ruleScope(r);
   const dirAttr=_hr.lang==='ar'?'rtl':'ltr';
   const icons=ICON_CHOICES.map(n=>{
     const on=!r.iconImage&&r.icon===n;
@@ -2113,9 +2123,11 @@ function hrRuleHtml(){
       <label class="hr-check"><input type="checkbox" ${r.highlight?'checked':''} onchange="hrSetFlag('highlight',this.checked)"> Highlight the text (yellow box)</label>
     </div></div>
     <div class="apt-card"><div class="apt-card-hd">Show in</div><div class="apt-card-bd">
-      <label class="hr-check"><input type="radio" name="hr-scope" ${sel.size?'':'checked'} onchange="hrSetScope('all')"> All apartments of ${esc(hrGroupLabel(_hr.group))}</label>
-      <label class="hr-check"><input type="radio" name="hr-scope" ${sel.size?'checked':''} onchange="hrSetScope('some')"> Only these apartments</label>
-      <div class="hr-rooms">${rooms.map(x=>`<label class="hr-check"><input type="checkbox" ${sel.has(x.roomCode)?'checked':''} onchange="hrToggleRoom('${esc(x.roomCode)}',this.checked)"> ${esc((x.displayCode||x.roomCode)+' · '+(x.displayName||''))}</label>`).join('')||'<div class="hr-empty">No apartments found.</div>'}</div>
+      <label class="hr-check"><input type="radio" name="hr-scope" ${sc==='all'?'checked':''} onchange="hrSetScope('all')"> All apartments of ${esc(hrGroupLabel(_hr.group))}</label>
+      <label class="hr-check"><input type="radio" name="hr-scope" ${sc==='only'?'checked':''} onchange="hrSetScope('only')"> Only these apartments</label>
+      <label class="hr-check"><input type="radio" name="hr-scope" ${sc==='except'?'checked':''} onchange="hrSetScope('except')"> All apartments except these</label>
+      ${sc!=='all'?`<div class="hr-rooms">${rooms.map(x=>`<label class="hr-check"><input type="checkbox" ${sel.has(x.roomCode)?'checked':''} onchange="hrToggleRoom('${esc(x.roomCode)}',this.checked)"> ${esc((x.displayCode||x.roomCode)+' · '+(x.displayName||''))}</label>`).join('')||'<div class="hr-empty">No apartments found.</div>'}</div>`:''}
+      ${sc==='only'&&!sel.size?'<p class="apt-hint" style="color:var(--red);font-weight:600">Tick at least one apartment</p>':''}
     </div></div>
     <div class="apt-card"><div class="apt-card-hd">Preview</div><div class="apt-card-bd"><div id="hr-preview-box">${hrPreviewHtml()}</div></div></div>`;
 }
@@ -2144,21 +2156,21 @@ window.hrRemove=function(i){
 };
 window.hrAddRule=function(){
   const id='r'+Math.random().toString(36).slice(2,8);
-  _hr.draft.rules.push({id,title:emptyLangs(),desc:emptyLangs(),icon:'info',iconImage:'',notAllowed:false,required:true,highlight:false,apartments:[]});
-  hrTouch();_hr.view='rule';_hr.editId=id;_hr.lang='en';hrRender();
+  _hr.draft.rules.push({id,title:emptyLangs(),desc:emptyLangs(),icon:'info',iconImage:'',notAllowed:false,required:true,highlight:false,scope:'all',apartments:[]});
+  hrTouch();_hr.view='rule';_hr.editIdx=_hr.draft.rules.length-1;_hr.lang='en';hrRender();
 };
-window.hrEditRule=function(i){const r=_hr.draft.rules[i];if(!r)return;_hr.view='rule';_hr.editId=r.id;hrRender();};
-function hrRule(){return _hr.draft.rules.find(x=>x.id===_hr.editId);}
+window.hrEditRule=function(i){const r=_hr.draft.rules[i];if(!r)return;_hr.view='rule';_hr.editIdx=i;hrRender();};
+function hrRule(){return _hr.draft.rules[_hr.editIdx];}
 window.hrSetRuleText=function(k,v){const r=hrRule();if(!r)return;r[k]=r[k]||emptyLangs();r[k][_hr.lang]=v;hrTouch();hrRefreshPreview();};
 window.hrSetIcon=function(n){const r=hrRule();if(!r)return;r.icon=n;r.iconImage='';hrTouch();hrRender();};
 window.hrSetIconImage=function(u){const r=hrRule();if(!r)return;r.iconImage=u;r.icon='';hrTouch();hrRender();};
 window.hrSetFlag=function(k,v){const r=hrRule();if(!r)return;r[k]=!!v;hrTouch();hrRefreshPreview();};
-window.hrSetScope=function(s){const r=hrRule();if(!r)return;if(s==='all')r.apartments=[];hrTouch();hrRender();};
+window.hrSetScope=function(s){const r=hrRule();if(!r)return;r.scope=s;if(s==='all')r.apartments=[];hrTouch();hrRender();};
 window.hrToggleRoom=function(code,on){
   const r=hrRule();if(!r)return;
   const set=new Set(r.apartments||[]);
   if(on)set.add(code);else set.delete(code);
-  r.apartments=[...set];hrTouch();hrRefreshPreview();
+  r.apartments=[...set];hrTouch();hrRender();
 };
 window.hrUploadIcon=async function(input){
   const file=input.files&&input.files[0];if(!file)return;
@@ -2169,12 +2181,27 @@ window.hrUploadIcon=async function(input){
     r.iconImage=url;r.icon='';hrTouch();hrRender();toast('Image added');
   }catch(e){toast('Upload failed: '+e.message);}
 };
+window.hrFindInvalid=function(){
+  for(const g of Object.keys(gsHouseRules||{})){
+    const rules=(gsHouseRules[g]&&gsHouseRules[g].rules)||[];
+    for(const r of rules){if(r.scope==='only'&&!(r.apartments||[]).length)return{group:hrGroupLabel(g),title:hrEn(r.title)||'untitled'};}
+  }
+  return null;
+};
+window.hrUpdateSave=function(){
+  const b=document.getElementById('hr-savebar');
+  if(b)b.style.display=(gsDirty&&document.getElementById('hr-editor-overlay')?.classList.contains('open'))?'flex':'none';
+};
+window.hrSave=async function(){await gsSaveAll();hrUpdateSave();};
 window.hrCopy=function(){
   const target=document.getElementById('hr-copy-target')?.value;
   if(!target)return;
-  if(!confirm('Replace the check-in rules of '+hrGroupLabel(target)+' with these rules?'))return;
+  const lim=_hr.draft.rules.filter(r=>ruleScope(r)!=='all').map(r=>'- '+(hrEn(r.title)||'untitled')+' ('+(ruleScope(r)==='only'?'only: ':'all except: ')+((r.apartments||[]).join(', ')||'none')+')');
+  let msg='Replace the check-in rules of '+hrGroupLabel(target)+' with these rules?';
+  if(lim.length)msg+='\n\nThese rules are limited to certain apartments here. After copying they will show in EVERY apartment of '+hrGroupLabel(target)+', so you may need to remove duplicates there:\n'+lim.join('\n');
+  if(!confirm(msg))return;
   const copy=hrClone(_hr.draft);
-  copy.rules.forEach(r=>{r.apartments=[];});
+  copy.rules.forEach(r=>{r.apartments=[];r.scope='all';});
   copy.version='r'+Date.now().toString(36);copy.updatedAt=new Date().toISOString();
   gsHouseRules[target]=copy;gsMarkDirty();
   toast('Copied to '+hrGroupLabel(target)+' — tap Save when ready');

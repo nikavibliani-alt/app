@@ -287,3 +287,11 @@ Notes:
 - Data: checkin_admin/config.houseRules[GROUP]. Nothing saved for a listing = today's default page. The old "Entrance card & key rule" switch is no longer shown; its value only pre-fills the first open of a listing.
 - Default Maxela page lists the normal noise rule for 6-1, 6-2, 7-1..7-4 (explicit apartments) and the highlighted one for 6-4: a NEW Maxela apartment needs the noise rule's "Show in" updated.
 - Saved record: agreementVersion = listing's version or 'default'; agreementRules = shown rules (+ English); rulesAcknowledged = {ruleId:true}.
+
+### House rules editor - fixes (restore point: tag before-house-rules-fixes)
+- Unique rule ids (default highlighted noise = noise-quiet; Edit/Remove/Move work by position; duplicates get new ids on open and in the guest resolver).
+- Save button inside the editor, shown only when there are unsaved changes; saving is refused while an "Only these" rule has no apartment ticked.
+- Discard now also resets house rules (also when the config doc is missing).
+- "Show in": All / Only these / All except these. Default Maxela normal noise = all except 6-4.
+- Copy lists the apartment-limited rules in the confirm. Icon picker: removed volume-x, key, key-round, home.
+- Undo: tell me "undo house rules fixes" (back to tag before-house-rules-fixes).
