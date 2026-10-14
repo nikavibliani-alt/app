@@ -278,3 +278,12 @@ Restore point: tag `before-house-rules`. Undo one step: `git revert --no-edit <c
 ## Progress log
 | Step | Commit | Status |
 |------|--------|--------|
+| 1 | e60e43d | live: shared/house-rules.js + rule icons (no visible change) |
+| 2 | e5a2b24 | live: guest rules page from the shared module (guest app 1.5.0) |
+| 3 | 405921b | live: admin Check-in rules editor (Build 1014a) |
+| 4 | - | tests at 390px (WebKit + Chromium), mocked writes, see report |
+
+Notes:
+- Data: checkin_admin/config.houseRules[GROUP]. Nothing saved for a listing = today's default page. The old "Entrance card & key rule" switch is no longer shown; its value only pre-fills the first open of a listing.
+- Default Maxela page lists the normal noise rule for 6-1, 6-2, 7-1..7-4 (explicit apartments) and the highlighted one for 6-4: a NEW Maxela apartment needs the noise rule's "Show in" updated.
+- Saved record: agreementVersion = listing's version or 'default'; agreementRules = shown rules (+ English); rulesAcknowledged = {ruleId:true}.
