@@ -321,6 +321,11 @@ input[type="date"].form-input::-webkit-date-and-time-value{text-align:left;paddi
 .rule-icon--sign{width:28px;height:28px;flex:none;margin-top:0;align-self:flex-start;}
 .rule-icon--sign img{width:28px;height:28px;object-fit:contain;display:block;}
 .rule-item.smoking .rule-icon--sign img{filter:none;}
+.rule-item--info{padding-left:32px;cursor:default;}
+.rule-icon--noentry{position:relative;width:28px;height:28px;flex:none;margin-top:0;align-self:flex-start;color:var(--muted);}
+.rule-icon--noentry .rule-noentry__art{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+.rule-icon--noentry .rule-noentry__art svg,.rule-icon--noentry .rule-noentry__art img{width:16px;height:16px;display:block;object-fit:contain;}
+.rule-icon--noentry .rule-noentry__sign{position:absolute;left:0;top:0;width:28px;height:28px;}
 .checkin-time-hint{font-size:12px;color:var(--muted);line-height:1.4;margin:-2px 0 2px;}
 .checkin-time-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:2px;}
 .checkin-time-chip{min-height:44px;padding:8px 4px;border:1.5px solid var(--line);background:var(--surface,#fff);color:var(--ink);font-family:var(--mono,'JetBrains Mono',monospace);font-size:13px;font-weight:500;letter-spacing:0.02em;cursor:pointer;border-radius:0;-webkit-tap-highlight-color:transparent;transition:border-color .12s,background .12s,color .12s;}
@@ -904,41 +909,8 @@ body{padding-bottom:0;}
       <h2 class="reg-welcome" style="font-size:26px;" id="t-rules-title">House Rules</h2>
     </div>
     <p style="font-size:13px;color:var(--muted);margin:0 24px 4px;text-align:center;" id="t-rules-intro">Please read and accept before your stay</p>
-    <div class="rules-checks">
-      <div class="rule-item" id="rule-noise" onclick="window.toggleRule('noise')">
-        <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <div class="rule-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M16 9l5 5M21 9l-5 5"/></svg></div>
-        <div class="rule-body">
-          <div class="rule-title" id="t-rule-noise-title">No parties or excessive noise</div>
-          <div class="rule-sub" id="rule-noise-sub">Quiet hours 22:00–10:00.</div>
-        </div>
-      </div>
-      <div class="rule-item smoking" id="rule-smoke" onclick="window.toggleRule('smoke')">
-        <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <div class="rule-icon rule-icon--sign" aria-hidden="true"><img src="assets/icons/no-smoking.png" alt="" width="28" height="28" loading="lazy" draggable="false"></div>
-        <div class="rule-body">
-          <div class="rule-title" id="t-rule-smoke-title">No smoking inside the apartment</div>
-          <div class="rule-sub" id="t-rule-smoke-sub">Strictly prohibited indoors. Fine applies.</div>
-        </div>
-      </div>
-      <div class="rule-item" id="rule-care" onclick="window.toggleRule('care')">
-        <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <div class="rule-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5z"/></svg></div>
-        <div class="rule-body">
-          <div class="rule-title" id="t-rule-care-title">Take care of the apartment</div>
-          <div class="rule-sub" id="rule-care-sub">Leave the apartment in reasonable condition. Dishes washed, trash disposed, belongings removed. Excessive mess may incur a cleaning fee.</div>
-        </div>
-      </div>
-      <div class="rule-item" id="rule-card" onclick="window.toggleRule('card')" style="display:none;">
-        <div class="rule-cb"><svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <div class="rule-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 21 9.6-9.6"></path><path d="m7.5 15.5 2.3 2.3a1 1 0 0 1 0 1.4l-2.1 2.1a1 1 0 0 1-1.4 0L4 19"></path><circle cx="15.5" cy="7.5" r="5.5"></circle></svg></div>
-        <div class="rule-body">
-          <div class="rule-title" id="t-rule-card-title">Entrance Card &amp; Key</div>
-          <div class="rule-sub" id="t-rule-card-sub">Entrance card and key are provided. Loss or damage fee: 50 GEL per item.</div>
-        </div>
-      </div>
-    </div>
-    <div class="rules-sign-block" style="margin:16px 0;">
+    <div class="rules-checks" id="rules-list"></div>
+    <div class="rules-sign-block" id="rules-sign-block" style="margin:16px 0;">
       <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;" id="t-rules-sign-label">Type your full name to sign</div>
       <input type="text" id="rules-sign-input" placeholder="First and Last Name" autocomplete="name" style="width:100%;padding:14px 16px;border:1.5px solid var(--line);border-radius:12px;font-size:15px;font-family:var(--sans);color:var(--ink);background:#fff;box-sizing:border-box;" oninput="window.onRulesSignInput()">
       <div id="rules-sign-display" style="display:none;margin-top:10px;font-size:12px;color:var(--muted);font-style:italic;text-align:center;"></div>
@@ -1234,6 +1206,7 @@ import{buildRegisterPrimaryPayload,buildRegisterCompanionPayload,isLikelyGuestTo
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 import{GUEST_APP_VERSION,GUEST_APP_URL}from"./shared/guest-app-version.js";
 import{featherIcon}from"./shared/feather-icons.js";
+import{resolveHouseRules,renderRulesList,agreementRules,pick as hrPick}from"./shared/house-rules.js";
 const fi=(name,size=18,stroke=1.8)=>featherIcon(name,size,stroke);
 // Storage rules (set in Firebase Console):
 //   match /passport_uploads/{allPaths=**} {
@@ -1833,16 +1806,46 @@ function entranceCardOn(room){
   if(scope&&typeof scope.entranceCard==='boolean')return scope.entranceCard;
   return prop==='FREEDOM';
 }
-function rulesRequiredKeys(){
-  const keys=['noise','smoke','care'];
-  if(entranceCardOn(rulesRoomCode()))keys.push('card');
-  return keys;
+function groupForRoom(code){
+  code=code||'';
+  if(code.startsWith('orb-'))return'ORBELIANI';
+  const g=ROOM_TO_PROP[code];
+  if(g==='ORBE_1'||g==='ORBE_2')return'ORBELIANI';
+  return g||(/^xcv-/i.test(code)?'XCV':/^vgl-/i.test(code)?'VGL':'ROOMS');
 }
-const _rules={noise:false,smoke:false,care:false,card:false};
+// The rules page comes from shared/house-rules.js: this listing's saved page (checkin_admin/config.houseRules)
+// or today's default page, resolved for the MATCHED BOOKING's room.
+let _houseRules=null;
+function _resolveRulesNow(){
+  const room=rulesRoomCode();
+  _houseRules=resolveHouseRules(guestFullCfg,groupForRoom(room),room,{entranceCard:entranceCardOn(room)});
+  return _houseRules;
+}
+function rulesRequiredKeys(){
+  return(_houseRules||_resolveRulesNow()).rules.filter(r=>r.required===true).map(r=>r.id);
+}
+function renderRulesPage(){
+  const hr=_resolveRulesNow();
+  const list=document.getElementById('rules-list');
+  if(list)list.innerHTML=renderRulesList(hr.rules,lang,{interactive:true,checked:_rules});
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  const pk=(o,fallbackKey)=>{const v=(o&&(o[lang]||o.en))||'';return v||t(fallbackKey);};
+  set('t-rules-title',pk(hr.texts.title,'rulesTitle'));
+  set('t-rules-intro',pk(hr.texts.intro,'rulesIntro'));
+  set('t-rules-sign-label',pk(hr.texts.signLabel,'rulesSignLabel'));
+  set('t-rules-btn',pk(hr.texts.button,'rulesBtn'));
+  set('t-rules-disclaimer',pk(hr.texts.disclaimer,'rulesDisclaimer'));
+  const sb=document.getElementById('rules-sign-block');
+  if(sb)sb.style.display=hr.signature===false?'none':'';
+  const btn=document.getElementById('rules-continue-btn');
+  if(btn)btn.disabled=!_rulesFormOk();
+}
+const _rules={};   // rule id -> ticked
 // Continue button needs both: every required checkbox checked AND a
 // plausible typed name (>=3 chars) in the signature field.
 function _rulesFormOk(){
-  const nameOk=(document.getElementById('rules-sign-input')?.value||'').trim().length>=3;
+  const needName=!_houseRules||_houseRules.signature!==false;
+  const nameOk=!needName||(document.getElementById('rules-sign-input')?.value||'').trim().length>=3;
   const rulesOk=rulesRequiredKeys().every(k=>_rules[k]);
   return nameOk&&rulesOk;
 }
@@ -1867,21 +1870,7 @@ window.onRulesSignInput=function(){
   const btn=document.getElementById('rules-continue-btn');
   if(btn)btn.disabled=!_rulesFormOk();
 };
-function _updateRulesForApt(){
-  const sub=document.getElementById('rule-noise-sub');
-  if(sub){
-    const isNoisyUnit=['6-3','6-4'].includes(aptId);
-    if(isNoisyUnit){
-      sub.textContent='Quiet hours 22:00–10:00. No running or jumping inside.';
-      sub.style.cssText='color:#92400e;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:8px 12px;';
-    }else{
-      sub.style.cssText='';
-    }
-  }
-  const showCard=entranceCardOn(rulesRoomCode());
-  const cardEl=document.getElementById('rule-card');
-  if(cardEl)cardEl.style.display=showCard?'':'none';
-}
+function _updateRulesForApt(){renderRulesPage();}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
 function getCheckInHour(){
@@ -2304,21 +2293,11 @@ function applyTranslations(){
   const timeHint=document.getElementById('t-checkin-time-hint');if(timeHint)timeHint.textContent=t('checkinTimeHint');
   if(typeof window.refreshCheckinTimePicker==='function')window.refreshCheckinTimePicker();
   else if(typeof window.updateCheckinTimeNotice==='function')window.updateCheckinTimeNotice();
-  const rulesTitle=document.getElementById('t-rules-title');if(rulesTitle)rulesTitle.textContent=t('rulesTitle');
-  const rulesIntro=document.getElementById('t-rules-intro');if(rulesIntro)rulesIntro.textContent=t('rulesIntro');
-  const rulesBtn=document.getElementById('t-rules-btn');if(rulesBtn)rulesBtn.textContent=t('rulesBtn');
-  const rulesSignLabel=document.getElementById('t-rules-sign-label');if(rulesSignLabel)rulesSignLabel.textContent=t('rulesSignLabel');
-  const rulesDisclaimer=document.getElementById('t-rules-disclaimer');if(rulesDisclaimer)rulesDisclaimer.textContent=t('rulesDisclaimer');
+  renderRulesPage();   // rules page texts + list follow the language switch
   // Re-run currently-visible field hints so a language switch mid-typing
   // updates their text instead of leaving a stale-language hint on screen.
   window.validateNameInput?.(document.getElementById('r-name')?.value||'');
   window.validateDateInput?.(document.getElementById('r-arrival')?.value||'');
-  rulesRequiredKeys().forEach(id=>{
-    const titleEl=document.getElementById('t-rule-'+id+'-title');
-    const subEl=document.getElementById(id==='noise'?'rule-noise-sub':id==='care'?'rule-care-sub':'t-rule-'+id+'-sub');
-    if(titleEl)titleEl.textContent=t('rule'+id.charAt(0).toUpperCase()+id.slice(1)+'Title');
-    if(subEl&&!(id==='noise'&&['6-3','6-4'].includes(aptId)))subEl.textContent=t('rule'+id.charAt(0).toUpperCase()+id.slice(1)+'Sub');
-  });
   const ppt=document.getElementById('t-passport-page-title');if(ppt)ppt.textContent=t('passportPageTitle');
   const pps=document.getElementById('t-passport-page-sub');if(pps)pps.textContent=t('passportPageSub');
   const ppr=document.getElementById('t-passport-required');if(ppr)ppr.textContent=t('passportRequired');
@@ -3161,23 +3140,21 @@ window.searchReservation=async function(){
 window.proceedFromRules=function(){
   if(!_rulesFormOk())return;
   const signedName=document.getElementById('rules-sign-input')?.value?.trim()||'';
+  const hr=_houseRules||_resolveRulesNow();
+  const ack={},text={};
+  hr.rules.forEach(r=>{
+    if(r.required===true)ack[r.id]=true;
+    text[r.id]=hrPick(r.desc,lang);
+  });
   _pendingAgreement={
     agreementSigned:true,
     agreementSignedAt:null, // set on write
-    agreementVersion:'2.0',
-    agreementSignature:signedName,
-    rulesAcknowledged:{
-      noise:true,
-      smoke:true,
-      care:true,
-      card:_rules.card||false
-    },
-    agreementText:{
-      noise:document.getElementById('rule-noise-sub')?.textContent?.trim()||'',
-      smoke:document.getElementById('t-rule-smoke-sub')?.textContent?.trim()||'',
-      care:document.getElementById('rule-care-sub')?.textContent?.trim()||'',
-      card:_rules.card?(document.getElementById('t-rule-card-sub')?.textContent?.trim()||''):null
-    }
+    agreementVersion:hr.version||'default',
+    agreementSignature:hr.signature===false?'':signedName,
+    rulesAcknowledged:ack,
+    agreementText:text,
+    agreementRules:agreementRules(hr.rules,lang),
+    agreementPageLang:lang,
   };
   if(_companionGuest&&_pendingMatches?.[0]){
     finishRegistration_(_pendingMatches[0].res,_pendingReg).catch(e=>{
