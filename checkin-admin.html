@@ -120,6 +120,60 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .hc-more{background:transparent;border:0;color:var(--red);font-family:var(--sans);font-size:13px;font-weight:600;min-height:40px;cursor:pointer;}
 .hc-panel{margin-bottom:12px;padding:12px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);}
 .hc-panel__btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.hr-langs{display:flex;gap:6px;margin-bottom:8px;}
+.hr-lang{flex:1;min-height:40px;border:1.5px solid var(--line);border-radius:var(--rs);background:var(--surface);color:var(--ink);font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;}
+.hr-lang.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.hr-check{display:flex;align-items:center;gap:10px;min-height:40px;font-size:14px;color:var(--ink);cursor:pointer;}
+.hr-check input{width:20px;height:20px;flex:none;accent-color:#2C2C2A;}
+.hr-empty{padding:12px;font-size:13px;color:var(--muted);text-align:center;}
+.hr-card{border:1px solid var(--line);border-radius:var(--rs);padding:12px;margin-bottom:10px;background:var(--surface);}
+.hr-card__top{display:flex;gap:12px;align-items:flex-start;}
+.hr-card__icon{width:28px;flex:none;}
+.hr-card__title{font-size:14px;font-weight:600;color:var(--ink);}
+.hr-card__desc{font-size:12px;color:var(--muted);margin-top:2px;max-height:3.6em;overflow:hidden;}
+.hr-card__meta{font-size:11px;color:var(--muted);margin-top:6px;}
+.hr-card__btns{display:flex;gap:8px;margin-top:10px;align-items:center;}
+.hr-icons{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+.hr-ico{height:48px;border:1.5px solid var(--line);border-radius:var(--rs);background:var(--surface);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
+.hr-ico.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);}
+.hr-uploaded{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:13px;color:var(--muted);}
+.hr-uploaded img{object-fit:contain;border:1px solid var(--line);border-radius:6px;}
+.hr-rooms{margin-top:6px;max-height:220px;overflow:auto;}
+.hr-preview{border:1px dashed var(--line);border-radius:var(--rs);padding:16px 14px;background:#fff;}
+.hr-pv-title{font-family:var(--serif,Georgia,serif);font-size:22px;text-align:center;color:var(--ink);}
+.hr-pv-intro{font-size:12px;color:var(--muted);text-align:center;margin:6px 0 4px;}
+.hr-pv-sign{margin:14px 0;}
+.hr-pv-label{font-size:11px;color:var(--muted);margin-bottom:6px;}
+.hr-pv-input{border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--muted);}
+.hr-pv-btn{margin-top:14px;background:var(--ink);color:#fff;text-align:center;padding:14px;font-weight:600;font-size:14px;}
+.hr-pv-btn.is-off{background:#969592;}
+.hr-pv-small{font-size:11px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5;}
+/* rules list look (same as the guest page) inside the preview */
+.hr-preview .rules-checks{margin:12px 0 0;display:flex;flex-direction:column;}
+.hr-preview .rule-item{display:flex;align-items:flex-start;gap:12px;padding:16px 0;border-bottom:1px solid var(--line);}
+.hr-preview .rule-item:first-child{border-top:1px solid var(--line);}
+.hr-preview .rule-item--info{padding-left:32px;}
+.hr-preview .rule-cb{width:20px;height:20px;border:1.5px solid #2C2C2A;flex:none;margin-top:1px;}
+.hr-preview .rule-cb svg{display:none;}
+.hr-preview .rule-icon{width:22px;height:22px;flex:none;color:var(--muted);margin-top:2px;display:flex;align-items:center;justify-content:center;}
+.hr-preview .rule-icon svg{width:20px;height:20px;display:block;}
+.hr-preview .rule-icon--sign{width:28px;height:28px;margin-top:0;}
+.hr-preview .rule-icon--sign img{width:28px;height:28px;object-fit:contain;}
+.hr-preview .rule-icon--noentry{position:relative;width:28px;height:28px;margin-top:0;}
+.hr-preview .rule-noentry__art{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+.hr-preview .rule-noentry__art svg,.hr-preview .rule-noentry__art img{width:16px;height:16px;}
+.hr-preview .rule-noentry__sign{position:absolute;left:0;top:0;width:28px;height:28px;}
+.hr-preview .rule-item.smoking .rule-title{color:var(--red);font-weight:600;}
+.hr-preview .rule-title{font-size:13.5px;font-weight:500;color:var(--ink);line-height:1.3;}
+.hr-preview .rule-sub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;}
+.hr-card .rule-icon{width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--muted);position:relative;}
+.hr-card .rule-icon svg{width:20px;height:20px;}
+.hr-card .rule-icon--noentry .rule-noentry__art{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+.hr-card .rule-icon--noentry .rule-noentry__art svg,.hr-card .rule-icon--noentry .rule-noentry__art img{width:16px;height:16px;}
+.hr-card .rule-icon--noentry .rule-noentry__sign{position:absolute;left:0;top:0;width:28px;height:28px;}
+.hr-card .rule-icon img,.hr-ico img{object-fit:contain;}
+.hr-ico .rule-icon{display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:var(--ink);}
+.hr-ico .rule-icon svg{width:22px;height:22px;}
 .access-sheet-overlay{position:fixed;inset:0;background:rgba(44,44,42,.45);z-index:9998;display:flex;align-items:flex-end;justify-content:center;}
 .access-sheet{width:100%;max-width:480px;background:var(--surface);border-radius:16px 16px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;}
 .access-sheet__title{font-size:16px;font-weight:700;color:var(--ink);margin-bottom:4px;line-height:1.3;}
@@ -227,6 +281,8 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .elev-msg.err{color:var(--red);}
 #detail,#apt-editor-overlay,#req-detail,#gp-editor-overlay{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;flex-direction:column;max-width:480px;margin:0 auto;overflow-y:auto;}
 #apt-editor-overlay{z-index:210;}
+#hr-editor-overlay{position:fixed;inset:0;background:var(--bg);z-index:215;display:none;flex-direction:column;max-width:480px;margin:0 auto;overflow-y:auto;}
+#hr-editor-overlay.open{display:flex;}
 #req-detail{z-index:220;}
 #detail.open,#apt-editor-overlay.open,#req-detail.open,#gp-editor-overlay.open{display:flex;}
 .detail-bar,.apt-ed-bar{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;}
@@ -702,7 +758,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1013c · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1014a · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -890,6 +946,14 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
   <div class="detail-body" id="req-detail-body"></div>
 </div>
 
+<div id="hr-editor-overlay">
+  <div class="apt-ed-bar">
+    <button class="detail-back" onclick="closeHrEditor()" aria-label="Back"><svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6L9 12l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="detail-title" id="hr-title">Check-in rules</div>
+  </div>
+  <div class="apt-ed-body" id="hr-body"></div>
+</div>
+
 <div id="gp-editor-overlay">
   <div class="apt-ed-bar">
     <button class="detail-back" onclick="goBack()" aria-label="Back"><svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6L9 12l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -966,6 +1030,7 @@ import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gsta
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour,normalizeStayDate}from"./shared/guest-unlock.js";
 import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON,hkPropertyGroupForRoom}from"./shared/hk-bedding.js";
 import{DEFAULT_ROOMS_SEED,ROOM_SITES}from"./shared/room-registry.js";
+import{HR_LANGS,HR_GROUPS,ICON_CHOICES,NO_SMOKING_IMG,defaultHouseRules,resolveHouseRules,renderRulesList,ruleIconHtml,emptyLangs,pick}from"./shared/house-rules.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
 import{featherIcon}from"./shared/feather-icons.js";
@@ -1803,6 +1868,7 @@ async function loadGuestSettings(){
       if(d.locationInfo)gsLocationInfo=d.locationInfo;
       if(d.parkingInfo)gsParkingInfo=d.parkingInfo;
       if(d.shuttleInfo)gsShuttleInfo=d.shuttleInfo;
+      if(d.houseRules)gsHouseRules=d.houseRules;
       if(d.waitingTabs){
         const wt={...WAITING_TABS_DEFAULTS,...d.waitingTabs};
         delete wt.shuttle;
@@ -1830,7 +1896,7 @@ window.gsSaveAll=async function(){
     delete waitingTabs.shuttle;
     await setDoc(doc(db,'checkin_admin','config'),{
       visibility:gsVisibility,laundryItems:gsLaundry,services:gsServices,sectionLabels:gsSectionLabels,
-      roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,parkingInfo:gsParkingInfo,shuttleInfo:gsShuttleInfo,waitingTabs,
+      roomCategories:gsRoomCategories,locationInfo:gsLocationInfo,parkingInfo:gsParkingInfo,shuttleInfo:gsShuttleInfo,houseRules:gsHouseRules,waitingTabs,
       updatedAt:serverTimestamp()
     },{merge:true});
     gsDirty=false;document.getElementById('gs-save-bar')?.classList.remove('show');
@@ -1889,11 +1955,6 @@ function renderGuestSettings(){
       <div class="gp-row__body"><div class="gp-row__title">Door code box</div><div class="gp-row__sub">Show the smart lock code to guests</div></div>
       <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${vis.smartLock!==false?'checked':''} onchange="gsToggle('smartLock',this.checked)"><span class="switch-track"></span></label>
     </div>
-    <div class="gp-row">
-      <div class="gp-row__icon">${gpIcon('rules')}</div>
-      <div class="gp-row__body"><div class="gp-row__title">Entrance card &amp; key rule</div><div class="gp-row__sub">Guests must accept the entrance card and key rule on check-in</div></div>
-      <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" ${(vis.entranceCard!==undefined?vis.entranceCard===true:gsProp==='FREEDOM')?'checked':''} onchange="gsToggle('entranceCard',this.checked)"><span class="switch-track"></span></label>
-    </div>
     <div class="section-hd" style="margin-top:8px"><h2>Services</h2></div>
     ${GP_TILES.filter(t=>t.group==='service').map(row).join('')}
     <div class="section-hd" style="margin-top:8px"><h2>Content pages</h2></div>
@@ -1908,7 +1969,219 @@ function renderGuestSettings(){
     <div style="height:72px"></div>`;
 }
 
+
+/* ── Check-in rules editor (per listing). Data: config.houseRules[GROUP] — see shared/house-rules.js ── */
+let gsHouseRules={};
+const _hr={group:'ROOMS',lang:'en',draft:null,view:'main',editId:null,previewRoom:''};
+const HR_LANG_LABEL={en:'EN',ka:'ქარ',ru:'RU',ar:'ع'};
+const HR_TEXT_FIELDS=[['title','Title','input'],['intro','Intro line','input'],['signLabel','Signature label','input'],['button','Button text','input'],['disclaimer','Small print','textarea']];
+function hrClone(o){return JSON.parse(JSON.stringify(o));}
+function hrEntranceOn(group){const v=gsVisibility[group]||{};return v.entranceCard!==undefined?v.entranceCard===true:group==='FREEDOM';}
+function hrGroupLabel(g){const x=HR_GROUPS.find(p=>p.id===g);return x?x.label:g;}
+function hrBase(group){
+  const saved=gsHouseRules[group];
+  if(saved&&Array.isArray(saved.rules))return hrClone(saved);
+  return defaultHouseRules(group,{entranceCard:hrEntranceOn(group)});   // first open: today's page (pre-filled from the old switch)
+}
+function hrRooms(group){
+  return roomsSorted(true).filter(r=>r.roomCode!=='abashidze'&&gpPropForRoom(r.roomCode)===group);
+}
+function hrLangVal(obj){return(obj&&obj[_hr.lang])||'';}
+function hrEn(obj){return(obj&&obj.en)||'';}
+function hrTouch(){   // the user changed something: the working page becomes this listing's saved page (saved with the save bar)
+  const d=_hr.draft;
+  d.version='r'+Date.now().toString(36);
+  d.updatedAt=new Date().toISOString();
+  gsHouseRules[_hr.group]=hrClone(d);
+  gsMarkDirty();
+}
+window.openHrEditor=function(group){
+  _hr.group=group||gsProp||'ROOMS';
+  _hr.lang='en';_hr.view='main';_hr.editId=null;
+  _hr.draft=hrBase(_hr.group);
+  const rooms=hrRooms(_hr.group);
+  _hr.previewRoom=rooms[0]?rooms[0].roomCode:'';
+  document.getElementById('hr-editor-overlay').classList.add('open');
+  hrRender();
+};
+window.closeHrEditor=function(){
+  if(_hr.view==='rule'){_hr.view='main';_hr.editId=null;hrRender();return;}
+  document.getElementById('hr-editor-overlay')?.classList.remove('open');
+  renderGuestSettings();
+};
+function hrLangChips(){
+  return`<div class="hr-langs">${HR_LANGS.map(l=>`<button type="button" class="hr-lang${_hr.lang===l?' active':''}" onclick="hrSetLang('${l}')">${HR_LANG_LABEL[l]}</button>`).join('')}</div>
+  <p class="apt-hint" style="margin:-4px 0 12px">${_hr.lang==='en'?'English is shown to every guest whose language is left empty.':'Empty fields show the English text.'}</p>`;
+}
+window.hrSetLang=function(l){_hr.lang=l;hrRender();};
+function hrPreviewHtml(){
+  const rooms=hrRooms(_hr.group);
+  const room=_hr.previewRoom||(rooms[0]?rooms[0].roomCode:'');
+  const cfg={houseRules:{[_hr.group]:_hr.draft}};
+  const res=resolveHouseRules(cfg,_hr.group,room,{});
+  const t=(k)=>esc(pick(res.texts[k],_hr.lang)||'');
+  const sign=res.signature!==false?`<div class="hr-pv-sign"><div class="hr-pv-label">${t('signLabel')}</div><div class="hr-pv-input">First and Last Name</div></div>`:'';
+  const needTicks=res.rules.some(r=>r.required===true);
+  return`<div class="hr-preview" ${_hr.lang==='ar'?'dir="rtl"':''}>
+    <div class="hr-pv-title">${t('title')}</div><div class="hr-pv-intro">${t('intro')}</div>
+    <div class="rules-checks">${renderRulesList(res.rules,_hr.lang,{})||'<div class="hr-empty">No rules shown for this apartment.</div>'}</div>
+    ${sign}<div class="hr-pv-btn${needTicks?' is-off':''}">${t('button')}</div><div class="hr-pv-small">${t('disclaimer')}</div></div>`;
+}
+function hrRefreshPreview(){const el=document.getElementById('hr-preview-box');if(el)el.innerHTML=hrPreviewHtml();}
+function hrCardsHtml(){
+  const rules=_hr.draft.rules;
+  if(!rules.length)return'<div class="hr-empty">No rules yet.</div>';
+  return rules.map((r,i)=>{
+    const lim=(r.apartments||[]).length?'Only: '+(r.apartments||[]).map(esc).join(', '):'All apartments';
+    return`<div class="hr-card">
+      <div class="hr-card__top">
+        <div class="hr-card__icon">${ruleIconHtml(r)}</div>
+        <div class="hr-card__txt"><div class="hr-card__title">${esc(hrEn(r.title)||'(no title)')}</div>
+          <div class="hr-card__desc">${esc(hrEn(r.desc))}</div>
+          <div class="hr-card__meta">${r.required?'Guest must tick':'Info only'} · ${lim}${r.highlight?' · Highlighted':''}${r.notAllowed?' · Not allowed sign':''}</div></div>
+      </div>
+      <div class="hr-card__btns">
+        <button type="button" class="apt-step-btn" aria-label="Move up" ${i===0?'disabled':''} onclick="hrMove(${i},-1)">${featherIcon('chevron-up',16,2)}</button>
+        <button type="button" class="apt-step-btn" aria-label="Move down" ${i===rules.length-1?'disabled':''} onclick="hrMove(${i},1)">${featherIcon('chevron-down',16,2)}</button>
+        <button type="button" class="btn" style="flex:1;min-height:36px" onclick="hrEditRule(${i})">Edit</button>
+        <button type="button" class="btn" style="flex:none;min-height:36px;color:var(--red)" onclick="hrRemove(${i})">Remove</button>
+      </div></div>`;
+  }).join('');
+}
+function hrMainHtml(){
+  const d=_hr.draft;
+  const rooms=hrRooms(_hr.group);
+  const fields=HR_TEXT_FIELDS.map(([k,label,kind])=>{
+    const val=hrLangVal(d.texts[k]),ph=_hr.lang==='en'?'':hrEn(d.texts[k]);
+    return`<label class="apt-label">${label}</label>`+(kind==='textarea'
+      ?`<textarea class="apt-textarea" style="min-height:80px" dir="${_hr.lang==='ar'?'rtl':'ltr'}" placeholder="${esc(ph)}" oninput="hrSetText('${k}',this.value)">${esc(val)}</textarea>`
+      :`<input class="apt-input" dir="${_hr.lang==='ar'?'rtl':'ltr'}" value="${esc(val)}" placeholder="${esc(ph)}" oninput="hrSetText('${k}',this.value)">`);
+  }).join('');
+  const copyOpts=HR_GROUPS.filter(g=>g.id!==_hr.group).map(g=>`<option value="${g.id}">${esc(g.label)}</option>`).join('');
+  return`${hrLangChips()}
+    <div class="apt-card"><div class="apt-card-hd">Page wording</div><div class="apt-card-bd">${fields}
+      <label class="hr-check"><input type="checkbox" ${d.signature!==false?'checked':''} onchange="hrSetSignature(this.checked)"> Guest types their name to sign</label>
+      <label class="apt-label" style="margin-top:12px">Home tile subtitle (small text under the House rules tile)</label>
+      <input class="apt-input" value="${esc(gsSectionLabels.rules||'')}" oninput="hrSetSubtitle(this.value)">
+    </div></div>
+    <div class="apt-card"><div class="apt-card-hd">Rules for ${esc(hrGroupLabel(_hr.group))}</div><div class="apt-card-bd">
+      ${hrCardsHtml()}
+      <button type="button" class="apt-add" onclick="hrAddRule()">+ Add rule</button>
+    </div></div>
+    <div class="apt-card"><div class="apt-card-hd">Preview</div><div class="apt-card-bd">
+      <label class="apt-label">Show as apartment</label>
+      <select class="apt-input" onchange="hrSetPreviewRoom(this.value)">${rooms.length?rooms.map(r=>`<option value="${esc(r.roomCode)}"${r.roomCode===_hr.previewRoom?' selected':''}>${esc((r.displayCode||r.roomCode)+' · '+(r.displayName||''))}</option>`).join(''):'<option value="">(no apartments)</option>'}</select>
+      <div id="hr-preview-box">${hrPreviewHtml()}</div>
+    </div></div>
+    <div class="apt-card"><div class="apt-card-hd">Copy these rules</div><div class="apt-card-bd">
+      <label class="apt-label">Copy to another listing</label>
+      <select class="apt-input" id="hr-copy-target">${copyOpts}</select>
+      <button type="button" class="btn" style="width:100%" onclick="hrCopy()">Copy rules to that listing</button>
+      <p class="apt-hint" style="margin-top:8px">The other listing's rules are replaced. "Show in" apartment limits are cleared.</p>
+    </div></div>`;
+}
+function hrRuleHtml(){
+  const r=_hr.draft.rules.find(x=>x.id===_hr.editId);
+  if(!r)return'';
+  const rooms=hrRooms(_hr.group);
+  const sel=new Set(r.apartments||[]);
+  const dirAttr=_hr.lang==='ar'?'rtl':'ltr';
+  const icons=ICON_CHOICES.map(n=>{
+    const on=!r.iconImage&&r.icon===n;
+    return`<button type="button" class="hr-ico${on?' on':''}" aria-label="${esc(n)}" onclick="hrSetIcon('${esc(n)}')">${ruleIconHtml({icon:n})}</button>`;
+  }).join('');
+  const smokeOn=r.iconImage===NO_SMOKING_IMG;
+  const upOn=!!r.iconImage&&!smokeOn;
+  return`${hrLangChips()}
+    <div class="apt-card"><div class="apt-card-hd">Rule</div><div class="apt-card-bd">
+      <label class="apt-label">Title</label>
+      <input class="apt-input" dir="${dirAttr}" value="${esc(hrLangVal(r.title))}" placeholder="${esc(_hr.lang==='en'?'':hrEn(r.title))}" oninput="hrSetRuleText('title',this.value)">
+      <label class="apt-label">Text</label>
+      <textarea class="apt-textarea" dir="${dirAttr}" placeholder="${esc(_hr.lang==='en'?'':hrEn(r.desc))}" oninput="hrSetRuleText('desc',this.value)">${esc(hrLangVal(r.desc))}</textarea>
+    </div></div>
+    <div class="apt-card"><div class="apt-card-hd">Icon</div><div class="apt-card-bd">
+      <div class="hr-icons">${icons}
+        <button type="button" class="hr-ico${smokeOn?' on':''}" aria-label="No smoking sign" onclick="hrSetIconImage('${NO_SMOKING_IMG}')"><img src="${NO_SMOKING_IMG}" alt="" width="24" height="24"></button>
+      </div>
+      <input type="file" id="hr-upload" accept="image/*" style="display:none" onchange="hrUploadIcon(this)">
+      <button type="button" class="btn" style="width:100%;margin-top:10px" onclick="document.getElementById('hr-upload').click()">Upload image</button>
+      ${upOn?`<div class="hr-uploaded"><img src="${esc(r.iconImage)}" alt="" width="40" height="40"><span>Uploaded image</span></div>`:''}
+      <label class="hr-check"><input type="checkbox" ${r.notAllowed?'checked':''} onchange="hrSetFlag('notAllowed',this.checked)"> Show as a not-allowed sign (red circle with a slash)</label>
+    </div></div>
+    <div class="apt-card"><div class="apt-card-hd">Behaviour</div><div class="apt-card-bd">
+      <label class="hr-check"><input type="checkbox" ${r.required?'checked':''} onchange="hrSetFlag('required',this.checked)"> Guest must tick this rule</label>
+      <label class="hr-check"><input type="checkbox" ${r.highlight?'checked':''} onchange="hrSetFlag('highlight',this.checked)"> Highlight the text (yellow box)</label>
+    </div></div>
+    <div class="apt-card"><div class="apt-card-hd">Show in</div><div class="apt-card-bd">
+      <label class="hr-check"><input type="radio" name="hr-scope" ${sel.size?'':'checked'} onchange="hrSetScope('all')"> All apartments of ${esc(hrGroupLabel(_hr.group))}</label>
+      <label class="hr-check"><input type="radio" name="hr-scope" ${sel.size?'checked':''} onchange="hrSetScope('some')"> Only these apartments</label>
+      <div class="hr-rooms">${rooms.map(x=>`<label class="hr-check"><input type="checkbox" ${sel.has(x.roomCode)?'checked':''} onchange="hrToggleRoom('${esc(x.roomCode)}',this.checked)"> ${esc((x.displayCode||x.roomCode)+' · '+(x.displayName||''))}</label>`).join('')||'<div class="hr-empty">No apartments found.</div>'}</div>
+    </div></div>
+    <div class="apt-card"><div class="apt-card-hd">Preview</div><div class="apt-card-bd"><div id="hr-preview-box">${hrPreviewHtml()}</div></div></div>`;
+}
+function hrRender(){
+  const body=document.getElementById('hr-body');
+  const title=document.getElementById('hr-title');
+  if(!body)return;
+  title.textContent=_hr.view==='rule'?'Edit rule':'Check-in rules · '+hrGroupLabel(_hr.group);
+  const top=body.scrollTop;
+  body.innerHTML=_hr.view==='rule'?hrRuleHtml():hrMainHtml();
+  body.scrollTop=top;
+}
+window.hrSetText=function(k,v){_hr.draft.texts[k]=_hr.draft.texts[k]||emptyLangs();_hr.draft.texts[k][_hr.lang]=v;hrTouch();hrRefreshPreview();};
+window.hrSetSignature=function(on){_hr.draft.signature=!!on;hrTouch();hrRefreshPreview();};
+window.hrSetSubtitle=function(v){gsSectionLabels.rules=v;gsMarkDirty();};
+window.hrSetPreviewRoom=function(v){_hr.previewRoom=v;hrRefreshPreview();};
+window.hrMove=function(i,d){
+  const a=_hr.draft.rules,j=i+d;
+  if(j<0||j>=a.length)return;
+  [a[i],a[j]]=[a[j],a[i]];hrTouch();hrRender();
+};
+window.hrRemove=function(i){
+  const r=_hr.draft.rules[i];if(!r)return;
+  if(!confirm('Remove the rule "'+(hrEn(r.title)||'untitled')+'"?'))return;
+  _hr.draft.rules.splice(i,1);hrTouch();hrRender();
+};
+window.hrAddRule=function(){
+  const id='r'+Math.random().toString(36).slice(2,8);
+  _hr.draft.rules.push({id,title:emptyLangs(),desc:emptyLangs(),icon:'info',iconImage:'',notAllowed:false,required:true,highlight:false,apartments:[]});
+  hrTouch();_hr.view='rule';_hr.editId=id;_hr.lang='en';hrRender();
+};
+window.hrEditRule=function(i){const r=_hr.draft.rules[i];if(!r)return;_hr.view='rule';_hr.editId=r.id;hrRender();};
+function hrRule(){return _hr.draft.rules.find(x=>x.id===_hr.editId);}
+window.hrSetRuleText=function(k,v){const r=hrRule();if(!r)return;r[k]=r[k]||emptyLangs();r[k][_hr.lang]=v;hrTouch();hrRefreshPreview();};
+window.hrSetIcon=function(n){const r=hrRule();if(!r)return;r.icon=n;r.iconImage='';hrTouch();hrRender();};
+window.hrSetIconImage=function(u){const r=hrRule();if(!r)return;r.iconImage=u;r.icon='';hrTouch();hrRender();};
+window.hrSetFlag=function(k,v){const r=hrRule();if(!r)return;r[k]=!!v;hrTouch();hrRefreshPreview();};
+window.hrSetScope=function(s){const r=hrRule();if(!r)return;if(s==='all')r.apartments=[];hrTouch();hrRender();};
+window.hrToggleRoom=function(code,on){
+  const r=hrRule();if(!r)return;
+  const set=new Set(r.apartments||[]);
+  if(on)set.add(code);else set.delete(code);
+  r.apartments=[...set];hrTouch();hrRefreshPreview();
+};
+window.hrUploadIcon=async function(input){
+  const file=input.files&&input.files[0];if(!file)return;
+  const r=hrRule();if(!r)return;
+  try{
+    toast('Uploading…',15000);
+    const url=await uploadToCloudinary(file,'maxela/rule-icons');
+    r.iconImage=url;r.icon='';hrTouch();hrRender();toast('Image added');
+  }catch(e){toast('Upload failed: '+e.message);}
+};
+window.hrCopy=function(){
+  const target=document.getElementById('hr-copy-target')?.value;
+  if(!target)return;
+  if(!confirm('Replace the check-in rules of '+hrGroupLabel(target)+' with these rules?'))return;
+  const copy=hrClone(_hr.draft);
+  copy.rules.forEach(r=>{r.apartments=[];});
+  copy.version='r'+Date.now().toString(36);copy.updatedAt=new Date().toISOString();
+  gsHouseRules[target]=copy;gsMarkDirty();
+  toast('Copied to '+hrGroupLabel(target)+' — tap Save when ready');
+};
+
 window.openGpEditor=function(ctx){
+  if(ctx==='rules'){openHrEditor(gsProp);return;}
   _gpEditCtx=ctx;
   const body=document.getElementById('gp-ed-body');
   const title=document.getElementById('gp-ed-title');
@@ -4171,6 +4444,7 @@ function updateHeaderBack(){
 }
 
 window.goBack=function(){
+  if(document.getElementById('hr-editor-overlay')?.classList.contains('open')){closeHrEditor();return;}
   if(document.getElementById('gp-editor-overlay')?.classList.contains('open')){closeGpEditor();return;}
   if(document.getElementById('apt-editor-overlay')?.classList.contains('open')){if(aptEditorDirty()&&!confirm('Discard unsaved changes?'))return;closeAptEditor();return;}
   if(document.getElementById('req-detail')?.classList.contains('open')){closeReqDetail();return;}
