@@ -265,3 +265,16 @@ Restore point: tag `before-s3`. Undo one step: `git revert --no-edit <commit>`, 
 Notes (S3):
 - Old requests (made before step 4) have no serviceRequestId/checkinRequestId: guest cancel/edit on those updates only the guest's own doc and opens the driver message; admin actions on them don't reach the guest's doc.
 - Old config keeps the global airport_transfer service values as the fallback for any group without its own shuttle settings.
+
+# House rules editor
+
+Restore point: tag `before-house-rules`. Undo one step: `git revert --no-edit <commit>`, then push.
+
+1. shared/house-rules.js (defaults reproduce today exactly, resolver, renderer) + rule icons in build-icons / feather-icons
+2. Guest page renders page-rules from it (matched booking's room), new agreement record fields
+3. Admin full-screen "Check-in rules" editor per listing with live preview
+4. Checks + report
+
+## Progress log
+| Step | Commit | Status |
+|------|--------|--------|
