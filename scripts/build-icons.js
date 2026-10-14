@@ -13,6 +13,7 @@ const ICON_NAMES = [
   'arrow-up-down','sparkles','washing-machine','compass','plane','bed','clipboard-check',
   'layout-grid','ellipsis','pencil','grip-vertical',
   'globe','paperclip','scale',
+  'volume-x','cigarette-off','dog','paw-print','flame','footprints','door-closed','key-round','wine-off','car','baby','camera-off','droplets','zap','shield-alert',
 ];
 
 const ALIASES = { 'edit-2': 'pencil' };
