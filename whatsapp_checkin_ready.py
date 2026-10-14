@@ -29,6 +29,15 @@ ROOM_READY_MESSAGE   = (
     'All check-in instructions are available on your check-in page. 🙌'
 )
 
+# No room-ready message for Orbeliani (orb-*), VGL (vgl-*) and XCV (xcv-*) rooms.
+# Shartava and Freedom Square keep getting it. Same list as
+# whatsapp-functions/roomReadyDate.js (the Cloud Function room-ready sender).
+NO_ROOM_READY_PREFIXES = ('orb-', 'vgl-', 'xcv-')
+
+
+def room_ready_excluded(room_code):
+    return str(room_code or '').strip().lower().startswith(NO_ROOM_READY_PREFIXES)
+
 
 def tbilisi_now():
     return datetime.datetime.utcnow() + datetime.timedelta(hours=TZ_OFFSET_HOURS)
@@ -138,6 +147,11 @@ def main():
 
         if not room:
             print(f'  SKIP (no roomCode): {label}')
+            skipped += 1
+            continue
+
+        if room_ready_excluded(room):
+            print(f'  SKIP (no room-ready message for this property): {label}')
             skipped += 1
             continue
 

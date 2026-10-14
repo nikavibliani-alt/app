@@ -1,5 +1,5 @@
 const { onRequest } = require('firebase-functions/v2/https');
-const { isRoomReadyDateToday } = require('./roomReadyDate');
+const { isRoomReadyDateToday, isRoomReadyExcluded } = require('./roomReadyDate');
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { defineString } = require('firebase-functions/params');
 const { initializeApp, getApps } = require('firebase-admin/app');
@@ -1339,6 +1339,12 @@ exports.roomReadyNotification = onDocumentWritten(
 
     const { roomCode, date } = after.data();
     if (!roomCode || !date) return;
+
+    // No room-ready message for Orbeliani, VGL and XCV rooms (roomReadyDate.js).
+    if (isRoomReadyExcluded(roomCode)) {
+      console.log(`roomReadyNotification: skipped: no room-ready message for this property (${roomCode} / ${date})`);
+      return;
+    }
 
     // Emergency fix 2026-10-04: only for a Done on TODAY (Tbilisi). toggleHkDone also marks the next-arrival
     // day done, which messaged a guest arriving 6 days later.

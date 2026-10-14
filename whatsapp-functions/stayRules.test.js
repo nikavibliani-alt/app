@@ -15,7 +15,17 @@ test('otherPropertyForRoom: decided by the booking room code', () => {
   for (const shartava of ['0-1', '6-2', '6-3', '7-4']) assert.equal(otherPropertyForRoom(shartava), null, shartava);
   assert.equal(otherPropertyForRoom(''), null);
   assert.equal(otherPropertyForRoom(undefined), null);
-  assert.equal(otherPropertyForRoom('stable-1'), null, 'only a tab-/orb- prefix counts');
+  assert.equal(otherPropertyForRoom('stable-1'), null, 'only a listed prefix counts');
+});
+
+test('otherPropertyForRoom: VGL, XCV (Modern Avlabari) and Abashidze never get Shartava answers', () => {
+  for (const vgl of ['vgl-st1', 'vgl-st2', 'vgl-ap3', 'vgl-ap4', 'VGL-AP3']) assert.equal(otherPropertyForRoom(vgl), 'VGL', vgl);
+  for (const xcv of ['xcv-1', 'xcv-2', ' XCV-2 ']) assert.equal(otherPropertyForRoom(xcv), 'XCV (Modern Avlabari)', xcv);
+  assert.equal(otherPropertyForRoom('abashidze'), 'Abashidze');
+  // Every non-Shartava room code seen in reservations since June 2026 is covered.
+  for (const code of ['tab-1', 'tab-2', 'tab-3', 'orb-1', 'orb-2', 'orb-3', 'vgl-st1', 'vgl-st2', 'vgl-ap3', 'vgl-ap4', 'xcv-1', 'xcv-2', 'abashidze']) {
+    assert.notEqual(otherPropertyForRoom(code), null, code);
+  }
 });
 
 test('stayTiming: check-in opens at 15:00 Tbilisi on the arrival day', async (t) => {

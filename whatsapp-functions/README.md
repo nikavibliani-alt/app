@@ -194,15 +194,23 @@ from 15:00 and on every later day of the stay). The entrance and door-code
 scenarios use that line, so a guest who arrives after 15:00 is never told the
 code "switches on at 3pm".
 
-## Freedom Square / Orbeliani bookings
+## Other-property bookings (Freedom Square, Orbeliani, VGL, XCV, Abashidze)
 
-If the guest's current booking room starts with `tab-` (Freedom Square) or
-`orb-` (Orbeliani), the worker sends nothing and never calls Claude. The owner
-gets one alert per conversation per stay (`reason: "other_property"`,
-claimed once in `whatsapp_alert_throttle`). This replaced the old
-keyword-based sticky `isFreedomSquare` flag, which is no longer read or
-written. Guests who only mention Freedom Square as a landmark are answered
-normally.
+If the guest's current booking room starts with `tab-` (Freedom Square),
+`orb-` (Orbeliani), `vgl-` (VGL), `xcv-` (XCV / Modern Avlabari) or is
+`abashidze` (`OTHER_PROPERTIES` in `stayRules.js`), the worker sends nothing
+and never calls Claude. The owner gets one alert per conversation per stay
+(`reason: "other_property"`, claimed once in `whatsapp_alert_throttle`). This
+replaced the old keyword-based sticky `isFreedomSquare` flag, which is no
+longer read or written. Guests who only mention Freedom Square as a landmark
+are answered normally.
+
+## Room ready
+
+`roomReadyNotification` sends nothing for Orbeliani (`orb-`), VGL (`vgl-`) and
+XCV (`xcv-`) rooms (`isRoomReadyExcluded` in `roomReadyDate.js`); the daily
+fallback `whatsapp_checkin_ready.py` skips the same rooms. Shartava and Freedom
+Square rooms still get it.
 
 ## Urgent issues (lockout, flooding, security)
 

@@ -10,4 +10,16 @@ function tbilisiToday(nowMs = Date.now()) {
 function isRoomReadyDateToday(date, nowMs = Date.now()) {
   return String(date || '') === tbilisiToday(nowMs);
 }
-module.exports = { tbilisiToday, isRoomReadyDateToday };
+
+/**
+ * No "room ready" message for Orbeliani (orb-*), VGL (vgl-*) and XCV (xcv-*) rooms.
+ * Shartava and Freedom Square (tab-*) keep getting it. whatsapp_checkin_ready.py
+ * (the daily fallback) applies the same list.
+ */
+const NO_ROOM_READY_PREFIXES = ['orb-', 'vgl-', 'xcv-'];
+function isRoomReadyExcluded(roomCode) {
+  const code = String(roomCode || '').trim().toLowerCase();
+  return NO_ROOM_READY_PREFIXES.some((p) => code.startsWith(p));
+}
+
+module.exports = { tbilisiToday, isRoomReadyDateToday, isRoomReadyExcluded, NO_ROOM_READY_PREFIXES };

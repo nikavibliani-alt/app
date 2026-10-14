@@ -1,19 +1,31 @@
 'use strict';
 
 // Facts about the guest's stay that the bot must not leave to the model:
-// - which property the booking is at (Freedom Square / Orbeliani guests get
-//   no bot reply at all: every scenario in the prompt is Shartava-specific)
+// - which property the booking is at (Freedom Square, Orbeliani, VGL, XCV and
+//   Abashidze guests get no bot reply at all: every scenario in the prompt is
+//   Shartava-specific)
 // - whether check-in (15:00 Tbilisi) has already opened for this guest.
 
 const TBILISI_OFFSET_MS = 4 * 60 * 60 * 1000; // UTC+4 year-round, no DST
 const CHECKIN_HOUR = 15;
 
-/** 'Freedom Square' for tab-*, 'Orbeliani' for orb-*, else null (Shartava and anything else). */
+// Properties whose guests get no bot reply: the bot sends nothing, Claude is
+// not called, and the owner is alerted once per stay. Matched by the start of
+// the booking's room code (tab-1..3, orb-1..3, vgl-st1/st2/ap3/ap4, xcv-1/2,
+// abashidze).
+const OTHER_PROPERTIES = [
+  { prefix: 'tab-', name: 'Freedom Square' },
+  { prefix: 'orb-', name: 'Orbeliani' },
+  { prefix: 'vgl-', name: 'VGL' },
+  { prefix: 'xcv-', name: 'XCV (Modern Avlabari)' },
+  { prefix: 'abashidze', name: 'Abashidze' },
+];
+
+/** The property name for a non-Shartava room code (see OTHER_PROPERTIES), else null (Shartava and anything else). */
 function otherPropertyForRoom(roomCode) {
   const code = String(roomCode || '').trim().toLowerCase();
-  if (code.startsWith('tab-')) return 'Freedom Square';
-  if (code.startsWith('orb-')) return 'Orbeliani';
-  return null;
+  const match = OTHER_PROPERTIES.find((p) => code.startsWith(p.prefix));
+  return match ? match.name : null;
 }
 
 function tbilisiNow(nowMs) {
