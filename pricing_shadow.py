@@ -257,7 +257,7 @@ def load_rules(db, repo_config: dict) -> tuple[dict, dict]:
         settings["date_overrides"] = page["dateOverrides"]
     # season date ranges: the list saved on the pricing page; config.json (today's ranges) only when it is missing or not valid
     table, source, problems = season_ranges.from_rules(page, repo_config.get("seasons") or [])
-    if table:
+    if table is not None:
         settings["seasons"] = table
     for pr in problems:
         LOADER_WARNINGS.append(f"season dates: {pr} Using config.json.")

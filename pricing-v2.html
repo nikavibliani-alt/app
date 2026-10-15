@@ -104,47 +104,48 @@ body[data-layout="phone"] .tab{font-size:13px}
 .verdict{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:700;margin-right:6px}
 .verdict.right{background:var(--green-bg);color:var(--green-ink)}.verdict.wrong{background:var(--red-bg);color:var(--red-ink)}.verdict.unclear{background:var(--amber-bg);color:var(--amber-ink)}.verdict.run{background:var(--chip);color:var(--soft)}
 
-.mbar{display:grid;grid-template-columns:repeat(12,1fr);gap:6px}
-body[data-layout="phone"] .mbar{grid-template-columns:repeat(6,1fr)}
-.mbar .mo{display:flex;flex-direction:column;gap:3px;min-width:0}
-.mbar .mo b{font-size:12px;font-weight:600;color:var(--soft)}
-.mbar .days{display:flex;height:20px;border-radius:5px;overflow:hidden;border:1px solid var(--line);background:#fff}
-.mbar .days i{flex:1 1 0;min-width:0;display:block}
-.mbar .days i.gap{background:repeating-linear-gradient(45deg,#fff,#fff 2px,#CFCCC6 2px,#CFCCC6 4px);outline:1px solid var(--red);outline-offset:-1px}
-.mbar .days i.dup{background:var(--red)}
-.sleg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--soft)}
-.sleg span{display:inline-flex;align-items:center;gap:6px}
-.sleg i{width:12px;height:12px;border-radius:3px;display:inline-block}
-.srow{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;padding:12px 14px;border-bottom:1px solid var(--line2)}
-.srow:last-child{border-bottom:0}
-.srow .sfld{display:flex;flex-direction:column;gap:3px;padding:0;border:0;background:transparent;min-height:0}
-.srow .sfld>span{font-size:12px;font-weight:600;color:var(--soft)}
-.srow .spair{display:flex;gap:6px}
-.srow select{min-height:44px;padding:0 10px;border-radius:10px;border:1px solid var(--btn-line);background:#FFFFFF;color:var(--ink);font:inherit;font-size:15px}
-.srow .x{margin-left:auto}
-.srow.bad{background:var(--red-bg)}
-.fold{display:flex;align-items:center;gap:12px}
-.fold .grow{flex:1;min-width:0}
-.foldb{flex:0 0 auto;width:44px;height:44px;border-radius:12px;border:1px solid var(--btn-line);background:#FFFFFF;color:var(--ink);font-size:26px;font-weight:600;line-height:1;display:inline-flex;align-items:center;justify-content:center}
-.foldb[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
-
-.mbar .mo{background:transparent;border:0;padding:0;text-align:left;min-height:44px;cursor:pointer;justify-content:center}
+.seg{display:flex;gap:4px;padding:4px;background:var(--chip);border-radius:12px}
 .cnav{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:16px}
-.cmonths{display:grid;grid-template-columns:1fr;gap:18px}
-body[data-layout="desk"] .cmonths{grid-template-columns:1fr 1fr}
+.slists{display:flex;flex-direction:column;gap:6px}
+.slist{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:#FFFFFF;color:var(--ink);font-size:15px;text-align:left}
+.slist.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.slist .sw{width:22px;height:22px;border-radius:6px;flex:0 0 auto}
+.myear{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.mm{display:flex;flex-direction:column;gap:5px;padding:8px;border-radius:12px;border:1px solid var(--line);background:#FFFFFF;color:var(--ink);text-align:left;min-height:44px}
+.mm b{font-size:13px}
+.mgd{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.mc{display:flex;align-items:center;justify-content:center;aspect-ratio:1;border-radius:3px;font-size:12px;font-style:normal;font-weight:700;color:var(--red);background:#FFFFFF;border:1px solid transparent;line-height:1}
+.mc.off{background:transparent}
+.mc.pre{background:#1F1F1F}
+.mc.dim{background:#F0EEEA;color:transparent}
 .cm{min-width:0}
 .cmh{font-size:15px;font-weight:700;margin-bottom:6px}
 .cwk,.cgd{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
 .cwk span{font-size:12px;font-weight:600;color:var(--soft);text-align:center;padding-bottom:2px}
-.cd{height:44px;border-radius:8px;border:0;color:#FFFFFF;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;background:#FFFFFF;padding:0;position:relative}
+.cd{height:34px;border-radius:7px;border:0;color:var(--ink);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;background:#FFFFFF;padding:0;position:relative}
+.cm.big .cd{height:48px;font-size:15px;border-radius:9px}
 .cd.off{background:transparent}
-.cd.gap{background:repeating-linear-gradient(45deg,#fff,#fff 3px,#CFCCC6 3px,#CFCCC6 6px);color:var(--ink);outline:1px solid var(--red)}
-.cd.dup{background:var(--red)}
-.cd.pre{box-shadow:inset 0 0 0 3px #FFFFFF;outline:3px solid var(--ink);outline-offset:-1px;z-index:1}
-.cd.end{outline-width:4px}
+.cd.un{background:#FFFFFF;border:1px solid var(--btn-line)}
+.cd.dim{color:#8C8A85}
+.cd.pre{background:#1F1F1F;color:#FFFFFF}
+.cd .bang{position:absolute;top:1px;right:3px;font-size:12px;font-style:normal;font-weight:700;color:var(--red)}
+.cd.pre .bang{color:#FFFFFF}
+.sgrid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
+.cyear{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 14px}
+.sside{display:flex;flex-direction:column;gap:12px;position:sticky;top:80px}
+.hint{margin:0;font-size:15px;color:var(--soft)}
+.cbox{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:14px;background:#FFFFFF;border:1px solid var(--line)}
 .cbtns{display:flex;flex-direction:column;gap:8px}
 .cbtns.row{flex-direction:row;flex-wrap:wrap}
-.sbtn{min-height:44px;padding:0 14px;border-radius:10px;border:0;color:#FFFFFF;font-weight:600;font-size:15px}
+.sbtn{min-height:44px;padding:0 14px;border-radius:10px;border:0;color:var(--ink);font-weight:600;font-size:15px}
+.sbtn.un{background:#FFFFFF;border:1px solid var(--btn-line)}
+.linkb{align-self:flex-start;min-height:44px;padding:0 4px;background:transparent;border:0;color:var(--ink);font-size:15px;font-weight:600;text-decoration:underline}
+.unwarn{padding:10px 14px;border-radius:10px;background:var(--amber-bg);border:1px solid #C9A86A;color:var(--amber-ink);font-size:14px;line-height:1.45}
+.unchip{font-size:13px;font-weight:600;color:var(--amber-ink)}
+.fold{display:flex;align-items:center;gap:12px}
+.fold .grow{flex:1;min-width:0}
+.foldb{flex:0 0 auto;width:44px;height:44px;border-radius:12px;border:1px solid var(--btn-line);background:#FFFFFF;color:var(--ink);font-size:26px;font-weight:600;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.foldb[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
 .rangeerr{padding:10px 14px;border-radius:10px;background:var(--red-bg);border:1px solid var(--red);color:var(--red-ink);font-size:14px;line-height:1.45}
 .impact li{margin:0 0 8px 0}
 .scorebar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px}
@@ -660,7 +661,7 @@ const DEFAULT_RANGES = () => FIXED.map(([season, from, to]) => ({from, to, seaso
 const rangeKey = list => JSON.stringify(list.map(r => [r.from, r.to, r.season]).sort());
 const rangesSaved = () => {
   const r = S.rules && S.rules.seasonRanges;
-  return Array.isArray(r) && r.length ? r.filter(x => x && x.from && x.to && SEASONS[x.season]).map(x => ({from: x.from, to: x.to, season: x.season})) : DEFAULT_RANGES();
+  return Array.isArray(r) ? r.filter(x => x && x.from && x.to && SEASONS[x.season]).map(x => ({from: x.from, to: x.to, season: x.season})) : DEFAULT_RANGES();
 };
 const rangesNow = () => P.seasonRanges || rangesSaved();
 const ALL_MD = mdDays("01-01", "12-31").concat(["02-29"]).sort();
@@ -677,16 +678,13 @@ function rangeCoverage(ranges) {
   ranges.forEach(r => { mdSpan(r.from, r.to).forEach(md => { cov[md].push(r.season); }); });
   return cov;
 }
-function rangeProblems(ranges) {
+function rangeProblems(ranges) {                          // only overlaps are a problem; days nobody marked are a warning (see unmarkedDays)
   if (!ranges) return [];
-  const cov = rangeCoverage(ranges), out = [];
-  const gaps = ALL_MD.filter(md => !cov[md].length);
-  if (gaps.length) out.push("No season for: " + mdRunsText(gaps) + ".");
-  const pairs = {};
-  ALL_MD.forEach(md => { if (cov[md].length > 1) { const k = [...new Set(cov[md])].map(x => SEASONS[x].label).join(" and ") || ""; (pairs[cov[md][0] === cov[md][1] ? SEASONS[cov[md][0]].label + " twice" : k] ??= []).push(md); } });
-  Object.entries(pairs).forEach(([k, days]) => out.push(`More than one season on: ${mdRunsText(days)} (${k}).`));
-  return out;
+  const cov = rangeCoverage(ranges), days = ALL_MD.filter(md => cov[md].length > 1);
+  return days.length ? [`More than one season on: ${mdRunsText(days)}.`] : [];
 }
+const unmarkedDays = ranges => { const cov = rangeCoverage(ranges); return ALL_MD.filter(md => !cov[md].length); };
+const unmarkedWarning = days => `${days.length} day${days.length === 1 ? "" : "s"} unmarked: ${mdRunsText(days)}. They use Mid prices until you mark them.`;
 function seasonTextFor(id) {
   const list = rangesSaved().filter(r => r.season === id).sort((a, b) => ALL_MD.indexOf(a.from) - ALL_MD.indexOf(b.from));
   return list.length ? list.map(r => r.from === r.to ? fmtMD(r.from) : fmtRange(r.from, r.to)) : ["No dates yet"];
@@ -820,7 +818,7 @@ function changeLines() {
     if (f.engine) L.push(`${nm} automatic prices ${f.engine.from === "live" ? "Send prices" : "Only calculate"} → ${f.engine.v === "live" ? "Send prices" : "Only calculate"}`);
     if (f.window_days) L.push(`${nm} how far ahead ${aheadLabel(f.window_days.from)} → ${aheadLabel(f.window_days.v)}`);
   }
-  if (P.seasonRanges) L.push("season dates changed");
+  if (P.seasonRanges) L.push(seasonChangeLine());
   const ss = [...new Set(Object.keys(P.seasons).map(k => k.split("|")[1]))];
   if (ss.length) L.push(ss.map(id => SEASONS[id].label).join(", ") + " prices changed");
   P.holAdd.forEach(o => L.push(`holiday dates ${fmtRange(o.from, o.to)} (${SEASONS[o.season].label}) added`));
@@ -849,7 +847,7 @@ function paintBar() {
     bar.className = "";
     bar.innerHTML = `<div class="in"><div class="msg"><b>Not saved:</b> ${esc(L.join(", "))}.<div class="n ${blocked ? "bad" : ""}">${esc(note)}</div></div>
       <div class="btns"><button type="button" class="btn light" data-act="undoAll">Undo</button>
-      <button type="button" class="btn ${blocked ? "off" : "dark"}" data-act="save" aria-disabled="${blocked}">Save</button></div></div>`;
+      <button type="button" class="btn ${blocked ? "off" : "dark"}" data-act="save" aria-disabled="${blocked}">${P.seasonRanges ? "Review and save" : "Save"}</button></div></div>`;
   }
   requestAnimationFrame(() => document.documentElement.style.setProperty("--bar-h", bar.hidden ? "0px" : bar.offsetHeight + "px"));
 }
@@ -870,12 +868,13 @@ function watchdogHtml(desk) {
   const when = w.ts ? runWhen(w.ts) : "";
   const wrap = h => desk ? `<div style="padding:12px 24px 0">${h}</div>` : `<div class="page" style="padding-bottom:0;gap:0">${h}</div>`;
   if (stale) return wrap(`<div class="card status"><div class="l1"><b>Price check</b><span class="muted" style="font-size:13px">No result yet today</span></div></div>`);
-  if (!red) return wrap(`<div class="card status"><div class="l1"><b>Price check</b><span class="ok">${icon("check", 16, 2.4)}All good · ${esc(when)}</span></div></div>`);
+  const notes = (w.notes || []).map(n => `<div class="muted" style="font-size:13px;margin-top:6px"><b>!</b> ${esc(n)}</div>`).join("");
+  if (!red) return wrap(`<div class="card status"><div class="l1"><b>Price check</b><span class="ok">${icon("check", 16, 2.4)}All good · ${esc(when)}</span></div>${notes}</div>`);
   const shown = (w.issues || []).slice(0, 8);
   const list = shown.map(i => `<li>${esc(i.text)}</li>`).join("");
   const more = Math.max(0, (w.total_issues || (w.issues || []).length) - shown.length);
   return wrap(`<div class="card status" style="border-color:var(--red)" role="alert"><div class="l1"><b>Price check</b><span class="ok bad">${icon("x", 16, 2.4)}Needs a look · ${esc(when)}</span></div>
-    <ul class="wlist">${list}</ul>${more ? `<div class="muted" style="font-size:13px">and ${more} more</div>` : ""}</div>`);
+    <ul class="wlist">${list}</ul>${more ? `<div class="muted" style="font-size:13px">and ${more} more</div>` : ""}${notes}</div>`);
 }
 function pausedBannerHtml(desk) {
   return pausedBannerCore(desk) + watchdogHtml(desk);
@@ -1182,11 +1181,11 @@ function seasonChipsHtml() {
     return `<button type="button" class="pill" role="radio" aria-checked="${on}" data-act="season" data-season="${id}"><span class="pd" style="background:${on ? "#FFFFFF" : s.dot}"></span>${s.label}${bad.has(id) ? " (fix)" : ""}</button>`;
   }).join("");
 }
-function seasonOpen() { return !!P.seasonRanges || !!U.seasonOpen; }          // unsaved changes or a red error keep it open
+function seasonOpen() { return !!P.seasonRanges || !!U.seasonOpen; }          // unsaved changes keep it open
 function seasonFoldHtml() {
-  const open = seasonOpen(), locked = !!P.seasonRanges;
+  const open = seasonOpen(), locked = !!P.seasonRanges, um = unmarkedDays(rangesNow());
   return `<section class="sec" id="seasonFold"><div class="fold">
-      <div class="grow"><h2 class="h2">Season dates</h2>${open ? `<p class="sub">Every year, all rooms. Tap the first and the last day of a season, then pick which season it is. Every day has exactly one season.${locked ? " Save or undo your changes to close this." : ""}</p>` : ""}</div>
+      <div class="grow"><h2 class="h2">Season dates</h2>${!open && um.length ? `<div class="unchip"><b>!</b> ${um.length} day${um.length === 1 ? "" : "s"} unmarked</div>` : ""}${open ? `<p class="sub">Every year, all rooms. Tap the first and the last day of a season, then pick which season it is.${locked ? " Save or undo your changes to close this." : ""}</p>` : ""}</div>
       <button type="button" class="foldb" data-act="toggleSeasonDates" aria-expanded="${open}" aria-controls="seasonDates" aria-disabled="${locked}" aria-label="${open ? "Close season dates" : "Open season dates"}">${open ? "−" : "+"}</button></div>
       ${open ? `<div class="sec" id="seasonDates">${seasonDatesInner()}</div>` : ""}</section>`;
 }
@@ -1219,67 +1218,88 @@ function refreshSeasonUi() {
 
 /* ---------- the Seasons tab: season dates (bar + list of ranges) ---------- */
 const MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-function monthBarHtml(ranges) {
-  const cov = rangeCoverage(ranges);
-  return `<div class="mbar" aria-label="The year by season: ${esc(SEASON_ORDER.map(id => SEASONS[id].label + " " + (seasonTextForRanges(ranges, id)).join(", ")).join("; "))}">` + MN.map((m, mi) => {
-    const cells = Array.from({length: MONTH_DAYS[mi]}, (_, d) => { const md = String(mi + 1).padStart(2, "0") + "-" + String(d + 1).padStart(2, "0"), c = cov[md];
-      return c.length === 0 ? `<i class="gap" title="${esc(fmtMD(md))}: no season"></i>` : c.length > 1 ? `<i class="dup" title="${esc(fmtMD(md))}: more than one season"></i>` : `<i style="background:${SEASONS[c[0]].dot}" title="${esc(fmtMD(md) + ": " + SEASONS[c[0]].label)}"></i>`; }).join("");
-    return `<button type="button" class="mo" data-act="calMonth" data-m="${mi + 1}" aria-label="Show ${MNL[mi]}"><b>${m}</b><div class="days">${cells}</div></button>`; }).join("") + `</div>`;
-}
-function seasonTextForRanges(ranges, id) { const l = ranges.filter(r => r.season === id); return l.length ? l.map(r => r.from === r.to ? fmtMD(r.from) : fmtRange(r.from, r.to)) : ["–"]; }
+const FILL = {low: "#E2E0DA", mid: "#CBDFC3", xmas_low: "#DCCFC2", high: "#8FBE85", peak: "#E89C90", new_year: "#B7A4D1"};
+const GREY = "#F0EEEA";
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const dayMapOf = ranges => { const cov = rangeCoverage(ranges), m = {}; ALL_MD.forEach(md => { m[md] = cov[md][0] || null; }); return m; };
 const sameDayMap = (a, b) => ALL_MD.every(md => a[md] === b[md]);
-function rangesFromMap(map) {                              // runs of the same season; one that runs over New Year stays one range
+function rangesFromMap(map) {                              // runs of the same season; unmarked days are simply not in the list; one run over New Year stays one range
   const runs = [];
   ALL_MD.forEach(md => { const l = runs[runs.length - 1]; if (l && l.season === map[md]) l.to = md; else runs.push({from: md, to: md, season: map[md]}); });
-  if (runs.length > 1 && runs[0].season === runs[runs.length - 1].season && runs[0].from === "01-01" && runs[runs.length - 1].to === "12-31") {
+  if (runs.length > 1 && runs[0].season && runs[0].season === runs[runs.length - 1].season && runs[0].from === "01-01" && runs[runs.length - 1].to === "12-31") {
     const last = runs.pop(); runs[0] = {from: last.from, to: runs[0].to, season: last.season};
   }
   return runs.filter(r => r.season);
 }
-function paintSeason(from, to, season) {
+function paintSeason(from, to, season) {                  // season null = unmarked
   const map = dayMapOf(rangesNow()); mdSpan(from, to).forEach(md => { map[md] = season; });
   P.seasonRanges = sameDayMap(dayMapOf(rangesSaved()), map) ? null : rangesFromMap(map);
   touch();
 }
-const calState = () => (U.cal ??= {m: +today().slice(5, 7), a: null, b: null, ambig: false});
+const calState = () => (U.cal ??= {mode: "year", m: +today().slice(5, 7), a: null, b: null, ambig: false, focus: null});
 const dayCount = (a, b) => mdSpan(a, b).length;
 const spanText = (a, b) => a === b ? fmtMD(a) : `${fmtMD(a)} – ${fmtMD(b)}`;
-function calMonthHtml(mi, cov, c) {
-  const first = new Date(Date.UTC(2028, mi - 1, 1)).getUTCDay(), lead = (first + 6) % 7, n = MONTH_DAYS[mi - 1];
-  const pre = new Set(c.a && !c.ambig ? (c.b ? mdSpan(c.a, c.b) : [c.a]) : []);
+function seasonChangeLine() {                              // "8 days changed (20–27 Dec → High)"
+  const was = dayMapOf(rangesSaved()), now = dayMapOf(rangesNow()), groups = {}; let n = 0;
+  ALL_MD.forEach(md => { if (was[md] !== now[md]) { n++; (groups[now[md] || "none"] ??= []).push(md); } });
+  return `${n} day${n === 1 ? "" : "s"} changed (${Object.entries(groups).map(([k, days]) => `${mdRunsText(days)} → ${k === "none" ? "Unmarked" : SEASONS[k].label}`).join("; ")})`;
+}
+function seasonListHtml(map, c) {
+  const counts = {}; let none = 0;
+  ALL_MD.forEach(md => { if (map[md]) counts[map[md]] = (counts[map[md]] || 0) + 1; else none++; });
+  const row = (id, label, n, swatch) => `<button type="button" class="slist ${c.focus === id ? "on" : ""}" data-act="calFocus" data-s="${id}" aria-pressed="${c.focus === id}"><span class="sw" style="${swatch}"></span><span class="grow"><b>${label}</b> · ${n} day${n === 1 ? "" : "s"}</span></button>`;
+  return `<div class="slists" role="group" aria-label="Seasons: tap one to see only its days">${SEASON_ORDER.map(id => row(id, SEASONS[id].label, counts[id] || 0, `background:${FILL[id]}`)).join("")}${none ? row("none", "Unmarked", none, "background:#FFFFFF;border:1px solid var(--btn-line)") : ""}</div>`;
+}
+function dayStyle(season, md, c, pre) {
+  if (pre.has(md)) return {cls: "pre", bg: ""};
+  const dim = c.focus && ((c.focus === "none" ? season !== null : season !== c.focus));
+  if (!season) return {cls: "un" + (dim ? " dim" : ""), bg: ""};
+  return {cls: dim ? "dim" : "", bg: `background:${dim ? GREY : FILL[season]};`};
+}
+function preSet(c) { return new Set(c.a && !c.ambig ? (c.b ? mdSpan(c.a, c.b) : [c.a]) : []); }
+function fullMonthHtml(mi, map, c, big) {
+  const first = new Date(Date.UTC(2028, mi - 1, 1)).getUTCDay(), lead = (first + 6) % 7, n = MONTH_DAYS[mi - 1], pre = preSet(c);
   const cells = [...Array(lead).fill('<span class="cd off"></span>')];
   for (let d = 1; d <= n; d++) {
-    const md = String(mi).padStart(2, "0") + "-" + String(d).padStart(2, "0"), cs = cov[md], sId = cs[0], bad = cs.length !== 1;
-    const bg = bad ? "" : `background:${SEASONS[sId].dot};`, state = [pre.has(md) ? "pre" : "", md === c.a ? "end" : "", md === c.b ? "end" : "", bad ? (cs.length ? "dup" : "gap") : ""].join(" ");
-    cells.push(`<button type="button" class="cd ${state}" style="${bg}" data-act="calDay" data-md="${md}" aria-pressed="${pre.has(md)}" aria-label="${esc(fmtMD(md))}, ${bad ? (cs.length ? "more than one season" : "no season") : esc(SEASONS[sId].label)}">${d}</button>`);
+    const md = String(mi).padStart(2, "0") + "-" + String(d).padStart(2, "0"), sId = map[md], st = dayStyle(sId, md, c, pre);
+    cells.push(`<button type="button" class="cd ${st.cls}" style="${st.bg}" data-act="calDay" data-md="${md}" aria-pressed="${pre.has(md)}" aria-label="${esc(fmtMD(md))}, ${sId ? esc(SEASONS[sId].label) : "unmarked"}">${d}${sId ? "" : '<i class="bang">!</i>'}</button>`);
   }
-  return `<div class="cm"><div class="cmh">${MNL[mi - 1]}</div><div class="cwk">${WEEKDAYS.map(w => `<span>${w}</span>`).join("")}</div><div class="cgd">${cells.join("")}</div></div>`;
+  return `<div class="cm ${big ? "big" : ""}"><div class="cmh">${MNL[mi - 1]}</div><div class="cwk">${WEEKDAYS.map(w => `<span>${w}</span>`).join("")}</div><div class="cgd">${cells.join("")}</div></div>`;
 }
-function calPanelHtml(c) {
-  if (!c.a) return `<p class="sub" style="margin:0">Tap the first day of a season, then its last day. Tap the same day twice for one day.</p>`;
-  if (!c.b) return `<p class="sub" style="margin:0">From <b>${esc(fmtMD(c.a))}</b>. Now tap the last day (in this month or another).</p><button type="button" class="btn light small" data-act="calCancel" style="color:var(--ink)">Cancel</button>`;
-  if (c.ambig) return `<div style="font-size:15px;line-height:1.45">The last day (${esc(fmtMD(c.b))}) comes before the first day (${esc(fmtMD(c.a))}). Which one do you mean?</div>
+function miniMonthHtml(mi, map, c) {                       // whole year on the phone: a small calendar, tap it to open the month
+  const first = new Date(Date.UTC(2028, mi - 1, 1)).getUTCDay(), lead = (first + 6) % 7, n = MONTH_DAYS[mi - 1], pre = preSet(c);
+  const cells = [...Array(lead).fill('<i class="mc off"></i>')];
+  for (let d = 1; d <= n; d++) {
+    const md = String(mi).padStart(2, "0") + "-" + String(d).padStart(2, "0"), sId = map[md], st = dayStyle(sId, md, c, pre);
+    cells.push(`<i class="mc ${st.cls}" style="${st.bg}">${sId || st.cls.includes("pre") ? "" : "!"}</i>`);
+  }
+  return `<button type="button" class="mm" data-act="calMonth" data-m="${mi}" aria-label="Open ${MNL[mi - 1]}"><b>${MN[mi - 1]}</b><span class="mgd">${cells.join("")}</span></button>`;
+}
+function calBoxHtml(c) {
+  if (!c.a) return `<p class="hint">Tap the first day</p>`;
+  if (!c.b) return `<p class="hint">From <b>${esc(fmtMD(c.a))}</b>. Now tap the last day</p><button type="button" class="linkb" data-act="calCancel">Cancel</button>`;
+  if (c.ambig) return `<div class="cbox"><div style="font-size:15px;line-height:1.45">The last day (${esc(fmtMD(c.b))}) comes before the first day (${esc(fmtMD(c.a))}). Which one do you mean?</div>
     <div class="cbtns"><button type="button" class="btn light" data-act="calWrap" style="color:var(--ink)">Over New Year: ${esc(spanText(c.a, c.b))} · ${dayCount(c.a, c.b)} days</button>
-    <button type="button" class="btn light" data-act="calSwap" style="color:var(--ink)">The other way: ${esc(spanText(c.b, c.a))} · ${dayCount(c.b, c.a)} days</button>
-    <button type="button" class="btn light small" data-act="calCancel" style="color:var(--ink)">Cancel</button></div>`;
-  return `<div style="font-size:15px;line-height:1.45"><b>${esc(spanText(c.a, c.b))}</b> · ${dayCount(c.a, c.b)} day${dayCount(c.a, c.b) === 1 ? "" : "s"}. Which season is this?</div>
-    <div class="cbtns row">${SEASON_ORDER.map(id => `<button type="button" class="sbtn" style="background:${SEASONS[id].dot}" data-act="calSeason" data-s="${id}">${SEASONS[id].label}</button>`).join("")}</div>
-    <button type="button" class="btn light small" data-act="calCancel" style="color:var(--ink)">Cancel</button>`;
+    <button type="button" class="btn light" data-act="calSwap" style="color:var(--ink)">The other way: ${esc(spanText(c.b, c.a))} · ${dayCount(c.b, c.a)} days</button></div><button type="button" class="linkb" data-act="calCancel">Cancel</button></div>`;
+  const n = dayCount(c.a, c.b);
+  return `<div class="cbox"><div style="font-size:16px;font-weight:700">${esc(spanText(c.a, c.b))} · ${n} day${n === 1 ? "" : "s"}</div><div style="font-size:14px">Make these days:</div>
+    <div class="cbtns row">${SEASON_ORDER.map(id => `<button type="button" class="sbtn" style="background:${FILL[id]}" data-act="calSeason" data-s="${id}">${SEASONS[id].label}</button>`).join("")}<button type="button" class="sbtn un" data-act="calSeason" data-s="none">Unmarked</button></div>
+    <button type="button" class="linkb" data-act="calCancel">Cancel</button></div>`;
 }
 function seasonDatesInner() {
-  const ranges = rangesNow(), cov = rangeCoverage(ranges), c = calState(), problems = rangeProblems(P.seasonRanges ? ranges : null);
-  const months = isDesk() ? [c.m, (c.m % 12) + 1] : [c.m];
-  const summary = SEASON_ORDER.map(id => `<div class="rline"><span class="dot" style="width:10px;height:10px;background:${SEASONS[id].dot}"></span><b>${SEASONS[id].label}</b>&nbsp;${esc(seasonTextForRanges(ranges, id).join(", "))}</div>`).join("");
-  return `${monthBarHtml(ranges)}
-    <div class="sleg">${SEASON_ORDER.map(id => `<span><i style="background:${SEASONS[id].dot}"></i>${SEASONS[id].label}</span>`).join("")}</div>
-    ${problems.length ? `<div class="rangeerr" role="alert">${problems.map(x => `<div>${esc(x)}</div>`).join("")} Pick the days and a season below to fix it.</div>` : ""}
-    <div class="card pad" style="display:flex;flex-direction:column;gap:12px">
-      <div class="cnav"><button type="button" class="foldb" data-act="calMove" data-d="-1" aria-label="Previous month">‹</button><b>${months.map(m => MNL[m - 1]).join(" · ")}</b><button type="button" class="foldb" data-act="calMove" data-d="1" aria-label="Next month">›</button></div>
-      <div class="cmonths">${months.map(m => calMonthHtml(m, cov, c)).join("")}</div>
-      <div class="cpanel">${calPanelHtml(c)}</div></div>
-    <div class="card pad" style="display:flex;flex-direction:column;gap:6px;font-size:14px">${summary}</div>`;
+  const ranges = rangesNow(), map = dayMapOf(ranges), c = calState(), desk = isDesk(), problems = rangeProblems(P.seasonRanges ? ranges : null), um = ALL_MD.filter(md => !map[md]);
+  const warn = um.length ? `<div class="unwarn" role="status"><b>!</b> ${esc(unmarkedWarning(um))}</div>` : "";
+  const err = problems.length ? `<div class="rangeerr" role="alert">${problems.map(x => `<div>${esc(x)}</div>`).join("")}</div>` : "";
+  const list = seasonListHtml(map, c), box = calBoxHtml(c);
+  if (desk) {
+    return `${warn}${err}<div class="sgrid"><div class="cyear">${Array.from({length: 12}, (_, i) => fullMonthHtml(i + 1, map, c, false)).join("")}</div>
+      <div class="sside">${list}${box}</div></div>`;
+  }
+  const modeSw = `<div class="seg" role="radiogroup" aria-label="Calendar view"><button type="button" class="segb ${c.mode === "year" ? "on" : ""}" role="radio" aria-checked="${c.mode === "year"}" data-act="calView" data-v="year">Whole year</button><button type="button" class="segb ${c.mode === "month" ? "on" : ""}" role="radio" aria-checked="${c.mode === "month"}" data-act="calView" data-v="month">Month</button></div>`;
+  const cal = c.mode === "year"
+    ? `<div class="myear">${Array.from({length: 12}, (_, i) => miniMonthHtml(i + 1, map, c)).join("")}</div>`
+    : `<div class="cnav"><button type="button" class="foldb" data-act="calMove" data-d="-1" aria-label="Previous month">‹</button><b>${MNL[c.m - 1]}</b><button type="button" class="foldb" data-act="calMove" data-d="1" aria-label="Next month">›</button></div>${fullMonthHtml(c.m, map, c, true)}`;
+  return `${warn}${err}${list}${modeSw}${cal}${c.mode === "month" ? box : `<p class="hint">Tap a month to open it, then tap the first and the last day.</p>`}`;
 }
 function refreshSeasonDates() {
   const el = $("seasonFold"); if (el) el.outerHTML = seasonFoldHtml();
@@ -1715,6 +1735,7 @@ function viewWeekly() {
     <div>Channel push failures: <b>${fails || "none"}</b></div>
     <div>Days the price check was red: <b>${a.watchdog_red_days ?? 0}</b> of ${a.watchdog_days_recorded ?? 0} recorded</div>
     <div>Season date changes: <b>${(a.season_date_changes || {}).count || 0}</b></div>
+    ${(a.season_unmarked || {}).count ? `<div>Season days nobody marked: <b>${a.season_unmarked.count}</b> (they use Mid prices)</div>` : ""}
     <div>Ideas scorecard: <b>${id.finished ? `Right ${id.right} of ${id.finished}` : "no finished ideas yet"}</b></div>
     <div>What-if twin: <b>${(a.twin || {}).finished ? `${a.twin.finished} compared, its prices ${a.twin.avg_difference_pct > 0 ? "higher" : a.twin.avg_difference_pct < 0 ? "lower" : "the same"} on average` : "nothing to compare yet"}</b></div></div>`;
   const check = r.checked ? `Checked by a second reader: ${(r.removed || []).length} claim${(r.removed || []).length === 1 ? "" : "s"} removed, ${r.edited || 0} shortened.` : "The second reader did not run, so no written claim is shown.";
@@ -1994,7 +2015,9 @@ async function saveAll() {
     const body = imp.length
       ? `<p>These nights move to another season:</p><ul class="impact" style="padding-left:18px;font-size:14px;line-height:1.45">${imp.map(x => `<li><b>${esc(x.room)}</b>: ${x.parts.map(esc).join("; ")}</li>`).join("")}</ul>`
       : `<p>No empty night within the price window changes season.</p>`;
-    if (!(await confirmHtml("Check what changes", body + `<p class="muted" style="font-size:13px">Booked, hand-set and protected nights are not touched. Holiday dates keep working as now. Starts at the next price update.</p>`, "Save", "Go back"))) return;
+    const umNow = unmarkedDays(P.seasonRanges);
+    const umHtml = umNow.length ? `<div class="unwarn" role="status"><b>!</b> ${esc(unmarkedWarning(umNow))}</div>` : "";
+    if (!(await confirmHtml("Check what changes", umHtml + body + `<p class="muted" style="font-size:13px">Booked, hand-set and protected nights are not touched. Holiday dates keep working as now. Starts at the next price update.</p>`, "Save", "Go back"))) return;
   }
   const live = Object.entries(P.room).filter(([, f]) => f.engine && f.engine.v === "live" && f.engine.from !== "live").map(([rt]) => roomById(rt).short);
   if (live.length && !(await confirmDialog("Send prices?", `${live.join(", ")} will start getting prices written to Booking and Airbnb at the next update. Save?`, "Yes, save", "Not yet"))) return;
@@ -2172,7 +2195,9 @@ document.addEventListener("click", async e => {
     case "undoAll": P.room = {}; P.seasons = {}; P.holAdd = []; P.holDel = []; P.ruleAdd = []; P.ruleDel = []; P.seasonRanges = null; touch(); render(); break;
     case "toggleSeasonDates": if (t.getAttribute("aria-disabled") === "true") break; U.seasonOpen = !U.seasonOpen; render(); break;
     case "calMove": { const c = calState(); c.m = ((c.m - 1 + (+d.d) + 12) % 12) + 1; refreshSeasonDates(); break; }
-    case "calMonth": calState().m = +d.m; refreshSeasonDates(); break;
+    case "calMonth": { const c = calState(); c.m = +d.m; c.mode = "month"; refreshSeasonDates(); break; }
+    case "calView": { calState().mode = d.v; refreshSeasonDates(); break; }
+    case "calFocus": { const c = calState(); c.focus = c.focus === d.s ? null : d.s; refreshSeasonDates(); break; }
     case "calDay": {
       const c = calState();
       if (!c.a || c.b) { c.a = d.md; c.b = null; c.ambig = false; }
@@ -2182,7 +2207,7 @@ document.addEventListener("click", async e => {
     case "calWrap": { calState().ambig = false; refreshSeasonDates(); break; }
     case "calSwap": { const c = calState(); [c.a, c.b] = [c.b, c.a]; c.ambig = false; refreshSeasonDates(); break; }
     case "calCancel": { const c = calState(); c.a = c.b = null; c.ambig = false; refreshSeasonDates(); break; }
-    case "calSeason": { const c = calState(); if (c.a && c.b) { paintSeason(c.a, c.b, d.s); c.a = c.b = null; c.ambig = false; refreshSeasonDates(); } break; }
+    case "calSeason": { const c = calState(); if (c.a && c.b) { paintSeason(c.a, c.b, d.s === "none" ? null : d.s); c.a = c.b = null; c.ambig = false; refreshSeasonDates(); } break; }
     case "save": if (t.getAttribute("aria-disabled") === "true") { paintBar(); break; } saveAll(); break;
     case "cur": U.cur = d.v; render(); break;
     case "win": U.win = d.v; U.sel = U.sel2 = null; U.panel = null; render(); break;

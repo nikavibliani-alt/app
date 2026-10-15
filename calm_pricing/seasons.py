@@ -3,7 +3,7 @@ Season date ranges: one list kept in Firestore (pricing_config/rules.seasonRange
 
   seasonRanges = [{"from": "12-28", "to": "01-06", "season": "new_year"}, ...]     every year; a range with from > to crosses New Year
 
-Rules: every day of the year (29 Feb included) has exactly one season; only the six known seasons. The engines work with the older table
+Rules: a day has at most one season (29 Feb included); only the six known seasons. Days with no season are "unmarked": allowed, the engines use Mid for them. The engines work with the older table
 form [{"name", "ranges": [["MM-DD", "MM-DD"], ...]}] whose ranges never cross New Year, so `engine_table` splits those ranges in two.
 If the saved list is missing or not valid, readers fall back to config.json (which holds today's ranges): see `from_rules`.
 """
@@ -64,7 +64,7 @@ def runs(days: list) -> list:
 def parse(raw) -> tuple:
     """(clean list, problems). A clean entry is {"from", "to", "season"}. Anything malformed is a problem, never a crash."""
     problems, out = [], []
-    if not isinstance(raw, list) or not raw:
+    if not isinstance(raw, list):
         return [], ["no season dates"]
     for i, r in enumerate(raw):
         if not isinstance(r, dict) or not valid_md(r.get("from")) or not valid_md(r.get("to")) or r.get("season") not in SEASON_NAMES:
@@ -80,6 +80,32 @@ def coverage(ranges: list) -> dict:
         for md in days_of(r["from"], r["to"]):
             cov[md].append(r["season"])
     return cov
+
+
+def unmarked(ranges: list) -> list:
+    """Days (MM-DD) that no range covers. Allowed: the engines use Mid for them and the pricing page warns until they are marked."""
+    cov = coverage(ranges)
+    return [md for md in ALL_DAYS if not cov[md]]
+
+
+def unmarked_text(days: list) -> str:
+    """'12 days unmarked: 3-14 Mar' for the page, the watchdog and the weekly report."""
+    n = len(days)
+    return f"{n} day{'s' if n != 1 else ''} unmarked: " + ", ".join(range_text(g) for g in runs(days))
+
+
+def overlaps(ranges: list) -> list:
+    """Days with two seasons (the page never makes these)."""
+    cov = coverage(ranges)
+    by_pair = {}
+    for md, s in cov.items():
+        if len(s) > 1:
+            by_pair.setdefault(tuple(dict.fromkeys(s)) if len(set(s)) > 1 else (s[0], s[0]), []).append(md)
+    out = []
+    for pair, days in by_pair.items():
+        names = " and ".join(LABELS[x] for x in pair) if pair[0] != pair[1] else f"{LABELS[pair[0]]} twice"
+        out.append(f"More than one season on: {', '.join(range_text(g) for g in runs(days))} ({names}).")
+    return out
 
 
 def check(ranges: list) -> list:
@@ -134,7 +160,7 @@ def from_rules(page: dict, fallback_table: list) -> tuple:
     if raw is None:
         return fallback_table, "config.json (no saved season dates yet)", []
     ranges, problems = parse(raw)
-    problems = problems + (check(ranges) if not problems else [])
+    problems = problems + (overlaps(ranges) if not problems else [])        # days nobody marked are allowed: the engines use Mid for them
     if problems:
         return fallback_table, "config.json (the saved season dates are not valid)", problems
     return engine_table(ranges), "pricing_config/rules.seasonRanges", []

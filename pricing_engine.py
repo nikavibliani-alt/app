@@ -745,7 +745,7 @@ def load_firestore_rules(db, config: dict):
         # season date ranges saved on the pricing page; config.json (today's ranges) stays when they are missing or not valid
         from calm_pricing import seasons as _seasons
         _table, _src, _problems = _seasons.from_rules(rules_data, config.get("seasons") or [])
-        if _table:
+        if _table is not None:
             config["seasons"] = _table
         for _p in _problems:
             print(f"  Warning: season dates: {_p} Using config.json.", file=sys.stderr)

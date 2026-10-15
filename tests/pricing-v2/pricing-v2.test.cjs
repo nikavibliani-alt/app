@@ -591,111 +591,158 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
     }});
   }
 
-  // ---- season dates fold: closed by default, + opens, - closes, locked while there are unsaved changes ----
+  // ---- season dates: closed row, season list, calendar (tap first and last day), unmarked days ----
+  const FILLS = {low: 'rgb(226, 224, 218)', mid: 'rgb(203, 223, 195)', xmas_low: 'rgb(220, 207, 194)', high: 'rgb(143, 190, 133)', peak: 'rgb(232, 156, 144)', new_year: 'rgb(183, 164, 209)'};
+  const GREYC = 'rgb(240, 238, 234)', BLACK = 'rgb(31, 31, 31)';
+  // phone: month view of a month; computer: the whole year is always there
+  const showMonth = async (page, desk, m) => { if (desk) return; await page.click('[data-act=calView][data-v=year]'); await page.click(`.mm[data-m="${m}"]`); await page.waitForSelector('.cm.big'); };
+  const monthOf = md => +md.slice(0, 2);
+  const cellBg = (page, md) => page.$eval(`.cd[data-md="${md}"]`, e => getComputedStyle(e).backgroundColor);
+  const tapDays = async (page, desk, a, b) => {
+    await showMonth(page, desk, monthOf(a)); await page.click(`.cd[data-md="${a}"]`);
+    if (!desk && monthOf(b) !== monthOf(a)) { const d = (monthOf(b) - monthOf(a) + 12) % 12 <= 6 ? 1 : -1; let m = monthOf(a); while (m !== monthOf(b)) { await page.click(`[data-act=calMove][data-d="${d}"]`); m = ((m - 1 + d + 12) % 12) + 1; } }
+    await page.click(`.cd[data-md="${b}"]`);
+  };
+  const BAR = '#bar';
   for (const [w, hh] of SIZES) {
-    await test('season dates fold: one row with + when closed; + opens, - closes; stays open while there are unsaved changes or an error', w, hh, async ({page}) => {
+    await test('season dates: closed by default (one row, +), + opens and - closes, locked open while there are unsaved changes', w, hh, async ({page}, desk) => {
       await go(page, '#/seasons');
       assert.ok(!(await page.$('#seasonDates')), 'closed by default');
       const row = await text(page, '#seasonFold');
-      assert.ok(/Season dates/.test(row) && !/Tap the first and the last day/.test(row) && !(await page.$('#seasonFold .mbar')), row);
+      assert.ok(/Season dates/.test(row) && !/unmarked/.test(row) && !(await page.$('#seasonFold .cd')), row);
       const b = '[data-act=toggleSeasonDates]';
       assert.strictEqual(await page.$eval(b, e => e.innerText.trim()), '+');
       assert.strictEqual(await page.getAttribute(b, 'aria-expanded'), 'false');
-      const box = await page.$eval(b, e => { const r = e.getBoundingClientRect(); return [r.width, r.height, r.right, innerWidth]; });
-      assert.ok(box[0] >= 44 && box[1] >= 44 && box[3] - box[2] < 60, 'a 44px button on the right: ' + box);
       await page.click(b); await page.waitForSelector('#seasonDates');
       assert.strictEqual(await page.$eval(b, e => e.innerText.trim()), '−');
-      assert.strictEqual(await page.getAttribute(b, 'aria-expanded'), 'true');
-      assert.ok(await page.$('#seasonDates .mbar') && (await page.$$('#seasonDates .cd')).length > 20);
       await page.click(b); await page.waitForTimeout(80);
       assert.ok(!(await page.$('#seasonDates')) && (await page.$eval(b, e => e.innerText.trim())) === '+', 'closes again');
-      // an unsaved change keeps it open and the button cannot close it
       await page.click(b); await page.waitForSelector('#seasonDates');
-      await page.click('#seasonDates .mbar .mo[data-m="12"]'); await page.click('.cd[data-md="12-02"]'); await page.click('.cd[data-md="12-05"]'); await page.click('[data-act=calSeason][data-s="high"]');
+      await tapDays(page, desk, '12-02', '12-05'); await page.click('[data-act=calSeason][data-s="high"]');
       assert.strictEqual(await page.getAttribute(b, 'aria-disabled'), 'true');
       assert.ok(/Save or undo your changes to close this/.test(await text(page, '#seasonFold')));
       await page.click(b, {force: true}); await page.waitForTimeout(80);
       assert.ok(await page.$('#seasonDates'), 'still open while there are unsaved changes');
-      await page.click('#bar [data-act=undoAll]'); await page.waitForTimeout(80);
+      await page.click(`${BAR} [data-act=undoAll]`); await page.waitForTimeout(80);
       assert.strictEqual(await page.getAttribute(b, 'aria-disabled'), 'false');
       await page.click(b); await page.waitForTimeout(80);
       assert.ok(!(await page.$('#seasonDates')), 'after undo it can close');
     });
-  }
-
-  // ---- season dates: a calendar (tap the first and the last day, pick the season) ----
-  const COLOR = {new_year: 'rgb(94, 74, 110)', mid: 'rgb(110, 139, 106)', high: 'rgb(46, 107, 52)', low: 'rgb(138, 137, 132)', peak: 'rgb(155, 44, 44)', xmas_low: 'rgb(122, 111, 100)'};
-  const bg = (page, md) => page.$eval(`.cd[data-md="${md}"]`, e => getComputedStyle(e).backgroundColor);
-  for (const [w, hh] of SIZES) {
-    await test('season calendar: days carry their season colour, the 12-month bar jumps to a month, tap first and last day then pick a season', w, hh, async ({page}, desk) => {
+    await test('season dates: the season list shows colour, name and day count; tap a season to see only its days, tap again for all colours', w, hh, async ({page}, desk) => {
       await go(page, '#/seasons'); await openDates(page);
-      assert.strictEqual(await page.$$eval('#seasonDates .mbar .mo', els => els.length), 12);
-      assert.strictEqual(await page.$$eval('#seasonDates .mbar .days i', els => els.length), 366);
-      assert.strictEqual((await page.$$('#seasonDates .cmonths .cm')).length, desk ? 2 : 1, 'one month on the phone, two on the computer');
-      assert.strictEqual(await bg(page, '10-05'), COLOR.mid);
-      await page.click('#seasonDates .mbar .mo[data-m="12"]');
-      assert.strictEqual(await bg(page, '12-10'), COLOR.xmas_low); assert.strictEqual(await bg(page, '12-26'), COLOR.new_year);
-      assert.ok(/December/.test(await text(page, '#seasonDates .cnav')));
-      const legend = await text(page, '#seasonDates .sleg');
-      assert.ok(/Low/.test(legend) && /Early December/.test(legend) && /New Year/.test(legend));
-      assert.ok(/Tap the first day of a season/.test(await text(page, '#seasonDates .cpanel')));
-      assert.ok(!(await page.$('#bar:not([hidden]) .btns')), 'nothing to save yet');
-      await page.click('.cd[data-md="12-10"]');
-      assert.ok(/From 10 Dec\. Now tap the last day/.test(await text(page, '#seasonDates .cpanel')));
-      await page.click('.cd[data-md="12-20"]');
-      assert.ok(/10 Dec – 20 Dec · 11 days\. Which season is this\?/.test(await text(page, '#seasonDates .cpanel')), await text(page, '#seasonDates .cpanel'));
-      assert.strictEqual((await page.$$('#seasonDates [data-act=calSeason]')).length, 6);
-      assert.ok((await page.$$('.cd.pre')).length === 11, 'the chosen days are marked');
-      await page.click('[data-act=calSeason][data-s="high"]'); await page.waitForTimeout(80);
-      assert.strictEqual(await bg(page, '12-10'), COLOR.high); assert.strictEqual(await bg(page, '12-20'), COLOR.high); assert.strictEqual(await bg(page, '12-21'), COLOR.xmas_low);
-      assert.ok(/Not saved/.test(await text(page, '#bar')) && /season dates changed/.test(await text(page, '#bar')));
-      assert.ok(!(await page.$('#seasonDates .rangeerr')), 'painting never leaves a gap or an overlap');
-      assert.ok(/High\s+1 May – 30 Jun, 1 – 30 Sep, 10 Dec – 20 Dec/.test((await text(page, '#seasonDates')).replace(/\s+/g, ' ')) || /10 Dec – 20 Dec/.test(await text(page, '#seasonDates')));
-      assert.strictEqual(await page.$$eval('#seasonDates .mbar .days i.gap, #seasonDates .mbar .days i.dup', els => els.length), 0);
-      await page.click('#bar [data-act=undoAll]'); await page.waitForTimeout(80);
-      assert.strictEqual(await bg(page, '12-10'), COLOR.xmas_low);
-      assert.ok(await page.$eval('#bar', e => e.hidden || !/Not saved/.test(e.innerText)), 'undo: nothing to save');
-      // painting the same season it already has changes nothing
-      await page.click('.cd[data-md="12-02"]'); await page.click('.cd[data-md="12-05"]'); await page.click('[data-act=calSeason][data-s="xmas_low"]'); await page.waitForTimeout(80);
-      assert.ok(await page.$eval('#bar', e => e.hidden || !/Not saved/.test(e.innerText)), 'no change, no Not saved');
+      const list = (await text(page, '#seasonDates .slists')).replace(/\s+/g, ' ');
+      for (const x of ['Low · 61 days', 'Mid · 107 days', 'Early December · 23 days', 'High · 91 days', 'Peak · 62 days', 'New Year · 22 days']) assert.ok(list.includes(x), x + ' in ' + list);
+      assert.strictEqual((await page.$$('#seasonDates .slist')).length, 6, 'no Unmarked row while nothing is unmarked');
+      const sw = await page.$$eval('#seasonDates .slist .sw', els => els.map(e => getComputedStyle(e).backgroundColor));
+      assert.deepStrictEqual(sw, [FILLS.low, FILLS.mid, FILLS.xmas_low, FILLS.high, FILLS.peak, FILLS.new_year]);
+      if (desk) assert.ok(!(await page.$('#seasonDates .seg')), 'no Whole year | Month switch on the computer');
+      await showMonth(page, desk, 7);
+      assert.strictEqual(await cellBg(page, '07-10'), FILLS.peak);
+      await page.click('.slist[data-s="high"]');
+      assert.strictEqual(await page.getAttribute('.slist[data-s="high"]', 'aria-pressed'), 'true');
+      assert.strictEqual(await cellBg(page, '07-10'), GREYC, 'other seasons turn light grey');
+      await showMonth(page, desk, 5); assert.strictEqual(await cellBg(page, '05-10'), FILLS.high, 'the chosen season keeps its colour');
+      await page.click('.slist[data-s="high"]');
+      await showMonth(page, desk, 7); assert.strictEqual(await cellBg(page, '07-10'), FILLS.peak, 'all colours are back');
     });
-    await test('season calendar: the other way round asks what you mean; a range over New Year is saved as one range after the review', w, hh, async ({page}) => {
+    await test('season dates: tap the first day, then the last day; the box offers the six seasons and Unmarked; the Save bar says what changed', w, hh, async ({page}, desk) => {
       await go(page, '#/seasons'); await openDates(page);
-      await page.click('#seasonDates .mbar .mo[data-m="3"]');
-      await page.click('.cd[data-md="03-20"]'); await page.click('.cd[data-md="03-10"]');
-      const q = await text(page, '#seasonDates .cpanel');
-      assert.ok(/comes before the first day/.test(q) && /Over New Year: 20 Mar – 10 Mar · 357 days/.test(q) && /The other way: 10 Mar – 20 Mar · 11 days/.test(q), q);
-      await page.click('[data-act=calSwap]');
-      assert.ok(/10 Mar – 20 Mar · 11 days\. Which season is this\?/.test(await text(page, '#seasonDates .cpanel')));
-      await page.click('[data-act=calCancel]');
-      assert.ok(/Tap the first day of a season/.test(await text(page, '#seasonDates .cpanel')));
-      // 28 Dec - 6 Jan, over New Year, taps in two different months
-      await page.click('#seasonDates .mbar .mo[data-m="12"]'); await page.click('.cd[data-md="12-28"]');
-      await page.click('[data-act=calMove][data-d="1"]'); assert.ok(/January/.test(await text(page, '#seasonDates .cnav')));
-      await page.click('.cd[data-md="01-06"]');
-      assert.ok(/comes before the first day/.test(await text(page, '#seasonDates .cpanel')));
-      await page.click('[data-act=calWrap]');
-      assert.ok(/28 Dec – 6 Jan · 10 days\. Which season is this\?/.test(await text(page, '#seasonDates .cpanel')), await text(page, '#seasonDates .cpanel'));
+      await showMonth(page, desk, 12);
+      assert.ok(/Tap the first day/.test(await text(page, '#seasonDates')), 'hint');
+      assert.strictEqual(await cellBg(page, '12-10'), FILLS.xmas_low); assert.strictEqual(await cellBg(page, '12-26'), FILLS.new_year);
+      await page.click('.cd[data-md="12-20"]');
+      assert.ok(/Now tap the last day/.test(await text(page, '#seasonDates')));
+      await page.click('.cd[data-md="12-27"]');
+      const box = (await text(page, '#seasonDates .cbox')).replace(/\s+/g, ' ');
+      assert.ok(/20 Dec – 27 Dec · 8 days/.test(box) && /Make these days:/.test(box) && /Cancel/.test(box), box);
+      assert.strictEqual((await page.$$('#seasonDates [data-act=calSeason]')).length, 7, 'six seasons and Unmarked');
+      assert.strictEqual(await cellBg(page, '12-22'), BLACK, 'selected days are black');
+      assert.strictEqual(await page.$eval('.cd[data-md="12-22"]', e => getComputedStyle(e).color), 'rgb(255, 255, 255)', 'with white numbers');
       await page.click('[data-act=calSeason][data-s="high"]'); await page.waitForTimeout(80);
-      assert.strictEqual(await bg(page, '01-06'), COLOR.high); assert.strictEqual(await bg(page, '01-07'), COLOR.new_year);
-      await page.click('[data-act=calMove][data-d="-1"]');
-      assert.strictEqual(await bg(page, '12-28'), COLOR.high); assert.strictEqual(await bg(page, '12-27'), COLOR.new_year);
-      await page.click('#bar [data-act=save]'); await page.waitForSelector('.dlg');
+      assert.strictEqual(await cellBg(page, '12-20'), FILLS.high); assert.strictEqual(await cellBg(page, '12-27'), FILLS.high); assert.strictEqual(await cellBg(page, '12-28'), FILLS.new_year);
+      const bar = (await text(page, BAR)).replace(/\s+/g, ' ');
+      assert.ok(/Not saved: 8 days changed \(20–27 Dec → High\)\./.test(bar) && /Undo/.test(bar) && /Review and save/.test(bar), bar);
+      assert.ok(/High · 99 days/.test((await text(page, '#seasonDates .slists')).replace(/\s+/g, ' ')));
+      await page.click(`${BAR} [data-act=undoAll]`); await page.waitForTimeout(80);
+      assert.strictEqual(await cellBg(page, '12-22'), FILLS.xmas_low);
+      if (!desk) {                                                            // phone: the whole year first, tap a month to open it
+        await page.click('[data-act=calView][data-v=year]');
+        assert.strictEqual((await page.$$('#seasonDates .mm')).length, 12);
+        const tops = await page.$$eval('#seasonDates .mm', els => els.map(e => Math.round(e.getBoundingClientRect().top)));
+        assert.ok(tops[0] === tops[1] && tops[1] === tops[2] && tops[3] > tops[0], 'three columns: ' + tops.slice(0, 4));
+        assert.ok((await page.$$eval('#seasonDates .mc', els => els.length)) >= 365);
+        const small = await page.$$eval('#seasonDates button', els => els.filter(e => e.getBoundingClientRect().height < 44).map(e => e.className));
+        assert.deepStrictEqual(small, [], 'every button is at least 44px tall');
+        await page.click('.mm[data-m="3"]'); assert.ok(/March/.test(await text(page, '#seasonDates .cm')));
+        const cellH = await page.$eval('.cm.big .cd:not(.off)', e => e.getBoundingClientRect().height); assert.ok(cellH >= 44, 'big day buttons: ' + cellH);
+        await page.click('[data-act=calMove][data-d="-1"]'); assert.ok(/February/.test(await text(page, '#seasonDates .cm')));
+      }
+    });
+    await test('season dates: a range over New Year across two months; the review lists the moved nights; Save writes one range and logs old and new', w, hh, async ({page}, desk) => {
+      await go(page, '#/seasons'); await openDates(page);
+      await tapDays(page, desk, '12-28', '01-06');
+      const q = await text(page, '#seasonDates .cbox');
+      assert.ok(/comes before the first day/.test(q) && /Over New Year: 28 Dec – 6 Jan · 10 days/.test(q) && /The other way: 6 Jan – 28 Dec · 358 days/.test(q), q);
+      await page.click('[data-act=calWrap]');
+      assert.ok(/28 Dec – 6 Jan · 10 days/.test(await text(page, '#seasonDates .cbox')) && /Make these days:/.test(await text(page, '#seasonDates .cbox')));
+      await page.click('[data-act=calSeason][data-s="high"]'); await page.waitForTimeout(80);
+      await showMonth(page, desk, 1);
+      assert.strictEqual(await cellBg(page, '01-06'), FILLS.high); assert.strictEqual(await cellBg(page, '01-07'), FILLS.new_year);
+      await showMonth(page, desk, 12);
+      assert.strictEqual(await cellBg(page, '12-28'), FILLS.high); assert.strictEqual(await cellBg(page, '12-27'), FILLS.new_year);
+      assert.ok(/Not saved: 10 days changed \(28 Dec – 6 Jan → High\)/.test((await text(page, BAR)).replace(/\s+/g, ' ')), await text(page, BAR));
+      await page.click(`${BAR} [data-act=save]`); await page.waitForSelector('.dlg');
       const dlg = await text(page, '.dlg');
-      assert.ok(/Check what changes/.test(dlg) && /Booked, hand-set and protected nights are not touched/.test(dlg), dlg);
+      assert.ok(/Check what changes/.test(dlg) && /Booked, hand-set and protected nights are not touched/.test(dlg) && !/unmarked/.test(dlg), dlg);
       assert.strictEqual((await h.writes(page)).filter(x => x.path === 'pricing_config/rules').length, 0, 'nothing written before the review is accepted');
-      await page.click('[data-act=closeDialog]');
-      assert.ok(/Not saved/.test(await text(page, '#bar')));
-      await page.click('#bar [data-act=save]'); await page.waitForSelector('.dlg'); await page.click('[data-act=dialogYes]');
+      await page.click('[data-act=closeDialog]'); assert.ok(/Not saved/.test(await text(page, BAR)));
+      await page.click(`${BAR} [data-act=save]`); await page.waitForSelector('.dlg'); await page.click('[data-act=dialogYes]');
       await page.waitForFunction(() => /Saved/.test(document.getElementById('bar').innerText), null, {timeout: 6000});
       const rules = await h.doc(page, 'pricing_config/rules');
       assert.ok(rules.seasonRanges.some(r => r.from === '12-28' && r.to === '01-06' && r.season === 'high'), JSON.stringify(rules.seasonRanges));
-      const days = new Set(); const md = []; for (let m = 1; m <= 12; m++) for (let d = 1; d <= [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]; d++) md.push(String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0'));
+      const md = []; for (let m = 1; m <= 12; m++) for (let d = 1; d <= [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1]; d++) md.push(String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0'));
       const cover = {}; md.forEach(x => { cover[x] = 0; });
       rules.seasonRanges.forEach(r => { const a = md.indexOf(r.from), b = md.indexOf(r.to); (a <= b ? md.slice(a, b + 1) : md.slice(a).concat(md.slice(0, b + 1))).forEach(x => { cover[x]++; }); });
-      assert.ok(md.every(x => cover[x] === 1), 'every day of the year has exactly one season in what was saved');
+      assert.ok(md.every(x => cover[x] === 1), 'every day has exactly one season in what was saved');
       const rec = (await h.writes(page)).filter(x => x.path.startsWith('pricing_changes/')).map(x => x.data).find(x => x.type === 'season_dates');
       assert.ok(rec && rec.fields.season_ranges.old.includes('12-24..12-31 new_year') && rec.fields.season_ranges.new.includes('12-28..01-06 high') && rec.ts, JSON.stringify(rec));
+    });
+    await test('season dates: unmarked days show white with !, the warning stays (tab, closed row, review), saving keeps them unmarked', w, hh, async ({page}, desk) => {
+      await go(page, '#/seasons'); await openDates(page);
+      await tapDays(page, desk, '03-03', '03-14'); await page.click('[data-act=calSeason][data-s="none"]'); await page.waitForTimeout(80);
+      const warn = '! 12 days unmarked: 3–14 Mar. They use Mid prices until you mark them.';
+      assert.ok((await text(page, '#seasonDates .unwarn')).replace(/\s+/g, ' ').includes(warn), await text(page, '#seasonDates .unwarn'));
+      assert.strictEqual(await cellBg(page, '03-05'), 'rgb(255, 255, 255)');
+      assert.ok(/!/.test(await text(page, '.cd[data-md="03-05"]')), 'a small ! on the day');
+      assert.ok(/Unmarked · 12 days/.test((await text(page, '#seasonDates .slists')).replace(/\s+/g, ' ')));
+      assert.ok(/Not saved: 12 days changed \(3–14 Mar → Unmarked\)/.test((await text(page, BAR)).replace(/\s+/g, ' ')));
+      await page.click(`${BAR} [data-act=save]`); await page.waitForSelector('.dlg');
+      assert.ok((await text(page, '.dlg')).replace(/\s+/g, ' ').includes(warn), 'the review repeats the warning: ' + await text(page, '.dlg'));
+      await page.click('[data-act=dialogYes]');
+      await page.waitForFunction(() => /Saved/.test(document.getElementById('bar').innerText), null, {timeout: 6000});
+      const saved = (await h.doc(page, 'pricing_config/rules')).seasonRanges;
+      const days = x => { const d = []; return d; };
+      assert.ok(!saved.some(r => r.from <= '03-14' && r.to >= '03-03' && r.from <= r.to && !(r.to < '03-03' || r.from > '03-14')), 'the unmarked days are not covered by any saved range');
+      assert.ok(!saved.some(r => r.season === 'mid' && r.from === '03-03'), 'not saved as Mid');
+      // still there after saving, on the tab and in the closed row
+      assert.ok((await text(page, '#seasonDates .unwarn')).replace(/\s+/g, ' ').includes(warn));
+      await page.click('[data-act=toggleSeasonDates]'); await page.waitForTimeout(80);
+      assert.ok(/! 12 days unmarked/.test(await text(page, '#seasonFold')) && !(await page.$('#seasonDates')), await text(page, '#seasonFold'));
+      // reload: the saved list is read back with the days still unmarked
+      await page.click('[data-act=toggleSeasonDates]'); await showMonth(page, desk, 3);
+      assert.strictEqual(await cellBg(page, '03-05'), 'rgb(255, 255, 255)'); assert.strictEqual(await cellBg(page, '03-15'), FILLS.low);
+      // mark them again as Mid: the warning goes
+      await tapDays(page, desk, '03-03', '03-14'); await page.click('[data-act=calSeason][data-s="mid"]');
+      assert.ok(!(await page.$('#seasonDates .unwarn')), 'no warning once every day is marked');
+    });
+    await test('season dates: every text is 12px or more and (phone) every button is 44px or taller, with the section open', w, hh, async ({page}, desk) => {
+      await go(page, '#/seasons'); await openDates(page);
+      if (!desk) await showMonth(page, desk, 12);
+      await page.click('.cd[data-md="12-02"]'); await page.click('.cd[data-md="12-05"]');
+      const bad = await page.$$eval('#seasonDates *', els => els.filter(e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(e).fontSize) < 12).map(e => e.className + ':' + getComputedStyle(e).fontSize));
+      assert.deepStrictEqual(bad, [], 'text under 12px');
+      const side = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1); assert.strictEqual(side, false, 'no sideways scroll');
+      if (!desk) assert.deepStrictEqual(await page.$$eval('#seasonDates button', els => els.filter(e => e.getBoundingClientRect().height < 44).map(e => e.className)), []);
     });
   }
 

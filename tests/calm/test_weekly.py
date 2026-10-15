@@ -177,3 +177,13 @@ def test_season_date_changes_are_part_of_the_weekly_numbers():
     a = wn.build(d, FROM, TO)["all"]["season_date_changes"]
     assert a["count"] == 1 and a["list"][0]["day"] == "2026-10-09" and a["list"][0]["new"] == ["12-01..12-19 mid"]
     assert wn.build(sample(), FROM, TO)["all"]["season_date_changes"] == {"count": 0, "list": []}
+
+
+def test_unmarked_season_days_are_mentioned_in_the_weekly_numbers():
+    d = sample()
+    d["season_unmarked"] = ["03-03", "03-04", "03-05"]
+    n = wn.build(d, FROM, TO)
+    assert n["all"]["season_unmarked"] == {"count": 3, "text": "3 days unmarked: 3-5 Mar"}
+    assert any("3 days unmarked: 3-5 Mar. They use Mid prices until you mark them." in x for x in n["data_notes"])
+    assert wn.build(sample(), FROM, TO)["all"]["season_unmarked"]["count"] == 0
+    assert wn.unsupported_numbers("3 days are unmarked: 3-5 Mar", n) == []

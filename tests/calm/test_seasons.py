@@ -54,10 +54,16 @@ def test_bad_data_never_crashes_and_the_readers_fall_back_to_config_json():
     table = CONFIG["seasons"]
     t, src, problems = sn.from_rules({}, table)
     assert t == table and "no saved season dates" in src and problems == []
-    for bad in ([{"from": "13-40", "to": "01-02", "season": "low"}], "text", [], [{"from": "01-01", "to": "06-30", "season": "low"}],
-                [{"from": "01-01", "to": "12-31", "season": "summer"}]):
+    for bad in ([{"from": "13-40", "to": "01-02", "season": "low"}], "text",
+                [{"from": "01-01", "to": "12-31", "season": "summer"}],
+                [{"from": "01-01", "to": "12-31", "season": "low"}, {"from": "03-01", "to": "03-05", "season": "peak"}]):      # an overlap
         t, src, problems = sn.from_rules({"seasonRanges": bad}, table)
         assert t == table and "not valid" in src and problems, bad
+    gappy = [{"from": "01-01", "to": "03-02", "season": "low"}, {"from": "03-15", "to": "12-31", "season": "peak"}]      # 3-14 Mar unmarked: allowed
+    t, src, problems = sn.from_rules({"seasonRanges": gappy}, table)
+    assert [x["name"] for x in t] == ["low", "peak"] and problems == [] and sn.unmarked_text(sn.unmarked(gappy)) == "12 days unmarked: 3-14 Mar"
+    t, src, problems = sn.from_rules({"seasonRanges": []}, table)                                                     # everything unmarked: valid, all Mid
+    assert t == [] and problems == [] and src == "pricing_config/rules.seasonRanges"
     good = [{"from": "01-01", "to": "06-30", "season": "low"}, {"from": "07-01", "to": "12-31", "season": "peak"}]
     t, src, problems = sn.from_rules({"seasonRanges": good}, table)
     assert [x["name"] for x in t] == ["low", "peak"] and src == "pricing_config/rules.seasonRanges" and problems == []
@@ -80,9 +86,13 @@ def test_the_loaders_read_the_saved_list_and_fall_back_to_config_json(tmp_path):
     _, settings2 = ps.load_rules(db2, CONFIG)
     assert settings2["seasons"] == CONFIG["seasons"]
     db3 = DB()
-    db3.collection("pricing_config").document("rules").set({"seasonRanges": [{"from": "01-01", "to": "03-01", "season": "low"}]})   # gaps: not valid
+    db3.collection("pricing_config").document("rules").set({"seasonRanges": [{"from": "01-01", "to": "12-31", "season": "low"}, {"from": "02-01", "to": "02-03", "season": "mid"}]})   # overlap: not valid
     _, settings3 = ps.load_rules(db3, CONFIG)
     assert settings3["seasons"] == CONFIG["seasons"] and any("season dates" in w for w in ps.LOADER_WARNINGS)
+    db4 = DB()                                                                  # gaps are allowed and the engines use Mid for those days
+    db4.collection("pricing_config").document("rules").set({"seasonRanges": [{"from": "01-01", "to": "03-02", "season": "low"}, {"from": "03-15", "to": "12-31", "season": "peak"}]})
+    _, settings4 = ps.load_rules(db4, CONFIG)
+    assert engine_season("2026-03-08", merged(settings4)) == "mid" and engine_season("2026-03-01", merged(settings4)) == "low"
 
 
 def test_the_migration_copies_exactly_once():

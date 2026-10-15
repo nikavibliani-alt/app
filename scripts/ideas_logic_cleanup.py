@@ -34,7 +34,7 @@ def run(db, today: str, repo_config: dict, dry: bool = False) -> dict:
         config["dateOverrides"] = rules["dateOverrides"]
     from calm_pricing import seasons as season_ranges
     table, _src, _problems = season_ranges.from_rules(rules, config.get("seasons") or [])
-    if table:
+    if table is not None:
         config["seasons"] = table
     locks = ie.locked_nights(db)
     ideas = []

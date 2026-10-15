@@ -183,3 +183,15 @@ def test_no_run_yet_today_is_waiting_not_red(monkeypatch):
     run_wd(db, post, monkeypatch)
     doc = db.store["pricing_watchdog"]["latest"]
     assert doc["status"] == "waiting" and doc["issues"] == [] and post.calls == []
+
+
+def test_the_watchdog_note_mentions_unmarked_season_days_and_never_makes_it_red():
+    import importlib.util
+    ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    import price_watchdog as pw
+    from test_pmslog import DB
+    db = DB()
+    assert pw.season_notes(db) == []                                         # nothing saved yet: config.json covers every day
+    db.collection("pricing_config").document("rules").set({"seasonRanges": [{"from": "01-01", "to": "03-02", "season": "low"}, {"from": "03-15", "to": "12-31", "season": "peak"}]})
+    assert pw.season_notes(db) == ["12 days unmarked: 3-14 Mar. They use Mid prices until you mark them."]

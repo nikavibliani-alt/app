@@ -103,6 +103,13 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
         if week_from <= day <= week_to:
             changes.append({"day": day, "old": c.get("old"), "new": c.get("new")})
     all_["season_date_changes"] = {"count": len(changes), "list": changes[:5]}
+    um = data.get("season_unmarked") or []
+    if um:
+        from calm_pricing import seasons as _sn
+        all_["season_unmarked"] = {"count": len(um), "text": _sn.unmarked_text(um)}
+        notes.append(f"{_sn.unmarked_text(um)}. They use Mid prices until you mark them.")
+    else:
+        all_["season_unmarked"] = {"count": 0, "text": ""}
     sc = data.get("scorecard") or {}
     all_["ideas"] = {k: sc.get(k, 0) for k in ("finished", "right", "wrong", "unclear", "tracking")}
     tw = [t for t in data.get("twin_results", []) if t.get("status") == "final"]
@@ -227,10 +234,19 @@ def load(db, now: datetime) -> dict:
             season_changes.append({"day": (ts.isoformat() if hasattr(ts, "isoformat") else str(ts or ""))[:10], "old": f.get("old"), "new": f.get("new")})
     except Exception:
         pass
+    season_unmarked = []
+    try:
+        from calm_pricing import seasons as _sn
+        rs = db.collection("pricing_config").document("rules").get()
+        raw = (rs.to_dict() or {}).get("seasonRanges") if rs.exists else None
+        if isinstance(raw, list):
+            season_unmarked = _sn.unmarked(_sn.parse(raw)[0])
+    except Exception:
+        pass
     ssum = db.collection("pricing_scorecard").document("_summary").get()
     return {"price_events": by_day("pmslog_price_events"), "booking_events": by_day("pmslog_booking_events"),
             "runs": by_day("pricing_calm_runs"), "watchdog_days": wd, "stays": sc.priced_stays(db, today, back_days=120),
-            "limits": limits, "season_changes": season_changes, "scorecard": ssum.to_dict() if ssum.exists else {},
+            "limits": limits, "season_changes": season_changes, "season_unmarked": season_unmarked, "scorecard": ssum.to_dict() if ssum.exists else {},
             "twin_results": [d.to_dict() or {} for d in db.collection("pricing_twin_results").stream()],
             "events": [dict(d.to_dict() or {}, date=(d.to_dict() or {}).get("date") or d.id.replace("event_", "")) for d in db.collection("pricing_events").stream()],
             "room_ids": sorted((ps.ROOM_TYPES or {}).keys()), "since": first_log_day(db)}, week_from, week_to

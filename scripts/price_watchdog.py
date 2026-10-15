@@ -49,6 +49,21 @@ def load_inputs(db, today: str, live_rts):
     return daily, states, runs
 
 
+def season_notes(db) -> list:
+    """Things worth a mention that are not a price problem: season days nobody marked (the engines use Mid for them)."""
+    try:
+        from calm_pricing import seasons as sn
+        snap = db.collection("pricing_config").document("rules").get()
+        raw = (snap.to_dict() or {}).get("seasonRanges") if snap.exists else None
+        if isinstance(raw, list):
+            um = sn.unmarked(sn.parse(raw)[0])
+            if um:
+                return [f"{sn.unmarked_text(um)}. They use Mid prices until you mark them."]
+    except Exception:
+        pass
+    return []
+
+
 def whatsapp_payload(to, issue, language, label=GUEST_LABEL):
     return {"messaging_product": "whatsapp", "to": to, "type": "template",
             "template": {"name": "owner_alert", "language": {"code": language},
@@ -102,7 +117,7 @@ def main(argv=None, db=None, post=requests.post, now=None, env=os.environ):
                     "stopped_room_types": sorted(last.get("stopped_room_types") or [])}
     if not runs:                                  # nothing has run yet today (for example just after midnight): nothing to judge
         doc = {"ts": now.isoformat(), "day": today, "status": "waiting", "counts": {}, "checked": 0, "issues": [], "total_issues": 0,
-               "main_run_done": False, "rooms": sorted(live_rts), "paused": False}
+               "main_run_done": False, "rooms": sorted(live_rts), "paused": False, "notes": season_notes(db)}
         print("Watchdog: waiting | no run yet today, nothing checked")
         db.collection("pricing_watchdog").document("latest").set(doc)
         return {"result": {"status": "waiting", "issues": [], "counts": {}, "checked": 0}, "doc": doc}
@@ -112,7 +127,7 @@ def main(argv=None, db=None, post=requests.post, now=None, env=os.environ):
     issues = result["issues"][:MAX_LISTED]
     doc = {"ts": now.isoformat(), "day": today, "status": result["status"], "counts": result["counts"],
            "checked": result["checked"], "issues": issues, "total_issues": len(result["issues"]),
-           "main_run_done": main_done, "rooms": sorted(live_rts), "paused": paused}
+           "main_run_done": main_done, "rooms": sorted(live_rts), "paused": paused, "notes": season_notes(db)}
     print(f"Watchdog: {result['status']} | checked {result['checked']} prices in {len(daily)} of {len(live_rts)} rooms | "
           f"issues {result['counts'] or 'none'} | main run today: {main_done}")
 
