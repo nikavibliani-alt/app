@@ -28,6 +28,13 @@ function otherPropertyForRoom(roomCode) {
   return match ? match.name : null;
 }
 
+/** Any property's name for a room code: 'Shartava' for 0-*, 6-*, 7-*, else as otherPropertyForRoom; null if not recognized. */
+function propertyForRoom(roomCode) {
+  const code = String(roomCode || '').trim().toLowerCase();
+  if (/^[067]-/.test(code)) return 'Shartava';
+  return otherPropertyForRoom(code);
+}
+
 function tbilisiNow(nowMs) {
   const d = new Date(nowMs + TBILISI_OFFSET_MS);
   return { date: d.toISOString().slice(0, 10), hour: d.getUTCHours() };
@@ -71,6 +78,7 @@ function stayTimingContextLines(timing) {
 
 module.exports = {
   otherPropertyForRoom,
+  propertyForRoom,
   stayTiming,
   stayTimingContextLines,
 };

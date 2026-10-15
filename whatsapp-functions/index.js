@@ -26,7 +26,7 @@ const { findCurrentGuestForm } = require('./guestLookup');
 const { otherPropertyForRoom, stayTiming, stayTimingContextLines } = require('./stayRules');
 const { describeInbound } = require('./inboundContent');
 const { downloadMetaMedia, photosToAttach, attachPhotos } = require('./metaMedia');
-const { sendOwnerAlert, ownerStatusIds, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
+const { sendOwnerAlert, ownerAlertGuest, ownerStatusIds, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
 const { callClaudeWithRetry, describeClaudeError, buildCachedSystem, formatUsage } = require('./claudeClient');
 const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
 
@@ -1146,7 +1146,7 @@ exports.whatsappBotWorker = onRequest(
             mode: effectiveMode,
           });
           if (config.ownerPhone) {
-            await notifyOwner(config.ownerPhone, { guest: `${guestName} / ${bookingRoom}`, issue: `${otherProperty} guest wrote: ${combinedGuestText}` });
+            await notifyOwner(config.ownerPhone, { guest: ownerAlertGuest(guestName, bookingRoom), issue: `${otherProperty} guest wrote: ${combinedGuestText}` });
           }
           console.log(`whatsappBotWorker: STOPPED — ${otherProperty} booking (${bookingRoom}); nothing sent, owner alerted (first message this stay), for`, phone);
         } else {
@@ -1218,7 +1218,8 @@ exports.whatsappBotWorker = onRequest(
       });
       console.log(`whatsappBotWorker: Claude usage (${claude.model}, ${claude.attempts} attempt(s)): ${formatUsage(claude.usage)}`);
 
-      const label = `${guestName} / ${roomCode || 'unknown room'}`;
+      // Owner alerts' {{1}}: "<name> / <property> <room>" (or "unknown property").
+      const label = ownerAlertGuest(guestName, bookingRoom);
       if (!claude.ok) {
         // Nothing is sent to the guest (no generic fallback). The pending batch is
         // kept, so the guest's message is answered together with their next one.

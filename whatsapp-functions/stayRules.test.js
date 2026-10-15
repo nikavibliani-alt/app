@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { otherPropertyForRoom, stayTiming, stayTimingContextLines } = require('./stayRules');
+const { otherPropertyForRoom, propertyForRoom, stayTiming, stayTimingContextLines } = require('./stayRules');
 
 // Tbilisi is UTC+4: 11:00 Tbilisi = 07:00 UTC, 22:00 Tbilisi = 18:00 UTC.
 const at = (date, tbilisiHour, minute = 0) => Date.UTC(...date.split('-').map((n, i) => (i === 1 ? Number(n) - 1 : Number(n))), tbilisiHour - 4, minute);
@@ -26,6 +26,16 @@ test('otherPropertyForRoom: VGL, XCV (Modern Avlabari) and Abashidze never get S
   for (const code of ['tab-1', 'tab-2', 'tab-3', 'orb-1', 'orb-2', 'orb-3', 'vgl-st1', 'vgl-st2', 'vgl-ap3', 'vgl-ap4', 'xcv-1', 'xcv-2', 'abashidze']) {
     assert.notEqual(otherPropertyForRoom(code), null, code);
   }
+});
+
+test('propertyForRoom: Shartava for 0-/6-/7-, the other properties by prefix, else null', () => {
+  for (const c of ['0-1', '0-5', '6-2', '6-3', '7-4']) assert.equal(propertyForRoom(c), 'Shartava', c);
+  assert.equal(propertyForRoom('tab-1'), 'Freedom Square');
+  assert.equal(propertyForRoom('orb-2'), 'Orbeliani');
+  assert.equal(propertyForRoom('vgl-st1'), 'VGL');
+  assert.equal(propertyForRoom('xcv-1'), 'XCV (Modern Avlabari)');
+  assert.equal(propertyForRoom(''), null);
+  assert.equal(propertyForRoom('60-1'), null, 'only the exact 0-/6-/7- prefixes');
 });
 
 test('stayTiming: check-in opens at 15:00 Tbilisi on the arrival day', async (t) => {
