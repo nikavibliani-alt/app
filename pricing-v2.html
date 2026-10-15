@@ -122,6 +122,10 @@ body[data-layout="phone"] .mbar{grid-template-columns:repeat(6,1fr)}
 .srow select{min-height:44px;padding:0 10px;border-radius:10px;border:1px solid var(--btn-line);background:#FFFFFF;color:var(--ink);font:inherit;font-size:15px}
 .srow .x{margin-left:auto}
 .srow.bad{background:var(--red-bg)}
+.fold{display:flex;align-items:center;gap:12px}
+.fold .grow{flex:1;min-width:0}
+.foldb{flex:0 0 auto;width:44px;height:44px;border-radius:12px;border:1px solid var(--btn-line);background:#FFFFFF;color:var(--ink);font-size:26px;font-weight:600;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.foldb[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
 .rangeerr{padding:10px 14px;border-radius:10px;background:var(--red-bg);border:1px solid var(--red);color:var(--red-ink);font-size:14px;line-height:1.45}
 .impact li{margin:0 0 8px 0}
 .scorebar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px}
@@ -1159,12 +1163,19 @@ function seasonChipsHtml() {
     return `<button type="button" class="pill" role="radio" aria-checked="${on}" data-act="season" data-season="${id}"><span class="pd" style="background:${on ? "#FFFFFF" : s.dot}"></span>${s.label}${bad.has(id) ? " (fix)" : ""}</button>`;
   }).join("");
 }
+function seasonOpen() { return !!P.seasonRanges || !!U.seasonOpen; }          // unsaved changes or a red error keep it open
+function seasonFoldHtml() {
+  const open = seasonOpen(), locked = !!P.seasonRanges;
+  return `<section class="sec" id="seasonFold"><div class="fold">
+      <div class="grow"><h2 class="h2">Season dates</h2>${open ? `<p class="sub">Every year, all rooms. Each day has exactly one season. A range can run over New Year, for example 28 Dec – 6 Jan.${locked ? " Save or undo your changes to close this." : ""}</p>` : ""}</div>
+      <button type="button" class="foldb" data-act="toggleSeasonDates" aria-expanded="${open}" aria-controls="seasonDates" aria-disabled="${locked}" aria-label="${open ? "Close season dates" : "Open season dates"}">${open ? "−" : "+"}</button></div>
+      ${open ? `<div class="sec" id="seasonDates">${seasonDatesInner()}</div>` : ""}</section>`;
+}
 function viewSeasons() {
   const s = SEASONS[U.season], rooms = newRooms().concat(U.showOld ? oldRooms() : []);
   const desk = isDesk();
   return `${desk ? "" : `<div class="topbar"><h1>Pricing</h1></div>${tabsHtml(false)}`}${errorsHtml()}
-    <section class="sec"><div><h2 class="h2">Season dates</h2><p class="sub">Every year, all rooms. Each day has exactly one season. A range can run over New Year, for example 28 Dec – 6 Jan.</p></div>
-      <div class="sec" id="seasonDates">${seasonDatesInner()}</div></section>
+    ${seasonFoldHtml()}
     <section class="sec"><div><h2 class="h2">Pick a season</h2><p class="sub">Each season has its own minimum, start and maximum for every room.</p></div>
       <div class="pills" role="radiogroup" aria-label="Season" id="seasonChips">${seasonChipsHtml()}</div></section>
     <section class="card pad sec"><div style="font-size:15px;font-weight:700">When is ${esc(s.label)}?</div>
@@ -1218,7 +1229,7 @@ function seasonDatesInner() {
     <button type="button" class="btn light full small" data-act="srAdd" style="color:var(--ink)">Add a range</button>`;
 }
 function refreshSeasonDates() {
-  const el = $("seasonDates"); if (el) el.innerHTML = seasonDatesInner();
+  const el = $("seasonFold"); if (el) el.outerHTML = seasonFoldHtml();
   paintBar();
 }
 function editRanges(fn) {
@@ -2112,6 +2123,7 @@ document.addEventListener("click", async e => {
     case "season": U.season = d.season; render(); break;
     case "toggleOld": U.showOld = !U.showOld; render(); break;
     case "undoAll": P.room = {}; P.seasons = {}; P.holAdd = []; P.holDel = []; P.ruleAdd = []; P.ruleDel = []; P.seasonRanges = null; touch(); render(); break;
+    case "toggleSeasonDates": if (t.getAttribute("aria-disabled") === "true") break; U.seasonOpen = !U.seasonOpen; render(); break;
     case "srAdd": editRanges(l => { const cov = rangeCoverage(l), gap = ALL_MD.find(md => !cov[md].length) || "01-01"; l.push({from: gap, to: gap, season: "mid"}); }); break;
     case "srDel": editRanges(l => { l.splice(+d.i, 1); }); break;
     case "save": if (t.getAttribute("aria-disabled") === "true") { paintBar(); break; } saveAll(); break;

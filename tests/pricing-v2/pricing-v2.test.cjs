@@ -18,6 +18,7 @@ async function test(name, w, hh, fn, opts = {}) {
   await env.ctx.close();
 }
 let BROWSER;
+const openDates = async page => { if (!(await page.$('#seasonDates'))) await page.click('[data-act=toggleSeasonDates]'); await page.waitForSelector('#seasonDates'); };
 const go = async (page, hash) => { await page.evaluate(x => { location.hash = x; }, hash); await page.waitForTimeout(150); };
 const text = (page, sel) => page.evaluate(s => (document.querySelector(s) || {}).innerText || '', sel);
 const bar = page => text(page, '#bar');
@@ -590,10 +591,42 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
     }});
   }
 
+  // ---- season dates fold: closed by default, + opens, - closes, locked while there are unsaved changes ----
+  for (const [w, hh] of SIZES) {
+    await test('season dates fold: one row with + when closed; + opens, - closes; stays open while there are unsaved changes or an error', w, hh, async ({page}) => {
+      await go(page, '#/seasons');
+      assert.ok(!(await page.$('#seasonDates')), 'closed by default');
+      const row = await text(page, '#seasonFold');
+      assert.ok(/Season dates/.test(row) && !/Each day has exactly one season/.test(row) && !(await page.$('#seasonFold .mbar')), row);
+      const b = '[data-act=toggleSeasonDates]';
+      assert.strictEqual(await page.$eval(b, e => e.innerText.trim()), '+');
+      assert.strictEqual(await page.getAttribute(b, 'aria-expanded'), 'false');
+      const box = await page.$eval(b, e => { const r = e.getBoundingClientRect(); return [r.width, r.height, r.right, innerWidth]; });
+      assert.ok(box[0] >= 44 && box[1] >= 44 && box[3] - box[2] < 60, 'a 44px button on the right: ' + box);
+      await page.click(b); await page.waitForSelector('#seasonDates');
+      assert.strictEqual(await page.$eval(b, e => e.innerText.trim()), '−');
+      assert.strictEqual(await page.getAttribute(b, 'aria-expanded'), 'true');
+      assert.ok(await page.$('#seasonDates .mbar') && (await page.$$('#seasonDates .srow')).length === 9);
+      await page.click(b); await page.waitForTimeout(80);
+      assert.ok(!(await page.$('#seasonDates')) && (await page.$eval(b, e => e.innerText.trim())) === '+', 'closes again');
+      // an unsaved change keeps it open and the button cannot close it
+      await page.click(b); await page.waitForSelector('#seasonDates');
+      await page.selectOption('select[data-sr="to-d"][data-i="7"]', '19');
+      assert.strictEqual(await page.getAttribute(b, 'aria-disabled'), 'true');
+      assert.ok(/Save or undo your changes to close this/.test(await text(page, '#seasonFold')));
+      await page.click(b, {force: true}); await page.waitForTimeout(80);
+      assert.ok(await page.$('#seasonDates'), 'still open while there are unsaved changes');
+      await page.click('#bar [data-act=undoAll]'); await page.waitForTimeout(80);
+      assert.strictEqual(await page.getAttribute(b, 'aria-disabled'), 'false');
+      await page.click(b); await page.waitForTimeout(80);
+      assert.ok(!(await page.$('#seasonDates')), 'after undo it can close');
+    });
+  }
+
   // ---- season dates: bar, list, checks, review before saving, save, log ----
   for (const [w, hh] of SIZES) {
     await test('season dates: 12-month bar and the list show today\'s ranges; edits update the bar live; gaps and overlaps block Save in red', w, hh, async ({page}) => {
-      await go(page, '#/seasons');
+      await go(page, '#/seasons'); await openDates(page);
       const rows = await page.$$eval('#seasonDates .srow', els => els.length);
       assert.strictEqual(rows, 9, 'nine ranges today');
       assert.strictEqual(await page.$$eval('#seasonDates .mbar .mo', els => els.length), 12);
@@ -621,7 +654,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       assert.ok(await page.$eval('#bar', e => e.hidden || !/Not saved/.test(e.innerText)), 'same as saved: no Not saved bar');
     });
     await test('season dates: a range can cross New Year; the review shows the moved nights; Save writes the list and logs old and new', w, hh, async ({page}) => {
-      await go(page, '#/seasons');
+      await go(page, '#/seasons'); await openDates(page);
       const find = async season => page.$$eval('#seasonDates .srow', (els, s) => els.map((e, i) => [i, e.querySelector('select[data-sr="season"]').value, e.querySelector('select[data-sr="from-m"]').value, e.querySelector('select[data-sr="from-d"]').value]).filter(x => x[1] === s), season);
       const ny = await find('new_year');                                    // [Jan 1-14, Dec 24-31] in the list order
       const dec = ny.find(x => x[2] === '12'), jan = ny.find(x => x[2] === '1');
