@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { ownerAlertParams, ownerAlertTemplatePayload, ownerAlertText, sendOwnerAlert, ownerStatusIds, ownerAlertStatusLines, alertDocId } = require('./ownerAlert');
+const { ownerAlertGuest, ownerAlertParams, ownerAlertTemplatePayload, ownerAlertText, sendOwnerAlert, ownerStatusIds, ownerAlertStatusLines, alertDocId } = require('./ownerAlert');
 
 const quiet = () => {
   const lines = [];
@@ -20,7 +20,7 @@ test('ownerAlertParams: cleaned for Meta (no newlines/tabs/runs of spaces, never
   assert.equal(ownerAlertParams('A', 'line one\nline two\t\ttab     spaces').issue, 'line one line two tab spaces');
   assert.deepEqual(ownerAlertParams('', '  '), { guest: 'unknown guest', issue: 'see the chat' });
   const long = ownerAlertParams('x'.repeat(200), 'y'.repeat(2000));
-  assert.equal(long.guest.length, 60);
+  assert.equal(long.guest.length, 80);
   assert.equal(long.issue.length, 500);
   assert.ok(long.issue.endsWith('…'));
 });
@@ -132,4 +132,29 @@ test('ownerStatusIds: unique ids of reports to the owner only', () => {
 test('alertDocId: Meta ids with "/" become valid Firestore doc ids', () => {
   assert.equal(alertDocId('wamid.HBgL/MzI0OTM5=='), 'wamid.HBgL_MzI0OTM5==');
   assert.equal(alertDocId('wamid.ABC'), 'wamid.ABC');
+});
+
+test('ownerAlertGuest: property name before the room in {{1}}', () => {
+  assert.equal(ownerAlertGuest('Anna', '6-2'), 'Anna / Shartava 6-2');
+  assert.equal(ownerAlertGuest('Anna Petrova', '0-3'), 'Anna Petrova / Shartava 0-3');
+  assert.equal(ownerAlertGuest('Lisa', 'tab-1'), 'Lisa / Freedom Square tab-1');
+  assert.equal(ownerAlertGuest('Guest', 'orb-2'), 'Guest / Orbeliani orb-2');
+  assert.equal(ownerAlertGuest('Guest', 'vgl-st1'), 'Guest / VGL vgl-st1');
+  assert.equal(ownerAlertGuest('Guest', 'xcv-1'), 'Guest / XCV (Modern Avlabari) xcv-1');
+  assert.equal(ownerAlertGuest('Guest', 'abashidze'), 'Guest / Abashidze abashidze');
+});
+
+test('ownerAlertGuest: unknown room, unknown name, unrecognized room code', () => {
+  assert.equal(ownerAlertGuest('Anna', ''), 'Anna / unknown property');
+  assert.equal(ownerAlertGuest('Anna', undefined), 'Anna / unknown property');
+  assert.equal(ownerAlertGuest('', '6-2'), 'Guest / Shartava 6-2');
+  assert.equal(ownerAlertGuest('Anna', 'new-9'), 'Anna / new-9', 'a room code we do not know is shown as is');
+});
+
+test('ownerAlertGuest: a long name is shortened so the property and room still fit the template', () => {
+  const g = ownerAlertGuest('Maximilian Alexander Konstantin von Hohenzollern-Sigmaringen', 'xcv-1');
+  assert.ok(g.endsWith(' / XCV (Modern Avlabari) xcv-1'), g);
+  assert.equal(ownerAlertParams(g, 'x').guest, g, 'not cut by the template limit');
+  const t = ownerAlertGuest('Anna\nPetrova', '6-2');
+  assert.equal(t, 'Anna Petrova / Shartava 6-2', 'no newlines in a template parameter');
 });

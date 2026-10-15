@@ -8,13 +8,18 @@
 // out as free-form text (and the failure is logged).
 //
 // Pure apart from the injected `send`, so every path is unit-testable.
+// {{1}} is built by ownerAlertGuest: "<name> / <property> <room>".
+
+const { propertyForRoom } = require('./stayRules');
 
 const TEMPLATE = 'owner_alert';
 // "English" in WhatsApp Manager is "en"; fall back to "en_US" if Meta says the
 // template does not exist in that language (error 132001).
 const LANGUAGES = ['en', 'en_US'];
-const MAX_GUEST = 60;
+const MAX_GUEST = 80;
 const MAX_ISSUE = 500;
+// The guest's name is shortened first, so the property and room always fit in {{1}}.
+const MAX_NAME = 40;
 // whatsapp_owner_alerts/{messageId}: one small doc per owner alert sent, so the
 // webhook can tell Meta's delivery reports for real alerts from other messages
 // to the owner's number (e.g. the bot replying to the owner as a guest).
@@ -25,6 +30,19 @@ function cleanParam(value, max, fallback) {
   const text = String(value ?? '').replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
   if (!text) return fallback;
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
+
+/**
+ * {{1}} text: "<name> / <property> <room>", e.g. "Anna / Shartava 6-2",
+ * "Lisa / Freedom Square tab-1"; "<name> / unknown property" when the room is
+ * unknown; an unrecognized room code is shown on its own.
+ */
+function ownerAlertGuest(name, roomCode) {
+  const who = cleanParam(name, MAX_NAME, 'Guest');
+  const room = String(roomCode || '').trim();
+  if (!room) return `${who} / unknown property`;
+  const property = propertyForRoom(room);
+  return `${who} / ${property ? `${property} ` : ''}${room}`;
 }
 
 /** { guest, issue } ready for the template: cleaned and trimmed to fit. */
@@ -115,4 +133,4 @@ function ownerAlertStatusLines(statuses, ownerPhone, alertIds = new Set()) {
     });
 }
 
-module.exports = { ownerAlertParams, ownerAlertTemplatePayload, ownerAlertText, sendOwnerAlert, ownerStatusIds, ownerAlertStatusLines, alertDocId, TEMPLATE, ALERTS_COLLECTION };
+module.exports = { ownerAlertGuest, ownerAlertParams, ownerAlertTemplatePayload, ownerAlertText, sendOwnerAlert, ownerStatusIds, ownerAlertStatusLines, alertDocId, TEMPLATE, ALERTS_COLLECTION };
