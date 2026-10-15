@@ -27,6 +27,7 @@ const { otherPropertyForRoom, stayTiming, stayTimingContextLines } = require('./
 const { describeInbound } = require('./inboundContent');
 const { downloadMetaMedia, photosToAttach, attachPhotos } = require('./metaMedia');
 const { sendOwnerAlert, ownerAlertGuest, ownerStatusIds, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
+const { urgentPushPayload, sendOwnerPush } = require('./ownerPush');
 const { callClaudeWithRetry, describeClaudeError, buildCachedSystem, formatUsage } = require('./claudeClient');
 const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
 
@@ -587,6 +588,34 @@ async function notifyOwner(ownerPhone, { guest, issue }) {
   }
 }
 
+/**
+ * Web Push to the admin app's devices (push_subscriptions, VAPID keys), the
+ * same system as the Hotel Collect alert. Urgent alerts and bot errors only
+ * (ownerPush.js). Never throws; failures are logged as "owner push FAILED".
+ */
+let vapidSet = false;
+async function pushToAdminDevices(payload) {
+  try {
+    return await sendOwnerPush({
+      payload,
+      loadSubscriptions: async () => (await getFirestore().collection('push_subscriptions').get())
+        .docs.map((d) => ({ id: d.id, subscription: d.data().subscription })),
+      send: (subscription, p) => {
+        // eslint-disable-next-line global-require
+        const webpush = require('web-push');
+        if (!vapidSet) {
+          webpush.setVapidDetails('mailto:nikavibliani@gmail.com', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+          vapidSet = true;
+        }
+        return webpush.sendNotification(subscription, JSON.stringify(p));
+      },
+    });
+  } catch (err) {
+    console.error('owner push FAILED:', err.message || err);
+    return { ok: false };
+  }
+}
+
 const OWNER_NOTIFY_WINDOW_MS = 30 * 60 * 1000;
 
 /**
@@ -594,8 +623,8 @@ const OWNER_NOTIFY_WINDOW_MS = 30 * 60 * 1000;
  * 30 minutes, tracked in whatsapp_alert_throttle/{key} so it holds across
  * worker instances. Callers always write the whatsapp_alerts doc themselves.
  */
-async function notifyOwnerThrottled(db, ownerPhone, key, alert) {
-  if (!ownerPhone) return;
+async function notifyOwnerThrottled(db, ownerPhone, key, alert, push = null) {
+  if (!ownerPhone && !push) return;
   const ref = db.collection('whatsapp_alert_throttle').doc(String(key).replace(/[^\w-]/g, '_'));
   let send = true;
   try {
@@ -610,10 +639,11 @@ async function notifyOwnerThrottled(db, ownerPhone, key, alert) {
     console.warn('notifyOwnerThrottled: throttle check failed, notifying anyway:', err.message || err);
   }
   if (!send) {
-    console.log(`notifyOwnerThrottled: owner already notified about "${key}" in the last 30 min — alert doc written, WhatsApp notification skipped`);
+    console.log(`notifyOwnerThrottled: owner already notified about "${key}" in the last 30 min — alert doc written, WhatsApp notification and push skipped`);
     return;
   }
-  await notifyOwner(ownerPhone, alert);
+  // WhatsApp and push side by side; neither can stop the other (both never throw).
+  await Promise.all([notifyOwner(ownerPhone, alert), push ? push() : null]);
 }
 
 /**
@@ -967,7 +997,7 @@ exports.whatsappBotWorker = onRequest(
     // wiped on the next deploy. Declaring the principal here makes Firebase
     // (re-)apply this exact Cloud Run Invoker binding on every deploy.
     invoker: 'whatsapp-tasks-invoker@sleepy-5c962.iam.gserviceaccount.com',
-    secrets: ['META_ACCESS_TOKEN', 'META_PHONE_NUMBER_ID', 'ANTHROPIC_API_KEY'],
+    secrets: ['META_ACCESS_TOKEN', 'META_PHONE_NUMBER_ID', 'ANTHROPIC_API_KEY', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY'],
   },
   async (req, res) => {
     console.log('whatsappBotWorker: raw request received');
@@ -1220,6 +1250,10 @@ exports.whatsappBotWorker = onRequest(
 
       // Owner alerts' {{1}}: "<name> / <property> <room>" (or "unknown property").
       const label = ownerAlertGuest(guestName, bookingRoom);
+      // Push notification for urgent alerts and bot errors (opts.push = kind).
+      const pushUrgent = (opts) => pushToAdminDevices(urgentPushPayload({
+        kind: opts.push, guestName, roomCode: bookingRoom, guestText: combinedGuestText, reason: opts.reason, phone,
+      }));
       if (!claude.ok) {
         // Nothing is sent to the guest (no generic fallback). The pending batch is
         // kept, so the guest's message is answered together with their next one.
@@ -1236,7 +1270,7 @@ exports.whatsappBotWorker = onRequest(
           errorType: claude.errorType,
           errorMessage: claude.message,
         });
-        await notifyOwnerThrottled(db, config.ownerPhone, `claude_${claude.errorType}`, { guest: label, issue: `Bot could not reply: ${describeClaudeError(claude)}` });
+        await notifyOwnerThrottled(db, config.ownerPhone, `claude_${claude.errorType}`, { guest: label, issue: `Bot could not reply: ${describeClaudeError(claude)}` }, () => pushUrgent({ push: 'bot_error', reason: `Bot could not reply: ${describeClaudeError(claude)}` }));
         return res.sendStatus(200);
       }
 
@@ -1300,8 +1334,14 @@ exports.whatsappBotWorker = onRequest(
           mode: effectiveMode,
           ...fields,
         }),
-        notifyOwner: async (issue) => { if (config.ownerPhone) await notifyOwner(config.ownerPhone, { guest: label, issue }); },
-        notifyOwnerThrottled: (key, issue) => notifyOwnerThrottled(db, config.ownerPhone, key, { guest: label, issue }),
+        // opts.push: also a push notification (urgent alerts only), side by side with WhatsApp.
+        notifyOwner: async (issue, opts) => {
+          await Promise.all([
+            config.ownerPhone ? notifyOwner(config.ownerPhone, { guest: label, issue }) : null,
+            opts?.push ? pushUrgent(opts) : null,
+          ]);
+        },
+        notifyOwnerThrottled: (key, issue, opts) => notifyOwnerThrottled(db, config.ownerPhone, key, { guest: label, issue }, opts?.push ? () => pushUrgent(opts) : null),
         finishPending: () => deletePendingIfTokenMatches(db, phone, batchToken),
       });
 

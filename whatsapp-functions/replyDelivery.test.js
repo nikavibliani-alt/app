@@ -210,3 +210,57 @@ test('video tag is recognized anywhere in the reply and never sent as text', asy
     assert.deepEqual(f.calls.find((c) => c[0] === 'storeAssistant'), ['storeAssistant', `Please adjust it.\n[VIDEO_SENT:${ID}]`]);
   });
 });
+
+test('push notification only for urgent alerts and bot errors, next to the WhatsApp alert', async (t) => {
+  const pushOf = (f, name) => f.calls.filter((c) => c[0] === name).map((c) => c[c.length - 1]?.push).filter(Boolean);
+  await t.test('locked out ([URGENT:LOCKOUT]): push "lockout"', async () => {
+    const f = fakeDeps();
+    await deliverReply(parseAiReply('I am contacting our team right now and will update you shortly. [ESCALATE] [URGENT:LOCKOUT]'), WHO, f.deps);
+    assert.deepEqual(pushOf(f, 'notifyOwner'), ['lockout']);
+    assert.equal(f.calls.filter((c) => c[0] === 'notifyOwner').length, 1, 'one WhatsApp alert, no second escalation alert');
+  });
+  await t.test('flooding / security ([URGENT:ISSUE]): push "issue"', async () => {
+    const f = fakeDeps();
+    await deliverReply(parseAiReply('We are looking into this right now and will update you shortly. [ESCALATE] [URGENT:ISSUE]'), WHO, f.deps);
+    assert.deepEqual(pushOf(f, 'notifyOwner'), ['issue']);
+  });
+  await t.test('angry guest ([URGENT:ANGRY]): push "angry"', async () => {
+    const f = fakeDeps();
+    await deliverReply(parseAiReply('[URGENT:ANGRY]'), WHO, f.deps);
+    assert.deepEqual(pushOf(f, 'notifyOwner'), ['angry']);
+  });
+  await t.test('normal escalation: WhatsApp only, no push', async () => {
+    const f = fakeDeps();
+    await deliverReply(parseAiReply('Let me check on that and get back to you shortly. [ESCALATE]'), WHO, f.deps);
+    assert.equal(f.calls.filter((c) => c[0] === 'notifyOwner').length, 1);
+    assert.deepEqual(pushOf(f, 'notifyOwner'), []);
+  });
+  await t.test('tag-only escalation: no push', async () => {
+    const f = fakeDeps();
+    await deliverReply(parseAiReply('[ESCALATE]'), WHO, f.deps);
+    assert.deepEqual(pushOf(f, 'notifyOwner'), []);
+  });
+  await t.test('normal reply: no alert, no push', async () => {
+    const f = fakeDeps();
+    await deliverReply(parseAiReply('Check-in starts at 3pm.'), WHO, f.deps);
+    assert.deepEqual([...pushOf(f, 'notifyOwner'), ...pushOf(f, 'notifyOwnerThrottled')], []);
+  });
+  await t.test('bot error, empty reply: push "bot_error"', async () => {
+    const f = fakeDeps();
+    await deliverReply(parseAiReply('[VIDEO_SENT:123]'), WHO, f.deps);
+    const opts = f.calls.find((c) => c[0] === 'notifyOwnerThrottled')[3];
+    assert.deepEqual(opts, { push: 'bot_error', reason: 'its reply was empty' });
+  });
+  await t.test('bot error, Meta refused the text: push "bot_error" with the reason', async () => {
+    const f = fakeDeps({ sendText: { ok: false, code: 131047, reason: 'Meta error 131047: Re-engagement message' } });
+    await deliverReply(parseAiReply('Here is the info.'), WHO, f.deps);
+    const opts = f.calls.find((c) => c[0] === 'notifyOwnerThrottled')[3];
+    assert.equal(opts.push, 'bot_error');
+    assert.match(opts.reason, /reply failed to send: Meta error 131047/);
+  });
+  await t.test('bot error, Meta refused the video: push "bot_error"', async () => {
+    const f = fakeDeps({ sendVideo: { ok: false, code: 131053, reason: 'Meta error 131053: Media upload error' } });
+    await deliverReply(parseAiReply('[VIDEO:975338858914982]\nPaid parking under Carrefour.'), WHO, f.deps);
+    assert.equal(f.calls.find((c) => c[0] === 'notifyOwnerThrottled')[3].push, 'bot_error');
+  });
+});

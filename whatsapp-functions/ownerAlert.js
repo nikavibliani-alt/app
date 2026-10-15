@@ -38,11 +38,15 @@ function cleanParam(value, max, fallback) {
  * unknown; an unrecognized room code is shown on its own.
  */
 function ownerAlertGuest(name, roomCode) {
-  const who = cleanParam(name, MAX_NAME, 'Guest');
+  return `${cleanParam(name, MAX_NAME, 'Guest')} / ${placeLabel(roomCode)}`;
+}
+
+/** "<property> <room>", e.g. "Shartava 6-2"; "unknown property" with no room; an unrecognized room code on its own. */
+function placeLabel(roomCode) {
   const room = String(roomCode || '').trim();
-  if (!room) return `${who} / unknown property`;
+  if (!room) return 'unknown property';
   const property = propertyForRoom(room);
-  return `${who} / ${property ? `${property} ` : ''}${room}`;
+  return `${property ? `${property} ` : ''}${room}`;
 }
 
 /** { guest, issue } ready for the template: cleaned and trimmed to fit. */
@@ -133,4 +137,4 @@ function ownerAlertStatusLines(statuses, ownerPhone, alertIds = new Set()) {
     });
 }
 
-module.exports = { ownerAlertGuest, ownerAlertParams, ownerAlertTemplatePayload, ownerAlertText, sendOwnerAlert, ownerStatusIds, ownerAlertStatusLines, alertDocId, TEMPLATE, ALERTS_COLLECTION };
+module.exports = { ownerAlertGuest, placeLabel, cleanParam, ownerAlertParams, ownerAlertTemplatePayload, ownerAlertText, sendOwnerAlert, ownerStatusIds, ownerAlertStatusLines, alertDocId, TEMPLATE, ALERTS_COLLECTION };

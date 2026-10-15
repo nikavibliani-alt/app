@@ -158,3 +158,10 @@ test('ownerAlertGuest: a long name is shortened so the property and room still f
   const t = ownerAlertGuest('Anna\nPetrova', '6-2');
   assert.equal(t, 'Anna Petrova / Shartava 6-2', 'no newlines in a template parameter');
 });
+
+test('placeLabel: the property + room text shared by the WhatsApp alert and the push', () => {
+  const { placeLabel } = require('./ownerAlert');
+  assert.equal(placeLabel('6-2'), 'Shartava 6-2');
+  assert.equal(placeLabel('orb-2'), 'Orbeliani orb-2');
+  assert.equal(placeLabel(''), 'unknown property');
+});
