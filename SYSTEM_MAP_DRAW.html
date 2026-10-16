@@ -8,7 +8,7 @@
   :root{
     --bg:#eceef1; --panel:#fff; --ink:#1a1d23; --muted:#6b7280;
     --line:#e2e5ea; --accent:#2563eb; --accent-soft:#eff6ff;
-    --ok:#15803d; --miss:#9ca3af;
+    --ok:#15803d;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;overflow:hidden}
@@ -30,7 +30,6 @@
 
   .body{flex:1;display:flex;min-height:0}
 
-  /* toolbar */
   .tools{
     width:48px;background:var(--panel);border-right:1px solid var(--line);
     display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;flex-shrink:0;
@@ -43,25 +42,22 @@
   .tools button.active{background:var(--accent-soft);color:var(--accent);outline:2px solid #bfdbfe}
   .tools .sep{height:1px;width:28px;background:var(--line);margin:6px 0}
 
-  /* canvas */
   .canvas-wrap{flex:1;position:relative;overflow:hidden;background:#fafafa}
   .canvas-wrap.hand{cursor:grab}
-  .canvas-wrap.hand.grabbing{cursor:grabbing}
+  .canvas-wrap.hand.grabbing,.canvas-wrap.space-pan{cursor:grabbing}
   .canvas-wrap.pen{cursor:crosshair}
-  .canvas-wrap.box{cursor:crosshair}
+  .canvas-wrap.box,.canvas-wrap.text{cursor:crosshair}
   svg{display:block;width:100%;height:100%;touch-action:none}
-  .grid line{stroke:#e8eaed;stroke-width:1}
-  .stroke{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
   .shape{fill:#fff;stroke:var(--ink);stroke-width:2;cursor:move}
   .shape-text{fill:var(--ink);font-size:14px;font-weight:600;text-anchor:middle;dominant-baseline:middle;pointer-events:none;user-select:none}
+  .stroke{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
   .arrow{fill:none;stroke:var(--ink);stroke-width:2;marker-end:url(#arr)}
   .label{fill:var(--ink);font-size:15px;font-weight:500;cursor:move;user-select:none}
   .sel{stroke:var(--accent)!important;stroke-width:3!important}
   .ghost{fill:rgba(37,99,235,.06);stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4;pointer-events:none}
 
-  /* checklist panel */
   .panel{
-    width:280px;background:var(--panel);border-left:1px solid var(--line);
+    width:260px;background:var(--panel);border-left:1px solid var(--line);
     display:flex;flex-direction:column;flex-shrink:0;transition:width .2s,margin .2s;
   }
   .panel.hidden{width:0;border:none;overflow:hidden}
@@ -84,7 +80,15 @@
   .hint{
     position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
     background:rgba(26,29,35,.88);color:#fff;font-size:12px;padding:8px 14px;border-radius:999px;
-    pointer-events:none;white-space:nowrap;z-index:5;
+    pointer-events:none;white-space:nowrap;z-index:5;transition:opacity .4s;
+  }
+  .hint.fade{opacity:0}
+
+  .text-editor{
+    position:absolute;z-index:20;min-width:120px;max-width:280px;
+    font:inherit;font-size:14px;font-weight:500;padding:6px 8px;border-radius:8px;
+    border:2px solid var(--accent);background:#fff;outline:none;resize:none;
+    box-shadow:0 4px 16px rgba(0,0,0,.12);
   }
 
   @media(max-width:800px){
@@ -97,7 +101,7 @@
 <header>
   <div>
     <h1>Your system map</h1>
-    <p>Blank board · drag to pan · draw only what you need · checklist on the right</p>
+    <p>Start on an empty board · roam freely · or open the <a href="SYSTEM_MAP_BEGINNER_VISUAL.html" style="color:#2563eb">pre-drawn beginner map</a></p>
   </div>
   <div class="hdr-btns">
     <button type="button" id="btn-checklist" class="on">Checklist</button>
@@ -108,13 +112,13 @@
 
 <div class="body">
   <aside class="tools" aria-label="Tools">
-    <button type="button" class="active" data-t="hand" title="Move / pan">✋</button>
+    <button type="button" class="active" data-t="hand" title="Move / pan (default)">✋</button>
     <button type="button" data-t="select" title="Select item">↖</button>
     <div class="sep"></div>
-    <button type="button" data-t="pen" title="Pen">✎</button>
+    <button type="button" data-t="pen" title="Pen — drag to draw">✎</button>
     <button type="button" data-t="box" title="Box — drag to draw">▢</button>
     <button type="button" data-t="arrow" title="Arrow — 2 clicks">→</button>
-    <button type="button" data-t="text" title="Text — click then type">T</button>
+    <button type="button" data-t="text" title="Text — drag a box, then type">T</button>
     <div class="sep"></div>
     <button type="button" data-t="erase" title="Delete — click item">⌫</button>
   </aside>
@@ -135,13 +139,13 @@
         <g id="ghost"></g>
       </g>
     </svg>
-    <div class="hint" id="hint">✋ Drag empty space to move around the board</div>
+    <div class="hint" id="hint">✋ Drag to move around · scroll to zoom · nothing is created until you choose a draw tool</div>
   </div>
 
   <aside class="panel" id="panel">
     <div class="panel-head">
       <h2>What am I missing?</h2>
-      <p>Tick items as you add them to your map. This is a guide — nothing is drawn for you.</p>
+      <p>Beginner checklist only. Tick items as you add them — nothing is drawn for you.</p>
     </div>
     <div class="panel-body" id="checks"></div>
     <div class="progress" id="prog">0 / 0 checked</div>
@@ -150,7 +154,10 @@
 
 <script>
 (() => {
-  const KEY = 'maxela_blank_map_v2';
+  const KEY = 'maxela_blank_map_v3';
+  const DRAG_START = 10;   // px before a draw gesture starts
+  const MIN_BOX = 28;      // min box size
+
   const wrap = document.getElementById('wrap');
   const svg = document.getElementById('svg');
   const cam = document.getElementById('cam');
@@ -161,39 +168,25 @@
   const prog = document.getElementById('prog');
 
   const CHECKLIST = [
-    { group:'Guest journey', items:[
+    { group:'Guest', items:[
       'Booking arrives (MiniHotel)',
-      'Booking saved in system',
       'Guest opens check-in page',
-      'Guest registers (passport / contact)',
-      'Guest gets unlock (door / WiFi / elevator)',
+      'Guest registers',
+      'Guest gets unlock (door / WiFi)',
     ]},
     { group:'Admin', items:[
       'See today’s guests',
       'Check passport / grant access',
-      'Edit apartment (WiFi, photos)',
-      'Update elevator code',
+      'Edit apartment info',
     ]},
     { group:'Housekeeping', items:[
       'HK marks room clean',
-      'Early unlock rule',
-      'WhatsApp “room ready” (optional)',
+      'Early unlock when room ready',
     ]},
-    { group:'Data (Firebase)', items:[
-      'reservations',
-      'checkin_guests (guest forms)',
-      'checkin_apartments (room info)',
-      'hk_status',
-      'elevator code',
-    ]},
-    { group:'Automation', items:[
-      'Booking sync (~10 min)',
-      'Elevator monitor',
-    ]},
-    { group:'New pipeline (future)', items:[
-      'One room truth (assignments)',
-      'Move = block conflict + swap',
-      'Logs when something fails',
+    { group:'Where data lives', items:[
+      'Bookings (reservations)',
+      'Guest forms (checkin_guests)',
+      'Room info (checkin_apartments)',
     ]},
   ];
 
@@ -202,19 +195,22 @@
   let selected = null;
   let dragItem = null;
   let panning = null;
+  let spaceDown = false;
+  let pointerDown = null;
   let boxDrag = null;
   let penPath = null;
   let penD = '';
   let arrowA = null;
   let idN = 0;
+  let activeEditor = null;
 
   const hints = {
-    hand:'✋ Drag empty space to pan · scroll to zoom',
-    select:'↖ Click an item to select · drag to move',
-    pen:'✎ Drag to draw',
-    box:'▢ Click and drag to draw a box · double-click box text to edit',
+    hand:'✋ Drag to pan · scroll to zoom · hold Space to pan from any tool',
+    select:'↖ Click an item to select · drag empty space to pan',
+    pen:'✎ Drag to draw — a plain click does nothing',
+    box:'▢ Drag to draw a box — a plain click does nothing',
     arrow:'→ Click start point, then end point',
-    text:'T Click where you want text',
+    text:'T Drag a text box, then type — a plain click does nothing',
     erase:'⌫ Click an item to delete it',
   };
 
@@ -228,13 +224,23 @@
     return p.matrixTransform(cam.getScreenCTM().inverse());
   }
 
+  function screenFromWorld(x, y){
+    const p = svg.createSVGPoint();
+    p.x = x; p.y = y;
+    const s = p.matrixTransform(cam.getScreenCTM());
+    const r = wrap.getBoundingClientRect();
+    return { left: s.x - r.left, top: s.y - r.top };
+  }
+
   function setTool(t){
+    closeEditor(false);
     tool = t;
     document.querySelectorAll('.tools button[data-t]').forEach(b=>{
       b.classList.toggle('active', b.dataset.t===t);
     });
     wrap.className = 'canvas-wrap ' + (t==='hand'||t==='select'? 'hand' : t);
     hint.textContent = hints[t]||'';
+    hint.classList.remove('fade');
     arrowA = null;
     ghost.innerHTML = '';
     if(t!=='select') deselect();
@@ -253,6 +259,54 @@
   }
 
   function isDrawn(el){ return draw.contains(el); }
+
+  function dist(a, b){
+    return Math.hypot(b.x - a.x, b.y - a.y);
+  }
+
+  function closeEditor(save){
+    if(!activeEditor) return;
+    const { el, ta, kind, box } = activeEditor;
+    const text = ta.value.trim();
+    if(save && text){
+      if(kind === 'text'){
+        el.textContent = text;
+      } else {
+        el.querySelector('text').textContent = text;
+      }
+    } else if(kind === 'text'){
+      el.remove();
+    } else if(!text){
+      el.querySelector('text').textContent = 'label';
+    }
+    ta.remove();
+    activeEditor = null;
+  }
+
+  function openEditor(kind, el, box){
+    closeEditor(true);
+    const pos = screenFromWorld(box.x, box.y);
+    const ta = document.createElement('textarea');
+    ta.className = 'text-editor';
+    ta.rows = Math.max(2, Math.ceil(box.h / 18));
+    ta.style.left = pos.left + 'px';
+    ta.style.top = pos.top + 'px';
+    ta.style.width = Math.max(120, box.w * camS) + 'px';
+    ta.style.minHeight = Math.max(36, box.h * camS) + 'px';
+    ta.value = kind === 'text' ? '' : (el.querySelector?.('text')?.textContent || '');
+    if(kind === 'text' && !ta.value) ta.placeholder = 'Type here…';
+    wrap.appendChild(ta);
+    ta.focus();
+    activeEditor = { el, ta, kind, box };
+    ta.addEventListener('keydown', e=>{
+      if(e.key === 'Enter' && !e.shiftKey){
+        e.preventDefault();
+        closeEditor(true);
+      }
+      if(e.key === 'Escape') closeEditor(false);
+    });
+    ta.addEventListener('blur', ()=> closeEditor(true));
+  }
 
   function wire(el){
     el.addEventListener('pointerdown', e=>{
@@ -281,38 +335,43 @@
     el.addEventListener('dblclick', e=>{
       e.stopPropagation();
       if(el.dataset.kind==='box'){
-        const tx = el.querySelector('text');
-        const v = prompt('Label:', tx.textContent);
-        if(v!==null) tx.textContent = v || ' ';
+        const tr = el.getAttribute('transform').match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+        const r = el.querySelector('rect');
+        openEditor('box', el, {
+          x:+tr[1], y:+tr[2],
+          w:+r.getAttribute('width'), h:+r.getAttribute('height'),
+        });
       } else if(el.dataset.kind==='text'){
-        const v = prompt('Text:', el.textContent);
-        if(v!==null) el.textContent = v;
+        openEditor('text', el, {
+          x:+el.getAttribute('x'), y:+el.getAttribute('y') - 14,
+          w:160, h:32,
+        });
       }
     });
   }
 
-  function addBox(x,y,w,h,text=''){
+  function addBox(x,y,w,h,text='label'){
     const g = document.createElementNS('http://www.w3.org/2000/svg','g');
     g.dataset.kind = 'box';
     g.dataset.id = nid();
     g.setAttribute('transform', `translate(${x},${y})`);
     const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
     r.setAttribute('class','shape');
-    r.setAttribute('width', Math.max(40,w));
-    r.setAttribute('height', Math.max(28,h));
+    r.setAttribute('width', Math.max(MIN_BOX,w));
+    r.setAttribute('height', Math.max(MIN_BOX,h));
     r.setAttribute('rx','8');
     const t = document.createElementNS('http://www.w3.org/2000/svg','text');
     t.setAttribute('class','shape-text');
-    t.setAttribute('x', Math.max(40,w)/2);
-    t.setAttribute('y', Math.max(28,h)/2);
-    t.textContent = text || 'label';
+    t.setAttribute('x', Math.max(MIN_BOX,w)/2);
+    t.setAttribute('y', Math.max(MIN_BOX,h)/2);
+    t.textContent = text;
     g.append(r,t);
     wire(g);
     draw.appendChild(g);
     return g;
   }
 
-  function addText(x,y, text='text'){
+  function addText(x,y, text=''){
     const t = document.createElementNS('http://www.w3.org/2000/svg','text');
     t.dataset.kind = 'text';
     t.dataset.id = nid();
@@ -377,6 +436,7 @@
   }
 
   function save(){
+    closeEditor(true);
     const items = [];
     draw.querySelectorAll('[data-kind]').forEach(el=>{
       const k = el.dataset.kind;
@@ -393,11 +453,12 @@
     const checked = [...checksEl.querySelectorAll('input:checked')].map(i=>i.dataset.id);
     localStorage.setItem(KEY, JSON.stringify({items, checked, cam:{camX,camY,camS}}));
     hint.textContent = 'Saved ✓';
+    hint.classList.remove('fade');
     setTimeout(()=> hint.textContent = hints[tool], 1200);
   }
 
   function load(){
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(KEY) || localStorage.getItem('maxela_blank_map_v2');
     if(!raw) return;
     try{
       const d = JSON.parse(raw);
@@ -426,7 +487,23 @@
     }catch(e){}
   }
 
-  // tools
+  function panMode(){
+    return tool==='hand' || tool==='select' || spaceDown || (pointerDown && pointerDown.mode==='pan');
+  }
+
+  function beginPan(e){
+    panning = {sx:e.clientX, sy:e.clientY, cx:camX, cy:camY};
+    wrap.classList.add(spaceDown ? 'space-pan' : 'grabbing');
+  }
+
+  function cancelGesture(){
+    ghost.innerHTML = '';
+    boxDrag = null;
+    penPath = null;
+    penD = '';
+    pointerDown = null;
+  }
+
   document.querySelector('.tools').addEventListener('click', e=>{
     const b = e.target.closest('button[data-t]');
     if(b) setTool(b.dataset.t);
@@ -441,41 +518,36 @@
 
   document.getElementById('btn-clear').addEventListener('click', ()=>{
     if(confirm('Clear the whole board?')){
+      closeEditor(false);
       draw.innerHTML = '';
       deselect();
     }
   });
 
+  window.addEventListener('keydown', e=>{
+    if(e.code === 'Space' && !spaceDown && !e.target.closest('textarea,input')){
+      spaceDown = true;
+      wrap.classList.add('space-pan');
+      e.preventDefault();
+    }
+  });
+  window.addEventListener('keyup', e=>{
+    if(e.code === 'Space'){
+      spaceDown = false;
+      wrap.classList.remove('space-pan');
+      if(!panning) wrap.classList.remove('grabbing');
+    }
+  });
+
   wrap.addEventListener('pointerdown', e=>{
-    if(e.target.closest('[data-kind]') && tool!=='hand') return;
+    if(activeEditor && !e.target.classList.contains('text-editor')) closeEditor(true);
+    if(e.target.closest('[data-kind]') && tool!=='hand' && !spaceDown) return;
 
     const p = pt(e.clientX, e.clientY);
 
-    if(tool==='hand' || (tool==='select' && !e.target.closest('[data-kind]'))){
-      panning = {sx:e.clientX, sy:e.clientY, cx:camX, cy:camY};
-      wrap.classList.add('grabbing');
-      return;
-    }
-
-    if(tool==='box'){
-      boxDrag = {x0:p.x, y0:p.y};
-      const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
-      r.setAttribute('class','ghost');
-      r.setAttribute('x', p.x); r.setAttribute('y', p.y);
-      r.setAttribute('width',0); r.setAttribute('height',0);
-      r.setAttribute('rx','8');
-      ghost.innerHTML=''; ghost.appendChild(r);
-      boxDrag.rect = r;
-      wrap.setPointerCapture(e.pointerId);
-      return;
-    }
-
-    if(tool==='pen'){
-      penD = `M${p.x},${p.y}`;
-      penPath = document.createElementNS('http://www.w3.org/2000/svg','path');
-      penPath.setAttribute('class','stroke');
-      penPath.setAttribute('d', penD);
-      ghost.innerHTML=''; ghost.appendChild(penPath);
+    if(panMode() || e.button === 1){
+      pointerDown = { sx:e.clientX, sy:e.clientY, p, mode:'pan' };
+      beginPan(e);
       wrap.setPointerCapture(e.pointerId);
       return;
     }
@@ -485,20 +557,16 @@
         arrowA = p;
         ghost.innerHTML = `<circle cx="${p.x}" cy="${p.y}" r="5" fill="#2563eb"/>`;
       } else {
-        addArrow(arrowA.x, arrowA.y, p.x, p.y);
+        if(dist(arrowA, p) > 8) addArrow(arrowA.x, arrowA.y, p.x, p.y);
         arrowA = null;
         ghost.innerHTML = '';
       }
       return;
     }
 
-    if(tool==='text'){
-      const t = prompt('Text:');
-      if(t) addText(p.x, p.y, t);
-      return;
-    }
-
-    if(tool==='select') deselect();
+    // drawing tools wait for drag threshold — plain click does nothing
+    pointerDown = { sx:e.clientX, sy:e.clientY, p, mode:'draw', tool };
+    wrap.setPointerCapture(e.pointerId);
   });
 
   wrap.addEventListener('pointermove', e=>{
@@ -520,6 +588,29 @@
       camY = panning.cy + (e.clientY - panning.sy);
       applyCam();
       return;
+    }
+
+    if(pointerDown && pointerDown.mode==='draw' && !boxDrag && !penPath){
+      if(dist(pointerDown.p, p) < DRAG_START) return;
+      if(pointerDown.tool==='box' || pointerDown.tool==='text'){
+        const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
+        r.setAttribute('class','ghost');
+        r.setAttribute('x', pointerDown.p.x);
+        r.setAttribute('y', pointerDown.p.y);
+        r.setAttribute('width',0);
+        r.setAttribute('height',0);
+        r.setAttribute('rx','8');
+        ghost.innerHTML='';
+        ghost.appendChild(r);
+        boxDrag = {x0:pointerDown.p.x, y0:pointerDown.p.y, rect:r, kind:pointerDown.tool};
+      } else if(pointerDown.tool==='pen'){
+        penD = `M${pointerDown.p.x},${pointerDown.p.y}`;
+        penPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+        penPath.setAttribute('class','stroke');
+        penPath.setAttribute('d', penD);
+        ghost.innerHTML='';
+        ghost.appendChild(penPath);
+      }
     }
 
     if(boxDrag && boxDrag.rect){
@@ -547,7 +638,12 @@
 
   wrap.addEventListener('pointerup', e=>{
     if(dragItem){ dragItem=null; return; }
-    if(panning){ panning=null; wrap.classList.remove('grabbing'); return; }
+    if(panning){
+      panning=null;
+      wrap.classList.remove('grabbing','space-pan');
+      pointerDown = null;
+      return;
+    }
 
     if(boxDrag && boxDrag.rect){
       const x = +boxDrag.rect.getAttribute('x');
@@ -555,8 +651,17 @@
       const w = +boxDrag.rect.getAttribute('width');
       const h = +boxDrag.rect.getAttribute('height');
       ghost.innerHTML = '';
-      if(w > 12 && h > 12) addBox(x,y,w,h);
+      if(w >= MIN_BOX && h >= MIN_BOX){
+        if(boxDrag.kind === 'text'){
+          const el = addText(x + 8, y + h/2 + 5, '');
+          openEditor('text', el, { x, y, w, h });
+        } else {
+          const el = addBox(x,y,w,h);
+          openEditor('box', el, { x, y, w, h });
+        }
+      }
       boxDrag = null;
+      pointerDown = null;
       return;
     }
 
@@ -565,7 +670,13 @@
       ghost.innerHTML = '';
       penPath = null;
       penD = '';
+      pointerDown = null;
+      return;
     }
+
+    pointerDown = null;
+
+    if(tool==='select') deselect();
   });
 
   wrap.addEventListener('wheel', e=>{
@@ -583,6 +694,7 @@
   load();
   applyCam();
   setTool('hand');
+  setTimeout(()=> hint.classList.add('fade'), 8000);
 })();
 </script>
 </body>
