@@ -179,9 +179,9 @@ test('video tag is recognized anywhere in the reply and never sent as text', asy
     assert.equal(p.text, 'Please click the button and scroll in your direction to adjust it.');
   });
   await t.test('at the start, on its own line', () => {
-    const p = parseAiReply(`[VIDEO:${ID}]\nThe left handle controls the temperature.`);
+    const p = parseAiReply(`[VIDEO:${ID}]\nFor hot water, press the button on the right handle.`);
     assert.equal(p.videoId, ID);
-    assert.equal(p.text, 'The left handle controls the temperature.');
+    assert.equal(p.text, 'For hot water, press the button on the right handle.');
   });
   await t.test('in the middle, inline', () => {
     const p = parseAiReply(`Here is how it works [VIDEO:${ID}] the right handle controls the pressure.`);
