@@ -49,6 +49,22 @@ function isHkDoneDateNotFuture(date, nowMs = Date.now()) {
   return d <= new Date(nowMs + 4 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
+// push_log: one small doc per notable push event (a deleted subscription, a failed send, a test).
+async function logPush(db, kind, subDoc, extra) {
+  try {
+    const d = (subDoc.data && subDoc.data()) || {};
+    await db.collection('push_log').add({
+      kind,
+      deviceId: subDoc.id,
+      userAgent: String(d.userAgent || '').slice(0, 100),
+      createdAt: new Date().toISOString(),
+      ...extra,
+    });
+  } catch (err) {
+    console.warn('[pushNotifications] could not write push_log', err.message || err);
+  }
+}
+
 // Helper — send to all subscribed devices
 async function sendPushToAll(payload) {
   const webpush = require('web-push');
@@ -70,8 +86,12 @@ async function sendPushToAll(payload) {
       } catch (e) {
         // Subscription expired or invalid — remove it
         if (e.statusCode === 404 || e.statusCode === 410) {
+          // Log WHICH device is dropped and WHY before deleting (push_log keeps the evidence).
+          console.warn('[pushNotifications] subscription deleted', subDoc.id, e.statusCode, payload && payload.title);
+          await logPush(db, 'subscription_deleted', subDoc, { statusCode: e.statusCode, title: payload && payload.title });
           await subDoc.ref.delete();
         } else {
+          await logPush(db, 'send_failed', subDoc, { statusCode: e.statusCode || null, message: String(e.message || '').slice(0, 200), title: payload && payload.title });
           console.warn('[pushNotifications] send failed', subDoc.id, e.statusCode || e.message);
         }
       }
@@ -172,7 +192,34 @@ function registerCloudFunctions() {
     }
   );
 
-  return { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone, pushOnDamageReport };
+  // "Send test notification" in the admin More tab: the page writes push_test_requests/{id} {deviceId};
+  // this sends one test push to that device only and writes the Apple/Google status back on the doc.
+  const pushTestRequest = onDocumentCreated(
+    { document: 'push_test_requests/{id}', ...opts },
+    async (event) => {
+      const ref = event.data.ref;
+      const deviceId = String((event.data.data() || {}).deviceId || '');
+      const done = (r) => ref.set({ ...r, doneAt: new Date().toISOString() }, { merge: true });
+      if (!deviceId) { await done({ ok: false, message: 'no deviceId' }); return; }
+      const db = getFirestore();
+      const snap = await db.collection('push_subscriptions').doc(deviceId).get();
+      if (!snap.exists) { await done({ ok: false, message: 'This phone has no saved subscription' }); return; }
+      const webpush = require('web-push');
+      webpush.setVapidDetails('mailto:nikavibliani@gmail.com', VAPID_PUBLIC_KEY.value(), VAPID_PRIVATE_KEY.value());
+      try {
+        const r = await webpush.sendNotification(snap.data().subscription, JSON.stringify({
+          title: 'Test notification', body: 'This phone can receive Maxela notifications.', tag: 'test-' + deviceId.slice(0, 8), url: '/checkin-admin',
+        }));
+        await done({ ok: true, statusCode: r.statusCode });
+      } catch (e) {
+        // A test never deletes the subscription: the status is shown to the user instead.
+        await logPush(db, 'test_failed', snap, { statusCode: e.statusCode || null, message: String(e.message || '').slice(0, 200) });
+        await done({ ok: false, statusCode: e.statusCode || null, message: String(e.message || '').slice(0, 200) });
+      }
+    }
+  );
+
+  return { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone, pushOnDamageReport, pushTestRequest };
 }
 
 module.exports = { sendPushToAll, registerCloudFunctions, isHkDoneDateNotFuture };

@@ -36,7 +36,8 @@ const { guestFind, guestStay } = registerGuestApi();
 exports.guestFind = guestFind;
 exports.guestStay = guestStay;
 
-const { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone, pushOnDamageReport } = registerPushNotifications();
+const { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone, pushOnDamageReport, pushTestRequest } = registerPushNotifications();
+exports.pushTestRequest = pushTestRequest;
 exports.pushOnFailedSearch = pushOnFailedSearch;
 exports.pushOnGuestCheckout = pushOnGuestCheckout;
 exports.pushOnServiceRequest = pushOnServiceRequest;
