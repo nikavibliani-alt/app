@@ -123,6 +123,15 @@ def main():
         aimed = run({**snap, **extra}, cfg_a, copy.deepcopy(state))
         show("with Aim -5%", aimed, night)
 
+    print("\n=== 2b. Tomorrow's morning run (the next run that may lower), same data ===")
+    tomorrow = datetime.combine(today + timedelta(days=1), datetime.min.time()) + timedelta(hours=9, minutes=5)
+    base_t = run({**snap, "now": tomorrow}, cfg, copy.deepcopy(state))
+    show("without an aim", base_t, night)
+    cfg_a = copy.deepcopy(cfg)
+    cfg_a["night_aims"] = [{"rt": ROOM, "date": night, "pct": -5, "avail": int(cell["avail"])}]
+    aimed_t = run({**snap, "now": tomorrow}, cfg_a, copy.deepcopy(state))
+    show("with Aim -5%", aimed_t, night)
+
     print("\n=== 3. The same night with an own price of 140 GEL / 38 USD ===")
     snap_own = {**snap, "own_prices": {**own, f"{ROOM}|{night}": {"GEL": 140.0, "USD": 38.0}}}
     res = run(snap_own, cfg, copy.deepcopy(state))
@@ -136,6 +145,13 @@ def main():
     print(f"  Channels pushed after the write: {portals}")
     print("  Booking and Expedia take the GEL price list; Airbnb takes the Airbnb list (named EUR here, plus *ALL), as today.")
     print(f"  Expedia is {'pushed' if 'EXPEDIA' in portals else 'NOT pushed: it is not a channel of ' + ROOM}.")
+    print("\n  === 3b. For the format only: the same night with a DIFFERENT own price, 150 GEL / 40 USD ===")
+    res_b = run({**snap, "own_prices": {**own, f"{ROOM}|{night}": {"GEL": 150.0, "USD": 40.0}}}, cfg, copy.deepcopy(state))
+    mine_b = [w for w in res_b["writes"] if w["rt"] == ROOM and w["date"] == night]
+    show("this run", res_b, night)
+    print("  What would be sent to MiniHotel (SendPrices):")
+    print(json.dumps(live.build_payload(mine_b), indent=2))
+    print(f"  Channels pushed after the write: {live.portals_to_push(mine_b, live_rts) if mine_b else []}")
     inv2 = copy.deepcopy(inventory)
     for w in mine:
         inv2[ROOM][night]["prices"][w["currency"]] = w["price"]
