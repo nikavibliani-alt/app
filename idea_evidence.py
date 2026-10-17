@@ -205,7 +205,7 @@ def last_year_lines(db, config: dict, today: str, props: list, stays: list | Non
 NOT_USEFUL = "Not useful: nothing left to sell"
 NOT_USEFUL_FEW = "Not useful: too few nights to sell"
 MIN_SELLABLE_NIGHTS = 3             # an idea must change at least this many sellable nights
-HAND_SET_KINDS = ("manual", "protected")
+HAND_SET_KINDS = ("manual", "protected", "own")
 
 
 def price_list_of(ptype: str) -> str:

@@ -113,6 +113,9 @@ DEFAULTS = {
     # aggressive = "fill the month": lower faster and further when selling slower than normal
     # hold       = small moves only, more active closer to the date: the holiday rule above, for these dates
     "date_rules": [],
+    # Aim for single nights, set on the pricing page: [{"rt": "XCV_1", "date": "2026-12-20", "pct": -5, "avail": 1}].
+    # Moves that night's target by pct percent (inside min/max); it ends when the night gets a booking (free units < avail).
+    "night_aims": [],
     "events": {},           # {"YYYY-MM-DD": {"label": "...", "pct": 0.30}}
     "room_types": {},       # filled by the caller
     "rules": {},            # {rt: {currency: {season: {"min":, "start":, "max":}}}}
@@ -140,6 +143,7 @@ AGGRESSIVE = {
 }
 STYLES = ("normal", "aggressive")
 RULE_ACTIONS = ("protect", "aggressive", "normal", "hold")
+AIM_MAX_PCT = 20            # a night aim moves the target by at most 20% up or down
 
 
 # Settings whose keys are numbers of days: replaced as a whole, keys made numeric
@@ -268,6 +272,20 @@ def apply_limits(cfg: dict) -> list:
         else:
             problems.append(f"setting date_rules entry {r!r} is not valid; ignored.")
     cfg["date_rules"] = good
+    aims = []
+    for a in cfg.get("night_aims") or []:
+        try:
+            from datetime import date as _date
+            pct = float(a["pct"])
+            ok = (isinstance(a, dict) and isinstance(a["rt"], str) and bool(_date.fromisoformat(str(a["date"])))
+                  and pct != 0 and abs(pct) <= AIM_MAX_PCT and (a.get("avail") is None or int(a["avail"]) >= 0))
+        except (KeyError, TypeError, ValueError):
+            ok = False
+        if ok:
+            aims.append({"rt": a["rt"], "date": str(a["date"]), "pct": pct, "avail": a.get("avail")})
+        else:
+            problems.append(f"setting night_aims entry {a!r} is not valid; ignored.")
+    cfg["night_aims"] = aims
     h = cfg.get("holiday")
     if not isinstance(h, dict):
         problems.append("setting holiday is not valid; defaults used.")

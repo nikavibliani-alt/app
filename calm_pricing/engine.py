@@ -286,6 +286,15 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
     tonight_drop = bool(snapshot.get("tonight_drop")) and only_dates is not None
     release_set = set(snapshot.get("release_manual") or ())          # "ROOM|YYYY-MM-DD" nights you gave back to the engine
     tomorrow_s = (today + timedelta(days=1)).isoformat()
+    # Per-night "Aim" set on the pricing page: {(room type, date): (percent, free units when it was set)}. It moves the target
+    # of that night up or down by that percent (always inside min/max). It ends when the night gets a booking.
+    aims = {}
+    for a_ in cfg.get("night_aims") or []:
+        aims[(a_["rt"], str(a_["date"]))] = (float(a_["pct"]), a_.get("avail"))
+    # Prices typed on the pricing page ("Set my own price"): {"ROOM|YYYY-MM-DD": {"GEL": x, "USD": y}}. Written once, then
+    # the night counts as hand-set. own_done = the keys that are finished (written, already that price, or booked).
+    own_prices = snapshot.get("own_prices") or {}
+    own_done = set()
     # One-time price reset (snapshot["reset"] = set of room types): see the reset block below.
     reset_rts = set(snapshot.get("reset") or ()) if not shadow else set()
     calm, dm = cfg["calm"], cfg["demand"]
@@ -408,6 +417,9 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
             # ---------- date rules and style ----------
             rule = _date_rule(rt, ds, cfg.get("date_rules"))
             if rule and rule["action"] == "protect":
+                if f"{rt}|{ds}" in own_prices:
+                    own_done.add(f"{rt}|{ds}")                 # a protected night is never touched: the typed price is dropped
+                    warnings.append(f"{rt} {ds}: protected night, the price you typed was not used.")
                 for cur in info.get("currencies", ["GEL"]):
                     p0 = float((cell.get("prices") or {}).get(cur) or 0)
                     st0 = rt_state.setdefault(ds, {}).setdefault(cur, {})
@@ -462,6 +474,10 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
             if units >= lu_cfg["min_units"] and avail in (1, 2):
                 lu = lu_cfg["one_left"] if avail == 1 else lu_cfg["two_left"]
 
+            aim = aims.get((rt, ds))
+            aim_pct = aim[0] if aim and (aim[1] is None or avail >= int(aim[1])) else 0.0
+            okey = f"{rt}|{ds}"
+
             for cur in info.get("currencies", ["GEL"]):
                 rules = cfg["rules"].get(rt, {}).get(cur, {}).get(season)
                 mh_price = float((cell.get("prices") or {}).get(cur) or 0)
@@ -476,6 +492,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 _track_anchor(st, hol_kind, current, now)
 
                 if avail == 0:
+                    if okey in own_prices:
+                        own_done.add(okey)                       # booked meanwhile: nothing to write
                     if st.get("manual_until") and avail < st.get("avail_at_manual", avail):
                         for k in ("manual_until", "manual_price", "avail_at_manual"):
                             st.pop(k, None)
@@ -529,6 +547,23 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 # A price that is not the one the engine wrote last is yours. It stays until that night is booked or you give it
                 # back on the pricing page ("release_manual"). Cancellation drops, the holiday rule and ideas all skip it.
                 if can_write and not shadow and not reset_mode:
+                    own_p = (own_prices.get(okey) or {}).get(cur)
+                    if own_p is not None:
+                        try:
+                            own_p = float(own_p)
+                        except (TypeError, ValueError):
+                            own_p = 0.0
+                        if not (0 < own_p <= 10 * mx):
+                            warnings.append(f"{rt} {ds} {cur}: the price you typed ({own_p:g}) is not usable; ignored.")
+                            own_done.add(okey)
+                        elif abs(current - own_p) >= 0.5:
+                            dec["proposed"], dec["kind"], dec["write"] = own_p, "own", True
+                            dec["why"].append(f"You set this price: {_fmt(cur, current)} -> {_fmt(cur, own_p)}. It stays as you set it, "
+                                              "even outside your minimum and maximum, until the night is booked or you give it back to the engine.")
+                            continue
+                        else:
+                            st["manual_until"], st["manual_price"], st["avail_at_manual"] = MANUAL_FOREVER, current, avail
+                            own_done.add(okey)
                     if f"{rt}|{ds}" in release_set:
                         for k in ("manual_until", "manual_price", "avail_at_manual"):
                             st.pop(k, None)
@@ -572,6 +607,9 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
 
                 # ---- 2b. a night freed tonight or tomorrow (cancellation run): lowered at once ----
                 # tonight: straight to the minimum; tomorrow: halfway between its price and the minimum.
+                if tonight_drop and ds in (today_s, tomorrow_s) and aim_pct and can_write and not shadow and not reset_mode:
+                    dec["why"].append(f"A booking for this night was cancelled, but you set an aim of {aim_pct:+g}% on it: no automatic drop.")
+                    continue
                 if tonight_drop and ds in (today_s, tomorrow_s) and hol_kind is None and can_write and not shadow and not reset_mode:
                     is_tonight = ds == today_s
                     when = "tonight" if is_tonight else "tomorrow"
@@ -612,6 +650,9 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 if last_days_behind:
                     target = mn
                 target = min(max(target, mn), mx_eff)
+                if aim_pct:
+                    target = min(max(target * (1 + aim_pct / 100), mn), mx_eff)
+                    dec["aim"] = aim_pct
                 dec["target"] = round(target, 2)
 
                 dec["why"].append(f"{season.replace('_', ' ').capitalize()} season: start {_fmt(cur, start)}.")
@@ -638,10 +679,12 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                     dec["why"].append("A booking for this room type came in nearby in the last 3 days: no drops.")
                 if last_days_behind:
                     dec["why"].append("Last days and still empty: stepping toward your minimum.")
+                if aim_pct:
+                    dec["why"].append(f"Your aim for this night: {aim_pct:+g}% on the target (always inside your minimum and maximum).")
 
                 # ---- 3b. one-time reset: straight down to the plain target, never up ----
                 if reset_mode:
-                    plain = min(max(base, mn), mx_eff)          # start price x weekend x holiday, inside min/max
+                    plain = min(max(base * (1 + aim_pct / 100), mn), mx_eff)          # start price x weekend x holiday (x your aim), inside min/max
                     dec["base_target"] = round(plain, 2)
                     if days_out < 1:
                         dec["why"].append("Reset: today is skipped.")
@@ -662,7 +705,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 # ---- 3c. far dates that are too high go straight to the plain target (live room types only) ----
                 far_from = int(calm.get("far_reset_from_days", 61))
                 if can_write and not shadow and days_out >= far_from and not dec.get("fill") and not hol_kind:
-                    plain = min(max(base, mn), mx_eff)
+                    plain = min(max(base * (1 + aim_pct / 100), mn), mx_eff)
                     new = _plain_target_price(plain, mn, mx_eff, step)
                     if new < current - 1e-9:
                         dec["base_target"] = round(plain, 2)
@@ -857,7 +900,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
 
     writes, shadow_moves = [], []
     for dec in decisions:
-        if dec["kind"] not in ("move", "correction", "fill", "reset", "far_reset", "tonight"):
+        if dec["kind"] not in ("move", "correction", "fill", "reset", "far_reset", "tonight", "own"):
             continue
         st = state[dec["rt"]][dec["date"]][dec["currency"]]
         if not ok or dec["rt"] in stopped_rts:
@@ -876,6 +919,10 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
         else:
             writes.append({"rt": dec["rt"], "date": dec["date"], "currency": dec["currency"], "price": dec["proposed"]})
             st["last_engine"] = dec["proposed"]
+            if dec["kind"] == "own":                      # your own price: from now on a hand-set night
+                st["manual_until"], st["manual_price"], st["avail_at_manual"] = MANUAL_FOREVER, dec["proposed"], dec["avail"]
+                own_done.add(f"{dec['rt']}|{dec['date']}")
+                continue
         st.setdefault("moves", []).append({"t": now.isoformat(), "p": dec["current"]})
         dirs = [x for x in st.get("dirs", []) if now - datetime.fromisoformat(x["t"]) < timedelta(hours=72)]
         dirs.append({"t": now.isoformat(), "d": direction, "k": dec["kind"], "p": dec["proposed"]})
@@ -913,4 +960,4 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
     return {"ok": ok, "stopped_room_types": sorted(stopped_rts), "main_run": main_run,
             "alerts": alerts, "warnings": warnings,
             "decisions": decisions, "writes": writes, "shadow_moves": shadow_moves, "state": state,
-            "changed": changed, "considered": considered, "corrections": corrections}
+            "changed": changed, "considered": considered, "corrections": corrections, "own_done": sorted(own_done)}

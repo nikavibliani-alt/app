@@ -19,6 +19,7 @@ async function test(name, w, hh, fn, opts = {}) {
 }
 let BROWSER;
 const openDates = async page => { if (!(await page.$('#seasonDates'))) await page.click('[data-act=toggleSeasonDates]'); await page.waitForSelector('#seasonDates'); };
+const openFold = async (page, id) => { await go(page, '#/seasons'); if (!(await page.$(`#foldbody-${id}`))) await page.click(`[data-act=toggleFold][data-id=${id}]`); await page.waitForSelector(`#foldbody-${id}`); };
 const go = async (page, hash) => { await page.evaluate(x => { location.hash = x; }, hash); await page.waitForTimeout(150); };
 const text = (page, sel) => page.evaluate(s => (document.querySelector(s) || {}).innerText || '', sel);
 const bar = page => text(page, '#bar');
@@ -72,7 +73,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
           const t = await text(page, '.dlg');
           assert.ok(t.length > 40, 'has text for ' + night.iso);
           if (night.what === 'Booked') assert.ok(/Booked\. The engine does not change booked nights/.test(t));
-          if (night.iso === '2026-10-17') assert.ok(/Set by you\. The engine never changes this price/.test(t) && /Give this night back to the engine/.test(t));
+          if (night.iso === '2026-10-17') assert.ok(/Set by you at .* The engine does not change it/.test(t.replace(/\s+/g, ' ')) && /Give this night back to the engine/.test(t));
           if (night.iso === '2026-10-19') assert.ok(/told the engine not to change/.test(t));
           if (night.iso === '2026-10-31') { assert.ok(/event you approved/.test(t)); assert.strictEqual(night.what, 'Empty · event'); }
           await page.keyboard.press('Escape');
@@ -87,7 +88,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
           const t = await text(page, '.panel');
           assert.ok(t.length > 30, 'panel text ' + c.iso);
           if (c.bk) assert.ok(/Booked\. The engine does not change booked nights/.test(t));
-          if (c.iso === '2026-10-17') { assert.ok(c.lock && /Set by you\. The engine never changes this price/.test(t) && /Give this night back to the engine/.test(t)); }
+          if (c.iso === '2026-10-17') { assert.ok(c.lock && /Set by you at .* The engine does not change it/.test(t.replace(/\s+/g, ' ')) && /Give this night back to the engine/.test(t)); }
           if (c.iso === '2026-10-19') assert.ok(c.lock && /told the engine not to change/.test(t));
           if (c.iso === '2026-10-31') assert.ok(c.ev && /event you approved/.test(t));
         }
@@ -206,7 +207,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
 
     // ---- 5. dates ----
     await test('5 holiday dates: cross-month range, overlap blocked, past days off, remove with Undo', w, hh, async ({page}) => {
-      await go(page, '#/dates');
+      await openFold(page, 'hol');
       const list = () => text(page, '#holList');
       assert.ok(/20 Dec – 27 Dec/.test(await list()) && /28 Dec – 6 Jan/.test(await list()));
       const dis = await page.$$eval('button.day', els => els.map(e => [e.dataset.iso, e.disabled]));
@@ -247,23 +248,12 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       const wr2 = await writesTo(page, 'pricing_config/rules'); assert.strictEqual(wr2[1].fields.dateOverrides.__op, 'remove');
       assert.strictEqual((await h.doc(page, 'pricing_config/rules')).dateOverrides.length, 2);
     });
-    await test('5b holiday dates are sorted from July on; date rules and events', w, hh, async ({page}) => {
-      await go(page, '#/dates');
+    await test('5b holiday dates are sorted from July on; events', w, hh, async ({page}) => {
+      await openFold(page, 'hol');
       const rows = await page.$$eval('#holList .lrow .t', els => els.map(e => e.innerText));
       assert.deepStrictEqual(rows, ['1 Jul – 10 Jul', '20 Dec – 27 Dec', '28 Dec – 6 Jan', '5 Mar – 8 Mar']);
-      // a date rule for one room, saved as an array add under settings
-      await page.click('[data-act=dpKind][data-k=rule]');
-      await page.click('[data-act=dpRoom][data-id=XCV_1]');
-      await page.click('button.day[data-iso="2026-10-20"]'); await page.click('button.day[data-iso="2026-10-22"]');
-      assert.ok(/Add 20 Oct – 22 Oct: Don’t change the price, XCV 1/.test(await text(page, '[data-act=dpAdd]')));
-      await page.click('[data-act=dpAdd]'); await page.click('[data-act=save]'); await page.waitForFunction(() => /^Saved/.test(document.getElementById('bar').innerText));
-      const wr = await writesTo(page, 'pricing_config/engine_v2');
-      assert.deepStrictEqual(Object.keys(wr[0].fields), ['settings.date_rules']);
-      const e = await h.doc(page, 'pricing_config/engine_v2');
-      assert.deepStrictEqual(e.settings.date_rules, [{from: '2026-10-20', to: '2026-10-22', rooms: ['XCV_1'], action: 'protect'}]);
-      assert.strictEqual(e.settings.room_types.XCV_1.style, 'normal');
-      assert.ok(/protect|Don’t change the price/.test(await text(page, '#ruleList')) && /only this time/.test(await text(page, '#ruleList')));
-      // events
+      assert.ok(!(await page.$('[data-act=dpKind]')) && !(await page.$('[data-act=dpRoom]')), 'date rules are no longer made here');
+      await openFold(page, 'ev');
       assert.ok(/Concert/.test(await text(page, 'body')) && /waiting for you/.test(await text(page, 'body')));
       await page.click('[data-act=eventSet][data-id="event_2026-11-14"][data-v=approved]');
       assert.strictEqual((await h.doc(page, 'pricing_events/event_2026-11-14')).status, 'approved');
@@ -345,16 +335,16 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
         await page.click('[data-act=undoAll]');
       }
     });
-    await test('computer calendar: Airbnb $ under the ₾ price, Shift range adds a rule, "don’t change this night"', w, hh, async ({page}) => {
+    await test('computer calendar: Airbnb $ under the ₾ price, Shift range and "don’t change" add a rule', w, hh, async ({page}) => {
       assert.ok(!(await page.$('[data-act=cur]')), 'no currency switch: both prices are always shown');
       const c = await text(page, '.cell[data-rt=XCV_2][data-iso="2026-10-14"]');
       assert.ok(/\d+ ₾/.test(c) && /\$\d+/.test(c) && c.indexOf('₾') < c.indexOf('$'), c);
       await page.click('.cell[data-rt=XCV_1][data-iso="2026-10-20"]');
       await page.click('.cell[data-rt=XCV_1][data-iso="2026-10-22"]', {modifiers: ['Shift']});
       assert.ok(/3 nights selected/.test(await text(page, '.panel')));
-      await page.click('[data-act=rangeAdd]');
-      assert.ok(/Not saved/.test(await bar(page)) && /date rule 20 Oct – 22 Oct/.test(await bar(page)));
-      await page.click('.cell[data-rt=XCV_2][data-iso="2026-10-15"]'); await page.click('[data-act=ruleNight]');
+      await page.click('[data-act=protectNights]');
+      assert.ok(/Not saved/.test(await bar(page)) && /date rule 22 Oct/.test(await bar(page)));
+      await page.click('.cell[data-rt=XCV_2][data-iso="2026-10-15"]'); await page.click('[data-act=protectNights]');
       assert.ok(await page.$('.cell[data-rt=XCV_2][data-iso="2026-10-15"] .lk'), 'lock shows on the night');
       await page.click('[data-act=save]'); await page.waitForFunction(() => /^Saved/.test(document.getElementById('bar').innerText));
       const e = await h.doc(page, 'pricing_config/engine_v2');
@@ -390,8 +380,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
         await page.click('.cname[data-rt=MAXELA]'); await page.waitForSelector('.panel');
         assert.ok(await page.$('.panel [data-act=mode][data-rt=MAXELA]'), 'MAXELA opens the room settings');
       }
-      await go(page, '#/dates'); await page.click('[data-act=dpKind][data-k=rule]');
-      assert.strictEqual((await page.$$('[data-act=dpRoom]')).length, 11, 'date rules can name all 10 rooms');
+      if (!desk) { await go(page, '#/room/MAXELA'); assert.ok(await page.$('[data-act=selToggle]'), 'every moved room has the night controls'); }
       await go(page, desk ? '#/calendar' : '#/rooms'); await page.click('[data-act=how]');
       const how = await text(page, '.dlg'); assert.ok(/All 10 rooms/.test(how) && /Expedia/.test(how) && !/Old way \(/.test(how));
     }, {mutate: MOVED});
@@ -403,7 +392,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
   const ENG = page => h.doc(page, 'pricing_config/engine_v2');
   for (const [w, hh] of SIZES) {
     await test('holiday rule: the card sits under Holiday dates and the window shows the table', w, hh, async ({page}, desk) => {
-      await go(page, '#/dates');
+      await openFold(page, 'hol');
       const t = await text(page, '#holList + .card');
       assert.ok(/Holiday rule: small moves far ahead/.test(t) && /down at most 5%/.test(t) && /up at most 3%/.test(t), t);
       assert.ok(await page.$('#holList + .card [data-act=holRule]'));
@@ -418,7 +407,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       assert.strictEqual((await h.writes(page)).length, 0);
     });
     await test('holiday rule: out-of-range and wrong-order numbers show a red message and cannot be saved', w, hh, async ({page}) => {
-      await go(page, '#/dates'); await page.click('[data-act=holRule]');
+      await openFold(page, 'hol'); await page.click('[data-act=holRule]');
       await fill(page, 'input[data-k="far|down_single"]', '25');
       assert.ok(/between 0 and 20%/.test(await text(page, '#holMsg')) && await holSaveOff(page));
       assert.ok(await page.$eval('input[data-k="far|down_single"]', e => e.classList.contains('bad')));
@@ -432,7 +421,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       assert.strictEqual(await text(page, '#holMsg'), ''); assert.ok(!(await holSaveOff(page)));
     });
     await test('holiday rule: Undo, Back to recommended, then Save writes only the changed field paths', w, hh, async ({page}) => {
-      await go(page, '#/dates'); await page.click('[data-act=holRule]');
+      await openFold(page, 'hol'); await page.click('[data-act=holRule]');
       await fill(page, 'input[data-k="far|down_multi"]', '6'); await fill(page, 'input[data-k="near|up_single"]', '9,5');
       assert.ok(!(await holSaveOff(page)));
       await page.click('[data-act=holUndo]');
@@ -453,21 +442,18 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       assert.strictEqual((await holGrid(page))['near|up_single'], '9.5');
     });
     await test('holiday rule: a number changed somewhere else is not overwritten', w, hh, async ({page}) => {
-      await go(page, '#/dates'); await page.click('[data-act=holRule]');
+      await openFold(page, 'hol'); await page.click('[data-act=holRule]');
       await fill(page, 'input[data-k="far|down_multi"]', '6');
       await page.evaluate(() => { const d = window.__FS.docs['pricing_config/engine_v2']; d.settings.holiday = {limits: {far: {down_multi: 0.04}}}; });
       await page.click('#holSaveBtn');
       await page.waitForSelector('.dlg:has-text("Nothing was saved")');
       assert.strictEqual((await writesTo(page, 'pricing_config/engine_v2')).length, 0);
     });
-    await test('hold: the new date rule choice has its plain label on the Dates tab', w, hh, async ({page}) => {
-      await go(page, '#/dates'); await page.click('[data-act=dpKind][data-k=rule]');
-      const labels = await page.$$eval('[data-act=dpChoice]', els => els.map(e => e.innerText.trim()));
-      assert.ok(labels.includes('Small moves only, more active closer to the date') && labels.includes('Don’t change the price'), labels.join('|'));
-    });
-    await test('hold: a saved hold rule is listed with its label', w, hh, async ({page}) => {
-      await go(page, '#/dates');
-      assert.ok(/Small moves only, more active closer to the date/.test(await text(page, '#ruleList')));
+    await test('hold: a saved hold rule shows in the room rules line with its plain words', w, hh, async ({page}, desk) => {
+      if (desk) { await page.click('.cname[data-rt=XCV_2]'); await page.waitForSelector('.panel'); } else await go(page, '#/room/XCV_2');
+      const t = (await text(page, '#roomRules')).replace(/\s+/g, ' ');
+      assert.ok(/1 rule:/.test(t) && /20 Dec – 2 Jan small moves only · all rooms/.test(t), t);
+      assert.ok(await page.$('#roomRules [data-act=delChip]'), 'it has a remove button');
     }, {mutate: d => { d['pricing_config/engine_v2'].settings.date_rules = [{from: '2026-12-20', to: '2027-01-02', rooms: 'all', action: 'hold'}]; }});
     await test('price check: green card when all is good, red card with the list, quiet when stale', w, hh, async ({page}) => {
       const t = await text(page, '#pausedBar');
@@ -707,6 +693,24 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       const rec = (await h.writes(page)).filter(x => x.path.startsWith('pricing_changes/')).map(x => x.data).find(x => x.type === 'season_dates');
       assert.ok(rec && rec.fields.season_ranges.old.includes('12-24..12-31 new_year') && rec.fields.season_ranges.new.includes('12-28..01-06 high') && rec.ts, JSON.stringify(rec));
     });
+    await test('season dates: the first day is kept when you change month or view, until the last day or Cancel', w, hh, async ({page}, desk) => {
+      await go(page, '#/seasons'); await openDates(page);
+      const box = async () => (await text(page, '#seasonDates .hint, #seasonDates .cbox')).replace(/\s+/g, ' ');
+      await showMonth(page, desk, 10); await page.click('.cd[data-md="10-28"]');
+      assert.ok(/From 28 Oct\. Now tap the last day/.test(await box()), await box());
+      if (!desk) {
+        await page.click('[data-act=calMove][data-d="1"]'); assert.ok(/From 28 Oct/.test(await box()), 'next month: ' + await box());
+        await page.click('[data-act=calView][data-v=year]'); assert.ok(/From 28 Oct/.test(await box()), 'whole year: ' + await box());
+        assert.ok(await page.$('.mm .mc.pre'), 'the first day is still marked on the small calendar');
+        await page.click('.mm[data-m="11"]'); assert.ok(/From 28 Oct/.test(await box()), 'back to a month: ' + await box());
+        await page.click('[data-act=calView][data-v=month]'); assert.ok(/From 28 Oct/.test(await box()), 'month switch: ' + await box());
+      }
+      await page.click('.cd[data-md="11-02"]');
+      assert.ok(/28 Oct – 2 Nov · 6 days/.test(await box()) && /Make these days/.test(await box()), await box());
+      await page.click('[data-act=calCancel]'); assert.ok(/Tap the first day|Tap a month/.test(await box()), await box());
+      await page.click(desk ? '.cd[data-md="10-28"]' : '.cd[data-md="11-02"]'); if (!desk) { await page.click('[data-act=calView][data-v=year]'); }
+      await page.click('[data-act=calCancel]'); assert.ok(!/From/.test(await box()), 'Cancel forgets it: ' + await box());
+    });
     await test('season dates: unmarked days show white with !, the warning stays (tab, closed row, review), saving keeps them unmarked', w, hh, async ({page}, desk) => {
       await go(page, '#/seasons'); await openDates(page);
       await tapDays(page, desk, '03-03', '03-14'); await page.click('[data-act=calSeason][data-s="none"]'); await page.waitForTimeout(80);
@@ -759,9 +763,9 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
         assert.ok(/Set by you/.test(row), row);
         await page.click('.night[data-iso="2026-10-17"]');
       }
-      assert.ok(/Set by you\. The engine never changes this price/.test(await text(page, desk ? '.panel' : '.dlg')));
+      assert.ok(/Set by you at .*The engine does not change it until the night is booked or you give it back/.test((await text(page, desk ? '.panel' : '.dlg')).replace(/\s+/g, ' ')));
       assert.strictEqual((await h.writes(page)).length, 0, 'nothing is written before the button');
-      await page.click('[data-act=giveBack]'); await page.waitForTimeout(150);
+      await page.click('[data-act=giveBackMany]'); await page.waitForTimeout(150);
       const ctl = await h.doc(page, 'pricing_config/control');
       assert.ok(Array.isArray(ctl.release) && ctl.release.includes('XCV_2|2026-10-17'), JSON.stringify(ctl));
       assert.ok(/Given back/.test(await text(page, desk ? '.panel' : '.dlg')) || /Given back/.test(await text(page, '#toast')), 'confirms');
@@ -769,9 +773,135 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
     await test('a normal night has no give-back button', w, hh, async ({page}, desk) => {
       if (desk) { await page.click('.cell[data-rt="XCV_2"][data-iso="2026-10-20"]'); await page.waitForSelector('.panel'); }
       else { await go(page, '#/room/XCV_2'); await page.click('[data-act=allNights]'); await page.click('.night[data-iso="2026-10-20"]'); }
-      assert.ok(!(await page.$('[data-act=giveBack]')));
+      assert.ok(!(await page.$('[data-act=giveBackMany]')));
     });
   }
+
+  // ---- the night screen: one plain sentence, Aim, own price, don't change, Select ----
+  const night = async (page, desk, iso = '2026-10-14') => {
+    if (desk) { await go(page, '#/calendar'); await page.click(`.cell[data-rt=XCV_2][data-iso="${iso}"]`); await page.waitForSelector('.panel'); }
+    else { await go(page, '#/room/XCV_2'); await page.click('[data-act=allNights]'); await page.click(`.night[data-iso="${iso}"]`); await page.waitForSelector('.dlg'); }
+    return desk ? '.panel' : '.dlg';
+  };
+  const squash = async (page, sel) => (await text(page, sel)).replace(/\s+/g, ' ');
+  const saveBar = async page => { await page.click('#bar [data-act=save]'); await page.waitForFunction(() => /^Saved/.test(document.getElementById('bar').innerText), null, {timeout: 6000}); };
+  for (const [w, hh] of SIZES) {
+    await test('night screen: top line, one plain sentence, details closed, the three controls for an empty night', w, hh, async ({page}, desk) => {
+      const box = await night(page, desk);
+      const t = await squash(page, box);
+      assert.ok(/Booking/.test(t) && /Airbnb/.test(t) && /Empty/.test(t), t);
+      assert.ok(/Mid season, .* so (it stays at|\d+ ₾ is moving)/.test(await squash(page, `${box} .plain`)), await squash(page, `${box} .plain`));
+      assert.ok(!(await page.$(`${box} .more`)), 'more details are closed by default');
+      await page.click('[data-act=moreToggle]'); assert.ok(await page.$(`${box} .more`) && /minimum and maximum/.test(await text(page, `${box} .more`)));
+      await page.click('[data-act=moreToggle]'); assert.ok(!(await page.$(`${box} .more`)));
+      assert.deepStrictEqual(await page.$$eval(`${box} [data-act=aim]`, els => els.map(e => e.innerText.trim())), ['−10%', '−5%', 'Normal', '+5%', '+10%']);
+      assert.strictEqual(await page.$eval(`${box} [data-act=aim][data-v="0"]`, e => e.getAttribute('aria-checked')), 'true');
+      assert.ok(await page.$(`${box} input[data-inp=own][data-c=GEL]`) && await page.$(`${box} input[data-inp=own][data-c=USD]`) && await page.$(`${box} [data-act=protectNights]`));
+      assert.strictEqual(await page.getAttribute(`${box} [data-act=ownSet]`, 'aria-disabled'), 'true');
+    });
+    await test('night screen: a booked night has no controls', w, hh, async ({page}, desk) => {
+      const box = await night(page, desk, '2026-10-12');
+      assert.ok(/Booked/.test(await text(page, `${box} .plain`)) && !(await page.$(`${box} [data-act=aim]`)) && !(await page.$(`${box} [data-act=ownSet]`)));
+    });
+    await test('aim: nothing is written until Save; Save writes the aim, logs it, the list and the rules line show it, removing it works', w, hh, async ({page}, desk) => {
+      const box = await night(page, desk);
+      await page.click(`${box} [data-act=aim][data-v="-5"]`); await page.waitForTimeout(100);
+      assert.ok(/Not saved/.test(await bar(page)) && /aim −5% for XCV 2: 14 Oct/.test(await bar(page)), await bar(page));
+      assert.strictEqual((await h.writes(page)).length, 0, 'nothing written before Save');
+      await saveBar(page);
+      const wr = await writesTo(page, 'pricing_config/engine_v2'); assert.deepStrictEqual(Object.keys(wr[0].fields), ['settings.night_aims']);
+      assert.deepStrictEqual((await h.doc(page, 'pricing_config/engine_v2')).settings.night_aims, [{avail: 1, date: '2026-10-14', pct: -5, rt: 'XCV_2'}]);
+      const rec = (await h.writes(page)).filter(x => x.path.startsWith('pricing_changes/')).map(x => x.data).find(x => x.fields && Object.keys(x.fields).some(k => k.startsWith('night_aims')));
+      assert.ok(rec && rec.ts && /aim −5%/.test(rec.detail) && rec.fields['night_aims/add/0'].new === 'XCV_2 2026-10-14 -5%', JSON.stringify(rec));
+      if (desk) {
+        assert.ok(/Aim −5%/.test(await text(page, '.cell[data-rt=XCV_2][data-iso="2026-10-14"]')), 'the cell shows the aim');
+        await page.click('.cname[data-rt=XCV_2]'); await page.waitForSelector('#roomRules');
+      } else {
+        await go(page, '#/room/XCV_2');
+        assert.ok(/Aim −5%/.test(await text(page, '.night[data-iso="2026-10-14"]')), 'the list shows the aim');
+      }
+      assert.ok(/1 rule:/.test(await squash(page, '#roomRules')) && /14 Oct aim −5%/.test(await squash(page, '#roomRules')), await squash(page, '#roomRules'));
+      await page.click('#roomRules [data-act=delChip]');
+      assert.ok(/aim removed for XCV 2: 14 Oct/.test(await bar(page)), await bar(page));
+      await saveBar(page);
+      assert.deepStrictEqual((await h.doc(page, 'pricing_config/engine_v2')).settings.night_aims, []);
+    });
+    await test('aim: the night screen shows Your aim and the aim button is on after Save', w, hh, async ({page}, desk) => {
+      const box = await night(page, desk);
+      assert.ok(/Your aim is \+10%/.test(await squash(page, `${box} .plain`)));
+      assert.strictEqual(await page.$eval(`${box} [data-act=aim][data-v="10"]`, e => e.getAttribute('aria-checked')), 'true');
+      await page.click(`${box} [data-act=aim][data-v="0"]`); await page.waitForTimeout(80);
+      assert.ok(/aim removed for XCV 2: 14 Oct/.test(await bar(page)));
+      await page.click('#bar [data-act=undoAll]'); assert.ok(!/Not saved/.test(await bar(page)));
+    }, {mutate: d => { d['pricing_config/engine_v2'].settings.night_aims = [{avail: 1, date: '2026-10-14', pct: 10, rt: 'XCV_2'}]; }});
+    await test('aim: it ends when the night gets a booking (nothing shown for it)', w, hh, async ({page}, desk) => {
+      const box = await night(page, desk);
+      assert.ok(!/Your aim/.test(await squash(page, `${box} .plain`)) && !(await page.$('#roomRules')));
+    }, {mutate: d => { d['pricing_config/engine_v2'].settings.night_aims = [{avail: 2, date: '2026-10-14', pct: 5, rt: 'XCV_2'}]; }});
+    await test('own price: numbers only, nothing written until Save, Save queues it for the next run and logs it', w, hh, async ({page}, desk) => {
+      const box = await night(page, desk);
+      await page.fill(`${box} input[data-c=GEL]`, 'abc'); assert.strictEqual(await page.getAttribute(`${box} [data-act=ownSet]`, 'aria-disabled'), 'true');
+      await page.fill(`${box} input[data-c=GEL]`, '120'); await page.fill(`${box} input[data-c=USD]`, '45');
+      assert.strictEqual(await page.getAttribute(`${box} [data-act=ownSet]`, 'aria-disabled'), 'false');
+      await page.click(`${box} [data-act=ownSet]`); await page.waitForTimeout(100);
+      assert.ok(/your own price 120 ₾ \/ \$45 for XCV 2: 14 Oct/.test(await bar(page)), await bar(page));
+      assert.strictEqual((await h.writes(page)).length, 0);
+      await saveBar(page);
+      const ctl = await h.doc(page, 'pricing_config/control');
+      assert.ok(Array.isArray(ctl.setprice) && ctl.setprice.length === 1 && ctl.setprice[0].rt === 'XCV_2' && ctl.setprice[0].date === '2026-10-14' && ctl.setprice[0].GEL === 120 && ctl.setprice[0].USD === 45, JSON.stringify(ctl));
+      const rec = (await h.writes(page)).filter(x => x.path.startsWith('pricing_changes/')).map(x => x.data).find(x => x.type === 'own_price');
+      assert.ok(rec && rec.ts && rec.fields['own_price/XCV_2|2026-10-14'].new === '120 ₾ / $45', JSON.stringify(rec));
+      if (desk) assert.ok(/Your price 120 ₾/.test(await text(page, '.cell[data-rt=XCV_2][data-iso="2026-10-14"]')));
+      else { await go(page, '#/room/XCV_2'); assert.ok(/Your price 120 ₾ \/ \$45/.test(await text(page, '.night[data-iso="2026-10-14"]'))); }
+    });
+    await test('don\'t change: one tap adds a rule for the night, the rules line shows it with a remove button', w, hh, async ({page}, desk) => {
+      const box = await night(page, desk);
+      await page.click(`${box} [data-act=protectNights]`); await page.waitForTimeout(100);
+      assert.ok(/date rule 14 Oct \(Don’t change the price\) added/.test(await bar(page)), await bar(page));
+      await saveBar(page);
+      assert.deepStrictEqual((await h.doc(page, 'pricing_config/engine_v2')).settings.date_rules, [{from: '2026-10-14', to: '2026-10-14', rooms: ['XCV_2'], action: 'protect', note: 'from the calendar'}]);
+      if (desk) { await page.click('.cname[data-rt=XCV_2]'); await page.waitForSelector('#roomRules'); } else { await go(page, '#/room/XCV_2'); assert.ok(/Don't change/.test(await text(page, '.night[data-iso="2026-10-14"]'))); }
+      assert.ok(/14 Oct don't change/.test(await squash(page, '#roomRules')));
+      await page.click('#roomRules [data-act=delChip]'); assert.ok(/date rule 14 Oct removed/.test(await bar(page)));
+      await saveBar(page); assert.deepStrictEqual((await h.doc(page, 'pricing_config/engine_v2')).settings.date_rules, []);
+    });
+    await test('several nights: pick empty nights (Select on the phone, Shift range on the computer) and give them the same aim, price or rule', w, hh, async ({page}, desk) => {
+      const reselect = async () => { if (!desk) { await page.click('[data-act=selToggle]'); for (const d of ['14', '15', '16']) await page.click(`.night[data-iso="2026-10-${d}"]`); } };
+      if (desk) {
+        await go(page, '#/calendar'); await page.click('.cell[data-rt=XCV_2][data-iso="2026-10-14"]'); await page.click('.cell[data-rt=XCV_2][data-iso="2026-10-16"]', {modifiers: ['Shift']});
+        await page.waitForSelector('.panel [data-act=aim]'); assert.ok(/3 nights selected/.test(await text(page, '.panel')));
+      } else {
+        await go(page, '#/room/XCV_2'); await page.click('[data-act=allNights]'); await page.click('[data-act=selToggle]');
+        assert.ok(await page.$eval('.night[data-iso="2026-10-12"]', e => e.disabled), 'booked nights cannot be picked');
+        for (const d of ['14', '15', '16']) await page.click(`.night[data-iso="2026-10-${d}"]`);
+        await page.waitForSelector('#pickPanel'); assert.ok(/3 nights selected/.test(await text(page, '#pickPanel')));
+      }
+      const box = desk ? '.panel' : '#pickPanel';
+      await page.click(`${box} [data-act=aim][data-v="5"]`); await page.waitForTimeout(100);
+      assert.ok(/aim \+5% for XCV 2: 14–16 Oct/.test(await bar(page)), await bar(page));
+      await page.click('#bar [data-act=undoAll]'); await reselect();
+      await page.fill(`${box} input[data-c=GEL]`, '99'); await page.click(`${box} [data-act=ownSet]`); await page.waitForTimeout(100);
+      assert.ok(/your own price 99 ₾ for XCV 2: 14–16 Oct/.test(await bar(page)), await bar(page));
+      await page.click('#bar [data-act=undoAll]'); await reselect();
+      await page.click(`${box} [data-act=protectNights]`); await page.waitForTimeout(100);
+      assert.ok(/date rule 14 Oct – 16 Oct \(Don’t change the price\) added/.test(await bar(page)), await bar(page));
+      if (!desk) assert.ok(!(await page.$('#pickPanel')), 'select mode ends after the change');
+    });
+  }
+  await test('the Dates tab is gone: holiday dates and events are closed sections in Seasons', 390, 800, async ({page}) => {
+    assert.ok(!(await page.$('a.tab[href="#/dates"]')));
+    await go(page, '#/dates'); assert.ok(/#\/seasons/.test(await page.evaluate(() => location.hash)));
+    assert.ok(!(await page.$('#foldbody-hol')) && !(await page.$('#foldbody-ev')), 'closed by default');
+    assert.strictEqual(await page.$eval('[data-act=toggleFold][data-id=hol]', e => e.innerText.trim()), '+');
+    await page.click('[data-act=toggleFold][data-id=hol]');
+    assert.ok(/20 Dec – 27 Dec/.test(await text(page, '#foldbody-hol')) && /Holiday rule: small moves far ahead/.test(await text(page, '#foldbody-hol')));
+    await page.click('[data-act=toggleFold][data-id=hol]'); assert.ok(!(await page.$('#foldbody-hol')), 'closes again');
+    await page.click('[data-act=toggleFold][data-id=ev]'); assert.ok(/Concert/.test(await text(page, '#foldbody-ev')));
+    await page.click('[data-act=toggleFold][data-id=hol]'); await page.click('[data-act=dpChoice][data-id=low]');
+    await page.click('button.day[data-iso="2026-10-29"]'); await page.click('button.day[data-iso="2026-10-30"]'); await page.click('[data-act=dpAdd]');
+    assert.strictEqual(await page.getAttribute('[data-act=toggleFold][data-id=hol]', 'aria-disabled'), 'true');
+    await page.$eval('[data-act=toggleFold][data-id=hol]', e => e.click()); assert.ok(await page.$('#foldbody-hol'), 'stays open while there are unsaved changes');
+  });
 
   // ---- weekly report ----
   for (const [w, hh] of SIZES) {
@@ -816,12 +946,18 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
   }
 
   // ---- 8 + design rules, on every screen at every size ----
-  const SCREENS = ['#/rooms', '#/room/XCV_2', '#/test/MAXELA', '#/seasons', '#/dates', '#/ideas', '#/weekly'];
+  const SCREENS = ['#/rooms', '#/room/XCV_2', '#/test/MAXELA', '#/seasons', '#/seasons+folds', '#/room/XCV_2+night', '#/room/XCV_2+select', '#/ideas', '#/weekly'];
   for (const [w, hh] of SIZES) {
     await test('8 + design rules on every screen: no console errors, no sideways scroll, no cut-off text, text 12px+, no emoji, no blue, 44px targets (phone)', w, hh, async ({page}, desk) => {
       const dialogs = [async () => { await page.$eval('[data-act=togglePause]', e => e.click()); }, async () => { await page.$eval('[data-act=how]', e => e.click()); }];
-      for (const hash of SCREENS) {
-        await go(page, hash); await page.waitForTimeout(100);
+      for (const hash0 of SCREENS) {
+        const [hash, extra] = hash0.split('+');
+        if (extra === 'select' && desk) continue;
+        if (await dlgOpen(page)) await page.keyboard.press('Escape');
+        await go(page, desk && extra === 'night' ? '#/calendar' : hash); await page.waitForTimeout(100);
+        if (extra === 'folds') for (const id of ['hol', 'ev']) if (!(await page.$(`#foldbody-${id}`))) await page.click(`[data-act=toggleFold][data-id=${id}]`);
+        if (extra === 'night') { if (desk) await page.click('.cell[data-rt=XCV_2][data-iso="2026-10-14"]'); else await page.click('.night[data-iso="2026-10-14"]'); await page.waitForTimeout(100); }
+        if (extra === 'select') { await page.click('[data-act=selToggle]'); await page.click('.night[data-iso="2026-10-14"]'); await page.click('.night[data-iso="2026-10-15"]'); await page.waitForSelector('#pickPanel'); }
         const wasDesk = desk;
         const r = await page.evaluate(({desk}) => {
           const out = {blue: [], small: [], clipped: [], emoji: false, targets: [], side: document.documentElement.scrollWidth > innerWidth + 1};

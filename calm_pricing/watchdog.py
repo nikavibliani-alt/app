@@ -15,7 +15,7 @@ Seven checks (each issue = {"code", "rt", "date", "text"}):
 from datetime import datetime, timedelta
 
 # Moves that are deliberate and bigger than a daily step (a correction into min/max, the one-time resets).
-BIG_MOVE_OK_KINDS = ("correction", "reset", "far_reset", "tonight")
+BIG_MOVE_OK_KINDS = ("correction", "reset", "far_reset", "tonight", "own")
 TOLERANCE_ABS = {"GEL": 2.0, "USD": 1.0, "EUR": 1.0}      # rounding to the price grid
 TOLERANCE_PCT = 0.01
 MAX_LISTED = 40
@@ -50,7 +50,7 @@ def check(daily, states, run, cfg, now, live_rts=None):
             kind = r.get("kind")
             avail = r.get("avail") or 0
             who = f"{rt} {date} {cur}"
-            if kind in ("protected", "manual"):               # protected nights and prices you set by hand are never a problem
+            if kind in ("protected", "manual", "own"):               # protected nights and prices you set by hand are never a problem
                 continue
             if avail > 0 and not new:
                 issues.append({"code": "no_price", "rt": rt, "date": date, "text": f"{who}: free but has no price."})
@@ -98,7 +98,7 @@ def check(daily, states, run, cfg, now, live_rts=None):
                         t = datetime.fromisoformat(x["t"])
                     except (KeyError, ValueError, TypeError):
                         continue
-                    if t >= cutoff and x.get("d") and x.get("k") not in ("correction", "reset", "far_reset"):
+                    if t >= cutoff and x.get("d") and x.get("k") not in ("correction", "reset", "far_reset", "own"):
                         seq.append(1 if x["d"] > 0 else -1)
                 collapsed = [s for i, s in enumerate(seq) if i == 0 or s != seq[i - 1]]
                 for i in range(len(collapsed) - 2):

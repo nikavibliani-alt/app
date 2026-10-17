@@ -115,6 +115,40 @@ def read_release(db) -> set:
     return {x for x in (raw or []) if isinstance(x, str) and "|" in x}
 
 
+def read_own_prices(db, today: str) -> dict:
+    """Prices typed on the pricing page: pricing_config/control.setprice = [{rt, date, GEL?, USD?}]. -> {"ROOM|DATE": {"GEL": x, "USD": y}}."""
+    try:
+        snap = db.collection("pricing_config").document("control").get()
+        raw = (snap.to_dict() or {}).get("setprice") if snap.exists else None
+    except Exception:
+        return {}
+    out = {}
+    for x in raw or []:
+        try:
+            rt, ds = str(x["rt"]), str(x["date"])
+        except (KeyError, TypeError):
+            continue
+        if ds < today:
+            continue
+        prices = {c: float(x[c]) for c in ("GEL", "USD") if x.get(c) not in (None, "")}
+        if prices:
+            out[f"{rt}|{ds}"] = prices
+    return out
+
+
+def clear_own_prices(db, done: set, today: str):
+    """Take the typed prices the run has finished (and the ones for past nights) off the list; read again first so a price typed meanwhile is kept."""
+    try:
+        ref = db.collection("pricing_config").document("control")
+        snap = ref.get()
+        cur = [x for x in ((snap.to_dict() or {}).get("setprice") or [])] if snap.exists else []
+        keep = [x for x in cur if isinstance(x, dict) and f"{x.get('rt')}|{x.get('date')}" not in done and str(x.get("date", "")) >= today]
+        if len(keep) != len(cur):
+            ref.set({"setprice": keep}, merge=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"  Could not clear the typed-price list: {type(e).__name__}")
+
+
 def clear_release(db, done: set):
     """Take the nights the run has handled off the list (read again first, so a night given back meanwhile is not lost)."""
     if not done:
@@ -386,7 +420,9 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         if only:
             state = {k: v for k, v in state.items() if k in only["rooms"] or k == "_meta"}      # other rooms are never saved
         release = {x for x in read_release(db) if x.split("|")[0] in live_rts and (not only or (x.split("|")[0] in only["rooms"] and x.split("|")[1] in only["dates"]))}
-        result = run({"now": now, "inventory": inventory, "reservations": reservations, "shadow": False, "release_manual": sorted(release),
+        own_all = read_own_prices(db, today.isoformat() if hasattr(today, "isoformat") else str(today))
+        own = {k: v for k, v in own_all.items() if k.split("|")[0] in live_rts and (not only or (k.split("|")[0] in only["rooms"] and k.split("|")[1] in only["dates"]))}
+        result = run({"now": now, "inventory": inventory, "reservations": reservations, "shadow": False, "release_manual": sorted(release), "own_prices": own,
                       **({"reset": sorted(reset_rts)} if reset_rts else {}),
                       # a cancellation run never uses up the day's one lowering run, and only looks at its nights
                       **({"run_kind": "update", "only": only, "tonight_drop": True} if only else {})}, cfg, state)
@@ -414,7 +450,7 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         fills = sum(1 for d in result["decisions"] if d.get("fill") and d["kind"] in ("fill", "move"))
         if fills:
             print(f"  {fills} empty date(s) get a first price from your start price.")
-        for d in [d for d in result["decisions"] if d["kind"] in ("move", "correction", "fill", "reset", "far_reset", "tonight")][:20]:
+        for d in [d for d in result["decisions"] if d["kind"] in ("move", "correction", "fill", "reset", "far_reset", "tonight", "own")][:20]:
             print(f"  {d['rt']:6} {d['date']} {d['currency']}: {d['current']:.0f} -> {d['proposed']:.0f}  ({d['why'][-1]})")
 
         report = reset_report(result, reset_rts, today) if reset_rts else None
@@ -443,6 +479,10 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         ps.save(db, now, result["state"], result, extra,
                 prefix=STATE_PREFIX, daily_coll="pricing_calm_daily", runs_coll="pricing_calm_runs")
         clear_release(db, release)                                # the nights you gave back are handled: take them off the list
+        if own or own_all:
+            clear_own_prices(db, set(result.get("own_done") or ()), today.isoformat() if hasattr(today, "isoformat") else str(today))
+            if own:
+                print(f"  Prices typed on the page: {len(own)} night(s), {len(result.get('own_done') or [])} finished.")
         log_price_events(db, result, now, {rt: portals_for(v, rt) for rt, v in live_rts.items()}, cfg, bool(payload))
         print(f"Written: {len(writes)} prices for {sorted({w['rt'] for w in writes})}."
               + (f" Channel push failed for {failed_portals}." if failed_portals else ""))

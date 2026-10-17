@@ -210,8 +210,8 @@ def merge_settings(base: dict, over: dict) -> dict:
             for rt, x in v.items():
                 rts.setdefault(rt, {}).update(x or {})
             out["room_types"] = rts
-        elif k == "date_rules" and isinstance(v, list):
-            out["date_rules"] = list(out.get("date_rules") or []) + v
+        elif k in ("date_rules", "night_aims") and isinstance(v, list):
+            out[k] = list(out.get(k) or []) + v
         else:
             out[k] = v
     return out
