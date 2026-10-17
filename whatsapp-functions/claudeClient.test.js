@@ -175,3 +175,31 @@ test('buildCachedSystem: fixed prompt cached first, per-guest part after the bre
   assert.equal(buildCachedSystem('FIXED', '').length, 1);
   assert.equal(formatUsage(undefined), 'usage unavailable');
 });
+
+test('requestBodyFor: Sonnet 4.6 unchanged; Sonnet 5 and 5.5 ready', () => {
+  const { requestBodyFor } = require('./claudeClient');
+  const args = { system: [{ type: 'text', text: 'S' }], messages: [{ role: 'user', content: 'hi' }], maxTokens: 500 };
+  assert.deepEqual(requestBodyFor('claude-sonnet-4-6', args), { body: { model: 'claude-sonnet-4-6', max_tokens: 500, system: args.system, messages: args.messages, thinking: { type: 'disabled' } }, headers: {} });
+  const s5 = requestBodyFor('claude-sonnet-5', args);
+  assert.deepEqual(s5.body.thinking, { type: 'disabled' });
+  assert.equal(s5.body.max_tokens, 650, 'new tokenizer: ~30% more tokens');
+  const s55 = requestBodyFor('claude-sonnet-5-5', args);
+  assert.equal(s55.body.thinking, undefined, '"disabled" is a 400 on Sonnet 5.5');
+  assert.deepEqual(s55.body.output_config, { effort: 'low' });
+  assert.equal(s55.body.max_tokens, 1500);
+  assert.equal(s55.body.fallbacks, 'default');
+  assert.deepEqual(s55.headers, { 'anthropic-beta': 'server-side-fallback-2026-07-01' });
+});
+
+test('a refusal is an error (nothing sent), not retried', async () => {
+  const { callClaudeWithRetry, isRetryable, describeClaudeError } = require('./claudeClient');
+  let calls = 0;
+  const fetchImpl = async () => { calls += 1; return { ok: true, status: 200, json: async () => ({ stop_reason: 'refusal', stop_details: { category: 'reasoning_extraction' }, content: [] }) }; };
+  const r = await callClaudeWithRetry({ apiKey: 'k', system: [], messages: [], model: 'claude-sonnet-5-5', fetchImpl, sleep: async () => {}, log: { warn() {}, error() {} } });
+  assert.equal(r.ok, false);
+  assert.equal(r.errorType, 'refusal');
+  assert.equal(r.message, 'refusal (reasoning_extraction)');
+  assert.equal(calls, 1);
+  assert.equal(isRetryable('refusal'), false);
+  assert.equal(describeClaudeError(r), 'Claude declined to answer (safety filter)');
+});

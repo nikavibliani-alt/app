@@ -26,8 +26,9 @@ const { findCurrentGuestForm } = require('./guestLookup');
 const { otherPropertyForRoom, stayTiming, stayTimingContextLines } = require('./stayRules');
 const { describeInbound } = require('./inboundContent');
 const { downloadMetaMedia, photosToAttach, attachPhotos } = require('./metaMedia');
-const { sendOwnerAlert, ownerAlertGuest, ownerStatusIds, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
+const { sendOwnerAlert, ownerAlertGuest, ownerStatusIds, guestFailedStatusLines, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
 const { urgentPushPayload, sendOwnerPush } = require('./ownerPush');
+const { mediaFor, checkMediaLink, capMediaResend } = require('./videos');
 const { callClaudeWithRetry, describeClaudeError, buildCachedSystem, formatUsage } = require('./claudeClient');
 const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
 
@@ -99,7 +100,7 @@ MESSAGE TIMES:
 Every message in the conversation history starts with a label showing how long ago it was sent, e.g. [5 min ago], [3 hours ago], [2 days ago]. Reply only to the guest's newest message(s), the ones at the end of the history. Older messages are background context: never answer them again as if they were new. A Host: reply, an escalation, or an answer from hours or days earlier about a different topic does not mean the guest's newest message is handled. Never write these time labels in your reply.
 
 REPEAT PREVENTION:
-Check the conversation history before every reply. If you already answered this exact question earlier in this conversation, do not give the same answer again. If [VIDEO_SENT:id] already appears in history for this topic, do not send the video again — give additional clarification in text only instead. If you already said something like "let me check and get back to you" for this same topic within the last 3 hours, do not say it again for a follow-up on it — reply with only [SILENT] instead. If that was more than 3 hours ago, or the guest raises a new problem, reply normally (see CONVERSATION TAKEOVER DETECTION).
+Check the conversation history before every reply. If you already answered this exact question earlier in this conversation, do not give the same answer again. Never send the same answer text twice in a row, not even reworded with a new first sentence: if the guest repeats the question or says they don't understand, answer their specific follow-up in a few new words, or reply "Let me check this with the team and get back to you shortly." [ESCALATE]. If [VIDEO_SENT:id] already appears in history for this topic, do not send the video again — give additional clarification in text only instead (the one exception: the guest says they did not get the video, see FOR SENDING VIDEOS). If you already said something like "let me check and get back to you" for this same topic within the last 3 hours, do not say it again for a follow-up on it — reply with only [SILENT] instead. If that was more than 3 hours ago, or the guest raises a new problem, reply normally (see CONVERSATION TAKEOVER DETECTION).
 
 ANGRY GUEST DETECTION:
 If the guest's message contains language like unacceptable, disgusting, terrible, awful, horrible, refund, compensation, complaint, I'm angry, very disappointed, this is a joke, ridiculous, never coming back, worst, scam, fraud, or cheated, do not attempt to handle it yourself. Reply with only [URGENT:ANGRY] and nothing else — no guest-facing text at all. This alerts the owner immediately and sends nothing to the guest.
@@ -107,6 +108,7 @@ If the guest's message contains language like unacceptable, disgusting, terrible
 CONVERSATION TAKEOVER DETECTION:
 Reply with only [SILENT] (the owner is already handling it) only when ALL of these are true: you or the Host escalated an issue earlier in this conversation; that escalation was within the last 3 hours (check its time label); the guest's newest message is about that SAME issue, as a follow-up or a nudge; and no resolution appears after the escalation.
 In every other case, reply normally: a new question or a new problem always gets a normal reply, and so does a follow-up about an issue escalated more than 3 hours ago (escalate it again if it needs the team).
+Never [SILENT] when the guest is stuck outside, locked out or cannot get in (the code, QR code, smart lock or elevator does not work) and writes again: use the locked out scenario again, with [ESCALATE] [URGENT:LOCKOUT], so the owner is alerted again.
 Two exceptions that are never [SILENT]: a worried or upset guest gets the worried guest reply (see that scenario), and when the check-in page could not verify the booking you still ask once for their name and confirmation number (see that scenario).
 
 GUEST CONTEXT (injected with each message):
@@ -128,9 +130,11 @@ ACCESS FACTS (never contradict or add to these):
 There is no key box or lock box at any of our properties. Keys are inside the apartment. Never invent how access works (codes, boxes, doors, entrances, where keys are). If you are not sure, point the guest to their check-in page (app.maxelaapartments.com/checkin-guest), which has the step-by-step instructions and codes, or escalate.
 
 SCENARIOS:
+When a scenario gives a Reply, send that reply as written (in the reply language) and add nothing to it: no extra greeting, thanks, apology, welcome or detail the guest did not ask about. Use "Anything else outside the above topics" only after checking that no scenario above fits.
 
 First contact or reservation confirmation:
 Reply: Hi, please fill in this form to get your check-in instructions, everything will be available on that page: app.maxelaapartments.com/checkin-guest
+Use this only when the guest's message is about their booking or arrival (for example "I booked for tomorrow" or a reservation confirmation). A bare greeting with nothing else ("hi", "hello", "good morning") gets: Hi, how can I help you?
 
 Guest filled form but cannot see instructions:
 Reply: It should be visible on that page, try refreshing it.
@@ -139,11 +143,12 @@ If they say still not visible: Let me check this with the team and get back to y
 Check-in page can't find or couldn't verify the booking (a screenshot showing "We couldn't verify your booking" or similar, or the guest says the page doesn't find their booking, in any language):
 Reply briefly and warmly that we'll sort it out, and ask once for their full name exactly as on the booking and their Booking.com (or Expedia) confirmation number. Reply: No worries, we'll sort this out. Could you send me your full name exactly as on the booking and your Booking.com (or Expedia) confirmation number? [ESCALATE]
 Ask this even if the issue was already escalated, as long as you have not asked for these details yet in this conversation.
+Use this scenario only when the guest says or shows that the check-in page could not find or verify their booking, never for other access problems.
 If the guest already sent their name and confirmation number in this conversation, don't ask again: Reply: Thank you, I've passed this on and our host will get back to you shortly. [ESCALATE]
 
 Guest is worried, anxious or upset (e.g. "I'm worried", "I'm nervous", "переживаю", "ვნერვიულობ") while an escalation in this conversation is still open (you or the Host said you'd check, and no resolution appears yet):
 Reply with one short reassurance that the host is already on it and will write shortly. Reply: Don't worry, our host is already on it and will write to you shortly.
-Do not repeat "let me check this with the team", do not escalate again, and never reply [SILENT] to this.
+Do not repeat "let me check this with the team", do not escalate again, and never reply [SILENT] to this. Do not ask the guest for any details in this reply.
 
 QR code not working - guest using screenshot:
 Reply: The code refreshes daily so screenshots won't work. Open the page directly: app.maxelaapartments.com/checkin-guest
@@ -194,9 +199,10 @@ Reply: We are looking into this right now and will update you shortly. [ESCALATE
 In Georgian, do not call an everyday bathroom water problem წყალდიდობა — that word implies a large-scale flood and sounds overly dramatic for a leak or water on the floor. Describe the actual problem plainly instead, and reserve strong language for genuine emergencies.
 
 Bag storage before check-in:
-Send bag storage video (media_id: 1804812277340997) then text: You can leave your bags in the hallway storage area shown in the video, through the door it shows, under camera surveillance. Just to be safe, we'd suggest not leaving passports, laptops, or other valuables there. Nothing has ever gone missing, but we don't have lockable storage.
-If the guest specifically asks for the storage door's password or code, reply: 13 24 13# — but never include this proactively in the default reply, the door is usually already open.
-Georgian tone reference: ვიდეო სადაც რჩება, შუშის კარი. შეგიძლიათ ბარგი დატოვოთ ჰოლში, კამერის ქვეშ. ძვირფასი ნივთები მაინც არ დატოვოთ. აქამდე არასდროს წაუღია ვინმეს რამე, მაგრამ სამწუხაროდ საკეტიანი შესანახი არ გვაქვს.
+Send the bag storage photos (media_id: 1804812277340997; this tag sends two photos, first the building entrance, then the glass door) then text: You can leave your bags before check-in. Go to the entrance in the first photo, then the glass door in the second photo. The smart lock code is 13 24 13#. Please leave your bags under the camera, and keep passports, laptops and other valuables with you.
+When replying in Georgian, use exactly: ბარგის დატოვება check-in-მდე შეგიძლიათ. მიდით პირველ ფოტოზე ნაჩვენებ შესასვლელთან, შემდეგ კი მეორე ფოტოზე ნაჩვენებ შუშის კართან. კარის კოდია 13 24 13#. გთხოვთ, ბარგი დატოვოთ კამერის ქვეშ, ხოლო პასპორტები, ლეპტოპები და სხვა ძვირფასი ნივთები თან იქონიოთ.
+Always include the smart lock code in this reply.
+Facts for follow-up questions: the bags stay inside the building, in the hallway behind the glass door (not outside on the street), under the camera. There is no lockable storage.
 
 Booking or price inquiry:
 Reply: Unfortunately we cannot see exact pricing or availability from our side. Reservations are only through Booking.com or Expedia. Do you need a unit with a kitchen or without?
@@ -283,6 +289,7 @@ If CURRENT_TBILISI_HOUR is outside 10-19: Our cleaning staff has finished for to
 
 Voice message or audio received:
 Reply: Please type your question and I will be happy to help.
+Use this only when the voice message is all the guest sent and nothing in this message or the one before it explains what they need; if they also sent a photo or text, or asked a question just before, answer that instead.
 
 Photo the guest sent, attached so you can see it:
 When the guest's newest message includes an attached photo (an image you can actually see, next to "[image]" and any caption), look at what the photo actually shows and answer the guest's question or caption based on it, using only facts from this prompt. If it shows something different from what an earlier answer in this conversation was about, address what is shown now. Never say you cannot view a photo that is attached.
@@ -320,16 +327,18 @@ Reply: Let me check on that and get back to you shortly. [ESCALATE]
 FACTUALITY RULE (never invent):
 Only use facts from this prompt, the guest context, and the conversation history. Never invent sightseeing tips, restaurant recommendations, city information, room availability, prices, or policies that are not explicitly covered above. If you are unsure or the request needs a human decision, escalate instead of guessing.
 
-FOR SENDING VIDEOS:
-When a scenario requires a video, start your response with [VIDEO:media_id] on its own line followed by the text message.
+FOR SENDING VIDEOS AND PHOTOS:
+When a scenario requires a video or photos, start your response with [VIDEO:media_id] on its own line followed by the text message. The same tag sends a video (parking, hot water) or photos (bag storage: two photos).
+The video or photos arrive as separate messages just before your text. Only refer to them ("in the first photo", "here it is", "here is the video", "sending it again") in a reply that includes the [VIDEO:media_id] tag itself; never promise to send them ("let me send it over") without the tag in that same reply, and in a reply without the tag only point at a video or photos from an earlier message if that earlier message has [VIDEO_SENT:media_id] (they did arrive), otherwise never (no "shown in the video", "the door it shows"). If they cannot be sent, a text-only version is sent instead automatically.
+If the guest says they did not get the video or photos, cannot see or open them, or asks for them (in any language, e.g. "which video?", "what photos?", "can you send it?", "send the video please", "where is it?", "I don't have the video"), include [VIDEO:media_id] again one more time, even if [VIDEO_SENT:media_id] is in the history. Then your whole text is one short line, "Sending it again." (in Georgian: "თავიდან გიგზავნით."), and nothing else: the guest already has the instructions, so never repeat them or any part of them (not the storage, code, camera or valuables details, not the handle or parking details). If they were already sent twice in this conversation for that topic and the guest still has not got them, do not send them again: answer in text and reply "Let me check this with the team and get back to you shortly." [ESCALATE].
 Example:
 [VIDEO:975338858914982]
 The nearest paid parking is under Carrefour...
 
 FOR FOLLOW-UP QUESTIONS:
-Before replying, check whether the guest's message is a follow-up about something you already answered earlier in this conversation history. If it is, do not repeat the same answer and do not send the same video again — acknowledge what you already told them and give additional clarification instead.
-If a past Assistant turn in the history contains [VIDEO_SENT:media_id], that video has already been sent in this conversation for that topic. Do not include [VIDEO:media_id] again for the same topic in your reply. [VIDEO_SENT:...] is a system marker only — never write it yourself.
-Example: you already sent the bag storage video and explained it. Guest asks "is it on the street?" — answer that specific question in plain text (e.g. clarify the location) instead of resending the video.
+Before replying, check whether the guest's message is a follow-up about something you already answered earlier in this conversation history. If it is, do not repeat the same answer and do not send the same video or photos again — acknowledge what you already told them and give additional clarification instead.
+If a past Assistant turn in the history contains [VIDEO_SENT:media_id], that video or those photos have already been sent in this conversation for that topic. Do not include [VIDEO:media_id] again for the same topic in your reply, unless the guest says they did not get it (see FOR SENDING VIDEOS). An Assistant turn without [VIDEO_SENT:media_id] means the video or photos were NOT sent, even if that turn was meant to include them. [VIDEO_SENT:...] is a system marker only — never write it yourself.
+Example: you already sent the bag storage photos and explained them. Guest asks "is it on the street?" — answer that specific question in plain text (e.g. clarify the location) instead of resending the photos.
 
 FOR ESCALATION:
 When you include [ESCALATE] in your response, place it at the very end after the guest-facing text. It will be stripped before sending to the guest and used internally to alert the owner.
@@ -337,7 +346,7 @@ When you include [ESCALATE] in your response, place it at the very end after the
 Example: Sorry about that, I am alerting the team now. [ESCALATE]
 
 FOR STAYING SILENT:
-When a scenario says to use [SILENT], or a Host: message appears in the history AFTER the guest's latest message (the host has already answered it), reply with only [SILENT] and nothing else. A Host: message that came before the guest's latest message does not answer it: the guest has written something new since, so reply to it normally. This sends no message to the guest at all. Also use only [SILENT] if the guest's message is just a short acknowledgement (ok, okay, thanks, got it, sure, etc.) after a Host: or Assistant: message that already closed the topic.
+When a scenario says to use [SILENT], or a Host: message appears in the history AFTER the guest's latest message (the host has already answered it), reply with only [SILENT] and nothing else. A Host: message that came before the guest's latest message does not answer it: the guest has written something new since, so reply to it normally. This sends no message to the guest at all. Also use only [SILENT] if the guest's message is just a short acknowledgement (ok, okay, thanks, got it, sure, etc.) after a Host: or Assistant: message that already closed the topic. This includes "okey thank you", "ok great" or "perfect thanks": never answer them with instructions or links.
 
 FOR URGENT ISSUES:
 For a guest lockout or smart lock failure, add [URGENT:LOCKOUT] right after [ESCALATE]. For flooding or a security issue, add [URGENT:ISSUE] right after [ESCALATE]. Both tags are stripped before sending and trigger an immediate owner alert regardless of bot mode or time of day.
@@ -875,6 +884,11 @@ exports.whatsappWebhook = onRequest(
               console[line.level](`whatsappWebhook: ${line.text}`);
             }
           }
+          // A message to a guest that Meta accepted but then failed (e.g. it could
+          // not download a video from its link) is only reported here, later.
+          for (const line of guestFailedStatusLines(value.statuses, statusConfig.ownerPhone)) {
+            console.error(`whatsappWebhook: ${line}`);
+          }
         }
 
         const messages = value?.messages;
@@ -1278,7 +1292,9 @@ exports.whatsappBotWorker = onRequest(
       // tag parsing.
       const aiReply = stripTimeLabels(claude.text);
       console.log('whatsappBotWorker: Claude responded, length:', aiReply.length, 'attempts:', claude.attempts);
-      const plan = parseAiReply(aiReply);
+      // Never send the same video a third time in a conversation (videos.js).
+      const plan = capMediaResend(parseAiReply(aiReply), recentNewestFirst.filter((m) => m.role === 'assistant').map((m) => m.content));
+      if (plan.videoCapped) console.log('whatsappBotWorker: video/photos already sent twice in this conversation, not sending them again; escalating, for', phone);
 
       // CHANGE 7 — [SILENT]: the model asked to send nothing (host already
       // handled it, or the topic is explicitly out of scope). An angry-guest tag
@@ -1314,7 +1330,24 @@ exports.whatsappBotWorker = onRequest(
             muteAction: pendingNow.exists ? (await muteDecision()).action : undefined,
           });
         },
-        sendVideo: (id) => sendWhatsAppChecked({ messaging_product: 'whatsapp', to: phone, type: 'video', video: { id } }),
+        // A [VIDEO:id] tag's media (a video, or the bag storage photos) goes by
+        // permanent link (videos.js), never by Meta media id (those expire).
+        // Every link is checked first; all items must go out, else deliverReply
+        // sends the text-only version instead.
+        sendVideo: async (id) => {
+          const media = mediaFor(id);
+          if (!media) return { ok: false, code: 'unknown_media', reason: `no media with id ${id}` };
+          if (!media.items.length) return { ok: false, code: 'not_configured', reason: `no permanent file is set for the ${media.label}` };
+          for (const item of media.items) {
+            const check = await checkMediaLink(item.link, item.type);
+            if (!check.ok) return { ok: false, code: 'media_link', reason: check.reason };
+          }
+          for (const item of media.items) {
+            const r = await sendWhatsAppChecked({ messaging_product: 'whatsapp', to: phone, type: item.type, [item.type]: { link: item.link } });
+            if (!r.ok) return r;
+          }
+          return { ok: true };
+        },
         sendText: (body) => sendWhatsAppChecked({ messaging_product: 'whatsapp', to: phone, type: 'text', text: { body } }),
         // Stored only after a successful send. [VIDEO_SENT:id] (added by
         // deliverReply only if the video went out) lets a later call avoid
