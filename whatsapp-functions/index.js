@@ -26,8 +26,9 @@ const { findCurrentGuestForm } = require('./guestLookup');
 const { otherPropertyForRoom, stayTiming, stayTimingContextLines } = require('./stayRules');
 const { describeInbound } = require('./inboundContent');
 const { downloadMetaMedia, photosToAttach, attachPhotos } = require('./metaMedia');
-const { sendOwnerAlert, ownerAlertGuest, ownerStatusIds, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
+const { sendOwnerAlert, ownerAlertGuest, ownerStatusIds, guestFailedStatusLines, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
 const { urgentPushPayload, sendOwnerPush } = require('./ownerPush');
+const { mediaFor, checkMediaLink, capMediaResend } = require('./videos');
 const { callClaudeWithRetry, describeClaudeError, buildCachedSystem, formatUsage } = require('./claudeClient');
 const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
 
@@ -99,7 +100,7 @@ MESSAGE TIMES:
 Every message in the conversation history starts with a label showing how long ago it was sent, e.g. [5 min ago], [3 hours ago], [2 days ago]. Reply only to the guest's newest message(s), the ones at the end of the history. Older messages are background context: never answer them again as if they were new. A Host: reply, an escalation, or an answer from hours or days earlier about a different topic does not mean the guest's newest message is handled. Never write these time labels in your reply.
 
 REPEAT PREVENTION:
-Check the conversation history before every reply. If you already answered this exact question earlier in this conversation, do not give the same answer again. If [VIDEO_SENT:id] already appears in history for this topic, do not send the video again — give additional clarification in text only instead. If you already said something like "let me check and get back to you" for this same topic within the last 3 hours, do not say it again for a follow-up on it — reply with only [SILENT] instead. If that was more than 3 hours ago, or the guest raises a new problem, reply normally (see CONVERSATION TAKEOVER DETECTION).
+Check the conversation history before every reply. If you already answered this exact question earlier in this conversation, do not give the same answer again. Never send the same answer text twice in a row, not even reworded with a new first sentence: if the guest repeats the question or says they don't understand, answer their specific follow-up in a few new words, or reply "Let me check this with the team and get back to you shortly." [ESCALATE]. If [VIDEO_SENT:id] already appears in history for this topic, do not send the video again — give additional clarification in text only instead (the one exception: the guest says they did not get the video, see FOR SENDING VIDEOS). If you already said something like "let me check and get back to you" for this same topic within the last 3 hours, do not say it again for a follow-up on it — reply with only [SILENT] instead. If that was more than 3 hours ago, or the guest raises a new problem, reply normally (see CONVERSATION TAKEOVER DETECTION).
 
 ANGRY GUEST DETECTION:
 If the guest's message contains language like unacceptable, disgusting, terrible, awful, horrible, refund, compensation, complaint, I'm angry, very disappointed, this is a joke, ridiculous, never coming back, worst, scam, fraud, or cheated, do not attempt to handle it yourself. Reply with only [URGENT:ANGRY] and nothing else — no guest-facing text at all. This alerts the owner immediately and sends nothing to the guest.
@@ -194,9 +195,10 @@ Reply: We are looking into this right now and will update you shortly. [ESCALATE
 In Georgian, do not call an everyday bathroom water problem წყალდიდობა — that word implies a large-scale flood and sounds overly dramatic for a leak or water on the floor. Describe the actual problem plainly instead, and reserve strong language for genuine emergencies.
 
 Bag storage before check-in:
-Send bag storage video (media_id: 1804812277340997) then text: You can leave your bags in the hallway storage area shown in the video, through the door it shows, under camera surveillance. Just to be safe, we'd suggest not leaving passports, laptops, or other valuables there. Nothing has ever gone missing, but we don't have lockable storage.
-If the guest specifically asks for the storage door's password or code, reply: 13 24 13# — but never include this proactively in the default reply, the door is usually already open.
-Georgian tone reference: ვიდეო სადაც რჩება, შუშის კარი. შეგიძლიათ ბარგი დატოვოთ ჰოლში, კამერის ქვეშ. ძვირფასი ნივთები მაინც არ დატოვოთ. აქამდე არასდროს წაუღია ვინმეს რამე, მაგრამ სამწუხაროდ საკეტიანი შესანახი არ გვაქვს.
+Send the bag storage photos (media_id: 1804812277340997; this tag sends two photos, first the building entrance, then the glass door) then text: You can leave your bags before check-in. Go to the entrance in the first photo, then the glass door in the second photo. The smart lock code is 13 24 13#. Please leave your bags under the camera, and keep passports, laptops and other valuables with you.
+When replying in Georgian, use exactly: ბარგის დატოვება check-in-მდე შეგიძლიათ. მიდით პირველ ფოტოზე ნაჩვენებ შესასვლელთან, შემდეგ კი მეორე ფოტოზე ნაჩვენებ შუშის კართან. კარის კოდია 13 24 13#. გთხოვთ, ბარგი დატოვოთ კამერის ქვეშ, ხოლო პასპორტები, ლეპტოპები და სხვა ძვირფასი ნივთები თან იქონიოთ.
+Always include the smart lock code in this reply.
+Facts for follow-up questions: the bags stay inside the building, in the hallway behind the glass door (not outside on the street), under the camera. There is no lockable storage.
 
 Booking or price inquiry:
 Reply: Unfortunately we cannot see exact pricing or availability from our side. Reservations are only through Booking.com or Expedia. Do you need a unit with a kitchen or without?
@@ -320,16 +322,18 @@ Reply: Let me check on that and get back to you shortly. [ESCALATE]
 FACTUALITY RULE (never invent):
 Only use facts from this prompt, the guest context, and the conversation history. Never invent sightseeing tips, restaurant recommendations, city information, room availability, prices, or policies that are not explicitly covered above. If you are unsure or the request needs a human decision, escalate instead of guessing.
 
-FOR SENDING VIDEOS:
-When a scenario requires a video, start your response with [VIDEO:media_id] on its own line followed by the text message.
+FOR SENDING VIDEOS AND PHOTOS:
+When a scenario requires a video or photos, start your response with [VIDEO:media_id] on its own line followed by the text message. The same tag sends a video (parking, hot water) or photos (bag storage: two photos).
+The video or photos arrive as separate messages just before your text. Only refer to them ("in the first photo", "here it is", "here is the video", "sending it again") in a reply that includes the [VIDEO:media_id] tag itself; never promise to send them ("let me send it over") without the tag in that same reply, and in a reply without the tag only point at a video or photos from an earlier message if that earlier message has [VIDEO_SENT:media_id] (they did arrive), otherwise never (no "shown in the video", "the door it shows"). If they cannot be sent, a text-only version is sent instead automatically.
+If the guest says they did not get the video or photos, cannot see or open them, or asks for them (in any language, e.g. "which video?", "what photos?", "can you send it?", "send the video please", "where is it?", "I don't have the video"), include [VIDEO:media_id] again one more time, even if [VIDEO_SENT:media_id] is in the history. Then your whole text is one short line, "Sending it again." (in Georgian: "თავიდან გიგზავნით."), and nothing else: the guest already has the instructions, so never repeat them or any part of them (not the storage, code, camera or valuables details, not the handle or parking details). If they were already sent twice in this conversation for that topic and the guest still has not got them, do not send them again: answer in text and reply "Let me check this with the team and get back to you shortly." [ESCALATE].
 Example:
 [VIDEO:975338858914982]
 The nearest paid parking is under Carrefour...
 
 FOR FOLLOW-UP QUESTIONS:
-Before replying, check whether the guest's message is a follow-up about something you already answered earlier in this conversation history. If it is, do not repeat the same answer and do not send the same video again — acknowledge what you already told them and give additional clarification instead.
-If a past Assistant turn in the history contains [VIDEO_SENT:media_id], that video has already been sent in this conversation for that topic. Do not include [VIDEO:media_id] again for the same topic in your reply. [VIDEO_SENT:...] is a system marker only — never write it yourself.
-Example: you already sent the bag storage video and explained it. Guest asks "is it on the street?" — answer that specific question in plain text (e.g. clarify the location) instead of resending the video.
+Before replying, check whether the guest's message is a follow-up about something you already answered earlier in this conversation history. If it is, do not repeat the same answer and do not send the same video or photos again — acknowledge what you already told them and give additional clarification instead.
+If a past Assistant turn in the history contains [VIDEO_SENT:media_id], that video or those photos have already been sent in this conversation for that topic. Do not include [VIDEO:media_id] again for the same topic in your reply, unless the guest says they did not get it (see FOR SENDING VIDEOS). An Assistant turn without [VIDEO_SENT:media_id] means the video or photos were NOT sent, even if that turn was meant to include them. [VIDEO_SENT:...] is a system marker only — never write it yourself.
+Example: you already sent the bag storage photos and explained them. Guest asks "is it on the street?" — answer that specific question in plain text (e.g. clarify the location) instead of resending the photos.
 
 FOR ESCALATION:
 When you include [ESCALATE] in your response, place it at the very end after the guest-facing text. It will be stripped before sending to the guest and used internally to alert the owner.
@@ -875,6 +879,11 @@ exports.whatsappWebhook = onRequest(
               console[line.level](`whatsappWebhook: ${line.text}`);
             }
           }
+          // A message to a guest that Meta accepted but then failed (e.g. it could
+          // not download a video from its link) is only reported here, later.
+          for (const line of guestFailedStatusLines(value.statuses, statusConfig.ownerPhone)) {
+            console.error(`whatsappWebhook: ${line}`);
+          }
         }
 
         const messages = value?.messages;
@@ -1278,7 +1287,9 @@ exports.whatsappBotWorker = onRequest(
       // tag parsing.
       const aiReply = stripTimeLabels(claude.text);
       console.log('whatsappBotWorker: Claude responded, length:', aiReply.length, 'attempts:', claude.attempts);
-      const plan = parseAiReply(aiReply);
+      // Never send the same video a third time in a conversation (videos.js).
+      const plan = capMediaResend(parseAiReply(aiReply), recentNewestFirst.filter((m) => m.role === 'assistant').map((m) => m.content));
+      if (plan.videoCapped) console.log('whatsappBotWorker: video/photos already sent twice in this conversation, not sending them again; escalating, for', phone);
 
       // CHANGE 7 — [SILENT]: the model asked to send nothing (host already
       // handled it, or the topic is explicitly out of scope). An angry-guest tag
@@ -1314,7 +1325,24 @@ exports.whatsappBotWorker = onRequest(
             muteAction: pendingNow.exists ? (await muteDecision()).action : undefined,
           });
         },
-        sendVideo: (id) => sendWhatsAppChecked({ messaging_product: 'whatsapp', to: phone, type: 'video', video: { id } }),
+        // A [VIDEO:id] tag's media (a video, or the bag storage photos) goes by
+        // permanent link (videos.js), never by Meta media id (those expire).
+        // Every link is checked first; all items must go out, else deliverReply
+        // sends the text-only version instead.
+        sendVideo: async (id) => {
+          const media = mediaFor(id);
+          if (!media) return { ok: false, code: 'unknown_media', reason: `no media with id ${id}` };
+          if (!media.items.length) return { ok: false, code: 'not_configured', reason: `no permanent file is set for the ${media.label}` };
+          for (const item of media.items) {
+            const check = await checkMediaLink(item.link, item.type);
+            if (!check.ok) return { ok: false, code: 'media_link', reason: check.reason };
+          }
+          for (const item of media.items) {
+            const r = await sendWhatsAppChecked({ messaging_product: 'whatsapp', to: phone, type: item.type, [item.type]: { link: item.link } });
+            if (!r.ok) return r;
+          }
+          return { ok: true };
+        },
         sendText: (body) => sendWhatsAppChecked({ messaging_product: 'whatsapp', to: phone, type: 'text', text: { body } }),
         // Stored only after a successful send. [VIDEO_SENT:id] (added by
         // deliverReply only if the video went out) lets a later call avoid

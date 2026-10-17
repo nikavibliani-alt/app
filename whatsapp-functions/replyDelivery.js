@@ -7,6 +7,7 @@
 // so every path is unit-testable.
 
 const { applyToneGuard } = require('./toneGuard');
+const { mediaFor, textWithoutMedia } = require('./videos');
 
 /**
  * Parses Claude's raw reply (time labels already stripped) into a plan:
@@ -125,19 +126,30 @@ async function deliverReply(plan, who, deps) {
   }
 
   let videoSent = false;
+  let text = plan.text;
   if (plan.videoId) {
     const v = await deps.sendVideo(plan.videoId);
     videoSent = v.ok;
     if (!v.ok) {
-      deps.log.error(`deliverReply: video ${plan.videoId} failed to send — ${v.reason}`);
-      await deps.writeAlert({ reason: 'bot_error', errorType: 'meta_send_failed', errorMessage: `video: ${v.reason}` });
-      await deps.notifyOwnerThrottled(`meta_${v.code}`, `Reply to the guest failed to send (video): ${v.reason}`, { push: 'bot_error', reason: `video failed to send: ${v.reason}` });
-      if (!plan.text) return { outcome: 'send_failed' }; // nothing reached the guest; pending kept
+      // Never send a text that points at a photo or video the guest didn't get
+      // ("shown in the video", "here it is"): send the text-only version instead (videos.js).
+      const label = mediaFor(plan.videoId)?.label || 'requested media';
+      text = textWithoutMedia(plan.text, plan.videoId);
+      const how = text !== plan.text ? (text ? '; sending the text-only version instead' : '; nothing usable to send') : '';
+      if (v.code === 'not_configured') {
+        // Known gap (no permanent file set yet, e.g. the hot water video): text only, no alert.
+        deps.log.log(`deliverReply: no ${label} to send (no permanent file set)${how}`);
+      } else {
+        deps.log.error(`deliverReply: ${label} (${plan.videoId}) failed to send — ${v.reason}${how}`);
+        await deps.writeAlert({ reason: 'bot_error', errorType: 'video_send_failed', errorMessage: `${label}: ${v.reason}` });
+        await deps.notifyOwnerThrottled(`video_${v.code}`, `The ${label} could not be sent (${v.reason}). ${text ? 'The guest got the text-only version.' : 'Nothing was sent to the guest.'}`, { push: 'bot_error', reason: `${label} could not be sent` });
+      }
+      if (!text) return { outcome: 'send_failed' }; // nothing reached the guest; pending kept
     }
   }
 
-  if (plan.text) {
-    const t = await deps.sendText(plan.text);
+  if (text) {
+    const t = await deps.sendText(text);
     if (!t.ok) {
       deps.log.error(`deliverReply: text failed to send — ${t.reason}`);
       await deps.writeAlert({ reason: 'bot_error', errorType: 'meta_send_failed', errorMessage: t.reason, urgency: !!plan.urgent });
@@ -147,7 +159,7 @@ async function deliverReply(plan, who, deps) {
   }
 
   // Store exactly what reached the guest; the video marker only if the video went out.
-  const stored = [plan.text, videoSent ? `[VIDEO_SENT:${plan.videoId}]` : ''].filter(Boolean).join('\n');
+  const stored = [text, videoSent ? `[VIDEO_SENT:${plan.videoId}]` : ''].filter(Boolean).join('\n');
   if (stored) await deps.storeAssistant(stored);
 
   if (plan.escalate) {

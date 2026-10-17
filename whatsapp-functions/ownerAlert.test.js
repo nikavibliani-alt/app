@@ -165,3 +165,13 @@ test('placeLabel: the property + room text shared by the WhatsApp alert and the 
   assert.equal(placeLabel('orb-2'), 'Orbeliani orb-2');
   assert.equal(placeLabel(''), 'unknown property');
 });
+
+test('guestFailedStatusLines: failed sends to guests, phone masked; owner and non-failed reports ignored', () => {
+  const { guestFailedStatusLines } = require('./ownerAlert');
+  const lines = guestFailedStatusLines([
+    { id: 'wamid.AAAAAAAAAAAAAAAAGUEST1', status: 'failed', recipient_id: '306912347508', errors: [{ code: 131053, title: 'Media upload error', error_data: { details: 'Downloading media from weblink failed' } }] },
+    { id: 'wamid.x', status: 'delivered', recipient_id: '306912347508' },
+    { id: 'wamid.y', status: 'failed', recipient_id: '995555123456', errors: [{ code: 131049 }] },
+  ], '995555123456');
+  assert.deepEqual(lines, ['message to guest …7508 (…AAAAAAGUEST1) FAILED: Meta error 131053 Media upload error (Downloading media from weblink failed)']);
+});

@@ -115,23 +115,32 @@ test('Meta send failure', async (t) => {
     assert.equal(key, 'meta_131047');
     assert.match(text, /^Reply to the guest failed to send: Meta error 131047: Re-engagement message \(it was an escalation: I am locked out/);
   });
-  await t.test('video rejected, text sent: stored without the video marker, owner alerted', async () => {
+  await t.test('video rejected, text stands on its own: text sent, stored without the video marker, owner alerted', async () => {
     const f = fakeDeps({ sendVideo: { ok: false, code: 131053, reason: 'Meta error 131053: Media upload error' } });
     const r = await deliverReply(parseAiReply('[VIDEO:975338858914982]\nPaid parking under Carrefour.'), WHO, f.deps);
     assert.equal(r.outcome, 'sent');
     assert.deepEqual(f.calls.find((c) => c[0] === 'storeAssistant'), ['storeAssistant', 'Paid parking under Carrefour.']);
-    assert.match(f.calls.find((c) => c[0] === 'notifyOwnerThrottled')[2], /failed to send \(video\)/);
+    const [, key, text] = f.calls.find((c) => c[0] === 'notifyOwnerThrottled');
+    assert.equal(key, 'video_131053');
+    assert.equal(text, 'The parking video could not be sent (Meta error 131053: Media upload error). The guest got the text-only version.');
+    assert.equal(f.calls.find((c) => c[0] === 'writeAlert')[1].errorType, 'video_send_failed');
   });
   await t.test('video sent: the marker is stored so it is not resent later', async () => {
     const f = fakeDeps();
     await deliverReply(parseAiReply('[VIDEO:975338858914982]\nPaid parking under Carrefour.'), WHO, f.deps);
     assert.deepEqual(f.calls.find((c) => c[0] === 'storeAssistant'), ['storeAssistant', 'Paid parking under Carrefour.\n[VIDEO_SENT:975338858914982]']);
   });
-  await t.test('video-only reply whose video fails: counted as a failed send', async () => {
+  await t.test('video-only reply whose video fails: the text-only version is sent instead', async () => {
     const f = fakeDeps({ sendVideo: { ok: false, code: 'network', reason: 'could not reach Meta' } });
     const r = await deliverReply(parseAiReply('[VIDEO:975338858914982]'), WHO, f.deps);
+    assert.equal(r.outcome, 'sent');
+    assert.match(f.calls.find((c) => c[0] === 'sendText')[1], /^We do not have private parking/);
+  });
+  await t.test('unknown video id and a text that points at it: nothing sent, pending kept', async () => {
+    const f = fakeDeps({ sendVideo: { ok: false, code: 'unknown_video', reason: 'no video with id 42' } });
+    const r = await deliverReply(parseAiReply('[VIDEO:42]\nHere it is.'), WHO, f.deps);
     assert.equal(r.outcome, 'send_failed');
-    assert.ok(!f.names().includes('storeAssistant'));
+    assert.ok(!f.names().includes('sendText'));
   });
 });
 
@@ -262,5 +271,61 @@ test('push notification only for urgent alerts and bot errors, next to the Whats
     const f = fakeDeps({ sendVideo: { ok: false, code: 131053, reason: 'Meta error 131053: Media upload error' } });
     await deliverReply(parseAiReply('[VIDEO:975338858914982]\nPaid parking under Carrefour.'), WHO, f.deps);
     assert.equal(f.calls.find((c) => c[0] === 'notifyOwnerThrottled')[3].push, 'bot_error');
+  });
+});
+
+test('16 Oct bag storage chat: a failed video never leaves a text that points at it', async (t) => {
+  const BAG = '1804812277340997';
+  const failed = { ok: false, code: 100, reason: 'Meta error 100: Param video.id is not a valid whatsapp business account media attachment ID' };
+  for (const reply of [
+    `[VIDEO:${BAG}]\nGood morning. Yes, you can leave your bags in our hallway storage area before check-in. You can leave your bags in the hallway storage area shown in the video, through the door it shows, under camera surveillance.`,
+    `[VIDEO:${BAG}]\nSorry about that, let me send it over. You can leave your bags in the hallway storage area shown in the video, under camera surveillance.`,
+    `[VIDEO:${BAG}]\nHere it is, sorry about that.`,
+  ]) {
+    await t.test(reply.split('\n')[1].slice(0, 40), async () => {
+      const f = fakeDeps({ sendVideo: failed });
+      const r = await deliverReply(parseAiReply(reply), WHO, f.deps);
+      assert.equal(r.outcome, 'sent');
+      const sent = f.calls.find((c) => c[0] === 'sendText')[1];
+      assert.doesNotMatch(sent, /video|photo|here it is|let me send/i);
+      assert.match(sent, /glass door/);
+      assert.match(sent, /13 24 13#/);
+      assert.equal(f.calls.find((c) => c[0] === 'storeAssistant')[1], sent, 'stored = what the guest got, no [VIDEO_SENT]');
+    });
+  }
+  await t.test('video sent: the text and the marker go out as before', async () => {
+    const f = fakeDeps();
+    await deliverReply(parseAiReply(`[VIDEO:${BAG}]\nHere it is, sorry about that.`), WHO, f.deps);
+    assert.deepEqual(f.calls.filter((c) => c[0] === 'sendVideo' || c[0] === 'sendText'), [['sendVideo', BAG], ['sendText', 'Here it is, sorry about that.']]);
+    assert.equal(f.calls.find((c) => c[0] === 'storeAssistant')[1], `Here it is, sorry about that.\n[VIDEO_SENT:${BAG}]`);
+  });
+});
+
+test('bag storage photos', async (t) => {
+  const BAG = '1804812277340997';
+  const reply = `[VIDEO:${BAG}]\nYou can leave your bags before check-in. Go to the entrance in the first photo, then the glass door in the second photo. The smart lock code is 13 24 13#. Please leave your bags under the camera, and keep passports, laptops and other valuables with you.`;
+  await t.test('photos sent: photos first, then the text, marker stored', async () => {
+    const f = fakeDeps();
+    const r = await deliverReply(parseAiReply(reply), WHO, f.deps);
+    assert.equal(r.outcome, 'sent');
+    assert.deepEqual(f.names().slice(2, 4), ['sendVideo', 'sendText'], 'media before text');
+    assert.match(f.calls.find((c) => c[0] === 'storeAssistant')[1], /first photo[\s\S]*\[VIDEO_SENT:1804812277340997\]$/);
+  });
+  await t.test('a photo fails: text-only version (no "photo"), owner alerted', async () => {
+    const f = fakeDeps({ sendVideo: { ok: false, code: 'media_link', reason: 'image link answered HTTP 404' } });
+    const r = await deliverReply(parseAiReply(reply), WHO, f.deps);
+    assert.equal(r.outcome, 'sent');
+    const sent = f.calls.find((c) => c[0] === 'sendText')[1];
+    assert.doesNotMatch(sent, /photo/i);
+    assert.match(sent, /Clean House/);
+    assert.match(sent, /13 24 13#/);
+    assert.equal(f.calls.find((c) => c[0] === 'notifyOwnerThrottled')[2], 'The bag storage photos could not be sent (image link answered HTTP 404). The guest got the text-only version.');
+  });
+  await t.test('hot water video not set up yet: mixer text only, no alert', async () => {
+    const f = fakeDeps({ sendVideo: { ok: false, code: 'not_configured', reason: 'no permanent file is set for the hot water video' } });
+    const r = await deliverReply(parseAiReply('[VIDEO:1819258012553462]\nFor hot water, press the button on the right handle.'), WHO, f.deps);
+    assert.equal(r.outcome, 'sent');
+    assert.equal(f.calls.find((c) => c[0] === 'sendText')[1], 'For hot water, press the button on the right handle.');
+    assert.ok(!f.names().includes('writeAlert') && !f.names().includes('notifyOwnerThrottled'), 'no alert for a known gap');
   });
 });

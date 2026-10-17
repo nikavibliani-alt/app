@@ -137,4 +137,19 @@ function ownerAlertStatusLines(statuses, ownerPhone, alertIds = new Set()) {
     });
 }
 
-module.exports = { ownerAlertGuest, placeLabel, cleanParam, ownerAlertParams, ownerAlertTemplatePayload, ownerAlertText, sendOwnerAlert, ownerStatusIds, ownerAlertStatusLines, alertDocId, TEMPLATE, ALERTS_COLLECTION };
+/**
+ * Meta's "failed" delivery reports for messages to anyone other than the owner
+ * (guests), as log lines with the phone masked to its last 4 digits.
+ */
+function guestFailedStatusLines(statuses, ownerPhone) {
+  const owner = digits(ownerPhone);
+  return (statuses || [])
+    .filter((s) => s?.status === 'failed' && digits(s.recipient_id) !== owner)
+    .map((s) => {
+      const e = (s.errors || [])[0] || {};
+      const detail = e.error_data?.details ? ` (${e.error_data.details})` : '';
+      return `message to guest …${digits(s.recipient_id).slice(-4)} (…${String(s.id || '').slice(-12)}) FAILED: Meta error ${e.code ?? '?'} ${e.title || e.message || ''}${detail}`.trim();
+    });
+}
+
+module.exports = { guestFailedStatusLines, ownerAlertGuest, placeLabel, cleanParam, ownerAlertParams, ownerAlertTemplatePayload, ownerAlertText, sendOwnerAlert, ownerStatusIds, ownerAlertStatusLines, alertDocId, TEMPLATE, ALERTS_COLLECTION };
