@@ -29,6 +29,7 @@ const { downloadMetaMedia, photosToAttach, attachPhotos } = require('./metaMedia
 const { sendOwnerAlert, ownerAlertGuest, ownerStatusIds, guestFailedStatusLines, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
 const { urgentPushPayload, sendOwnerPush } = require('./ownerPush');
 const { mediaFor, checkMediaLink, capMediaResend } = require('./videos');
+const { CONFIG_DEFAULTS, tbilisiHour, resolveEffectiveMode, buildModeContext, timingSettings, replyDelaySeconds } = require('./botModes');
 const { callClaudeWithRetry, describeClaudeError, buildCachedSystem, formatUsage } = require('./claudeClient');
 const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
 
@@ -479,24 +480,6 @@ function sleep(ms) {
 
 // ---- Bot config / mode resolution ------------------------------------------
 
-const CONFIG_DEFAULTS = {
-  aiBotEnabled: true,
-  botMode: 'available',
-  botResponseDelay: 20,
-  ownerPhone: '',
-  nightStart: 22,
-  nightEnd: 9,
-  ownerSilenceWindowMinutes: 30,
-  // Flat mute after any manual owner message: the bot stays silent for this long.
-  ownerMuteMinutes: 5,
-  // If the conversation's last message (either side) is older than this, a new
-  // guest message waits staleGraceSeconds (floor 10) before the bot replies, so
-  // the owner can answer first. All three live in globals/config, editable
-  // without a redeploy.
-  staleConversationMinutes: 60,
-  staleGraceSeconds: 60,
-};
-
 async function getGlobalsConfig(db) {
   try {
     const snap = await db.collection('globals').doc('config').get();
@@ -505,52 +488,6 @@ async function getGlobalsConfig(db) {
     console.error('getGlobalsConfig failed:', err);
     return { ...CONFIG_DEFAULTS };
   }
-}
-
-/** Current hour (0-23) in Tbilisi local time. Georgia is UTC+4 year-round, no DST. */
-function tbilisiHour(date = new Date()) {
-  const formatted = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Tbilisi',
-    hour: 'numeric',
-    hourCycle: 'h23',
-  }).format(date);
-  return Number(formatted) % 24;
-}
-
-function isNightHour(hour, nightStart, nightEnd) {
-  if (nightStart === nightEnd) return false; // no window configured — treat as always available
-  if (nightStart > nightEnd) return hour >= nightStart || hour < nightEnd; // wraps past midnight, e.g. 22 -> 9
-  return hour >= nightStart && hour < nightEnd;
-}
-
-/**
- * Resolve the effective bot mode ("available" | "away" | "night") from config.botMode.
- * Does NOT consider aiBotEnabled — callers must check that separately (hard kill switch).
- */
-function resolveEffectiveMode(config) {
-  if (config.botMode === 'away') return 'away';
-  if (config.botMode === 'night') return 'night';
-  if (config.botMode === 'auto') {
-    const hour = tbilisiHour();
-    return isNightHour(hour, Number(config.nightStart), Number(config.nightEnd)) ? 'night' : 'available';
-  }
-  return 'available';
-}
-
-function buildModeContext(effectiveMode, ownerPhone) {
-  if (effectiveMode === 'away') {
-    return 'AWAY MODE: The owner may be unreachable (traveling/no internet). Be helpful with everything you can. For escalations that require human action, tell the guest: I have noted this and someone from our team will follow up as soon as possible. Do not promise immediate response times. If a Host: message appears in the history after the guest\'s latest message, the owner has returned and already replied — respond with only [SILENT] and do not add extra tips after that. A Host: message that came before the guest\'s latest message does not answer it — reply normally.';
-  }
-  if (effectiveMode === 'night') {
-    let text = 'NIGHT MODE: It is currently nighttime in Tbilisi. For escalations that require urgent human action, tell the guest: If this is urgent please call the night contact number provided below, otherwise we will get back to you first thing in the morning.';
-    const normalizedOwner = normalizePhone(ownerPhone);
-    if (normalizedOwner) {
-      text += `\nNight contact number: +${normalizedOwner}`;
-    }
-    text += ' If a Host: message appears after the guest\'s latest message, the host already answered it — reply with only [SILENT]. A Host: message that came before the guest\'s latest message does not answer it — reply normally.';
-    return text;
-  }
-  return 'AVAILABLE MODE: A human host may reply manually. If a Host: message appears after the guest\'s latest message, the host already answered it — reply with only [SILENT]. A Host: message that came before the guest\'s latest message does not answer it — reply normally. Guest should never be told they are talking to a bot.';
 }
 
 async function writeAlert(db, { reason, phone, guestName = '', room = '', message = '', mode = '', urgency = false, errorType, errorMessage }) {
@@ -958,20 +895,18 @@ exports.whatsappWebhook = onRequest(
 
         // CHANGE 2 — batch into whatsapp_pending and hand off to the Cloud Tasks worker
         const effectiveMode = resolveEffectiveMode(config);
-        const configuredDelay = Number(config.botResponseDelay) || CONFIG_DEFAULTS.botResponseDelay;
+        const timing = timingSettings(config);
 
         // Stale-conversation grace: after a long silence, give the owner a chance to
         // answer first. Available mode only (in Away/night the owner isn't expected).
-        const staleMinutes = Number(config.staleConversationMinutes) || CONFIG_DEFAULTS.staleConversationMinutes;
-        const graceSeconds = Math.max(10, Number(config.staleGraceSeconds) || CONFIG_DEFAULTS.staleGraceSeconds);
         const stale = effectiveMode === 'available'
-          && isConversationStale(prevAt ? prevAt.getTime() : NaN, Date.now(), staleMinutes);
+          && isConversationStale(prevAt ? prevAt.getTime() : NaN, Date.now(), timing.staleConversationMinutes);
 
-        const { batchToken, graceUntilMs } = await upsertPendingMessage(db, phone, text, stale ? graceSeconds : 0);
+        const { batchToken, graceUntilMs } = await upsertPendingMessage(db, phone, text, stale ? timing.staleGraceSeconds : 0);
 
         // Away/night still debounce rapid bursts, but don't make the guest wait the full
         // human-first delay — cap at 3s.
-        let delaySeconds = effectiveMode === 'available' ? configuredDelay : Math.min(configuredDelay, 3);
+        let delaySeconds = replyDelaySeconds(config, effectiveMode);
         if (graceUntilMs) {
           delaySeconds = Math.max(delaySeconds, Math.ceil((graceUntilMs - Date.now()) / 1000));
         }
@@ -1065,7 +1000,7 @@ exports.whatsappBotWorker = onRequest(
       // ownerMuteDecision); an owner reply at or after this batch started means
       // the owner addressed it, so it is dropped. Available-only used to miss the
       // Away incident: the host returned, answered, and the bot still talked over them.
-      const ownerMuteMinutes = Number(config.ownerMuteMinutes) || CONFIG_DEFAULTS.ownerMuteMinutes;
+      const { ownerMuteMinutes, ownerSilenceWindowMinutes } = timingSettings(config);
       const batchStartDate = toJsDate(pending.batchStartedAt || pending.lastMessageAt);
       const ownerMuteCutoff = () => new Date(ownerMuteCutoffMs(
         Date.now(),
@@ -1123,7 +1058,6 @@ exports.whatsappBotWorker = onRequest(
       // necessarily the directly preceding one) is still fresh (within
       // ownerSilenceWindowMinutes) and the guest's follow-up isn't a clear new
       // topic (approximated here the same way CHANGE 6 does: a short ack).
-      const ownerSilenceWindowMinutes = Number(config.ownerSilenceWindowMinutes) || CONFIG_DEFAULTS.ownerSilenceWindowMinutes;
       const lastOwnerMsg = findMostRecentOwnerMessage(recentNewestFirst);
       if (lastOwnerMsg) {
         const ownerAt = toJsDate(lastOwnerMsg.timestamp);
