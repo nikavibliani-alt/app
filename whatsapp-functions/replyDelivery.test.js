@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
+const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply, findForbiddenCode, SAFE_CODE_REPLY } = require('./replyDelivery');
 
 const WHO = { name: 'Anna Petrova', room: '6-2', guestText: 'I am locked out, the code does not work', mode: 'available' };
 
@@ -328,4 +328,48 @@ test('bag storage photos', async (t) => {
     assert.equal(f.calls.find((c) => c[0] === 'sendText')[1], 'For hot water, press the button on the right handle.');
     assert.ok(!f.names().includes('writeAlert') && !f.names().includes('notifyOwnerThrottled'), 'no alert for a known gap');
   });
+});
+
+test('stripReasoning: the 17 Oct Sonnet 5.5 leak is removed, normal replies untouched', () => {
+  const { stripReasoning } = require('./replyDelivery');
+  const leak = 'Guest\'s newest message is in English, so reply in English. The direct booking scenario: "We don\'t take direct bookings, sorry, reservations and payment are only through Booking.com or Expedia." We don\'t take direct bookings, sorry, reservations and payment are only through Booking.com or Expedia.';
+  assert.equal(stripReasoning(leak).text, 'We don\'t take direct bookings, sorry, reservations and payment are only through Booking.com or Expedia.');
+  assert.equal(stripReasoning('The room/apartment type is unknown, so per the rules I will escalate. [ESCALATE]').text.includes('rules'), false);
+  for (const ok of [
+    'Hi, please fill in this form to get your check-in instructions, everything will be available on that page: app.maxelaapartments.com/checkin-guest',
+    'Your door code and step-by-step instructions are on your check-in page, just scroll down through the steps: app.maxelaapartments.com/checkin-guest',
+    'Hi, happy to help in English. Your entrance and access instructions are on your check-in page.',
+    'ცხელი წყლისთვის დააჭირეთ მარჯვენა სახელურის ღილაკს და დაატრიალეთ ქვემოთ, თქვენკენ.',
+  ]) assert.deepEqual(stripReasoning(ok), { text: ok, removed: 0 }, ok);
+});
+
+test('deliverReply: a reply that is only reasoning sends nothing and alerts the owner', async () => {
+  const f = fakeDeps();
+  const r = await deliverReply(parseAiReply('The guest\'s newest message is a thank you, so per the rules this needs no answer.'), WHO, f.deps);
+  assert.equal(r.outcome, 'empty_reply');
+  assert.ok(!f.names().includes('sendText'));
+  assert.equal(f.calls.find((c) => c[0] === 'writeAlert')[1].errorType, 'reasoning_leak');
+});
+
+test('findForbiddenCode: door / lock codes blocked, the bag storage code and normal numbers allowed', () => {
+  for (const t of ['Your door code is 4821#', 'The code for your door is 7 3 9 1 5', 'კარის კოდია 55912', 'Код от двери 4821', 'Enter 2580* at the keypad']) assert.equal(findForbiddenCode(t), true, t);
+  for (const t of [
+    'You can leave your bags before check-in. The smart lock code is 13 24 13#.',
+    'Daily rate is 15 GEL, cash only. Location: https://maps.app.goo.gl/MruPY7q5RB1trNCz9',
+    'Check-in starts at 3pm, checkout is before 12:00.',
+    'If this is urgent please call the night contact number: +995555123456',
+    'Could you send me your full name and your Booking.com confirmation number?',
+    'WiFi network "maxela 6-2", password "maxela62".',
+    'Room 30 GEL, Apartment 50 GEL, 3 Bedroom Apartment 70 GEL.',
+  ]) assert.equal(findForbiddenCode(t), false, t);
+});
+
+test('deliverReply: a reply with a door code is replaced by the check-in page pointer and the owner is told', async () => {
+  const calls = [];
+  const rec = (n) => async (...a) => { calls.push([n, ...a]); return { ok: true, id: 'x' }; };
+  const deps = { log: { error: () => {}, warn: () => {}, log: () => {} }, humanize: async () => {}, preSendCheck: async () => 'send', sendVideo: rec('sendVideo'), sendText: rec('sendText'), storeAssistant: rec('storeAssistant'), writeAlert: rec('writeAlert'), notifyOwner: rec('notifyOwner'), notifyOwnerThrottled: rec('notifyOwnerThrottled'), finishPending: rec('finishPending') };
+  await deliverReply(parseAiReply('Your door code is 4821#'), { name: 'A', guestText: 'code?', mode: 'available' }, deps);
+  assert.equal(calls.find((c) => c[0] === 'sendText')[1], SAFE_CODE_REPLY);
+  assert.match(SAFE_CODE_REPLY, /check-in page.*app\.maxelaapartments\.com\/checkin-guest/);
+  assert.equal(calls.find((c) => c[0] === 'writeAlert')[1].errorType, 'code_blocked');
 });

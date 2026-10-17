@@ -6,13 +6,37 @@
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 // The one place the model is set, for both guest replies and post-checkout
-// summaries. 'claude-sonnet-5' is the planned next step once the prompt holds
-// up on it in the replay (see README "Model and prompt caching").
+// summaries. Switching to Sonnet 5.5 is this one line once the owner approves
+// (see requestBodyFor: the request shape per model is already handled).
 const MODEL = 'claude-sonnet-4-6';
-// Thinking explicitly off: Sonnet 5 runs adaptive thinking when the field is
-// omitted (Sonnet 4.6 did not), and thinking tokens count against the small
-// max_tokens used for 1-3 sentence replies. Valid on both models.
+// Thinking explicitly off on Sonnet 4.6 / 5 (thinking tokens would count
+// against the small max_tokens used for 1-3 sentence replies).
 const THINKING = { type: 'disabled' };
+// Sonnet 5.5 server-side fallback: a request its safety filter declines (e.g.
+// "reasoning_extraction" on a history with leaked bot reasoning) is re-run on
+// a fallback model instead of returning nothing.
+const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+
+/**
+ * Request body + extra headers for `model`:
+ * - Sonnet 4.6: thinking disabled (unchanged).
+ * - Sonnet 5: thinking disabled; ~30% more tokens for the same text (new tokenizer).
+ * - Sonnet 5.5: "disabled" thinking is a 400 there; adaptive thinking at low
+ *   effort instead (Anthropic's recommended replacement), room for thinking
+ *   in max_tokens, and the server-side refusal fallback.
+ */
+function requestBodyFor(model, { system, messages, maxTokens }) {
+  if (/^claude-sonnet-5-5/.test(model)) {
+    return {
+      body: { model, max_tokens: Math.max(1500, maxTokens * 3), system, messages, output_config: { effort: 'low' }, fallbacks: 'default' },
+      headers: { 'anthropic-beta': FALLBACK_BETA },
+    };
+  }
+  if (/^claude-sonnet-5(?!-\d)/.test(model)) {
+    return { body: { model, max_tokens: Math.ceil(maxTokens * 1.3), system, messages, thinking: THINKING }, headers: {} };
+  }
+  return { body: { model, max_tokens: maxTokens, system, messages, thinking: THINKING }, headers: {} };
+}
 const DEFAULT_TIMEOUT_MS = 25000;
 const DEFAULT_RETRY_DELAY_MS = 2000;
 
@@ -42,17 +66,18 @@ function describeClaudeError(err) {
     case 'timeout': return 'Claude did not answer in time';
     case 'network': return 'could not reach the Claude API';
     case 'empty_response': return 'Claude returned an empty reply';
+    case 'refusal': return 'Claude declined to answer (safety filter)';
     default: return `Claude API error ${err.status || ''}: ${String(err.message || '').slice(0, 120)}`.trim();
   }
 }
 
-async function attempt({ fetchImpl, apiKey, body, timeoutMs }) {
+async function attempt({ fetchImpl, apiKey, body, headers = {}, timeoutMs }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetchImpl(API_URL, {
       method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json', ...headers },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -62,6 +87,8 @@ async function attempt({ fetchImpl, apiKey, body, timeoutMs }) {
       const message = data?.error?.message || `HTTP ${res.status}`;
       return { ok: false, status: res.status, errorType: classifyError(res.status, message), message };
     }
+    // A declined request (safety filter) has no usable text: never sent to the guest.
+    if (data?.stop_reason === 'refusal') return { ok: false, status: res.status, errorType: 'refusal', message: `refusal${data?.stop_details?.category ? ` (${data.stop_details.category})` : ''}`, usage: data?.usage };
     // First text block, not content[0]: a thinking block could come first.
     const text = (data?.content || []).find((b) => b?.type === 'text')?.text || '';
     if (!text) return { ok: false, status: res.status, errorType: 'empty_response', message: `stop_reason=${data?.stop_reason || 'unknown'}`, usage: data?.usage };
@@ -83,14 +110,14 @@ async function callClaudeWithRetry({
   fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
   timeoutMs = DEFAULT_TIMEOUT_MS, retryDelayMs = DEFAULT_RETRY_DELAY_MS, log = console,
 }) {
-  const body = { model, max_tokens: maxTokens, system, messages, thinking: THINKING };
-  let result = await attempt({ fetchImpl, apiKey, body, timeoutMs });
+  const { body, headers } = requestBodyFor(model, { system, messages, maxTokens });
+  let result = await attempt({ fetchImpl, apiKey, body, headers, timeoutMs });
   let attempts = 1;
   if (!result.ok) {
     log.warn(`callClaude: attempt 1 failed — ${result.errorType}${result.status ? ` (HTTP ${result.status})` : ''}: ${result.message}`);
     if (isRetryable(result.errorType)) {
       await sleep(retryDelayMs);
-      result = await attempt({ fetchImpl, apiKey, body, timeoutMs });
+      result = await attempt({ fetchImpl, apiKey, body, headers, timeoutMs });
       attempts = 2;
       if (!result.ok) log.error(`callClaude: attempt 2 failed — ${result.errorType}${result.status ? ` (HTTP ${result.status})` : ''}: ${result.message}`);
     }
@@ -122,6 +149,7 @@ function formatUsage(usage) {
 
 module.exports = {
   MODEL,
+  requestBodyFor,
   classifyError,
   isRetryable,
   describeClaudeError,
