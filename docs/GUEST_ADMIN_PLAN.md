@@ -295,3 +295,8 @@ Notes:
 - "Show in": All / Only these / All except these. Default Maxela normal noise = all except 6-4.
 - Copy lists the apartment-limited rules in the confirm. Icon picker: removed volume-x, key, key-round, home.
 - Undo: tell me "undo house rules fixes" (back to tag before-house-rules-fixes).
+
+### Push notifications fix (restore point: tag before-push-fix)
+- Server: sendPushToAll logs every deleted subscription (device, status) to push_log; pushTestRequest sends a test to one phone. NOT deployed yet: the pipeline codebase cannot deploy until the secret GUEST_PROOF_SECRET exists (from security stage 2).
+- Admin (Build 1014c): permission is asked first on a tap, stale subscription replaced, visible "Notifications are off on this phone" bar, failed re-sync logged to push_log, "Send test notification" in More.
+- Undo: tell me "undo push fix".

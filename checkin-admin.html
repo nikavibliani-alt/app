@@ -61,6 +61,7 @@ html.standalone-hk.hk-authed #pane-hk{display:block!important;}
 html.standalone-hk.hk-authed #pane-hksettings{display:none!important;}
 html.standalone-hk.hk-authed.hk-tab-settings #pane-hk{display:none!important;}
 html.standalone-hk.hk-authed.hk-tab-settings #pane-hksettings{display:block!important;}
+html.standalone-hk #push-bar{display:none!important;}
 html.standalone-hk #detail,html.standalone-hk #apt-editor-overlay,html.standalone-hk #req-detail,html.standalone-hk #gp-editor-overlay,html.standalone-hk #gs-save-bar{display:none!important;}
 html.standalone-hk .hk-cleaner-link{display:none;}
 html.standalone-hk.hk-admin-role .hk-cleaner-link{display:inline;}
@@ -751,6 +752,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
   <div class="lock-err" id="lock-error"></div>
 </div>
 <div id="app">
+  <button type="button" id="push-bar" onclick="window.subscribeToPush(true)" style="display:none;width:100%;min-height:44px;padding:10px 14px;border:none;border-bottom:1px solid var(--line);background:var(--amber-bg);color:var(--amber);font-family:var(--sans);font-size:13px;font-weight:600;text-align:left;cursor:pointer">Notifications are off on this phone - tap to turn on</button>
   <div class="app-header">
     <div class="app-header__row">
       <div class="app-header__main">
@@ -758,7 +760,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1014b · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1014c · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -908,7 +910,8 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
     <div class="more-section">App</div>
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('navsettings')">Tab bar layout</button>
-      <button class="more-item" type="button" onclick="window.subscribeToPush()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>Notifications<span class="more-hint" id="more-notif-status">Tap to enable notifications</span></button>
+      <button class="more-item" type="button" onclick="window.subscribeToPush(true)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>Notifications<span class="more-hint" id="more-notif-status">Tap to enable notifications</span></button>
+      <button class="more-item" type="button" onclick="window.sendTestPush()">Send test notification<span class="more-hint">To this phone only</span></button>
       <button class="more-item" type="button" onclick="adminSignOut()">Sign out</button>
     </div>
     <p class="om-attrib">Icons by <a href="https://lucide.dev/" target="_blank" rel="noopener">Lucide</a> (ISC)</p>
@@ -1020,7 +1023,7 @@ window.adminUnlock=function(){
     document.documentElement.classList.add('admin-authed');
     document.getElementById('lock-screen').style.display='none';
     document.getElementById('loading').style.display='none';
-    window.subscribeToPush();
+    window.subscribeToPush(true);
   }else{
     inp.classList.add('shake');setTimeout(()=>inp.classList.remove('shake'),300);
     inp.value='';err.textContent='Incorrect password';setTimeout(()=>err.textContent='',2500);
@@ -1081,33 +1084,75 @@ async function saveSubscription(subscription){
     {merge:true}
   );
 }
-window.subscribeToPush=async function(){
+function _pushBar(show,msg){
+  const el=document.getElementById('push-bar');if(!el)return;
+  el.style.display=show?'block':'none';
+  if(msg)el.textContent=msg;
+}
+async function _pushLog(kind,err){   // one line in push_log per phone per day, so a failing phone is visible
   try{
-    if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
-    const reg=await navigator.serviceWorker.ready;
-    // Check if already subscribed
-    const existing=await reg.pushManager.getSubscription();
-    if(existing){
-      await saveSubscription(existing);
-      _updateNotifStatusUI();
+    const key='maxela_push_log_'+kind;const day=new Date().toISOString().slice(0,10);
+    if(localStorage.getItem(key)===day)return;
+    localStorage.setItem(key,day);
+    await setDoc(doc(collection(db,'push_log')),{
+      kind,deviceId:localStorage.getItem('maxela_device_id')||'',userAgent:navigator.userAgent.slice(0,100),
+      permission:typeof Notification!=='undefined'?Notification.permission:'none',
+      message:String((err&&err.message)||err||'').slice(0,200),createdAt:new Date().toISOString()
+    });
+  }catch(e){}
+}
+// fromTap=true: the user tapped the bar or the More row. The permission question is asked FIRST, before any await,
+// so iPhone Safari still counts it as a tap. A stale subscription is dropped and replaced.
+window.subscribeToPush=async function(fromTap){
+  fromTap=fromTap===true;
+  try{
+    if(!('serviceWorker' in navigator)||!('PushManager' in window)){
+      _pushBar(true,'Notifications need the Home Screen app - open Maxela from its icon');
+      if(fromTap)toast('Open Maxela from the Home Screen icon to turn on notifications',5000);
       return;
     }
-    // Request permission
-    const permission=await Notification.requestPermission();
+    let permission=Notification.permission;
+    if(permission!=='granted'&&fromTap)permission=await Notification.requestPermission();
     _updateNotifStatusUI();
-    if(permission!=='granted')return;
-    // Subscribe
-    const {VAPID_PUBLIC_KEY}=await import('/shared/push-config.js');
-    const subscription=await reg.pushManager.subscribe({
-      userVisibleOnly:true,
-      applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-    });
-    await saveSubscription(subscription);
+    if(permission!=='granted'){
+      _pushBar(true,permission==='denied'?'Notifications are blocked - turn them on in iPhone Settings, then tap here':'Notifications are off on this phone - tap to turn on');
+      return;
+    }
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(sub&&fromTap){try{await sub.unsubscribe();}catch(e){}sub=null;}
+    if(!sub){
+      const {VAPID_PUBLIC_KEY}=await import('/shared/push-config.js');
+      sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
+    }
+    await saveSubscription(sub);
+    _pushBar(false);
     _updateNotifStatusUI();
-    toast('Notifications enabled on this device');
+    if(fromTap)toast('Notifications are on for this phone');
   }catch(e){
     console.warn('[Push]',e);
+    _pushBar(true,'Notifications are off on this phone - tap to turn on');
+    _pushLog(fromTap?'subscribe_failed':'resync_failed',e);
+    if(fromTap)toast('Could not turn on notifications: '+(e&&e.message||e),5000);
   }
+};
+// "Send test notification" (More tab): asks the server to push to THIS phone only and shows Apple's answer.
+window.sendTestPush=async function(){
+  const deviceId=localStorage.getItem('maxela_device_id');
+  if(!deviceId){toast('This phone is not registered yet - tap Notifications first',4000);return;}
+  try{
+    const ref=doc(collection(db,'push_test_requests'));
+    await setDoc(ref,{deviceId,createdAt:new Date().toISOString()});
+    toast('Sending test...',12000);
+    let finished=false;
+    const unsub=onSnapshot(ref,snap=>{
+      const d=snap.data()||{};
+      if(!d.doneAt||finished)return;
+      finished=true;unsub();
+      toast(d.ok?'Test sent (status '+d.statusCode+') - it should arrive in a few seconds':'Test failed: '+(d.statusCode?d.statusCode+' ':'')+(d.message||'unknown error')+' - tap Notifications to re-register',6000);
+    });
+    setTimeout(()=>{if(!finished){finished=true;unsub();toast('No answer from the server - the test function may not be live yet',5000);}},15000);
+  }catch(e){toast('Test failed: '+e.message,5000);}
 };
 // Reflects current permission/subscription state in the More menu row —
 // see renderMoreNotifRow() / #more-notif-status.
@@ -6693,8 +6738,11 @@ onSnapshot(collection(db,'checkin_rooms'),async snap=>{
 // this covers the far more common "already logged in, reopened the PWA"
 // case, without ever triggering a fresh permission prompt without a
 // deliberate tap on the Notifications row).
-if(document.documentElement.classList.contains('admin-authed')&&typeof Notification!=='undefined'&&Notification.permission==='granted'){
-  window.subscribeToPush();
+if(document.documentElement.classList.contains('admin-authed')&&typeof Notification!=='undefined'){
+  if(Notification.permission==='granted')window.subscribeToPush();
+  else _pushBar(true,Notification.permission==='denied'?'Notifications are blocked - turn them on in iPhone Settings, then tap here':'Notifications are off on this phone - tap to turn on');
+}else if(document.documentElement.classList.contains('admin-authed')){
+  _pushBar(true,'Notifications need the Home Screen app - open Maxela from its icon');
 }
 _updateNotifStatusUI();
 onSnapshot(collection(db,'checkin_apartments'),snap=>{
