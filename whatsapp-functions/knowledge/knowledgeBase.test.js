@@ -1,0 +1,224 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
+const {
+  SEED, renderSystemPrompt, templatePaths, propertyIdForRoom, unitFactLines, loadUnitWifi, readKnowledgeBase, loadKnowledgeBase, resetKnowledgeBaseCache, getPath,
+} = require('./knowledgeBase');
+const { SYSTEM_PROMPT_TEMPLATE, ORIGINAL_PROMPT_SHA256, ORIGINAL_PROMPT_LENGTH } = require('./promptTemplate');
+
+// Rule (not fact) changes made since the knowledge-base split, word for word.
+// Removing them from the rendered prompt must give back the original prompt
+// exactly, which proves no fact changed. Add every new rule edit here.
+const RULE_CHANGES_SINCE_SPLIT = [
+  // Round 1 of Sonnet 5.5 tuning (2026-10-17): clarifications, additions only.
+  "\nNever [SILENT] when the guest is stuck outside, locked out or cannot get in (the code, QR code, smart lock or elevator does not work) and writes again: use the locked out scenario again, with [ESCALATE] [URGENT:LOCKOUT], so the owner is alerted again.",
+  "\nUse this only when the guest's message is about their booking or arrival (for example \"I booked for tomorrow\" or a reservation confirmation). A bare greeting with nothing else (\"hi\", \"hello\", \"good morning\") gets: Hi, how can I help you?",
+  "\nWhen a scenario gives a Reply, send that reply as written (in the reply language) and add nothing to it: no extra greeting, thanks, apology, welcome or detail the guest did not ask about. Use \"Anything else outside the above topics\" only after checking that no scenario above fits.",
+  " Do not ask the guest for any details in this reply.",
+  "\nUse this scenario only when the guest says or shows that the check-in page could not find or verify their booking, never for other access problems.",
+  "\nUse this only when the voice message is all the guest sent and nothing in this message or the one before it explains what they need; if they also sent a photo or text, or asked a question just before, answer that instead.",
+  " This includes \"okey thank you\", \"ok great\" or \"perfect thanks\": never answer them with instructions or links.",
+];
+// Owner fact decisions (2026-10-17), as [now, before] text pairs in the rendered
+// prompt; every occurrence of `now` is put back to `before`.
+const DECISION_CHANGES_2026_10_17 = [
+  // Refund: a normal escalation, not anger
+  ["horrible, compensation,",
+   "horrible, refund, compensation,"],
+  ["\nAsking for a refund or money back is not by itself anger: use the refund scenario (a short polite reply and [ESCALATE]), unless the message also has angry language like the words above.",
+   ""],
+  ["\nRefund request (the guest asks for a refund or money back, without angry language):\nReply: Let me check on that and get back to you shortly. [ESCALATE]\nNever promise or refuse a refund, and never mention amounts or Booking.com / Expedia rules: the owner decides.\n",
+   ""],
+  // Booking lookup and WiFi lines in the guest context
+  ["\n- \"Booking lookup\" (only when no check-in form matched this phone): whether the guest's booking is in our system, searched in code by the confirmation number or full name the guest wrote. When it found the booking, the room and dates above come from it.\n- \"This guest's WiFi\": the network name and password of the guest's own unit, from their check-in page. It is the only source of WiFi details.",
+   ""],
+  // 3-bedroom: 11 guests + 1 baby
+  ["fits up to 11 guests plus 1 baby in the baby bed",
+   "fits up to 12 guests"],
+  // Unknown location: never assume Shartava
+  ["\nShartava facts (address, entrance, parking, bag storage, hot water, door code timing, WiFi) are only for a guest whose Room/apartment type is a Shartava unit (starting 0-, 6- or 7-). When it is unknown, use \"Guest's booking not matched\" first.",
+   ""],
+  ["Guest's booking not matched (Room/apartment type is unknown):\nNever assume the guest is staying at Shartava. We have several locations, and the address, entrance, parking, bag storage, hot water, door code timing and WiFi are different for each.\nBefore giving any of those facts, ask naturally and professionally for the name on the booking (or the booking dates), so you can find their reservation and send the right details. Reply: Could you send me the full name on your booking (or your booking dates)? Then I can find your reservation and send you the right details. Never ask the guest which location or property they are staying at.\nAsk this only before giving one of those location facts. Everything else is answered exactly as its own scenario says, with no booking name: pointing to the check-in form or check-in page (it works for every location), check-in and checkout times, early check-in, late checkout or extending the stay, booking and price questions, and anything that needs the team.\nIf the guest already sent their name or dates and the Booking lookup still did not find the booking, or it is still unclear where they are staying, or they say they are staying at our Freedom Square / Tabidze or Orbeliani location: reply \"Let me check on that and get back to you shortly.\" [ESCALATE]",
+   "If the Room/apartment type is unknown and the guest says they are staying at our Freedom Square / Tabidze or Orbeliani location (not Shartava), never give Shartava facts (address, entrance, door code timing, bag storage): reply \"Let me check on that and get back to you shortly.\" [ESCALATE]"],
+  [" (only for a Shartava booking; if Room/apartment type is unknown, see \"Guest's booking not matched\")",
+   ""],
+  // New booking not found: 10 minutes, else the couldn't-verify flow
+  ["Use this scenario only when the guest says or shows that the check-in page could not find or verify their booking, never for other access problems.\nFirst check the \"Booking lookup\" line in the guest context:\n- If it says the booking is not in our system yet (no booking has the confirmation number the guest wrote): Reply: New bookings can take up to 10 minutes to appear in our system. Please try the check-in page again in about 10 minutes. (No [ESCALATE].) If you already sent this in this conversation and the guest says it still does not work, Reply: Thank you, I've passed this on and our host will get back to you shortly. [ESCALATE]\n- If it says the booking is in our system (found), or there is no lookup line, or the lookup was not possible or unavailable: reply briefly and warmly that we'll sort it out, and ask once for their full name exactly as on the booking and their Booking.com (or Expedia) confirmation number. Reply: No worries, we'll sort this out. Could you send me your full name exactly as on the booking and your Booking.com (or Expedia) confirmation number? [ESCALATE]\nAsk this even if the issue was already escalated, as long as you have not asked for these details yet in this conversation.\n",
+   "Reply briefly and warmly that we'll sort it out, and ask once for their full name exactly as on the booking and their Booking.com (or Expedia) confirmation number. Reply: No worries, we'll sort this out. Could you send me your full name exactly as on the booking and your Booking.com (or Expedia) confirmation number? [ESCALATE]\nAsk this even if the issue was already escalated, as long as you have not asked for these details yet in this conversation.\nUse this scenario only when the guest says or shows that the check-in page could not find or verify their booking, never for other access problems.\n"],
+  // WiFi only from the check-in page data (no pattern)
+  ["Use only the \"This guest's WiFi\" line in the guest context: give that network name and password exactly as written there (same capital letters, spaces and dashes). Several units share one network, so never work a name or password out from the unit number, and never use another unit's WiFi.\nIf there is no \"This guest's WiFi\" line, never guess: if Room/apartment type is unknown, ask for the name on the booking (see \"Guest's booking not matched\"); otherwise Reply: Let me check on that and get back to you shortly. [ESCALATE]\nIf the guest can't find that network or the password does not work, use the WiFi not working scenario.",
+   "For rooms 0-1 through 0-5: the network is always \"Superior Apartments\" and the password is always \"maxela03\" — fixed and identical for every 0-x room.\nFor 6-x and 7-x apartments: the network name is \"maxela [unit]\" (e.g. \"maxela 6-2\") and the password is \"maxela\" followed by the unit number with no space and no dash, lowercase (e.g. unit 6-2 -> password \"maxela62\", unit 7-4 -> password \"maxela74\").\nIf the guest can't find their network or is confused about the password, explain the pattern using their own unit as the example."],
+  ["15. WiFi tone (see the WiFi scenario above for the actual logic; the name and password come only from \"This guest's WiFi\"): ვაიფაის სახელია [network name], ხოლო პაროლია [password].",
+   "15. WiFi tone (see the WiFi scenario above for the actual logic): ვაიფაის სახელი და პაროლი თითქმის ერთნაირია, მაგალითად, ბინა maxela 6-2-ის ვაიფაის სახელია maxela 6-2, ხოლო პაროლია maxela62, პატარა ასოებით, გამოტოვების და მინუსის გარეშე."],
+  ["Parking question (only for a Shartava booking; if Room/apartment type is unknown, use \"Guest's booking not matched\" instead):",
+   "Parking question:"],
+  ["Bag storage before check-in (only for a Shartava booking; if Room/apartment type is unknown, use \"Guest's booking not matched\" instead):",
+   "Bag storage before check-in:"],
+  // Address link: the named 35/37 place (as in admin settings)
+  ["https://maps.app.goo.gl/fSW3iLsu4MxghzGRA",
+   "https://maps.app.goo.gl/g1wVvjEG3xRn5bNR7"],
+  // Parking link: the Carrefour garage (as in admin settings)
+  ["https://maps.app.goo.gl/MruPY7q5RB1trNCz9",
+   "https://maps.app.goo.gl/LArVmJASytmQdReJA"],
+];
+const withoutRuleChanges = (p) => {
+  const undone = DECISION_CHANGES_2026_10_17.reduce((acc, [now, before]) => { assert.ok(acc.includes(now), `decision change not found: ${now.slice(0, 60)}`); return acc.split(now).join(before); }, p);
+  return RULE_CHANGES_SINCE_SPLIT.reduce((acc, r) => { assert.ok(acc.includes(r), `rule change not found: ${r.slice(0, 60)}`); return acc.replace(r, ''); }, undone);
+};
+
+test('the prompt rendered from the seed equals the pre-knowledge-base prompt apart from the listed rule changes and owner decisions (nothing else changed)', () => {
+  const p = withoutRuleChanges(renderSystemPrompt(SEED));
+  assert.equal(p.length, ORIGINAL_PROMPT_LENGTH);
+  assert.equal(crypto.createHash('sha256').update(p).digest('hex'), ORIGINAL_PROMPT_SHA256);
+  assert.doesNotMatch(p, /\{\{/, 'no placeholder left');
+});
+
+test('every placeholder resolves to text in the seed', () => {
+  const paths = templatePaths();
+  assert.ok(paths.length >= 38, `${paths.length} facts`);
+  for (const path of paths) assert.equal(typeof getPath(SEED, path), 'string', path);
+});
+
+test('the rules template itself holds no addresses, prices, links or WiFi passwords', () => {
+  const t = SYSTEM_PROMPT_TEMPLATE;
+  for (const fact of ['Zhiuli Shartava', 'maps.app.goo.gl', 'maxela03', 'maxela62', '15 GEL', '30 GEL', 'booking.com/Share', '13 24 13#', 'app.maxelaapartments.com', '975338858914982']) {
+    assert.ok(!t.includes(fact), `"${fact}" should live in the knowledge base`);
+  }
+});
+
+test('changing a fact in the knowledge base changes the prompt (and nothing else)', () => {
+  const kb = JSON.parse(JSON.stringify(SEED));
+  kb.policies.parking.reply.en = 'PARKING TEXT';
+  const p = renderSystemPrompt(kb);
+  assert.ok(p.includes('then text: PARKING TEXT'));
+  assert.equal(p.replace('PARKING TEXT', SEED.policies.parking.reply.en), renderSystemPrompt(SEED));
+  delete kb.policies.gym;
+  assert.throws(() => renderSystemPrompt(kb), /missing fact "policies.gym.reply.en"/);
+});
+
+test('properties and units', () => {
+  assert.deepEqual(Object.keys(SEED.properties).sort(), ['abashidze', 'freedom_square', 'orbeliani', 'shartava', 'vgl', 'xcv']);
+  for (const [code, prop] of [['6-2', 'shartava'], ['0-3', 'shartava'], ['tab-1', 'freedom_square'], ['orb-2', 'orbeliani'], ['vgl-st1', 'vgl'], ['xcv-2', 'xcv'], ['abashidze', 'abashidze'], ['VGL-AP9', 'vgl']]) {
+    assert.equal(propertyIdForRoom(SEED, code), prop, code);
+  }
+  assert.equal(propertyIdForRoom(SEED, ''), null);
+  assert.equal(SEED.units['6-3'].type, 'threeBedroom');
+  assert.equal(SEED.properties.shartava.botAnswers, true);
+  assert.ok(Object.entries(SEED.properties).filter(([, p]) => p.botAnswers).every(([id]) => id === 'shartava'));
+});
+
+test('unitFactLines: the unit\'s own facts, only where the bot answers', () => {
+  assert.deepEqual(unitFactLines(SEED, '6-2'), ['This guest\'s unit: 6-2 is a Superior Apartment (has a kitchen), up to 6 guests.'], 'no WiFi without the check-in page data');
+  assert.deepEqual(unitFactLines(SEED, '7-1', { name: 'Maxela 7-4', password: 'pw74' }), [
+    'This guest\'s unit: 7-1 is a Superior Apartment (has a kitchen), up to 6 guests.',
+    'This guest\'s WiFi (from their check-in page, exactly as written): network "Maxela 7-4", password "pw74".',
+  ], 'a shared network is given exactly as saved');
+  assert.deepEqual(unitFactLines(SEED, '0-4'), ['This guest\'s unit: 0-4 is a Triple Room with Private Bathroom (no kitchen), up to 4 guests.']);
+  assert.match(unitFactLines(SEED, '6-3')[0], /3 Bedroom Apartment \(has a kitchen\), up to 11 guests plus 1 baby in the baby bed\.$/);
+  assert.deepEqual(unitFactLines(SEED, 'tab-1', { name: 'csofs', password: 'x' }), [], 'Freedom Square: no WiFi either');
+  assert.deepEqual(unitFactLines(SEED, 'tab-1'), [], 'Freedom Square: the bot does not answer');
+  assert.deepEqual(unitFactLines(SEED, ''), []);
+});
+
+test('WiFi has no pattern rule and no copy in the knowledge base (the check-in page data is the only source)', () => {
+  const p = renderSystemPrompt(SEED);
+  assert.doesNotMatch(p, /maxela03|maxela62|"maxela \[unit\]"|explain the pattern/);
+  for (const [code, unit] of Object.entries(SEED.units)) assert.equal(unit.wifi, undefined, code);
+  assert.match(p, /never work a name or password out from the unit number/);
+});
+
+test('owner decisions: address, parking, capacity, refund, new booking, unknown location', () => {
+  const p = renderSystemPrompt(SEED);
+  assert.equal(SEED.properties.shartava.mapsUrl, 'https://maps.app.goo.gl/fSW3iLsu4MxghzGRA');
+  assert.ok(SEED.properties.shartava.addressLine.includes(SEED.properties.shartava.mapsUrl));
+  assert.equal(SEED.policies.parking.mapsUrl, 'https://maps.app.goo.gl/MruPY7q5RB1trNCz9');
+  assert.ok(SEED.policies.parking.reply.en.endsWith(SEED.policies.parking.mapsUrl));
+  assert.doesNotMatch(p, /g1wVvjEG3xRn5bNR7|LArVmJASytmQdReJA/, 'old links gone');
+  assert.equal(SEED.unitTypes.threeBedroom.maxGuests, 11);
+  assert.equal(SEED.unitTypes.threeBedroom.maxBabies, 1);
+  assert.doesNotMatch(p.match(/ANGRY GUEST DETECTION:\n[^\n]*/)[0], /refund/);
+  assert.match(p, /Refund request[^\n]*\nReply: Let me check on that and get back to you shortly\. \[ESCALATE\]/);
+  assert.match(p, /New bookings can take up to 10 minutes to appear in our system\. Please try the check-in page again in about 10 minutes\./);
+  assert.match(p, /Never assume the guest is staying at Shartava/);
+  assert.match(p, /Never ask the guest which location or property they are staying at/);
+  assert.deepEqual(SEED.policies.cleaning.prices, { en: 'Room 30 GEL, Apartment 50 GEL, 3 Bedroom Apartment 70 GEL.', room: 30, apartment: 50, threeBedroom: 70, currency: 'GEL' });
+});
+
+test('no door or smart lock code anywhere in the knowledge base except the bag storage code', () => {
+  const json = JSON.stringify(SEED);
+  assert.ok(!/"(doorCode|tuyaDeviceId)"/.test(json), 'no doorCode / tuyaDeviceId fields');
+  const codes = json.match(/\b\d{2} \d{2} \d{2}#/g) || [];
+  assert.ok(codes.every((c) => c === '13 24 13#'), codes.join(','));
+});
+
+/** A minimal read-only Firestore fake: { collection: { docId: data } }. */
+function fakeDb(data, { fail = false } = {}) {
+  return {
+    collection: (name) => ({
+      get: async () => {
+        if (fail) throw new Error('unavailable');
+        const docs = Object.entries(data[name] || {}).map(([id, d]) => ({ id, data: () => d }));
+        return { empty: docs.length === 0, docs };
+      },
+    }),
+  };
+}
+
+test('readKnowledgeBase: Firestore docs override the seed by id; door codes never copied', async () => {
+  const kb = await readKnowledgeBase(fakeDb({
+    kb_policies: { parking: { pricePerDay: 20, reply: { en: 'NEW PARKING' } } },
+    kb_units: { '6-2': { displayName: 'Apt 6-2', doorCode: '9999' } },
+  }));
+  assert.equal(kb.policies.parking.pricePerDay, 20);
+  assert.equal(kb.policies.parking.reply.en, 'NEW PARKING');
+  assert.equal(kb.policies.parking.mediaId, SEED.policies.parking.mediaId, 'rest of the entry kept');
+  assert.equal(kb.units['6-2'].displayName, 'Apt 6-2');
+  assert.equal(kb.units['6-2'].type, 'superior', 'rest of the unit kept');
+  assert.equal(kb.units['6-2'].doorCode, undefined);
+  assert.equal(SEED.policies.parking.pricePerDay, 15, 'seed itself untouched');
+});
+
+test('loadKnowledgeBase: empty Firestore -> seed; errors or a broken edit -> seed; cached', async () => {
+  const quiet = { warn: () => {} };
+  resetKnowledgeBaseCache();
+  assert.equal(renderSystemPrompt(await loadKnowledgeBase(fakeDb({}), { nowMs: 1, log: quiet })), renderSystemPrompt(SEED));
+  resetKnowledgeBaseCache();
+  assert.equal(await loadKnowledgeBase(fakeDb({}, { fail: true }), { nowMs: 1, log: quiet }), SEED);
+  resetKnowledgeBaseCache();
+  const broken = await loadKnowledgeBase(fakeDb({ kb_policies: { gym: { reply: null } } }), { nowMs: 1, log: quiet });
+  assert.equal(renderSystemPrompt(broken), renderSystemPrompt(SEED), 'a doc that removes a fact falls back to the seed');
+  resetKnowledgeBaseCache();
+  const a = await loadKnowledgeBase(fakeDb({ kb_policies: { gym: { reply: { en: 'GYM A' } } } }), { nowMs: 1000, log: quiet });
+  const b = await loadKnowledgeBase(fakeDb({ kb_policies: { gym: { reply: { en: 'GYM B' } } } }), { nowMs: 2000, log: quiet });
+  assert.equal(b, a, 'cached for 5 minutes');
+  resetKnowledgeBaseCache();
+});
+
+test('loadUnitWifi: only wifiName / wifiPass of that unit, null when unknown or failing', async () => {
+  const calls = [];
+  const db = (docs, { fail = false } = {}) => ({
+    collection: (name) => ({
+      doc: (id) => ({ id }),
+      where: (field, op, ref) => ({
+        select: (...fields) => ({
+          get: async () => {
+            calls.push({ name, id: ref.id, fields });
+            if (fail) throw new Error('unavailable');
+            const d = docs[ref.id];
+            return d ? { empty: false, docs: [{ get: (f) => d[f] }] } : { empty: true, docs: [] };
+          },
+        }),
+      }),
+    }),
+  });
+  const quiet = { warn: () => {} };
+  const data = { '7-1': { wifiName: 'Maxela 7-4', wifiPass: 'pw74' }, abashidze: { wifiName: '', wifiPass: '' } };
+  assert.deepEqual(await loadUnitWifi(db(data), '7-1'), { name: 'Maxela 7-4', password: 'pw74' });
+  assert.deepEqual(calls[0], { name: 'checkin_apartments', id: '7-1', fields: ['wifiName', 'wifiPass'] }, 'never selects door codes');
+  assert.equal(await loadUnitWifi(db(data), 'abashidze'), null, 'nothing saved');
+  assert.equal(await loadUnitWifi(db(data), '9-9'), null, 'no such unit');
+  assert.equal(await loadUnitWifi(db(data), ''), null);
+  assert.equal(await loadUnitWifi(db(data, { fail: true }), '7-1', { log: quiet }), null);
+});

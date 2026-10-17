@@ -8,8 +8,9 @@
 
 const { applyToneGuard } = require('./toneGuard');
 const { mediaFor, textWithoutMedia } = require('./videos');
+const { SEED: KB } = require('./knowledge/knowledgeBase');
 
-const CHECKIN_PAGE_URL = 'app.maxelaapartments.com/checkin-guest';
+const CHECKIN_PAGE_URL = KB.properties.shartava.checkinPageUrl;
 
 /**
  * Parses Claude's raw reply (time labels already stripped) into a plan:
