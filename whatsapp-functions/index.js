@@ -31,6 +31,7 @@ const { urgentPushPayload, sendOwnerPush } = require('./ownerPush');
 const { mediaFor, checkMediaLink, capMediaResend } = require('./videos');
 const { SEED: KB_SEED, renderSystemPrompt, loadKnowledgeBase, unitFactLines, loadUnitWifi, propertyIdForRoom } = require('./knowledge/knowledgeBase');
 const { lookupBooking, bookingLookupLines, guestTextsFrom } = require('./bookingLookup');
+const { loadLiveStay, liveContextLines, checkinOpenWithLiveData } = require('./liveData');
 const { CONFIG_DEFAULTS, tbilisiHour, resolveEffectiveMode, buildModeContext, timingSettings, replyDelaySeconds } = require('./botModes');
 const { callClaudeWithRetry, describeClaudeError, buildCachedSystem, formatUsage } = require('./claudeClient');
 const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
@@ -855,11 +856,14 @@ exports.whatsappBotWorker = onRequest(
 
       // CHANGE G — inject the current Tbilisi hour so the model can apply
       // hour-dependent scenarios (e.g. cleaning staff availability).
-      // Facts come from the shared knowledge base (read-only; the seed if Firestore has none).
+      // Facts come from the shared knowledge base (read-only; the seed if Firestore has none),
+      // live data (check-in page state, next arrival, service prices) from Firestore, read-only.
       const kb = await loadKnowledgeBase(db);
       // WiFi only from the check-in page data (several units share a network).
       const wifi = await loadUnitWifi(db, bookingRoom);
+      const live = await loadLiveStay(db, { roomCode: bookingRoom, form: guestMatch?.form, reservation: guestMatch?.reservation });
       const timing = stayTiming({ checkin: checkinDate || guestMatch?.form?.arrivalDate, checkout: checkoutDate }, Date.now());
+      timing.checkinOpen = checkinOpenWithLiveData(timing.checkinOpen, live.page);
       const guestContext = [
         `Guest name: ${guestName}`,
         `Room/apartment type: ${roomCode || 'unknown'}`,
@@ -872,6 +876,7 @@ exports.whatsappBotWorker = onRequest(
         ...stayTimingContextLines(timing),
         ...unitFactLines(kb, bookingRoom, wifi),
         ...bookingLookupLines(lookup, kb.properties?.[propertyIdForRoom(kb, lookup?.roomCode)]?.name),
+        ...liveContextLines(live),
       ].join('\n') + memoryContext;
 
       const modeContext = buildModeContext(effectiveMode, config.ownerPhone);
@@ -938,6 +943,7 @@ exports.whatsappBotWorker = onRequest(
         room: roomCode,
         guestText: combinedGuestText,
         mode: effectiveMode,
+        ownerNote: live.ownerNote,
       }, {
         log: console,
         // Small humanizer — short, after Claude, before send. Not the batching delay.

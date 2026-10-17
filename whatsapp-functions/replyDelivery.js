@@ -119,7 +119,7 @@ function shouldNotifyNow(lastNotifiedMs, nowMs, windowMs) {
  *   'send_failed'     — Meta rejected the text: nothing stored, owner alerted, pending kept
  *   'sent'
  *
- * who: { name, room, guestText, mode }
+ * who: { name, room, guestText, mode, ownerNote? } (ownerNote: stay + next arrival, added to escalation alerts)
  * deps: preSendCheck() -> 'send'|'newer_message'|'owner_replied', humanize(),
  *   sendVideo(id) / sendText(body) -> { ok, id } | { ok: false, code, reason },
  *   storeAssistant(content), writeAlert(fields), notifyOwner(issue, opts),
@@ -162,7 +162,7 @@ async function deliverReply(plan, who, deps) {
     if (plan.escalate) {
       deps.log.warn('deliverReply: reply had only tags, nothing sent to the guest; escalating to the owner');
       await deps.writeAlert({ reason: 'escalation', urgency: !!plan.urgent });
-      if (!plan.urgent) await deps.notifyOwner(`Guest needs help (mode ${who.mode}): ${who.guestText}`);
+      if (!plan.urgent) await deps.notifyOwner(`Guest needs help (mode ${who.mode}): ${who.guestText}${who.ownerNote ? ` [${who.ownerNote}]` : ''}`);
       await deps.finishPending();
       return { outcome: 'escalated_only' };
     }
@@ -230,7 +230,7 @@ async function deliverReply(plan, who, deps) {
   if (plan.escalate) {
     await deps.writeAlert({ reason: 'escalation', urgency: !!plan.urgent });
     // Urgent cases were already paged above.
-    if (!plan.urgent) await deps.notifyOwner(`Guest needs help (mode ${who.mode}): ${who.guestText}`);
+    if (!plan.urgent) await deps.notifyOwner(`Guest needs help (mode ${who.mode}): ${who.guestText}${who.ownerNote ? ` [${who.ownerNote}]` : ''}`);
   }
   await deps.finishPending();
   return { outcome: 'sent' };

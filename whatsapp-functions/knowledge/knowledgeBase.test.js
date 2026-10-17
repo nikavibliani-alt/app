@@ -20,6 +20,7 @@ const RULE_CHANGES_SINCE_SPLIT = [
   "\nUse this scenario only when the guest says or shows that the check-in page could not find or verify their booking, never for other access problems.",
   "\nUse this only when the voice message is all the guest sent and nothing in this message or the one before it explains what they need; if they also sent a photo or text, or asked a question just before, answer that instead.",
   " This includes \"okey thank you\", \"ok great\" or \"perfect thanks\": never answer them with instructions or links.",
+  "\n- Live data read in code, always trust it: whether the guest's check-in page is unlocked right now and why (when it is unlocked, the door code and step-by-step instructions are already on the guest's check-in page), the guest's own unit (type, WiFi) and airport transfer prices. Use these lines only to answer more accurately: early check-in, late checkout, discounts and room changes are still the owner's decision, so handle those exactly as their scenarios say (escalate). Never give a door or smart lock code yourself; the bag storage code is the only code you may give.",
 ];
 // Owner fact decisions (2026-10-17), as [now, before] text pairs in the rendered
 // prompt; every occurrence of `now` is put back to `before`.
