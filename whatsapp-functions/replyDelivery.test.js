@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply, findForbiddenCode, SAFE_CODE_REPLY } = require('./replyDelivery');
+const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply, findForbiddenCode, SAFE_CODE_REPLY, dropGreetingPrefix } = require('./replyDelivery');
 
 const WHO = { name: 'Anna Petrova', room: '6-2', guestText: 'I am locked out, the code does not work', mode: 'available' };
 
@@ -372,4 +372,17 @@ test('deliverReply: a reply with a door code is replaced by the check-in page po
   assert.equal(calls.find((c) => c[0] === 'sendText')[1], SAFE_CODE_REPLY);
   assert.match(SAFE_CODE_REPLY, /check-in page.*app\.maxelaapartments\.com\/checkin-guest/);
   assert.equal(calls.find((c) => c[0] === 'writeAlert')[1].errorType, 'code_blocked');
+});
+
+test('dropGreetingPrefix: the generic greeting goes when an answer follows it, stays alone', () => {
+  assert.equal(dropGreetingPrefix('Hi, how can I help you? Your booking for 21-24 October is confirmed.'), 'Your booking for 21-24 October is confirmed.');
+  assert.equal(dropGreetingPrefix('Hello, how can I help? Check-in starts at 3pm.'), 'Check-in starts at 3pm.');
+  assert.equal(dropGreetingPrefix('გამარჯობა, რით შემიძლია დაგეხმაროთ? ჯავშანი დადასტურებულია.'), 'ჯავშანი დადასტურებულია.');
+  for (const t of ['Hi, how can I help you?', 'Hi, how can I help you? Thanks', 'Hi Zubair, your booking is confirmed.', 'Your door code is on your check-in page.']) assert.equal(dropGreetingPrefix(t), t, t);
+});
+
+test('deliverReply: a greeting before a real answer is not sent', async () => {
+  const f = fakeDeps();
+  await deliverReply(parseAiReply('Hi, how can I help you? Your Superior Apartment has two rooms in total.'), { name: 'A', guestText: 'two bedrooms?', mode: 'available' }, f.deps);
+  assert.equal(f.calls.find((c) => c[0] === 'sendText')[1], 'Your Superior Apartment has two rooms in total.');
 });

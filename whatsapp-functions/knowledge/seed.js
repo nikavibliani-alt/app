@@ -18,17 +18,24 @@ module.exports = {
         "1 single bed",
         "1 double bed",
         "1 sofa bed"
-      ]
+      ],
+      "layout": {
+        "en": "It has a private bathroom, a double bed, a single bed and a sofa bed, and fits up to 4 guests."
+      }
     },
     "superior": {
-      "description": "Superior Apartment: 1 isolated bedroom with double bed, living room with double bed divided by curtains and 2 sofas, has kitchen, fits up to 6 guests",
+      "description": "Superior Apartment: two rooms in total: a separate bedroom with a double bed, and a second double bed in the living room, divided by curtains (plus 2 sofas), has kitchen, fits up to 6 guests",
       "name": "Superior Apartment",
       "kitchen": true,
       "maxGuests": 6,
       "beds": [
         "bedroom: 1 double bed",
         "living room: 1 double bed (curtain) + 2 sofas"
-      ]
+      ],
+      "layout": {
+        "en": "It has two rooms in total: a separate bedroom with a double bed, and a second double bed in the living room, divided by curtains. It has a kitchen and fits up to 6 guests."
+      },
+      "rooms": 2
     },
     "threeBedroom": {
       "description": "3 Bedroom Apartment: Bedroom 1 has 2 double beds, Bedroom 2 has 1 double bed and 1 baby bed, Bedroom 3 has 1 double bed, living room has 3 sofa beds, 1 separate toilet, 2 bathrooms with showers, has kitchen, fits up to 11 guests plus 1 baby in the baby bed",
@@ -73,7 +80,21 @@ module.exports = {
       "pricePerDay": 15,
       "currency": "GEL",
       "cashOnly": true,
-      "mapsUrl": "https://maps.app.goo.gl/MruPY7q5RB1trNCz9"
+      "mapsUrl": "https://maps.app.goo.gl/MruPY7q5RB1trNCz9",
+      "behindBuilding": {
+        "reply": {
+          "en": "Unfortunately the parking behind the building is for the residents only. We don't have a key for it, and the spaces are very limited, so we can't offer it to guests. The nearest option is the paid parking under Carrefour.",
+          "ka": "სამწუხაროდ, შენობის უკან არსებული პარკინგი მხოლოდ მაცხოვრებლებისთვისაა. გასაღები არ გვაქვს და ადგილები ძალიან შეზღუდულია, ამიტომ სტუმრებს ვერ ვთავაზობთ. ახლოს არის ფასიანი პარკინგი Carrefour-ის ქვეშ."
+        },
+        "insist": {
+          "en": "I understand. There are only about 30 spaces there for around 400 families living in the building, so it isn't possible for us to offer it.",
+          "ka": "გასაგებია, თუმცა იქ დაახლოებით 30 ადგილია 400-მდე ოჯახზე, ამიტომ ვერ ვთავაზობთ."
+        },
+        "residentsOnly": true,
+        "key": false,
+        "spaces": 30,
+        "families": 400
+      }
     },
     "hotWater": {
       "reply": {
@@ -285,9 +306,9 @@ module.exports = {
   },
   "_meta": {
     "status": "draft",
-    "version": "2026-10-17b",
+    "version": "2026-10-18",
     "note": "Seed = the facts that were in SYSTEM_PROMPT on 2026-10-17, word for word. Firestore kb_* docs (when they exist) override these by id. Text fragments used by the bot prompt are kept exactly; structured fields are for other readers (e.g. a Booking.com inbox answerer).",
-    "factDecisions": "Owner decisions 2026-10-17: address and parking links checked (Shartava address = the named 35/37 place, parking = the Carrefour garage, same links as admin settings); 3-bedroom 11 guests + 1 baby; WiFi only from the check-in page data; cleaning prices 30/50/70 confirmed."
+    "factDecisions": "Owner decisions 2026-10-17: address and parking links checked (Shartava address = the named 35/37 place, parking = the Carrefour garage, same links as admin settings); 3-bedroom 11 guests + 1 baby; WiFi only from the check-in page data; cleaning prices 30/50/70 confirmed. 2026-10-18: Superior Apartment described as two rooms in total (owner wording); parking behind the building is residents only (no key, about 30 spaces for about 400 families)."
   },
   "units": {
     "0-1": {

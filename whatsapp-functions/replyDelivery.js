@@ -92,6 +92,20 @@ function stripReasoning(text) {
   return { text: dedup.join(' ').replace(/\s+/g, ' ').trim(), removed: parts.length - kept.length };
 }
 
+// "Hi, how can I help you?" is only for a bare greeting. When the model opens
+// with it and then answers a real question (seen 18 Oct: a guest who asked
+// about two bedrooms), the greeting reads as ignoring the question: dropped.
+const GREETING_PREFIX_RE = /^\s*(?:hi|hello)(?: there)?,? how can i help(?: you)?(?: today)?\?\s+|^\s*გამარჯობა,? რით შემიძლია დაგეხმაროთ\?\s+/i;
+
+/** The reply without a leading generic greeting, when an answer follows it. */
+function dropGreetingPrefix(text) {
+  const t = String(text || '');
+  const m = t.match(GREETING_PREFIX_RE);
+  if (!m) return t;
+  const rest = t.slice(m[0].length).trim();
+  return rest.length >= 15 ? rest : t;
+}
+
 /** Meta Cloud API send response -> { ok, id } or { ok: false, code, reason }. */
 function interpretMetaResponse(data) {
   const id = data?.messages?.[0]?.id;
@@ -185,6 +199,7 @@ async function deliverReply(plan, who, deps) {
       return { outcome: 'empty_reply' };
     }
   }
+  text = dropGreetingPrefix(text);
   // Safety net: never send a door / smart lock code (the bag storage code is the only one allowed).
   if (findForbiddenCode(text)) {
     deps.log.error('deliverReply: reply contained a door/lock code, not sent; sending the check-in page pointer instead');
@@ -237,6 +252,7 @@ async function deliverReply(plan, who, deps) {
 }
 
 module.exports = {
+  dropGreetingPrefix,
   stripReasoning,
   findForbiddenCode,
   SAFE_CODE_REPLY,

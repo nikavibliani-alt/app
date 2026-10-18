@@ -81,4 +81,7 @@ Text fragments used by the bot prompt are kept exactly as they were in the promp
 | New booking not found | Not in our system yet: "new bookings take up to 10 minutes, try again in about 10 minutes". In the system: the couldn't-verify flow. |
 | Unknown location | Never assume Shartava: ask for the name on the booking (or the dates), else escalate. |
 
+| Room type (18 Oct) | Booking.com / Expedia only for new bookings, prices and availability; questions about a stay are answered or escalated. Lead with what the unit has: Superior Apartment = "two rooms in total: a separate bedroom with a double bed, and a second double bed in the living room, divided by curtains. It has a kitchen and fits up to 6 guests." (`unitTypes.superior.layout`). Expected something else: apologize, explain, escalate. Photos of their unit: escalate. |
+| Parking behind the building (18 Oct) | Residents only, no key, about 30 spaces for about 400 families (`policies.parking.behindBuilding`, fixed EN / KA replies for the first and the repeated question). |
+
 The prompt test (`knowledgeBase.test.js`) lists each of these changes word for word; undoing them gives back the original prompt exactly.
