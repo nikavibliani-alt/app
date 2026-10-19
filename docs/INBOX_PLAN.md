@@ -316,3 +316,10 @@ service cloud.firestore {
 - **Heartbeat:** `inboxOutbox` saves `inbox_meta/script_heartbeat` on each pull that does not come from the web app. `inboxScriptWatch` (every minute, new function) pushes "Booking.com Gmail script has stopped" to all phones (both lists, once per phone) after 15 minutes without a call, repeats every 3 hours, and sends "Booking.com Gmail script is back". It is a health alert and is not stopped by the "Booking.com message alerts" switch. Not built, as you asked: the 24 hour no-email alert.
 - **Expected daily trigger time after the fix:** idle minutes about 0.3 to 0.5 s, a full read every 10 minutes, a reply pull every 5 minutes: roughly 15 to 20 minutes a day (mock numbers, check Executions).
 - **Undo:** put the previous `Code.gs` and `appsscript.json` back from tag `inbox-gmail-light-before` (`git show inbox-gmail-light-before:apps-script/booking-inbox/Code.gs`), delete `inboxScriptWatch`, redeploy `inboxOutbox`, or `git revert` the commit.
+
+## Update: the Gmail daily limit (19 Oct) and the Gmail API
+
+Every `processNew` run failed with "Service invoked too many times for one day: gmail" (at the GmailApp search). Cause: the old loop (fixed in step 4c) searched Gmail about 500 times per run all day and used up the daily GmailApp limit; the new script was only the first one to be stopped by it. A rollback to the previous files would fail the same way until the limit resets. Last saved Booking.com email: 16:12 Tbilisi time.
+Fix: `Code.gs` reads and sends mail through the Gmail API (Advanced Gmail service) instead of GmailApp (details in `apps-script/booking-inbox/README.md`). Nothing is lost: the script's cursor did not advance while it failed.
+Note: the "script stopped" alert only notices when the script stops calling the server; it does not notice a script that runs but fails to read Gmail (this case). A check "no new email saved for N hours" would. Not built.
+Undo: `git revert` the commit and paste the previous `Code.gs` (tag `inbox-gmail-api-before`) once the daily limit has reset.

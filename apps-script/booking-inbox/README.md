@@ -55,3 +55,11 @@ Booking.com mail for ingest.
 6. Triggers (clock icon): exactly one trigger, `processNew`, every minute. Open it (three dots, Edit trigger) and set **Failure notification settings** to **Notify me immediately**. Save. (Google then emails the Gmail account when a run fails.)
 7. **Do not** create a new web app deployment. The existing one keeps working with the new code because it runs the latest saved version only if you update the deployment: Deploy, Manage deployments, pencil icon, Version: **New version**, Deploy. The URL stays the same.
 8. Check: Executions should now show `processNew` runs of about 1 second or less, with most minutes finishing almost at once.
+
+## Gmail API instead of GmailApp (step 4d)
+
+- **What happened (19 Oct):** every run failed with "Service invoked too many times for one day: gmail". The earlier loop bug (about 500 Gmail searches per run, all day) had used up the daily limit of the GmailApp service. Putting the old files back would not help: the limit applies to the account for the rest of the day, whatever the code.
+- **Fix:** reading mail and sending replies now use the Gmail API (the Advanced Gmail service, already on) instead of GmailApp. The API has its own, much larger limits. Same behavior: the same ingest payload (message id, thread id, date, from, to, reply-to, subject, text and HTML bodies, kept headers), the same sorting, replies still a plain email with an empty subject to the `@guest.booking.com` address after checking the original email's reply address. Encoded subjects and names are decoded, and big bodies are fetched. Unit-tested with mocks, including the real server sorter on the result.
+- **Catching up:** the script's cursor did not move while it failed, so the first runs after the update read everything missed since then. Emails already saved are skipped by the server.
+- **Replies that failed during this** show "Failed: Service invoked too many times..." in the inbox; tap Try again after the update.
+- **To update:** paste `Code.gs` and `appsscript.json` as in the section above, run `processNew` once from the editor (Run), and check Executions: it should finish without an error. Then Deploy, Manage deployments, pencil, Version "New version", Deploy.

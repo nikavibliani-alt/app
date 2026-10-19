@@ -207,69 +207,147 @@ function save_(props, cursor, recent) {
 
 // ---------------------------------------------------------------- Gmail
 
-/** Booking.com messages dated in [fromMs, toMs), oldest first. Returns null if time ran out. */
+/**
+ * Reading mail uses the Gmail API (the Advanced Gmail service), not GmailApp. GmailApp has a daily
+ * "Service invoked too many times: gmail" limit that the old looping version used up; the API has its own
+ * generous limits, and one call returns the whole message.
+ */
+
+/** Booking.com messages dated in [fromMs, toMs) (Gmail arrival time), oldest first. Returns null if time ran out. */
 function collect_(fromMs, toMs, recent, started) {
   var q = SENDER_QUERY + ' after:' + Math.floor(fromMs / 1000) + ' before:' + (Math.ceil(toMs / 1000) + 1);
+  var refs = [];
+  var pageToken;
+  do {
+    if (Date.now() - started > TIME_BUDGET_MS) return null;
+    var res = Gmail.Users.Messages.list('me', { q: q, maxResults: 100, pageToken: pageToken });
+    (res.messages || []).forEach(function (m) { refs.push(m.id); });
+    pageToken = res.nextPageToken;
+  } while (pageToken);
+
   var seen = {};
   var out = [];
-  var start = 0;
-  while (true) {
+  for (var i = 0; i < refs.length; i++) {
+    var id = refs[i];
+    if (seen[id] || recent.indexOf(id) !== -1) continue;
     if (Date.now() - started > TIME_BUDGET_MS) return null;
-    var threads = GmailApp.search(q, start, 100);
-    if (!threads.length) break;
-    for (var t = 0; t < threads.length; t++) {
-      var messages = threads[t].getMessages();
-      for (var k = 0; k < messages.length; k++) {
-        var msg = messages[k];
-        var id = msg.getId();
-        var time = msg.getDate().getTime();
-        if (seen[id] || time < fromMs || time >= toMs) continue;
-        if (recent.indexOf(id) !== -1) continue;
-        if (!SENDER_RE.test(msg.getFrom())) continue;
-        seen[id] = true;
-        out.push({ id: id, time: time, msg: msg });
-      }
-    }
-    if (threads.length < 100) break;
-    start += 100;
+    var msg = Gmail.Users.Messages.get('me', id, { format: 'full' });
+    var time = Number(msg.internalDate);
+    if (!(time >= fromMs && time < toMs)) continue;
+    if (!SENDER_RE.test(mimeWords_(apiHeaders_(msg)['from'] || ''))) continue;
+    seen[id] = true;
+    out.push({ id: id, time: time, msg: msg });
   }
   out.sort(function (a, b) { return a.time - b.time; });
   return out;
 }
 
+/** Header name (lower case) -> first value, from a Gmail API message. */
+function apiHeaders_(msg) {
+  var h = {};
+  ((msg.payload && msg.payload.headers) || []).forEach(function (x) {
+    var n = String(x.name).toLowerCase();
+    if (!(n in h)) h[n] = x.value;
+  });
+  return h;
+}
+
+/** RFC 2047 encoded words in a header ("=?UTF-8?B?...?=") as plain text. */
+function mimeWords_(s) {
+  s = String(s || '');
+  if (s.indexOf('=?') === -1) return s;
+  s = s.replace(/(\?=)\s+(=\?)/g, '$1$2');
+  return s.replace(/=\?([^?]+)\?([bBqQ])\?([^?]*)\?=/g, function (m, cs, enc, txt) {
+    try {
+      var bytes;
+      if (enc.toUpperCase() === 'B') {
+        bytes = Utilities.base64Decode(txt);
+      } else {
+        var t = txt.replace(/_/g, ' ');
+        bytes = [];
+        for (var i = 0; i < t.length; i++) {
+          var c = t.charAt(i);
+          if (c === '=' && /^[0-9a-fA-F]{2}$/.test(t.substr(i + 1, 2))) { bytes.push(parseInt(t.substr(i + 1, 2), 16)); i += 2; }
+          else bytes.push(t.charCodeAt(i));
+        }
+        bytes = bytes.map(function (b) { return b > 127 ? b - 256 : b; });
+      }
+      return Utilities.newBlob(bytes).getDataAsString(cs);
+    } catch (e) {
+      return m;
+    }
+  });
+}
+
+function padB64_(d) {
+  var s = String(d || '').replace(/\s+/g, '');
+  while (s.length % 4) s += '=';
+  return s;
+}
+
+function charsetOf_(part) {
+  var ct = '';
+  (part.headers || []).forEach(function (x) { if (String(x.name).toLowerCase() === 'content-type') ct = x.value; });
+  var m = String(ct).match(/charset\s*=\s*"?([^";\s]+)/i);
+  return m ? m[1] : 'UTF-8';
+}
+
+/** The text of one body part (inline data, or fetched when Gmail stores a big part as an attachment). */
+function partText_(msgId, part) {
+  var data = part.body && part.body.data;
+  if (!data && part.body && part.body.attachmentId) {
+    data = Gmail.Users.Messages.Attachments.get('me', msgId, part.body.attachmentId).data;
+  }
+  if (!data) return undefined;
+  var bytes = Utilities.base64DecodeWebSafe(padB64_(data));
+  try { return Utilities.newBlob(bytes).getDataAsString(charsetOf_(part)); }
+  catch (e) { return Utilities.newBlob(bytes).getDataAsString('UTF-8'); }
+}
+
+/** First text/plain and first text/html part (not attachments), looking through nested multiparts. */
+function bodies_(msgId, part, out) {
+  if (!part) return out;
+  if (part.parts && part.parts.length) { part.parts.forEach(function (p) { bodies_(msgId, p, out); }); return out; }
+  if (part.filename) return out;
+  var mime = String(part.mimeType || '').toLowerCase();
+  if (mime === 'text/plain' && out.text === undefined) out.text = partText_(msgId, part);
+  else if (mime === 'text/html' && out.html === undefined) out.html = partText_(msgId, part);
+  return out;
+}
+
+function htmlToText_(html) {
+  return String(html || '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' ').replace(/[ \t]+/g, ' ').replace(/\n\s+/g, '\n').trim();
+}
+
 function toPayload_(msg) {
+  var h = apiHeaders_(msg);
+  var b = bodies_(msg.id, msg.payload, {});
+  var date = new Date(h['date'] || '');
+  if (isNaN(date.getTime())) date = new Date(Number(msg.internalDate));
+  var from = mimeWords_(h['from'] || '');
   return {
-    gmailMessageId: msg.getId(),
-    gmailThreadId: msg.getThread().getId(),
-    date: msg.getDate().toISOString(),
-    from: msg.getFrom(),
-    to: msg.getTo(),
-    replyTo: msg.getReplyTo(),
-    subject: msg.getSubject(),
-    bodyText: msg.getPlainBody().slice(0, MAX_TEXT),
-    bodyHtml: msg.getBody().slice(0, MAX_HTML),
-    headers: headers_(msg)
+    gmailMessageId: msg.id,
+    gmailThreadId: msg.threadId,
+    date: date.toISOString(),
+    from: from,
+    to: mimeWords_(h['to'] || ''),
+    replyTo: mimeWords_(h['reply-to'] || h['from'] || ''),
+    subject: mimeWords_(h['subject'] || ''),
+    bodyText: String(b.text !== undefined ? b.text : htmlToText_(b.html)).slice(0, MAX_TEXT),
+    bodyHtml: String(b.html || '').slice(0, MAX_HTML),
+    headers: keptHeaders_(msg)
   };
 }
 
-/** The few headers we care about, read from the top of the raw message. */
-function headers_(msg) {
+/** The few headers we care about (raw, as in the message). */
+function keptHeaders_(msg) {
   var out = {};
-  try {
-    var raw = msg.getRawContent();
-    var end = raw.search(/\r?\n\r?\n/);
-    var head = (end === -1 ? raw : raw.slice(0, end)).replace(/\r?\n[ \t]+/g, ' ');
-    head.split(/\r?\n/).forEach(function (line) {
-      var i = line.indexOf(':');
-      if (i < 1) return;
-      var name = line.slice(0, i).trim().toLowerCase();
-      if (KEEP_HEADERS.indexOf(name) !== -1 || name.indexOf('x-booking') === 0) {
-        out[name] = line.slice(i + 1).trim().slice(0, 1000);
-      }
-    });
-  } catch (e) {
-    Logger.log('Could not read headers for one message: ' + e.message);
-  }
+  ((msg.payload && msg.payload.headers) || []).forEach(function (x) {
+    var name = String(x.name).toLowerCase();
+    if ((KEEP_HEADERS.indexOf(name) !== -1 || name.indexOf('x-booking') === 0) && !(name in out)) {
+      out[name] = String(x.value).slice(0, 1000);
+    }
+  });
   return out;
 }
 
@@ -347,9 +425,9 @@ function sendOne_(item) {
     var expected = addr_(item.expectedTo);
     if (!GUEST_ADDRESS_RE.test(expected)) return { ok: false, error: 'Not a Booking.com guest address.' };
 
-    var msg = GmailApp.getMessageById(item.gmailMessageId);
-    if (!msg) return { ok: false, error: 'The guest email was not found in Gmail.' };
-    if (addr_(msg.getReplyTo() || msg.getFrom()) !== expected) return { ok: false, error: 'The guest email has a different reply address.' };
+    var meta = Gmail.Users.Messages.get('me', item.gmailMessageId, { format: 'metadata', metadataHeaders: ['Reply-To', 'From'] });
+    var mh = apiHeaders_(meta);
+    if (addr_(mimeWords_(mh['reply-to'] || mh['from'] || '')) !== expected) return { ok: false, error: 'The guest email has a different reply address.' };
 
     // Booking.com shows the subject inside the guest chat, so the reply has an empty subject.
     // GmailMessage.reply always adds "Re: <subject>", so this is a new plain email to the guest address.
@@ -361,16 +439,12 @@ function sendOne_(item) {
   }
 }
 
-/** Plain text, empty subject, no signature, no quoted text. A single space if Gmail refuses an empty subject. */
+/** Plain text, empty subject, no signature, no quoted text. Sent through the Gmail API (not GmailApp). */
 function sendPlain_(to, text) {
-  try {
-    GmailApp.sendEmail(to, '', text);
-    return 'an empty';
-  } catch (e) {
-    if (!/subject|invalid argument/i.test(String(e && e.message))) throw e;   // not a subject problem: do not retry
-  }
-  GmailApp.sendEmail(to, ' ', text);
-  return 'a one-space';
+  var body = Utilities.base64Encode(text, Utilities.Charset.UTF_8).replace(/(.{76})/g, '$1\r\n');
+  var mime = ['To: ' + to, 'Subject: ', 'MIME-Version: 1.0', 'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', body].join('\r\n');
+  Gmail.Users.Messages.send({ raw: Utilities.base64EncodeWebSafe(mime, Utilities.Charset.UTF_8) }, 'me');
+  return 'an empty';
 }
 
 function outbox_(url, key, payload, attempts) {
