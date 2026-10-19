@@ -1,13 +1,16 @@
 /**
- * Maxela Booking.com inbox, step 1: collect emails.
+ * Maxela Booking.com inbox, steps 1 and 4: collect emails, send replies.
  *
- * Runs inside the Gmail account that receives Booking.com emails. Every minute it sends new
- * Booking.com emails to the Cloud Function inboxEmailIngest, which saves them in Firestore.
- * It only reads Gmail. Nothing is sent, labelled, moved or deleted.
+ * Runs inside the Gmail account that receives Booking.com emails. Every minute it
+ *   1. asks the Cloud Function inboxOutbox for replies I wrote in the inbox screen and sends each
+ *      one as a plain-text reply to the guest's Booking.com email (step 4), then
+ *   2. sends new Booking.com emails to the Cloud Function inboxEmailIngest, which saves them in
+ *      Firestore (step 1). Nothing is labelled, moved or deleted.
  *
  * Script Properties (Project Settings > Script Properties), never written in this file:
  *   INGEST_URL  the inboxEmailIngest function URL
- *   INGEST_KEY  the same value as the Firebase secret INBOX_INGEST_KEY
+ *   INGEST_KEY  the same value as the Firebase secret INBOX_INGEST_KEY (also used for inboxOutbox)
+ *   OUTBOX_URL  optional: the inboxOutbox function URL, if it ever changes (default below)
  *
  * Run once: setup() (creates the 1-minute trigger), then backfill() (starts the last 30 days).
  *
@@ -25,6 +28,12 @@ var TIME_BUDGET_MS = 4.5 * 60 * 1000;     // Apps Script stops at 6 minutes; sto
 var MAX_RECENT_IDS = 100;
 var MAX_HTML = 150000;
 var MAX_TEXT = 150000;
+
+// Step 4: sending replies.
+var OUTBOX_URL_DEFAULT = 'https://europe-west1-sleepy-5c962.cloudfunctions.net/inboxOutbox';
+var GUEST_ADDRESS_RE = /^[^\s<>@]+@guest\.booking\.com$/i;
+var MAX_REPLY_CHARS = 2000;
+var MAX_ATTEMPTED_IDS = 200;
 
 var SENDER_QUERY = '(from:booking.com OR from:mchat.booking.com OR from:guest.booking.com)';
 var SENDER_RE = /@([a-z0-9-]+\.)*booking\.com>?\s*$/i;
@@ -74,6 +83,7 @@ function processNew() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) { Logger.log('Another run is still going.'); return; }
   try {
+    try { sendReplies_(); } catch (e) { Logger.log('Replies step failed: ' + e.message); }   // replies first: they are time sensitive
     run_();
   } finally {
     lock.releaseLock();
@@ -211,6 +221,95 @@ function post_(url, key, payload) {
       last = e.message;
     }
     Utilities.sleep(1500);
+  }
+  return { ok: false, error: last };
+}
+
+
+// ---------------------------------------------------------------- replies (step 4)
+
+/**
+ * Asks the server for waiting replies and sends each one. The server marks a reply "sending"
+ * before handing it out, so it is never handed out twice. If a report never reaches the server
+ * the reply shows as "unknown, check in Booking.com" after 10 minutes. It is never resent.
+ */
+function sendReplies_() {
+  var props = PropertiesService.getScriptProperties();
+  var key = props.getProperty('INGEST_KEY');
+  var url = props.getProperty('OUTBOX_URL') || OUTBOX_URL_DEFAULT;
+  if (!key) return;
+
+  var pulled = outbox_(url, key, { action: 'pull' });
+  if (!pulled.ok) { Logger.log('Could not ask for replies: ' + pulled.error); return; }
+  var items = (pulled.body && pulled.body.items) || [];
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var attempted = JSON.parse(props.getProperty('ATTEMPTED_IDS') || '[]');
+    if (attempted.indexOf(item.id) !== -1) {
+      Logger.log('Skipped a reply that was already tried once (it will show as unknown): ' + item.id);
+      continue;                                       // never try the same reply twice
+    }
+    attempted.push(item.id);
+    if (attempted.length > MAX_ATTEMPTED_IDS) attempted.shift();
+    props.setProperty('ATTEMPTED_IDS', JSON.stringify(attempted));   // saved before sending
+
+    var result = sendOne_(item);
+    var rep = { action: 'report', id: item.id, result: result.ok ? 'sent' : 'failed', reason: result.ok ? '' : result.error };
+    var reported = outbox_(url, key, rep, 3);
+    Logger.log((result.ok ? 'Sent' : 'Failed (' + result.error + ')') + ': ' + item.id + (reported.ok ? '' : ' (report not delivered: ' + reported.error + ')'));
+  }
+}
+
+function addr_(s) {
+  var m = String(s || '').match(/<([^>]+)>/);
+  return (m ? m[1] : String(s || '')).trim().toLowerCase();
+}
+
+/** Sends one reply as plain text. Returns { ok: true } or { ok: false, error }. */
+function sendOne_(item) {
+  try {
+    var text = String(item.text || '');
+    if (!text.trim()) return { ok: false, error: 'Empty message.' };
+    if (text.length > MAX_REPLY_CHARS) return { ok: false, error: 'Message too long.' };
+    var expected = addr_(item.expectedTo);
+    if (!GUEST_ADDRESS_RE.test(expected)) return { ok: false, error: 'Not a Booking.com guest address.' };
+
+    var msg = GmailApp.getMessageById(item.gmailMessageId);
+    if (!msg) return { ok: false, error: 'The guest email was not found in Gmail.' };
+    if (addr_(msg.getReplyTo() || msg.getFrom()) !== expected) return { ok: false, error: 'The guest email has a different reply address.' };
+
+    // Reply to the newest email of the guest in that Gmail thread.
+    var target = msg;
+    var all = msg.getThread().getMessages();
+    for (var i = all.length - 1; i >= 0; i--) {
+      if (addr_(all[i].getReplyTo() || all[i].getFrom()) === expected) { target = all[i]; break; }
+    }
+    target.reply(text);                               // plain text only: no HTML, no signature
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: 'Gmail error: ' + String(e && e.message || e).slice(0, 200) };
+  }
+}
+
+function outbox_(url, key, payload, attempts) {
+  var last = 'no answer';
+  for (var attempt = 0; attempt < (attempts || 1); attempt++) {
+    try {
+      var res = UrlFetchApp.fetch(url, {
+        method: 'post',
+        contentType: 'application/json',
+        headers: { Authorization: 'Bearer ' + key },
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+      var code = res.getResponseCode();
+      if (code === 200) return { ok: true, body: JSON.parse(res.getContentText() || '{}') };
+      last = 'server answered ' + code;
+      if (code === 401 || code === 400 || code === 404) break;
+    } catch (e) {
+      last = e.message;
+    }
+    if (attempt + 1 < (attempts || 1)) Utilities.sleep(1500);
   }
   return { ok: false, error: last };
 }

@@ -110,3 +110,23 @@ service cloud.firestore {
   }
 }
 ```
+
+## Step 4 details (reply from the inbox)
+
+- `inboxSendReply` (callable, owner only: Firebase Auth nikavibliani@gmail.com, email verified):
+  saves the reply as a host message in the conversation (status `waiting`) and as an item in
+  `inbox_outbox` (server-only). Sets `needsReply=false`, `done=true`. Plain text, max 2000 chars.
+  A client id per click makes a double tap create one item.
+- `inboxOutbox` (HTTPS, `Authorization: Bearer <INBOX_INGEST_KEY>`): the Gmail script calls
+  `{action:'pull'}` for waiting replies (each is marked `sending` first, so it is never handed out
+  twice) and `{action:'report', id, result:'sent'|'failed', reason}`.
+  `sending` for more than 10 minutes with no report becomes `unknown`, and is never resent.
+  `failed` and `unknown` put the conversation back on Needs reply.
+- `inboxCheckinLink` (callable, owner only): the Extranet page of a check-in time request, built
+  from the saved raw email. No Accept/Reject option in the link.
+- Statuses: waiting, sending, sent, failed, unknown. "Try again" in the screen makes a new item.
+- The screen warns (never blocks) about links other than app.maxelaapartments.com, email
+  addresses, phone numbers, and anything that looks like a door code or WiFi password
+  (`shared/inbox-reply-warnings.js`).
+- Deploy: `firebase deploy --only functions:pipeline:inboxSendReply,functions:pipeline:inboxOutbox,functions:pipeline:inboxCheckinLink --project sleepy-5c962`.
+- Gmail script: see `apps-script/booking-inbox/README.md`. Firestore rules are unchanged.

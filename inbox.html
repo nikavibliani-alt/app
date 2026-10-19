@@ -74,6 +74,26 @@ svg{display:block;flex:none}
 .bubble__time{font-size:11px;color:var(--text-muted);margin-top:4px}
 .note{align-self:center;text-align:center;font-size:12px;color:var(--text-muted);background:transparent;padding:2px 8px}
 .msg{color:var(--text-muted);padding:14px 16px;font-size:14px}
+.thread{padding-bottom:8px}
+.me{align-self:flex-end;max-width:86%;display:flex;flex-direction:column;align-items:flex-end}
+.bubble--me{align-self:flex-end;background:var(--ink);color:#ffffff;border-radius:16px 16px 4px 16px;padding:9px 12px;
+  white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;max-width:100%}
+.me__status{font-size:12px;color:var(--text-muted);margin-top:3px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.me__status--bad{color:var(--status-red);font-weight:600}
+.me__status--wait{color:var(--status-amber);font-weight:600}
+.me__status--ok{color:var(--status-green);font-weight:600}
+.mini{min-height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--ink);background:var(--card-bg);color:var(--ink);font-weight:700;font-size:13px}
+.reply{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--border);
+  padding:8px 16px calc(8px + env(safe-area-inset-bottom));z-index:4}
+.reply__row{display:flex;gap:8px;align-items:flex-end}
+.reply textarea{flex:1;min-width:0;font:inherit;font-size:16px;line-height:1.35;color:var(--ink);background:var(--card-bg);
+  border:1px solid var(--border);border-radius:12px;padding:10px 12px;resize:none;max-height:40vh;min-height:44px;-webkit-appearance:none;appearance:none}
+.reply .btn{min-height:44px}
+.reply__err{color:var(--status-red);font-size:13px;margin:0 0 6px}
+.reply__count{font-size:11px;color:var(--text-muted);text-align:right;margin-top:2px}
+.wbox{background:var(--bg-amber);color:var(--status-amber);border:1px solid #ecd98b;border-radius:10px;padding:8px 10px;font-size:13px;margin-bottom:8px}
+.wbox ul{margin:4px 0 8px 18px}
+.wbox__btns{display:flex;gap:8px}
 .err{margin:16px;padding:12px;border-radius:10px;background:var(--bg-red);color:var(--status-red);font-size:14px}
 .rv{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-card);padding:12px 14px}
 .rv__reason{font-weight:700}
@@ -90,7 +110,9 @@ svg{display:block;flex:none}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, updateDoc, collection, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { requireOwner } from "./shared/owner-auth.js";
+import { replyWarnings } from "./shared/inbox-reply-warnings.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
@@ -102,6 +124,9 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const fns = getFunctions(app, "europe-west1");
+const sendReplyFn = httpsCallable(fns, "inboxSendReply");
+const checkinLinkFn = httpsCallable(fns, "inboxCheckinLink");
 const auth = getAuth(app);
 
 const TZ = "Asia/Tbilisi";
@@ -243,6 +268,11 @@ function rowHtml(c) {
 
 function stopMsgs() { if (msgUnsub) { msgUnsub(); msgUnsub = null; } msgsFor = null; msgs = []; }
 
+const MAX_REPLY = 2000;
+const drafts = {};              // bookingNumber -> unsent text, kept while you move around
+const checkinLinks = {};        // bookingNumber -> url | false (false: asked, none found)
+const newId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2, 12));
+
 function renderConv(id) {
   const c = convs.find(x => x.id === id);
   if (msgsFor !== id) {
@@ -255,32 +285,58 @@ function renderConv(id) {
   $("top").innerHTML = `<div class="top__row"><button class="iconbtn" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
     <div class="top__title">${esc(c ? c.guestName || "Guest" : "Conversation")}</div></div>`;
   $("backBtn").onclick = () => go("");
-  if (!c) { $("main").innerHTML = loaded.convs ? `<div class="empty">This conversation was not found.</div>` : `<div class="msg">Loading...</div>`; return; }
+  if (!c) { $("main").dataset.conv = ""; $("main").innerHTML = loaded.convs ? `<div class="empty">This conversation was not found.</div>` : `<div class="msg">Loading...</div>`; return; }
 
+  // The page is built once per conversation, so a live update never wipes what you are typing.
+  if ($("main").dataset.conv !== id) {
+    $("main").dataset.conv = id;
+    $("main").innerHTML = `<div id="convTop"></div><div class="thread" id="thread"></div><div id="replyBar"></div>`;
+    buildReplyBar(id, c);
+  }
+  drawConvTop(c);
+  const canReply = /@guest\.booking\.com$/i.test(c.replyTo || "");
+  $("replyBar").style.display = canReply ? "" : "none";
+  if (c.checkinRequest && checkinLinks[id] === undefined) {
+    checkinLinks[id] = false;
+    checkinLinkFn({ bookingNumber: id }).then(r => { checkinLinks[id] = (r.data && r.data.url) || false; if (msgsFor === id) drawThread(); }).catch(() => {});
+  }
+  drawThread();
+}
+
+function drawConvTop(c) {
+  const id = c.id;
   const url = extranetUrl(c);
   const tags = ['<span class="tag">Booking.com</span>'];
   if (isCancelled(c)) tags.push('<span class="tag tag--red">Cancelled</span>');
   if (c.done) tags.push('<span class="tag tag--green">Done</span>');
-  $("main").innerHTML = `
+  $("convTop").innerHTML = `
     <div class="head">
       <div class="head__name">${esc(c.guestName || "Guest")}</div>
       <div class="head__line">${esc(propLine(c))}</div>
-      <div class="head__line">${esc(stayText(c))}${c.bookingNumber ? ` · Booking ${esc(c.bookingNumber)}` : ""}</div>
+      <div class="head__line">${esc(stayText(c))}${c.bookingNumber ? ` \u00b7 Booking ${esc(c.bookingNumber)}` : ""}</div>
       <div class="tags">${tags.join("")}</div>
       ${cancelWarning(c)}
     </div>
     <div class="actions">
       <button class="btn ${c.done ? "" : "btn--primary"}" id="doneBtn" type="button">${c.done ? icon("undo") + "Not done" : icon("check") + "Done"}</button>
       ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">${icon("out")}Open in Booking.com</a>` : ""}
-    </div>
-    <div class="thread" id="thread"></div>`;
+    </div>`;
   $("doneBtn").onclick = async e => {
     const b = e.currentTarget; b.disabled = true;
     try {
       await updateDoc(doc(db, "inbox_conversations", id), c.done ? { done: false, doneAt: null } : { done: true, doneAt: serverTimestamp() });
     } catch (err) { alert("Could not save (" + (err.code || err.message) + ")."); b.disabled = false; }
   };
-  drawThread();
+}
+
+function statusHtml(m, laterSame) {
+  const st = m.status || "waiting";
+  if (st === "sent") return `<span class="me__status--ok">Sent</span>`;
+  if (st === "sending") return `<span class="me__status--wait">Sending</span>`;
+  if (st === "failed") return `<span class="me__status--bad">Failed${m.failReason ? ": " + esc(m.failReason) : ""}</span>` +
+    (laterSame ? "" : `<button class="mini" type="button" data-retry="${esc(m.id)}">Try again</button>`);
+  if (st === "unknown") return `<span class="me__status--bad">Unknown, check in Booking.com</span>`;
+  return `<span class="me__status--wait">Waiting</span>`;
 }
 
 function drawThread() {
@@ -288,14 +344,82 @@ function drawThread() {
   const c = convs.find(x => x.id === msgsFor);
   const out = [];
   let lastDay = "";
-  for (const m of msgs) {
+  msgs.forEach((m, i) => {
     const d = toDate(m.sentAt);
     if (d && dayKey(d) !== lastDay) { lastDay = dayKey(d); out.push(`<div class="day">${esc(fmtDay(d))}</div>`); }
-    out.push(`<div class="bubble">${esc(m.text)}<div class="bubble__time">${d ? esc(fmtClock(d)) : ""}</div></div>`);
-  }
+    const time = d ? esc(fmtClock(d)) : "";
+    if (m.direction === "host") {
+      const laterSame = msgs.slice(i + 1).some(x => x.direction === "host" && x.text === m.text && x.status !== "failed");
+      out.push(`<div class="me"><div class="bubble--me">${esc(m.text)}</div>
+        <div class="me__status">${time}${time ? " \u00b7 " : ""}${statusHtml(m, laterSame)}</div></div>`);
+    } else {
+      out.push(`<div class="bubble">${esc(m.text)}<div class="bubble__time">${time}</div></div>`);
+    }
+  });
   const line = c ? checkinLine(c) : "";
-  if (line) out.push(`<div class="note">${line}</div>`);
+  if (line) {
+    const link = checkinLinks[msgsFor];
+    out.push(`<div class="note">${line}${link ? ` <a class="linkbtn" href="${esc(link)}" target="_blank" rel="noopener">Answer in Booking.com</a>` : ""}</div>`);
+  }
   el.innerHTML = out.length ? out.join("") : `<div class="msg">No chat messages yet.</div>`;
+  el.querySelectorAll("[data-retry]").forEach(b => b.onclick = () => {
+    const m = msgs.find(x => x.id === b.dataset.retry);
+    if (m) { b.disabled = true; doSend(msgsFor, m.text, true); }
+  });
+  // Like a chat: show the newest message when the conversation opens and when a new one arrives.
+  const first = el.dataset.drawn !== msgsFor;
+  const grew = msgs.length > Number(el.dataset.count || 0);
+  el.dataset.drawn = msgsFor; el.dataset.count = String(msgs.length);
+  if (msgs.length && (first || grew)) window.scrollTo(0, document.body.scrollHeight);
+}
+
+function buildReplyBar(id, c) {
+  const bar = $("replyBar");
+  bar.className = "reply";
+  bar.innerHTML = `<div id="replyWarn"></div><div class="reply__err" id="replyErr" hidden></div>
+    <div class="reply__row"><textarea id="replyText" rows="1" maxlength="${MAX_REPLY + 200}" placeholder="Write a reply to the guest" aria-label="Reply to the guest"></textarea>
+    <button class="btn btn--primary" id="sendBtn" type="button">Send</button></div>
+    <div class="reply__count" id="replyCount"></div>`;
+  const ta = $("replyText");
+  ta.value = drafts[id] || "";
+  const fit = () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, window.innerHeight * 0.4) + "px"; };
+  const count = () => { const n = ta.value.length; $("replyCount").textContent = n > MAX_REPLY * 0.8 ? `${n} / ${MAX_REPLY}` : ""; };
+  ta.oninput = () => { drafts[id] = ta.value; $("replyWarn").innerHTML = ""; $("replyErr").hidden = true; fit(); count(); };
+  fit(); count();
+  $("sendBtn").onclick = () => trySend(id);
+}
+
+function trySend(id, force) {
+  const ta = $("replyText");
+  const text = ta.value.trim();
+  const err = $("replyErr");
+  err.hidden = true;
+  if (!text) return;
+  if (text.length > MAX_REPLY) { err.textContent = `The message is too long (${text.length} of ${MAX_REPLY} characters).`; err.hidden = false; return; }
+  const w = force ? [] : replyWarnings(text);
+  if (w.length) {
+    $("replyWarn").innerHTML = `<div class="wbox"><strong>Check before sending</strong><ul>${w.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+      <div class="wbox__btns"><button class="btn btn--primary" id="warnSend" type="button">Send anyway</button><button class="btn" id="warnEdit" type="button">Edit</button></div></div>`;
+    $("warnSend").onclick = () => { $("replyWarn").innerHTML = ""; trySend(id, true); };
+    $("warnEdit").onclick = () => { $("replyWarn").innerHTML = ""; ta.focus(); };
+    return;
+  }
+  $("replyWarn").innerHTML = "";
+  doSend(id, text, false);
+}
+
+async function doSend(id, text, isRetry) {
+  const btn = $("sendBtn"), err = $("replyErr"), ta = $("replyText");
+  if (btn) btn.disabled = true;
+  if (err) err.hidden = true;
+  try {
+    await sendReplyFn({ bookingNumber: id, text, clientId: newId() });
+    if (!isRetry && ta && msgsFor === id) { ta.value = ""; drafts[id] = ""; ta.style.height = "auto"; $("replyCount").textContent = ""; }
+  } catch (e) {
+    const m = (e && e.message) || "Could not send.";
+    if (err) { err.textContent = "Not sent: " + m; err.hidden = false; } else alert("Not sent: " + m);
+  }
+  if (btn) btn.disabled = false;
 }
 
 function renderReview() {

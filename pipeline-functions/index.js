@@ -51,3 +51,5 @@ const { registerCloudFunction: registerInboxEmailIngest } = require('./controlle
 exports.inboxEmailIngest = registerInboxEmailIngest();
 const { registerCloudFunction: registerInboxSort } = require('./controllers/inboxSort');
 exports.inboxSort = registerInboxSort();
+const { registerCloudFunctions: registerInboxReply } = require('./controllers/inboxReply');
+Object.assign(exports, registerInboxReply());   // inboxSendReply, inboxCheckinLink, inboxOutbox
