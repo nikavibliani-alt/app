@@ -307,3 +307,12 @@ service cloud.firestore {
 
 - **Until the rules are published, Nutsa gets "permission-denied" in the inbox** (the functions already accept her). Nika is not affected either way.
 - **Undo:** put the old rules back (the owner-only version is in the section "Step 3" above), `git revert` the commit, redeploy the four callables, or restore from tag `inbox-access-before`.
+
+## Update: a lighter Gmail script and the "script stopped" alert
+
+- **Found while checking the run time:** the script's loop never ended by itself. It kept searching Gmail until its 4.5 minute time budget ran out (about 500 searches per run in a simulation). That is what made the server see the script only every 5 minutes, and it would have used far more than the 90 minutes of trigger time a free Gmail account gets per day. Fixed: the loop stops once it has looked at everything up to one minute ago.
+- **Idle gate:** each minute the script compares the mailbox history id (Advanced Gmail service) with the last complete check; unchanged means do nothing, with a full read at least every 10 minutes. No Gmail service or an error means a full check every run (as before). An incomplete run never records the id, so the next minute tries again.
+- **Backup reply pull** about every 5th minute (time based, so it also works if the trigger interval changes).
+- **Heartbeat:** `inboxOutbox` saves `inbox_meta/script_heartbeat` on each pull that does not come from the web app. `inboxScriptWatch` (every minute, new function) pushes "Booking.com Gmail script has stopped" to all phones (both lists, once per phone) after 15 minutes without a call, repeats every 3 hours, and sends "Booking.com Gmail script is back". It is a health alert and is not stopped by the "Booking.com message alerts" switch. Not built, as you asked: the 24 hour no-email alert.
+- **Expected daily trigger time after the fix:** idle minutes about 0.3 to 0.5 s, a full read every 10 minutes, a reply pull every 5 minutes: roughly 15 to 20 minutes a day (mock numbers, check Executions).
+- **Undo:** put the previous `Code.gs` and `appsscript.json` back from tag `inbox-gmail-light-before` (`git show inbox-gmail-light-before:apps-script/booking-inbox/Code.gs`), delete `inboxScriptWatch`, redeploy `inboxOutbox`, or `git revert` the commit.

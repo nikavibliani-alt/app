@@ -168,8 +168,19 @@ async function claim(id, deps) {
   });
 }
 
-async function pull(deps) {
+/** The script is alive: remember when it last called (read by inboxScriptWatch). A call from the web app does not count. */
+async function noteHeartbeat(deps, source) {
+  if (source === 'webapp') return;
+  try {
+    await deps.db.collection('inbox_meta').doc('script_heartbeat').set({ lastPullAt: deps.now(), source: String(source || 'trigger').slice(0, 20) }, { merge: true });
+  } catch (e) {
+    console.warn('inboxOutbox: heartbeat not saved', e && e.message);
+  }
+}
+
+async function pull(deps, source) {
   const { db } = deps;
+  await noteHeartbeat(deps, source);
   const stuck = await db.collection(OUTBOX).where('status', '==', 'sending').limit(20).get();
   let unknown = 0;
   for (const s of stuck.docs) if (await markUnknown(s.id, deps)) unknown++;
@@ -251,7 +262,7 @@ async function handleOutbox(req, res, deps) {
   if (!expected || !given || !safeEqual(given, expected)) return res.status(401).json({ ok: false, error: 'unauthorized' });
   const b = req.body && typeof req.body === 'object' ? req.body : {};
   try {
-    if (b.action === 'pull') return res.status(200).json(await pull(deps));
+    if (b.action === 'pull') return res.status(200).json(await pull(deps, b.source));
     if (b.action === 'report') return res.status(200).json(await report(b, deps));
     return res.status(400).json({ ok: false, error: 'bad action' });
   } catch (e) {
@@ -296,6 +307,6 @@ function registerCloudFunctions() {
 }
 
 module.exports = {
-  sendReply, pokeWebApp, checkinLink, pull, report, handleOutbox, markUnknown, registerCloudFunctions, Fail,
+  sendReply, pokeWebApp, noteHeartbeat, checkinLink, pull, report, handleOutbox, markUnknown, registerCloudFunctions, Fail,
   CONVERSATIONS, OUTBOX,
 };

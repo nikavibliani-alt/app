@@ -1,7 +1,9 @@
 /**
  * Maxela Booking.com inbox, steps 1 and 4: collect emails, send replies.
  *
- * Runs inside the Gmail account that receives Booking.com emails. Every minute it
+ * Runs inside the Gmail account that receives Booking.com emails. The trigger runs every minute, but an
+ * idle minute is cheap: the mailbox history id is compared first and the mail is only read when it changed
+ * (at least every 10 minutes anyway), and the backup check for waiting replies runs about every 5th minute.
  *   1. asks the Cloud Function inboxOutbox for replies I wrote in the inbox screen and sends each
  *      one as a plain-text email with an empty subject to the guest's Booking.com address (step 4).
  *      The same thing also runs at once when the web app (doPost) is poked after I tap Send, then
@@ -32,6 +34,9 @@ var MAX_TEXT = 150000;
 
 // Step 4: sending replies.
 var OUTBOX_URL_DEFAULT = 'https://europe-west1-sleepy-5c962.cloudfunctions.net/inboxOutbox';
+// Keeping the daily run time low (a free Gmail account gets about 90 minutes of trigger time a day).
+var PULL_EVERY_MS = 4.5 * 60 * 1000;      // backup check for waiting replies about every 5th minute (instant sending goes through doPost)
+var FULL_CHECK_EVERY_MS = 10 * 60 * 1000; // read the mail even if the mailbox looks unchanged, at least this often (safety net)
 var GUEST_ADDRESS_RE = /^[^\s<>@]+@guest\.booking\.com$/i;
 var MAX_REPLY_CHARS = 2000;
 var MAX_ATTEMPTED_IDS = 200;
@@ -81,11 +86,44 @@ function status() {
 // ---------------------------------------------------------------- trigger
 
 function processNew() {
-  // Replies first (time sensitive), each part under the script lock so two runs never overlap.
-  withLock_(5000, function () {
-    try { sendReplies_(); } catch (e) { Logger.log('Replies step failed: ' + e.message); }
-  });
-  withLock_(5000, run_);
+  var props = PropertiesService.getScriptProperties();
+  var now = Date.now();
+
+  // 1. Replies: only about every 5th minute. Instant sending goes through doPost; this is the backup,
+  //    and the server also counts each of these calls as "the script is alive" (see inboxScriptWatch).
+  if (now - Number(props.getProperty('LAST_PULL_MS') || 0) >= PULL_EVERY_MS) {
+    props.setProperty('LAST_PULL_MS', String(now));
+    withLock_(5000, function () {
+      try { sendReplies_('trigger'); } catch (e) { Logger.log('Replies step failed: ' + e.message); }
+    });
+  }
+
+  // 2. New mail: skip the Gmail search when the mailbox has not changed since the last full check.
+  var marker = mailboxMarker_();                       // the mailbox "history id", or '' if it cannot be read
+  var lastFull = Number(props.getProperty('LAST_FULL_MS') || 0);
+  if (marker && marker === props.getProperty('LAST_HISTORY_ID') && now - lastFull < FULL_CHECK_EVERY_MS) return;
+  var complete = false;
+  var locked = withLock_(5000, function () { complete = run_() === true; });
+  if (locked && complete) {
+    // Only when the run caught up completely; after a failure or a time-out the next minute tries again.
+    // The marker was read BEFORE the run, so a change during the run forces the next one.
+    props.setProperties({ LAST_FULL_MS: String(now), LAST_HISTORY_ID: marker });
+  }
+}
+
+/**
+ * A cheap "did anything change in this mailbox?" number: the history id from the Gmail API
+ * (Advanced Gmail service, one small call). Returns '' when the service is not on or fails, which
+ * means "do the full check every time", exactly like before.
+ */
+function mailboxMarker_() {
+  try {
+    if (typeof Gmail === 'undefined') return '';
+    return String(Gmail.Users.getProfile('me').historyId || '');
+  } catch (e) {
+    Logger.log('Mailbox marker unavailable (full check every run): ' + e.message);
+    return '';
+  }
 }
 
 /** Runs fn while holding the script lock. Returns false if the lock could not be had in time. */
@@ -113,7 +151,7 @@ function doPost(e) {
     var key = PropertiesService.getScriptProperties().getProperty('INGEST_KEY');
     if (!key || !body.key || String(body.key) !== key) return out({ ok: false, error: 'unauthorized' });
     if (body.action !== 'sendNow') return out({ ok: false, error: 'bad action' });
-    var ran = withLock_(20000, function () { sendReplies_(); });
+    var ran = withLock_(20000, function () { sendReplies_('webapp'); });
     return out({ ok: true, ran: ran });
   } catch (err) {
     return out({ ok: false, error: String(err && err.message || err).slice(0, 200) });
@@ -131,10 +169,11 @@ function run_() {
   var cursor = Number(props.getProperty('CURSOR_MS'));
   var recent = JSON.parse(props.getProperty('RECENT_IDS') || '[]');
   var sent = 0;
+  var caughtUp = false;
 
   while (true) {
     var safeNow = Date.now() - SAFE_LAG_MS;
-    if (cursor >= safeNow) break;
+    if (cursor >= safeNow) { caughtUp = true; break; }
     var winEnd = Math.min(cursor + WINDOW_MS, safeNow);
 
     var msgs = collect_(cursor - OVERLAP_MS, winEnd, recent, started);
@@ -153,9 +192,13 @@ function run_() {
     }
     cursor = Math.max(cursor, winEnd);              // this window is finished
     save_(props, cursor, recent);
+    // The window reached "now minus 1 minute": nothing newer to look at. Stop here. (Without this the loop
+    // kept chasing "now" and searched Gmail hundreds of times per run until the time budget ran out.)
+    if (winEnd >= safeNow) { caughtUp = true; break; }
     if (Date.now() - started > TIME_BUDGET_MS) break;
   }
   Logger.log('Done. Sent ' + sent + ' email(s). Up to date until ' + new Date(cursor));
+  return caughtUp;
 }
 
 function save_(props, cursor, recent) {
@@ -263,13 +306,13 @@ function post_(url, key, payload) {
  * before handing it out, so it is never handed out twice. If a report never reaches the server
  * the reply shows as "unknown, check in Booking.com" after 10 minutes. It is never resent.
  */
-function sendReplies_() {
+function sendReplies_(source) {
   var props = PropertiesService.getScriptProperties();
   var key = props.getProperty('INGEST_KEY');
   var url = props.getProperty('OUTBOX_URL') || OUTBOX_URL_DEFAULT;
   if (!key) return;
 
-  var pulled = outbox_(url, key, { action: 'pull' });
+  var pulled = outbox_(url, key, { action: 'pull', source: source || 'trigger' });
   if (!pulled.ok) { Logger.log('Could not ask for replies: ' + pulled.error); return; }
   var items = (pulled.body && pulled.body.items) || [];
   for (var i = 0; i < items.length; i++) {
