@@ -123,10 +123,10 @@ test('a cancellation request pushes once with the deadline; nothing else on that
   assert.strictEqual(sent[0].payload.title, 'Cancellation request');
   assert.match(sent[0].payload.body, /^Test Guest \(Maxela Apartments\): asks to cancel for free, answer in Booking\.com by 10\/20 02:00$/);
   assert.strictEqual(sent[0].payload.url, `/inbox#c/${BN}`);
-  assert.strictEqual((await C.onConversationWritten(BN, after, { ...after, done: true }, d)).action, 'unchanged');
-  assert.strictEqual((await C.onConversationWritten(BN, before, before, d)).action, 'no cancel request');
+  assert.strictEqual((await C.onConversationWritten(BN, after, { ...after, done: true }, d)).action, 'none');
+  assert.strictEqual((await C.onConversationWritten(BN, before, before, d)).action, 'none');
   const old = { ...before, cancelRequest: { at: stamp(T0 - 7 * 3600000), deadline: stamp(deadline) } };
-  assert.strictEqual((await C.onConversationWritten(BN, before, old, d)).action, 'stale');
+  assert.strictEqual((await C.onConversationWritten(BN, before, old, d)).action, 'none', 'a stale cancellation request');
   assert.strictEqual(sent.length, 2, 'one alert, two phones');
 });
 
@@ -191,4 +191,33 @@ test('both inbox users can register a phone; the record says whose it is', async
   assert.strictEqual(saved.email, 'nutsamargiani@gmail.com');
   assert.strictEqual(saved.name, 'Nutsa');
   assert.deepStrictEqual(await C.alerts(WIFE, { action: 'status', deviceId: 'device-wife-001' }, d), { registered: true });
+});
+
+// ---------------------------------------------------------------- alerts for the automatic assistant
+test('an automatic send alerts once with "AI answered <guest>" and the first line; people\'s replies do not alert', async () => {
+  clock = T0;
+  const { d, sent } = mk();
+  const r = await C.onGuestMessage(BN, 'ai-m1', { direction: 'host', text: 'Check-in is from 15:00.\nSecond line', sentBy: 'ai', sentByName: 'AI', sentAt: stamp(clock) }, d);
+  assert.strictEqual(r.action, 'pushed');
+  assert.strictEqual(sent.length, 2, 'both phones, once each');
+  assert.deepStrictEqual(sent[0].payload, { title: 'AI answered Test Guest', body: 'Check-in is from 15:00.', tag: `inbox-ai-${BN}`, url: `/inbox#c/${BN}` });
+  assert.strictEqual((await C.onGuestMessage(BN, 'h2', { direction: 'host', text: 'my reply', sentBy: 'nikavibliani@gmail.com', sentAt: stamp(clock) }, d)).action, 'ignored');
+  assert.strictEqual(sent.length, 2);
+  const off = mk({ 'globals/config': { bookingAlertsEnabled: false } });
+  assert.strictEqual((await C.onGuestMessage(BN, 'ai-m1', { direction: 'host', text: 'x', sentBy: 'ai', sentAt: stamp(clock) }, off.d)).action, 'alerts off');
+});
+
+test('a new "Needs you" note alerts once with the reason; a draft or an old note does not', async () => {
+  clock = T0;
+  const { d, sent } = mk();
+  const base = { guestName: 'Test Guest', propertyName: 'Maxela Apartments' };
+  const note = { kind: 'needs_you', reason: 'the guest asks about a refund', text: 'x', createdAt: stamp(clock - 60000) };
+  assert.strictEqual((await C.onConversationWritten(BN, base, { ...base, aiDraft: note }, d)).action, 'pushed');
+  assert.strictEqual(sent[0].payload.title, 'Test Guest needs you');
+  assert.strictEqual(sent[0].payload.body, 'the guest asks about a refund');
+  const n = sent.length;
+  assert.strictEqual((await C.onConversationWritten(BN, { ...base, aiDraft: note }, { ...base, aiDraft: note, done: true }, d)).action, 'none', 'same note, other change');
+  assert.strictEqual((await C.onConversationWritten(BN, base, { ...base, aiDraft: { kind: 'reply', text: 'hi', createdAt: stamp(clock) } }, d)).action, 'none', 'a draft reply does not alert');
+  assert.strictEqual((await C.onConversationWritten(BN, base, { ...base, aiDraft: { ...note, createdAt: stamp(clock - 30 * 60000) } }, d)).action, 'none', 'an old note does not alert');
+  assert.strictEqual(sent.length, n);
 });

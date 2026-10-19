@@ -67,6 +67,7 @@ async function sendToOwnerDevices(payload, deps) {
 /** deps: { db, nowMs(), ts(ms), sendNotification }. */
 async function onGuestMessage(bookingNumber, messageId, msg, deps) {
   const { db, nowMs, ts } = deps;
+  if (msg && msg.direction === 'host' && String(msg.sentBy || '').toLowerCase() === 'ai') return onAiAnswered(bookingNumber, msg, deps);
   if (!msg || msg.direction !== 'guest') return { action: 'ignored' };
   const now = nowMs();
   const sent = ms(msg.sentAt);
@@ -88,19 +89,48 @@ async function onGuestMessage(bookingNumber, messageId, msg, deps) {
   return { action: 'pushed', ...result };
 }
 
-/** A cancellation request that is new or changed. */
+/** The assistant sent a reply by itself: one alert per automatic send. */
+async function onAiAnswered(bookingNumber, msg, deps) {
+  const { db } = deps;
+  if (!(await alertsEnabled(db))) return { action: 'alerts off' };
+  const c = await db.collection(CONVERSATIONS).doc(bookingNumber).get();
+  const result = await sendToOwnerDevices(P.aiAnsweredPayload(c.exists ? c.data() : {}, bookingNumber, msg.text), deps);
+  return { action: 'pushed', kind: 'ai answered', ...result };
+}
+
+const NEEDS_YOU_FRESH_MS = 10 * 60 * 1000;
+
+/**
+ * Things that happen on a conversation document and deserve an alert: a new or changed cancellation request,
+ * and a new "Needs you" note from the assistant. Returns { action: 'none' } or { action: 'pushed', kinds }.
+ */
 async function onConversationWritten(bookingNumber, before, after, deps) {
   const { db, nowMs } = deps;
-  const a = after && after.cancelRequest;
-  if (!a) return { action: 'no cancel request' };
-  const atMs = ms(a.at);
-  const prevAt = before && before.cancelRequest ? ms(before.cancelRequest.at) : NaN;
-  if (Number.isFinite(prevAt) && prevAt === atMs) return { action: 'unchanged' };
+  if (!after) return { action: 'none' };
   const now = nowMs();
-  if (Number.isFinite(atMs) && now - atMs > P.STALE_CANCEL_MS) return { action: 'stale' };
+  const payloads = [];
+  const kinds = [];
+
+  const a = after.cancelRequest;
+  if (a) {
+    const atMs = ms(a.at);
+    const prevAt = before && before.cancelRequest ? ms(before.cancelRequest.at) : NaN;
+    const changed = !(Number.isFinite(prevAt) && prevAt === atMs);
+    if (changed && !(Number.isFinite(atMs) && now - atMs > P.STALE_CANCEL_MS)) { payloads.push(P.cancelPayload(after, bookingNumber, ms(a.deadline), now)); kinds.push('cancel'); }
+  }
+  const dr = after.aiDraft;
+  if (dr && dr.kind === 'needs_you') {
+    const at = ms(dr.createdAt);
+    const prevAt = before && before.aiDraft && before.aiDraft.kind === 'needs_you' ? ms(before.aiDraft.createdAt) : NaN;
+    if (!(Number.isFinite(prevAt) && prevAt === at) && !(Number.isFinite(at) && now - at > NEEDS_YOU_FRESH_MS)) {
+      payloads.push(P.needsYouPayload(after, bookingNumber, dr.reason || dr.text)); kinds.push('needs you');
+    }
+  }
+  if (!payloads.length) return { action: 'none' };
   if (!(await alertsEnabled(db))) return { action: 'alerts off' };
-  const result = await sendToOwnerDevices(P.cancelPayload(after, bookingNumber, ms(a.deadline), now), deps);
-  return { action: 'pushed', ...result };
+  let result = { sent: 0, removed: 0, devices: 0 };
+  for (const p of payloads) result = await sendToOwnerDevices(p, deps);
+  return { action: 'pushed', kinds, ...result };
 }
 
 /** register / unregister / status. deps: { db, now(), sendNotification }. */
@@ -161,7 +191,7 @@ function registerCloudFunctions() {
     async event => {
       const before = event.data && event.data.before && event.data.before.exists ? event.data.before.data() : null;
       const after = event.data && event.data.after && event.data.after.exists ? event.data.after.data() : null;
-      if (!after || !after.cancelRequest) return;
+      if (!after) return;
       try { await onConversationWritten(event.params.bookingNumber, before, after, deps()); }
       catch (e) { console.error('inboxPushOnConversation failed', e && e.code, e && e.message); }
     }
@@ -177,4 +207,4 @@ function registerCloudFunctions() {
   return { inboxPushOnMessage, inboxPushOnConversation, inboxAlerts };
 }
 
-module.exports = { onGuestMessage, onConversationWritten, sendToOwnerDevices, alerts, registerCloudFunctions, alertsEnabled };
+module.exports = { onGuestMessage, onAiAnswered, onConversationWritten, sendToOwnerDevices, alerts, registerCloudFunctions, alertsEnabled };

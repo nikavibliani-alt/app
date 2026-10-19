@@ -43,6 +43,28 @@ function messagePayload(conv, bookingNumber, text) {
   };
 }
 
+/** The assistant sent a reply by itself. */
+function aiAnsweredPayload(conv, bookingNumber, text) {
+  const c = conv || {};
+  return {
+    title: `AI answered ${String(c.guestName || 'Guest').slice(0, 60)}`,
+    body: firstLine(text),
+    tag: `inbox-ai-${bookingNumber}`,
+    url: `/inbox#c/${bookingNumber}`,
+  };
+}
+
+/** The assistant could not answer and hands the conversation to me. */
+function needsYouPayload(conv, bookingNumber, reason) {
+  const c = conv || {};
+  return {
+    title: `${String(c.guestName || 'Guest').slice(0, 60)} needs you`,
+    body: firstLine(reason),
+    tag: `inbox-needs-${bookingNumber}`,
+    url: `/inbox#c/${bookingNumber}`,
+  };
+}
+
 /** A cancellation request, with the deadline. */
 function cancelPayload(conv, bookingNumber, deadlineMs, nowMs) {
   const c = conv || {};
@@ -82,5 +104,5 @@ const isDeviceId = v => typeof v === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(v)
 
 module.exports = {
   QUIET_MS, STALE_MESSAGE_MS, STALE_CANCEL_MS,
-  burstDecision, firstLine, messagePayload, cancelPayload, cleanSubscription, isDeviceId, tbilisiClock,
+  burstDecision, firstLine, messagePayload, aiAnsweredPayload, needsYouPayload, cancelPayload, cleanSubscription, isDeviceId, tbilisiClock,
 };

@@ -42,6 +42,51 @@ const fail = (code, message) => new Fail(code, message);
 
 const millis = v => (v && typeof v.toMillis === 'function' ? v.toMillis() : v && typeof v.toDate === 'function' ? v.toDate().getTime() : v ? new Date(v).getTime() : 0);
 
+// ---------------------------------------------------------------- the writes that queue one reply
+
+/**
+ * The three writes that queue a reply, inside a transaction (all reads done by the caller):
+ * the outbox item (what the Gmail script sends), the host message in the conversation, and the
+ * conversation marked answered. Shared by a person tapping Send (sendReply) and by the automatic
+ * sender. `gmailMessageId` is a guest email in Gmail whose reply address the script checks first.
+ * Throws if the conversation has no guest address. opts: { bookingNumber, clientId, text (clean),
+ * conv, gmailMessageId, sentBy, sentByName, now(), label ('You' or 'AI') }.
+ */
+function queueReplyWrites(tx, db, o) {
+  const c = o.conv;
+  if (!isGuestAddress(c.replyTo)) throw fail('failed-precondition', 'This conversation has no guest address to reply to.');
+  const convRef = db.collection(CONVERSATIONS).doc(o.bookingNumber);
+  const t = o.now();
+  tx.create(db.collection(OUTBOX).doc(o.clientId), {
+    bookingNumber: o.bookingNumber,
+    text: o.text,
+    status: 'waiting',
+    createdAt: t,
+    expectedTo: c.replyTo.toLowerCase(),
+    gmailMessageId: o.gmailMessageId,
+    sentBy: o.sentBy,
+    sentByName: o.sentByName,
+  });
+  tx.create(convRef.collection('messages').doc(o.clientId), {
+    direction: 'host',
+    text: o.text,
+    sentAt: t,
+    status: 'waiting',
+    outboxId: o.clientId,
+    sentBy: o.sentBy,
+    sentByName: o.sentByName,
+    createdAt: t,
+  });
+  tx.update(convRef, {
+    needsReply: false,
+    done: true,
+    doneAt: t,
+    lastMessageAt: t,
+    lastMessagePreview: ((o.label || 'You') + ': ' + o.text.replace(/\s+/g, ' ')).slice(0, 160),
+    updatedAt: t,
+  });
+}
+
 // ---------------------------------------------------------------- owner: send a reply
 
 /** deps: { db, now(), trigger?() }. Returns { ok, outboxId, duplicate }. */
@@ -72,34 +117,9 @@ async function sendReply(auth, data, deps) {
     const latestGuest = recent.docs.find(m => m.data().direction === 'guest');
     if (!latestGuest) throw fail('failed-precondition', 'There is no guest message to reply to.');
 
-    const t = now();
-    tx.create(outRef, {
-      bookingNumber: d.bookingNumber,
-      text: clean.text,
-      status: 'waiting',
-      createdAt: t,
-      expectedTo: c.replyTo.toLowerCase(),
-      gmailMessageId: latestGuest.id,
-      sentBy: user.email,
-      sentByName: user.name,
-    });
-    tx.create(msgRef, {
-      direction: 'host',
-      text: clean.text,
-      sentAt: t,
-      status: 'waiting',
-      outboxId: d.clientId,
-      sentBy: user.email,
-      sentByName: user.name,
-      createdAt: t,
-    });
-    tx.update(convRef, {
-      needsReply: false,
-      done: true,
-      doneAt: t,
-      lastMessageAt: t,
-      lastMessagePreview: ('You: ' + clean.text.replace(/\s+/g, ' ')).slice(0, 160),
-      updatedAt: t,
+    queueReplyWrites(tx, db, {
+      bookingNumber: d.bookingNumber, clientId: d.clientId, text: clean.text, conv: c,
+      gmailMessageId: latestGuest.id, sentBy: user.email, sentByName: user.name, now, label: 'You',
     });
     return { ok: true, outboxId: d.clientId, duplicate: false };
   });
@@ -307,6 +327,6 @@ function registerCloudFunctions() {
 }
 
 module.exports = {
-  sendReply, pokeWebApp, noteHeartbeat, checkinLink, pull, report, handleOutbox, markUnknown, registerCloudFunctions, Fail,
+  sendReply, queueReplyWrites, pokeWebApp, noteHeartbeat, checkinLink, pull, report, handleOutbox, markUnknown, registerCloudFunctions, Fail,
   CONVERSATIONS, OUTBOX,
 };

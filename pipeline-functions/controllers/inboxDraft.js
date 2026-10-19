@@ -17,6 +17,9 @@
 
 const { isBookingNumber } = require('../lib/inboxReply');
 const { isInboxUser } = require('../lib/inboxAccess');
+const { resolveAiMode, AI_SENDER, autoSendBlockReason } = require('../lib/inboxAiMode');
+const { queueReplyWrites } = require('./inboxReply');
+const { cleanReplyText } = require('../lib/inboxReply');
 const D = require('../lib/inboxDraft');
 const KB = require('../lib/guestKnowledge/knowledgeBase');
 const { canonicalPhone } = require('../lib/guestKnowledge/guestLookup');
@@ -138,7 +141,7 @@ async function processConversation(bookingNumber, deps) {
   if (!claimed) return { outcome: 'not due' };
   const { conv, pending } = claimed;
 
-  const finish = async (outcome, draft, extra = {}) => {
+  const finish = async (outcome, draft, extra = {}, send = null) => {
     const r = await db.runTransaction(async tx => {
       const c = await tx.get(convRef);
       if (!c.exists) return 'gone';
@@ -152,19 +155,36 @@ async function processConversation(bookingNumber, deps) {
         tx.update(convRef, { aiPending: null, aiRunning: null, aiDueAt: null });
         return 'replied or newer';
       }
+      if (send) {
+        // Automatic send: same last check as above, and the reply is queued in THIS transaction, so nothing
+        // newer can slip in between the check and the send. Same path as a person tapping Send.
+        const clientId = `ai-${pending.lastMessageId}`;
+        const existing = await tx.get(db.collection('inbox_outbox').doc(clientId));
+        if (existing.exists) { tx.update(convRef, { aiPending: null, aiRunning: null, aiDueAt: null }); return 'already sent'; }
+        const clean = cleanReplyText(send.text);
+        if (!clean.ok) { tx.update(convRef, { aiPending: null, aiRunning: null, aiDueAt: null, aiDraft: { ...draft, createdAt: ts(nowMs()), forMessageId: pending.lastMessageId } }); return 'saved'; }
+        tx.update(convRef, { aiPending: null, aiRunning: null, aiDueAt: null, aiDraft: null });
+        queueReplyWrites(tx, db, {
+          bookingNumber, clientId, text: clean.text, conv: v, gmailMessageId: pending.lastMessageId,
+          sentBy: AI_SENDER.email, sentByName: AI_SENDER.name, now: () => ts(nowMs()), label: 'AI',
+        });
+        return 'auto_sent';
+      }
       const upd = { aiPending: null, aiRunning: null, aiDueAt: null };
       if (draft) upd.aiDraft = { ...draft, createdAt: ts(nowMs()), forMessageId: pending.lastMessageId };
       tx.update(convRef, upd);
       return draft ? 'saved' : 'cleared';
     });
-    log({ conv: bookingNumber, outcome: r === 'saved' || r === 'cleared' ? outcome : `discarded (${r})`, ...extra, ms: Date.now() - started });
-    return { outcome: r === 'saved' || r === 'cleared' ? outcome : `discarded (${r})` };
+    const done = r === 'saved' || r === 'cleared' || r === 'auto_sent';
+    log({ conv: bookingNumber, outcome: done ? (r === 'auto_sent' ? 'auto_sent' : outcome) : `discarded (${r})`, ...extra, ms: Date.now() - started });
+    return { outcome: done ? (r === 'auto_sent' ? 'auto_sent' : outcome) : `discarded (${r})`, sent: r === 'auto_sent' };
   };
   const note = (kind, reason, extra) => finish(kind === 'needs_you' ? `needs_you: ${reason}` : kind, { kind, reason, text: reason, source: 'rule' }, extra);
 
   // 2. Switch.
   const cfg = await db.collection('globals').doc('config').get();
-  if (cfg.exists && cfg.data().bookingAiDraftsEnabled === false) return finish('switch off', null);
+  const mode = resolveAiMode(cfg.exists ? cfg.data() : null);
+  if (mode === 'off') return finish('switch off', null);
 
   // 3. The burst.
   const history = await loadHistory(db, bookingNumber);
@@ -221,7 +241,12 @@ async function processConversation(bookingNumber, deps) {
     const reason = `the draft contained ${checked.problem}, which Booking.com chats must not have. Write this one yourself`;
     return finish(`needs_you: draft rejected (${checked.problem})`, { kind: 'needs_you', reason, text: reason, source: 'ai', model }, info);
   }
-  return finish('reply', { kind: 'reply', text: checked.text, source: 'ai', model }, { ...info, removedLinks: checked.removedLinks });
+  // A normal draft that passed every check. Drafts mode: shown for me to send. Automatic mode: sent by itself,
+  // unless the reservation is cancelled or one of us replied in the last 30 minutes (then it stays a draft).
+  const block = mode === 'auto' ? autoSendBlockReason({ conv, messages: history, nowMs: nowMs() }) : 'drafts mode';
+  const draft = { kind: 'reply', text: checked.text, source: 'ai', model, ...(mode === 'auto' && block ? { autoBlocked: block } : {}) };
+  if (mode === 'auto' && !block) return finish('reply', draft, { ...info, removedLinks: checked.removedLinks, mode }, { text: checked.text });
+  return finish('reply', draft, { ...info, removedLinks: checked.removedLinks, mode });
 }
 
 /** Runs every conversation that is due (a few per call). deps as processConversation. */
@@ -229,7 +254,13 @@ async function runDue(deps) {
   const snap = await deps.db.collection(CONVERSATIONS).where('aiDueAt', '<=', deps.ts(deps.nowMs())).limit(MAX_DUE_PER_RUN).get();
   const results = [];
   for (const d of snap.docs) {
-    try { results.push(await processConversation(d.id, deps)); } catch (e) { console.error('inboxAi failed', d.id, e && e.code, e && e.message); }
+    try {
+      const r = await processConversation(d.id, deps);
+      results.push(r);
+      if (r && r.sent && typeof deps.poke === 'function') {
+        try { await deps.poke(); } catch (e) { console.warn('inboxAi: instant send not triggered', e && e.message); }   // the script's next run sends it anyway
+      }
+    } catch (e) { console.error('inboxAi failed', d.id, e && e.code, e && e.message); }
   }
   return results;
 }
@@ -258,6 +289,8 @@ function registerCloudFunctions() {
   const { defineSecret } = require('firebase-functions/params');
   const { getFirestore, Timestamp } = require('firebase-admin/firestore');
   const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
+  const INBOX_INGEST_KEY = defineSecret('INBOX_INGEST_KEY');
+  const INBOX_SCRIPT_URL = defineSecret('INBOX_SCRIPT_URL');
   const region = 'europe-west1';
   const baseDeps = () => ({ db: getFirestore(), nowMs: () => Date.now(), ts: m => Timestamp.fromMillis(m) });
 
@@ -275,9 +308,11 @@ function registerCloudFunctions() {
   );
 
   const inboxAiRun = onSchedule(
-    { schedule: 'every 1 minutes', region, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 300, memory: '512MiB', maxInstances: 1 },
+    { schedule: 'every 1 minutes', region, secrets: [ANTHROPIC_API_KEY, INBOX_INGEST_KEY, INBOX_SCRIPT_URL], timeoutSeconds: 300, memory: '512MiB', maxInstances: 1 },
     async () => {
-      await runDue({ ...baseDeps(), apiKey: ANTHROPIC_API_KEY.value() });
+      // poke: after an automatic send, ask the Gmail script web app to send it now (best effort; its next run sends it anyway)
+      const { pokeWebApp } = require('./inboxReply');
+      await runDue({ ...baseDeps(), apiKey: ANTHROPIC_API_KEY.value(), poke: () => pokeWebApp(INBOX_SCRIPT_URL.value().trim(), INBOX_INGEST_KEY.value()) });
       try { await require('./inboxStats').refreshInboxStats({ db: getFirestore(), now: () => Timestamp.now() }); }   // heals the admin count
       catch (e) { console.warn('inboxAiRun: stats refresh failed', e && e.message); }
     }

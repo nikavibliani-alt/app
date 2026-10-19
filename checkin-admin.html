@@ -334,6 +334,11 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .pill-pending-req{background:var(--amber-bg);color:var(--amber);}
 .pill-confirmed{background:var(--green-bg);color:var(--green);}
 .pill-cancelled{background:var(--bg);color:var(--muted);}
+.more-item--mode{flex-wrap:wrap;}
+.more-item--mode .more-item__text{flex:1 1 100%;}
+.seg3{display:flex;gap:6px;width:100%;margin-top:10px;}
+.seg3 button{flex:1;min-height:44px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:var(--rs);font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;}
+.seg3 button.is-active{background:var(--ink);border-color:var(--ink);color:#fff;}
 .inbox-card{display:flex;align-items:center;gap:12px;min-height:60px;padding:12px 16px;margin-bottom:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);text-decoration:none;color:var(--ink);}
 .inbox-card:visited{color:var(--ink);}
 .inbox-card:active{background:#f3f1ee;}
@@ -909,15 +914,16 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
           <span class="switch-track"></span>
         </label>
       </div>
-      <div class="more-item more-item--switch" role="group" aria-label="Booking.com AI drafts">
+      <div class="more-item more-item--mode" role="group" aria-label="Booking.com AI">
         <div class="more-item__text">
-          <div class="more-item__title">Booking.com AI drafts</div>
+          <div class="more-item__title">Booking.com AI</div>
           <div class="more-item__sub" id="more-booking-ai-status">Loading…</div>
         </div>
-        <label class="switch" title="Turn Booking.com AI drafts on or off">
-          <input type="checkbox" id="more-booking-ai-toggle" onchange="waSetBookingAiDrafts(this.checked)">
-          <span class="switch-track"></span>
-        </label>
+        <div class="seg3" id="more-booking-ai-mode">
+          <button type="button" data-mode="off" onclick="waSetBookingAiMode('off')">Off</button>
+          <button type="button" data-mode="drafts" onclick="waSetBookingAiMode('drafts')">Drafts</button>
+          <button type="button" data-mode="auto" onclick="waSetBookingAiMode('auto')">Automatic</button>
+        </div>
       </div>
       <div class="more-item more-item--switch" role="group" aria-label="Booking.com message alerts">
         <div class="more-item__text">
@@ -2865,7 +2871,7 @@ function pickCheckinInviteKey(roomCode){
 let waSettings=mergeWaSettings(null);
 let waLoaded=false;
 let _waInviteProp='maxela';
-const BOT_SETTINGS_DEFAULTS={aiBotEnabled:true,bookingAiDraftsEnabled:true,bookingAlertsEnabled:true,botMode:'available',botResponseDelay:20,ownerPhone:'',nightStart:22,nightEnd:9};
+const BOT_SETTINGS_DEFAULTS={aiBotEnabled:true,bookingAiDraftsEnabled:true,bookingAiMode:'drafts',bookingAlertsEnabled:true,botMode:'available',botResponseDelay:20,ownerPhone:'',nightStart:22,nightEnd:9};
 let botSettings={...BOT_SETTINGS_DEFAULTS};
 let botSettingsLoaded=false;
 async function loadBotSettings(){
@@ -2876,6 +2882,7 @@ async function loadBotSettings(){
       botSettings={
         aiBotEnabled:d.aiBotEnabled!==false,
         bookingAiDraftsEnabled:d.bookingAiDraftsEnabled!==false,
+        bookingAiMode:['off','drafts','auto'].includes(d.bookingAiMode)?d.bookingAiMode:(d.bookingAiDraftsEnabled===false?'off':'drafts'),
         bookingAlertsEnabled:d.bookingAlertsEnabled!==false,
         botMode:['available','away','night','auto'].includes(d.botMode)?d.botMode:'available',
         botResponseDelay:Number(d.botResponseDelay)||20,
@@ -2906,10 +2913,10 @@ function syncMoreBotToggle(){
   const alStatus=document.getElementById('more-booking-alerts-status');
   if(alToggle)alToggle.checked=botSettings.bookingAlertsEnabled!==false;
   if(alStatus)alStatus.textContent=!botSettingsLoaded?'Loading…':botSettings.bookingAlertsEnabled!==false?'On · only to the phones you turned on in the inbox':'Off';
-  const bkToggle=document.getElementById('more-booking-ai-toggle');
   const bkStatus=document.getElementById('more-booking-ai-status');
-  if(bkToggle)bkToggle.checked=botSettings.bookingAiDraftsEnabled!==false;
-  if(bkStatus)bkStatus.textContent=!botSettingsLoaded?'Loading…':botSettings.bookingAiDraftsEnabled!==false?'On · drafts only, you tap Send':'Off';
+  const bkMode=botSettings.bookingAiMode||'drafts';
+  document.querySelectorAll('#more-booking-ai-mode button').forEach(b=>b.classList.toggle('is-active',botSettingsLoaded&&b.dataset.mode===bkMode));
+  if(bkStatus)bkStatus.textContent=!botSettingsLoaded?'Loading…':bkMode==='auto'?'Automatic · sends by itself when it is sure':bkMode==='drafts'?'Drafts only · you tap Send':'Off · no drafts, no replies';
   const toggle=document.getElementById('more-bot-toggle');
   const status=document.getElementById('more-bot-status');
   if(toggle)toggle.checked=!!botSettings.aiBotEnabled;
@@ -2938,10 +2945,11 @@ window.waSetBookingAlerts=async function(checked){
   syncMoreBotToggle();
   toast(checked?'Booking.com message alerts on':'Booking.com message alerts off');
 };
-window.waSetBookingAiDrafts=async function(checked){
-  await waSaveBotSettings({bookingAiDraftsEnabled:checked});
+window.waSetBookingAiMode=async function(mode){
+  if(!['off','drafts','auto'].includes(mode))return;
+  await waSaveBotSettings({bookingAiMode:mode,bookingAiDraftsEnabled:mode!=='off'});   // the old field is kept in step for older code
   syncMoreBotToggle();
-  toast(checked?'Booking.com AI drafts on':'Booking.com AI drafts off');
+  toast(mode==='auto'?'Booking.com AI: automatic':mode==='drafts'?'Booking.com AI: drafts only':'Booking.com AI: off');
 };
 window.waSetAiBotEnabled=async function(checked){
   await waSaveBotSettings({aiBotEnabled:checked});

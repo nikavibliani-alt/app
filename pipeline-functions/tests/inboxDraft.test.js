@@ -405,3 +405,179 @@ test('helpers: parse the model output, due time', () => {
   assert.strictEqual(D.dueAtMs(0, 30000), 90000);
   assert.strictEqual(D.dueAtMs(0, 300000), 240000);
 });
+
+// ---------------------------------------------------------------- automatic mode
+const A = require('../lib/inboxAiMode');
+const autoSeed = (conv = {}, extra = {}) => ({ ...baseSeed(conv), 'globals/config': { bookingAiMode: 'auto' }, ...extra });
+const outboxItems = d => [...d.db.store.entries()].filter(([k]) => k.startsWith('inbox_outbox/'));
+const hostMsgs = d => [...d.db.store.entries()].filter(([k, v]) => k.startsWith(`inbox_conversations/${BN}/messages/`) && v.direction === 'host');
+
+test('mode: off, drafts, automatic, and the old switch still counts', () => {
+  assert.strictEqual(A.resolveAiMode({ bookingAiMode: 'auto' }), 'auto');
+  assert.strictEqual(A.resolveAiMode({ bookingAiMode: 'drafts' }), 'drafts');
+  assert.strictEqual(A.resolveAiMode({ bookingAiMode: 'off' }), 'off');
+  assert.strictEqual(A.resolveAiMode({ bookingAiDraftsEnabled: false }), 'off', 'old switch off');
+  assert.strictEqual(A.resolveAiMode({ bookingAiDraftsEnabled: true }), 'drafts');
+  assert.strictEqual(A.resolveAiMode({}), 'drafts');
+  assert.strictEqual(A.resolveAiMode(null), 'drafts');
+  assert.strictEqual(A.resolveAiMode({ bookingAiMode: 'nonsense', bookingAiDraftsEnabled: false }), 'off');
+  assert.strictEqual(A.resolveAiMode({ bookingAiMode: 'off', bookingAiDraftsEnabled: true }), 'off', 'the new field wins');
+});
+
+test('automatic: a normal draft that passes every check is sent through the normal reply path, by "AI"', async () => {
+  clock = T0; seq = 0;
+  let pokes = 0;
+  const calls = [];
+  const d = mk({ seed: autoSeed(), deps: { callClaude: claudeStub('Check-in is from 15:00.', calls), poke: async () => { pokes++; } } });
+  const g = await guestSays(d, 'What time is check-in?'); clock += 61000;
+  const r = await C.runDue(d);
+  assert.strictEqual(r[0].outcome, 'auto_sent');
+  const [[, ob]] = outboxItems(d);
+  assert.strictEqual(ob.status, 'waiting');
+  assert.strictEqual(ob.text, 'Check-in is from 15:00.');
+  assert.strictEqual(ob.sentBy, 'ai');
+  assert.strictEqual(ob.sentByName, 'AI');
+  assert.strictEqual(ob.gmailMessageId, g, 'replies to the guest email that started the burst');
+  assert.strictEqual(ob.expectedTo, conv(d).replyTo);
+  const [[, hm]] = hostMsgs(d);
+  assert.strictEqual(hm.sentByName, 'AI');
+  assert.strictEqual(hm.status, 'waiting');
+  assert.strictEqual(conv(d).done, true);
+  assert.strictEqual(conv(d).needsReply, false);
+  assert.strictEqual(conv(d).aiDraft, null, 'nothing is left as a draft');
+  assert.match(conv(d).lastMessagePreview, /^AI: Check-in/);
+  assert.strictEqual(pokes, 1, 'the Gmail script is told to send now');
+  assert.strictEqual(calls.length, 1);
+  assert.deepStrictEqual(await C.runDue(d), [], 'a second run does nothing');
+  assert.strictEqual(outboxItems(d).length, 1);
+});
+
+test('automatic: the same drafting rules as before (drafts mode still only shows a draft)', async () => {
+  clock = T0; seq = 0;
+  const d = mk({ seed: { ...baseSeed(), 'globals/config': { bookingAiMode: 'drafts' } }, deps: { callClaude: claudeStub('Check-in is from 15:00.') } });
+  await guestSays(d, 'What time is check-in?'); clock += 61000;
+  await C.runDue(d);
+  assert.strictEqual(outboxItems(d).length, 0, 'drafts mode never sends');
+  assert.strictEqual(conv(d).aiDraft.kind, 'reply');
+  assert.ok(!conv(d).aiDraft.autoBlocked);
+});
+
+test('automatic: "Needs you", "already answered", rule-breaking drafts and owner topics are never sent', async () => {
+  const cases = [
+    ['NEEDS_YOU: guest wants another room', 'Is the apartment high up?'],
+    ['[WHATSAPP_ANSWERED: 13:30] Parking is under Carrefour.', 'Is there parking?'],
+    ['The smart lock code is 13 24 13#.', 'Where do I leave my bags?'],
+    ['Call us on +995 555 12 34 56', 'Is there a phone?'],
+    ['See https://example.com/x for details please', 'Where is it?'],
+    ['Message us on WhatsApp', 'How do I reach you?'],
+    ['You can book direct for less', 'Do you have a discount page?'],
+    ['Sure, a refund is fine', 'Can I get a refund?'],
+  ];
+  for (const [model, guestText] of cases) {
+    clock = T0; seq = 0;
+    const d = mk({ seed: autoSeed({}, { 'whatsapp_conversations/995555123456/messages/w1': { role: 'owner', content: 'x', timestamp: stamp(T0 - 30 * 60000) } }), deps: { callClaude: claudeStub(model) } });
+    await guestSays(d, guestText); clock += 61000;
+    await C.runDue(d);
+    assert.strictEqual(outboxItems(d).length, 0, model);
+    assert.strictEqual(hostMsgs(d).length, 0, model);
+    assert.notStrictEqual(conv(d).aiDraft && conv(d).aiDraft.kind, 'reply', model);
+  }
+});
+
+test('automatic: a cancelled reservation stays a draft', async () => {
+  clock = T0; seq = 0;
+  const d = mk({ seed: autoSeed({ reservationStatus: 'CANCELLED' }), deps: { callClaude: claudeStub('Check-in is from 15:00.') } });
+  await guestSays(d, 'What time is check-in?'); clock += 61000;
+  await C.runDue(d);
+  assert.strictEqual(outboxItems(d).length, 0);
+  assert.strictEqual(conv(d).aiDraft.kind, 'reply');
+  assert.match(conv(d).aiDraft.autoBlocked, /cancelled/);
+});
+
+test('automatic: not within 30 minutes after one of us replied; the assistant\'s own replies do not count', async () => {
+  const run = async (host) => {
+    clock = T0; seq = 0;
+    const seedExtra = host ? { [`inbox_conversations/${BN}/messages/hh1`]: { direction: 'host', text: 'hi', sentAt: stamp(T0 - host.minutesAgo * 60000), createdAt: stamp(T0 - host.minutesAgo * 60000), sentBy: host.by } } : {};
+    const d = mk({ seed: autoSeed({}, seedExtra), deps: { callClaude: claudeStub('Check-in is from 15:00.') } });
+    await guestSays(d, 'What time is check-in?'); clock += 61000;
+    await C.runDue(d);
+    return d;
+  };
+  let d = await run({ minutesAgo: 25, by: 'nutsamargiani@gmail.com' });
+  assert.strictEqual(outboxItems(d).length, 0, 'Nutsa replied 25 minutes ago');
+  assert.match(conv(d).aiDraft.autoBlocked, /30 minutes/);
+  d = await run({ minutesAgo: 20, by: 'nikavibliani@gmail.com' });
+  assert.strictEqual(outboxItems(d).length, 0, 'Nika replied 20 minutes ago');
+  d = await run({ minutesAgo: 40, by: 'nikavibliani@gmail.com' });
+  assert.strictEqual(outboxItems(d).length, 1, 'a reply 40 minutes ago does not block');
+  d = await run({ minutesAgo: 5, by: 'ai' });
+  assert.strictEqual(outboxItems(d).length, 1, 'the assistant\'s own earlier reply does not block');
+  d = await run({ minutesAgo: 10, by: undefined });
+  assert.strictEqual(outboxItems(d).length, 0, 'a reply with no sender counts as a person');
+});
+
+test('automatic: the last check right before sending (a newer guest message or our reply cancels it)', async () => {
+  for (const interrupt of ['guest', 'host']) {
+    clock = T0; seq = 0;
+    const d = mk({ seed: autoSeed() });
+    d.callClaude = async () => {
+      if (interrupt === 'guest') await guestSays(d, 'and one more thing?');
+      else await hostSays(d, 'I answered myself');
+      return { ok: true, text: 'A draft that is out of date.' };
+    };
+    await guestSays(d, 'Question?'); clock += 61000;
+    const r = await C.runDue(d);
+    assert.match(r[0].outcome, /discarded/);
+    assert.strictEqual(outboxItems(d).length, interrupt === 'host' ? 0 : 0, 'nothing was queued (' + interrupt + ')');
+    assert.strictEqual(hostMsgs(d).filter(([, m]) => m.sentBy === 'ai').length, 0);
+  }
+});
+
+test('automatic: the limits still apply (6 per conversation per hour, 60 a day) and bursts give one send', async () => {
+  clock = T0; seq = 0;
+  const calls = [];
+  const d = mk({ seed: autoSeed(), deps: { callClaude: claudeStub('Answer.', calls) } });
+  for (let i = 0; i < 8; i++) {
+    clock += 5 * 60000;
+    await guestSays(d, 'question ' + i + '?'); clock += 61000;
+    await C.runDue(d);
+    // the guest writes again, so the previous AI answer is not "a person replied"
+  }
+  assert.strictEqual(calls.length, 6, 'at most 6 model calls in the hour');
+  assert.strictEqual(outboxItems(d).length, 6, 'so at most 6 automatic sends');
+  assert.match(conv(d).aiDraft.reason, /too many drafts/);
+
+  clock = T0; seq = 0;
+  const day = new Date(T0 + 4 * 3600000).toISOString().slice(0, 10);
+  const d2 = mk({ seed: autoSeed({}, { [`inbox_ai_usage/${day}`]: { count: C.DAILY_CAP } }), deps: { callClaude: claudeStub('x') } });
+  await guestSays(d2, 'Is there a lift?'); clock += 61000;
+  await C.runDue(d2);
+  assert.strictEqual(outboxItems(d2).length, 0);
+
+  clock = T0; seq = 0;
+  const d3 = mk({ seed: autoSeed(), deps: { callClaude: claudeStub('Check-in is from 15:00.') } });
+  await guestSays(d3, 'Hello'); clock += 20000; await guestSays(d3, 'what time is'); clock += 20000; await guestSays(d3, 'check-in please?'); clock += 61000;
+  await C.runDue(d3);
+  assert.strictEqual(outboxItems(d3).length, 1, 'one send for the whole burst');
+});
+
+test('automatic: a send that already exists for this burst is not made again', async () => {
+  clock = T0; seq = 0;
+  const d = mk({ seed: autoSeed(), deps: { callClaude: claudeStub('Check-in is from 15:00.') } });
+  const g = await guestSays(d, 'What time is check-in?'); clock += 61000;
+  d.db.store.set(`inbox_outbox/ai-${g}`, { status: 'sent', text: 'already' });
+  const r = await C.runDue(d);
+  assert.strictEqual(outboxItems(d).length, 1, 'still just the one that was there');
+  assert.ok(!r[0].sent);
+});
+
+test('automatic mode off switch: Off sends and drafts nothing', async () => {
+  clock = T0; seq = 0;
+  const calls = [];
+  const d = mk({ seed: { ...baseSeed(), 'globals/config': { bookingAiMode: 'off' } }, deps: { callClaude: claudeStub('x', calls) } });
+  await guestSays(d, 'What time is check-in?'); clock += 61000;
+  const r = await C.runDue(d);
+  assert.strictEqual(r[0].outcome, 'switch off');
+  assert.strictEqual(calls.length, 0);
+  assert.strictEqual(outboxItems(d).length, 0);
+});

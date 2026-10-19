@@ -516,6 +516,7 @@ function drawDraft(c) {
   slot.dataset.key = key;
   if (kind === "reply") {
     slot.innerHTML = `<div class="draft"><div class="draft__label">Draft reply (written by the assistant, not sent)</div>
+      ${d.autoBlocked ? `<div class="draft__label">Not sent automatically: ${esc(d.autoBlocked)}</div>` : ""}
       <div class="draft__text">${esc(d.text)}</div>
       <div class="draft__btns"><button class="btn btn--primary" id="dSend" type="button">Send</button><button class="btn" id="dEdit" type="button">Edit</button><button class="btn" id="dDiscard" type="button">Discard</button></div></div>`;
     $("dSend").onclick = () => {
