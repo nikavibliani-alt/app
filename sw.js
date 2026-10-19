@@ -37,6 +37,11 @@ self.addEventListener('notificationclick', event => {
   const url = event.notification.data?.url || '/checkin-admin';
   event.waitUntil(
     clients.matchAll({type:'window'}).then(clientList => {
+      // A full web address (the Booking.com Extranet answer for a check-in time request): open it as it is.
+      if(/^https:\/\//.test(url)){
+        if(clients.openWindow) return clients.openWindow(url);
+        return;
+      }
       // Booking.com inbox alerts (/inbox#c/<booking number>): open that conversation, in the inbox window if one is open.
       if(/^\/inbox(?:[#?]|$)/.test(url)){
         for(const client of clientList){

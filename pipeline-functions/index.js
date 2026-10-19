@@ -61,3 +61,5 @@ const { registerCloudFunctions: registerInboxPush } = require('./controllers/inb
 Object.assign(exports, registerInboxPush());   // inboxPushOnMessage, inboxPushOnConversation, inboxAlerts
 const { registerCloudFunctions: registerInboxScriptWatch } = require('./controllers/inboxScriptWatch');
 Object.assign(exports, registerInboxScriptWatch());   // inboxScriptWatch
+const { registerCloudFunctions: registerInboxCheckin } = require('./controllers/inboxCheckin');
+Object.assign(exports, registerInboxCheckin());   // inboxCheckinTrigger

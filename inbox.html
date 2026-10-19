@@ -217,7 +217,7 @@ const stayText = c => (c.checkin && c.checkout ? `${fmtDate(c.checkin)} to ${fmt
 /* ---------- model helpers ---------- */
 const activityTime = c => Math.max(toDate(c.lastMessageAt)?.getTime() || 0, toDate(c.cancelRequest?.at)?.getTime() || 0);
 const hasChat = c => (c.messageCount || 0) > 0;
-const visible = c => hasChat(c) || !!c.cancelRequest;
+const visible = c => hasChat(c) || !!c.cancelRequest || !!c.checkinRequest;
 const needsReply = c => !c.done && (!!c.needsReply || !!c.cancelRequest);
 const isCancelled = c => String(c.reservationStatus || "").toUpperCase() === "CANCELLED";
 const statusLabel = c => (isCancelled(c) ? "Cancelled" : String(c.reservationStatus || "").toUpperCase() === "OK2" ? "Confirmed" : "");
@@ -357,7 +357,7 @@ function rowHtml(c, selected) {
   if (isCancelled(c)) tags.push('<span class="tag tag--red">Cancelled</span>');
   if (c.done) tags.push('<span class="tag tag--green">Done</span>');
   if (c.aiDraft && c.aiDraft.text) tags.push(c.aiDraft.kind === "reply" ? '<span class="tag">Draft ready</span>' : '<span class="tag tag--amber">Needs you</span>');
-  const prev = c.lastMessagePreview || (hasChat(c) ? "" : "No chat messages");
+  const prev = c.lastMessagePreview || (hasChat(c) ? "" : c.checkinRequest ? "Check-in time request" : "No chat messages");
   const unread = needsReply(c);
   return `<button class="row ${unread ? "unread" : ""} ${selected ? "sel" : ""}" type="button" data-id="${esc(c.id)}">
     <div class="row__top">${unread ? '<span class="dot" title="Needs reply"></span>' : ""}
@@ -483,8 +483,10 @@ function drawThread() {
   });
   const line = c ? checkinLine(c) : "";
   if (line) {
-    const link = checkinLinks[id];
-    out.push(`<div class="note">${line}${link ? ` <a class="linkbtn" href="${esc(link)}" target="_blank" rel="noopener">Answer in Booking.com</a>` : ""}</div>`);
+    // The one-tap answer in Booking.com: the right button for the requested time (Accept, Decline or Answer).
+    const act = c && c.checkinAction && c.checkinAction.url ? c.checkinAction : null;
+    const link = act ? act.url : checkinLinks[id];
+    out.push(`<div class="note">${line}${link ? ` <a class="linkbtn" href="${esc(link)}" target="_blank" rel="noopener">${esc(act ? act.label : "Answer in Booking.com")}</a>` : ""}</div>`);
   }
   el.innerHTML = out.length ? out.join("") : `<div class="msg">No chat messages yet.</div>`;
   el.querySelectorAll("[data-retry]").forEach(b => b.onclick = () => {
@@ -518,6 +520,7 @@ function drawDraft(c) {
     slot.innerHTML = `<div class="draft"><div class="draft__label">Draft reply (written by the assistant, not sent)</div>
       ${d.autoBlocked ? `<div class="draft__label">Not sent automatically: ${esc(d.autoBlocked)}</div>` : ""}
       <div class="draft__text">${esc(d.text)}</div>
+      ${d.actionUrl ? `<a class="linkbtn" href="${esc(d.actionUrl)}" target="_blank" rel="noopener">${esc(d.actionLabel || "Answer in Booking.com")}</a>` : ""}
       <div class="draft__btns"><button class="btn btn--primary" id="dSend" type="button">Send</button><button class="btn" id="dEdit" type="button">Edit</button><button class="btn" id="dDiscard" type="button">Discard</button></div></div>`;
     $("dSend").onclick = () => {
       const ta = $("replyText"); if (!ta) return;

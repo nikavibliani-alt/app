@@ -126,6 +126,14 @@ async function onConversationWritten(bookingNumber, before, after, deps) {
       payloads.push(P.needsYouPayload(after, bookingNumber, dr.reason || dr.text)); kinds.push('needs you');
     }
   }
+  const ch = after.checkinHandled;
+  if (ch && (ch.outcome === 'sent' || ch.outcome === 'draft')) {
+    const prevAt = before && before.checkinHandled ? Number(before.checkinHandled.atMs) : NaN;
+    const processed = ms(ch.processedAt);
+    if (!(Number.isFinite(prevAt) && prevAt === Number(ch.atMs) && before.checkinHandled.outcome === ch.outcome) && !(Number.isFinite(processed) && now - processed > NEEDS_YOU_FRESH_MS)) {
+      payloads.push(P.checkinPayload(after, bookingNumber, ch)); kinds.push('check-in');
+    }
+  }
   if (!payloads.length) return { action: 'none' };
   if (!(await alertsEnabled(db))) return { action: 'alerts off' };
   let result = { sent: 0, removed: 0, devices: 0 };

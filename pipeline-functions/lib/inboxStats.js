@@ -6,7 +6,7 @@
  */
 
 const needsReply = c => !c.done && (!!c.needsReply || !!c.cancelRequest);
-const visible = c => (c.messageCount || 0) > 0 || !!c.cancelRequest;
+const visible = c => (c.messageCount || 0) > 0 || !!c.cancelRequest || !!c.checkinRequest;
 
 /** conversations: array of conversation data. Returns { needsReply, cancelRequests }. */
 function computeInboxStats(conversations) {

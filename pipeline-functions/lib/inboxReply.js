@@ -28,10 +28,11 @@ const isClientId = v => typeof v === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(v)
 const isGuestAddress = v => typeof v === 'string' && v.toLowerCase().endsWith(GUEST_DOMAIN) && /^[^\s<>@]+@guest\.booking\.com$/i.test(v);
 
 /**
- * The Extranet page of a guest's check-in time request, from the saved raw email. It is the
- * request page itself, with no answer chosen (no Accept / Reject option in the link).
+ * The Extranet page of a guest's check-in time request, from the saved raw email. Without `option` it is
+ * the request page itself with no answer chosen; with option 'confirm' (Accept), 'reject' (Decline) or
+ * 'availability' (Subject to availability) it is the link of that answer button in the Booking.com email.
  */
-function checkinRequestLink(email) {
+function checkinRequestLink(email, option) {
   const html = String((email && email.bodyHtml) || '').replace(/&amp;/gi, '&');
   const m = html.match(/href="(https:\/\/admin\.booking\.com\/hotel\/hoteladmin\/extranet_ng\/manage\/messaging\/self_service\.html\?[^"]+)"/i);
   if (!m) return null;
@@ -40,7 +41,8 @@ function checkinRequestLink(email) {
   const hotel = u.searchParams.get('hotel_id');
   const req = u.searchParams.get('ss_request_id');
   if (!/^\d{3,}$/.test(hotel || '') || !/^\d{3,}$/.test(req || '')) return null;
-  return `https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/messaging/self_service.html?form_key=partner_approval&hotel_id=${hotel}&ss_request_id=${req}`;
+  const opt = ['confirm', 'reject', 'availability'].includes(option) ? `&option=${option}` : '';   // no option = just the request page
+  return `https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/messaging/self_service.html?form_key=partner_approval&hotel_id=${hotel}&ss_request_id=${req}${opt}`;
 }
 
 module.exports = {

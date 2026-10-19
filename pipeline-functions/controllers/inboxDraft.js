@@ -312,7 +312,10 @@ function registerCloudFunctions() {
     async () => {
       // poke: after an automatic send, ask the Gmail script web app to send it now (best effort; its next run sends it anyway)
       const { pokeWebApp } = require('./inboxReply');
-      await runDue({ ...baseDeps(), apiKey: ANTHROPIC_API_KEY.value(), poke: () => pokeWebApp(INBOX_SCRIPT_URL.value().trim(), INBOX_INGEST_KEY.value()) });
+      const runDeps = { ...baseDeps(), apiKey: ANTHROPIC_API_KEY.value(), poke: () => pokeWebApp(INBOX_SCRIPT_URL.value().trim(), INBOX_INGEST_KEY.value()) };
+      await runDue(runDeps);
+      try { await require('./inboxCheckin').runDueCheckin({ ...runDeps, callClaude: claude.callClaudeWithRetry }); }   // check-in time requests
+      catch (e) { console.warn('inboxAiRun: check-in step failed', e && e.message); }
       try { await require('./inboxStats').refreshInboxStats({ db: getFirestore(), now: () => Timestamp.now() }); }   // heals the admin count
       catch (e) { console.warn('inboxAiRun: stats refresh failed', e && e.message); }
     }

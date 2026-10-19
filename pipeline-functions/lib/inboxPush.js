@@ -65,6 +65,20 @@ function needsYouPayload(conv, bookingNumber, reason) {
   };
 }
 
+/** A guest asked for a check-in time and the assistant answered (or drafted). Tap goes to the Booking.com answer. */
+function checkinPayload(conv, bookingNumber, handled) {
+  const c = conv || {};
+  const h = handled || {};
+  const name = String(c.guestName || 'Guest').slice(0, 60);
+  const sent = h.outcome === 'sent';
+  return {
+    title: `${name} asked check-in ${h.time || ''}`.trim(),
+    body: sent ? `Message sent. Tap to ${h.verb || 'answer'} in Booking.com` : 'Draft ready in the inbox. Open it to send, then answer in Booking.com',
+    tag: `inbox-checkin-${bookingNumber}`,
+    url: sent && h.url ? h.url : `/inbox#c/${bookingNumber}`,
+  };
+}
+
 /** A cancellation request, with the deadline. */
 function cancelPayload(conv, bookingNumber, deadlineMs, nowMs) {
   const c = conv || {};
@@ -104,5 +118,5 @@ const isDeviceId = v => typeof v === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(v)
 
 module.exports = {
   QUIET_MS, STALE_MESSAGE_MS, STALE_CANCEL_MS,
-  burstDecision, firstLine, messagePayload, aiAnsweredPayload, needsYouPayload, cancelPayload, cleanSubscription, isDeviceId, tbilisiClock,
+  burstDecision, firstLine, messagePayload, aiAnsweredPayload, needsYouPayload, checkinPayload, cancelPayload, cleanSubscription, isDeviceId, tbilisiClock,
 };
