@@ -4,16 +4,9 @@
  * No Firebase, no network, no clock.
  */
 
-const OWNER_EMAIL = 'nikavibliani@gmail.com';
 const MAX_REPLY_CHARS = 2000;
 const STALE_SENDING_MS = 10 * 60 * 1000;   // "sending" with no report for this long becomes "unknown"
 const GUEST_DOMAIN = '@guest.booking.com';
-
-/** Only the owner's verified Google sign-in may send. `auth` is the callable's request.auth. */
-function isOwnerAuth(auth) {
-  const t = auth && auth.token;
-  return !!(t && t.email_verified === true && String(t.email || '').toLowerCase() === OWNER_EMAIL);
-}
 
 /** Plain text only: no markup, no control characters, no long runs of blank lines. */
 function cleanReplyText(input) {
@@ -51,6 +44,6 @@ function checkinRequestLink(email) {
 }
 
 module.exports = {
-  OWNER_EMAIL, MAX_REPLY_CHARS, STALE_SENDING_MS, GUEST_DOMAIN,
-  isOwnerAuth, cleanReplyText, isBookingNumber, isClientId, isGuestAddress, checkinRequestLink,
+  MAX_REPLY_CHARS, STALE_SENDING_MS, GUEST_DOMAIN,
+  cleanReplyText, isBookingNumber, isClientId, isGuestAddress, checkinRequestLink,
 };

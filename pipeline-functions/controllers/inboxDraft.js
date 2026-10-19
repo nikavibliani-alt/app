@@ -9,13 +9,14 @@
  *                     host message   -> my reply cancels any pending draft and removes the shown one
  *   inboxAiRun        runs every minute: for each conversation that is due, makes ONE draft for the
  *                     whole burst, after a last check that nothing newer arrived
- *   inboxDraftDiscard callable, owner only: the Discard button
+ *   inboxDraftDiscard callable, inbox users only: the Discard button
  *
  * Guards: switch globals/config.bookingAiDraftsEnabled (default on), at most 6 drafts per
  * conversation per hour, a daily total cap, one log line per AI call (no guest text).
  */
 
-const { isOwnerAuth, isBookingNumber } = require('../lib/inboxReply');
+const { isBookingNumber } = require('../lib/inboxReply');
+const { isInboxUser } = require('../lib/inboxAccess');
 const D = require('../lib/inboxDraft');
 const KB = require('../lib/guestKnowledge/knowledgeBase');
 const { canonicalPhone } = require('../lib/guestKnowledge/guestLookup');
@@ -236,7 +237,7 @@ async function runDue(deps) {
 // ---------------------------------------------------------------- owner: discard
 
 async function discardDraft(auth, data, deps) {
-  if (!isOwnerAuth(auth)) throw new Fail('permission-denied', 'Only the owner can do this.');
+  if (!isInboxUser(auth)) throw new Fail('permission-denied', 'Only people with inbox access can do this.');
   const bn = data && data.bookingNumber;
   if (!isBookingNumber(bn)) throw new Fail('invalid-argument', 'Bad booking number.');
   const ref = deps.db.collection(CONVERSATIONS).doc(bn);

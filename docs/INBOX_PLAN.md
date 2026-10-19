@@ -257,3 +257,53 @@ Undo: `git revert` this commit and redeploy `inboxAiRun`, or restore from tag `i
 You confirmed that the 3 iPhones in `push_subscriptions` are yours and your team's. Booking.com guest-message alerts and cancellation alerts now go to **every device in `push_subscriptions` and every device in `inbox_push_devices`**, once per phone: devices are de-duplicated by their push address, so a phone on both lists gets one alert. A phone that answers 404/410 is removed from the list(s) it is on (as `pushNotifications.js` already does). The burst rule, the alert text and the admin switch ("Booking.com message alerts") are unchanged. Registering a phone from the inbox page is now optional (it is only needed for a phone that is not on the admin list).
 Note: anyone who unlocks the admin with the shared password and turns on notifications now also gets Booking.com guest text. Remove a phone from `push_subscriptions` to stop that.
 Undo: `git revert` the commit and redeploy `inboxPushOnMessage` and `inboxPushOnConversation` (this goes back to `inbox_push_devices` only), or restore from tag `inbox-push-all-before`.
+
+## Update: inbox access for Nutsa
+
+- **One list.** `pipeline-functions/lib/inboxAccess.js` (`INBOX_USERS`: email and the name shown as "sent by") is the only list in the functions. The callables `inboxSendReply`, `inboxCheckinLink`, `inboxDraftDiscard` and `inboxAlerts` all use it. To add or remove a person: edit that list, edit `shared/inbox-auth.js` (the sign-in screen; a unit test fails if the two differ), paste the rules below with the email added, and redeploy those four functions.
+- **Same access as the owner:** read conversations and the "Check this" list, reply, use AI drafts (Send, Edit, Discard), mark Done, turn on alerts. Pricing and every other owner-only page stay Nika only: `isOwner()` and `shared/owner-auth.js` were not changed.
+- **Who sent a reply.** Every reply now stores `sentBy` (email) and `sentByName` on the outbox item and on the message; our reply bubbles show the name ("10:15 · Nutsa · Sent"). Older replies have no name.
+- **Alerts.** A phone registered from the inbox page records whose it is. The 3 admin phones in `push_subscriptions` still get every alert.
+- **Firestore rules to paste** (Firebase console, Firestore, Rules, Publish). Changes against the live rules: a new `isInboxUser()` function and the inbox rules use it instead of `isOwner()`. Tested without deploying (63 allow/deny cases: both people, a stranger, an unverified email, anonymous; pricing, WhatsApp, raw emails, outbox and push devices stay closed):
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'nikavibliani@gmail.com';
+    }
+    // People who run the Booking.com guest inbox (verified Google email). Pricing stays isOwner() only.
+    function isInboxUser() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['nikavibliani@gmail.com', 'nutsamargiani@gmail.com'];
+    }
+    function ownerOnly(c) { return c.matches('pricing_.*'); }
+    function serverOnly(c) { return c.matches('whatsapp_.*') || c.matches('inbox_.*'); }
+
+    // Guest inbox: inbox users may read, and may change only done / doneAt on a conversation.
+    // Everything else in inbox_* (raw emails, creating or deleting) stays server-only.
+    match /inbox_conversations/{conv} {
+      allow read: if isInboxUser();
+      allow update: if isInboxUser()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', 'doneAt']);
+      match /messages/{msg} {
+        allow read: if isInboxUser();
+      }
+    }
+    match /inbox_review/{item} {
+      allow read: if isInboxUser();
+    }
+
+    match /{col}/{doc=**} {
+      allow read, write: if !serverOnly(col) && (!ownerOnly(col) || isOwner());
+    }
+  }
+}
+```
+
+- **Until the rules are published, Nutsa gets "permission-denied" in the inbox** (the functions already accept her). Nika is not affected either way.
+- **Undo:** put the old rules back (the owner-only version is in the section "Step 3" above), `git revert` the commit, redeploy the four callables, or restore from tag `inbox-access-before`.

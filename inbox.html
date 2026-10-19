@@ -141,7 +141,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFirestore, doc, updateDoc, collection, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
-import { requireOwner } from "./shared/owner-auth.js";
+import { requireInboxUser, inboxUserFor } from "./shared/inbox-auth.js";
 import { replyWarnings } from "./shared/inbox-reply-warnings.js";
 
 const firebaseConfig = {
@@ -185,6 +185,7 @@ let msgUnsub = null;
 let msgs = [];
 let msgsFor = null;
 const pending = {};         // bookingNumber -> [{id, text, sentAt}] replies shown before the server has saved them
+let me = null;              // the signed-in inbox user ({email, name}), for the "sent by" name on my pending bubbles
 const sendingNow = {};      // bookingNumber -> true while a send is in flight (blocks a double send)
 
 /* ---------- time helpers ---------- */
@@ -463,7 +464,7 @@ function drawThread() {
   const prevTop = el.scrollTop;
 
   const items = [...msgs];
-  for (const p of pending[id] || []) items.push({ id: p.id, direction: "host", text: p.text, status: "waiting", sentAt: p.sentAt });
+  for (const p of pending[id] || []) items.push({ id: p.id, direction: "host", text: p.text, status: "waiting", sentAt: p.sentAt, sentByName: p.by });
   items.sort((a, b) => (toDate(a.sentAt)?.getTime() || 0) - (toDate(b.sentAt)?.getTime() || 0));
 
   const out = [];
@@ -475,7 +476,7 @@ function drawThread() {
     if (m.direction === "host") {
       const laterSame = items.slice(i + 1).some(x => x.direction === "host" && x.text === m.text && x.status !== "failed");
       out.push(`<div class="me"><div class="bubble--me">${esc(m.text)}</div>
-        <div class="me__status">${time}${time ? " · " : ""}${statusHtml(m, laterSame)}</div></div>`);
+        <div class="me__status">${time}${time ? " · " : ""}${m.sentByName ? esc(m.sentByName) + " · " : ""}${statusHtml(m, laterSame)}</div></div>`);
     } else {
       out.push(`<div class="bubble">${esc(m.text)}<div class="bubble__time">${time}</div></div>`);
     }
@@ -587,7 +588,7 @@ async function doSend(id, text, isRetry) {
   const clientId = newId();
   const ta = $("replyText");
   // My bubble shows at once; the box clears and keeps focus.
-  (pending[id] = pending[id] || []).push({ id: clientId, text, sentAt: new Date() });
+  (pending[id] = pending[id] || []).push({ id: clientId, text, sentAt: new Date(), by: me && me.name });
   if (!isRetry && ta && msgsFor === id) {
     ta.value = ""; drafts[id] = ""; ta.style.height = "auto"; $("replyCount").textContent = ""; $("replyErr").hidden = true;
     ta.focus();
@@ -639,7 +640,7 @@ function start() {
 }
 // Stay signed in on this phone or computer: the sign-in is kept in the browser's local storage until I sign out.
 try { await setPersistence(auth, browserLocalPersistence); } catch (e) { /* the default (also kept) is fine */ }
-requireOwner({ auth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut }, { onReady: start });
+requireInboxUser({ auth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut }, { onReady: user => { me = inboxUserFor(user && user.email); start(); } });
 </script>
 </body>
 </html>

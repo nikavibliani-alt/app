@@ -157,7 +157,7 @@ test('register saves a clean subscription, sends a test alert, and status / unre
   assert.deepStrictEqual(await C.alerts(OWNER, data, d), { registered: true });
   const saved = d.db.store.get('inbox_push_devices/device-abcdef01');
   assert.deepStrictEqual(saved.subscription, goodSub);
-  assert.strictEqual(saved.owner, true);
+  assert.strictEqual(saved.email, 'nikavibliani@gmail.com');
   assert.strictEqual(sent.length, 1);
   assert.strictEqual(sent[0].payload.title, 'Booking.com alerts are on');
   assert.deepStrictEqual(await C.alerts(OWNER, { action: 'status', deviceId: 'device-abcdef01' }, d), { registered: true });
@@ -181,4 +181,14 @@ test('bad subscriptions and ids are refused', async () => {
 test('a failed test alert is reported to the owner', async () => {
   const { d } = mk({}, { sendNotification: async () => { const e = new Error('nope'); e.statusCode = 403; throw e; } });
   await assert.rejects(C.alerts(OWNER, { action: 'register', deviceId: 'device-abcdef01', subscription: goodSub }, d), { code: 'failed-precondition' });
+});
+
+test('both inbox users can register a phone; the record says whose it is', async () => {
+  const { d } = mk();
+  const WIFE = { token: { email: 'nutsamargiani@gmail.com', email_verified: true } };
+  await C.alerts(WIFE, { action: 'register', deviceId: 'device-wife-001', subscription: goodSub }, d);
+  const saved = d.db.store.get('inbox_push_devices/device-wife-001');
+  assert.strictEqual(saved.email, 'nutsamargiani@gmail.com');
+  assert.strictEqual(saved.name, 'Nutsa');
+  assert.deepStrictEqual(await C.alerts(WIFE, { action: 'status', deviceId: 'device-wife-001' }, d), { registered: true });
 });

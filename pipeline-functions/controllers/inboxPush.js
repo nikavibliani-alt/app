@@ -10,13 +10,13 @@
  *
  *   inboxPushOnMessage       guest message -> one push per burst (none until 3 minutes pass without a guest message)
  *   inboxPushOnConversation  cancellation request -> a push with the deadline
- *   inboxAlerts              callable, owner only: register / unregister / status of this phone
+ *   inboxAlerts              callable, inbox users only: register / unregister / status of this phone
  *
  * No push for hidden emails, check-in time requests, my own replies, or old messages. Switch:
  * globals/config.bookingAlertsEnabled (default on).
  */
 
-const { isOwnerAuth } = require('../lib/inboxReply');
+const { inboxUser } = require('../lib/inboxAccess');
 const P = require('../lib/inboxPush');
 
 const CONVERSATIONS = 'inbox_conversations';
@@ -105,7 +105,8 @@ async function onConversationWritten(bookingNumber, before, after, deps) {
 
 /** register / unregister / status. deps: { db, now(), sendNotification }. */
 async function alerts(auth, data, deps) {
-  if (!isOwnerAuth(auth)) throw new Fail('permission-denied', 'Only the owner can do this.');
+  const user = inboxUser(auth);
+  if (!user) throw new Fail('permission-denied', 'Only people with inbox access can do this.');
   const d = data || {};
   if (!P.isDeviceId(d.deviceId)) throw new Fail('invalid-argument', 'Bad device id.');
   const ref = deps.db.collection(DEVICES).doc(d.deviceId);
@@ -121,7 +122,7 @@ async function alerts(auth, data, deps) {
   if (d.action === 'register') {
     const clean = P.cleanSubscription(d.subscription);
     if (!clean.ok) throw new Fail('invalid-argument', clean.error);
-    await ref.set({ subscription: clean.subscription, userAgent: String(d.userAgent || '').slice(0, 100), registeredAt: deps.now(), owner: true });
+    await ref.set({ subscription: clean.subscription, userAgent: String(d.userAgent || '').slice(0, 100), registeredAt: deps.now(), email: user.email, name: user.name });
     // A short test, so the owner sees at once that this phone works. It holds no guest text.
     try {
       await deps.sendNotification(clean.subscription, JSON.stringify({ title: 'Booking.com alerts are on', body: 'This phone gets an alert when a guest writes.', tag: 'inbox-test', url: '/inbox' }));

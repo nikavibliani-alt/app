@@ -2,12 +2,12 @@
 /**
  * Replying to guests from the inbox (step 4, see docs/INBOX_PLAN.md).
  *
- *   inboxSendReply     callable, owner only. Saves the reply as a host message (status "waiting")
+ *   inboxSendReply     callable, inbox users only (lib/inboxAccess.js). Saves the reply as a host message (status "waiting")
  *                      and as an item in inbox_outbox. Marks the conversation answered.
  *   inboxOutbox        HTTPS, key protected (same INBOX_INGEST_KEY as the ingest function). The
  *                      Gmail script asks it for waiting replies ("pull") and tells it how each
  *                      one went ("report"). A pulled item is marked "sending" first.
- *   inboxCheckinLink   callable, owner only. The Extranet page of a check-in time request.
+ *   inboxCheckinLink   callable, inbox users only. The Extranet page of a check-in time request.
  *
  * After saving a reply, inboxSendReply pokes the Gmail script's web app so the reply goes out at
  * once. That is best effort: if it fails or is slow, the script's every-minute run sends it.
@@ -23,9 +23,10 @@
 
 const crypto = require('crypto');
 const {
-  isOwnerAuth, cleanReplyText, isBookingNumber, isClientId, isGuestAddress,
+  cleanReplyText, isBookingNumber, isClientId, isGuestAddress,
   checkinRequestLink, STALE_SENDING_MS,
 } = require('../lib/inboxReply');
+const { inboxUser } = require('../lib/inboxAccess');
 
 const CONVERSATIONS = 'inbox_conversations';
 const OUTBOX = 'inbox_outbox';
@@ -45,7 +46,8 @@ const millis = v => (v && typeof v.toMillis === 'function' ? v.toMillis() : v &&
 
 /** deps: { db, now(), trigger?() }. Returns { ok, outboxId, duplicate }. */
 async function sendReply(auth, data, deps) {
-  if (!isOwnerAuth(auth)) throw fail('permission-denied', 'Only the owner can send replies.');
+  const user = inboxUser(auth);
+  if (!user) throw fail('permission-denied', 'Only people with inbox access can send replies.');
   const d = data || {};
   if (!isBookingNumber(d.bookingNumber)) throw fail('invalid-argument', 'Bad booking number.');
   if (!isClientId(d.clientId)) throw fail('invalid-argument', 'Bad request id.');
@@ -78,6 +80,8 @@ async function sendReply(auth, data, deps) {
       createdAt: t,
       expectedTo: c.replyTo.toLowerCase(),
       gmailMessageId: latestGuest.id,
+      sentBy: user.email,
+      sentByName: user.name,
     });
     tx.create(msgRef, {
       direction: 'host',
@@ -85,6 +89,8 @@ async function sendReply(auth, data, deps) {
       sentAt: t,
       status: 'waiting',
       outboxId: d.clientId,
+      sentBy: user.email,
+      sentByName: user.name,
       createdAt: t,
     });
     tx.update(convRef, {
@@ -106,7 +112,7 @@ async function sendReply(auth, data, deps) {
 // ---------------------------------------------------------------- owner: check-in request page
 
 async function checkinLink(auth, data, deps) {
-  if (!isOwnerAuth(auth)) throw fail('permission-denied', 'Only the owner can do this.');
+  if (!inboxUser(auth)) throw fail('permission-denied', 'Only people with inbox access can do this.');
   const bn = data && data.bookingNumber;
   if (!isBookingNumber(bn)) throw fail('invalid-argument', 'Bad booking number.');
   const snap = await deps.db.collection(RAW).where('conversationId', '==', bn).where('sortedAs', '==', 'checkin_request').get();

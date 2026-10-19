@@ -377,8 +377,11 @@ test('at most 6 drafts per conversation per hour, and a daily cap', async () => 
   assert.match(conv(d2).aiDraft.reason, /daily AI draft limit/);
 });
 
-test('discard: owner only', async () => {
+test('discard: both inbox users, nobody else', async () => {
   const d = mk({ seed: baseSeed({ aiDraft: { kind: 'reply', text: 'x' } }) });
+  await assert.rejects(C.discardDraft({ token: { email: 'someone@example.com', email_verified: true } }, { bookingNumber: BN }, d), { code: 'permission-denied' });
+  assert.deepStrictEqual(await C.discardDraft({ token: { email: 'nutsamargiani@gmail.com', email_verified: true } }, { bookingNumber: BN }, d), { ok: true });
+  d.db.store.set(`inbox_conversations/${BN}`, { ...conv(d), aiDraft: { kind: 'reply', text: 'x' } });
   await assert.rejects(C.discardDraft(null, { bookingNumber: BN }, d), { code: 'permission-denied' });
   await assert.rejects(C.discardDraft(OWNER, { bookingNumber: 'abc' }, d), { code: 'invalid-argument' });
   assert.deepStrictEqual(await C.discardDraft(OWNER, { bookingNumber: BN }, d), { ok: true });

@@ -61,11 +61,7 @@ const seed = (over = {}) => ({
 });
 const deps = db => ({ db, now: mkNow() });
 
-test('helpers: owner check, text cleaning, ids, addresses', () => {
-  assert.ok(L.isOwnerAuth(OWNER));
-  assert.ok(!L.isOwnerAuth(null));
-  assert.ok(!L.isOwnerAuth({ token: { email: 'nikavibliani@gmail.com', email_verified: false } }));
-  assert.ok(!L.isOwnerAuth({ token: { email: 'other@example.com', email_verified: true } }));
+test('helpers: text cleaning, ids, addresses', () => {
   assert.strictEqual(L.cleanReplyText('  Hello\r\n\r\n\r\n\r\nthere \u0007 ').text, 'Hello\n\nthere');
   assert.ok(!L.cleanReplyText('   ').ok);
   assert.ok(!L.cleanReplyText('x'.repeat(2001)).ok);
@@ -271,4 +267,41 @@ test('poke: only the Apps Script web app address, key in the body, gives up on a
   await assert.rejects(C.pokeWebApp('http://script.google.com/macros/s/abc/exec', 'secret', async () => ({})), /bad web app url/);
   const slow = (u, o) => new Promise((_, rej) => o.signal.addEventListener('abort', () => rej(new Error('aborted'))));
   await assert.rejects(C.pokeWebApp(url, 'secret', slow, 20), /aborted/);
+});
+
+const WIFE = { token: { email: 'nutsamargiani@gmail.com', email_verified: true } };
+const STRANGER = { token: { email: 'someone@example.com', email_verified: true } };
+
+test('both inbox users can send, and the reply says who sent it', async () => {
+  for (const [auth, email, name] of [[OWNER, 'nikavibliani@gmail.com', 'Nika'], [WIFE, 'nutsamargiani@gmail.com', 'Nutsa']]) {
+    const db = fakeDb(seed());
+    await C.sendReply(auth, { bookingNumber: NUM, clientId: 'client-' + name, text: 'Hello' }, deps(db));
+    const o = db.store.get('inbox_outbox/client-' + name);
+    const m = db.store.get(`inbox_conversations/${NUM}/messages/client-${name}`);
+    assert.strictEqual(o.sentBy, email);
+    assert.strictEqual(o.sentByName, name);
+    assert.strictEqual(m.sentBy, email);
+    assert.strictEqual(m.sentByName, name);
+  }
+  const db = fakeDb(seed());
+  await assert.rejects(C.sendReply(STRANGER, { bookingNumber: NUM, clientId: CID, text: 'Hello' }, deps(db)), { code: 'permission-denied' });
+  await assert.rejects(C.sendReply({ token: { email: 'nutsamargiani@gmail.com', email_verified: false } }, { bookingNumber: NUM, clientId: CID, text: 'Hello' }, deps(db)), { code: 'permission-denied' });
+});
+
+test('the check-in link callable is open to both inbox users and nobody else', async () => {
+  const db = fakeDb({});
+  assert.deepStrictEqual(await C.checkinLink(WIFE, { bookingNumber: NUM }, deps(db)), { url: null });
+  await assert.rejects(C.checkinLink(STRANGER, { bookingNumber: NUM }, deps(db)), { code: 'permission-denied' });
+});
+
+test('the allowed-people list: one list on the server, the sign-in screen matches it', async () => {
+  const A = require('../lib/inboxAccess');
+  assert.deepStrictEqual(A.INBOX_EMAILS, ['nikavibliani@gmail.com', 'nutsamargiani@gmail.com']);
+  assert.strictEqual(A.inboxUser({ token: { email: 'NutsaMargiani@Gmail.com', email_verified: true } }).name, 'Nutsa');
+  assert.strictEqual(A.inboxUser(null), null);
+  assert.strictEqual(A.inboxUser({ token: { email: 'nikavibliani@gmail.com' } }), null, 'unverified email');
+  const client = await import('../../shared/inbox-auth.js');
+  assert.deepStrictEqual(client.INBOX_USERS, A.INBOX_USERS, 'shared/inbox-auth.js must list the same people');
+  assert.strictEqual(client.inboxUserFor('nutsamargiani@gmail.com').name, 'Nutsa');
+  assert.strictEqual(client.inboxUserFor('x@example.com'), null);
 });
