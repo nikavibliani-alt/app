@@ -154,6 +154,13 @@ service cloud.firestore {
    (102 seconds from tap to sent, before instant sending existed). Nothing reached the server
    around 16:40 to 16:50. Details in the final report.
 
+3. **Which property is "Super Luxury Apartments"?** The WhatsApp knowledge only covers Shartava. Conversations of any other property get "Needs you: no knowledge for this property" (safe, no guessing). If it is one of the VGL/XCV/Orbeliani houses, tell me and I can add its facts later; I did not invent any.
+4. **Bag storage and door codes.** For Booking.com drafts the bag storage code is removed from the prompt and the draft points to the check-in page (`app.maxelaapartments.com/checkin-guest`), as you asked. The WhatsApp bot still gives that code. I did not touch it.
+5. **"Needs you" word list is English only.** Refunds, payments, discounts, date changes, early check-in, late check-out and complaints are caught in code in English. In Georgian, Russian and other languages the model decides under the same rules. If you see misses, send me the (masked) phrases.
+6. **Draft speed.** A scheduler checks once a minute, so a draft appears 60 to 120 seconds after the guest's last message. Cloud Tasks would be exact but needs extra setup; I took the simpler, safer one.
+7. **Limits I chose.** 6 drafts per conversation per hour, 60 model calls per day in total (`DAILY_CAP` in `controllers/inboxDraft.js`). Easy to change.
+8. **Live test left behind.** To test the live pipeline I made one fake conversation, `inbox_conversations/9999990001` (marked `test: true`, fake guest, fake address, no messages counted, so it never shows in your list), and one fake guest message. The drafter made a draft for it in about 90 seconds. Nothing can be sent from it. I did not delete it (you said never delete data); delete it in the console when you like. It also used 1 of the 60 daily calls.
+
 ## Part 1 details (chat design)
 
 - `inbox.html`: one screen on a phone (list, then chat), list and chat side by side from 860 px wide.
