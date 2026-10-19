@@ -159,6 +159,7 @@ const fns = getFunctions(app, "europe-west1");
 const sendReplyFn = httpsCallable(fns, "inboxSendReply");
 const checkinLinkFn = httpsCallable(fns, "inboxCheckinLink");
 const discardDraftFn = httpsCallable(fns, "inboxDraftDiscard");
+const alertsFn = httpsCallable(fns, "inboxAlerts");
 
 const TZ = "Asia/Tbilisi";
 const $ = id => document.getElementById(id);
@@ -246,6 +247,57 @@ function extranetUrl(c) {
   return `https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/messaging/inbox.html?product_type=POST_BOOKING&product_id=${n}&hotel_id=${encodeURIComponent(c.hotelId)}&res_id=${n}&lang=en`;
 }
 
+/* ---------- alerts on this phone (owner only: the server accepts a phone only from my verified Google sign-in) ---------- */
+const alertsSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+let alertsOn = (() => { try { return localStorage.getItem("inbox_alerts_on") === "1"; } catch { return false; } })();
+let alertsBusy = false;
+const deviceId = () => {
+  try {
+    let id = localStorage.getItem("inbox_device_id");
+    if (!id) { id = newId(); localStorage.setItem("inbox_device_id", id); }
+    return id;
+  } catch { return newId(); }
+};
+const alertsLabel = () => (alertsBusy ? "Alerts..." : alertsOn ? "Alerts on" : "Turn on alerts");
+function paintAlerts() { const b = $("alertsBtn"); if (b) b.textContent = alertsLabel(); }
+const b64ToBytes = s => { const p = "=".repeat((4 - (s.length % 4)) % 4); const r = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from([...r].map(c => c.charCodeAt(0))); };
+async function checkAlertsStatus() {
+  try {
+    const r = await alertsFn({ action: "status", deviceId: deviceId() });
+    alertsOn = !!(r.data && r.data.registered) && Notification.permission === "granted";
+    try { localStorage.setItem("inbox_alerts_on", alertsOn ? "1" : "0"); } catch {}
+    paintAlerts();
+  } catch (e) { /* keep what we know */ }
+}
+async function toggleAlerts() {
+  if (alertsBusy) return;
+  if (!alertsSupported()) { alert("To get alerts, open the Maxela app from its Home Screen icon (not from Safari), then tap here."); return; }
+  alertsBusy = true; paintAlerts();
+  try {
+    if (alertsOn) {
+      if (!confirm("Turn off Booking.com message alerts on this phone?")) return;
+      await alertsFn({ action: "unregister", deviceId: deviceId() });
+      alertsOn = false;
+    } else {
+      const perm = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+      if (perm !== "granted") { alert(perm === "denied" ? "Notifications are blocked for this app. Turn them on in the phone Settings, then tap here again." : "Notifications were not allowed."); return; }
+      const reg = await navigator.serviceWorker.register("/sw.js").then(() => navigator.serviceWorker.ready);
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        const { VAPID_PUBLIC_KEY } = await import("./shared/push-config.js");
+        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC_KEY) });
+      }
+      await alertsFn({ action: "register", deviceId: deviceId(), subscription: sub.toJSON(), userAgent: navigator.userAgent.slice(0, 100) });
+      alertsOn = true;
+    }
+    try { localStorage.setItem("inbox_alerts_on", alertsOn ? "1" : "0"); } catch {}
+  } catch (e) {
+    alert("Alerts: " + ((e && e.message) || "something went wrong") + ".");
+  } finally {
+    alertsBusy = false; paintAlerts();
+  }
+}
+
 /* ---------- routing ---------- */
 const route = () => {
   const h = location.hash.replace(/^#/, "");
@@ -273,6 +325,7 @@ function renderList(r) {
   const rows = vis.filter(c => tab === "needs" ? needsReply(c) : tab === "done" ? !!c.done : true);
   $("listTop").innerHTML = `
     <div class="top__row"><div class="top__title">Guest inbox</div>
+      <button class="linkbtn" id="alertsBtn" type="button">${esc(alertsLabel())}</button>
       <button class="linkbtn" id="adminBtn" type="button">Admin</button></div>
     <div class="tabs">
       <button class="tab ${tab === "needs" ? "on" : ""}" data-tab="needs" type="button">Needs reply<small>${nNeeds}</small></button>
@@ -283,6 +336,7 @@ function renderList(r) {
   $("listTop").querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.tab; renderList(route()); });
   $("reviewBtn").onclick = () => go("review");
   $("adminBtn").onclick = () => { location.href = "/checkin-admin"; };
+  $("alertsBtn").onclick = toggleAlerts;
 
   const body = $("listBody");
   const keep = body.scrollTop;
@@ -581,6 +635,7 @@ function start() {
   onSnapshot(collection(db, "inbox_review"),
     s => { reviewItems = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.resolved); loaded.review = true; render(); }, () => {});
   render();
+  if (alertsSupported() && Notification.permission === "granted") checkAlertsStatus();
 }
 // Stay signed in on this phone or computer: the sign-in is kept in the browser's local storage until I sign out.
 try { await setPersistence(auth, browserLocalPersistence); } catch (e) { /* the default (also kept) is fine */ }

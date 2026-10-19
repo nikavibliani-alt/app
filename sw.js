@@ -37,6 +37,14 @@ self.addEventListener('notificationclick', event => {
   const url = event.notification.data?.url || '/checkin-admin';
   event.waitUntil(
     clients.matchAll({type:'window'}).then(clientList => {
+      // Booking.com inbox alerts (/inbox#c/<booking number>): open that conversation, in the inbox window if one is open.
+      if(/^\/inbox(?:[#?]|$)/.test(url)){
+        for(const client of clientList){
+          if(/\/inbox(?:[#?]|$)/.test(client.url) && 'navigate' in client)return client.navigate(url).then(c => (c || client).focus());
+        }
+        if(clients.openWindow) return clients.openWindow(url);
+        return;
+      }
       for(const client of clientList){
         if(client.url.includes('checkin-admin') && 'focus' in client){
           // deep-link notifications (e.g. /checkin-admin?tab=damage) must change the open tab too
