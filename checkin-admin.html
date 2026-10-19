@@ -770,7 +770,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1014c · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1014d · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -896,15 +896,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 
   <div class="pane" id="pane-more">
     <div class="more-section">Operations</div>
-    <div class="more-list">
-      <button class="more-item" type="button" onclick="switchTab('hk')">Housekeeping</button>
-      <button class="more-item" id="more-damage-item" hidden type="button" onclick="window._dmgFromHk=false;switchTab('damage')">Damage reports<span class="more-hint" id="more-damage-hint">Airbnb claim evidence</span></button>
-      <button class="more-item" type="button" onclick="openAptsGuest()">Apartments &amp; guest page</button>
-      <button class="more-item" type="button" onclick="switchTab('history')">Guest history</button>
-      <button class="more-item" type="button" onclick="location.href='/pricing-v2'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Pricing engine</button>
-      <button class="more-item" type="button" onclick="location.href='/inbox'">Guest inbox<span class="more-badge" id="more-inbox-badge" style="display:none">0</span><span class="more-hint" id="more-inbox-hint">Booking.com messages</span></button>
-      <button class="more-item" type="button" onclick="switchTab('failures')" id="more-failures-btn">Failed searches<span class="more-badge" id="sf-more-badge" style="display:none">0</span></button>
-    </div>
+    <div class="more-list" id="more-list-ops"></div>
     <div class="more-section">Guest experience</div>
     <div class="more-list">
       <div class="more-item more-item--switch" role="group" aria-label="AI Guest Assistant">
@@ -937,12 +929,10 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
           <span class="switch-track"></span>
         </label>
       </div>
-      <button class="more-item" type="button" onclick="switchTab('wasettings')">WhatsApp &amp; bot settings<span class="more-hint">Modes · templates</span></button>
+      <span id="more-list-guest" style="display:contents"></span>
     </div>
     <div class="more-section">Housekeeping setup</div>
-    <div class="more-list">
-      <button class="more-item" type="button" onclick="switchTab('hksettings')">HK settings</button>
-    </div>
+    <div class="more-list" id="more-list-hksetup"></div>
     <div class="more-section">App</div>
     <div class="more-list">
       <button class="more-item" type="button" onclick="switchTab('navsettings')">Tab bar layout</button>
@@ -1470,6 +1460,23 @@ const DESTINATIONS=[
 ];
 /* what the tab bar layout can use: same list, short label shown on the tab */
 const NAV_POOL=Object.fromEntries(DESTINATIONS.map(d=>[d.id,{...d,label:d.tabLabel,fullLabel:d.label,pane:d.tab||null}]));
+/* More menu buttons come from the same list (switches, Notifications, Tab bar layout and Sign out are not destinations) */
+function renderMoreMenu(){
+  const covered=navBarPanes(loadNavSlots());
+  const inBar=new Set(loadNavSlots());
+  const html={ops:'',guest:'',hksetup:''};
+  for(const d of DESTINATIONS){
+    if(d.more==='ifNotInBar'&&inBar.has(d.id))continue;
+    const n=d.badge?(_destBadge[d.badge]||0):0;
+    const click=d.moreClick||(d.href?`location.href='${d.href}'`:`switchTab('${d.tab}')`);
+    html[d.section||'ops']+=`<button class="more-item" type="button"${d.moreId?` id="${d.moreId}"`:''}${d.hiddenUntilLoaded?' hidden':''} onclick="${click}">${esc(d.label)}`
+      +(d.badge?`<span class="more-badge" data-badge="${d.badge}" style="display:${n?'inline-flex':'none'}">${n>99?'99+':n}</span>`:'')
+      +(d.hint?`<span class="more-hint"${d.hintId?` id="${d.hintId}"`:''}>${esc(d.hint)}</span>`:'')+'</button>';
+  }
+  for(const [k,id] of [['ops','more-list-ops'],['guest','more-list-guest'],['hksetup','more-list-hksetup']]){
+    const el=document.getElementById(id);if(el)el.innerHTML=html[k];
+  }
+}
 function navTabSvg(id,size=22){return featherIcon(NAV_POOL[id]?.icon||'circle',size,1.8);}
 function navDestIsLink(id){return !!NAV_POOL[id]?.href;}
 function navDestClick(d){return d.href?`location.href='${d.href}'`:`switchTab('${d.pane}')`;}
@@ -1573,6 +1580,7 @@ function renderNavBar(){
   }
   html+=`<button class="nav__btn${covered.has(currentTab)?'':' active'}" data-tab="more" onclick="switchTab('more')">${featherIcon('more-horizontal',22,1.8)}More</button>`;
   nav.innerHTML=html;
+  renderMoreMenu();
   if(elevData)document.getElementById('nav-elev')?.classList.toggle('has-alert',elevFreshness().cls==='old');
 }
 
