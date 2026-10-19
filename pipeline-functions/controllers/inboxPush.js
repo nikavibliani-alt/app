@@ -1,10 +1,12 @@
 'use strict';
 /**
  * Alerts for the Booking.com inbox (see docs/INBOX_PLAN.md). Uses the same Web Push setup and VAPID
- * keys as pushNotifications.js, but NOT its device list: that list (`push_subscriptions`) holds every
- * phone that ever unlocked the admin page with the shared password, and a guest's message must reach
- * only the owner. Guest alerts go to `inbox_push_devices` (server-only), and a device gets into it
- * only through the owner-only callable below, which needs the owner's verified Google sign-in.
+ * keys as pushNotifications.js.
+ *
+ * Who gets an alert: every device in `push_subscriptions` (the admin phones, like the other admin
+ * alerts; the owner confirmed those are his and his team's) AND every device in `inbox_push_devices`
+ * (phones registered from the inbox page through the owner-only callable below). A phone that is on
+ * both lists gets ONE alert: devices are de-duplicated by their push address.
  *
  *   inboxPushOnMessage       guest message -> one push per burst (none until 3 minutes pass without a guest message)
  *   inboxPushOnConversation  cancellation request -> a push with the deadline
@@ -28,27 +30,38 @@ async function alertsEnabled(db) {
   return !(cfg.exists && cfg.data().bookingAlertsEnabled === false);
 }
 
+const LISTS = ['push_subscriptions', DEVICES];
+
 /**
- * Sends to the owner's registered devices only. A device that answers 404/410 is removed.
+ * Sends to every device in both lists, once per phone (de-duplicated by push address).
+ * A device that answers 404/410 is removed from the list(s) it is on.
  * deps: { db, sendNotification(subscription, jsonString) }.
  */
 async function sendToOwnerDevices(payload, deps) {
   const { db, sendNotification } = deps;
-  const snap = await db.collection(DEVICES).get();
+  const byEndpoint = new Map();
+  for (const list of LISTS) {
+    const snap = await db.collection(list).get();
+    for (const d of snap.docs) {
+      const { subscription } = d.data() || {};
+      const endpoint = subscription && subscription.endpoint;
+      if (!endpoint) continue;
+      if (!byEndpoint.has(endpoint)) byEndpoint.set(endpoint, { subscription, docs: [] });
+      byEndpoint.get(endpoint).docs.push(d);
+    }
+  }
   let sent = 0;
   let removed = 0;
-  await Promise.allSettled(snap.docs.map(async d => {
-    const { subscription } = d.data() || {};
-    if (!subscription) return;
+  await Promise.allSettled([...byEndpoint.values()].map(async ({ subscription, docs }) => {
     try {
       await sendNotification(subscription, JSON.stringify(payload));
       sent++;
     } catch (e) {
-      if (e && (e.statusCode === 404 || e.statusCode === 410)) { removed++; await d.ref.delete(); }
-      else console.warn('inboxPush: send failed', d.id, e && (e.statusCode || e.message));
+      if (e && (e.statusCode === 404 || e.statusCode === 410)) { removed++; await Promise.all(docs.map(d => d.ref.delete())); }
+      else console.warn('inboxPush: send failed', docs[0].id, e && (e.statusCode || e.message));
     }
   }));
-  return { sent, removed, devices: snap.docs.length };
+  return { sent, removed, devices: byEndpoint.size };
 }
 
 /** deps: { db, nowMs(), ts(ms), sendNotification }. */

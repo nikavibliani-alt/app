@@ -56,7 +56,7 @@ test('one push per burst: the first message pushes, words that follow do not', a
   const { d, sent } = mk();
   assert.strictEqual((await C.onGuestMessage(BN, 'm1', guest('Hello'), d)).action, 'pushed');
   for (let i = 2; i <= 6; i++) { clock += 30000; assert.strictEqual((await C.onGuestMessage(BN, 'm' + i, guest('word ' + i), d)).action, 'same burst'); }
-  assert.strictEqual(sent.length, 1, 'six messages, one push');
+  assert.strictEqual(sent.length, 2, 'six messages, one push to each of the two phones');
 });
 
 test('a new push only after 3 minutes without a guest message', async () => {
@@ -65,10 +65,10 @@ test('a new push only after 3 minutes without a guest message', async () => {
   await C.onGuestMessage(BN, 'm1', guest('one'), d);
   clock += 2 * 60000 + 50000; await C.onGuestMessage(BN, 'm2', guest('two'), d);       // 2m50 later: same burst, restarts the quiet time
   clock += 2 * 60000 + 50000; await C.onGuestMessage(BN, 'm3', guest('three'), d);     // 2m50 after the last message: still same burst
-  assert.strictEqual(sent.length, 1);
+  assert.strictEqual(sent.length, 2, 'one push, two phones');
   clock += 3 * 60000; const r = await C.onGuestMessage(BN, 'm4', guest('four'), d);    // 3 minutes of quiet: new burst
   assert.strictEqual(r.action, 'pushed');
-  assert.strictEqual(sent.length, 2);
+  assert.strictEqual(sent.length, 4, 'a second push to the two phones');
 });
 
 test('the push says guest name, listing and the first line, and opens that conversation', async () => {
@@ -81,15 +81,23 @@ test('the push says guest name, listing and the first line, and opens that conve
   assert.strictEqual(P.firstLine('\n\n  hi there  \nsecond'), 'hi there');
 });
 
-test('only the owner devices get it, never the old admin device list', async () => {
+test('every device in both lists gets it, and a phone on both lists gets it once', async () => {
+  clock = T0;
+  const both = { subscription: { endpoint: 'https://web.push.apple.com/BOTH', keys: { p256dh: 'p', auth: 'a' } } };
+  const { d, sent } = mk({ 'push_subscriptions/phone-both': both, 'inbox_push_devices/phone-both-inbox': both });
+  const r = await C.onGuestMessage(BN, 'm1', guest('Hello'), d);
+  assert.deepStrictEqual(sent.map(s => s.endpoint).sort(), ['https://web.push.apple.com/AAA', 'https://web.push.apple.com/BOTH', 'https://web.push.apple.com/STAFF']);
+  assert.strictEqual(r.sent, 3);
+  assert.strictEqual(r.devices, 3, 'four documents, three phones');
+});
+
+test('with no device at all nothing is sent and nothing breaks', async () => {
   clock = T0;
   const { d, sent } = mk();
-  await C.onGuestMessage(BN, 'm1', guest('Hello'), d);
-  assert.deepStrictEqual(sent.map(s => s.endpoint), ['https://web.push.apple.com/AAA']);
-  const { d: d2, sent: sent2 } = mk({ 'inbox_push_devices/owner-phone-1': undefined });
-  d2.db.store.delete('inbox_push_devices/owner-phone-1');
-  const r = await C.onGuestMessage(BN, 'm1', guest('Hello'), d2);
-  assert.strictEqual(sent2.length, 0, 'no owner device registered: nothing is sent to anyone');
+  d.db.store.delete('inbox_push_devices/owner-phone-1');
+  d.db.store.delete('push_subscriptions/staff-phone');
+  const r = await C.onGuestMessage(BN, 'm1', guest('Hello'), d);
+  assert.strictEqual(sent.length, 0);
   assert.strictEqual(r.devices, 0);
 });
 
@@ -119,16 +127,16 @@ test('a cancellation request pushes once with the deadline; nothing else on that
   assert.strictEqual((await C.onConversationWritten(BN, before, before, d)).action, 'no cancel request');
   const old = { ...before, cancelRequest: { at: stamp(T0 - 7 * 3600000), deadline: stamp(deadline) } };
   assert.strictEqual((await C.onConversationWritten(BN, before, old, d)).action, 'stale');
-  assert.strictEqual(sent.length, 1);
+  assert.strictEqual(sent.length, 2, 'one alert, two phones');
 });
 
-test('a phone that no longer exists is removed from the owner list', async () => {
+test('a phone that no longer exists is removed from the list it is on, others are kept', async () => {
   clock = T0;
-  const { d } = mk({}, { sendNotification: async () => { const e = new Error('gone'); e.statusCode = 410; throw e; } });
+  const { d } = mk({}, { sendNotification: async sub => { if (sub.endpoint.endsWith('/STAFF')) { const e = new Error('gone'); e.statusCode = 410; throw e; } } });
   const r = await C.onGuestMessage(BN, 'm1', guest('Hello'), d);
   assert.strictEqual(r.removed, 1);
-  assert.ok(!d.db.store.has('inbox_push_devices/owner-phone-1'));
-  assert.ok(d.db.store.has('push_subscriptions/staff-phone'), 'the old admin list is never touched');
+  assert.ok(!d.db.store.has('push_subscriptions/staff-phone'));
+  assert.ok(d.db.store.has('inbox_push_devices/owner-phone-1'));
 });
 
 // ---------------------------------------------------------------- registering a phone

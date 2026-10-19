@@ -251,3 +251,9 @@ Undo: `git revert` this commit and redeploy `inboxAiRun`, or restore from tag `i
 - Needs the Maxela app opened from the iPhone Home Screen icon (iOS only allows Web Push there).
 - Functions: `inboxPushOnMessage`, `inboxPushOnConversation`, `inboxAlerts`. Secrets: the existing `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`.
 - **Undo:** switch off in the admin (instant), or `firebase functions:delete inboxPushOnMessage inboxPushOnConversation inboxAlerts --region europe-west1 --project sleepy-5c962`, `git revert` the commit, or restore from tag `inbox-push-before`. The `inbox_push_devices` documents can stay.
+
+### Change: alerts also go to the admin phones
+
+You confirmed that the 3 iPhones in `push_subscriptions` are yours and your team's. Booking.com guest-message alerts and cancellation alerts now go to **every device in `push_subscriptions` and every device in `inbox_push_devices`**, once per phone: devices are de-duplicated by their push address, so a phone on both lists gets one alert. A phone that answers 404/410 is removed from the list(s) it is on (as `pushNotifications.js` already does). The burst rule, the alert text and the admin switch ("Booking.com message alerts") are unchanged. Registering a phone from the inbox page is now optional (it is only needed for a phone that is not on the admin list).
+Note: anyone who unlocks the admin with the shared password and turns on notifications now also gets Booking.com guest text. Remove a phone from `push_subscriptions` to stop that.
+Undo: `git revert` the commit and redeploy `inboxPushOnMessage` and `inboxPushOnConversation` (this goes back to `inbox_push_devices` only), or restore from tag `inbox-push-all-before`.
