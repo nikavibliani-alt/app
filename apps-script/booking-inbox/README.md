@@ -18,8 +18,9 @@ The web app is called by the `inboxSendReply` Cloud Function right after Send, w
 stays as a backup. Both only send what the server hands out as `waiting`; the server marks an item
 `sending` before handing it out, so a reply is never sent twice.
 
-The URL goes to the server with `node scripts/inbox-set-script-url.js <url>` (saved in Firestore
-`inbox_meta/outbox_config`). Use the URL that ends in `/exec`.
+The URL goes to the server as the Firebase secret `INBOX_SCRIPT_URL`
+(`firebase functions:secrets:set INBOX_SCRIPT_URL`, then redeploy `inboxSendReply`). Use the URL
+that ends in `/exec`.
 
 ## Updating the script
 

@@ -139,5 +139,5 @@ service cloud.firestore {
   reply address first.
 - The Gmail script is also a web app (`doPost`, execute as the account, access Anyone, key in the
   body). `inboxSendReply` pokes it right after saving a reply, waiting at most 6 seconds. If that
-  fails, the every-minute run sends it. URL: `node scripts/inbox-set-script-url.js <url>`
-  (`inbox_meta/outbox_config`, server-only).
+  fails, the every-minute run sends it. The web app URL is the Firebase secret `INBOX_SCRIPT_URL`
+  (`firebase functions:secrets:set INBOX_SCRIPT_URL`, then redeploy `inboxSendReply`).

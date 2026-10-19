@@ -262,6 +262,7 @@ function registerCloudFunctions() {
   const { defineSecret } = require('firebase-functions/params');
   const { getFirestore, Timestamp } = require('firebase-admin/firestore');
   const INBOX_INGEST_KEY = defineSecret('INBOX_INGEST_KEY');
+  const INBOX_SCRIPT_URL = defineSecret('INBOX_SCRIPT_URL');
   const region = 'europe-west1';
   const deps = () => ({ db: getFirestore(), now: () => Timestamp.now() });
   const wrap = fn => async request => {
@@ -274,15 +275,10 @@ function registerCloudFunctions() {
     }
   };
 
-  // Pokes the Gmail script web app (URL saved in inbox_meta/outbox_config by scripts/inbox-set-script-url.js).
-  const triggerScript = async () => {
-    const snap = await getFirestore().collection('inbox_meta').doc('outbox_config').get();
-    const url = snap.exists && snap.data().webAppUrl;
-    if (!url) return;
-    await pokeWebApp(url, INBOX_INGEST_KEY.value());
-  };
+  // Pokes the Gmail script web app. Its URL is the Firebase secret INBOX_SCRIPT_URL (not in the repo).
+  const triggerScript = () => pokeWebApp(INBOX_SCRIPT_URL.value().trim(), INBOX_INGEST_KEY.value());
   const inboxSendReply = onCall(
-    { region, secrets: [INBOX_INGEST_KEY], timeoutSeconds: 30, maxInstances: 5, memory: '256MiB' },
+    { region, secrets: [INBOX_INGEST_KEY, INBOX_SCRIPT_URL], timeoutSeconds: 30, maxInstances: 5, memory: '256MiB' },
     wrap((auth, data, d) => sendReply(auth, data, { ...d, trigger: triggerScript }))
   );
   const inboxCheckinLink = onCall({ region, timeoutSeconds: 30, maxInstances: 5, memory: '256MiB' }, wrap(checkinLink));
