@@ -114,6 +114,14 @@ body.show-chat #chatPane{display:flex}
 .reply__err{color:var(--status-red);font-size:13px;margin:0 0 6px}
 .reply__count{font-size:11px;color:var(--text-muted);text-align:right;margin-top:2px}
 .reply__hint{font-size:11px;color:var(--text-muted);margin-top:2px}
+.tag--amber{background:var(--bg-amber);color:var(--status-amber)}
+.draft{flex:none;margin:0 16px 8px;border:1px solid var(--border);background:var(--card-bg);border-radius:12px;padding:10px 12px}
+.draft__label{font-size:12px;font-weight:700;color:var(--text-muted)}
+.draft__text{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px;max-height:28vh;overflow-y:auto;font-size:15px}
+.draft__btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.draft--needs{background:var(--bg-amber);border-color:#ecd98b}
+.draft--needs .draft__label,.draft--needs .draft__text{color:var(--status-amber)}
+.draft--info{background:#f1f1f1}
 .wbox{background:var(--bg-amber);color:var(--status-amber);border:1px solid #ecd98b;border-radius:10px;padding:8px 10px;font-size:13px;margin-bottom:8px}
 .wbox ul{margin:4px 0 8px 18px}
 .wbox__btns{display:flex;gap:8px}
@@ -150,6 +158,7 @@ const auth = getAuth(app);
 const fns = getFunctions(app, "europe-west1");
 const sendReplyFn = httpsCallable(fns, "inboxSendReply");
 const checkinLinkFn = httpsCallable(fns, "inboxCheckinLink");
+const discardDraftFn = httpsCallable(fns, "inboxDraftDiscard");
 
 const TZ = "Asia/Tbilisi";
 const $ = id => document.getElementById(id);
@@ -292,6 +301,7 @@ function rowHtml(c, selected) {
   const tags = ['<span class="tag">Booking.com</span>'];
   if (isCancelled(c)) tags.push('<span class="tag tag--red">Cancelled</span>');
   if (c.done) tags.push('<span class="tag tag--green">Done</span>');
+  if (c.aiDraft && c.aiDraft.text) tags.push(c.aiDraft.kind === "reply" ? '<span class="tag">Draft ready</span>' : '<span class="tag tag--amber">Needs you</span>');
   const prev = c.lastMessagePreview || (hasChat(c) ? "" : "No chat messages");
   const unread = needsReply(c);
   return `<button class="row ${unread ? "unread" : ""} ${selected ? "sel" : ""}" type="button" data-id="${esc(c.id)}">
@@ -341,10 +351,11 @@ function renderConv(id) {
   // Built once per conversation, so a live update never wipes what you are typing.
   if (pane.dataset.conv !== id) {
     pane.dataset.conv = id;
-    pane.innerHTML = `<div class="head" id="convHead"></div><div class="thread" id="thread"></div><div id="draftSlot"></div><div class="reply" id="replyBar"></div>`;
+    pane.innerHTML = `<div class="head" id="convHead"></div><div class="thread" id="thread"></div><div id="draftSlot" data-key=""></div><div class="reply" id="replyBar"></div>`;
     buildReplyBar(id);
   }
   drawHead(c);
+  drawDraft(c);
   const canReply = /@guest\.booking\.com$/i.test(c.replyTo || "");
   $("replyBar").style.display = canReply ? "" : "none";
   if (c.checkinRequest && checkinLinks[id] === undefined) {
@@ -426,11 +437,52 @@ function drawThread() {
     if (m) { b.disabled = true; doSend(id, m.text, true); }
   });
 
+  if (c) drawDraft(c);
   el.dataset.drawn = id; el.dataset.count = String(items.length);
   const lastIsMine = items.length && items[items.length - 1].direction === "host";
   // Opens on the newest message; follows new ones when you are at the bottom or just replied.
   if (wasFirst || (items.length > prevCount && (nearBottom || lastIsMine))) el.scrollTop = el.scrollHeight;
   else el.scrollTop = prevTop;
+}
+
+/* ---------- AI draft (never sent without my tap) ---------- */
+const hiddenDrafts = {};        // bookingNumber -> createdAt (ms) of a draft I already dealt with on this screen
+function drawDraft(c) {
+  const slot = $("draftSlot");
+  if (!slot) return;
+  const d = c.aiDraft;
+  const created = d ? (toDate(d.createdAt)?.getTime() || 0) : 0;
+  const answeredAfter = msgs.some(m => m.direction === "host" && (toDate(m.sentAt)?.getTime() || 0) >= created);
+  if (!d || !d.text || hiddenDrafts[c.id] === created || (created && answeredAfter)) { slot.innerHTML = ""; slot.dataset.key = ""; return; }
+  const id = c.id;
+  const kind = d.kind || "reply";
+  const key = id + ":" + created + ":" + kind;
+  if (slot.dataset.key === key) return;            // already showing this one, leave the buttons alone
+  slot.dataset.key = key;
+  if (kind === "reply") {
+    slot.innerHTML = `<div class="draft"><div class="draft__label">Draft reply (written by the assistant, not sent)</div>
+      <div class="draft__text">${esc(d.text)}</div>
+      <div class="draft__btns"><button class="btn btn--primary" id="dSend" type="button">Send</button><button class="btn" id="dEdit" type="button">Edit</button><button class="btn" id="dDiscard" type="button">Discard</button></div></div>`;
+    $("dSend").onclick = () => {
+      const ta = $("replyText"); if (!ta) return;
+      ta.value = d.text; drafts[id] = d.text; ta.dispatchEvent(new Event("input"));
+      trySend(id);
+    };
+    $("dEdit").onclick = () => {
+      const ta = $("replyText"); if (!ta) return;
+      ta.value = d.text; drafts[id] = d.text; ta.dispatchEvent(new Event("input")); ta.focus();
+      hiddenDrafts[id] = created; slot.dataset.key = ""; slot.innerHTML = "";
+    };
+  } else {
+    const label = kind === "needs_you" ? "Needs you" : "Already answered on WhatsApp";
+    slot.innerHTML = `<div class="draft ${kind === "needs_you" ? "draft--needs" : "draft--info"}"><div class="draft__label">${esc(label)}</div>
+      <div class="draft__text">${kind === "needs_you" ? esc("Needs you: " + (d.reason || d.text)) : esc(d.text)}</div>
+      <div class="draft__btns"><button class="btn" id="dDiscard" type="button">Dismiss</button></div></div>`;
+  }
+  $("dDiscard").onclick = async () => {
+    hiddenDrafts[id] = created; slot.dataset.key = ""; slot.innerHTML = "";
+    try { await discardDraftFn({ bookingNumber: id }); } catch (e) { /* hidden here already; the server copy goes at the next reply */ }
+  };
 }
 
 /* ---------- composer ---------- */

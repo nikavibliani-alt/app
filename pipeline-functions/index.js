@@ -53,3 +53,5 @@ const { registerCloudFunction: registerInboxSort } = require('./controllers/inbo
 exports.inboxSort = registerInboxSort();
 const { registerCloudFunctions: registerInboxReply } = require('./controllers/inboxReply');
 Object.assign(exports, registerInboxReply());   // inboxSendReply, inboxCheckinLink, inboxOutbox
+const { registerCloudFunctions: registerInboxDraft } = require('./controllers/inboxDraft');
+Object.assign(exports, registerInboxDraft());   // inboxAiOnMessage, inboxAiRun, inboxDraftDiscard

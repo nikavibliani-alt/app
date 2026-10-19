@@ -902,6 +902,16 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
           <span class="switch-track"></span>
         </label>
       </div>
+      <div class="more-item more-item--switch" role="group" aria-label="Booking.com AI drafts">
+        <div class="more-item__text">
+          <div class="more-item__title">Booking.com AI drafts</div>
+          <div class="more-item__sub" id="more-booking-ai-status">Loading…</div>
+        </div>
+        <label class="switch" title="Turn Booking.com AI drafts on or off">
+          <input type="checkbox" id="more-booking-ai-toggle" onchange="waSetBookingAiDrafts(this.checked)">
+          <span class="switch-track"></span>
+        </label>
+      </div>
       <button class="more-item" type="button" onclick="switchTab('wasettings')">WhatsApp &amp; bot settings<span class="more-hint">Modes · templates</span></button>
     </div>
     <div class="more-section">Housekeeping setup</div>
@@ -2787,7 +2797,7 @@ function pickCheckinInviteKey(roomCode){
 let waSettings=mergeWaSettings(null);
 let waLoaded=false;
 let _waInviteProp='maxela';
-const BOT_SETTINGS_DEFAULTS={aiBotEnabled:true,botMode:'available',botResponseDelay:20,ownerPhone:'',nightStart:22,nightEnd:9};
+const BOT_SETTINGS_DEFAULTS={aiBotEnabled:true,bookingAiDraftsEnabled:true,botMode:'available',botResponseDelay:20,ownerPhone:'',nightStart:22,nightEnd:9};
 let botSettings={...BOT_SETTINGS_DEFAULTS};
 let botSettingsLoaded=false;
 async function loadBotSettings(){
@@ -2797,6 +2807,7 @@ async function loadBotSettings(){
       const d=snap.data();
       botSettings={
         aiBotEnabled:d.aiBotEnabled!==false,
+        bookingAiDraftsEnabled:d.bookingAiDraftsEnabled!==false,
         botMode:['available','away','night','auto'].includes(d.botMode)?d.botMode:'available',
         botResponseDelay:Number(d.botResponseDelay)||20,
         ownerPhone:d.ownerPhone||'',
@@ -2822,6 +2833,10 @@ window.waSaveBotSettings=async function(patch){
   }
 };
 function syncMoreBotToggle(){
+  const bkToggle=document.getElementById('more-booking-ai-toggle');
+  const bkStatus=document.getElementById('more-booking-ai-status');
+  if(bkToggle)bkToggle.checked=botSettings.bookingAiDraftsEnabled!==false;
+  if(bkStatus)bkStatus.textContent=!botSettingsLoaded?'Loading…':botSettings.bookingAiDraftsEnabled!==false?'On · drafts only, you tap Send':'Off';
   const toggle=document.getElementById('more-bot-toggle');
   const status=document.getElementById('more-bot-status');
   if(toggle)toggle.checked=!!botSettings.aiBotEnabled;
@@ -2845,6 +2860,11 @@ async function ensureBotSettingsLoaded(){
   if(!botSettingsLoaded)await loadBotSettings();
   syncMoreBotToggle();
 }
+window.waSetBookingAiDrafts=async function(checked){
+  await waSaveBotSettings({bookingAiDraftsEnabled:checked});
+  syncMoreBotToggle();
+  toast(checked?'Booking.com AI drafts on':'Booking.com AI drafts off');
+};
 window.waSetAiBotEnabled=async function(checked){
   await waSaveBotSettings({aiBotEnabled:checked});
   syncMoreBotToggle();
