@@ -129,6 +129,7 @@ async function processEmail(emailId, deps) {
     };
     // The no-reply address of Booking.com's own notices is not a way to answer the guest.
     if (sorted.kind !== 'auto_confirmed' && sorted.replyTo) conv.replyTo = sorted.replyTo;
+    if (sorted.hotelId) conv.hotelId = sorted.hotelId;
     if (!prev) {
       Object.assign(conv, {
         createdAt: now(), done: false, needsReply: false, messageCount: 0,
@@ -144,6 +145,8 @@ async function processEmail(emailId, deps) {
         conv.lastMessageAt = ts(sorted.sentAt);
         conv.needsReply = true;
         conv.done = false;
+        conv.doneAt = null;
+        conv.lastMessagePreview = sorted.text.replace(/\s+/g, ' ').trim().slice(0, 160);
       }
       tx.set(convRef.collection('messages').doc(emailId), {
         direction: 'guest',

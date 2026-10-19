@@ -68,6 +68,8 @@ test('chat creates a conversation, a message and marks the email sorted', async 
   assert.strictEqual(c.needsReply, true);
   assert.strictEqual(c.done, false);
   assert.strictEqual(c.messageCount, 1);
+  assert.strictEqual(c.lastMessagePreview, 'Hello there');
+  assert.strictEqual(c.doneAt, null);
   assert.strictEqual(c.lastGuestMessageAt, 'T:2026-10-01T10:00:00.000Z');
   assert.strictEqual(c.replyTo, '2000000001-aa11.bb22.cc33.dd44@guest.booking.com');
   const m = db.store.get('inbox_conversations/2000000001/messages/m1');
@@ -189,4 +191,19 @@ test('hidden emails are only marked; review emails go to the check-this pile', a
 
 test('missing email is skipped', async () => {
   assert.strictEqual((await processEmail('nope', deps(fakeDb()))).skipped, true);
+});
+
+test('a new guest message after the conversation was marked done sets done=false again', async () => {
+  const db = fakeDb({
+    'inbox_raw_emails/m1': chat('2000000007', 'm1', '2026-10-01T10:00:00Z', 'one'),
+    'inbox_raw_emails/m2': chat('2000000007', 'm2', '2026-10-02T10:00:00Z', 'two'),
+  });
+  const real = { db, ts: iso => ({ toDate: () => new Date(iso) }), now: () => 'NOW' }; // like a real Timestamp
+  await processEmail('m1', real);
+  const k = 'inbox_conversations/2000000007';
+  db.store.set(k, { ...db.store.get(k), done: true, doneAt: 'D' });
+  await processEmail('m2', real);
+  assert.strictEqual(db.store.get(k).done, false);
+  assert.strictEqual(db.store.get(k).doneAt, null);
+  assert.strictEqual(db.store.get(k).lastMessagePreview, 'two');
 });

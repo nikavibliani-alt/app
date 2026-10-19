@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Guest inbox</title>
+<style>
+:root{
+  --bg:#F7F7F7;--card-bg:#FFFFFF;--ink:#222222;--text-main:#222222;--text-muted:#717171;
+  --border:#E6E6E6;--bubble:#EDEDED;
+  --status-green:#2E6B34;--bg-green:#E3F1DF;--status-amber:#856404;--bg-amber:#FDF3C7;
+  --status-red:#9B2C2C;--bg-red:#FBE4E4;
+  --radius-card:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text-main);
+  line-height:1.4;font-size:15px;touch-action:manipulation;min-height:100vh;
+  padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+button{font:inherit;cursor:pointer;color:var(--ink);-webkit-appearance:none;appearance:none;touch-action:manipulation}
+a{color:var(--ink)}
+svg{display:block;flex:none}
+.icon{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+#app{display:none;max-width:720px;margin:0 auto}
+
+.top{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 16px 8px;
+  border-bottom:1px solid var(--border)}
+.top__row{display:flex;align-items:center;gap:8px;min-height:44px}
+.top__title{font-size:18px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;border:0;background:transparent;
+  color:var(--ink);border-radius:10px;margin-left:-10px;gap:2px;font-size:14px;font-weight:600}
+.tabs{display:flex;gap:6px;margin-top:6px}
+.tab{flex:1;min-height:40px;border:1px solid var(--border);background:var(--card-bg);color:var(--ink);border-radius:10px;
+  font-size:14px;font-weight:600;padding:0 8px}
+.tab.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.tab small{font-weight:600;opacity:.7;margin-left:3px}
+.sub{display:flex;justify-content:flex-end;margin-top:6px}
+.linkbtn{border:0;background:transparent;color:var(--ink);font-size:13px;font-weight:600;text-decoration:underline;
+  min-height:36px;padding:0 4px}
+
+.list{padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.empty{padding:40px 16px;text-align:center;color:var(--text-muted)}
+.row{display:block;width:100%;text-align:left;background:var(--card-bg);border:1px solid var(--border);
+  border-radius:var(--radius-card);padding:12px 14px;color:var(--ink)}
+.row:active{background:#f1f1f1}
+.row__top{display:flex;align-items:center;gap:8px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--ink);flex:none}
+.row__name{font-weight:700;font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row__time{font-size:12px;color:var(--text-muted);flex:none}
+.row__meta{font-size:13px;color:var(--text-muted);margin-top:2px}
+.row__prev{font-size:14px;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tag{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--bubble);color:var(--ink)}
+.tag--red{background:var(--bg-red);color:var(--status-red)}
+.tag--green{background:var(--bg-green);color:var(--status-green)}
+.warn{display:flex;gap:8px;align-items:flex-start;background:var(--bg-red);color:var(--status-red);
+  border:1px solid #efc4c4;border-radius:10px;padding:8px 10px;font-size:13px;font-weight:600;margin-top:8px}
+.warn .icon{margin-top:1px}
+.warn--late{background:var(--bg-amber);color:var(--status-amber);border-color:#ecd98b}
+
+.head{padding:14px 16px 6px}
+.head__name{font-size:20px;font-weight:700}
+.head__line{font-size:14px;color:var(--text-muted);margin-top:2px}
+.actions{display:flex;gap:8px;padding:10px 16px 4px;flex-wrap:wrap}
+.btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--ink);background:var(--card-bg);color:var(--ink);
+  font-weight:700;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+.btn--primary{background:var(--ink);color:#ffffff}
+.btn:disabled{opacity:.55}
+.thread{padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.day{align-self:center;font-size:12px;color:var(--text-muted);margin:6px 0 0}
+.bubble{max-width:86%;align-self:flex-start;background:var(--bubble);border-radius:16px 16px 16px 4px;padding:9px 12px;
+  white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px}
+.bubble__time{font-size:11px;color:var(--text-muted);margin-top:4px}
+.note{align-self:center;text-align:center;font-size:12px;color:var(--text-muted);background:transparent;padding:2px 8px}
+.msg{color:var(--text-muted);padding:14px 16px;font-size:14px}
+.err{margin:16px;padding:12px;border-radius:10px;background:var(--bg-red);color:var(--status-red);font-size:14px}
+.rv{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-card);padding:12px 14px}
+.rv__reason{font-weight:700}
+.rv__meta{font-size:13px;color:var(--text-muted);margin-top:2px;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top" id="top"></div>
+  <div id="main"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, updateDoc, collection, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { requireOwner } from "./shared/owner-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
+  authDomain: "sleepy-5c962.firebaseapp.com",
+  projectId: "sleepy-5c962",
+  storageBucket: "sleepy-5c962.firebasestorage.app",
+  messagingSenderId: "152940098906",
+  appId: "1:152940098906:web:bf245230d705c0a62c2f63"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+const TZ = "Asia/Tbilisi";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ICON = {
+  back: '<path d="m15 18-6-6 6-6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  out: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+};
+const icon = n => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
+
+/* ---------- state ---------- */
+let convs = [];            // all conversations
+let reviewItems = [];      // unresolved "check this" items
+let tab = "needs";         // needs | all | done
+let loaded = { convs: false, review: false };
+let loadError = "";
+let msgUnsub = null;
+let msgs = [];
+let msgsFor = null;
+
+/* ---------- time helpers ---------- */
+const toDate = v => (v ? (v.toDate ? v.toDate() : new Date(v)) : null);
+const fmt = (d, o) => new Intl.DateTimeFormat("en-GB", { timeZone: TZ, ...o }).format(d);
+const dayKey = d => fmt(d, { year: "numeric", month: "2-digit", day: "2-digit" });
+function fmtListTime(d) {
+  if (!d) return "";
+  if (dayKey(d) === dayKey(new Date())) return fmt(d, { hour: "2-digit", minute: "2-digit" });
+  return fmt(d, { day: "numeric", month: "short" });
+}
+const fmtClock = d => fmt(d, { hour: "2-digit", minute: "2-digit" });
+const fmtDay = d => fmt(d, { weekday: "short", day: "numeric", month: "short" });
+function fmtDate(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y) return iso;
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "numeric", month: "short" }).format(new Date(Date.UTC(y, m - 1, d)));
+}
+const stayText = c => (c.checkin && c.checkout ? `${fmtDate(c.checkin)} to ${fmtDate(c.checkout)}` : "");
+
+/* ---------- model helpers ---------- */
+const sortTime = c => Math.max(toDate(c.lastMessageAt)?.getTime() || 0, toDate(c.cancelRequest?.at)?.getTime() || 0);
+const hasChat = c => (c.messageCount || 0) > 0;
+const visible = c => hasChat(c) || !!c.cancelRequest;
+const needsReply = c => !c.done && (!!c.needsReply || !!c.cancelRequest);
+const isCancelled = c => String(c.reservationStatus || "").toUpperCase() === "CANCELLED";
+const propLine = c => [c.propertyName, c.roomCode].filter(Boolean).join(" · ");
+
+function cancelWarning(c) {
+  const r = c.cancelRequest;
+  if (!r) return "";
+  const dl = toDate(r.deadline);
+  if (!dl) return `<div class="warn">${icon("warn")}<span>Guest asks to cancel for free. Answer in Booking.com.</span></div>`;
+  const when = dayKey(dl) === dayKey(new Date()) ? fmtClock(dl) : `${fmtDay(dl)}, ${fmtClock(dl)}`;
+  const late = dl.getTime() < Date.now();
+  return late
+    ? `<div class="warn warn--late">${icon("warn")}<span>Guest asked to cancel for free. The answer was due in Booking.com by ${esc(when)}.</span></div>`
+    : `<div class="warn">${icon("warn")}<span>Guest asks to cancel for free, answer in Booking.com by ${esc(when)}.</span></div>`;
+}
+
+function checkinLine(c) {
+  const r = c.checkinRequest;
+  if (!r) return "";
+  const t = r.time ? String(r.time).replace(/\s*-\s*/, "–") : "time not read";
+  return `Check-in time request: ${esc(t)}, ${r.autoConfirmed ? "auto-confirmed" : "not auto-confirmed"}`;
+}
+
+function extranetUrl(c) {
+  if (!c.hotelId || !c.bookingNumber) return "";
+  const n = encodeURIComponent(c.bookingNumber);
+  return `https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/messaging/inbox.html?product_type=POST_BOOKING&product_id=${n}&hotel_id=${encodeURIComponent(c.hotelId)}&res_id=${n}&lang=en`;
+}
+
+/* ---------- routing ---------- */
+const route = () => {
+  const h = location.hash.replace(/^#/, "");
+  if (h === "review") return { page: "review" };
+  if (h.startsWith("c/")) return { page: "conv", id: decodeURIComponent(h.slice(2)) };
+  return { page: "list" };
+};
+const go = h => { location.hash = h; };
+
+/* ---------- render ---------- */
+let lastRouteKey = "";
+function render() {
+  const r = route();
+  if (r.page !== "conv") stopMsgs();
+  if (r.page === "conv") renderConv(r.id);
+  else if (r.page === "review") renderReview();
+  else renderList();
+  const key = r.page + (r.id || "");
+  if (key !== lastRouteKey) { lastRouteKey = key; window.scrollTo(0, 0); }   // keep the scroll position on live updates
+}
+window.addEventListener("hashchange", () => { if (started) render(); });
+
+function renderList() {
+  const vis = convs.filter(visible).sort((a, b) => sortTime(b) - sortTime(a));
+  const nNeeds = vis.filter(needsReply).length;
+  const rows = vis.filter(c => tab === "needs" ? needsReply(c) : tab === "done" ? !!c.done : true);
+  $("top").innerHTML = `
+    <div class="top__row"><div class="top__title">Guest inbox</div>
+      <button class="linkbtn" id="adminBtn" type="button">Admin</button></div>
+    <div class="tabs">
+      <button class="tab ${tab === "needs" ? "on" : ""}" data-tab="needs" type="button">Needs reply<small>${nNeeds}</small></button>
+      <button class="tab ${tab === "all" ? "on" : ""}" data-tab="all" type="button">All</button>
+      <button class="tab ${tab === "done" ? "on" : ""}" data-tab="done" type="button">Done</button>
+    </div>
+    <div class="sub"><button class="linkbtn" id="reviewBtn" type="button">Check this (${reviewItems.length})</button></div>`;
+  $("top").querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.tab; renderList(); });
+  $("reviewBtn").onclick = () => go("review");
+  $("adminBtn").onclick = () => { location.href = "/checkin-admin"; };
+
+  let html;
+  if (loadError) html = `<div class="err">${esc(loadError)}</div>`;
+  else if (!loaded.convs) html = `<div class="msg">Loading...</div>`;
+  else if (!rows.length) html = `<div class="empty">${tab === "needs" ? "Nothing waiting for a reply." : tab === "done" ? "Nothing marked done yet." : "No conversations yet."}</div>`;
+  else html = `<div class="list">${rows.map(rowHtml).join("")}</div>`;
+  $("main").innerHTML = html;
+  $("main").querySelectorAll(".row").forEach(b => b.onclick = () => go("c/" + encodeURIComponent(b.dataset.id)));
+}
+
+function rowHtml(c) {
+  const t = toDate(c.lastMessageAt) || toDate(c.cancelRequest?.at);
+  const tags = ['<span class="tag">Booking.com</span>'];
+  if (isCancelled(c)) tags.push('<span class="tag tag--red">Cancelled</span>');
+  if (c.done) tags.push('<span class="tag tag--green">Done</span>');
+  const prev = c.lastMessagePreview || (hasChat(c) ? "" : "No chat messages");
+  return `<button class="row" type="button" data-id="${esc(c.id)}">
+    <div class="row__top">${needsReply(c) ? '<span class="dot" title="Needs reply"></span>' : ""}
+      <span class="row__name">${esc(c.guestName || "Guest")}</span><span class="row__time">${esc(fmtListTime(t))}</span></div>
+    <div class="row__meta">${esc([propLine(c), stayText(c)].filter(Boolean).join(" · "))}</div>
+    ${c.cancelRequest && !c.done ? cancelWarning(c) : ""}
+    ${prev ? `<div class="row__prev">${esc(prev)}</div>` : ""}
+    <div class="tags">${tags.join("")}</div></button>`;
+}
+
+function stopMsgs() { if (msgUnsub) { msgUnsub(); msgUnsub = null; } msgsFor = null; msgs = []; }
+
+function renderConv(id) {
+  const c = convs.find(x => x.id === id);
+  if (msgsFor !== id) {
+    stopMsgs();
+    msgsFor = id;
+    msgUnsub = onSnapshot(query(collection(db, "inbox_conversations", id, "messages"), orderBy("sentAt", "asc")),
+      s => { msgs = s.docs.map(d => ({ id: d.id, ...d.data() })); if (route().page === "conv" && route().id === id) drawThread(); },
+      e => { $("thread") && ($("thread").innerHTML = `<div class="err">Could not load messages (${esc(e.code || e.message)}).</div>`); });
+  }
+  $("top").innerHTML = `<div class="top__row"><button class="iconbtn" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
+    <div class="top__title">${esc(c ? c.guestName || "Guest" : "Conversation")}</div></div>`;
+  $("backBtn").onclick = () => go("");
+  if (!c) { $("main").innerHTML = loaded.convs ? `<div class="empty">This conversation was not found.</div>` : `<div class="msg">Loading...</div>`; return; }
+
+  const url = extranetUrl(c);
+  const tags = ['<span class="tag">Booking.com</span>'];
+  if (isCancelled(c)) tags.push('<span class="tag tag--red">Cancelled</span>');
+  if (c.done) tags.push('<span class="tag tag--green">Done</span>');
+  $("main").innerHTML = `
+    <div class="head">
+      <div class="head__name">${esc(c.guestName || "Guest")}</div>
+      <div class="head__line">${esc(propLine(c))}</div>
+      <div class="head__line">${esc(stayText(c))}${c.bookingNumber ? ` · Booking ${esc(c.bookingNumber)}` : ""}</div>
+      <div class="tags">${tags.join("")}</div>
+      ${cancelWarning(c)}
+    </div>
+    <div class="actions">
+      <button class="btn ${c.done ? "" : "btn--primary"}" id="doneBtn" type="button">${c.done ? icon("undo") + "Not done" : icon("check") + "Done"}</button>
+      ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">${icon("out")}Open in Booking.com</a>` : ""}
+    </div>
+    <div class="thread" id="thread"></div>`;
+  $("doneBtn").onclick = async e => {
+    const b = e.currentTarget; b.disabled = true;
+    try {
+      await updateDoc(doc(db, "inbox_conversations", id), c.done ? { done: false, doneAt: null } : { done: true, doneAt: serverTimestamp() });
+    } catch (err) { alert("Could not save (" + (err.code || err.message) + ")."); b.disabled = false; }
+  };
+  drawThread();
+}
+
+function drawThread() {
+  const el = $("thread"); if (!el) return;
+  const c = convs.find(x => x.id === msgsFor);
+  const out = [];
+  let lastDay = "";
+  for (const m of msgs) {
+    const d = toDate(m.sentAt);
+    if (d && dayKey(d) !== lastDay) { lastDay = dayKey(d); out.push(`<div class="day">${esc(fmtDay(d))}</div>`); }
+    out.push(`<div class="bubble">${esc(m.text)}<div class="bubble__time">${d ? esc(fmtClock(d)) : ""}</div></div>`);
+  }
+  const line = c ? checkinLine(c) : "";
+  if (line) out.push(`<div class="note">${line}</div>`);
+  el.innerHTML = out.length ? out.join("") : `<div class="msg">No chat messages yet.</div>`;
+}
+
+function renderReview() {
+  $("top").innerHTML = `<div class="top__row"><button class="iconbtn" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
+    <div class="top__title">Check this (${reviewItems.length})</div></div>`;
+  $("backBtn").onclick = () => go("");
+  const items = [...reviewItems].sort((a, b) => (toDate(b.date)?.getTime() || 0) - (toDate(a.date)?.getTime() || 0));
+  $("main").innerHTML = !loaded.review ? `<div class="msg">Loading...</div>`
+    : !items.length ? `<div class="empty">Nothing to check.</div>`
+    : `<div class="list">${items.map(i => `<div class="rv"><div class="rv__reason">${esc(i.reason)}</div>
+        <div class="rv__meta">${esc(toDate(i.date) ? fmtDay(toDate(i.date)) + ", " + fmtClock(toDate(i.date)) : "")}</div>
+        <div class="rv__meta">${esc(i.subject || "")}</div></div>`).join("")}</div>`;
+}
+
+/* ---------- data + sign-in (owner's Google account only, same as the pricing pages) ---------- */
+let started = false;
+function start() {
+  if (started) return;
+  started = true;
+  $("app").style.display = "block";
+  const fail = e => { loadError = "Could not read the inbox (" + (e.code || e.message) + "). If this says permission-denied, the new Firestore rules are not published yet."; render(); };
+  onSnapshot(collection(db, "inbox_conversations"),
+    s => { convs = s.docs.map(d => ({ id: d.id, ...d.data() })); loaded.convs = true; loadError = ""; render(); }, fail);
+  onSnapshot(collection(db, "inbox_review"),
+    s => { reviewItems = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.resolved); loaded.review = true; if (route().page !== "conv") render(); }, () => {});
+  render();
+}
+requireOwner({ auth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut }, { onReady: start });
+</script>
+</body>
+</html>

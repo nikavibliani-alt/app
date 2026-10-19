@@ -137,6 +137,14 @@ function messageId(email) {
   return m ? m[1] : null;
 }
 
+/** Booking.com property id from the Extranet link in the email (needed to open the chat). */
+function hotelId(email) {
+  const flat = String(email.bodyHtml || '').replace(/&amp;/gi, '&') + '\n' +
+    String(email.bodyText || '').replace(/\n\s*/g, '');
+  const m = flat.match(/[?&]hotel_id=(\d{3,})/i);
+  return m ? m[1] : null;
+}
+
 function emailDate(email) {
   const d = new Date(email.date);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
@@ -157,6 +165,7 @@ function bookingInfo(email) {
   const t = String(email.bodyText || '');
   return {
     bookingNumber: bookingNumber(email),
+    hotelId: hotelId(email),
     guestName: labelValue(t, 'Guest name'),
     propertyName: labelValue(t, 'Property Name'),
     checkin: parseDate(labelValue(t, 'Check-in')),

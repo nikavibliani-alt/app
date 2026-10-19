@@ -64,3 +64,49 @@ address, posts the reply into the guest chat. Booking.com first, Airbnb later.
 - Recovery and one-time run: `node scripts/inbox-sort-backfill.js` (`--dry` prints counts only).
   Needs `gcloud auth application-default login`. Safe to run twice.
 - Own replies from the Extranet or Pulse never arrive by email, so the inbox cannot see them.
+
+## Step 3 details (inbox screen, read + Done)
+
+- Page: `inbox.html` (live at /inbox). Owner Google sign-in via `shared/owner-auth.js`, same as
+  the pricing pages. Linked from the admin More menu ("Guest inbox"). Live updates (onSnapshot).
+- Lists: Needs reply / All / Done, plus "Check this (N)". Conversations with no chat messages are
+  hidden unless they carry a cancel request. The Done button only writes `done` and `doneAt`.
+- New fields on conversations (set by `inboxSort`): `hotelId` (for the Open in Booking.com
+  button), `lastMessagePreview`, and `doneAt` is cleared when a new guest message arrives.
+- Launch (one time, safe to repeat): `node scripts/inbox-step3-launch.js` marks the existing
+  conversations done, using the launch time saved in `inbox_meta/step3_launch`.
+- The Firestore rules are not in this repo; they live in the Firebase console. Current text,
+  including `inbox_*` being server-only except for the owner reads and the done update:
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'nikavibliani@gmail.com';
+    }
+    function ownerOnly(c) { return c.matches('pricing_.*'); }
+    function serverOnly(c) { return c.matches('whatsapp_.*') || c.matches('inbox_.*'); }
+
+    // Guest inbox: the owner may read, and may change only done / doneAt on a conversation.
+    // Everything else in inbox_* (raw emails, creating or deleting) stays server-only.
+    match /inbox_conversations/{conv} {
+      allow read: if isOwner();
+      allow update: if isOwner()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', 'doneAt']);
+      match /messages/{msg} {
+        allow read: if isOwner();
+      }
+    }
+    match /inbox_review/{item} {
+      allow read: if isOwner();
+    }
+
+    match /{col}/{doc=**} {
+      allow read, write: if !serverOnly(col) && (!ownerOnly(col) || isOwner());
+    }
+  }
+}
+```

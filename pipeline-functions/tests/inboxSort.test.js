@@ -49,7 +49,7 @@ function chatEmail(over = {}) {
                                      -->
    https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/messaging
    /inbox.html?product_type=POST_BOOKING&product_id=${num}&lang=xu&hotel_i
-   d=1&res_id=${num}&message_id=aaaa1111-b4c1-11f1-8791-f9cc85dd2571&utm_c
+   d=555123&res_id=${num}&message_id=aaaa1111-b4c1-11f1-8791-f9cc85dd2571&utm_c
    ampaign=x
 ${DETAILS(num)}`,
     bodyHtml: over.html !== undefined ? over.html : `<html><body><table><tr><td><p>Test Guest said:</p></td></tr></table>
@@ -78,6 +78,7 @@ test('guest chat message: text, ids and booking info', () => {
   assert.strictEqual(r.checkout, '2026-11-19');
   assert.strictEqual(r.replyTo, '1000000001-ab12.cd34.ef56.gh78@guest.booking.com');
   assert.strictEqual(r.script, 'latin');
+  assert.strictEqual(r.hotelId, "555123");
 });
 
 test('guest chat message: falls back to plain text and unwraps lines', () => {
