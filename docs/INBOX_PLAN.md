@@ -222,3 +222,9 @@ service cloud.firestore {
 4. **Silence only.** Turn on for the one case that matters (an answered question), only for matches with my inbox reply inside the last 24 hours. Watch daily for a week.
 5. **Full context.** Let the block inform answers more broadly.
 6. **Kill switch.** `botReadsBooking: false` in the admin returns to today's behavior instantly, no deploy. Code undo: redeploy the previous `whatsapp` commit.
+
+## Update: the four Booking.com listings (answer to question 3)
+
+"Super Luxury Apartments", "Maxela Apartments", "Shartava Deluxe Apartment" and "Superior Apartments" are the same Shartava apartments, so all four use the Shartava knowledge and the same answers as the WhatsApp bot. The list is `SHARTAVA_LISTINGS` at the top of the property check in `pipeline-functions/lib/inboxDraft.js` (edit it there; then deploy `inboxAiRun`).
+Order of the check: the reservation's room code first (a Freedom Square `tab-*`, Orbeliani `orb-*`, VGL, XCV or Abashidze room gives "Needs you: not Shartava", even when the listing name says Shartava), then the listing name. An unknown listing with no room code still gives "Needs you: no knowledge for this property". Limits unchanged (6 per conversation per hour, 60 per day).
+Undo: `git revert` this commit and redeploy `inboxAiRun`, or restore from tag `inbox-listings-before`.

@@ -64,13 +64,30 @@ function ownerTopicReason(texts) {
 // ---------------------------------------------------------------- property knowledge
 
 /**
+ * The Booking.com listing names that are the SAME Shartava apartments (identical listings).
+ * Edit this one list when a listing is added or renamed. Matching ignores case and extra spaces.
+ */
+const SHARTAVA_LISTINGS = [
+  'Super Luxury Apartments',
+  'Maxela Apartments',
+  'Shartava Deluxe Apartment',
+  'Superior Apartments',
+];
+
+const normName = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+const isShartavaListing = name => SHARTAVA_LISTINGS.some(l => normName(l) === normName(name)) || /shartava/i.test(String(name || ''));
+
+/**
  * Does the WhatsApp knowledge cover this booking? Returns { ok, propertyId } or { ok:false, reason }.
- * By room code first (the same way the WhatsApp bot decides), else by the property name.
+ * 1. The reservation's room code decides first, the same way the WhatsApp bot does: a Shartava room
+ *    (0-, 6-, 7-) is fine; a room of another house (Freedom Square tab-, Orbeliani orb-, VGL, XCV,
+ *    Abashidze) is "not Shartava", even if the listing name says Shartava.
+ * 2. No known room code: the listing name decides (SHARTAVA_LISTINGS).
  */
 function knowledgeForConversation(conv, kb = SEED) {
   const id = propertyIdForRoom(kb, conv && conv.roomCode);
-  if (id) return kb.properties[id] && kb.properties[id].botAnswers ? { ok: true, propertyId: id } : { ok: false, reason: 'no knowledge for this property' };
-  if (!(conv && conv.roomCode) && /shartava/i.test(String((conv && conv.propertyName) || ''))) return { ok: true, propertyId: 'shartava' };
+  if (id) return id === 'shartava' && kb.properties[id] && kb.properties[id].botAnswers ? { ok: true, propertyId: id } : { ok: false, reason: 'not Shartava' };
+  if (isShartavaListing(conv && conv.propertyName)) return { ok: true, propertyId: 'shartava' };
   return { ok: false, reason: 'no knowledge for this property' };
 }
 
@@ -143,6 +160,7 @@ function dynamicSystemText({ conv, formFilled, nowMs, kb = SEED }) {
     'GUEST CONTEXT (Booking.com conversation):',
     `Guest name: ${c.guestName || 'unknown'}`,
     `Room/apartment: ${c.roomCode || 'unknown'}`,
+    ...(c.propertyName ? [`Booking.com listing: ${c.propertyName} (all our Booking.com listings are the same Shartava apartments)`] : []),
     `Check-in date: ${c.checkin || 'unknown'}; check-out date: ${c.checkout || 'unknown'}`,
     `Filled check-in form: ${formFilled === true ? 'yes' : formFilled === false ? 'no' : 'unknown'}`,
     `CURRENT_TBILISI_HOUR: ${hour}`,
@@ -277,7 +295,7 @@ function checkDraft(rawText, { kb = SEED } = {}) {
 
 module.exports = {
   WAIT_MS, MAX_WAIT_MS, CHECKIN_PAGE, MAX_HISTORY,
-  dueAtMs, isCloser, burstIsOnlyClosers, ownerTopicReason, knowledgeForConversation,
+  dueAtMs, isCloser, burstIsOnlyClosers, ownerTopicReason, knowledgeForConversation, SHARTAVA_LISTINGS, isShartavaListing,
   BOOKING_OVERRIDE, kbForBooking, fixedSystemText, dynamicSystemText, buildUserTurn,
   parseModelOutput, whatsappAnswerAt, checkDraft, tbilisiTime,
 };

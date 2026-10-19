@@ -203,9 +203,34 @@ test('a property the WhatsApp knowledge does not cover is "Needs you: no knowled
   await C.runDue(d);
   assert.strictEqual(calls.length, 0);
   assert.strictEqual(conv(d).aiDraft.kind, 'needs_you');
-  assert.match(conv(d).aiDraft.reason, /no knowledge for this property/);
-  assert.ok(D.knowledgeForConversation({ roomCode: '', propertyName: 'Shartava Deluxe Apartment' }).ok);
-  assert.ok(!D.knowledgeForConversation({ roomCode: '', propertyName: 'Super Luxury Apartments' }).ok);
+  assert.match(conv(d).aiDraft.reason, /not Shartava/);
+});
+
+test('all four Booking.com listings are Shartava; other houses and unknown listings are not', () => {
+  for (const name of ['Super Luxury Apartments', 'Maxela Apartments', 'Shartava Deluxe Apartment', 'Superior Apartments', '  maxela   apartments ']) {
+    assert.deepStrictEqual(D.knowledgeForConversation({ roomCode: '', propertyName: name }), { ok: true, propertyId: 'shartava' }, name);
+    assert.ok(D.knowledgeForConversation({ propertyName: name }).ok, name + ' without a room code');
+    assert.ok(D.knowledgeForConversation({ roomCode: '7-2', propertyName: name }).ok, name + ' with a Shartava room');
+  }
+  assert.deepStrictEqual(D.SHARTAVA_LISTINGS.length, 4);
+  // A room of another house wins over the listing name.
+  for (const room of ['tab-1', 'orb-2', 'xcv-1', 'vgl-st1', 'abashidze']) {
+    assert.deepStrictEqual(D.knowledgeForConversation({ roomCode: room, propertyName: 'Super Luxury Apartments' }), { ok: false, reason: 'not Shartava' }, room);
+  }
+  // No room code and a listing we do not know: no guessing.
+  assert.deepStrictEqual(D.knowledgeForConversation({ roomCode: '', propertyName: 'Some Other Hotel' }), { ok: false, reason: 'no knowledge for this property' });
+  assert.deepStrictEqual(D.knowledgeForConversation({}), { ok: false, reason: 'no knowledge for this property' });
+});
+
+test('a draft is made for a listing-only Shartava booking and the listing is in the context', async () => {
+  clock = T0; seq = 0;
+  const calls = [];
+  const d = mk({ seed: baseSeed({ roomCode: null, propertyName: 'Maxela Apartments' }), deps: { callClaude: claudeStub('Yes, there is a kitchen.', calls) } });
+  await guestSays(d, 'Does the apartment have a kitchen?'); clock += 61000;
+  await C.runDue(d);
+  assert.strictEqual(calls.length, 1);
+  assert.match(calls[0].system[1].text, /Booking\.com listing: Maxela Apartments/);
+  assert.strictEqual(conv(d).aiDraft.kind, 'reply');
 });
 
 test('the switch turns drafting off', async () => {
