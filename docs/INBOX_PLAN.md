@@ -45,3 +45,22 @@ address, posts the reply into the guest chat. Booking.com first, Airbnb later.
 - Script: `apps-script/booking-inbox/`. First run sends the last 30 days, then a 1-minute
   trigger sends new mail. Progress is kept per message (not Gmail labels) in Script Properties.
 - Script Properties (`INGEST_URL`, `INGEST_KEY`) are never in the repo.
+
+## Step 2 details (done)
+
+- Rules: `pipeline-functions/lib/inboxSort.js` (pure, tested). Firestore side:
+  `pipeline-functions/controllers/inboxSort.js`. Function `inboxSort` runs when a document is
+  created in `inbox_raw_emails` (europe-west1). Deploy it alone:
+  `firebase deploy --only functions:pipeline:inboxSort --project sleepy-5c962`.
+- Every raw email gets `sortedAs`: `chat`, `checkin_request`, `auto_confirmed`, `cancel_request`,
+  `hidden` or `review`. An email with `sortedAs` is never processed again.
+- `inbox_conversations/{bookingNumber}`: one per reservation (channel `booking`, account `maxela`).
+  Holds the reservation link, guest, property, dates, `replyTo`, `needsReply`, `done`,
+  `checkinRequest {time, autoConfirmed, at}` and `cancelRequest {at, deadline}`.
+  `messages/{gmailMessageId}`: guest chat messages (direction `guest`, clean text, `sentAt`).
+- `inbox_review/{gmailMessageId}`: the "check this" pile, with a reason.
+- Hidden: reminder digests, finance, payments, marketing, policy, security notices.
+- Cancelled reservations still show their conversation.
+- Recovery and one-time run: `node scripts/inbox-sort-backfill.js` (`--dry` prints counts only).
+  Needs `gcloud auth application-default login`. Safe to run twice.
+- Own replies from the Extranet or Pulse never arrive by email, so the inbox cannot see them.

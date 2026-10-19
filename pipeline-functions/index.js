@@ -49,3 +49,5 @@ exports.pushOnHotelCollect = registerHotelCollectAlert();
 
 const { registerCloudFunction: registerInboxEmailIngest } = require('./controllers/inboxEmailIngest');
 exports.inboxEmailIngest = registerInboxEmailIngest();
+const { registerCloudFunction: registerInboxSort } = require('./controllers/inboxSort');
+exports.inboxSort = registerInboxSort();
