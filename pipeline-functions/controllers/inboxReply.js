@@ -9,6 +9,11 @@
  *                      one went ("report"). A pulled item is marked "sending" first.
  *   inboxCheckinLink   callable, owner only. The Extranet page of a check-in time request.
  *
+ * After saving a reply, inboxSendReply pokes the Gmail script's web app so the reply goes out at
+ * once. That is best effort: if it fails or is slow, the script's every-minute run sends it.
+ * Both paths only send what pull() hands out, and pull() marks an item "sending" in a transaction,
+ * so a reply is never handed to both.
+ *
  * Never sends twice: only "waiting" items can be pulled, and pulling marks them "sending" in the
  * same transaction. An item stuck in "sending" for more than 10 minutes becomes "unknown" and is
  * never sent again by itself. Sending is done by the Gmail script, not here.
@@ -27,6 +32,7 @@ const OUTBOX = 'inbox_outbox';
 const RAW = 'inbox_raw_emails';
 const MAX_PULL = 5;
 const MAX_REASON = 300;
+const POKE_TIMEOUT_MS = 6000;
 
 class Fail extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -37,7 +43,7 @@ const millis = v => (v && typeof v.toMillis === 'function' ? v.toMillis() : v &&
 
 // ---------------------------------------------------------------- owner: send a reply
 
-/** deps: { db, now() }. Returns { ok, outboxId, duplicate }. */
+/** deps: { db, now(), trigger?() }. Returns { ok, outboxId, duplicate }. */
 async function sendReply(auth, data, deps) {
   if (!isOwnerAuth(auth)) throw fail('permission-denied', 'Only the owner can send replies.');
   const d = data || {};
@@ -51,7 +57,7 @@ async function sendReply(auth, data, deps) {
   const outRef = db.collection(OUTBOX).doc(d.clientId);
   const msgRef = convRef.collection('messages').doc(d.clientId);
 
-  return db.runTransaction(async tx => {
+  const saved = await db.runTransaction(async tx => {
     const [conv, existing, recent] = await Promise.all([
       tx.get(convRef),
       tx.get(outRef),
@@ -91,6 +97,10 @@ async function sendReply(auth, data, deps) {
     });
     return { ok: true, outboxId: d.clientId, duplicate: false };
   });
+  if (!saved.duplicate && typeof deps.trigger === 'function') {
+    try { await deps.trigger(); } catch (e) { console.warn('inboxSendReply: instant send not triggered', e && e.message); }
+  }
+  return saved;
 }
 
 // ---------------------------------------------------------------- owner: check-in request page
@@ -199,6 +209,24 @@ async function report(body, deps) {
   });
 }
 
+/** POSTs {key, action:'sendNow'} to the Gmail script web app. Gives up after a few seconds; the script keeps running. */
+async function pokeWebApp(url, key, fetchImpl = fetch, timeoutMs = POKE_TIMEOUT_MS) {
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url)) throw new Error('bad web app url');
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    await fetchImpl(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ key, action: 'sendNow' }),
+      redirect: 'follow',
+      signal: ctl.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function safeEqual(a, b) {
   const ha = crypto.createHash('sha256').update(String(a)).digest();
   const hb = crypto.createHash('sha256').update(String(b)).digest();
@@ -246,7 +274,17 @@ function registerCloudFunctions() {
     }
   };
 
-  const inboxSendReply = onCall({ region, timeoutSeconds: 30, maxInstances: 5, memory: '256MiB' }, wrap(sendReply));
+  // Pokes the Gmail script web app (URL saved in inbox_meta/outbox_config by scripts/inbox-set-script-url.js).
+  const triggerScript = async () => {
+    const snap = await getFirestore().collection('inbox_meta').doc('outbox_config').get();
+    const url = snap.exists && snap.data().webAppUrl;
+    if (!url) return;
+    await pokeWebApp(url, INBOX_INGEST_KEY.value());
+  };
+  const inboxSendReply = onCall(
+    { region, secrets: [INBOX_INGEST_KEY], timeoutSeconds: 30, maxInstances: 5, memory: '256MiB' },
+    wrap((auth, data, d) => sendReply(auth, data, { ...d, trigger: triggerScript }))
+  );
   const inboxCheckinLink = onCall({ region, timeoutSeconds: 30, maxInstances: 5, memory: '256MiB' }, wrap(checkinLink));
   const inboxOutbox = onRequest(
     { region, secrets: [INBOX_INGEST_KEY], timeoutSeconds: 60, maxInstances: 2, memory: '256MiB' },
@@ -256,6 +294,6 @@ function registerCloudFunctions() {
 }
 
 module.exports = {
-  sendReply, checkinLink, pull, report, handleOutbox, markUnknown, registerCloudFunctions, Fail,
+  sendReply, pokeWebApp, checkinLink, pull, report, handleOutbox, markUnknown, registerCloudFunctions, Fail,
   CONVERSATIONS, OUTBOX,
 };

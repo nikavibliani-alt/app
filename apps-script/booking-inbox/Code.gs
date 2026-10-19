@@ -3,7 +3,8 @@
  *
  * Runs inside the Gmail account that receives Booking.com emails. Every minute it
  *   1. asks the Cloud Function inboxOutbox for replies I wrote in the inbox screen and sends each
- *      one as a plain-text reply to the guest's Booking.com email (step 4), then
+ *      one as a plain-text email with an empty subject to the guest's Booking.com address (step 4).
+ *      The same thing also runs at once when the web app (doPost) is poked after I tap Send, then
  *   2. sends new Booking.com emails to the Cloud Function inboxEmailIngest, which saves them in
  *      Firestore (step 1). Nothing is labelled, moved or deleted.
  *
@@ -80,13 +81,42 @@ function status() {
 // ---------------------------------------------------------------- trigger
 
 function processNew() {
+  // Replies first (time sensitive), each part under the script lock so two runs never overlap.
+  withLock_(5000, function () {
+    try { sendReplies_(); } catch (e) { Logger.log('Replies step failed: ' + e.message); }
+  });
+  withLock_(5000, run_);
+}
+
+/** Runs fn while holding the script lock. Returns false if the lock could not be had in time. */
+function withLock_(waitMs, fn) {
   var lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) { Logger.log('Another run is still going.'); return; }
+  if (!lock.tryLock(waitMs)) { Logger.log('Another run is still going.'); return false; }
   try {
-    try { sendReplies_(); } catch (e) { Logger.log('Replies step failed: ' + e.message); }   // replies first: they are time sensitive
-    run_();
+    fn();
   } finally {
     lock.releaseLock();
+  }
+  return true;
+}
+
+/**
+ * Web app entry (Deploy > New deployment > Web app). The inboxSendReply Cloud Function calls it
+ * right after I tap Send, so the reply goes out at once instead of at the next minute. It must
+ * send the same key as INGEST_KEY. It only sends what the server hands out as "waiting", so it
+ * cannot send anything the inbox did not queue, and the every-minute run stays as a backup.
+ */
+function doPost(e) {
+  var out = function (o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); };
+  try {
+    var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    var key = PropertiesService.getScriptProperties().getProperty('INGEST_KEY');
+    if (!key || !body.key || String(body.key) !== key) return out({ ok: false, error: 'unauthorized' });
+    if (body.action !== 'sendNow') return out({ ok: false, error: 'bad action' });
+    var ran = withLock_(20000, function () { sendReplies_(); });
+    return out({ ok: true, ran: ran });
+  } catch (err) {
+    return out({ ok: false, error: String(err && err.message || err).slice(0, 200) });
   }
 }
 
@@ -278,17 +308,26 @@ function sendOne_(item) {
     if (!msg) return { ok: false, error: 'The guest email was not found in Gmail.' };
     if (addr_(msg.getReplyTo() || msg.getFrom()) !== expected) return { ok: false, error: 'The guest email has a different reply address.' };
 
-    // Reply to the newest email of the guest in that Gmail thread.
-    var target = msg;
-    var all = msg.getThread().getMessages();
-    for (var i = all.length - 1; i >= 0; i--) {
-      if (addr_(all[i].getReplyTo() || all[i].getFrom()) === expected) { target = all[i]; break; }
-    }
-    target.reply(text);                               // plain text only: no HTML, no signature
+    // Booking.com shows the subject inside the guest chat, so the reply has an empty subject.
+    // GmailMessage.reply always adds "Re: <subject>", so this is a new plain email to the guest address.
+    var how = sendPlain_(expected, text);
+    Logger.log('Sent with ' + how + ' subject.');
     return { ok: true };
   } catch (e) {
     return { ok: false, error: 'Gmail error: ' + String(e && e.message || e).slice(0, 200) };
   }
+}
+
+/** Plain text, empty subject, no signature, no quoted text. A single space if Gmail refuses an empty subject. */
+function sendPlain_(to, text) {
+  try {
+    GmailApp.sendEmail(to, '', text);
+    return 'an empty';
+  } catch (e) {
+    if (!/subject|invalid argument/i.test(String(e && e.message))) throw e;   // not a subject problem: do not retry
+  }
+  GmailApp.sendEmail(to, ' ', text);
+  return 'a one-space';
 }
 
 function outbox_(url, key, payload, attempts) {

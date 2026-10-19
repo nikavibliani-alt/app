@@ -242,3 +242,33 @@ test('reply warnings', async () => {
   assert.ok(replyWarnings('wifi password: Sun12345').some(w => /door code or WiFi/.test(w)));
   assert.ok(!replyWarnings('Please send your passport photo').some(w => /door code/.test(w)));
 });
+
+test('send: pokes the script after saving, once, and never fails the send if the poke fails', async () => {
+  const db = fakeDb(seed());
+  let pokes = 0;
+  const r = await C.sendReply(OWNER, { bookingNumber: NUM, clientId: CID, text: 'hi' }, { ...deps(db), trigger: async () => { pokes++; } });
+  assert.strictEqual(r.duplicate, false);
+  assert.strictEqual(pokes, 1);
+  assert.strictEqual(db.store.get(`inbox_outbox/${CID}`).status, 'waiting', 'the poke does not change the item; pull() does');
+  const again = await C.sendReply(OWNER, { bookingNumber: NUM, clientId: CID, text: 'hi' }, { ...deps(db), trigger: async () => { pokes++; } });
+  assert.strictEqual(again.duplicate, true);
+  assert.strictEqual(pokes, 1, 'a repeated request does not poke again');
+
+  const db2 = fakeDb(seed());
+  const r2 = await C.sendReply(OWNER, { bookingNumber: NUM, clientId: 'client-id-0002', text: 'hi' }, { ...deps(db2), trigger: async () => { throw new Error('boom'); } });
+  assert.strictEqual(r2.ok, true);
+  assert.strictEqual(db2.store.get('inbox_outbox/client-id-0002').status, 'waiting');
+});
+
+test('poke: only the Apps Script web app address, key in the body, gives up on a slow answer', async () => {
+  const url = 'https://script.google.com/macros/s/AKfycbxAbC_123-xyz/exec';
+  let seen;
+  await C.pokeWebApp(url, 'secret', async (u, o) => { seen = { u, o }; return {}; });
+  assert.strictEqual(seen.u, url);
+  assert.strictEqual(seen.o.method, 'POST');
+  assert.deepStrictEqual(JSON.parse(seen.o.body), { key: 'secret', action: 'sendNow' });
+  await assert.rejects(C.pokeWebApp('https://evil.example.com/exec', 'secret', async () => ({})), /bad web app url/);
+  await assert.rejects(C.pokeWebApp('http://script.google.com/macros/s/abc/exec', 'secret', async () => ({})), /bad web app url/);
+  const slow = (u, o) => new Promise((_, rej) => o.signal.addEventListener('abort', () => rej(new Error('aborted'))));
+  await assert.rejects(C.pokeWebApp(url, 'secret', slow, 20), /aborted/);
+});

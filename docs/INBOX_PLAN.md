@@ -130,3 +130,14 @@ service cloud.firestore {
   (`shared/inbox-reply-warnings.js`).
 - Deploy: `firebase deploy --only functions:pipeline:inboxSendReply,functions:pipeline:inboxOutbox,functions:pipeline:inboxCheckinLink --project sleepy-5c962`.
 - Gmail script: see `apps-script/booking-inbox/README.md`. Firestore rules are unchanged.
+
+### Step 4b (empty subject, instant send)
+
+- Booking.com shows the email subject inside the guest chat, so replies are sent with an empty
+  subject (a single space if Gmail refuses an empty one) as a new plain email to the guest's
+  `@guest.booking.com` address. The script still checks that the saved guest email has the expected
+  reply address first.
+- The Gmail script is also a web app (`doPost`, execute as the account, access Anyone, key in the
+  body). `inboxSendReply` pokes it right after saving a reply, waiting at most 6 seconds. If that
+  fails, the every-minute run sends it. URL: `node scripts/inbox-set-script-url.js <url>`
+  (`inbox_meta/outbox_config`, server-only).

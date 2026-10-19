@@ -412,14 +412,18 @@ async function doSend(id, text, isRetry) {
   const btn = $("sendBtn"), err = $("replyErr"), ta = $("replyText");
   if (btn) btn.disabled = true;
   if (err) err.hidden = true;
+  // Clear the box at once; the text comes back if the send is refused.
+  if (!isRetry && ta && msgsFor === id) { ta.value = ""; drafts[id] = ""; ta.style.height = "auto"; $("replyCount").textContent = ""; }
   try {
     await sendReplyFn({ bookingNumber: id, text, clientId: newId() });
-    if (!isRetry && ta && msgsFor === id) { ta.value = ""; drafts[id] = ""; ta.style.height = "auto"; $("replyCount").textContent = ""; }
   } catch (e) {
     const m = (e && e.message) || "Could not send.";
-    if (err) { err.textContent = "Not sent: " + m; err.hidden = false; } else alert("Not sent: " + m);
+    const box = $("replyText");
+    if (!isRetry && box && msgsFor === id && !box.value) { box.value = text; drafts[id] = text; box.dispatchEvent(new Event("input")); }
+    const er = $("replyErr");
+    if (er) { er.textContent = "Not sent: " + m; er.hidden = false; } else alert("Not sent: " + m);
   }
-  if (btn) btn.disabled = false;
+  const b2 = $("sendBtn"); if (b2) b2.disabled = false;
 }
 
 function renderReview() {
