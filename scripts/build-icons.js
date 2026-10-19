@@ -14,6 +14,7 @@ const ICON_NAMES = [
   'layout-grid','ellipsis','pencil','grip-vertical',
   'globe','paperclip','scale',
   'volume-x','cigarette-off','dog','paw-print','flame','footprints','door-closed','key-round','wine-off','car','baby','camera-off','droplets','zap','shield-alert',
+  'search','trending-up','sliders-horizontal',
 ];
 
 const ALIASES = { 'edit-2': 'pencil' };
