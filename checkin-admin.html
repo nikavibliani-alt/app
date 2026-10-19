@@ -1449,16 +1449,47 @@ const VALID_TABS=new Set(['stay','elevator','requests','apts','hk','guestsetting
 const _NAV_KEY='maxela_admin_nav_v5';
 const NAV_MIN=2;
 const NAV_MAX=5;
-const NAV_POOL={
-  stay:{label:'Stay',pane:'stay',icon:'calendar',extra:''},
-  hk:{label:'HK',pane:'hk',icon:'bed',extra:''},
-  elevator:{label:'Elevator',pane:'elevator',icon:'arrow-up-down',extra:'<span class="dot"></span>',navId:'nav-elev'},
-  requests:{label:'Requests',pane:'requests',icon:'message-square',extra:'<span class="badge" id="req-badge">0</span>',navId:'nav-req'},
-  apts:{label:'Apts',pane:'apts',icon:'home',extra:''},
-  history:{label:'History',pane:'history',icon:'clock',extra:''},
-  ...(HK_DAMAGE_ENABLED?{damage:{label:'Damage',pane:'damage',icon:'alert-triangle',extra:''}}:{}),
-};
+/* ONE list of destinations. It builds the More menu and the Tab bar layout options.
+   id: saved in tab bar layouts (never rename). label: full name (More + layout picker). tabLabel: short name under the tab icon.
+   tab: pane opened with switchTab (panes: other panes that count as the same place). href: opens a separate page.
+   section: where it sits in More (ops | guest | hksetup). more: 'always' (default) or 'ifNotInBar'.
+   badge: key of a live count shown on the tab and in More (see setDestBadge). */
+const DESTINATIONS=[
+  {id:'stay',label:'Stay',tabLabel:'Stay',icon:'calendar',tab:'stay',section:'ops',more:'ifNotInBar'},
+  {id:'requests',label:'Requests',tabLabel:'Requests',icon:'message-square',tab:'requests',section:'ops',more:'ifNotInBar',badge:'requests'},
+  {id:'elevator',label:'Elevator',tabLabel:'Elevator',icon:'arrow-up-down',tab:'elevator',section:'ops',more:'ifNotInBar',navId:'nav-elev',navDot:true},
+  {id:'hk',label:'Housekeeping',tabLabel:'HK',icon:'bed',tab:'hk',section:'ops'},
+  ...(HK_DAMAGE_ENABLED?[{id:'damage',label:'Damage reports',tabLabel:'Damage',icon:'alert-triangle',tab:'damage',section:'ops',hint:'Airbnb claim evidence',moreId:'more-damage-item',hintId:'more-damage-hint',hiddenUntilLoaded:true,moreClick:"window._dmgFromHk=false;switchTab('damage')"}]:[]),
+  {id:'apts',label:'Apartments & guest page',tabLabel:'Apts',icon:'home',tab:'apts',panes:['apts','guestsettings'],section:'ops',moreClick:'openAptsGuest()'},
+  {id:'history',label:'Guest history',tabLabel:'History',icon:'clock',tab:'history',section:'ops'},
+  {id:'pricing',label:'Pricing engine',tabLabel:'Pricing',icon:'trending-up',href:'/pricing-v2',section:'ops'},
+  {id:'inbox',label:'Guest inbox',tabLabel:'Inbox',icon:'inbox',href:'/inbox',section:'ops',badge:'inbox',hint:'Booking.com messages'},
+  {id:'failures',label:'Failed searches',tabLabel:'Failed',icon:'search',tab:'failures',section:'ops',badge:'failures',moreId:'more-failures-btn'},
+  {id:'wasettings',label:'WhatsApp & bot settings',tabLabel:'WhatsApp',icon:'message-circle',tab:'wasettings',section:'guest',hint:'Modes · templates'},
+  {id:'hksettings',label:'HK settings',tabLabel:'HK setup',icon:'sliders-horizontal',tab:'hksettings',section:'hksetup'},
+];
+/* what the tab bar layout can use: same list, short label shown on the tab */
+const NAV_POOL=Object.fromEntries(DESTINATIONS.map(d=>[d.id,{...d,label:d.tabLabel,fullLabel:d.label,pane:d.tab||null}]));
 function navTabSvg(id,size=22){return featherIcon(NAV_POOL[id]?.icon||'circle',size,1.8);}
+function navDestIsLink(id){return !!NAV_POOL[id]?.href;}
+function navDestClick(d){return d.href?`location.href='${d.href}'`:`switchTab('${d.pane}')`;}
+/* panes that are covered by the current tab bar; every other page highlights More */
+function navBarPanes(slots){
+  const set=new Set();
+  for(const id of slots){const d=NAV_POOL[id];if(d&&d.pane){set.add(d.pane);(d.panes||[]).forEach(x=>set.add(x));}}
+  return set;
+}
+/* live counts shown on tab buttons and More items */
+const _destBadge={};
+function setDestBadge(key,n){
+  n=Number(n)||0;_destBadge[key]=n;
+  const txt=n>99?'99+':String(n);
+  document.querySelectorAll(`[data-badge="${key}"]`).forEach(el=>{
+    el.textContent=txt;
+    if(el.classList.contains('more-badge'))el.style.display=n?'inline-flex':'none';
+    else el.closest('.nav__btn')?.classList.toggle('has-badge',n>0);
+  });
+}
 const DEFAULT_NAV_CONFIG={slots:['stay','requests','elevator'],landingTab:'stay'};
 let navConfigDraft=null;
 
@@ -1474,7 +1505,7 @@ function normalizeNavConfig(raw){
     unique.push(next);
   }
   let landing=raw?.landingTab||DEFAULT_NAV_CONFIG.landingTab;
-  if(!unique.includes(landing))landing=unique[0];
+  if(!unique.includes(landing)||navDestIsLink(landing))landing=unique.find(id=>!navDestIsLink(id))||'stay';
   return{slots:unique,landingTab:landing};
 }
 function loadNavConfig(){
@@ -1502,7 +1533,8 @@ function loadSavedTab(){
     const t=localStorage.getItem(_TAB_KEY);
     if(t&&VALID_TABS.has(t))return t;
   }catch(e){}
-  return loadNavConfig().landingTab||'stay';
+  const lt=loadNavConfig().landingTab||'stay';
+  return NAV_POOL[lt]?.pane||'stay';
 }
 let currentTab=loadSavedTab();
 let reqData=[],reqFilter='all',_reqLoading=false;
@@ -1529,15 +1561,18 @@ function renderNavBar(){
   navSlots=loadNavSlots();
   const nav=document.getElementById('main-nav');
   if(!nav)return;
+  const covered=navBarPanes(navSlots);
   let html='';
   for(const id of navSlots){
     const d=NAV_POOL[id];
     if(!d)continue;
-    html+=`<button class="nav__btn${currentTab===d.pane?' active':''}" data-tab="${d.pane}" onclick="switchTab('${d.pane}')" ${d.navId?`id="${d.navId}"`:''}>${navTabSvg(id)}${d.label}${d.extra||''}</button>`;
+    const on=!!d.pane&&(currentTab===d.pane||(d.panes||[]).includes(currentTab));
+    const n=d.badge?(_destBadge[d.badge]||0):0;
+    const extra=(d.navDot?'<span class="dot"></span>':'')+(d.badge?`<span class="badge" data-badge="${d.badge}">${n>99?'99+':n}</span>`:'');
+    html+=`<button class="nav__btn${on?' active':''}${n?' has-badge':''}" ${d.pane?`data-tab="${d.pane}"`:`data-link="${esc(d.href)}"`} onclick="${navDestClick(d)}" ${d.navId?`id="${d.navId}"`:''}>${navTabSvg(id)}${esc(d.label)}${extra}</button>`;
   }
-  html+=`<button class="nav__btn${currentTab==='more'||['apts','guestsettings','wasettings','navsettings','failures','elevator','hksettings','damage','hk','history'].includes(currentTab)?' active':''}" data-tab="more" onclick="switchTab('more')">${featherIcon('more-horizontal',22,1.8)}More</button>`;
+  html+=`<button class="nav__btn${covered.has(currentTab)?'':' active'}" data-tab="more" onclick="switchTab('more')">${featherIcon('more-horizontal',22,1.8)}More</button>`;
   nav.innerHTML=html;
-  updateRequestsBadge();
   if(elevData)document.getElementById('nav-elev')?.classList.toggle('has-alert',elevFreshness().cls==='old');
 }
 
@@ -1551,7 +1586,7 @@ window.saveNavConfig=async function(){
   if(slots.length<NAV_MIN||slots.length>NAV_MAX){toast('Need '+NAV_MIN+'–'+NAV_MAX+' tabs');return;}
   if(new Set(slots).size<slots.length){toast('Each tab must be different');return;}
   let landing=cfg.landingTab;
-  if(!slots.includes(landing))landing=slots[0];
+  if(!slots.includes(landing)||navDestIsLink(landing))landing=slots.find(x=>!navDestIsLink(x))||'stay';
   const norm=normalizeNavConfig({slots,landingTab:landing});
   try{
     localStorage.setItem(_NAV_KEY,JSON.stringify(norm));
@@ -1600,10 +1635,10 @@ function navCfgRowHtml(id,i){
     <div class="nav-cfg-body">
       <div class="nav-cfg-body__label">Tab ${i+1}${isLand?' · Opens on launch':''}</div>
       <select id="nav-slot-${i}" onchange="navSlotPick(${i},this.value)">
-        ${Object.entries(NAV_POOL).map(([k,nd])=>`<option value="${k}"${k===id?' selected':''}>${esc(nd.label)}</option>`).join('')}
+        ${Object.entries(NAV_POOL).map(([k,nd])=>`<option value="${k}"${k===id?' selected':''}>${esc(nd.fullLabel)}</option>`).join('')}
       </select>
     </div>
-    <button type="button" class="nav-cfg-landing${isLand?' on':''}" aria-label="Set as landing tab" aria-pressed="${isLand}" onclick="navSetLanding(${i})"><span class="nav-cfg-landing__dot"></span><span>Landing</span></button>
+    ${navDestIsLink(id)?'':`<button type="button" class="nav-cfg-landing${isLand?' on':''}" aria-label="Set as landing tab" aria-pressed="${isLand}" onclick="navSetLanding(${i})"><span class="nav-cfg-landing__dot"></span><span>Landing</span></button>`}
     <button type="button" class="nav-cfg-remove" aria-label="Remove tab" onclick="navRemoveSlot(${i})" ${n<=NAV_MIN?'disabled':''}>${featherIcon('x',18,2)}</button>
   </div>`;
 }
@@ -1645,14 +1680,14 @@ function renderNavSettings(){
 window.navSlotPick=function(i,val){
   if(!navConfigDraft)return;
   navConfigDraft.slots[i]=val;
-  if(navConfigDraft.landingTab&&!navConfigDraft.slots.includes(navConfigDraft.landingTab))
-    navConfigDraft.landingTab=navConfigDraft.slots[0];
+  if(navConfigDraft.landingTab&&(!navConfigDraft.slots.includes(navConfigDraft.landingTab)||navDestIsLink(navConfigDraft.landingTab)))
+    navConfigDraft.landingTab=navConfigDraft.slots.find(x=>!navDestIsLink(x))||'stay';
   renderNavSettings();
 };
 window.navSetLanding=function(i){
   if(!navConfigDraft)return;
   const id=navConfigDraft.slots[i];
-  if(navConfigDraft.landingTab===id)return;
+  if(navConfigDraft.landingTab===id||navDestIsLink(id))return;
   const label=NAV_POOL[id]?.label||id;
   if(!confirm(`Set "${label}" as the landing tab?\n\nThis tab opens first when you launch the admin app.`))return;
   navConfigDraft.landingTab=id;
@@ -1665,7 +1700,7 @@ window.navRemoveSlot=function(i){
   if(!confirm(`Remove "${label}" from the tab bar?`))return;
   navFlipReorder(()=>{
     const removed=navConfigDraft.slots.splice(i,1)[0];
-    if(navConfigDraft.landingTab===removed)navConfigDraft.landingTab=navConfigDraft.slots[0];
+    if(navConfigDraft.landingTab===removed)navConfigDraft.landingTab=navConfigDraft.slots.find(x=>!navDestIsLink(x))||'stay';
     renderNavSettings();
   });
 };
@@ -3698,8 +3733,7 @@ function dmgEvidenceHtml({r,prep,metas,propertyName,sigName,sigTitle,now,qr}){
 /* ── Search failures ── */
 function updateSfBadge(){
   const n=searchFailures.length;
-  const b=document.getElementById('sf-more-badge');
-  if(b){b.textContent=n;b.style.display=n?'inline-flex':'none';}
+  setDestBadge('failures',n);
 }
 function renderFailures(){
   const el=document.getElementById('failures-list');
@@ -4605,10 +4639,6 @@ window.switchTab=function(tab){
   try{localStorage.setItem(_TAB_KEY,tab);}catch(e){}
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='pane-'+tab));
   renderNavBar();
-  document.querySelectorAll('.nav__btn').forEach(b=>{
-    const t=b.dataset.tab;
-    b.classList.toggle('active',t===tab||(t==='more'&&MORE_TABS.has(tab)));
-  });
   const m=TAB_META[tab]||TAB_META.more;
   document.getElementById('header-title').textContent=m.title;
   document.getElementById('header-sub').textContent=m.sub;
@@ -5350,12 +5380,7 @@ function reqSubline(r){
   return sub;
 }
 function updateRequestsBadge(){
-  const pending=reqData.filter(r=>(r.status||'PENDING')==='PENDING').length;
-  const btn=document.getElementById('nav-req');
-  const badge=document.getElementById('req-badge');
-  if(!btn||!badge)return;
-  btn.classList.toggle('has-badge',pending>0);
-  badge.textContent=pending>99?'99+':String(pending);
+  setDestBadge('requests',reqData.filter(r=>(r.status||'PENDING')==='PENDING').length);
 }
 /* Live requests: every PENDING one + everything from the last 30 days (two snapshot listeners, merged) */
 const _reqLive={pending:new Map(),recent:new Map(),started:false,ready:0};
@@ -6833,8 +6858,7 @@ onSnapshot(doc(db,'globals','inboxStats'),snap=>{
     sub.textContent=n===null?'Booking.com guest messages':n===0?'Nothing waiting for a reply':`${n} need${n===1?'s':''} a reply${c?`, ${c} cancellation request${c===1?'':'s'}`:''}`;
     sub.classList.toggle('is-warn',!!c);
   }
-  const badge=document.getElementById('more-inbox-badge');
-  if(badge){badge.textContent=n||0;badge.style.display=n?'inline-flex':'none';}
+  setDestBadge('inbox',n||0);
 },()=>{});
 onSnapshot(query(collection(db,'search_failures'),where('resolved','==',false)),snap=>{
   searchFailures=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.timestamp?.seconds||0)-(a.timestamp?.seconds||0));
