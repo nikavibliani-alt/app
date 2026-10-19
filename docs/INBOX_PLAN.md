@@ -328,3 +328,9 @@ Undo: `git revert` the commit and paste the previous `Code.gs` (tag `inbox-gmail
 
 The first Gmail API version of `Code.gs` failed in `partText_`: the Advanced Gmail service returned the body data as a byte array, not text, so the base64 decode failed. Fixed: `dataBytes_` accepts a byte array or web-safe base64 (with or without padding); an unreadable part is skipped and logged, an unreadable message is saved with an empty body (it lands in the "check this" pile), an unloadable message is skipped, and a broken encoded header word no longer matters for the reply-address check. Mock-tested (byte arrays, unpadded web-safe text, garbage, attachment data, unreadable messages).
 Undo: previous `Code.gs` from tag `inbox-gmail-decode-before`.
+
+## Update: alert when no Booking.com email has been saved for 12 hours
+
+`inboxScriptWatch` (the function that already watches the script every minute) also looks at the time the newest email was saved in `inbox_raw_emails`. No new email for **12 hours**: one push to all phones (both lists, once per phone): "No Booking.com email saved for 12 hours", with the time of the last one. While it stays quiet it repeats every 6 hours ("Still no Booking.com email saved"), and it sends "Booking.com emails are being saved again" when one arrives. State: `inbox_meta/email_watch`. Like the script alert it is a health alert and is not stopped by the "Booking.com message alerts" switch.
+This catches a script that runs but cannot read Gmail (the 19 Oct case), which the heartbeat alone does not. Possible false alarm: a genuinely quiet night. At about 4 Booking.com emails a day, 12 hours without any is uncommon but can happen; the threshold is `EMAIL_STALE_MS` in `pipeline-functions/lib/inboxScriptWatch.js`.
+Undo: restore from tag `inbox-email-watch-before` and redeploy `inboxScriptWatch`, or `git revert` the commit.
