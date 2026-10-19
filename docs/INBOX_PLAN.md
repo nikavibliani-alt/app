@@ -179,3 +179,39 @@ service cloud.firestore {
 - **Cost guard.** At most 6 drafts per conversation per hour (then a "Needs you" note), `DAILY_CAP` 60 model calls a day (`inbox_ai_usage/{date}`), one JSON log line per run without guest text.
 - **Functions:** `inboxAiOnMessage`, `inboxAiRun`, `inboxDraftDiscard`. Secret used: `ANTHROPIC_API_KEY` (the same one the WhatsApp bot uses).
 - **Undo:** switch it off in the admin (instant), or delete the three functions: `firebase functions:delete inboxAiOnMessage inboxAiRun inboxDraftDiscard --region europe-west1 --project sleepy-5c962` (the inbox page hides the draft box when there is no `aiDraft`). Code: `git revert` the part 2 commit or return to tag `inbox-part2-before`.
+
+## Part 3: plan only, no code. The WhatsApp bot reads Booking.com conversations
+
+**Goal.** A question answered on Booking.com is not answered again on WhatsApp (the drafter already reads WhatsApp the other way round). I need to approve this before anything is built.
+
+### What the bot would read
+- The conversation `inbox_conversations/{bookingNumber}` and its `messages` (guest messages, and my replies sent from the inbox, with their status).
+- How to find it from a WhatsApp chat, using what the worker already does: phone, then `findCurrentGuestForm` (check-in form and reservation), then the reservation's `bookingId` (the Booking.com number, only for `source: "booking"`), then the conversation with that id. Only the guest's current stay. If the match is missing, ambiguous (two reservations, a returning guest) or the reservation is cancelled: read nothing and behave exactly as today.
+- The newest 10 to 15 messages, with the same time labels the bot already uses ("[5 min ago]"), as one extra block in the guest context: "Booking.com chat with this same guest".
+
+### What would change in `whatsapp-functions` (nothing is changed now)
+1. A new small module `bookingContext.js` (pure, tested): find the conversation, pick the messages, format the block. Reading uses admin access; `inbox_*` stays server-only.
+2. `index.js`, in the worker after `findCurrentGuestForm` (about line 759): call it behind a switch, add the block to the dynamic part of the system prompt (not the cached part).
+3. The prompt template (`knowledge/promptTemplate.js`): a short new section, "BOOKING.COM CHAT": use it as background only; if my reply on Booking.com, sent after the guest's newest WhatsApp question, already answers it, reply `[SILENT]`; never quote the Booking.com chat; never mix up the two guests.
+4. Owner silence (`ownerSilence.js` / `shouldStaySilentFromHistory`): optionally count a Booking.com reply of mine as an "owner" message for the "okay / thanks" silence window.
+5. `globals/config.botReadsBooking` (default false) and one admin switch next to the existing AI settings.
+6. Tests, the `guestKnowledge` copy check, and the README section.
+7. Deploy: `firebase deploy --only functions:whatsapp` by hand, as usual. This is the live bot, so only after the rollout below.
+
+### Risks
+1. **Blind spot (the big one).** My replies sent from the Booking.com Extranet or the Pulse app never reach the inbox (confirmed: 0 copies by email). The bot only sees replies sent from our inbox. It can repeat something I said in Pulse, and it cannot know. Nothing the bot does can fix this; the fix is to answer from the inbox.
+2. **Wrongly silent.** The worst failure is the bot ignoring a guest. So it may only go silent when my Booking.com reply is newer than the guest's WhatsApp question and clearly about the same thing. Otherwise it answers, as today. Shadow mode (below) measures this before it can stay quiet.
+3. **Wrong guest.** Matching by phone and reservation can pick the wrong person (shared phones, a returning guest, a booking for someone else). Guest text from one person must never reach another's chat. Rule: only an exact current-stay match, otherwise nothing.
+4. **Delay.** Booking.com messages reach the inbox after up to about 5 minutes (the Gmail script trigger runs every 5 minutes, see the questions). A fresh answer may be missing.
+5. **Prompt injection.** Booking.com guest text is untrusted; wrap it as data like the drafter does.
+6. **Cost and speed.** A few hundred extra input tokens per worker run and one extra Firestore read; the cached prompt prefix is untouched.
+7. **Drift.** Two copies of the shared knowledge. The sync script and test keep them equal; a later cleanup can make WhatsApp use one shared module.
+8. **Privacy.** Booking.com guest text goes to Claude. WhatsApp text already does, so no new third party, but it is still worth saying.
+
+### Safe rollout (each step needs my OK)
+1. **Build offline.** Module, prompt section and tests. No deploy.
+2. **Replay.** Run the bot's existing replay on past WhatsApp chats whose guests also have a Booking.com conversation, with and without the new block. Read every difference.
+3. **Shadow mode.** Deploy with `botReadsBooking: "shadow"`: the bot builds the block and logs "would have stayed silent" or "would have changed the answer", but its replies stay exactly as today. Run for about 2 weeks. Count how often it would have been right, and every wrong "silent".
+4. **Silence only.** Turn on for the one case that matters (an answered question), only for matches with my inbox reply inside the last 24 hours. Watch daily for a week.
+5. **Full context.** Let the block inform answers more broadly.
+6. **Kill switch.** `botReadsBooking: false` in the admin returns to today's behavior instantly, no deploy. Code undo: redeploy the previous `whatsapp` commit.
