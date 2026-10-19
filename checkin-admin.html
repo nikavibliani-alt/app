@@ -334,6 +334,16 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
 .pill-pending-req{background:var(--amber-bg);color:var(--amber);}
 .pill-confirmed{background:var(--green-bg);color:var(--green);}
 .pill-cancelled{background:var(--bg);color:var(--muted);}
+.inbox-card{display:flex;align-items:center;gap:12px;min-height:60px;padding:12px 16px;margin-bottom:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);text-decoration:none;color:var(--ink);}
+.inbox-card:visited{color:var(--ink);}
+.inbox-card:active{background:#f3f1ee;}
+.inbox-card__icon{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
+.inbox-card__text{flex:1;min-width:0;}
+.inbox-card__title{font-weight:700;font-size:15px;}
+.inbox-card__sub{font-size:12.5px;color:var(--muted);margin-top:1px;}
+.inbox-card__sub.is-warn{color:var(--red);font-weight:600;}
+.inbox-card__count{min-width:28px;height:28px;padding:0 9px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;background:#eceae6;color:var(--ink);}
+.inbox-card__count.has{background:var(--red);color:#fff;}
 .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;}
 .stat{color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 6px;text-align:center;cursor:pointer;font-family:var(--sans);width:100%;}
 .stat.active{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);}
@@ -769,6 +779,11 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
   </div>
 
   <div class="pane active" id="pane-stay">
+    <a class="inbox-card" id="stay-inbox-card" href="/inbox" aria-label="Open the Booking.com guest inbox">
+      <svg class="inbox-card__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>
+      <span class="inbox-card__text"><span class="inbox-card__title" style="display:block">Inbox</span><span class="inbox-card__sub" id="inbox-card-sub" style="display:block">Booking.com guest messages</span></span>
+      <span class="inbox-card__count" id="inbox-card-count">&ndash;</span>
+    </a>
     <div id="stay-hc"></div>
     <div class="stat-row stat-row--stay" id="stay-stats"></div>
     <div class="day-row show" id="upcoming-days" aria-label="Arrivals by day (arriving / registered)"></div>
@@ -887,7 +902,7 @@ html.standalone-hk.hk-authed #hk-pin-screen{display:none!important;}
       <button class="more-item" type="button" onclick="openAptsGuest()">Apartments &amp; guest page</button>
       <button class="more-item" type="button" onclick="switchTab('history')">Guest history</button>
       <button class="more-item" type="button" onclick="location.href='/pricing-v2'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Pricing engine</button>
-      <button class="more-item" type="button" onclick="location.href='/inbox'">Guest inbox<span class="more-hint">Booking.com messages</span></button>
+      <button class="more-item" type="button" onclick="location.href='/inbox'">Guest inbox<span class="more-badge" id="more-inbox-badge" style="display:none">0</span><span class="more-hint" id="more-inbox-hint">Booking.com messages</span></button>
       <button class="more-item" type="button" onclick="switchTab('failures')" id="more-failures-btn">Failed searches<span class="more-badge" id="sf-more-badge" style="display:none">0</span></button>
     </div>
     <div class="more-section">Guest experience</div>
@@ -6788,6 +6803,19 @@ onSnapshot(collection(db,'hk_pins'),snap=>{
   }
   if(loaded>=2&&currentTab==='hksettings')renderHkSettings();
 });
+// Inbox count: globals/inboxStats is kept by the inboxStatsOnWrite function (two numbers, no guest text).
+onSnapshot(doc(db,'globals','inboxStats'),snap=>{
+  const d=snap.exists()?snap.data():null;
+  const n=d?Number(d.needsReply)||0:null, c=d?Number(d.cancelRequests)||0:0;
+  const cnt=document.getElementById('inbox-card-count'), sub=document.getElementById('inbox-card-sub');
+  if(cnt){cnt.textContent=n===null?'\u2013':String(n);cnt.classList.toggle('has',!!n);}
+  if(sub){
+    sub.textContent=n===null?'Booking.com guest messages':n===0?'Nothing waiting for a reply':`${n} need${n===1?'s':''} a reply${c?`, ${c} cancellation request${c===1?'':'s'}`:''}`;
+    sub.classList.toggle('is-warn',!!c);
+  }
+  const badge=document.getElementById('more-inbox-badge');
+  if(badge){badge.textContent=n||0;badge.style.display=n?'inline-flex':'none';}
+},()=>{});
 onSnapshot(query(collection(db,'search_failures'),where('resolved','==',false)),snap=>{
   searchFailures=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.timestamp?.seconds||0)-(a.timestamp?.seconds||0));
   updateSfBadge();

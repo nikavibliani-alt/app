@@ -139,7 +139,7 @@ body.show-chat #chatPane{display:flex}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, updateDoc, collection, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { requireOwner } from "./shared/owner-auth.js";
 import { replyWarnings } from "./shared/inbox-reply-warnings.js";
@@ -582,6 +582,8 @@ function start() {
     s => { reviewItems = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.resolved); loaded.review = true; render(); }, () => {});
   render();
 }
+// Stay signed in on this phone or computer: the sign-in is kept in the browser's local storage until I sign out.
+try { await setPersistence(auth, browserLocalPersistence); } catch (e) { /* the default (also kept) is fine */ }
 requireOwner({ auth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut }, { onReady: start });
 </script>
 </body>

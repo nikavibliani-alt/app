@@ -275,7 +275,11 @@ function registerCloudFunctions() {
 
   const inboxAiRun = onSchedule(
     { schedule: 'every 1 minutes', region, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 300, memory: '512MiB', maxInstances: 1 },
-    async () => { await runDue({ ...baseDeps(), apiKey: ANTHROPIC_API_KEY.value() }); }
+    async () => {
+      await runDue({ ...baseDeps(), apiKey: ANTHROPIC_API_KEY.value() });
+      try { await require('./inboxStats').refreshInboxStats({ db: getFirestore(), now: () => Timestamp.now() }); }   // heals the admin count
+      catch (e) { console.warn('inboxAiRun: stats refresh failed', e && e.message); }
+    }
   );
 
   const inboxDraftDiscard = onCall({ region, timeoutSeconds: 30, maxInstances: 5, memory: '256MiB' }, async request => {
