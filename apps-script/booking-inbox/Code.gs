@@ -182,7 +182,7 @@ function run_() {
     for (var i = 0; i < msgs.length; i++) {
       if (Date.now() - started > TIME_BUDGET_MS) { save_(props, cursor, recent); Logger.log('Time is up, sent ' + sent + '. Continuing next run.'); return; }
       var m = msgs[i];
-      var result = post_(url, key, toPayload_(m.msg));
+      var result = post_(url, key, safePayload_(m.msg));
       if (!result.ok) { save_(props, cursor, recent); Logger.log('Stopped: ' + result.error + ' (sent ' + sent + ').'); return; }
       sent++;
       recent.push(m.id);
@@ -231,7 +231,13 @@ function collect_(fromMs, toMs, recent, started) {
     var id = refs[i];
     if (seen[id] || recent.indexOf(id) !== -1) continue;
     if (Date.now() - started > TIME_BUDGET_MS) return null;
-    var msg = Gmail.Users.Messages.get('me', id, { format: 'full' });
+    var msg;
+    try {
+      msg = Gmail.Users.Messages.get('me', id, { format: 'full' });
+    } catch (e) {
+      Logger.log('Skipped message ' + id + ' (could not load it): ' + (e && e.message));   // e.g. deleted since the search
+      continue;
+    }
     var time = Number(msg.internalDate);
     if (!(time >= fromMs && time < toMs)) continue;
     if (!SENDER_RE.test(mimeWords_(apiHeaders_(msg)['from'] || ''))) continue;
@@ -279,10 +285,21 @@ function mimeWords_(s) {
   });
 }
 
-function padB64_(d) {
-  var s = String(d || '').replace(/\s+/g, '');
-  while (s.length % 4) s += '=';
-  return s;
+/**
+ * Message data from the Advanced Gmail service as bytes. It can arrive as a web-safe base64 string
+ * (with or without "=" padding) or already as a byte array, so both are handled. Returns null if it
+ * cannot be read (the caller skips that part).
+ */
+function dataBytes_(data) {
+  if (data === null || data === undefined || data === '') return null;
+  if (typeof data === 'string') {
+    var s = data.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    try { return Utilities.base64Decode(s); } catch (e1) { /* try the other decoder */ }
+    try { return Utilities.base64DecodeWebSafe(s); } catch (e2) { return null; }
+  }
+  if (typeof data.length === 'number') return Array.prototype.slice.call(data);   // a byte array
+  return null;
 }
 
 function charsetOf_(part) {
@@ -292,16 +309,24 @@ function charsetOf_(part) {
   return m ? m[1] : 'UTF-8';
 }
 
-/** The text of one body part (inline data, or fetched when Gmail stores a big part as an attachment). */
+/**
+ * The text of one body part (inline data, or fetched when Gmail stores a big part as an attachment).
+ * Never throws: a part that cannot be read is skipped (undefined) and logged.
+ */
 function partText_(msgId, part) {
-  var data = part.body && part.body.data;
-  if (!data && part.body && part.body.attachmentId) {
-    data = Gmail.Users.Messages.Attachments.get('me', msgId, part.body.attachmentId).data;
+  try {
+    var data = part.body && part.body.data;
+    if (!dataBytes_(data) && part.body && part.body.attachmentId) {
+      data = Gmail.Users.Messages.Attachments.get('me', msgId, part.body.attachmentId).data;
+    }
+    var bytes = dataBytes_(data);
+    if (!bytes) return undefined;
+    try { return Utilities.newBlob(bytes).getDataAsString(charsetOf_(part)); }
+    catch (e) { return Utilities.newBlob(bytes).getDataAsString('UTF-8'); }
+  } catch (err) {
+    Logger.log('Skipped a message part that could not be read (message ' + msgId + ', ' + (part && part.mimeType) + '): ' + (err && err.message));
+    return undefined;
   }
-  if (!data) return undefined;
-  var bytes = Utilities.base64DecodeWebSafe(padB64_(data));
-  try { return Utilities.newBlob(bytes).getDataAsString(charsetOf_(part)); }
-  catch (e) { return Utilities.newBlob(bytes).getDataAsString('UTF-8'); }
 }
 
 /** First text/plain and first text/html part (not attachments), looking through nested multiparts. */
@@ -317,6 +342,29 @@ function bodies_(msgId, part, out) {
 
 function htmlToText_(html) {
   return String(html || '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' ').replace(/[ \t]+/g, ' ').replace(/\n\s+/g, '\n').trim();
+}
+
+/**
+ * toPayload_, but a message that cannot be read at all is still saved (with the headers and an empty
+ * body) so the server puts it in the "check this" pile. It never stops the run.
+ */
+function safePayload_(msg) {
+  try {
+    return toPayload_(msg);
+  } catch (e) {
+    Logger.log('Could not read message ' + (msg && msg.id) + ', saving it without a body: ' + (e && e.message));
+    var h = {};
+    try { h = apiHeaders_(msg); } catch (e2) { /* headers unreadable too */ }
+    var d = new Date(Number(msg && msg.internalDate));
+    return {
+      gmailMessageId: String(msg && msg.id),
+      gmailThreadId: String((msg && msg.threadId) || ''),
+      date: (isNaN(d.getTime()) ? new Date() : d).toISOString(),
+      from: mimeWords_(h['from'] || ''), to: mimeWords_(h['to'] || ''),
+      replyTo: mimeWords_(h['reply-to'] || h['from'] || ''), subject: mimeWords_(h['subject'] || ''),
+      bodyText: '', bodyHtml: '', headers: {}
+    };
+  }
 }
 
 function toPayload_(msg) {

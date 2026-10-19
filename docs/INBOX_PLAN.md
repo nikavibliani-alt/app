@@ -323,3 +323,8 @@ Every `processNew` run failed with "Service invoked too many times for one day: 
 Fix: `Code.gs` reads and sends mail through the Gmail API (Advanced Gmail service) instead of GmailApp (details in `apps-script/booking-inbox/README.md`). Nothing is lost: the script's cursor did not advance while it failed.
 Note: the "script stopped" alert only notices when the script stops calling the server; it does not notice a script that runs but fails to read Gmail (this case). A check "no new email saved for N hours" would. Not built.
 Undo: `git revert` the commit and paste the previous `Code.gs` (tag `inbox-gmail-api-before`) once the daily limit has reset.
+
+## Update: "Could not decode string" (19 Oct)
+
+The first Gmail API version of `Code.gs` failed in `partText_`: the Advanced Gmail service returned the body data as a byte array, not text, so the base64 decode failed. Fixed: `dataBytes_` accepts a byte array or web-safe base64 (with or without padding); an unreadable part is skipped and logged, an unreadable message is saved with an empty body (it lands in the "check this" pile), an unloadable message is skipped, and a broken encoded header word no longer matters for the reply-address check. Mock-tested (byte arrays, unpadded web-safe text, garbage, attachment data, unreadable messages).
+Undo: previous `Code.gs` from tag `inbox-gmail-decode-before`.

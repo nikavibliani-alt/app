@@ -63,3 +63,6 @@ Booking.com mail for ingest.
 - **Catching up:** the script's cursor did not move while it failed, so the first runs after the update read everything missed since then. Emails already saved are skipped by the server.
 - **Replies that failed during this** show "Failed: Service invoked too many times..." in the inbox; tap Try again after the update.
 - **To update:** paste `Code.gs` and `appsscript.json` as in the section above, run `processNew` once from the editor (Run), and check Executions: it should finish without an error. Then Deploy, Manage deployments, pencil, Version "New version", Deploy.
+
+### Step 4e: "Could not decode string"
+The Advanced Gmail service can return a body part as a **byte array** (not text), and sometimes as web-safe base64 without padding. `Code.gs` now accepts both (`dataBytes_`). A part that cannot be read is skipped and logged; a message that cannot be read at all is still saved with its headers and an empty body, so the server puts it in the "check this" pile; a message that cannot be loaded is skipped. One bad message or part never stops the run. Paste `Code.gs` again, then Deploy, Manage deployments, pencil, Version "New version", Deploy.
