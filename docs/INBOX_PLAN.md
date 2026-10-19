@@ -141,3 +141,25 @@ service cloud.firestore {
   body). `inboxSendReply` pokes it right after saving a reply, waiting at most 6 seconds. If that
   fails, the every-minute run sends it. The web app URL is the Firebase secret `INBOX_SCRIPT_URL`
   (`firebase functions:secrets:set INBOX_SCRIPT_URL`, then redeploy `inboxSendReply`).
+
+## Questions for Nika
+
+(Written while you were away. Each has the safe option I picked; tell me if you want it the other way.)
+
+1. **The backup trigger runs every 5 minutes, not every minute.** The server log shows the Gmail
+   script asking for replies at :x2 and :x7 past the hour, 5 minutes apart. In script.google.com
+   open Triggers: `processNew` should say "every minute". If it says every 5 minutes, new emails
+   also arrive in the inbox up to 5 minutes late. I did not change anything (the script is yours).
+2. **Last test reply.** The only reply in the outbox was created at 16:20 and went out at 16:22
+   (102 seconds from tap to sent, before instant sending existed). Nothing reached the server
+   around 16:40 to 16:50. Details in the final report.
+
+## Part 1 details (chat design)
+
+- `inbox.html`: one screen on a phone (list, then chat), list and chat side by side from 860 px wide.
+- The chat opens on the newest message, with date separators (Today, Yesterday, 12 Oct), guest
+  bubbles on the left and mine on the right with time and status.
+- Composer pinned at the bottom. Computer: Enter sends, Shift+Enter is a new line. Phone (touch
+  screen): Enter is a new line, the Send button sends. My bubble shows at once as "Waiting", the box
+  clears and keeps focus, and a second tap while sending is ignored.
+- Undo: `git revert` this part's commit, or restore `inbox.html` from tag `inbox-part1-before`.

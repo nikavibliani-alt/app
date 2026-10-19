@@ -15,17 +15,29 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
+html,body{height:100%}
 body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text-main);
-  line-height:1.4;font-size:15px;touch-action:manipulation;min-height:100vh;
-  padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+  line-height:1.4;font-size:15px;touch-action:manipulation;overflow:hidden}
 button{font:inherit;cursor:pointer;color:var(--ink);-webkit-appearance:none;appearance:none;touch-action:manipulation}
 a{color:var(--ink)}
 svg{display:block;flex:none}
 .icon{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-#app{display:none;max-width:720px;margin:0 auto}
 
-.top{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 16px 8px;
-  border-bottom:1px solid var(--border)}
+/* ---------- layout: one pane on a phone, list and chat side by side on a wide screen ---------- */
+#app{display:none;height:100vh;height:100dvh}
+#listPane,#chatPane{display:flex;flex-direction:column;min-height:0;min-width:0;height:100%}
+#listPane{width:100%}
+#chatPane{display:none;flex:1}
+body.show-chat #listPane{display:none}
+body.show-chat #chatPane{display:flex}
+@media (min-width:860px){
+  #listPane{width:380px;flex:none;border-right:1px solid var(--border)}
+  #chatPane,body.show-chat #chatPane{display:flex}
+  body.show-chat #listPane{display:flex}
+  .only-narrow{display:none!important}
+}
+.pane__top{flex:none;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 16px 8px;border-bottom:1px solid var(--border)}
+.pane__scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .top__row{display:flex;align-items:center;gap:8px;min-height:44px}
 .top__title{font-size:18px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .iconbtn{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;border:0;background:transparent;
@@ -36,17 +48,20 @@ svg{display:block;flex:none}
 .tab.on{background:var(--ink);border-color:var(--ink);color:#fff}
 .tab small{font-weight:600;opacity:.7;margin-left:3px}
 .sub{display:flex;justify-content:flex-end;margin-top:6px}
-.linkbtn{border:0;background:transparent;color:var(--ink);font-size:13px;font-weight:600;text-decoration:underline;
-  min-height:36px;padding:0 4px}
+.linkbtn{border:0;background:transparent;color:var(--ink);font-size:13px;font-weight:600;text-decoration:underline;min-height:36px;padding:0 4px}
 
+/* ---------- list ---------- */
 .list{padding:12px 16px;display:flex;flex-direction:column;gap:8px}
 .empty{padding:40px 16px;text-align:center;color:var(--text-muted)}
 .row{display:block;width:100%;text-align:left;background:var(--card-bg);border:1px solid var(--border);
   border-radius:var(--radius-card);padding:12px 14px;color:var(--ink)}
 .row:active{background:#f1f1f1}
+.row.sel{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
 .row__top{display:flex;align-items:center;gap:8px}
 .dot{width:10px;height:10px;border-radius:50%;background:var(--ink);flex:none}
-.row__name{font-weight:700;font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row__name{font-weight:600;font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row.unread .row__name{font-weight:800}
+.row.unread .row__prev{font-weight:600}
 .row__time{font-size:12px;color:var(--text-muted);flex:none}
 .row__meta{font-size:13px;color:var(--text-muted);margin-top:2px}
 .row__prev{font-size:14px;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
@@ -59,22 +74,21 @@ svg{display:block;flex:none}
 .warn .icon{margin-top:1px}
 .warn--late{background:var(--bg-amber);color:var(--status-amber);border-color:#ecd98b}
 
-.head{padding:14px 16px 6px}
-.head__name{font-size:20px;font-weight:700}
-.head__line{font-size:14px;color:var(--text-muted);margin-top:2px}
-.actions{display:flex;gap:8px;padding:10px 16px 4px;flex-wrap:wrap}
-.btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--ink);background:var(--card-bg);color:var(--ink);
-  font-weight:700;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+/* ---------- chat ---------- */
+.head{flex:none;padding:calc(6px + env(safe-area-inset-top)) 16px 8px;border-bottom:1px solid var(--border);background:var(--bg)}
+.head__row{display:flex;align-items:center;gap:6px;min-height:44px}
+.head__name{font-size:18px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.head__line{font-size:13px;color:var(--text-muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.btn{min-height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--ink);background:var(--card-bg);color:var(--ink);
+  font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
 .btn--primary{background:var(--ink);color:#ffffff}
 .btn:disabled{opacity:.55}
-.thread{padding:12px 16px;display:flex;flex-direction:column;gap:8px}
-.day{align-self:center;font-size:12px;color:var(--text-muted);margin:6px 0 0}
+.thread{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.day{align-self:center;font-size:12px;color:var(--text-muted);margin:8px 0 0;background:#ececec;border-radius:999px;padding:2px 10px}
 .bubble{max-width:86%;align-self:flex-start;background:var(--bubble);border-radius:16px 16px 16px 4px;padding:9px 12px;
   white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px}
 .bubble__time{font-size:11px;color:var(--text-muted);margin-top:4px}
-.note{align-self:center;text-align:center;font-size:12px;color:var(--text-muted);background:transparent;padding:2px 8px}
-.msg{color:var(--text-muted);padding:14px 16px;font-size:14px}
-.thread{padding-bottom:8px}
 .me{align-self:flex-end;max-width:86%;display:flex;flex-direction:column;align-items:flex-end}
 .bubble--me{align-self:flex-end;background:var(--ink);color:#ffffff;border-radius:16px 16px 4px 16px;padding:9px 12px;
   white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;max-width:100%}
@@ -83,27 +97,35 @@ svg{display:block;flex:none}
 .me__status--wait{color:var(--status-amber);font-weight:600}
 .me__status--ok{color:var(--status-green);font-weight:600}
 .mini{min-height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--ink);background:var(--card-bg);color:var(--ink);font-weight:700;font-size:13px}
-.reply{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--border);
-  padding:8px 16px calc(8px + env(safe-area-inset-bottom));z-index:4}
-.reply__row{display:flex;gap:8px;align-items:flex-end}
-.reply textarea{flex:1;min-width:0;font:inherit;font-size:16px;line-height:1.35;color:var(--ink);background:var(--card-bg);
-  border:1px solid var(--border);border-radius:12px;padding:10px 12px;resize:none;max-height:40vh;min-height:44px;-webkit-appearance:none;appearance:none}
-.reply .btn{min-height:44px}
-.reply__err{color:var(--status-red);font-size:13px;margin:0 0 6px}
-.reply__count{font-size:11px;color:var(--text-muted);text-align:right;margin-top:2px}
-.wbox{background:var(--bg-amber);color:var(--status-amber);border:1px solid #ecd98b;border-radius:10px;padding:8px 10px;font-size:13px;margin-bottom:8px}
-.wbox ul{margin:4px 0 8px 18px}
-.wbox__btns{display:flex;gap:8px}
+.note{align-self:center;text-align:center;font-size:12px;color:var(--text-muted);padding:2px 8px}
+.msg{color:var(--text-muted);padding:14px 16px;font-size:14px}
 .err{margin:16px;padding:12px;border-radius:10px;background:var(--bg-red);color:var(--status-red);font-size:14px}
 .rv{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-card);padding:12px 14px}
 .rv__reason{font-weight:700}
 .rv__meta{font-size:13px;color:var(--text-muted);margin-top:2px;overflow-wrap:anywhere}
+.placeholder{flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);padding:24px;text-align:center}
+
+/* ---------- composer ---------- */
+.reply{flex:none;background:var(--bg);border-top:1px solid var(--border);padding:8px 16px calc(8px + env(safe-area-inset-bottom))}
+.reply__row{display:flex;gap:8px;align-items:flex-end}
+.reply textarea{flex:1;min-width:0;font:inherit;font-size:16px;line-height:1.35;color:var(--ink);background:var(--card-bg);
+  border:1px solid var(--border);border-radius:12px;padding:10px 12px;resize:none;max-height:40vh;min-height:44px;-webkit-appearance:none;appearance:none}
+.reply .btn{min-height:44px;padding:0 18px}
+.reply__err{color:var(--status-red);font-size:13px;margin:0 0 6px}
+.reply__count{font-size:11px;color:var(--text-muted);text-align:right;margin-top:2px}
+.reply__hint{font-size:11px;color:var(--text-muted);margin-top:2px}
+.wbox{background:var(--bg-amber);color:var(--status-amber);border:1px solid #ecd98b;border-radius:10px;padding:8px 10px;font-size:13px;margin-bottom:8px}
+.wbox ul{margin:4px 0 8px 18px}
+.wbox__btns{display:flex;gap:8px}
 </style>
 </head>
 <body>
 <div id="app">
-  <div class="top" id="top"></div>
-  <div id="main"></div>
+  <div id="listPane">
+    <div class="pane__top" id="listTop"></div>
+    <div class="pane__scroll" id="listBody"></div>
+  </div>
+  <div id="chatPane"></div>
 </div>
 
 <script type="module">
@@ -124,10 +146,10 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 const fns = getFunctions(app, "europe-west1");
 const sendReplyFn = httpsCallable(fns, "inboxSendReply");
 const checkinLinkFn = httpsCallable(fns, "inboxCheckinLink");
-const auth = getAuth(app);
 
 const TZ = "Asia/Tbilisi";
 const $ = id => document.getElementById(id);
@@ -140,16 +162,20 @@ const ICON = {
   warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
 };
 const icon = n => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
+// A phone keyboard has no Shift+Enter, so on touch screens Enter is a new line and Send is the button.
+const IS_TOUCH = (() => { try { return window.matchMedia("(pointer: coarse)").matches; } catch { return false; } })();
 
 /* ---------- state ---------- */
-let convs = [];            // all conversations
-let reviewItems = [];      // unresolved "check this" items
-let tab = "needs";         // needs | all | done
+let convs = [];
+let reviewItems = [];
+let tab = "needs";          // needs | all | done
 let loaded = { convs: false, review: false };
 let loadError = "";
 let msgUnsub = null;
 let msgs = [];
 let msgsFor = null;
+const pending = {};         // bookingNumber -> [{id, text, sentAt}] replies shown before the server has saved them
+const sendingNow = {};      // bookingNumber -> true while a send is in flight (blocks a double send)
 
 /* ---------- time helpers ---------- */
 const toDate = v => (v ? (v.toDate ? v.toDate() : new Date(v)) : null);
@@ -162,6 +188,13 @@ function fmtListTime(d) {
 }
 const fmtClock = d => fmt(d, { hour: "2-digit", minute: "2-digit" });
 const fmtDay = d => fmt(d, { weekday: "short", day: "numeric", month: "short" });
+function dayLabel(d) {
+  const now = new Date();
+  if (dayKey(d) === dayKey(now)) return "Today";
+  if (dayKey(d) === dayKey(new Date(now.getTime() - 86400000))) return "Yesterday";
+  const sameYear = fmt(d, { year: "numeric" }) === fmt(now, { year: "numeric" });
+  return fmt(d, sameYear ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" });
+}
 function fmtDate(iso) {
   if (!iso) return "";
   const [y, m, d] = iso.split("-").map(Number);
@@ -171,11 +204,12 @@ function fmtDate(iso) {
 const stayText = c => (c.checkin && c.checkout ? `${fmtDate(c.checkin)} to ${fmtDate(c.checkout)}` : "");
 
 /* ---------- model helpers ---------- */
-const sortTime = c => Math.max(toDate(c.lastMessageAt)?.getTime() || 0, toDate(c.cancelRequest?.at)?.getTime() || 0);
+const activityTime = c => Math.max(toDate(c.lastMessageAt)?.getTime() || 0, toDate(c.cancelRequest?.at)?.getTime() || 0);
 const hasChat = c => (c.messageCount || 0) > 0;
 const visible = c => hasChat(c) || !!c.cancelRequest;
 const needsReply = c => !c.done && (!!c.needsReply || !!c.cancelRequest);
 const isCancelled = c => String(c.reservationStatus || "").toUpperCase() === "CANCELLED";
+const statusLabel = c => (isCancelled(c) ? "Cancelled" : String(c.reservationStatus || "").toUpperCase() === "OK2" ? "Confirmed" : "");
 const propLine = c => [c.propertyName, c.roomCode].filter(Boolean).join(" · ");
 
 function cancelWarning(c) {
@@ -211,25 +245,24 @@ const route = () => {
   return { page: "list" };
 };
 const go = h => { location.hash = h; };
+window.addEventListener("hashchange", () => { if (started) render(); });
 
 /* ---------- render ---------- */
-let lastRouteKey = "";
 function render() {
   const r = route();
+  document.body.classList.toggle("show-chat", r.page !== "list");
+  renderList(r);
   if (r.page !== "conv") stopMsgs();
   if (r.page === "conv") renderConv(r.id);
   else if (r.page === "review") renderReview();
-  else renderList();
-  const key = r.page + (r.id || "");
-  if (key !== lastRouteKey) { lastRouteKey = key; window.scrollTo(0, 0); }   // keep the scroll position on live updates
+  else renderPlaceholder();
 }
-window.addEventListener("hashchange", () => { if (started) render(); });
 
-function renderList() {
-  const vis = convs.filter(visible).sort((a, b) => sortTime(b) - sortTime(a));
+function renderList(r) {
+  const vis = convs.filter(visible).sort((a, b) => activityTime(b) - activityTime(a));
   const nNeeds = vis.filter(needsReply).length;
   const rows = vis.filter(c => tab === "needs" ? needsReply(c) : tab === "done" ? !!c.done : true);
-  $("top").innerHTML = `
+  $("listTop").innerHTML = `
     <div class="top__row"><div class="top__title">Guest inbox</div>
       <button class="linkbtn" id="adminBtn" type="button">Admin</button></div>
     <div class="tabs">
@@ -238,27 +271,31 @@ function renderList() {
       <button class="tab ${tab === "done" ? "on" : ""}" data-tab="done" type="button">Done</button>
     </div>
     <div class="sub"><button class="linkbtn" id="reviewBtn" type="button">Check this (${reviewItems.length})</button></div>`;
-  $("top").querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.tab; renderList(); });
+  $("listTop").querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.tab; renderList(route()); });
   $("reviewBtn").onclick = () => go("review");
   $("adminBtn").onclick = () => { location.href = "/checkin-admin"; };
 
+  const body = $("listBody");
+  const keep = body.scrollTop;
   let html;
   if (loadError) html = `<div class="err">${esc(loadError)}</div>`;
   else if (!loaded.convs) html = `<div class="msg">Loading...</div>`;
   else if (!rows.length) html = `<div class="empty">${tab === "needs" ? "Nothing waiting for a reply." : tab === "done" ? "Nothing marked done yet." : "No conversations yet."}</div>`;
-  else html = `<div class="list">${rows.map(rowHtml).join("")}</div>`;
-  $("main").innerHTML = html;
-  $("main").querySelectorAll(".row").forEach(b => b.onclick = () => go("c/" + encodeURIComponent(b.dataset.id)));
+  else html = `<div class="list">${rows.map(c => rowHtml(c, r.page === "conv" && r.id === c.id)).join("")}</div>`;
+  body.innerHTML = html;
+  body.scrollTop = keep;
+  body.querySelectorAll(".row").forEach(b => b.onclick = () => go("c/" + encodeURIComponent(b.dataset.id)));
 }
 
-function rowHtml(c) {
+function rowHtml(c, selected) {
   const t = toDate(c.lastMessageAt) || toDate(c.cancelRequest?.at);
   const tags = ['<span class="tag">Booking.com</span>'];
   if (isCancelled(c)) tags.push('<span class="tag tag--red">Cancelled</span>');
   if (c.done) tags.push('<span class="tag tag--green">Done</span>');
   const prev = c.lastMessagePreview || (hasChat(c) ? "" : "No chat messages");
-  return `<button class="row" type="button" data-id="${esc(c.id)}">
-    <div class="row__top">${needsReply(c) ? '<span class="dot" title="Needs reply"></span>' : ""}
+  const unread = needsReply(c);
+  return `<button class="row ${unread ? "unread" : ""} ${selected ? "sel" : ""}" type="button" data-id="${esc(c.id)}">
+    <div class="row__top">${unread ? '<span class="dot" title="Needs reply"></span>' : ""}
       <span class="row__name">${esc(c.guestName || "Guest")}</span><span class="row__time">${esc(fmtListTime(t))}</span></div>
     <div class="row__meta">${esc([propLine(c), stayText(c)].filter(Boolean).join(" · "))}</div>
     ${c.cancelRequest && !c.done ? cancelWarning(c) : ""}
@@ -268,6 +305,12 @@ function rowHtml(c) {
 
 function stopMsgs() { if (msgUnsub) { msgUnsub(); msgUnsub = null; } msgsFor = null; msgs = []; }
 
+function renderPlaceholder() {
+  $("chatPane").dataset.conv = "";
+  $("chatPane").innerHTML = `<div class="placeholder">Pick a conversation from the list.</div>`;
+}
+
+/* ---------- conversation ---------- */
 const MAX_REPLY = 2000;
 const drafts = {};              // bookingNumber -> unsent text, kept while you move around
 const checkinLinks = {};        // bookingNumber -> url | false (false: asked, none found)
@@ -279,21 +322,29 @@ function renderConv(id) {
     stopMsgs();
     msgsFor = id;
     msgUnsub = onSnapshot(query(collection(db, "inbox_conversations", id, "messages"), orderBy("sentAt", "asc")),
-      s => { msgs = s.docs.map(d => ({ id: d.id, ...d.data() })); if (route().page === "conv" && route().id === id) drawThread(); },
+      s => {
+        msgs = s.docs.map(d => ({ id: d.id, ...d.data() }));
+        const seen = new Set(msgs.map(m => m.id));
+        if (pending[id]) pending[id] = pending[id].filter(p => !seen.has(p.id));
+        if (route().page === "conv" && route().id === id) drawThread();
+      },
       e => { $("thread") && ($("thread").innerHTML = `<div class="err">Could not load messages (${esc(e.code || e.message)}).</div>`); });
   }
-  $("top").innerHTML = `<div class="top__row"><button class="iconbtn" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
-    <div class="top__title">${esc(c ? c.guestName || "Guest" : "Conversation")}</div></div>`;
-  $("backBtn").onclick = () => go("");
-  if (!c) { $("main").dataset.conv = ""; $("main").innerHTML = loaded.convs ? `<div class="empty">This conversation was not found.</div>` : `<div class="msg">Loading...</div>`; return; }
-
-  // The page is built once per conversation, so a live update never wipes what you are typing.
-  if ($("main").dataset.conv !== id) {
-    $("main").dataset.conv = id;
-    $("main").innerHTML = `<div id="convTop"></div><div class="thread" id="thread"></div><div id="replyBar"></div>`;
-    buildReplyBar(id, c);
+  const pane = $("chatPane");
+  if (!c) {
+    pane.dataset.conv = "";
+    pane.innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button></div></div>
+      <div class="placeholder">${loaded.convs ? "This conversation was not found." : "Loading..."}</div>`;
+    if ($("backBtn")) $("backBtn").onclick = () => go("");
+    return;
   }
-  drawConvTop(c);
+  // Built once per conversation, so a live update never wipes what you are typing.
+  if (pane.dataset.conv !== id) {
+    pane.dataset.conv = id;
+    pane.innerHTML = `<div class="head" id="convHead"></div><div class="thread" id="thread"></div><div id="draftSlot"></div><div class="reply" id="replyBar"></div>`;
+    buildReplyBar(id);
+  }
+  drawHead(c);
   const canReply = /@guest\.booking\.com$/i.test(c.replyTo || "");
   $("replyBar").style.display = canReply ? "" : "none";
   if (c.checkinRequest && checkinLinks[id] === undefined) {
@@ -303,24 +354,22 @@ function renderConv(id) {
   drawThread();
 }
 
-function drawConvTop(c) {
+function drawHead(c) {
   const id = c.id;
   const url = extranetUrl(c);
-  const tags = ['<span class="tag">Booking.com</span>'];
-  if (isCancelled(c)) tags.push('<span class="tag tag--red">Cancelled</span>');
-  if (c.done) tags.push('<span class="tag tag--green">Done</span>');
-  $("convTop").innerHTML = `
-    <div class="head">
+  const st = statusLabel(c);
+  $("convHead").innerHTML = `
+    <div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
       <div class="head__name">${esc(c.guestName || "Guest")}</div>
-      <div class="head__line">${esc(propLine(c))}</div>
-      <div class="head__line">${esc(stayText(c))}${c.bookingNumber ? ` \u00b7 Booking ${esc(c.bookingNumber)}` : ""}</div>
-      <div class="tags">${tags.join("")}</div>
-      ${cancelWarning(c)}
-    </div>
+      ${st ? `<span class="tag ${isCancelled(c) ? "tag--red" : "tag--green"}">${esc(st)}</span>` : ""}</div>
+    <div class="head__line">${esc(propLine(c))}</div>
+    <div class="head__line">${esc(stayText(c))}${c.bookingNumber ? ` · Booking ${esc(c.bookingNumber)}` : ""}</div>
+    ${cancelWarning(c)}
     <div class="actions">
       <button class="btn ${c.done ? "" : "btn--primary"}" id="doneBtn" type="button">${c.done ? icon("undo") + "Not done" : icon("check") + "Done"}</button>
       ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">${icon("out")}Open in Booking.com</a>` : ""}
     </div>`;
+  $("backBtn").onclick = () => go("");
   $("doneBtn").onclick = async e => {
     const b = e.currentTarget; b.disabled = true;
     try {
@@ -341,52 +390,70 @@ function statusHtml(m, laterSame) {
 
 function drawThread() {
   const el = $("thread"); if (!el) return;
-  const c = convs.find(x => x.id === msgsFor);
+  const id = msgsFor;
+  const c = convs.find(x => x.id === id);
+  const wasFirst = el.dataset.drawn !== id;
+  const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 90;
+  const prevCount = Number(el.dataset.count || 0);
+  const prevTop = el.scrollTop;
+
+  const items = [...msgs];
+  for (const p of pending[id] || []) items.push({ id: p.id, direction: "host", text: p.text, status: "waiting", sentAt: p.sentAt });
+  items.sort((a, b) => (toDate(a.sentAt)?.getTime() || 0) - (toDate(b.sentAt)?.getTime() || 0));
+
   const out = [];
   let lastDay = "";
-  msgs.forEach((m, i) => {
+  items.forEach((m, i) => {
     const d = toDate(m.sentAt);
-    if (d && dayKey(d) !== lastDay) { lastDay = dayKey(d); out.push(`<div class="day">${esc(fmtDay(d))}</div>`); }
+    if (d && dayKey(d) !== lastDay) { lastDay = dayKey(d); out.push(`<div class="day">${esc(dayLabel(d))}</div>`); }
     const time = d ? esc(fmtClock(d)) : "";
     if (m.direction === "host") {
-      const laterSame = msgs.slice(i + 1).some(x => x.direction === "host" && x.text === m.text && x.status !== "failed");
+      const laterSame = items.slice(i + 1).some(x => x.direction === "host" && x.text === m.text && x.status !== "failed");
       out.push(`<div class="me"><div class="bubble--me">${esc(m.text)}</div>
-        <div class="me__status">${time}${time ? " \u00b7 " : ""}${statusHtml(m, laterSame)}</div></div>`);
+        <div class="me__status">${time}${time ? " · " : ""}${statusHtml(m, laterSame)}</div></div>`);
     } else {
       out.push(`<div class="bubble">${esc(m.text)}<div class="bubble__time">${time}</div></div>`);
     }
   });
   const line = c ? checkinLine(c) : "";
   if (line) {
-    const link = checkinLinks[msgsFor];
+    const link = checkinLinks[id];
     out.push(`<div class="note">${line}${link ? ` <a class="linkbtn" href="${esc(link)}" target="_blank" rel="noopener">Answer in Booking.com</a>` : ""}</div>`);
   }
   el.innerHTML = out.length ? out.join("") : `<div class="msg">No chat messages yet.</div>`;
   el.querySelectorAll("[data-retry]").forEach(b => b.onclick = () => {
-    const m = msgs.find(x => x.id === b.dataset.retry);
-    if (m) { b.disabled = true; doSend(msgsFor, m.text, true); }
+    const m = items.find(x => x.id === b.dataset.retry);
+    if (m) { b.disabled = true; doSend(id, m.text, true); }
   });
-  // Like a chat: show the newest message when the conversation opens and when a new one arrives.
-  const first = el.dataset.drawn !== msgsFor;
-  const grew = msgs.length > Number(el.dataset.count || 0);
-  el.dataset.drawn = msgsFor; el.dataset.count = String(msgs.length);
-  if (msgs.length && (first || grew)) window.scrollTo(0, document.body.scrollHeight);
+
+  el.dataset.drawn = id; el.dataset.count = String(items.length);
+  const lastIsMine = items.length && items[items.length - 1].direction === "host";
+  // Opens on the newest message; follows new ones when you are at the bottom or just replied.
+  if (wasFirst || (items.length > prevCount && (nearBottom || lastIsMine))) el.scrollTop = el.scrollHeight;
+  else el.scrollTop = prevTop;
 }
 
-function buildReplyBar(id, c) {
+/* ---------- composer ---------- */
+function buildReplyBar(id) {
   const bar = $("replyBar");
-  bar.className = "reply";
   bar.innerHTML = `<div id="replyWarn"></div><div class="reply__err" id="replyErr" hidden></div>
-    <div class="reply__row"><textarea id="replyText" rows="1" maxlength="${MAX_REPLY + 200}" placeholder="Write a reply to the guest" aria-label="Reply to the guest"></textarea>
+    <div class="reply__row"><textarea id="replyText" rows="1" maxlength="${MAX_REPLY + 200}" placeholder="Write a reply to the guest" aria-label="Reply to the guest" enterkeyhint="${IS_TOUCH ? "enter" : "send"}"></textarea>
     <button class="btn btn--primary" id="sendBtn" type="button">Send</button></div>
-    <div class="reply__count" id="replyCount"></div>`;
+    <div class="reply__count" id="replyCount"></div>
+    ${IS_TOUCH ? "" : `<div class="reply__hint">Enter sends, Shift+Enter makes a new line.</div>`}`;
   const ta = $("replyText");
   ta.value = drafts[id] || "";
   const fit = () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, window.innerHeight * 0.4) + "px"; };
   const count = () => { const n = ta.value.length; $("replyCount").textContent = n > MAX_REPLY * 0.8 ? `${n} / ${MAX_REPLY}` : ""; };
   ta.oninput = () => { drafts[id] = ta.value; $("replyWarn").innerHTML = ""; $("replyErr").hidden = true; fit(); count(); };
+  ta.onkeydown = e => {
+    if (e.key === "Enter" && !e.shiftKey && !IS_TOUCH && !e.isComposing) { e.preventDefault(); trySend(id); }
+  };
   fit(); count();
-  $("sendBtn").onclick = () => trySend(id);
+  const btn = $("sendBtn");
+  btn.addEventListener("pointerdown", e => e.preventDefault());   // keeps the keyboard open on a phone
+  btn.onclick = () => trySend(id);
+  if (!IS_TOUCH) ta.focus();
 }
 
 function trySend(id, force) {
@@ -394,7 +461,7 @@ function trySend(id, force) {
   const text = ta.value.trim();
   const err = $("replyErr");
   err.hidden = true;
-  if (!text) return;
+  if (!text || sendingNow[id]) return;
   if (text.length > MAX_REPLY) { err.textContent = `The message is too long (${text.length} of ${MAX_REPLY} characters).`; err.hidden = false; return; }
   const w = force ? [] : replyWarnings(text);
   if (w.length) {
@@ -409,33 +476,45 @@ function trySend(id, force) {
 }
 
 async function doSend(id, text, isRetry) {
-  const btn = $("sendBtn"), err = $("replyErr"), ta = $("replyText");
-  if (btn) btn.disabled = true;
-  if (err) err.hidden = true;
-  // Clear the box at once; the text comes back if the send is refused.
-  if (!isRetry && ta && msgsFor === id) { ta.value = ""; drafts[id] = ""; ta.style.height = "auto"; $("replyCount").textContent = ""; }
+  if (sendingNow[id]) return;
+  sendingNow[id] = true;
+  const clientId = newId();
+  const ta = $("replyText");
+  // My bubble shows at once; the box clears and keeps focus.
+  (pending[id] = pending[id] || []).push({ id: clientId, text, sentAt: new Date() });
+  if (!isRetry && ta && msgsFor === id) {
+    ta.value = ""; drafts[id] = ""; ta.style.height = "auto"; $("replyCount").textContent = ""; $("replyErr").hidden = true;
+    ta.focus();
+  }
+  if (msgsFor === id) drawThread();
   try {
-    await sendReplyFn({ bookingNumber: id, text, clientId: newId() });
+    await sendReplyFn({ bookingNumber: id, text, clientId });
   } catch (e) {
+    pending[id] = (pending[id] || []).filter(p => p.id !== clientId);
     const m = (e && e.message) || "Could not send.";
     const box = $("replyText");
-    if (!isRetry && box && msgsFor === id && !box.value) { box.value = text; drafts[id] = text; box.dispatchEvent(new Event("input")); }
-    const er = $("replyErr");
-    if (er) { er.textContent = "Not sent: " + m; er.hidden = false; } else alert("Not sent: " + m);
+    if (msgsFor === id) {
+      if (!isRetry && box && !box.value) { box.value = text; drafts[id] = text; box.dispatchEvent(new Event("input")); }
+      const er = $("replyErr");
+      if (er) { er.textContent = "Not sent: " + m; er.hidden = false; }
+      drawThread();
+    } else alert("Not sent: " + m);
   }
-  const b2 = $("sendBtn"); if (b2) b2.disabled = false;
+  sendingNow[id] = false;
 }
 
+/* ---------- check this ---------- */
 function renderReview() {
-  $("top").innerHTML = `<div class="top__row"><button class="iconbtn" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
-    <div class="top__title">Check this (${reviewItems.length})</div></div>`;
-  $("backBtn").onclick = () => go("");
+  $("chatPane").dataset.conv = "";
   const items = [...reviewItems].sort((a, b) => (toDate(b.date)?.getTime() || 0) - (toDate(a.date)?.getTime() || 0));
-  $("main").innerHTML = !loaded.review ? `<div class="msg">Loading...</div>`
+  $("chatPane").innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
+    <div class="head__name">Check this (${reviewItems.length})</div></div></div>
+    <div class="pane__scroll">${!loaded.review ? `<div class="msg">Loading...</div>`
     : !items.length ? `<div class="empty">Nothing to check.</div>`
     : `<div class="list">${items.map(i => `<div class="rv"><div class="rv__reason">${esc(i.reason)}</div>
         <div class="rv__meta">${esc(toDate(i.date) ? fmtDay(toDate(i.date)) + ", " + fmtClock(toDate(i.date)) : "")}</div>
-        <div class="rv__meta">${esc(i.subject || "")}</div></div>`).join("")}</div>`;
+        <div class="rv__meta">${esc(i.subject || "")}</div></div>`).join("")}</div>`}</div>`;
+  $("backBtn").onclick = () => go("");
 }
 
 /* ---------- data + sign-in (owner's Google account only, same as the pricing pages) ---------- */
@@ -443,12 +522,12 @@ let started = false;
 function start() {
   if (started) return;
   started = true;
-  $("app").style.display = "block";
-  const fail = e => { loadError = "Could not read the inbox (" + (e.code || e.message) + "). If this says permission-denied, the new Firestore rules are not published yet."; render(); };
+  $("app").style.display = "flex";
+  const fail = e => { loadError = "Could not read the inbox (" + (e.code || e.message) + "). If this says permission-denied, the Firestore rules are not published."; render(); };
   onSnapshot(collection(db, "inbox_conversations"),
     s => { convs = s.docs.map(d => ({ id: d.id, ...d.data() })); loaded.convs = true; loadError = ""; render(); }, fail);
   onSnapshot(collection(db, "inbox_review"),
-    s => { reviewItems = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.resolved); loaded.review = true; if (route().page !== "conv") render(); }, () => {});
+    s => { reviewItems = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.resolved); loaded.review = true; render(); }, () => {});
   render();
 }
 requireOwner({ auth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut }, { onReady: start });
