@@ -12,6 +12,7 @@ export function replyWarnings(text) {
   const urls = t.match(/(?:https?:\/\/|www\.)[^\s<>"']+/gi) || [];
   const bare = t.match(/\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|net|org|ge|io|app|me|co|info|biz|ru|eu|uk|de|fr)\b(?:\/[^\s]*)?/gi) || [];
   const bad = [...urls, ...bare].filter(u => {
+    if (/^(?:booking|expedia)\.com$/i.test(u)) return false;   // the platform's name, not a link
     const host = u.replace(/^https?:\/\//i, "").replace(/^www\./i, "").split(/[\/?#]/)[0].toLowerCase();
     return host !== ALLOWED_HOST && !host.endsWith("." + ALLOWED_HOST);
   });

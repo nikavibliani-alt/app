@@ -221,3 +221,18 @@ test('a new "Needs you" note alerts once with the reason; a draft or an old note
   assert.strictEqual((await C.onConversationWritten(BN, base, { ...base, aiDraft: { ...note, createdAt: stamp(clock - 30 * 60000) } }, d)).action, 'none', 'an old note does not alert');
   assert.strictEqual(sent.length, n);
 });
+
+test('a holding reply gives the "needs you" alert, not "AI answered"; a held draft alerts too', async () => {
+  clock = T0;
+  const { d, sent } = mk();
+  assert.strictEqual((await C.onGuestMessage(BN, 'ai-h1', { direction: 'host', text: "Thank you, we'll forward this to our team and get back to you soon.", sentBy: 'ai', holding: true, sentAt: stamp(clock) }, d)).action, 'holding reply');
+  assert.strictEqual(sent.length, 0);
+  const base = { guestName: 'Test Guest', propertyName: 'Maxela Apartments' };
+  const note = { kind: 'needs_you', reason: 'cancellation request', text: 'cancellation request', createdAt: stamp(clock - 1000) };
+  assert.strictEqual((await C.onConversationWritten(BN, base, { ...base, aiDraft: note }, d)).action, 'pushed');
+  assert.strictEqual(sent[0].payload.title, 'Test Guest needs you');
+  assert.strictEqual(sent[0].payload.body, 'cancellation request');
+  const held = { kind: 'reply', text: 'Thank you', needsYouReason: 'date change request', createdAt: stamp(clock - 500) };
+  assert.strictEqual((await C.onConversationWritten(BN, base, { ...base, aiDraft: held }, d)).action, 'pushed');
+  assert.strictEqual(sent[sent.length - 1].payload.body, 'date change request');
+});

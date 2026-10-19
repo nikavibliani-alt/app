@@ -92,6 +92,7 @@ async function onGuestMessage(bookingNumber, messageId, msg, deps) {
 /** The assistant sent a reply by itself: one alert per automatic send. */
 async function onAiAnswered(bookingNumber, msg, deps) {
   const { db } = deps;
+  if (msg && msg.holding) return { action: 'holding reply' };   // the "needs you" alert for that conversation is the one to send
   if (!(await alertsEnabled(db))) return { action: 'alerts off' };
   const c = await db.collection(CONVERSATIONS).doc(bookingNumber).get();
   const result = await sendToOwnerDevices(P.aiAnsweredPayload(c.exists ? c.data() : {}, bookingNumber, msg.text), deps);
@@ -119,11 +120,12 @@ async function onConversationWritten(bookingNumber, before, after, deps) {
     if (changed && !(Number.isFinite(atMs) && now - atMs > P.STALE_CANCEL_MS)) { payloads.push(P.cancelPayload(after, bookingNumber, ms(a.deadline), now)); kinds.push('cancel'); }
   }
   const dr = after.aiDraft;
-  if (dr && dr.kind === 'needs_you') {
+  const needsMe = d => d && (d.kind === 'needs_you' || d.needsYouReason);          // a note, or a draft the host must still decide on
+  if (needsMe(dr)) {
     const at = ms(dr.createdAt);
-    const prevAt = before && before.aiDraft && before.aiDraft.kind === 'needs_you' ? ms(before.aiDraft.createdAt) : NaN;
+    const prevAt = before && needsMe(before.aiDraft) ? ms(before.aiDraft.createdAt) : NaN;
     if (!(Number.isFinite(prevAt) && prevAt === at) && !(Number.isFinite(at) && now - at > NEEDS_YOU_FRESH_MS)) {
-      payloads.push(P.needsYouPayload(after, bookingNumber, dr.reason || dr.text)); kinds.push('needs you');
+      payloads.push(P.needsYouPayload(after, bookingNumber, dr.needsYouReason || dr.reason || dr.text)); kinds.push('needs you');
     }
   }
   const ch = after.checkinHandled;

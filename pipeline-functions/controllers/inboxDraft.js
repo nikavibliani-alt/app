@@ -20,6 +20,8 @@ const { isInboxUser } = require('../lib/inboxAccess');
 const { resolveAiMode, AI_SENDER, autoSendBlockReason } = require('../lib/inboxAiMode');
 const { queueReplyWrites } = require('./inboxReply');
 const { cleanReplyText } = require('../lib/inboxReply');
+const T = require('../lib/inboxTopics');
+const { translationRequest, acceptTranslation } = require('../lib/inboxCheckin');
 const D = require('../lib/inboxDraft');
 const KB = require('../lib/guestKnowledge/knowledgeBase');
 const { canonicalPhone } = require('../lib/guestKnowledge/guestLookup');
@@ -167,7 +169,12 @@ async function processConversation(bookingNumber, deps) {
         queueReplyWrites(tx, db, {
           bookingNumber, clientId, text: clean.text, conv: v, gmailMessageId: pending.lastMessageId,
           sentBy: AI_SENDER.email, sentByName: AI_SENDER.name, now: () => ts(nowMs()), label: 'AI',
+          messageExtra: send.holding ? { holding: true } : undefined,
         });
+        if (send.needsYou) {
+          // A holding reply was sent, but the host still has to decide: back to "Needs reply" with a note (the alert comes from it).
+          tx.update(convRef, { needsReply: true, done: false, doneAt: null, aiDraft: { kind: 'needs_you', reason: send.needsYou, text: send.needsYou, source: 'rule', createdAt: ts(nowMs()), forMessageId: pending.lastMessageId } });
+        }
         return 'auto_sent';
       }
       const upd = { aiPending: null, aiRunning: null, aiDueAt: null };
@@ -192,12 +199,42 @@ async function processConversation(bookingNumber, deps) {
   const texts = burst.map(m => String(m.text || ''));
   if (!texts.length) return finish('empty burst', null);
 
-  // 4. Skip rules and the owner's own topics.
+  // The holding reply for a cancellation or a change of dates: it promises nothing, and the host is alerted.
+  const holdingReply = async (label, extra = {}) => {
+    const reason = `${label} request`;
+    const twoHours = nowMs() - 2 * 60 * 60 * 1000;
+    if (history.some(m => m.direction === 'host' && m.holding && ms(m.sentAt) >= twoHours)) {
+      return note('needs_you', `${reason} (asked again, a holding reply was already sent)`, extra);   // not twice in a row
+    }
+    let text = T.HOLDING_EN;
+    const guestTexts = history.filter(m => m.direction === 'guest').map(m => String(m.text || ''));
+    if (guestTexts.length) {
+      try {
+        const r = translationRequest(T.HOLDING_EN, guestTexts);
+        const outT = await (deps.callClaude || claude.callClaudeWithRetry)({ apiKey: deps.apiKey, system: r.system, messages: [{ role: 'user', content: r.user }], maxTokens: 400, model: deps.model || claude.MODEL, log: { warn: () => {}, error: () => {} } });
+        const tr = outT && outT.ok ? acceptTranslation(T.HOLDING_EN, outT.text) : null;   // the same words, nothing more, or English only
+        if (tr) text = `${T.HOLDING_EN}\n\n${tr}`;
+      } catch (e) { console.warn('inboxAi: holding translation failed, English only', e && e.message); }
+    }
+    const checked = D.checkDraft(text);
+    if (!checked.ok) return note('needs_you', reason, extra);
+    const draft = { kind: 'reply', text: checked.text, source: 'rule', needsYouReason: reason };
+    if (mode === 'auto') {
+      const block = autoSendBlockReason({ conv, messages: history, nowMs: nowMs() });
+      if (block) return finish('hold draft', { ...draft, autoBlocked: block }, { ...extra, hold: label });
+      return finish('hold sent', draft, { ...extra, hold: label, mode }, { text: checked.text, holding: true, needsYou: reason });
+    }
+    return finish('hold draft', draft, { ...extra, hold: label });
+  };
+
+  // 4. Skip rules and the topics that are the host's call. The English keywords are a safety net; the model names
+  //    the topics in any language (see below).
   if (D.burstIsOnlyClosers(texts)) return finish('closer', null);
   const k = D.knowledgeForConversation(conv, KB.SEED);
   if (!k.ok) return note('needs_you', k.reason);
-  const topic = D.ownerTopicReason(texts);
-  if (topic) return note('needs_you', topic);
+  const kw = T.keywordTopics(texts);
+  const kwDecision = T.decideByTopics(kw);
+  if (kwDecision.action === 'needs_you') return note('needs_you', kwDecision.reason);
 
   // 5. Cost guard.
   const hourAgo = nowMs() - 60 * 60 * 1000;
@@ -213,6 +250,7 @@ async function processConversation(bookingNumber, deps) {
     return true;
   });
   if (!allowed) return note('needs_you', 'the daily AI draft limit is reached');
+  if (kwDecision.action === 'hold') return holdingReply(kwDecision.label);   // a cancellation or date change found by keywords: no model call for the topic
 
   // 6. Ask the model (same prompt as the WhatsApp bot plus the Booking.com rules).
   const wa = await findWhatsapp(db, conv);
@@ -226,7 +264,8 @@ async function processConversation(bookingNumber, deps) {
   if (!out || !out.ok) return note('needs_you', 'the assistant could not write a draft just now', { model, error: out && out.errorType, usage });
 
   // 7. Read the answer.
-  const parsed = D.parseModelOutput(out.text);
+  const tp = T.parseTopicsLine(out.text);                 // "TOPICS: ..." first line, then the answer
+  const parsed = D.parseModelOutput(tp.rest);
   const info = { model, usage };
   if (parsed.type === 'silent') return finish('silent', null, info);
   if (parsed.type === 'needs_you') return finish(`needs_you: ${parsed.reason}`, { kind: 'needs_you', reason: parsed.reason, text: parsed.reason, source: 'ai', model }, info);
@@ -236,6 +275,17 @@ async function processConversation(bookingNumber, deps) {
     return finish('already_answered', { kind: 'already_answered', text, source: 'ai', model }, info);
   }
   if (parsed.type !== 'reply') return finish('needs_you: empty answer', { kind: 'needs_you', reason: 'the assistant gave no usable draft', text: 'the assistant gave no usable draft', source: 'ai', model }, info);
+  // The topics decide what is allowed: the model's (any language) together with the keywords.
+  if (!tp.topics) return finish('needs_you: topic unclear', { kind: 'needs_you', reason: 'the assistant could not tell what the guest is asking about, so nothing was sent', text: 'the assistant could not tell what the guest is asking about, so nothing was sent', source: 'ai', model }, info);
+  const topics = new Set([...tp.topics, ...kw]);
+  const byTopic = T.decideByTopics(topics);
+  if (byTopic.action === 'needs_you') return finish(`needs_you: ${byTopic.reason}`, { kind: 'needs_you', reason: byTopic.reason, text: byTopic.reason, source: 'ai', model }, info);
+  if (byTopic.action === 'hold') return holdingReply(byTopic.label, info);
+  const tcheck = T.validateTopicReply(parsed.text, topics);
+  if (!tcheck.ok) {
+    const reason = `the answer was not safe to send (${tcheck.problem}). Write this one yourself`;
+    return finish(`needs_you: topic check (${tcheck.problem})`, { kind: 'needs_you', reason, text: reason, source: 'ai', model }, info);
+  }
   const checked = D.checkDraft(parsed.text, { kb });
   if (!checked.ok) {
     const reason = `the draft contained ${checked.problem}, which Booking.com chats must not have. Write this one yourself`;

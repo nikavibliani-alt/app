@@ -76,6 +76,7 @@ function queueReplyWrites(tx, db, o) {
     sentBy: o.sentBy,
     sentByName: o.sentByName,
     createdAt: t,
+    ...(o.messageExtra || {}),
   });
   tx.update(convRef, {
     needsReply: false,

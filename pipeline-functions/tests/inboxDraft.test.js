@@ -81,7 +81,13 @@ async function hostSays(d, text) {
   return id;
 }
 const conv = d => d.db.store.get(`inbox_conversations/${BN}`);
-const claudeStub = (text, log = []) => async args => { log.push(args); return { ok: true, text, usage: { input_tokens: 10, output_tokens: 5 } }; };
+// The model's answer starts with a TOPICS line; the stub adds "TOPICS: other" unless the test gives its own or the answer is a special marker.
+const claudeStub = (text, log = []) => async args => {
+  log.push(args);
+  if (/translate one short message/i.test(JSON.stringify(args.system))) return { ok: true, text: 'NO_TRANSLATION' };   // the model says the guest writes English
+  const special = text === '' || /^\s*(TOPICS|NEEDS_YOU|\[SILENT\]|\[WHATSAPP_ANSWERED)/i.test(text) || /\[ESCALATE\]/.test(text);
+  return { ok: true, text: special ? text : `TOPICS: other\n${text}`, usage: { input_tokens: 10, output_tokens: 5 } };
+};
 
 // ---------------------------------------------------------------- bursts and waiting
 test('one draft for a burst, and split words restart the wait', async () => {
@@ -177,11 +183,12 @@ test('short closers get no draft and no model call', async () => {
   assert.ok(!D.isCloser('thanks?'));
 });
 
-test('the owner topics become a "Needs you" note without asking the model', async () => {
+test('the hard owner topics become a "Needs you" note without asking the model (English keywords)', async () => {
   const cases = {
-    'Can I get a refund please': 'refund', 'I want a discount': 'discount', 'Can we extend our stay by one night': 'date change',
-    'We would like early check-in at 9am': 'early check-in', 'Can we have a late checkout?': 'late check-out',
-    'The room is dirty and I want to complain': 'complaint', 'How can I pay the city tax?': 'payment',
+    'Can I get a refund please': 'refund', 'I want a discount': 'discount',
+    'Can we have a late checkout?': 'late check-out', 'The room is dirty and I want to complain': 'complaint',
+    'How can I pay the city tax?': 'payment details', 'Is there a deposit and do you take a card?': 'payment details',
+    'Can I get early check-in and a late checkout?': 'late check-out wins over early check-in',
   };
   for (const [text, label] of Object.entries(cases)) {
     clock = T0; seq = 0;
@@ -580,4 +587,194 @@ test('automatic mode off switch: Off sends and drafts nothing', async () => {
   assert.strictEqual(r[0].outcome, 'switch off');
   assert.strictEqual(calls.length, 0);
   assert.strictEqual(outboxItems(d).length, 0);
+});
+
+// ---------------------------------------------------------------- Part D: fewer "Needs you"
+const T2 = require('../lib/inboxTopics');
+const EARLY_EN = "TOPICS: early_checkin\nCheck-in starts at 15:00. If your apartment is ready earlier, we'll message you after you fill in the check-in form.";
+const drive = async (guestText, modelText, { seedExtra = {}, cfg = { bookingAiMode: 'auto' }, convOver = {}, claude } = {}) => {
+  clock = T0; seq = 0;
+  const calls = [];
+  const d = mk({ seed: { ...baseSeed(convOver), 'globals/config': cfg, ...seedExtra }, deps: { callClaude: claude || claudeStub(modelText, calls) } });
+  d.calls = calls;
+  await guestSays(d, guestText); clock += 61000;
+  await C.runDue(d);
+  return d;
+};
+const hostOut = d => hostMsgs(d).map(([, m]) => m);
+
+test('early check-in questions are answered automatically (English and other languages), never with an earlier time', async () => {
+  const cases = [
+    ['Can we check in earlier, around 11?', EARLY_EN],
+    ['Можно заселиться пораньше?', 'TOPICS: early_checkin\nЗаезд с 15:00. Если квартира будет готова раньше, мы напишем вам после заполнения формы.'],
+    ['შეიძლება ადრე შესვლა?', 'TOPICS: early_checkin\nშესვლა 15:00 საათიდანაა. თუ ბინა უკვე დალაგებული იქნება, გაგიგზავნით.'],
+    ['¿Podemos llegar antes de las 15:00? Llegamos de madrugada', 'TOPICS: early_checkin\nEl check-in empieza a las 15:00. Si el apartamento está listo antes, le escribiremos cuando rellene el formulario.'],
+    ['Kann ich früher einchecken?', 'TOPICS: early_checkin\nDer Check-in beginnt um 15:00. Wenn die Wohnung früher fertig ist, schreiben wir Ihnen.'],
+  ];
+  for (const [guestText, model] of cases) {
+    const d = await drive(guestText, model);
+    assert.strictEqual(outboxItems(d).length, 1, guestText);
+    const [[, ob]] = outboxItems(d);
+    assert.ok(/15:00/.test(ob.text), 'says 15:00: ' + ob.text);
+    assert.ok(!/\b(?:(?!15:00)\d{1,2}:\d{2})\b/.test(ob.text), 'no other time: ' + ob.text);
+    assert.strictEqual(ob.sentBy, 'ai');
+  }
+  // drafts mode: the same answer, shown for me to send
+  const dd = await drive('Can we check in earlier, around 11?', EARLY_EN, { cfg: { bookingAiMode: 'drafts' } });
+  assert.strictEqual(outboxItems(dd).length, 0);
+  assert.strictEqual(conv(dd).aiDraft.kind, 'reply');
+});
+
+test('early check-in: an answer that promises or names an earlier time, or leaves out 15:00, is not sent', async () => {
+  for (const model of ['TOPICS: early_checkin\nYes, come at 11:00.', 'TOPICS: early_checkin\nCheck-in is from 15:00, but you can come at 12:30.', 'TOPICS: early_checkin\nSure, no problem, come earlier.', 'TOPICS: early_checkin\nCheck-in starts at 3pm.']) {
+    const d = await drive('Can we check in earlier?', model);
+    assert.strictEqual(outboxItems(d).length, 0, model);
+    assert.strictEqual(conv(d).aiDraft.kind, 'needs_you', model);
+  }
+});
+
+test('payment: how or where to pay is answered automatically; anything beyond that stays "Needs you"', async () => {
+  const how = [
+    ['How do I pay for the reservation?', 'TOPICS: payment_how\nPayment for your reservation is handled by Booking.com.'],
+    ['¿Cómo pago la reserva?', 'TOPICS: payment_how\nEl pago de la reserva se gestiona a través de Booking.com.'],
+    ['Как оплатить бронь?', 'TOPICS: payment_how\nОплата бронирования обрабатывается через Booking.com.'],
+    ['სად უნდა გადავხდა ბრონირება?', 'TOPICS: payment_how\nბრონირების გადახდა Booking.com-ის მიერ ხდება.'],
+  ];
+  for (const [g, m] of how) {
+    const d = await drive(g, m);
+    assert.strictEqual(outboxItems(d).length, 1, g);
+  }
+  const beyond = [
+    ['Do I pay by card on arrival or is there a deposit?', null, 'English keywords, no model call'],
+    ['Muss ich eine Kaution zahlen?', 'TOPICS: payment_other\nNein.', 'German, found by the model'],
+    ['¿Cuánto cuesta pagar con tarjeta en el apartamento?', 'TOPICS: payment_other, payment_how\nNo.', 'Spanish, found by the model'],
+    ['Нужно ли платить залог при заезде?', 'TOPICS: payment_other\nНет.', 'Russian, found by the model'],
+    ['How do I pay for the reservation?', 'TOPICS: payment_how\nPay 50 GEL cash on arrival.', 'amounts in the answer are refused'],
+  ];
+  for (const [g, m, why] of beyond) {
+    const d = await drive(g, m || 'x');
+    assert.strictEqual(outboxItems(d).length, 0, why);
+    assert.strictEqual(conv(d).aiDraft.kind, 'needs_you', why);
+  }
+});
+
+test('cancellation and date change: a holding reply that promises nothing, then needs-you and "Needs reply"', async () => {
+  const HOLD_EN = "Thank you, we'll forward this to our team and get back to you soon.";
+  const holdCases = [
+    ['I need to cancel my booking', null, 'English keyword'],
+    ['Can we extend our stay by one night?', null, 'English keyword (dates)'],
+    ['Мне нужно изменить даты бронирования', 'TOPICS: date_change\nHOLD', 'Russian'],
+    ['Rezervasyonumu iptal etmek istiyorum', 'TOPICS: cancellation\nHOLD', 'Turkish'],
+    ['თარიღის შეცვლა მინდა', 'TOPICS: date_change\nHOLD', 'Georgian'],
+    ['Quiero mover mi reserva a la semana siguiente', 'TOPICS: date_change\nHOLD', 'Spanish'],
+  ];
+  for (const [g, m, why] of holdCases) {
+    const d = await drive(g, m || 'x');
+    assert.strictEqual(outboxItems(d).length, 1, why);
+    const [[, ob]] = outboxItems(d);
+    assert.ok(ob.text.startsWith(HOLD_EN), why + ': ' + ob.text);
+    assert.ok(!/(cancel|refund|confirm|approved|new date)/i.test(ob.text.replace(HOLD_EN, '')) || ob.text === HOLD_EN || why !== 'English keyword', why);
+    assert.strictEqual(hostOut(d)[0].holding, true, why);
+    assert.strictEqual(hostOut(d)[0].sentByName, 'AI');
+    const c = conv(d);
+    assert.strictEqual(c.needsReply, true, why + ': stays in Needs reply');
+    assert.strictEqual(c.done, false, why);
+    assert.strictEqual(c.aiDraft.kind, 'needs_you', why);
+    assert.match(c.aiDraft.reason, /^(cancellation|date change|cancellation and date change) request$/, why);
+  }
+  // English guest: exactly the fixed sentence, no model call at all for the topic or a translation of it
+  const en = await drive('I need to cancel my booking', 'x');
+  assert.strictEqual(en.calls.length, 1, 'only the translation call (the model decides it is English)');
+});
+
+test('holding reply: translation only when it keeps the same words; both topics; drafts mode; blocked cases; not twice', async () => {
+  const HOLD_EN = "Thank you, we'll forward this to our team and get back to you soon.";
+  const ru = 'Спасибо, мы передадим это нашей команде и скоро свяжемся с вами.';
+  const two = async (text, isTranslation) => {
+    const calls = [];
+    const claude = async a => { calls.push(a); const isTr = /translate one short message/i.test(JSON.stringify(a.system)); return { ok: true, text: isTr ? text : 'TOPICS: date_change\nHOLD' }; };
+    const d = await drive('Мне нужно изменить даты', null, { claude });
+    return d;
+  };
+  let d = await two(ru);
+  assert.strictEqual(outboxItems(d)[0][1].text, `${HOLD_EN}\n\n${ru}`, 'English first, then the same words in the guest\'s language');
+  d = await two('We will cancel your booking and refund you 50 GEL 12345');
+  assert.strictEqual(outboxItems(d)[0][1].text, HOLD_EN, 'a translation with other numbers or content is dropped');
+  d = await two('NO_TRANSLATION');
+  assert.strictEqual(outboxItems(d)[0][1].text, HOLD_EN);
+
+  d = await drive('I want to cancel and also change the dates', 'x');
+  assert.match(conv(d).aiDraft.reason, /^cancellation and date change request$/);
+  assert.strictEqual(outboxItems(d)[0][1].text, HOLD_EN);
+
+  d = await drive('I need to cancel my booking', 'x', { cfg: { bookingAiMode: 'drafts' } });
+  assert.strictEqual(outboxItems(d).length, 0, 'drafts mode sends nothing');
+  assert.strictEqual(conv(d).aiDraft.kind, 'reply');
+  assert.strictEqual(conv(d).aiDraft.text, HOLD_EN);
+  assert.strictEqual(conv(d).aiDraft.needsYouReason, 'cancellation request');
+
+  d = await drive('I need to cancel my booking', 'x', { convOver: { reservationStatus: 'CANCELLED' } });
+  assert.strictEqual(outboxItems(d).length, 0);
+  assert.match(conv(d).aiDraft.autoBlocked, /cancelled/);
+  assert.strictEqual(conv(d).aiDraft.needsYouReason, 'cancellation request');
+
+  d = await drive('I need to cancel my booking', 'x', { cfg: { bookingAiMode: 'off' } });
+  assert.strictEqual(outboxItems(d).length, 0);
+
+  // asked again soon after: no second holding reply, only the note
+  d = await drive('I need to cancel my booking', 'x');
+  assert.strictEqual(outboxItems(d).length, 1);
+  clock += 5 * 60000;
+  await guestSays(d, 'please cancel it'); clock += 61000;
+  await C.runDue(d);
+  assert.strictEqual(outboxItems(d).length, 1, 'still only one holding reply');
+  assert.match(conv(d).aiDraft.reason, /asked again/);
+});
+
+test('hard topics in any language are found by the model: nothing is sent', async () => {
+  const cases = [
+    ['Верните деньги за бронь', 'TOPICS: refund'],
+    ['¿Hay algún descuento si me quedo una semana?', 'TOPICS: discount'],
+    ['Können wir später auschecken?', 'TOPICS: late_checkout'],
+    ['ბნაში წყალი არ მოდის, ძალიან გავიანსებს', 'TOPICS: complaint'],
+    ['درجة الحرارة باردة جدا وهذا غير مقبول', 'TOPICS: complaint'],
+    ['Can we check in earlier and also get our money back?', 'TOPICS: early_checkin, refund'],
+  ];
+  for (const [g, m] of cases) {
+    const d = await drive(g, `${m}\nCheck-in starts at 15:00.`);
+    assert.strictEqual(outboxItems(d).length, 0, g);
+    assert.strictEqual(conv(d).aiDraft.kind, 'needs_you', g);
+  }
+  // the model's own NEEDS_YOU, an answer with no TOPICS line, and the other special answers are never sent
+  for (const m of ['NEEDS_YOU: guest wants another room', '[SILENT]']) {
+    const d = await drive('Is the apartment on a high floor?', m);
+    assert.strictEqual(outboxItems(d).length, 0, m);
+  }
+  const noLine = await drive('Is the apartment on a high floor?', null, { claude: async () => ({ ok: true, text: 'Check-in starts at 15:00.' }) });
+  assert.strictEqual(outboxItems(noLine).length, 0, 'an answer with no TOPICS line is not trusted');
+  const unclear = await drive('Is there a hairdryer?', null, { claude: async () => ({ ok: true, text: 'Yes, there is a hairdryer.' }) });
+  assert.match(conv(unclear).aiDraft.reason, /could not tell what the guest is asking/);
+  // a normal question is still answered
+  const normal = await drive('Is there a hairdryer?', 'TOPICS: other\nYes, there is a hairdryer.');
+  assert.strictEqual(outboxItems(normal).length, 1);
+  // keywords and the model together: a hold topic found only by the model plus an early check-in keyword
+  const mixed = await drive('Can we check in earlier? Or should I cancel?', 'TOPICS: early_checkin');
+  assert.strictEqual(outboxItems(mixed)[0][1].text.startsWith("Thank you, we'll forward"), true);
+});
+
+test('not Shartava and Freedom Square stay "Needs you" with nothing sent, whatever the topic', async () => {
+  for (const [room, name] of [['tab-1', 'Super Luxury Apartments'], ['orb-2', 'Maxela Apartments']]) {
+    const d = await drive('Can we check in earlier?', EARLY_EN, { convOver: { roomCode: room, propertyName: name } });
+    assert.strictEqual(outboxItems(d).length, 0, room);
+    assert.match(conv(d).aiDraft.reason, /not Shartava/);
+  }
+});
+
+test('"Booking.com" as a name is allowed in a draft; a real link to it is not', () => {
+  assert.ok(D.checkDraft('Payment for your reservation is handled by Booking.com.').ok);
+  assert.strictEqual(D.checkDraft('Payment for your reservation is handled by Booking.com.').text, 'Payment for your reservation is handled by Booking.com.');
+  assert.ok(D.checkDraft('Payment is handled by Booking.com, so please check there.').ok);
+  assert.ok(!D.checkDraft('Look at https://www.booking.com/hotel/x for it.').ok);
+  assert.ok(!D.checkDraft('Look at www.booking.com/hotel/x for it please.').ok);
+  assert.ok(!D.checkDraft('Visit example.com for it please.').ok);
 });
