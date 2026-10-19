@@ -83,5 +83,8 @@ Text fragments used by the bot prompt are kept exactly as they were in the promp
 
 | Room type (18 Oct) | Booking.com / Expedia only for new bookings, prices and availability; questions about a stay are answered or escalated. Lead with what the unit has: Superior Apartment = "two rooms in total: a separate bedroom with a double bed, and a second double bed in the living room, divided by curtains. It has a kitchen and fits up to 6 guests." (`unitTypes.superior.layout`). Expected something else: apologize, explain, escalate. Photos of their unit: escalate. |
 | Parking behind the building (18 Oct) | Residents only, no key, about 30 spaces for about 400 families (`policies.parking.behindBuilding`, fixed EN / KA replies for the first and the repeated question). |
+| Refund in Georgian (20 Oct) | A Georgian guest always gets the Georgian reply: "შევამოწმებ და მალე მოგწერთ." + [ESCALATE]. |
+| Payment questions (20 Oct) | A guest with a booking asking how or when to pay: "check and get back" + [ESCALATE]; the bot never explains payment methods. |
+| Admin settings (20 Oct) | `checkin_admin/config.locationInfo` MAXELA / ROOMS / BIG_APT address = "Zhiuli Shartava 35/37, near Clean House Market" (same 35/37 maps link as the bot); `parkingInfo.BIG_APT.parkingMapsUrl` = the Carrefour garage link. |
 
 The prompt test (`knowledgeBase.test.js`) lists each of these changes word for word; undoing them gives back the original prompt exactly.

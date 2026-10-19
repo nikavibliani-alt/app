@@ -85,8 +85,18 @@ const DECISION_CHANGES_2026_10_18 = [
   ["\nGuest asks what their unit has (for example whether it has two bedrooms, a kitchen or enough beds):\nAnswer warmly with what the unit has (see UNIT TYPES), leading with what it has, never with what it lacks: never \"it is not a two-bedroom\" or \"it does not include\". For a Superior Apartment, describe it exactly like this: It has two rooms in total: a separate bedroom with a double bed, and a second double bed in the living room, divided by curtains. It has a kitchen and fits up to 6 guests. For a Triple Room: It has a private bathroom, a double bed, a single bed and a sofa bed, and fits up to 4 guests.\n\nGuest says they expected something else (for example two separate bedrooms, or a kitchen in the Triple Room):\nApologize warmly for the confusion, explain what their unit has as above, and say you will check with the team whether a change is possible. Example for a Superior Apartment: Sorry for the confusion. It has two rooms in total: a separate bedroom with a double bed, and a second double bed in the living room, divided by curtains. It has a kitchen and fits up to 6 guests. Let me check with the team whether a change is possible and get back to you shortly. [ESCALATE]\nExample for a Triple Room guest who expected a kitchen: Sorry for the confusion. It has a private bathroom, a double bed, a single bed and a sofa bed, and fits up to 4 guests. It doesn't have a kitchen, so let me check with the team whether a change to an apartment with a kitchen is possible and get back to you shortly. [ESCALATE]\nNever lecture (\"as shown in the listing\", \"you booked\"), and never send the guest to Booking.com or Expedia.\n\nGuest asks for photos or videos of their apartment or room, or of the exact unit they will get:\nReply: Let me check on that and get back to you shortly. [ESCALATE]\nNever send them to Booking.com, Expedia or the listing for this: the owner sends the photos.",
    "\nRoom type complaint (booked Triple Room but expected kitchen):\nReply: I understand. Just to clarify, you booked the Triple Room with Private Bathroom which does not include a kitchen, as shown in the listing. We also have the Superior Apartment and 3 Bedroom Apartment which both have kitchens. If you have questions about your booking please contact Booking.com or Expedia directly.\nIf guest insists or is very upset: [ESCALATE]"],
 ];
+// Owner changes (2026-10-20): a Georgian refund reply is always Georgian; a
+// staying guest asking how or when to pay gets "check and get back" +
+// [ESCALATE], never payment methods. [now, before] pairs as above.
+const DECISION_CHANGES_2026_10_20 = [
+  ["Reply: Let me check on that and get back to you shortly. [ESCALATE]\nWhen the guest wrote in Georgian, the whole reply is in Georgian, never English: Reply exactly: შევამოწმებ და მალე მოგწერთ. [ESCALATE]",
+   "Reply: Let me check on that and get back to you shortly. [ESCALATE]"],
+  ["\nGuest with a booking asks how or when to pay (card or cash, paying on arrival or at checkout, a deposit, an invoice or receipt, whether it is already paid):\nReply: Let me check on that and get back to you shortly. [ESCALATE]\nWhen the guest wrote in Georgian, Reply exactly: შევამოწმებ და მალე მოგწერთ. [ESCALATE]\nNever explain payment methods yourself: never say how, when or where to pay, that payment goes through Booking.com or Expedia, or that there is nothing to pay. The owner answers this. (A price question from someone who wants to book is the booking or price inquiry scenario instead.)\n",
+   ""],
+];
 const withoutRuleChanges = (p) => {
-  const undone18 = DECISION_CHANGES_2026_10_18.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `18 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, p);
+  const undone20 = DECISION_CHANGES_2026_10_20.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `20 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, p);
+  const undone18 = DECISION_CHANGES_2026_10_18.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `18 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone20);
   const undone = DECISION_CHANGES_2026_10_17.reduce((acc, [now, before]) => { assert.ok(acc.includes(now), `decision change not found: ${now.slice(0, 60)}`); return acc.split(now).join(before); }, undone18);
   return RULE_CHANGES_SINCE_SPLIT.reduce((acc, r) => { assert.ok(acc.includes(r), `rule change not found: ${r.slice(0, 60)}`); return acc.replace(r, ''); }, undone);
 };
@@ -256,4 +266,11 @@ test('18 Oct: room type tone and parking behind the building', () => {
   for (const t of [pb.reply.en, pb.reply.ka, pb.insist.en, pb.insist.ka]) assert.ok(p.includes(t), t.slice(0, 40));
   assert.match(pb.insist.en, /about 30 spaces there for around 400 families/);
   assert.match(p, /Reservations are only through Booking\.com or Expedia/, 'new bookings keep Booking.com');
+});
+
+test('20 Oct: Georgian refund reply in Georgian; payment questions go to the owner', () => {
+  const p = renderSystemPrompt(SEED);
+  assert.match(p, /Refund request[^\n]*\nReply: Let me check on that and get back to you shortly\. \[ESCALATE\]\nWhen the guest wrote in Georgian, the whole reply is in Georgian, never English: Reply exactly: შევამოწმებ და მალე მოგწერთ\. \[ESCALATE\]/);
+  assert.match(p, /asks how or when to pay[^\n]*\nReply: Let me check on that and get back to you shortly\. \[ESCALATE\]/);
+  assert.match(p, /Never explain payment methods yourself/);
 });
