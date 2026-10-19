@@ -300,3 +300,8 @@ Notes:
 - Server: sendPushToAll logs every deleted subscription (device, status) to push_log; pushTestRequest sends a test to one phone. NOT deployed yet: the pipeline codebase cannot deploy until the secret GUEST_PROOF_SECRET exists (from security stage 2).
 - Admin (Build 1014c): permission is asked first on a tap, stale subscription replaced, visible "Notifications are off on this phone" bar, failed re-sync logged to push_log, "Send test notification" in More.
 - Undo: tell me "undo push fix".
+
+### Tab bar from one list (restore point: tag before-tabbar-list)
+- checkin-admin.html has one DESTINATIONS list; it builds the More menu buttons and the Tab bar layout options (NAV_POOL). Page links (Inbox, Pricing) can be tabs but not the landing tab. Badges (requests, inbox, failed searches) show on tabs and in More. The More tab is highlighted for any page not in the bar.
+- Saved layouts keep their ids (stay, hk, elevator, requests, apts, history). New ids: damage (when enabled), pricing, inbox, failures, wasettings, hksettings.
+- Undo: tell me "undo tab bar list".
