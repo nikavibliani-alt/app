@@ -175,7 +175,12 @@ html.embed body{background:var(--bg)}
 .reply__hint{font-size:12px;color:var(--muted);margin-top:2px}
 .wbox{background:var(--amber-bg);color:var(--amber);border:1px solid #e3d6b0;border-radius:var(--r);padding:8px 10px;font-size:13px;margin-bottom:8px}
 .wbox ul{margin:4px 0 8px 18px}
-.wbox__btns{display:flex;gap:8px}
+.wbox__btns{display:flex;gap:8px;flex-wrap:wrap}
+.wbox__quote{margin:4px 0 8px;color:var(--ink)}
+.who{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted)}
+.who--live{color:var(--green);border-color:#bfd9c8;background:var(--green-bg)}
+.presence{font-size:13px;color:var(--green);font-weight:600;padding:2px 16px 0;min-height:0}
+.presence:empty{display:none}
 </style>
 </head>
 <body>
@@ -190,7 +195,7 @@ html.embed body{background:var(--bg)}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, getDoc, updateDoc, collection, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { requireInboxUser, inboxUserFor } from "./shared/inbox-auth.js";
@@ -450,6 +455,60 @@ function setBadge(n) {
   try { if (navigator.setAppBadge) { if (n > 0) navigator.setAppBadge(n); else navigator.clearAppBadge(); } } catch (e) { /* no badge here */ }
 }
 
+/* ---------- two people: what my screen has seen, and who else is here ---------- */
+const seenLast = {};          // conversation -> id of the newest chat message my screen showed when the composer was opened
+const latestMsgId = () => (msgs.length ? msgs[msgs.length - 1].id : null);
+const PRESENCE_FRESH_MS = 60000;
+const PRESENCE_BEAT_MS = 20000;
+let presenceAll = {};         // conversation -> { person: { at, typing } } (everyone's records)
+let presenceOk = true;        // turns false on the first "not allowed": the feature then stays hidden, no errors shown
+const myKey = () => String((me && me.name) || "").toLowerCase();
+const personName = key => (INBOX_PEOPLE[key] || key);
+const INBOX_PEOPLE = { nika: "Nika", nutsa: "Nutsa" };
+function othersHere(convId) {
+  const rec = presenceAll[convId] || {}; const out = [];
+  for (const [k, v] of Object.entries(rec)) {
+    if (k === myKey() || !v || !Number.isFinite(Number(v.at)) || Date.now() - Number(v.at) > PRESENCE_FRESH_MS) continue;
+    out.push({ key: k, name: personName(k), typing: !!v.typing });
+  }
+  return out;
+}
+const initialOf = name => (!name ? "" : name === "AI" ? "AI" : String(name).toLowerCase() === "nutsa" ? "Nu" : String(name).charAt(0).toUpperCase());
+let presenceTyping = false, presenceTypingTimer = null, presenceBeat = null, presenceFor = null;
+function writePresence(convId, typing) {
+  if (!presenceOk || !me || !convId) return;
+  setDoc(doc(db, "inbox_presence", convId), { [myKey()]: { at: Date.now(), typing: !!typing } }, { merge: true })
+    .catch(e => { if (e && e.code === "permission-denied") { presenceOk = false; paintPresence(); } });
+}
+function startPresence(convId) {
+  if (presenceFor === convId) return;
+  stopPresence();
+  presenceFor = convId; presenceTyping = false;
+  writePresence(convId, false);
+  presenceBeat = setInterval(() => { if (document.visibilityState === "visible") writePresence(convId, presenceTyping); }, PRESENCE_BEAT_MS);
+}
+function stopPresence() {
+  if (presenceBeat) { clearInterval(presenceBeat); presenceBeat = null; }
+  clearTimeout(presenceTypingTimer);
+  if (presenceFor && presenceTyping) writePresence(presenceFor, false);
+  presenceFor = null; presenceTyping = false;
+}
+function iAmTyping() {
+  if (!presenceFor) return;
+  if (!presenceTyping) { presenceTyping = true; writePresence(presenceFor, true); }
+  clearTimeout(presenceTypingTimer);
+  presenceTypingTimer = setTimeout(() => { presenceTyping = false; writePresence(presenceFor, false); }, 5000);
+}
+function paintPresence() {
+  const el = $("presenceLine"); if (!el) return;
+  const id = $("chatPane").dataset.conv;
+  const o = presenceOk ? othersHere(id) : [];
+  el.textContent = o.map(x => `${x.name} is ${x.typing ? "typing" : "viewing"}`).join(" \u00b7 ");
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && presenceFor) writePresence(presenceFor, presenceTyping); });
+window.addEventListener("pagehide", () => stopPresence());
+setInterval(() => { paintPresence(); }, 15000);
+
 /* ---------- routing ---------- */
 const route = () => {
   const h = location.hash.replace(/^#/, "");
@@ -574,6 +633,9 @@ function rowHtml(c, selected) {
   if (a) tags.push(`<span class="tag ${TAG_CLASS[a.k] || ""}">${esc(a.t)}</span>`);
   if (isCancelled(c) && !(a && a.t === "Booking was cancelled")) tags.push('<span class="tag tag--red">Cancelled</span>');
   if (c.done && tab === "all") tags.push('<span class="tag tag--green">Done</span>');
+  const here = presenceOk ? othersHere(c.id) : [];
+  here.forEach(h => tags.push(`<span class="who who--live" title="${esc(h.name)} is ${h.typing ? "typing" : "viewing"}">${esc(initialOf(h.name))} ${h.typing ? "typing" : "viewing"}</span>`));
+  if (c.lastReplyBy && (c.done || !needsReply(c))) tags.push(`<span class="who" title="Last reply by ${esc(c.lastReplyBy)}">${esc(initialOf(c.lastReplyBy))}</span>`);
   const unread = needsReply(c);
   if (unread) tags.push(`<span class="row__wait">waiting ${esc(fmtWait(Date.now() - waitSince(c)))}</span>`);
   const prev = c.lastMessagePreview || (hasChat(c) ? "" : c.checkinRequest ? "Check-in time request" : "No chat messages");
@@ -585,7 +647,7 @@ function rowHtml(c, selected) {
     <div class="tags">${tags.join("")}</div></button>`;
 }
 
-function stopMsgs() { if (msgUnsub) { msgUnsub(); msgUnsub = null; } msgsFor = null; msgs = []; }
+function stopMsgs() { if (msgUnsub) { msgUnsub(); msgUnsub = null; } stopPresence(); msgsFor = null; msgs = []; }
 
 function renderPlaceholder() {
   $("chatPane").dataset.conv = "";
@@ -626,6 +688,7 @@ function renderConv(id) {
     pane.innerHTML = `<div class="head" id="convHead"></div><div class="thread" id="thread"></div><div id="draftSlot" data-key=""></div><div class="reply" id="replyBar"></div>`;
     buildReplyBar(id);
   }
+  startPresence(id); paintPresence();
   drawHead(c);
   drawDraft(c);
   const canReply = /@guest\.booking\.com$/i.test(c.replyTo || "");
@@ -708,6 +771,7 @@ function drawThread() {
   const prevCount = Number(el.dataset.count || 0);
   const prevTop = el.scrollTop;
 
+  if (seenLast[id] === undefined && msgs.length) seenLast[id] = latestMsgId();
   const items = [...msgs];
   for (const p of pending[id] || []) items.push({ id: p.id, direction: "host", text: p.text, status: "waiting", sentAt: p.sentAt, sentByName: p.by });
   items.sort((a, b) => (toDate(a.sentAt)?.getTime() || 0) - (toDate(b.sentAt)?.getTime() || 0));
@@ -802,7 +866,7 @@ function drawDraft(c) {
 /* ---------- composer ---------- */
 function buildReplyBar(id) {
   const bar = $("replyBar");
-  bar.innerHTML = `<div id="replyWarn"></div><div class="reply__err" id="replyErr" hidden></div>
+  bar.innerHTML = `<div class="presence" id="presenceLine"></div><div id="replyWarn"></div><div class="reply__err" id="replyErr" hidden></div>
     <div class="reply__row"><textarea id="replyText" rows="1" maxlength="${MAX_REPLY + 200}" placeholder="Write a reply to the guest" aria-label="Reply to the guest" enterkeyhint="${IS_TOUCH ? "enter" : "send"}"></textarea>
     <button class="btn btn--primary" id="sendBtn" type="button">Send</button></div>
     <div class="reply__count" id="replyCount"></div>
@@ -812,7 +876,7 @@ function buildReplyBar(id) {
   const fit = () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, window.innerHeight * 0.4) + "px"; };
   const count = () => { const n = ta.value.length; $("replyCount").textContent = n > MAX_REPLY * 0.8 ? `${n} / ${MAX_REPLY}` : ""; };
   const syncSend = () => { const b = $("sendBtn"); if (b) b.disabled = !ta.value.trim() || !!sendingNow[id]; };
-  ta.oninput = () => { drafts[id] = ta.value; $("replyWarn").innerHTML = ""; $("replyErr").hidden = true; fit(); count(); syncSend(); };
+  ta.oninput = () => { iAmTyping(); drafts[id] = ta.value; $("replyWarn").innerHTML = ""; $("replyErr").hidden = true; fit(); count(); syncSend(); };
   ta.addEventListener("focus", () => { tellAdmin({ type: "composer", focused: true }); if (isNarrow()) $("chatPane").classList.add("typing"); });
   ta.addEventListener("blur", () => { tellAdmin({ type: "composer", focused: false }); $("chatPane").classList.remove("typing", "menu-open"); });
   syncSend();
@@ -824,6 +888,17 @@ function buildReplyBar(id) {
   btn.addEventListener("pointerdown", e => e.preventDefault());   // keeps the keyboard open on a phone
   btn.onclick = () => trySend(id);
   if (!IS_TOUCH) ta.focus();
+}
+
+function ago(ms) { const m = Math.max(0, Math.round((Date.now() - ms) / 60000)); return m < 1 ? "just now" : m === 1 ? "1 min ago" : m < 60 ? m + " min ago" : Math.round(m / 60) + " h ago"; }
+function showConflict(id, cf) {
+  const head = cf.kind === "guest" ? "The guest wrote again" : `${cf.by} replied ${ago(cf.at)}`;
+  $("replyWarn").innerHTML = `<div class="wbox"><strong>${esc(head)}</strong><div class="wbox__quote">${esc(cf.preview || "")}</div>
+    <div class="wbox__btns"><button class="btn" id="cfMine" type="button">Send mine anyway</button><button class="btn" id="cfEdit" type="button">Edit</button><button class="btn" id="cfDiscard" type="button">Discard</button></div></div>`;
+  const ta = $("replyText");
+  $("cfMine").onclick = () => { $("replyWarn").innerHTML = ""; const t = ta.value.trim(); if (t) doSend(id, t, false, true); };
+  $("cfEdit").onclick = () => { seenLast[id] = latestMsgId(); $("replyWarn").innerHTML = ""; ta.focus(); };
+  $("cfDiscard").onclick = () => { $("replyWarn").innerHTML = ""; ta.value = ""; drafts[id] = ""; ta.dispatchEvent(new Event("input")); seenLast[id] = latestMsgId(); };
 }
 
 function trySend(id, force) {
@@ -845,7 +920,7 @@ function trySend(id, force) {
   doSend(id, text, false);
 }
 
-async function doSend(id, text, isRetry) {
+async function doSend(id, text, isRetry, force) {
   if (sendingNow[id]) return;
   sendingNow[id] = true;
   const clientId = newId();
@@ -859,7 +934,14 @@ async function doSend(id, text, isRetry) {
   }
   if (msgsFor === id) drawThread();
   try {
-    await sendReplyFn({ bookingNumber: id, text, clientId });
+    const res = await sendReplyFn({ bookingNumber: id, text, clientId, ...(isRetry ? {} : { seenLastId: seenLast[id] || undefined }), ...(force ? { force: true } : {}) });
+    const out = res && res.data;
+    if (out && out.ok === false && out.conflict) {
+      // Something new arrived since this screen last showed the chat: nothing was sent.
+      pending[id] = (pending[id] || []).filter(p => p.id !== clientId);
+      const box = $("replyText");
+      if (msgsFor === id && box) { if (!box.value) { box.value = text; drafts[id] = text; box.dispatchEvent(new Event("input")); } drawThread(); showConflict(id, out.conflict); }
+    } else delete seenLast[id];       // sent: the next reply starts from what the chat shows after this one
   } catch (e) {
     pending[id] = (pending[id] || []).filter(p => p.id !== clientId);
     const m = (e && e.message) || "Could not send.";
@@ -932,6 +1014,10 @@ function start() {
     paintAiChip();
     if (route().page === "conv") { const cv = convs.find(x => x.id === route().id); if (cv) { $("draftSlot") && ($("draftSlot").dataset.key = ""); drawDraft(cv); } }
   }, () => { aiMode = null; paintAiChip(); });
+  // Who is here: one small record per conversation. Needs a Firestore rule (docs/INBOX_PLAN.md); without it this stays hidden.
+  onSnapshot(collection(db, "inbox_presence"),
+    s => { presenceAll = {}; s.docs.forEach(d => { presenceAll[d.id] = d.data(); }); paintPresence(); if (route().page !== "conv" || isNarrow() === false) renderList(route()); },
+    () => { presenceOk = false; presenceAll = {}; paintPresence(); });
   render();
   setInterval(() => { if (started && !loadError && route().page !== "conv") renderList(route()); }, 60000);   // keeps "waiting 2 h" current
   if (alertsSupported() && Notification.permission === "granted") checkAlertsStatus();
