@@ -940,6 +940,26 @@ html.inbox-typing #main-nav{display:none}
           <button type="button" data-mode="auto" onclick="waSetBookingAiMode('auto')">Automatic</button>
         </div>
       </div>
+      <div class="more-item more-item--mode" role="group" aria-label="AI answer alerts">
+        <div class="more-item__text">
+          <div class="more-item__title">AI answer alerts</div>
+          <div class="more-item__sub" id="more-ai-alert-status">Loading…</div>
+        </div>
+        <div class="seg3" id="more-ai-alert-mode">
+          <button type="button" data-mode="every" onclick="waSetAiAlertMode('every')">Every answer</button>
+          <button type="button" data-mode="needs" onclick="waSetAiAlertMode('needs')">Only when it needs you</button>
+        </div>
+      </div>
+      <div class="more-item more-item--switch" role="group" aria-label="Sign AI replies">
+        <div class="more-item__text">
+          <div class="more-item__title">Sign AI replies</div>
+          <div class="more-item__sub" id="more-ai-sign-status">Loading…</div>
+        </div>
+        <label class="switch" title="Add a short line to the first AI reply in a chat">
+          <input type="checkbox" id="more-ai-sign-toggle" onchange="waSetAiSign(this.checked)">
+          <span class="switch-track"></span>
+        </label>
+      </div>
       <div class="more-item more-item--switch" role="group" aria-label="Booking.com message alerts">
         <div class="more-item__text">
           <div class="more-item__title">Booking.com message alerts</div>
@@ -2900,7 +2920,7 @@ function pickCheckinInviteKey(roomCode){
 let waSettings=mergeWaSettings(null);
 let waLoaded=false;
 let _waInviteProp='maxela';
-const BOT_SETTINGS_DEFAULTS={aiBotEnabled:true,bookingAiDraftsEnabled:true,bookingAiMode:'drafts',bookingAlertsEnabled:true,botMode:'available',botResponseDelay:20,ownerPhone:'',nightStart:22,nightEnd:9};
+const BOT_SETTINGS_DEFAULTS={aiBotEnabled:true,bookingAiDraftsEnabled:true,bookingAiMode:'drafts',bookingAlertsEnabled:true,aiAlertMode:'every',aiSignReplies:false,botMode:'available',botResponseDelay:20,ownerPhone:'',nightStart:22,nightEnd:9};
 let botSettings={...BOT_SETTINGS_DEFAULTS};
 let botSettingsLoaded=false;
 async function loadBotSettings(){
@@ -2913,6 +2933,8 @@ async function loadBotSettings(){
         bookingAiDraftsEnabled:d.bookingAiDraftsEnabled!==false,
         bookingAiMode:['off','drafts','auto'].includes(d.bookingAiMode)?d.bookingAiMode:(d.bookingAiDraftsEnabled===false?'off':'drafts'),
         bookingAlertsEnabled:d.bookingAlertsEnabled!==false,
+        aiAlertMode:d.aiAlertMode==='needs'?'needs':'every',
+        aiSignReplies:d.aiSignReplies===true,
         botMode:['available','away','night','auto'].includes(d.botMode)?d.botMode:'available',
         botResponseDelay:Number(d.botResponseDelay)||20,
         ownerPhone:d.ownerPhone||'',
@@ -2942,6 +2964,14 @@ function syncMoreBotToggle(){
   const alStatus=document.getElementById('more-booking-alerts-status');
   if(alToggle)alToggle.checked=botSettings.bookingAlertsEnabled!==false;
   if(alStatus)alStatus.textContent=!botSettingsLoaded?'Loading…':botSettings.bookingAlertsEnabled!==false?'On · all admin phones and the phones turned on in the inbox':'Off';
+  const aaMode=botSettings.aiAlertMode==='needs'?'needs':'every';
+  document.querySelectorAll('#more-ai-alert-mode button').forEach(b=>b.classList.toggle('is-active',botSettingsLoaded&&b.dataset.mode===aaMode));
+  const aaStatus=document.getElementById('more-ai-alert-status');
+  if(aaStatus)aaStatus.textContent=!botSettingsLoaded?'Loading…':aaMode==='needs'?'Only when it needs you, plus a summary at 21:00':'An alert for every AI answer';
+  const sgToggle=document.getElementById('more-ai-sign-toggle');
+  if(sgToggle)sgToggle.checked=botSettings.aiSignReplies===true;
+  const sgStatus=document.getElementById('more-ai-sign-status');
+  if(sgStatus)sgStatus.textContent=!botSettingsLoaded?'Loading…':botSettings.aiSignReplies===true?'On · the first AI reply in a chat says it is from the AI assistant':'Off · replies carry no AI line';
   const bkStatus=document.getElementById('more-booking-ai-status');
   const bkMode=botSettings.bookingAiMode||'drafts';
   document.querySelectorAll('#more-booking-ai-mode button').forEach(b=>b.classList.toggle('is-active',botSettingsLoaded&&b.dataset.mode===bkMode));
@@ -2979,6 +3009,17 @@ window.waSetBookingAiMode=async function(mode){
   await waSaveBotSettings({bookingAiMode:mode,bookingAiDraftsEnabled:mode!=='off'});   // the old field is kept in step for older code
   syncMoreBotToggle();
   toast(mode==='auto'?'Booking.com AI: automatic':mode==='drafts'?'Booking.com AI: drafts only':'Booking.com AI: off');
+};
+window.waSetAiAlertMode=async function(mode){
+  if(!['every','needs'].includes(mode))return;
+  await waSaveBotSettings({aiAlertMode:mode});
+  syncMoreBotToggle();
+  toast(mode==='needs'?'AI answer alerts: only when it needs you':'AI answer alerts: every answer');
+};
+window.waSetAiSign=async function(checked){
+  await waSaveBotSettings({aiSignReplies:checked});
+  syncMoreBotToggle();
+  toast(checked?'AI replies will say they are from the AI assistant':'AI replies carry no AI line');
 };
 window.waSetAiBotEnabled=async function(checked){
   await waSaveBotSettings({aiBotEnabled:checked});
@@ -4630,9 +4671,9 @@ window.closeHistoryPhoto=function(){
 
 /* ---------- Inbox inside the admin: /inbox?embed=1 in a frame, created on the first visit and kept loaded ---------- */
 let _inboxFrame=null,_inboxReady=false,_inboxQueue=null,_inboxTyping=false;
-function openInbox(c){
-  if(INBOX_IN_TAB){_inboxQueue=c||null;switchTab('inbox');return false;}
-  location.href='/inbox'+(c?'#c/'+encodeURIComponent(c):'');return false;
+function openInbox(c,view){
+  if(INBOX_IN_TAB){_inboxQueue=view==='ai'?'@ai':(c||null);switchTab('inbox');return false;}
+  location.href='/inbox'+(view==='ai'?'#ai':c?'#c/'+encodeURIComponent(c):'');return false;
 }
 window.openInbox=openInbox;
 function showInboxTab(){
@@ -4640,10 +4681,10 @@ function showInboxTab(){
   if(!_inboxFrame){
     _inboxFrame=document.createElement('iframe');
     _inboxFrame.title='Guest inbox';
-    _inboxFrame.src='/inbox?embed=1'+(_inboxQueue?'#c/'+encodeURIComponent(_inboxQueue):'');
+    _inboxFrame.src='/inbox?embed=1'+(_inboxQueue==='@ai'?'#ai':_inboxQueue?'#c/'+encodeURIComponent(_inboxQueue):'');
     _inboxQueue=null;
     wrap.insertBefore(_inboxFrame,wrap.firstChild);
-  }else if(_inboxQueue){inboxSend({type:'open',c:_inboxQueue});_inboxQueue=null;}
+  }else if(_inboxQueue){inboxSend(_inboxQueue==='@ai'?{type:'view',view:'ai'}:{type:'open',c:_inboxQueue});_inboxQueue=null;}
   layoutInbox();
 }
 function inboxSend(m){try{_inboxFrame?.contentWindow?.postMessage(Object.assign({source:'maxela-admin'},m),location.origin);}catch(e){}}
@@ -4674,7 +4715,7 @@ window.addEventListener('message',ev=>{
 });
 /* a tapped guest alert: sw.js tells an open admin window which conversation to show */
 if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',ev=>{
-  if(ev.data&&ev.data.type==='open-inbox')openInbox(ev.data.c||null);
+  if(ev.data&&ev.data.type==='open-inbox')openInbox(ev.data.c||null,ev.data.view||null);
 });
 /* the setting in More */
 function paintInboxOpenSetting(){
@@ -6987,7 +7028,7 @@ onSnapshot(doc(db,'globals','elevator_code'),snap=>{
 });
 setInterval(()=>{if(currentTab==='elevator')renderElevator();loadElevatorOnce();},60000);
 setTimeout(()=>{document.getElementById('loading').style.display='none';if(!_resCache&&!_resSubscribed)_loadResCache();if(loaded<2){if(STANDALONE_HK)hkInitStandalone();else switchTab(currentTab);}},5000);
-try{const qc=new URLSearchParams(location.search).get('c');if(qc&&INBOX_IN_TAB&&currentTab==='inbox')_inboxQueue=qc;}catch(e){}   // alert tap: /checkin-admin?tab=inbox&c=<booking number>
+try{const qp=new URLSearchParams(location.search);const qc=qp.get('c');if(INBOX_IN_TAB&&currentTab==='inbox'){if(qp.get('view')==='ai')_inboxQueue='@ai';else if(qc)_inboxQueue=qc;}}catch(e){}   // alert tap: /checkin-admin?tab=inbox&c=<booking number>
 if(!STANDALONE_HK)switchTab(currentTab);
 </script>
 <script>

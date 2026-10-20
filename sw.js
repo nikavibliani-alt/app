@@ -46,9 +46,10 @@ self.addEventListener('notificationclick', event => {
       if(/^\/inbox(?:[#?]|$)/.test(url)){
         // An admin window is open: hand it the conversation (it opens its Inbox tab, or the inbox page, by the admin setting).
         const m=url.match(/#c\/(.+)$/);
+        const view=/#ai$/.test(url)?'ai':null;
         for(const client of clientList){
           if(client.url.includes('checkin-admin') && 'focus' in client){
-            client.postMessage({type:'open-inbox',c:m?decodeURIComponent(m[1]):null});
+            client.postMessage({type:'open-inbox',c:m?decodeURIComponent(m[1]):null,view});
             return client.focus();
           }
         }
