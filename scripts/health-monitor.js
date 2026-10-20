@@ -67,18 +67,15 @@ function runLocalChecks() {
 }
 
 async function checkReservationSync(db) {
-  // Sample recent docs — avoids requiring a syncedAt composite index
-  const snap = await db.collection('reservations').limit(200).get();
+  // Newest sync only: single-field orderBy, no composite index. (The sync updates bookings with checkout >= today,
+  // so sampling "the first 200 docs" read old bookings and gave a false alarm.)
+  const snap = await db.collection('reservations').orderBy('syncedAt', 'desc').limit(1).get();
   if (snap.empty) {
-    return { name: 'MiniHotel reservation sync', ok: false, detail: 'No reservations in Firestore' };
+    return { name: 'MiniHotel reservation sync', ok: false, detail: 'No reservations with syncedAt in Firestore' };
   }
-  let latest = null;
-  snap.forEach((d) => {
-    const ts = d.data().syncedAt?.toDate?.();
-    if (ts && (!latest || ts > latest)) latest = ts;
-  });
+  const latest = snap.docs[0].data().syncedAt?.toDate?.();
   if (!latest) {
-    return { name: 'MiniHotel reservation sync', ok: false, detail: 'No syncedAt on sampled reservations' };
+    return { name: 'MiniHotel reservation sync', ok: false, detail: 'Newest reservation has no readable syncedAt' };
   }
   const ageMs = Date.now() - latest.getTime();
   const ageH = (ageMs / 3_600_000).toFixed(1);
