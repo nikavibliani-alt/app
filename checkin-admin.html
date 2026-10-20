@@ -4314,7 +4314,8 @@ window.openResDetail=function(base){
       ${kv('Dates',fmtDate(r.checkin)+' – '+fmtDate(r.checkout))}${kv('Nights',r.nights)}${kv('Guests',r.guestCount)}
       ${kv('Total',hcTotal(docs))}${kv('Source',r.source)}${kv('Booking id',r.bookingId)}${kv('Phone',r.phone)}${kv('Email',r.email)}
     </div>
-    ${wa?`<a class="btn" style="width:100%;margin-top:12px" href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>`:''}`;
+    ${wa?`<a class="btn" style="width:100%;margin-top:12px" href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>`:''}
+    ${bookingChatBtn(r)}`;
   document.getElementById('detail').classList.add('open');
 };
 /* deep link: /checkin-admin?hc=<reservationNumber> (push / WhatsApp alert) */
@@ -4703,6 +4704,7 @@ if(window.visualViewport){visualViewport.addEventListener('resize',layoutInbox);
 window.addEventListener('message',ev=>{
   if(ev.origin!==location.origin||!ev.data||ev.data.source!=='maxela-inbox'||ev.source!==_inboxFrame?.contentWindow)return;
   const d=ev.data;
+  if(d.type==='open-booking'&&d.hc&&typeof openHcDetail==='function'){openHcDetail(String(d.hc));return;}
   if(d.type==='ready'){_inboxReady=true;document.getElementById('inbox-signin')?.classList.remove('show');}
   if(d.type==='auth-needed'){_inboxReady=false;document.getElementById('inbox-signin')?.classList.add('show');}
   if(d.type==='title'&&currentTab==='inbox'){document.getElementById('header-title').textContent=d.title||'Inbox';document.getElementById('header-sub').textContent='Booking.com guest chat';}
@@ -4723,6 +4725,12 @@ function paintInboxOpenSetting(){
   document.querySelectorAll('#more-inbox-open button').forEach(b=>b.classList.toggle('is-active',b.dataset.mode===m));
   const st=document.getElementById('more-inbox-open-status');
   if(st)st.textContent=m==='tab'?'In the Inbox tab, with the tab bar':'On its own page (the old way)';
+}
+/* Booking.com reservations get a "Booking.com chat" button that opens the inbox at that conversation (by booking number). The admin reads no inbox data for this. */
+function bookingChatBtn(res){
+  const bn=res&&String(res.bookingId||'').trim();
+  if(!bn||!/booking/i.test(String(res.source||'')))return '';
+  return `<button class="btn" type="button" style="width:100%;margin-top:12px" onclick="closeDetail();openInbox('${esc(bn)}')">Booking.com chat</button>`;
 }
 window.setInboxOpen=function(m){
   try{localStorage.setItem('maxela_inbox_open',m);}catch(e){}
@@ -5228,6 +5236,7 @@ window.openDetail=function(guestId){
     </div>
     ${hcPanelHtml(reservationBaseNum(g.matchedReservationId)||'')}
     ${roomBlocks}
+    ${bookingChatBtn(door)}
     ${g.matchedReservationId?`<div style="margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs)">
       <div style="font-size:12px;font-weight:700;margin-bottom:8px">Move room (pipeline)${guestReservationManual(g)?' <span class="pill pill-manual">MANUAL</span>':''}</div>
       ${moveBlocks}
@@ -7006,7 +7015,8 @@ onSnapshot(doc(db,'globals','inboxStats'),snap=>{
   const cnt=document.getElementById('inbox-card-count'), sub=document.getElementById('inbox-card-sub');
   if(cnt){cnt.textContent=n===null?'\u2013':String(n);cnt.classList.toggle('has',!!n);}
   if(sub){
-    sub.textContent=n===null?'Booking.com guest messages':n===0?'Nothing waiting for a reply':`${n} need${n===1?'s':''} a reply${c?`, ${c} cancellation request${c===1?'':'s'}`:''}`;
+    const aw=d?Number(d.arrivalsWaiting)||0:0;
+    sub.textContent=n===null?'Booking.com guest messages':n===0?'Nothing waiting for a reply':`${n} need${n===1?'s':''} a reply${c?`, ${c} cancellation request${c===1?'':'s'}`:''}`+(aw?`. ${aw} arriving today ${aw===1?'is':'are'} waiting for a reply`:'');
     sub.classList.toggle('is-warn',!!c);
   }
   setDestBadge('inbox',n||0);
