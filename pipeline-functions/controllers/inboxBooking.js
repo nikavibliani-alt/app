@@ -81,6 +81,7 @@ async function bookingPanel(auth, data, deps) {
 
   const res = await safe('reservation', notes, () => loadReservation(db, conv, bn), null);
   out.found = !!res;
+  out.reservationNumber = res && res.reservationNumber ? String(res.reservationNumber).replace(/_\d+$/, '') : null;   // for the admin's "Open booking" link
   const checkin = (res && res.checkin) || conv.checkin || null;
   const checkout = (res && res.checkout) || conv.checkout || null;
   const room = (res && (res.roomCode || res.room)) || conv.roomCode || null;

@@ -40,6 +40,7 @@ test('booking panel: the facts, read only', async () => {
   const before = JSON.stringify([...db.store.entries()]);
   const r = await B.bookingPanel(NIKA, { bookingNumber: BN }, deps(db));
   assert.deepStrictEqual(r.reservation, { checkin: '2026-11-09', checkout: '2026-11-19', nights: 10, room: '6-2', status: 'OK2', guests: 3, guestName: 'Test Guest' });
+  assert.strictEqual(r.reservationNumber, '555');
   assert.deepStrictEqual(r.form, { filled: true, submittedAt: 5 });
   assert.deepStrictEqual(r.access, { on: true, text: 'Door access is on (check-in time has come).' });
   assert.strictEqual(r.cleaning.text, 'Cleaned today.');
