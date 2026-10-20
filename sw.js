@@ -44,6 +44,14 @@ self.addEventListener('notificationclick', event => {
       }
       // Booking.com inbox alerts (/inbox#c/<booking number>): open that conversation, in the inbox window if one is open.
       if(/^\/inbox(?:[#?]|$)/.test(url)){
+        // An admin window is open: hand it the conversation (it opens its Inbox tab, or the inbox page, by the admin setting).
+        const m=url.match(/#c\/(.+)$/);
+        for(const client of clientList){
+          if(client.url.includes('checkin-admin') && 'focus' in client){
+            client.postMessage({type:'open-inbox',c:m?decodeURIComponent(m[1]):null});
+            return client.focus();
+          }
+        }
         for(const client of clientList){
           if(/\/inbox(?:[#?]|$)/.test(client.url) && 'navigate' in client)return client.navigate(url).then(c => (c || client).focus());
         }
