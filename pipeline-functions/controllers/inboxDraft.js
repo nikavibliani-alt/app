@@ -143,7 +143,7 @@ async function processConversation(bookingNumber, deps) {
   if (!claimed) return { outcome: 'not due' };
   const { conv, pending } = claimed;
 
-  const finish = async (outcome, draft, extra = {}, send = null) => {
+  const finish = async (outcome, draft, extra = {}, send = null, extraUpdate = null) => {
     const r = await db.runTransaction(async tx => {
       const c = await tx.get(convRef);
       if (!c.exists) return 'gone';
@@ -173,11 +173,11 @@ async function processConversation(bookingNumber, deps) {
         });
         if (send.needsYou) {
           // A holding reply was sent, but the host still has to decide: back to "Needs reply" with a note (the alert comes from it).
-          tx.update(convRef, { needsReply: true, done: false, doneAt: null, aiDraft: { kind: 'needs_you', reason: send.needsYou, text: send.needsYou, source: 'rule', createdAt: ts(nowMs()), forMessageId: pending.lastMessageId } });
+          tx.update(convRef, { needsReply: true, done: false, doneAt: null, waitingSince: v.waitingSince || v.lastGuestMessageAt || null, aiDraft: { kind: 'needs_you', reason: send.needsYou, text: send.needsYou, source: 'rule', createdAt: ts(nowMs()), forMessageId: pending.lastMessageId } });
         }
         return 'auto_sent';
       }
-      const upd = { aiPending: null, aiRunning: null, aiDueAt: null };
+      const upd = { aiPending: null, aiRunning: null, aiDueAt: null, ...(extraUpdate || {}) };
       if (draft) upd.aiDraft = { ...draft, createdAt: ts(nowMs()), forMessageId: pending.lastMessageId };
       tx.update(convRef, upd);
       return draft ? 'saved' : 'cleared';
@@ -229,7 +229,12 @@ async function processConversation(bookingNumber, deps) {
 
   // 4. Skip rules and the topics that are the host's call. The English keywords are a safety net; the model names
   //    the topics in any language (see below).
-  if (D.burstIsOnlyClosers(texts)) return finish('closer', null);
+  if (D.burstIsOnlyClosers(texts)) {
+    // "ok", "thanks": nothing to answer, so the conversation moves to Done by itself (a new guest message reopens it).
+    // Not when a cancellation or check-in request is still open or the last reply did not go out.
+    const open = conv.cancelRequest || conv.checkinAction || conv.lastSendStatus === 'failed' || conv.lastSendStatus === 'unknown';
+    return finish('closer', null, {}, null, open ? null : { done: true, needsReply: false, doneAt: ts(nowMs()), closedAsThanksAt: ts(nowMs()), waitingSince: null });
+  }
   const k = D.knowledgeForConversation(conv, KB.SEED);
   if (!k.ok) return note('needs_you', k.reason);
   const kw = T.keywordTopics(texts);

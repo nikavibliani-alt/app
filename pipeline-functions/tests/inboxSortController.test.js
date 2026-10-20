@@ -207,3 +207,20 @@ test('a new guest message after the conversation was marked done sets done=false
   assert.strictEqual(db.store.get(k).doneAt, null);
   assert.strictEqual(db.store.get(k).lastMessagePreview, 'two');
 });
+
+test('waitingSince: the first unanswered guest message; kept while the guest keeps writing; reset after a reply', async () => {
+  const db = fakeDb({
+    'inbox_raw_emails/m1': chat('2000000020', 'm1', '2026-10-01T10:00:00Z', 'one'),
+    'inbox_raw_emails/m2': chat('2000000020', 'm2', '2026-10-01T10:30:00Z', 'two'),
+    'inbox_raw_emails/m3': chat('2000000020', 'm3', '2026-10-01T12:00:00Z', 'three'),
+  });
+  const real = { db, ts: iso => ({ toDate: () => new Date(iso), __iso: iso }), now: () => 'NOW' };
+  const k = 'inbox_conversations/2000000020';
+  await processEmail('m1', real);
+  assert.strictEqual(db.store.get(k).waitingSince.__iso, '2026-10-01T10:00:00.000Z');
+  await processEmail('m2', real);
+  assert.strictEqual(db.store.get(k).waitingSince.__iso, '2026-10-01T10:00:00.000Z', 'still the first one');
+  db.store.set(k, { ...db.store.get(k), needsReply: false, waitingSince: null });         // we replied
+  await processEmail('m3', real);
+  assert.strictEqual(db.store.get(k).waitingSince.__iso, '2026-10-01T12:00:00.000Z', 'a new wait starts');
+});

@@ -131,7 +131,7 @@ async function processCheckin(bookingNumber, deps) {
   text = checked.text;
 
   const action = { label: d.label, url, option: d.option, verb: d.verb, time: d.time, range: d.range };
-  const common = { checkinAction: action, needsReply: true, done: false, doneAt: null, updatedAt: ts(nowMs()) };   // the answer in Booking.com is still open
+  const common = { checkinAction: action, needsReply: true, done: false, doneAt: null, updatedAt: ts(nowMs()), waitingSince: ts(atMs) };   // the answer in Booking.com is still open
 
   const asDraft = async (autoBlocked) => {
     const draft = { kind: 'reply', text, source: 'checkin', actionLabel: d.label, actionUrl: url, createdAt: ts(nowMs()), checkinAtMs: atMs, ...(autoBlocked ? { autoBlocked } : {}) };

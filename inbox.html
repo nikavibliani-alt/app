@@ -68,6 +68,19 @@ body.show-chat #chatPane{display:flex}
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .tag{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--bubble);color:var(--ink)}
 .tag--red{background:var(--bg-red);color:var(--status-red)}
+.tag--grey{background:#ececec;color:var(--text-muted)}
+.tag--ink{background:transparent;color:var(--ink);border:1px solid var(--ink)}
+.row__wait{font-size:12px;color:var(--text-muted);align-self:center}
+.btn--full{width:100%;min-height:48px;margin-top:8px}
+.card{margin-top:8px;border-radius:10px;padding:10px 12px;border:1px solid var(--border);background:var(--card-bg);font-size:14px}
+.card--amber{background:var(--bg-amber);border-color:#ecd98b;color:var(--status-amber)}
+.card--red{background:var(--bg-red);border-color:#efc4c4;color:var(--status-red)}
+.card--grey{background:#f1f1f1;color:var(--text-muted)}
+.card__title{font-weight:700}
+.card__sub{margin-top:2px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;background:var(--ink);color:#ffffff;border-radius:12px;padding:6px 8px 6px 16px;display:flex;align-items:center;gap:10px;font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,.25)}
+.toast button{min-height:44px;padding:0 14px;border:0;background:transparent;color:#ffffff;font-weight:700;text-decoration:underline;font-size:14px}
+.rv__btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .tag--green{background:var(--bg-green);color:var(--status-green)}
 .warn{display:flex;gap:8px;align-items:flex-start;background:var(--bg-red);color:var(--status-red);
   border:1px solid #efc4c4;border-radius:10px;padding:8px 10px;font-size:13px;font-weight:600;margin-top:8px}
@@ -96,7 +109,8 @@ body.show-chat #chatPane{display:flex}
 .me__status--bad{color:var(--status-red);font-weight:600}
 .me__status--wait{color:var(--status-amber);font-weight:600}
 .me__status--ok{color:var(--status-green);font-weight:600}
-.mini{min-height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--ink);background:var(--card-bg);color:var(--ink);font-weight:700;font-size:13px}
+.mini--link{display:inline-flex;align-items:center;text-decoration:none}
+.mini{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--ink);background:var(--card-bg);color:var(--ink);font-weight:700;font-size:13px}
 .note{align-self:center;text-align:center;font-size:12px;color:var(--text-muted);padding:2px 8px}
 .msg{color:var(--text-muted);padding:14px 16px;font-size:14px}
 .err{margin:16px;padding:12px;border-radius:10px;background:var(--bg-red);color:var(--status-red);font-size:14px}
@@ -160,6 +174,7 @@ const sendReplyFn = httpsCallable(fns, "inboxSendReply");
 const checkinLinkFn = httpsCallable(fns, "inboxCheckinLink");
 const discardDraftFn = httpsCallable(fns, "inboxDraftDiscard");
 const alertsFn = httpsCallable(fns, "inboxAlerts");
+const reviewHandledFn = httpsCallable(fns, "inboxReviewHandled");
 
 const TZ = "Asia/Tbilisi";
 const $ = id => document.getElementById(id);
@@ -181,6 +196,8 @@ let reviewItems = [];
 let tab = "needs";          // needs | all | done
 let loaded = { convs: false, review: false };
 let loadError = "";
+let reviewError = "";
+let lastRenderedTab = "";
 let msgUnsub = null;
 let msgs = [];
 let msgsFor = null;
@@ -215,31 +232,98 @@ function fmtDate(iso) {
 const stayText = c => (c.checkin && c.checkout ? `${fmtDate(c.checkin)} to ${fmtDate(c.checkout)}` : "");
 
 /* ---------- model helpers ---------- */
-const activityTime = c => Math.max(toDate(c.lastMessageAt)?.getTime() || 0, toDate(c.cancelRequest?.at)?.getTime() || 0);
+const tsMs = v => toDate(v)?.getTime() || 0;
+const activityTime = c => Math.max(tsMs(c.lastMessageAt), tsMs(c.cancelRequest?.at), tsMs(c.checkinRequest?.at));
 const hasChat = c => (c.messageCount || 0) > 0;
 const visible = c => hasChat(c) || !!c.cancelRequest || !!c.checkinRequest;
-const needsReply = c => !c.done && (!!c.needsReply || !!c.cancelRequest);
 const isCancelled = c => String(c.reservationStatus || "").toUpperCase() === "CANCELLED";
+// A cancellation request for a booking that is already cancelled needs nothing from us.
+const needsReply = c => !c.done && (!!c.needsReply || (!!c.cancelRequest && !isCancelled(c)));
 const statusLabel = c => (isCancelled(c) ? "Cancelled" : String(c.reservationStatus || "").toUpperCase() === "OK2" ? "Confirmed" : "");
-const propLine = c => [c.propertyName, c.roomCode].filter(Boolean).join(" · ");
+const propLine = c => [c.propertyName, c.roomCode].filter(Boolean).join(" \u00b7 ");
+// Since when the guest has been waiting (the first unanswered guest message); drafts and notes never change it.
+const waitSince = c => tsMs(c.waitingSince) || tsMs(c.lastGuestMessageAt) || tsMs(c.cancelRequest?.at) || tsMs(c.checkinRequest?.at) || 0;
+function fmtWait(ms) {
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return "less than 1 min";
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  return h < 48 ? `${h} h` : `${Math.floor(h / 24)} d`;
+}
+const closedAsThanks = c => !!c.done && tsMs(c.closedAsThanksAt) > 0 && tsMs(c.closedAsThanksAt) >= tsMs(c.lastGuestMessageAt);
+const whenText = dl => (dayKey(dl) === dayKey(new Date()) ? fmtClock(dl) : `${fmtDay(dl)}, ${fmtClock(dl)}`);
+const guestAddr = c => /@guest\.booking\.com$/i.test(c.replyTo || "");
+const fmtRange = t => String(t || "").replace(/\s*[-\u2013]\s*/, " to ");
 
-function cancelWarning(c) {
+/** The one thing to do about a conversation, as one short tag: { t: text, k: colour }, or null. */
+function actionTag(c) {
+  const open = !c.done;
+  if (open && c.lastSendStatus === "failed") return { t: "Not sent: try again", k: "red" };
+  if (open && c.lastSendStatus === "unknown") return { t: "Not sure it arrived: check in Booking.com", k: "amber" };
+  if (open && c.cancelRequest) {
+    if (isCancelled(c)) return { t: "Booking was cancelled", k: "grey" };
+    const dl = toDate(c.cancelRequest.deadline);
+    return { t: dl ? `Cancellation: answer in Booking.com by ${whenText(dl)}` : "Cancellation: answer in Booking.com", k: "red" };
+  }
+  if (open && c.checkinRequest && !c.checkinRequest.autoConfirmed && c.checkinAction) {
+    const verb = c.checkinAction.verb === "decline" ? "Decline" : c.checkinAction.verb === "answer" ? "Answer" : "Accept";
+    return { t: `${verb} check-in time in Booking.com`, k: "amber" };
+  }
+  const d = c.aiDraft;
+  if (open && d && (d.text || d.reason)) {
+    if (d.kind === "needs_you") return { t: `Needs you: ${d.reason || d.text}`, k: "red" };
+    if (d.kind === "already_answered") return { t: "Answered on WhatsApp", k: "grey" };
+    return { t: "AI draft: check it", k: "ink" };
+  }
+  if (closedAsThanks(c)) return { t: "Guest said thanks", k: "grey" };
+  if (c.lastReplyBy === "AI" && (c.done || !c.needsReply)) return { t: "AI answered", k: "green" };
+  if (needsReply(c)) return { t: "Answer this", k: "ink" };
+  return null;
+}
+const TAG_CLASS = { red: "tag--red", amber: "tag--amber", green: "tag--green", grey: "tag--grey", ink: "tag--ink" };
+
+/** The cancellation request card at the top of the chat, with a full-size button to answer it in Booking.com. */
+function cancelCard(c) {
   const r = c.cancelRequest;
   if (!r) return "";
+  if (isCancelled(c)) return `<div class="card card--grey"><div class="card__title">Booking was cancelled</div><div class="card__sub">The guest asked to cancel for free, and the booking is cancelled now. Nothing to answer.</div></div>`;
   const dl = toDate(r.deadline);
-  if (!dl) return `<div class="warn">${icon("warn")}<span>Guest asks to cancel for free. Answer in Booking.com.</span></div>`;
-  const when = dayKey(dl) === dayKey(new Date()) ? fmtClock(dl) : `${fmtDay(dl)}, ${fmtClock(dl)}`;
-  const late = dl.getTime() < Date.now();
-  return late
-    ? `<div class="warn warn--late">${icon("warn")}<span>Guest asked to cancel for free. The answer was due in Booking.com by ${esc(when)}.</span></div>`
-    : `<div class="warn">${icon("warn")}<span>Guest asks to cancel for free, answer in Booking.com by ${esc(when)}.</span></div>`;
+  const late = dl && dl.getTime() < Date.now();
+  const text = !dl ? "Guest asks to cancel for free. Answer in Booking.com."
+    : late ? `Guest asked to cancel for free. The answer was due in Booking.com by ${whenText(dl)}.`
+    : `Guest asks to cancel for free, answer in Booking.com by ${whenText(dl)}.`;
+  const url = reservationUrl(c);
+  return `<div class="card ${late ? "card--amber" : "card--red"}"><div class="card__title">${icon("warn")} Cancellation request</div><div class="card__sub">${esc(text)}</div>
+    ${url ? `<a class="btn btn--primary btn--full" href="${esc(url)}" target="_blank" rel="noopener">${icon("out")}Answer in Booking.com</a>` : ""}</div>`;
+}
+
+/** The check-in time request card at the top of the chat: what was asked, what we did, what is still to do. */
+function checkinCard(c) {
+  const r = c.checkinRequest;
+  if (!r || c.done) return "";
+  const asked = r.time ? `Guest asks to check in ${fmtRange(r.time)}.` : "Guest asks for a check-in time.";
+  if (r.autoConfirmed) return `<div class="card card--grey"><div class="card__title">${esc(asked)}</div><div class="card__sub">Booking.com already confirmed this, nothing to do.</div></div>`;
+  const h = c.checkinHandled;
+  const act = c.checkinAction && c.checkinAction.url ? c.checkinAction : null;
+  const ours = h && h.outcome === "sent" ? "Our message was sent." : h && h.outcome === "draft" ? "A draft message is ready below." : h ? "" : "We are checking this request.";
+  const link = act ? act.url : checkinLinks[c.id];
+  const verb = act ? (act.verb === "decline" ? "decline" : act.verb === "answer" ? "answer" : "accept") : "answer";
+  return `<div class="card card--amber"><div class="card__title">${esc(asked)}</div>
+    <div class="card__sub">${ours ? esc(ours) + " " : ""}Still to do: ${verb} it in Booking.com.</div>
+    ${link ? `<a class="btn btn--primary btn--full" href="${esc(link)}" target="_blank" rel="noopener">${icon("out")}${esc(act ? act.label : "Answer in Booking.com")}</a>` : ""}</div>`;
 }
 
 function checkinLine(c) {
   const r = c.checkinRequest;
   if (!r) return "";
-  const t = r.time ? String(r.time).replace(/\s*-\s*/, "–") : "time not read";
+  const t = r.time ? fmtRange(r.time) : "time not read";
   return `Check-in time request: ${esc(t)}, ${r.autoConfirmed ? "auto-confirmed" : "not auto-confirmed"}`;
+}
+
+// The reservation's page in the Booking.com Extranet (for a cancellation request).
+function reservationUrl(c) {
+  if (!c.hotelId || !c.bookingNumber) return "";
+  return `https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/booking.html?hotel_id=${encodeURIComponent(c.hotelId)}&res_id=${encodeURIComponent(c.bookingNumber)}`;
 }
 
 function extranetUrl(c) {
@@ -324,6 +408,8 @@ function renderList(r) {
   const vis = convs.filter(visible).sort((a, b) => activityTime(b) - activityTime(a));
   const nNeeds = vis.filter(needsReply).length;
   const rows = vis.filter(c => tab === "needs" ? needsReply(c) : tab === "done" ? !!c.done : true);
+  // Needs reply: the guest who has waited longest first.
+  if (tab === "needs") rows.sort((a, b) => waitSince(a) - waitSince(b));
   $("listTop").innerHTML = `
     <div class="top__row"><div class="top__title">Guest inbox</div>
       <button class="linkbtn" id="alertsBtn" type="button">${esc(alertsLabel())}</button>
@@ -333,14 +419,15 @@ function renderList(r) {
       <button class="tab ${tab === "all" ? "on" : ""}" data-tab="all" type="button">All</button>
       <button class="tab ${tab === "done" ? "on" : ""}" data-tab="done" type="button">Done</button>
     </div>
-    <div class="sub"><button class="linkbtn" id="reviewBtn" type="button">Check this (${reviewItems.length})</button></div>`;
+    <div class="sub"><button class="linkbtn" id="reviewBtn" type="button">Other Booking.com emails (${reviewItems.length})</button></div>`;
   $("listTop").querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.tab; renderList(route()); });
   $("reviewBtn").onclick = () => go("review");
   $("adminBtn").onclick = () => { location.href = "/checkin-admin"; };
   $("alertsBtn").onclick = toggleAlerts;
 
   const body = $("listBody");
-  const keep = body.scrollTop;
+  const keep = lastRenderedTab === tab ? body.scrollTop : 0;      // a new tab starts at the top; a live update keeps the place
+  lastRenderedTab = tab;
   let html;
   if (loadError) html = `<div class="err">${esc(loadError)}</div>`;
   else if (!loaded.convs) html = `<div class="msg">Loading...</div>`;
@@ -352,18 +439,19 @@ function renderList(r) {
 }
 
 function rowHtml(c, selected) {
-  const t = toDate(c.lastMessageAt) || toDate(c.cancelRequest?.at);
-  const tags = ['<span class="tag">Booking.com</span>'];
-  if (isCancelled(c)) tags.push('<span class="tag tag--red">Cancelled</span>');
-  if (c.done) tags.push('<span class="tag tag--green">Done</span>');
-  if (c.aiDraft && c.aiDraft.text) tags.push(c.aiDraft.kind === "reply" ? '<span class="tag">Draft ready</span>' : '<span class="tag tag--amber">Needs you</span>');
-  const prev = c.lastMessagePreview || (hasChat(c) ? "" : c.checkinRequest ? "Check-in time request" : "No chat messages");
+  const t = toDate(c.lastMessageAt) || toDate(c.cancelRequest?.at) || toDate(c.checkinRequest?.at);
+  const tags = [];
+  const a = actionTag(c);
+  if (a) tags.push(`<span class="tag ${TAG_CLASS[a.k] || ""}">${esc(a.t)}</span>`);
+  if (isCancelled(c) && !(a && a.t === "Booking was cancelled")) tags.push('<span class="tag tag--red">Cancelled</span>');
+  if (c.done && tab === "all") tags.push('<span class="tag tag--green">Done</span>');
   const unread = needsReply(c);
+  if (unread) tags.push(`<span class="row__wait">waiting ${esc(fmtWait(Date.now() - waitSince(c)))}</span>`);
+  const prev = c.lastMessagePreview || (hasChat(c) ? "" : c.checkinRequest ? "Check-in time request" : "No chat messages");
   return `<button class="row ${unread ? "unread" : ""} ${selected ? "sel" : ""}" type="button" data-id="${esc(c.id)}">
     <div class="row__top">${unread ? '<span class="dot" title="Needs reply"></span>' : ""}
       <span class="row__name">${esc(c.guestName || "Guest")}</span><span class="row__time">${esc(fmtListTime(t))}</span></div>
-    <div class="row__meta">${esc([propLine(c), stayText(c)].filter(Boolean).join(" · "))}</div>
-    ${c.cancelRequest && !c.done ? cancelWarning(c) : ""}
+    <div class="row__meta">${esc([propLine(c), stayText(c)].filter(Boolean).join(" \u00b7 "))}</div>
     ${prev ? `<div class="row__prev">${esc(prev)}</div>` : ""}
     <div class="tags">${tags.join("")}</div></button>`;
 }
@@ -413,12 +501,24 @@ function renderConv(id) {
   drawDraft(c);
   const canReply = /@guest\.booking\.com$/i.test(c.replyTo || "");
   $("replyBar").style.display = canReply ? "" : "none";
-  if (c.checkinRequest && checkinLinks[id] === undefined) {
+  if (c.checkinRequest && !c.checkinRequest.autoConfirmed && !(c.checkinAction && c.checkinAction.url) && checkinLinks[id] === undefined) {
     checkinLinks[id] = false;
     checkinLinkFn({ bookingNumber: id }).then(r => { checkinLinks[id] = (r.data && r.data.url) || false; if (msgsFor === id) drawThread(); }).catch(() => {});
   }
   drawThread();
 }
+
+let toastTimer = null;
+function showToast(text, undo) {
+  let t = $("toast");
+  if (!t) { t = document.createElement("div"); t.id = "toast"; t.className = "toast"; document.body.appendChild(t); }
+  t.innerHTML = `<span>${esc(text)}</span>${undo ? `<button type="button" id="toastUndo">Undo</button>` : ""}`;
+  t.style.display = "flex";
+  if (undo) $("toastUndo").onclick = () => { t.style.display = "none"; undo(); };
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.display = "none"; }, 5000);
+}
+const isNarrow = () => !window.matchMedia("(min-width:860px)").matches;
 
 function drawHead(c) {
   const id = c.id;
@@ -429,29 +529,40 @@ function drawHead(c) {
       <div class="head__name">${esc(c.guestName || "Guest")}</div>
       ${st ? `<span class="tag ${isCancelled(c) ? "tag--red" : "tag--green"}">${esc(st)}</span>` : ""}</div>
     <div class="head__line">${esc(propLine(c))}</div>
-    <div class="head__line">${esc(stayText(c))}${c.bookingNumber ? ` · Booking ${esc(c.bookingNumber)}` : ""}</div>
-    ${cancelWarning(c)}
+    <div class="head__line">${esc(stayText(c))}${c.bookingNumber ? ` \u00b7 Booking ${esc(c.bookingNumber)}` : ""}</div>
+    ${cancelCard(c)}
+    ${checkinCard(c)}
     <div class="actions">
-      <button class="btn ${c.done ? "" : "btn--primary"}" id="doneBtn" type="button">${c.done ? icon("undo") + "Not done" : icon("check") + "Done"}</button>
+      <button class="btn" id="doneBtn" type="button">${c.done ? icon("undo") + "Not done" : icon("check") + "Done"}</button>
       ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">${icon("out")}Open in Booking.com</a>` : ""}
     </div>`;
   $("backBtn").onclick = () => go("");
   $("doneBtn").onclick = async e => {
     const b = e.currentTarget; b.disabled = true;
+    const toDone = !c.done;
     try {
-      await updateDoc(doc(db, "inbox_conversations", id), c.done ? { done: false, doneAt: null } : { done: true, doneAt: serverTimestamp() });
+      await updateDoc(doc(db, "inbox_conversations", id), toDone ? { done: true, doneAt: serverTimestamp() } : { done: false, doneAt: null });
+      if (toDone) {
+        showToast("Moved to Done.", async () => {
+          try { await updateDoc(doc(db, "inbox_conversations", id), { done: false, doneAt: null }); } catch (err) { alert("Could not undo (" + (err.code || err.message) + ")."); }
+        });
+        if (isNarrow()) go("");          // on a phone, back to the list
+      }
     } catch (err) { alert("Could not save (" + (err.code || err.message) + ")."); b.disabled = false; }
   };
 }
 
-function statusHtml(m, laterSame) {
+function statusHtml(m, laterSame, c) {
   const st = m.status || "waiting";
-  if (st === "sent") return `<span class="me__status--ok">Sent</span>`;
-  if (st === "sending") return `<span class="me__status--wait">Sending</span>`;
-  if (st === "failed") return `<span class="me__status--bad">Failed${m.failReason ? ": " + esc(m.failReason) : ""}</span>` +
+  if (st === "sent") return `<span class="me__status--ok">Sent to Booking.com</span>`;
+  if (st === "sending" || st === "waiting") return `<span class="me__status--wait">Sending...</span>`;
+  if (st === "failed") return `<span class="me__status--bad">Not sent${m.failReason ? " (" + esc(m.failReason) + ")" : ""}</span>` +
     (laterSame ? "" : `<button class="mini" type="button" data-retry="${esc(m.id)}">Try again</button>`);
-  if (st === "unknown") return `<span class="me__status--bad">Unknown, check in Booking.com</span>`;
-  return `<span class="me__status--wait">Waiting</span>`;
+  if (st === "unknown") {
+    const u = c ? extranetUrl(c) : "";
+    return `<span class="me__status--bad">Not sure it arrived</span>` + (u ? `<a class="mini mini--link" href="${esc(u)}" target="_blank" rel="noopener">Open in Booking.com</a>` : "");
+  }
+  return `<span class="me__status--wait">Sending...</span>`;
 }
 
 function drawThread() {
@@ -476,18 +587,14 @@ function drawThread() {
     if (m.direction === "host") {
       const laterSame = items.slice(i + 1).some(x => x.direction === "host" && x.text === m.text && x.status !== "failed");
       out.push(`<div class="me"><div class="bubble--me">${esc(m.text)}</div>
-        <div class="me__status">${time}${time ? " · " : ""}${m.sentByName ? esc(m.sentByName) + " · " : ""}${statusHtml(m, laterSame)}</div></div>`);
+        <div class="me__status">${time}${time ? " · " : ""}${m.sentByName ? esc(m.sentByName) + " · " : ""}${statusHtml(m, laterSame, c)}</div></div>`);
     } else {
       out.push(`<div class="bubble">${esc(m.text)}<div class="bubble__time">${time}</div></div>`);
     }
   });
   const line = c ? checkinLine(c) : "";
-  if (line) {
-    // The one-tap answer in Booking.com: the right button for the requested time (Accept, Decline or Answer).
-    const act = c && c.checkinAction && c.checkinAction.url ? c.checkinAction : null;
-    const link = act ? act.url : checkinLinks[id];
-    out.push(`<div class="note">${line}${link ? ` <a class="linkbtn" href="${esc(link)}" target="_blank" rel="noopener">${esc(act ? act.label : "Answer in Booking.com")}</a>` : ""}</div>`);
-  }
+  if (line) out.push(`<div class="note">${line}</div>`);     // the button to answer it is in the card at the top
+  if (c && closedAsThanks(c)) out.push(`<div class="note">Guest said thanks, nothing to answer.</div>`);
   el.innerHTML = out.length ? out.join("") : `<div class="msg">No chat messages yet.</div>`;
   el.querySelectorAll("[data-retry]").forEach(b => b.onclick = () => {
     const m = items.find(x => x.id === b.dataset.retry);
@@ -522,9 +629,10 @@ function drawDraft(c) {
       ${d.needsYouReason ? `<div class="draft__label">Needs you: ${esc(d.needsYouReason)}. Nothing is confirmed or promised in this reply.</div>` : ""}
       <div class="draft__text">${esc(d.text)}</div>
       ${d.actionUrl ? `<a class="linkbtn" href="${esc(d.actionUrl)}" target="_blank" rel="noopener">${esc(d.actionLabel || "Answer in Booking.com")}</a>` : ""}
-      <div class="draft__btns"><button class="btn btn--primary" id="dSend" type="button">Send</button><button class="btn" id="dEdit" type="button">Edit</button><button class="btn" id="dDiscard" type="button">Discard</button></div></div>`;
+      ${guestAddr(c) ? "" : `<div class="draft__label">This conversation has no guest reply address, so nothing can be sent from here. Answer it in Booking.com.</div>`}
+      <div class="draft__btns"><button class="btn btn--primary" id="dSend" type="button" ${guestAddr(c) ? "" : "disabled"}>Send</button><button class="btn" id="dEdit" type="button">Edit</button><button class="btn" id="dDiscard" type="button">Discard</button></div></div>`;
     $("dSend").onclick = () => {
-      const ta = $("replyText"); if (!ta) return;
+      const ta = $("replyText"); if (!ta || !guestAddr(c)) return;
       ta.value = d.text; drafts[id] = d.text; ta.dispatchEvent(new Event("input"));
       trySend(id);
     };
@@ -616,17 +724,41 @@ async function doSend(id, text, isRetry) {
 }
 
 /* ---------- check this ---------- */
+// Plain words for why an email is in this list.
+function reviewReason(r) {
+  const x = String(r || "").toLowerCase();
+  if (/question before booking/.test(x)) return "A guest asked a question before booking. Answer it in Booking.com.";
+  if (/unknown email from booking\.com/.test(x)) return "Booking.com sent an email we do not recognise. Have a look in Gmail.";
+  if (/unknown sender/.test(x)) return "An email from someone we do not recognise. Have a look in Gmail.";
+  if (/could not be read|unreadable|text could not/.test(x)) return "A guest message we could not read. Open the chat in Booking.com.";
+  if (/without a booking number/.test(x)) return "A message without a booking number. Check it in Booking.com.";
+  if (/date missing|unreadable date/.test(x)) return "An email we could not date. Have a look in Gmail.";
+  const t = String(r || "Something we could not sort");
+  return t.charAt(0).toUpperCase() + t.slice(1) + ". Have a look in Gmail.";
+}
+
+async function markHandled(id, btn) {
+  if (btn) btn.disabled = true;
+  try { await reviewHandledFn({ id }); }       // the list updates by itself when the server saves it
+  catch (e) { alert("Could not save (" + ((e && e.message) || "error") + ")."); if (btn) btn.disabled = false; }
+}
+
 function renderReview() {
   $("chatPane").dataset.conv = "";
   const items = [...reviewItems].sort((a, b) => (toDate(b.date)?.getTime() || 0) - (toDate(a.date)?.getTime() || 0));
-  $("chatPane").innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
-    <div class="head__name">Check this (${reviewItems.length})</div></div></div>
-    <div class="pane__scroll">${!loaded.review ? `<div class="msg">Loading...</div>`
-    : !items.length ? `<div class="empty">Nothing to check.</div>`
-    : `<div class="list">${items.map(i => `<div class="rv"><div class="rv__reason">${esc(i.reason)}</div>
+  const body = reviewError ? `<div class="err">${esc(reviewError)}</div>`
+    : !loaded.review ? `<div class="msg">Loading...</div>`
+    : !items.length ? `<div class="empty">Nothing to look at.</div>`
+    : `<div class="list">${items.map(i => `<div class="rv"><div class="rv__reason">${esc(reviewReason(i.reason))}</div>
         <div class="rv__meta">${esc(toDate(i.date) ? fmtDay(toDate(i.date)) + ", " + fmtClock(toDate(i.date)) : "")}</div>
-        <div class="rv__meta">${esc(i.subject || "")}</div></div>`).join("")}</div>`}</div>`;
+        <div class="rv__meta">${esc(i.subject || "")}</div>
+        <div class="rv__btns">${i.link ? `<a class="btn" href="${esc(i.link)}" target="_blank" rel="noopener">${icon("out")}Open in Booking.com</a>` : ""}
+          <button class="btn" type="button" data-handled="${esc(i.id)}">${icon("check")}Handled</button></div></div>`).join("")}</div>`;
+  $("chatPane").innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
+    <div class="head__name">Other Booking.com emails (${reviewItems.length})</div></div></div>
+    <div class="pane__scroll">${body}</div>`;
   $("backBtn").onclick = () => go("");
+  $("chatPane").querySelectorAll("[data-handled]").forEach(b => b.onclick = () => markHandled(b.dataset.handled, b));
 }
 
 /* ---------- data + sign-in (owner's Google account only, same as the pricing pages) ---------- */
@@ -639,8 +771,10 @@ function start() {
   onSnapshot(collection(db, "inbox_conversations"),
     s => { convs = s.docs.map(d => ({ id: d.id, ...d.data() })); loaded.convs = true; loadError = ""; render(); }, fail);
   onSnapshot(collection(db, "inbox_review"),
-    s => { reviewItems = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.resolved); loaded.review = true; render(); }, () => {});
+    s => { reviewItems = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.resolved); loaded.review = true; reviewError = ""; render(); },
+    e => { reviewError = "Could not load the other Booking.com emails (" + (e.code || e.message) + ")."; if (route().page === "review") renderReview(); });
   render();
+  setInterval(() => { if (started && !loadError && route().page !== "conv") renderList(route()); }, 60000);   // keeps "waiting 2 h" current
   if (alertsSupported() && Notification.permission === "granted") checkAlertsStatus();
 }
 // Stay signed in on this phone or computer: the sign-in is kept in the browser's local storage until I sign out.

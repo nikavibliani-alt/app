@@ -305,3 +305,44 @@ test('the allowed-people list: one list on the server, the sign-in screen matche
   assert.strictEqual(client.inboxUserFor('nutsamargiani@gmail.com').name, 'Nutsa');
   assert.strictEqual(client.inboxUserFor('x@example.com'), null);
 });
+
+// ---------------------------------------------------------------- Step 1: the last send status on the conversation
+test('a queued reply marks the conversation: sending, who replied, wait ended; the report updates it; a failure reopens with the old wait', async () => {
+  const waited = T(100);
+  const db = fakeDb(seed({ needsReply: true, done: false, waitingSince: waited }));
+  await C.sendReply(OWNER, { bookingNumber: NUM, clientId: CID, text: 'Hello' }, deps(db));
+  const k = `inbox_conversations/${NUM}`;
+  let c = db.store.get(k);
+  assert.strictEqual(c.lastSendStatus, 'sending');
+  assert.strictEqual(c.lastSendOutboxId, CID);
+  assert.strictEqual(c.lastReplyBy, 'Nika');
+  assert.strictEqual(c.waitingSince, null, 'a sent reply ends the wait');
+  assert.strictEqual(db.store.get(`inbox_outbox/${CID}`).prevWaitingSince, waited);
+  await C.pull(deps(db));
+  await C.report({ id: CID, result: 'sent' }, deps(db));
+  assert.strictEqual(db.store.get(k).lastSendStatus, 'sent');
+
+  const db2 = fakeDb(seed({ needsReply: true, done: false, waitingSince: waited }));
+  await C.sendReply(OWNER, { bookingNumber: NUM, clientId: CID, text: 'Hello' }, deps(db2));
+  await C.pull(deps(db2));
+  await C.report({ id: CID, result: 'failed', reason: 'Gmail refused' }, deps(db2));
+  c = db2.store.get(k);
+  assert.strictEqual(c.lastSendStatus, 'failed');
+  assert.strictEqual(c.lastSendFailReason, 'Gmail refused');
+  assert.strictEqual(c.done, false);
+  assert.strictEqual(c.needsReply, true);
+  assert.strictEqual(c.waitingSince, waited, 'the guest has been waiting since before, not since the failed try');
+
+  const db3 = fakeDb(seed({}));
+  await C.sendReply(OWNER, { bookingNumber: NUM, clientId: CID, text: 'Hello' }, deps(db3));
+  await C.pull(deps(db3));
+  clock += 11 * 60 * 1000;
+  await C.pull(deps(db3));                       // stuck in sending for over 10 minutes
+  assert.strictEqual(db3.store.get(k).lastSendStatus, 'unknown');
+  // an old reply reporting late does not overwrite a newer reply's status
+  const db4 = fakeDb(seed({ lastSendOutboxId: 'newer-reply-id' }));
+  db4.store.set(`inbox_outbox/${CID}`, { bookingNumber: NUM, status: 'sending', claimedAt: T(1), text: 'x' });
+  db4.store.set(`inbox_conversations/${NUM}/messages/${CID}`, { direction: 'host', status: 'sending' });
+  await C.report({ id: CID, result: 'sent' }, deps(db4));
+  assert.ok(!db4.store.get(k).lastSendStatus, 'the newer reply keeps its own status');
+});

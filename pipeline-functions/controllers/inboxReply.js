@@ -66,6 +66,7 @@ function queueReplyWrites(tx, db, o) {
     gmailMessageId: o.gmailMessageId,
     sentBy: o.sentBy,
     sentByName: o.sentByName,
+    prevWaitingSince: c.waitingSince || c.lastGuestMessageAt || null,   // put back if this reply does not go out
   });
   tx.create(convRef.collection('messages').doc(o.clientId), {
     direction: 'host',
@@ -85,6 +86,12 @@ function queueReplyWrites(tx, db, o) {
     lastMessageAt: t,
     lastMessagePreview: ((o.label || 'You') + ': ' + o.text.replace(/\s+/g, ' ')).slice(0, 160),
     updatedAt: t,
+    waitingSince: null,                    // a sent reply ends the wait
+    lastReplyBy: o.sentByName || null,
+    lastSendStatus: 'sending',             // updated by the Gmail script's report (sent, failed, unknown)
+    lastSendAt: t,
+    lastSendOutboxId: o.clientId,
+    lastSendFailReason: null,
   });
 }
 
@@ -154,8 +161,14 @@ function setHostStatus(tx, bookingNumber, id, db, fields) {
 }
 
 /** A reply that did not go through puts the conversation back on "Needs reply". */
-function reopen(tx, bookingNumber, db, t) {
-  tx.update(db.collection(CONVERSATIONS).doc(bookingNumber), { done: false, doneAt: null, needsReply: true, updatedAt: t });
+function reopen(tx, bookingNumber, db, t, waitingSince) {
+  tx.update(db.collection(CONVERSATIONS).doc(bookingNumber), { done: false, doneAt: null, needsReply: true, updatedAt: t, waitingSince: waitingSince || t });
+}
+
+/** The conversation shows how its last reply went (for the list), if that reply is still the latest one. */
+function setSendStatus(tx, db, bookingNumber, convData, outboxId, status, reason, t) {
+  if (!convData || convData.lastSendOutboxId !== outboxId) return;
+  tx.update(db.collection(CONVERSATIONS).doc(bookingNumber), { lastSendStatus: status, lastSendAt: t, lastSendFailReason: reason || null });
 }
 
 async function markUnknown(id, deps) {
@@ -167,10 +180,12 @@ async function markUnknown(id, deps) {
     const o = s.data();
     if (o.status !== 'sending') return false;
     if (millis(o.claimedAt) + STALE_SENDING_MS > millis(now())) return false;
+    const conv = await tx.get(db.collection(CONVERSATIONS).doc(o.bookingNumber));
     const t = now();
     tx.update(ref, { status: 'unknown', failReason: 'No report from the Gmail script. Check in Booking.com.', reportedAt: t });
     setHostStatus(tx, o.bookingNumber, id, db, { status: 'unknown', failReason: 'No report from the Gmail script. Check in Booking.com.' });
-    reopen(tx, o.bookingNumber, db, t);
+    reopen(tx, o.bookingNumber, db, t, o.prevWaitingSince);
+    setSendStatus(tx, db, o.bookingNumber, conv.exists ? conv.data() : null, id, 'unknown', 'No report from the Gmail script. Check in Booking.com.', t);
     return true;
   });
 }
@@ -234,14 +249,18 @@ async function report(body, deps) {
     // Only an item that was being sent (or went unknown) can get a result. A repeat report or a
     // report for a waiting item is ignored, so nothing is ever sent or re-marked by accident.
     if (o.status !== 'sending' && o.status !== 'unknown') return { ok: true, ignored: o.status };
+    const conv = await tx.get(db.collection(CONVERSATIONS).doc(o.bookingNumber));
+    const cd = conv.exists ? conv.data() : null;
     const t = now();
     if (result === 'sent') {
       tx.update(ref, { status: 'sent', reportedAt: t, failReason: null });
       setHostStatus(tx, o.bookingNumber, id, db, { status: 'sent', failReason: null });
+      setSendStatus(tx, db, o.bookingNumber, cd, id, 'sent', null, t);
     } else {
       tx.update(ref, { status: 'failed', reportedAt: t, failReason: reason || 'Sending failed.' });
       setHostStatus(tx, o.bookingNumber, id, db, { status: 'failed', failReason: reason || 'Sending failed.' });
-      reopen(tx, o.bookingNumber, db, t);
+      reopen(tx, o.bookingNumber, db, t, o.prevWaitingSince);
+      setSendStatus(tx, db, o.bookingNumber, cd, id, 'failed', reason || 'Sending failed.', t);
     }
     return { ok: true };
   });

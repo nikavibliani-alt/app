@@ -49,3 +49,14 @@ test('the stats document is written only when a number changed', async () => {
   store.set('inbox_conversations/3', { done: false, needsReply: true, messageCount: 2 });
   assert.deepStrictEqual(await refreshInboxStats(deps), { needsReply: 2, cancelRequests: 0, changed: true });
 });
+
+test('a cancellation request on a booking that is already cancelled needs nothing; check-in changes count', () => {
+  assert.deepStrictEqual(computeInboxStats([
+    { done: false, messageCount: 0, cancelRequest: { at: 1 }, reservationStatus: 'CANCELLED' },        // booking cancelled: not counted
+    { done: false, messageCount: 0, cancelRequest: { at: 1 }, reservationStatus: 'OK2' },              // counted
+    { done: false, needsReply: true, messageCount: 1, reservationStatus: 'CANCELLED' },                // a real guest message still counts
+  ]), { needsReply: 2, cancelRequests: 1 });
+  const a = { done: false, needsReply: true, messageCount: 0 };
+  assert.ok(statsRelevantChange(a, { ...a, checkinRequest: { time: '17:00' } }));
+  assert.ok(statsRelevantChange(a, { ...a, reservationStatus: 'CANCELLED' }));
+});

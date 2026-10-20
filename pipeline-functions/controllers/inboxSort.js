@@ -146,6 +146,9 @@ async function processEmail(emailId, deps) {
         conv.needsReply = true;
         conv.done = false;
         conv.doneAt = null;
+        // Since when the guest has been waiting: the first unanswered guest message. Kept while the guest keeps
+        // writing; our reply (a sent one) clears it; drafts and notes never touch it.
+        conv.waitingSince = (prev && prev.needsReply && !prev.done && (prev.waitingSince || prev.lastGuestMessageAt)) || ts(sorted.sentAt);
         conv.lastMessagePreview = sorted.text.replace(/\s+/g, ' ').trim().slice(0, 160);
       }
       tx.set(convRef.collection('messages').doc(emailId), {

@@ -2912,7 +2912,7 @@ function syncMoreBotToggle(){
   const alToggle=document.getElementById('more-booking-alerts-toggle');
   const alStatus=document.getElementById('more-booking-alerts-status');
   if(alToggle)alToggle.checked=botSettings.bookingAlertsEnabled!==false;
-  if(alStatus)alStatus.textContent=!botSettingsLoaded?'Loading…':botSettings.bookingAlertsEnabled!==false?'On · only to the phones you turned on in the inbox':'Off';
+  if(alStatus)alStatus.textContent=!botSettingsLoaded?'Loading…':botSettings.bookingAlertsEnabled!==false?'On · all admin phones and the phones turned on in the inbox':'Off';
   const bkStatus=document.getElementById('more-booking-ai-status');
   const bkMode=botSettings.bookingAiMode||'drafts';
   document.querySelectorAll('#more-booking-ai-mode button').forEach(b=>b.classList.toggle('is-active',botSettingsLoaded&&b.dataset.mode===bkMode));

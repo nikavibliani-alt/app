@@ -778,3 +778,25 @@ test('"Booking.com" as a name is allowed in a draft; a real link to it is not', 
   assert.ok(!D.checkDraft('Look at www.booking.com/hotel/x for it please.').ok);
   assert.ok(!D.checkDraft('Visit example.com for it please.').ok);
 });
+
+// ---------------------------------------------------------------- Step 1: "thanks" moves the conversation to Done
+test('a guest who only says thanks: the conversation moves to Done by itself, unless something is still open', async () => {
+  for (const [text, over, moved] of [['Thanks!', {}, true], ['ok', {}, true], ['Thank you so much', { cancelRequest: { at: stamp(T0) } }, false], ['thanks', { checkinAction: { label: 'x' } }, false], ['thanks', { lastSendStatus: 'failed' }, false], ['Is there parking?', {}, false]]) {
+    clock = T0; seq = 0;
+    const d = mk({ seed: baseSeed({ done: false, needsReply: true, waitingSince: stamp(T0 - 1000), ...over }), deps: { callClaude: claudeStub('Answer.') } });
+    await guestSays(d, text); clock += 61000;
+    await C.runDue(d);
+    const c = conv(d);
+    if (moved) {
+      assert.strictEqual(c.done, true, text);
+      assert.strictEqual(c.needsReply, false);
+      assert.ok(c.closedAsThanksAt, 'remembered, so the chat can say "Guest said thanks"');
+      assert.strictEqual(c.waitingSince, null);
+    } else if (text === 'Is there parking?') {
+      assert.ok(!c.closedAsThanksAt, 'a real question is not a thank-you');
+    } else {
+      assert.ok(!c.done || over.cancelRequest === undefined && !over.checkinAction && !over.lastSendStatus, text + ': stays open');
+      assert.ok(!c.closedAsThanksAt, text);
+    }
+  }
+});
