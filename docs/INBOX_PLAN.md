@@ -381,3 +381,88 @@ How a guest burst is decided (`lib/inboxTopics.js`, used in `controllers/inboxDr
 - **"Other Booking.com emails"** (was "Check this"): plain reasons, a "Handled" button (new callable `inboxReviewHandled`, sets `resolved`), the count only counts unhandled ones, an error shows instead of "Loading...".
 - **Fixes:** list scroll resets when the tab changes; check-in-only conversations use the request time for the time and sorting; the draft Send is disabled (with the reason) when the conversation has no guest reply address; the admin count also reacts to check-in request changes; the admin alerts text is up to date.
 - **Undo:** `git revert` the commit and redeploy `inboxSort`, `inboxSendReply`, `inboxOutbox`, `inboxAiRun`, `inboxStatsOnWrite` (delete `inboxReviewHandled`), or restore from tag `inbox-clear-before`.
+
+## Morning report: Steps 3 to 6 of the improvement plan (done overnight, 21 Oct 2026)
+
+All four steps are pushed to main (the website deploys by itself) and the new or changed Cloud Functions are deployed by name.
+Tested with fake data at 390 px and 1366 px: the admin (More menu, Inbox tab, Stay card) and the inbox. NOT tested on a real iPhone,
+and not against the real Firebase data. Nothing was sent to a real guest. The AI's way of deciding what to say and when to send is unchanged
+(the only new things that can stop or add to it are things you switch on: Pause AI, Stop, approved answers, the sign line).
+
+### What is live, what is switched off
+
+| Step | Live now | Switched off, waiting for you |
+|---|---|---|
+| 3 Inside the admin | The Inbox tab in the admin, the "Inbox opens" setting, embed mode of the inbox, "Sign in to the inbox" button, alert taps and the app icon badge. Everything works the old way because the setting is "As its own page". | The Inbox tab itself (setting "Inside the admin"), and the sign-in on our own domain (flag `USE_OWN_AUTH_DOMAIN = false` in inbox.html). |
+| 4 Two people | The check before sending ("Nutsa replied 1 min ago", Send mine anyway / Edit / Discard), the initial of who replied last on each row, and 20-second alerts that skip when one of us already replied or opened the chat. | "Nutsa is viewing / typing" and the viewing tag on rows: they need the Firestore rule below, and stay hidden (no errors) until you paste it. |
+| 5 Watching the AI | AI view (today's AI replies, held drafts, Needs you, questions it could not answer, test box), Looks good / Wrong, "AI will reply in 0:45" with Stop and Write it myself, Pause AI (24 hours / until check-out), the AI knowledge page, the safety scan with the "Check this AI reply" alert, the evening summary function, two new settings in More. | Nothing the AI knows changes until you approve a suggestion. "AI answer alerts" is on "Every answer", "Sign AI replies" is Off, the evening summary only sends if you choose "Only when it needs you". |
+| 6 Connected | Booking details panel in the chat, "+ Request" on guest messages, "Open booking" in the chat, "Booking.com chat" button on Booking.com bookings in the admin, the arriving-today line on the Stay screen's Inbox card. | Nothing. (All of it uses Cloud Functions, so no Firestore rules were needed.) |
+
+### Console steps and rules for you
+
+1. **Firestore rules for "who is viewing / typing" (Step 4).** Paste this inside `match /databases/{database}/documents { ... }` in the Firebase console, Firestore, Rules, then Publish.
+   Until you do, the inbox quietly hides that feature (the code turns it off the first time Firestore says no).
+
+```
+match /inbox_presence/{conv} {
+  function isInboxUser() {
+    return request.auth != null && request.auth.token.email_verified == true
+      && request.auth.token.email in ['nikavibliani@gmail.com', 'nutsamargiani@gmail.com'];
+  }
+  function myKey() {
+    return request.auth.token.email == 'nikavibliani@gmail.com' ? 'nika' : 'nutsa';
+  }
+  allow read: if isInboxUser();
+  allow create: if isInboxUser() && request.resource.data.keys().hasOnly([myKey()]);
+  allow update: if isInboxUser() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([myKey()]);
+  allow delete: if false;
+}
+```
+   (Each of you can only write your own entry. If your rules already have an `isInboxUser` helper, delete the first function above.)
+   The 20-second alert check also looks at this record, so it only fully works after you paste the rules; the "already replied" half works now.
+
+2. **Sign-in on our own domain (Step 3, part 2). Do these BEFORE changing the flag to `true`:**
+   - Firebase console, Authentication, Settings, Authorized domains: make sure `app.maxelaapartments.com` is on the list.
+   - Google Cloud console, APIs and Services, Credentials, the Web client used by Firebase sign-in: add `https://app.maxelaapartments.com/__/auth/handler` under Authorized redirect URIs, and `https://app.maxelaapartments.com` under Authorized JavaScript origins.
+   - Then set `USE_OWN_AUTH_DOMAIN = true` in inbox.html (one line, near the top of the script), push, and test the sign-in on the iPhone Home Screen app. If it fails, set it back to false.
+   - firebase.json was not touched (Hosting serves /__/auth/ on our own domain by itself).
+
+3. **To make the Inbox tab the default** (after the iPhone test): in checkin-admin.html change `INBOX_OPEN_DEFAULT='page'` to `'tab'`. Until then each phone chooses in More, "Inbox opens".
+
+### What to test on your phone (in this order)
+
+1. Open the admin. Everything should look and work exactly as before (More menu has new items: "Inbox opens", "AI answer alerts", "Sign AI replies").
+2. More, Inbox opens, tap "Inside the admin". The page reloads. Open the Inbox from the Stay card or More. Check the tab bar is there, open a chat, tap the reply box: the tab bar hides and the box sits above the keyboard, and the page behind does not scroll. Tap the Inbox tab or Back to leave. If the keyboard misbehaves, set "As its own page" again (instant undo, per phone).
+3. In the tab: if you are not signed in you see "Sign in to the inbox". Tap it, sign in, you land back in the Inbox tab.
+4. Tap a guest alert (have a test guest message arrive or use the admin's alert test): with the tab setting on it should open the Inbox tab on that chat. Check the app icon shows a number (needs notifications allowed for the Home Screen app).
+5. Two phones (you and Nutsa) in the same chat: one types and sends; the other should get "Nika replied 1 min ago ..." when sending with the old screen, with Send mine anyway / Edit / Discard. Rows show "Nu" or "N" for who replied last.
+6. AI view (link under the list, "AI view"): mark one AI reply "Looks good" and one "Wrong" (type what it should have said). Open "AI knowledge", approve or reject the suggestion. Try the test box. Pause AI in a chat (the "Pause AI" button, in the "..." menu while typing).
+7. A chat: tap "Booking details" (dates, form, door access, cleaning, earlier stays), tap "+ Request" on a guest message (it should appear in the admin Requests list), tap "Open booking".
+8. Admin Stay: open a Booking.com booking, tap "Booking.com chat". The Inbox card on Stay shows "N arriving today are waiting for a reply" when it applies.
+
+### Things I decided or could not do (read these)
+
+- **"Why" line under AI replies (Step 5, part 1): done differently.** Asking the model to name the knowledge sections it used would change what the AI is asked to output. I did not touch that. The line shows the topic the model already names ("Topic: parking, check in"). If you want the real section names, that is a separate, careful change.
+- **Setting "Inbox opens" is per phone** (saved in that browser), not for everyone. That is why it is safe to test on your iPhone only.
+- **App icon badge:** set when the admin or inbox page is open. It is not updated while the app is closed (the alert itself does not know the count). Opening the app sets it right.
+- **Alerts for the AI go to everyone** (all admin phones) as before. "Don't alert the other person" is done by not alerting at all when one of you replied or opened the chat during the 20 seconds.
+- **The 20-second wait** means a guest-message alert now arrives about 20 seconds later than before.
+- **Presence** (viewing/typing) is written by the inbox page straight to Firestore, so it needs the rule above. Everything else in these steps goes through Cloud Functions and needs no rules.
+- **Wrong replies and corrections** contain guest text; they are stored in Firestore (`inbox_ai_knowledge`), private, server-only. Nothing from them is in the repo.
+- **AI knowledge changes:** an approved answer is added as an extra section to the Booking.com prompt only. WhatsApp and the copied knowledge files are not touched. Switch an entry off, or reject it, and the AI stops using it.
+- **Booking panel details:** door access uses the flags the guest unlock function already stores (read only); "earlier stays" matches the guest's name, so two different people with the same name could show up together. The "Booking.com chat" button only shows for reservations whose source says Booking and that have a booking id.
+- **Evening summary** is deployed (`inboxAiEveningSummary`, 21:00 Tbilisi) and does nothing unless "AI answer alerts" is on "Only when it needs you".
+- **GitNexus index** is stale; I did not rebuild it.
+
+### How to undo each step
+
+- **Step 3:** More, Inbox opens, "As its own page" (instant, per phone). Code: `git revert` the Step 3 commits, or restore tag `inbox-in-admin-before` (files: checkin-admin.html, inbox.html, shared/inbox-auth.js, sw.js). No functions were changed.
+- **Step 4:** `git revert` the Step 4 commits or use tag `inbox-team-before`, then redeploy `inboxSendReply` and `inboxPushOnMessage` from that state: `firebase deploy --only functions:pipeline:inboxSendReply,functions:pipeline:inboxPushOnMessage --project sleepy-5c962`. The rule above can stay or be removed.
+- **Step 5:** tag `inbox-ai-oversight-before`. Redeploy `inboxAiRun` and `inboxPushOnMessage` from that state and delete the new functions: `firebase functions:delete inboxAiAction inboxAiKnowledge inboxAiEveningSummary --region europe-west1 --project sleepy-5c962` (use the exact names Firebase shows). To stop the AI using an approved answer without any code change: AI knowledge, Switch off. Pause AI per chat: Resume AI.
+- **Step 6:** tag `inbox-connected-before`. Redeploy `inboxStatsOnWrite` and `inboxAiRun`, delete `inboxBookingPanel` and `inboxRequestCreate`. A request made by "+ Request" is a normal item in the Requests list: decline or clear it there.
+
+### Commits and tags (all pushed)
+
+Tags: `inbox-in-admin-before`, `inbox-team-before`, `inbox-ai-oversight-before`, `inbox-connected-before`.
+Functions deployed by name: Step 4: `inboxSendReply`, `inboxPushOnMessage`. Step 5: `inboxAiRun`, `inboxPushOnMessage`, new `inboxAiAction`, `inboxAiKnowledge`, `inboxAiEveningSummary`. Step 6: `inboxBookingPanel`, `inboxRequestCreate` (new), `inboxStatsOnWrite`, `inboxAiRun`.
+Server tests: 160 inbox tests pass.
