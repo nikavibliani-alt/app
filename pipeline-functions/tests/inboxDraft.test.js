@@ -800,3 +800,49 @@ test('a guest who only says thanks: the conversation moves to Done by itself, un
     }
   }
 });
+
+// ---------------------------------------------------------------- Step 5: oversight and teaching
+test('Step 5: a paused chat gets no AI answer; the AI view data is saved on an automatic send', async () => {
+  clock = T0; seq = 0;
+  let calls = [];
+  let d = mk({ seed: autoSeed({ aiPausedUntil: T0 + 3600000 }), deps: { callClaude: claudeStub('Check-in is from 15:00.', calls) } });
+  await guestSays(d, 'What time is check-in?'); clock += 61000;
+  const r = await C.runDue(d);
+  assert.match(r[0].outcome, /^paused for this guest|discarded|cleared/);
+  assert.strictEqual(calls.length, 0, 'no model call while paused');
+  assert.strictEqual(outboxItems(d).length, 0);
+  // not paused: sent, and the conversation remembers what the AI said (for the AI view)
+  calls = [];
+  d = mk({ seed: autoSeed(), deps: { callClaude: claudeStub('Check-in is from 15:00.', calls), poke: async () => {} } });
+  await guestSays(d, 'What time is check-in?'); clock += 61000;
+  await C.runDue(d);
+  const last = conv(d).aiLastReply;
+  assert.strictEqual(last.text, 'Check-in is from 15:00.');
+  assert.strictEqual(last.review, null);
+  assert.deepStrictEqual(last.topics, ['other']);
+  assert.match(last.question, /What time is check-in/);
+});
+
+test('Step 5: approved extra answers reach the AI prompt; pending, rejected and switched-off ones do not; the sign line is off by default', async () => {
+  clock = T0; seq = 0;
+  const seed = {
+    ...autoSeed(),
+    'inbox_ai_knowledge/a': { status: 'approved', enabled: true, question: 'Is there a pool?', answer: 'No pool, but a gym is nearby.' },
+    'inbox_ai_knowledge/b': { status: 'pending', enabled: false, question: 'Secret pending question', answer: 'Pending answer' },
+    'inbox_ai_knowledge/c': { status: 'approved', enabled: false, question: 'Switched off question', answer: 'Off answer' },
+  };
+  const calls = [];
+  const d = mk({ seed, deps: { callClaude: claudeStub('Check-in is from 15:00.', calls), poke: async () => {} } });
+  await guestSays(d, 'What time is check-in?'); clock += 61000;
+  await C.runDue(d);
+  const sys = JSON.stringify(calls[0].system);
+  assert.match(sys, /No pool, but a gym is nearby/);
+  assert.ok(!/Secret pending question|Pending answer|Switched off question|Off answer/.test(sys));
+  assert.ok(!/written by our AI assistant/.test(outboxItems(d)[0][1].text), 'no sign-off unless the setting is on');
+  // with the setting on, the first AI reply carries the line
+  clock = T0; seq = 0;
+  const d2 = mk({ seed: { ...autoSeed(), 'globals/config': { bookingAiMode: 'auto', aiSignReplies: true } }, deps: { callClaude: claudeStub('Check-in is from 15:00.'), poke: async () => {} } });
+  await guestSays(d2, 'What time is check-in?'); clock += 61000;
+  await C.runDue(d2);
+  assert.match(outboxItems(d2)[0][1].text, /Check-in is from 15:00\.\n\nThis reply was written by our AI assistant\./);
+});

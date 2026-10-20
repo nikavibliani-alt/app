@@ -23,6 +23,7 @@ const { cleanReplyText } = require('../lib/inboxReply');
 const T = require('../lib/inboxTopics');
 const { translationRequest, acceptTranslation } = require('../lib/inboxCheckin');
 const D = require('../lib/inboxDraft');
+const AI = require('../lib/inboxAi');
 const KB = require('../lib/guestKnowledge/knowledgeBase');
 const { canonicalPhone } = require('../lib/guestKnowledge/guestLookup');
 const claude = require('../lib/guestKnowledge/claudeClient');
@@ -165,11 +166,12 @@ async function processConversation(bookingNumber, deps) {
         if (existing.exists) { tx.update(convRef, { aiPending: null, aiRunning: null, aiDueAt: null }); return 'already sent'; }
         const clean = cleanReplyText(send.text);
         if (!clean.ok) { tx.update(convRef, { aiPending: null, aiRunning: null, aiDueAt: null, aiDraft: { ...draft, createdAt: ts(nowMs()), forMessageId: pending.lastMessageId } }); return 'saved'; }
-        tx.update(convRef, { aiPending: null, aiRunning: null, aiDueAt: null, aiDraft: null });
+        tx.update(convRef, { aiPending: null, aiRunning: null, aiDueAt: null, aiDraft: null,
+          aiLastReply: { messageId: clientId, text: clean.text, at: ts(nowMs()), topics: send.topics || [], question: String(send.question || '').slice(0, 400), holding: !!send.holding, review: null } });   // what the AI view shows
         queueReplyWrites(tx, db, {
           bookingNumber, clientId, text: clean.text, conv: v, gmailMessageId: pending.lastMessageId,
           sentBy: AI_SENDER.email, sentByName: AI_SENDER.name, now: () => ts(nowMs()), label: 'AI',
-          messageExtra: send.holding ? { holding: true } : undefined,
+          messageExtra: { ...(send.holding ? { holding: true } : {}), ...(send.topics && send.topics.length ? { aiTopics: send.topics } : {}) },
         });
         if (send.needsYou) {
           // A holding reply was sent, but the host still has to decide: back to "Needs reply" with a note (the alert comes from it).
@@ -192,6 +194,7 @@ async function processConversation(bookingNumber, deps) {
   const cfg = await db.collection('globals').doc('config').get();
   const mode = resolveAiMode(cfg.exists ? cfg.data() : null);
   if (mode === 'off') return finish('switch off', null);
+  if (AI.isPaused(conv, nowMs())) return finish('paused for this guest', null);   // a person paused the AI for this chat (Pause AI in the inbox)
 
   // 3. The burst.
   const history = await loadHistory(db, bookingNumber);
@@ -260,7 +263,12 @@ async function processConversation(bookingNumber, deps) {
   // 6. Ask the model (same prompt as the WhatsApp bot plus the Booking.com rules).
   const wa = await findWhatsapp(db, conv);
   const kb = KB.SEED;
-  const system = claude.buildCachedSystem(D.fixedSystemText(kb), D.dynamicSystemText({ conv, formFilled: wa.formFilled, nowMs: nowMs(), kb }));
+  let extra = '';
+  try {   // answers the host approved in the inbox (AI knowledge page); none yet = nothing added
+    const ks = await db.collection('inbox_ai_knowledge').where('status', '==', 'approved').limit(AI.MAX_ENTRIES + 10).get();
+    extra = AI.extraKnowledgeText(ks.docs.map(d => d.data()));
+  } catch (e) { console.warn('inboxAi: extra knowledge unavailable', e && e.message); }
+  const system = claude.buildCachedSystem(D.fixedSystemText(kb), D.dynamicSystemText({ conv, formFilled: wa.formFilled, nowMs: nowMs(), kb }) + (extra ? '\n\n' + extra : ''));
   const userTurn = D.buildUserTurn({ bookingMessages: history, burstIds: pending.ids, whatsapp: wa.messages, nowMs: nowMs() });
   const call = deps.callClaude || claude.callClaudeWithRetry;
   const model = deps.model || claude.MODEL;
@@ -299,8 +307,10 @@ async function processConversation(bookingNumber, deps) {
   // A normal draft that passed every check. Drafts mode: shown for me to send. Automatic mode: sent by itself,
   // unless the reservation is cancelled or one of us replied in the last 30 minutes (then it stays a draft).
   const block = mode === 'auto' ? autoSendBlockReason({ conv, messages: history, nowMs: nowMs() }) : 'drafts mode';
-  const draft = { kind: 'reply', text: checked.text, source: 'ai', model, ...(mode === 'auto' && block ? { autoBlocked: block } : {}) };
-  if (mode === 'auto' && !block) return finish('reply', draft, { ...info, removedLinks: checked.removedLinks, mode }, { text: checked.text });
+  const firstAi = !history.some(m => m.direction === 'host' && String(m.sentBy || '').toLowerCase() === 'ai');
+  const finalText = AI.withSignLine(checked.text, { on: !!(cfg.exists && cfg.data().aiSignReplies === true), firstAiReply: firstAi });   // optional line, off by default
+  const draft = { kind: 'reply', text: finalText, source: 'ai', model, topics: [...topics], ...(mode === 'auto' && block ? { autoBlocked: block } : {}) };
+  if (mode === 'auto' && !block) return finish('reply', draft, { ...info, removedLinks: checked.removedLinks, mode }, { text: finalText, topics: [...topics], question: texts.join(' / ') });
   return finish('reply', draft, { ...info, removedLinks: checked.removedLinks, mode });
 }
 

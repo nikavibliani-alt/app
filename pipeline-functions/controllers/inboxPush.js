@@ -18,6 +18,7 @@
 
 const { inboxUser } = require('../lib/inboxAccess');
 const P = require('../lib/inboxPush');
+const AI = require('../lib/inboxAi');
 
 const CONVERSATIONS = 'inbox_conversations';
 const DEVICES = 'inbox_push_devices';
@@ -104,8 +105,20 @@ async function onAiAnswered(bookingNumber, msg, deps) {
   const { db } = deps;
   if (msg && msg.holding) return { action: 'holding reply' };   // the "needs you" alert for that conversation is the one to send
   if (!(await alertsEnabled(db))) return { action: 'alerts off' };
-  const c = await db.collection(CONVERSATIONS).doc(bookingNumber).get();
-  const result = await sendToOwnerDevices(P.aiAnsweredPayload(c.exists ? c.data() : {}, bookingNumber, msg.text), deps);
+  const convRef = db.collection(CONVERSATIONS).doc(bookingNumber);
+  const c = await convRef.get();
+  const conv = c.exists ? c.data() : {};
+  // Safety net: after every automatic send, look for things the AI must never say. Always alerts, whatever the alert setting.
+  const flags = AI.scanAiReply(msg.text);
+  if (flags.length) {
+    try { await convRef.update({ 'aiLastReply.flags': flags }); } catch (e) { console.warn('inboxPush: flag not saved', e && e.message); }
+    const result = await sendToOwnerDevices(P.aiCheckPayload(conv, bookingNumber, flags), deps);
+    return { action: 'pushed', kind: 'ai check', flags, ...result };
+  }
+  // "AI answer alerts": every answer (default) or only when it needs you (plus the evening summary).
+  const cfg = await db.collection('globals').doc('config').get();
+  if (cfg.exists && cfg.data().aiAlertMode === 'needs') return { action: 'ai alert skipped (needs-you mode)' };
+  const result = await sendToOwnerDevices(P.aiAnsweredPayload(conv, bookingNumber, msg.text), deps);
   return { action: 'pushed', kind: 'ai answered', ...result };
 }
 
@@ -151,6 +164,29 @@ async function onConversationWritten(bookingNumber, before, after, deps) {
   let result = { sent: 0, removed: 0, devices: 0 };
   for (const p of payloads) result = await sendToOwnerDevices(p, deps);
   return { action: 'pushed', kinds, ...result };
+}
+
+/**
+ * 21:00 Tbilisi, only when the alert setting is "only when it needs you": one alert with the day's numbers.
+ * deps: { db, nowMs(), sendNotification }. Numbers only, no guest text.
+ */
+async function eveningSummary(deps) {
+  const { db, nowMs } = deps;
+  const cfg = await db.collection('globals').doc('config').get();
+  if (!(cfg.exists && cfg.data().aiAlertMode === 'needs')) return { action: 'every-answer mode' };
+  if (!(await alertsEnabled(db))) return { action: 'alerts off' };
+  const start = AI.tbilisiDayStartMs(nowMs());
+  const snap = await db.collection(CONVERSATIONS).get();
+  let answered = 0; let needs = 0;
+  for (const d of snap.docs) {
+    const v = d.data();
+    if (v.aiLastReply && AI.ms(v.aiLastReply.at) >= start) answered++;
+    const dr = v.aiDraft;
+    if (v.needsReply === true && dr && (dr.kind === 'needs_you' || dr.needsYouReason)) needs++;
+  }
+  if (!answered && !needs) return { action: 'nothing to report' };
+  const result = await sendToOwnerDevices(P.aiSummaryPayload(answered, needs), deps);
+  return { action: 'pushed', answered, needs, ...result };
 }
 
 /** register / unregister / status. deps: { db, now(), sendNotification }. */
@@ -216,6 +252,11 @@ function registerCloudFunctions() {
       catch (e) { console.error('inboxPushOnConversation failed', e && e.code, e && e.message); }
     }
   );
+  const { onSchedule } = require('firebase-functions/v2/scheduler');
+  const inboxAiEveningSummary = onSchedule(
+    { schedule: '0 21 * * *', timeZone: 'Asia/Tbilisi', region, secrets, timeoutSeconds: 60, memory: '256MiB', maxInstances: 1 },
+    async () => { try { await eveningSummary(deps()); } catch (e) { console.error('inboxAiEveningSummary failed', e && e.message); } }
+  );
   const inboxAlerts = onCall({ region, secrets, timeoutSeconds: 30, maxInstances: 3, memory: '256MiB' }, async request => {
     try { return await alerts(request.auth, request.data, deps()); }
     catch (e) {
@@ -224,7 +265,7 @@ function registerCloudFunctions() {
       throw new HttpsError('internal', 'Something went wrong. Try again.');
     }
   });
-  return { inboxPushOnMessage, inboxPushOnConversation, inboxAlerts };
+  return { inboxPushOnMessage, inboxPushOnConversation, inboxAlerts, inboxAiEveningSummary };
 }
 
-module.exports = { onGuestMessage, onAiAnswered, onConversationWritten, sendToOwnerDevices, alerts, registerCloudFunctions, alertsEnabled };
+module.exports = { eveningSummary, onGuestMessage, onAiAnswered, onConversationWritten, sendToOwnerDevices, alerts, registerCloudFunctions, alertsEnabled };

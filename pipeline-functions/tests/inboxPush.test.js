@@ -262,3 +262,42 @@ test('alerts wait 20 seconds; no alert if one of us replied or opened the chat m
   ({ d, sent } = mk({ [`inbox_presence/${BN}`]: { Nutsa: { at: T0 - 600000 } } }, { sleep: async () => {} }));
   assert.strictEqual((await C.onGuestMessage(BN, 'm1', guest('Hello'), d)).action, 'pushed');
 });
+
+test('AI answer alerts: every answer by default; "only when it needs you" skips them; a flagged reply always alerts', async () => {
+  const ai = text => ({ direction: 'host', sentBy: 'ai', text, sentAt: stamp(clock), createdAt: stamp(clock) });
+  clock = T0;
+  let { d, sent } = mk();
+  assert.strictEqual((await C.onGuestMessage(BN, 'a1', ai('Check-in starts at 15:00.'), d)).kind, 'ai answered');
+  assert.ok(sent.length > 0);
+  ({ d, sent } = mk({ 'globals/config': { aiAlertMode: 'needs' } }));
+  assert.strictEqual((await C.onGuestMessage(BN, 'a1', ai('Check-in starts at 15:00.'), d)).action, 'ai alert skipped (needs-you mode)');
+  assert.strictEqual(sent.length, 0);
+  // a reply with a money amount: alert even in "needs" mode, and the flag is saved on the conversation
+  let flagged = null;
+  ({ d, sent } = mk({ 'globals/config': { aiAlertMode: 'needs' } }));
+  const ref = d.db.collection('inbox_conversations').doc(BN);
+  const origDoc = d.db.collection;
+  d.db.collection = n => { const col = origDoc(n); if (n === 'inbox_conversations') { const orig = col.doc; col.doc = id => { const r = orig(id); r.update = async u => { flagged = u; }; return r; }; } return col; };
+  void ref;
+  const r = await C.onGuestMessage(BN, 'a2', ai('Parking costs 15 GEL a day.'), d);
+  assert.strictEqual(r.kind, 'ai check');
+  assert.deepStrictEqual(flagged, { 'aiLastReply.flags': ['a money amount'] });
+  assert.ok(sent.every(s => /^Check this AI reply/.test(s.payload.title) && !/GEL/.test(s.payload.body)));
+});
+
+test('evening summary: only in "needs you" mode, numbers only', async () => {
+  clock = T0 + 17 * 3600000;       // 21:00 in Tbilisi that day (UTC+4)
+  const seed = {
+    'globals/config': { aiAlertMode: 'needs' },
+    'inbox_conversations/1': { aiLastReply: { at: stamp(clock - 3600000) } },
+    'inbox_conversations/2': { aiLastReply: { at: stamp(clock - 3600000) }, needsReply: true, aiDraft: { kind: 'needs_you' } },
+    'inbox_conversations/3': { aiLastReply: { at: stamp(clock - 5 * 86400000) } },
+  };
+  let { d, sent } = mk(seed);
+  const r = await C.eveningSummary(d);
+  assert.deepStrictEqual([r.answered, r.needs], [2, 1]);
+  assert.ok(sent.every(s => s.payload.body === 'AI answered 2 guests today, 1 needs you.'));
+  ({ d, sent } = mk({ ...seed, 'globals/config': {} }));
+  assert.strictEqual((await C.eveningSummary(d)).action, 'every-answer mode');
+  assert.strictEqual(sent.length, 0);
+});

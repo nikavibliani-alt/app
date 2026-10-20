@@ -117,7 +117,29 @@ function cleanSubscription(sub) {
 
 const isDeviceId = v => typeof v === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(v);
 
+/** After an automatic AI send that the safety scan flagged. No guest text in the alert. */
+function aiCheckPayload(conv, bookingNumber, flags) {
+  const c = conv || {};
+  return {
+    title: `Check this AI reply: ${String(c.guestName || 'Guest').slice(0, 60)}`,
+    body: `It may contain ${(flags || []).slice(0, 3).join(', ')}.`,
+    tag: `inbox-aicheck-${bookingNumber}`,
+    url: `/inbox#c/${bookingNumber}`,
+  };
+}
+
+/** The evening summary (only in "only when it needs you" mode). Numbers only. */
+function aiSummaryPayload(answered, needs) {
+  const g = n => `${n} guest${n === 1 ? '' : 's'}`;
+  return {
+    title: 'Booking.com AI today',
+    body: `AI answered ${g(answered)} today, ${needs} need${needs === 1 ? 's' : ''} you.`,
+    tag: 'inbox-ai-summary',
+    url: '/inbox#ai',
+  };
+}
+
 module.exports = {
   QUIET_MS, QUIET_BEFORE_ALERT_MS, STALE_MESSAGE_MS, STALE_CANCEL_MS,
-  burstDecision, firstLine, messagePayload, aiAnsweredPayload, needsYouPayload, checkinPayload, cancelPayload, cleanSubscription, isDeviceId, tbilisiClock,
+  burstDecision, firstLine, messagePayload, aiAnsweredPayload, aiCheckPayload, aiSummaryPayload, needsYouPayload, checkinPayload, cancelPayload, cleanSubscription, isDeviceId, tbilisiClock,
 };
