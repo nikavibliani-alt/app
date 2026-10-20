@@ -5,20 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Guest inbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+/* Same look as the admin (checkin-admin.html): Inter, the same colours and button sizes. No blue, no emojis. */
 :root{
-  --bg:#F7F7F7;--card-bg:#FFFFFF;--ink:#222222;--text-main:#222222;--text-muted:#717171;
-  --border:#E6E6E6;--bubble:#EDEDED;
-  --status-green:#2E6B34;--bg-green:#E3F1DF;--status-amber:#856404;--bg-amber:#FDF3C7;
-  --status-red:#9B2C2C;--bg-red:#FBE4E4;
-  --radius-card:12px;
+  --bg:#FAFAF9;--surface:#fff;--ink:#2C2C2A;--ink-2:#4A4A48;--muted:#6B6B68;
+  --line:#E8E4E0;--green:#2d6b50;--green-bg:#edf5f0;--red:#8b2020;--red-bg:#fdf0f0;
+  --amber:#6B5A2E;--amber-bg:#faf6ee;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --r:10px;--rs:6px;
+  --bubble:#EFEDEA;
+  /* names the page already used, mapped to the admin's colours */
+  --card-bg:var(--surface);--text-main:var(--ink);--text-muted:var(--muted);--border:var(--line);
+  --status-green:var(--green);--bg-green:var(--green-bg);--status-amber:var(--amber);--bg-amber:var(--amber-bg);
+  --status-red:var(--red);--bg-red:var(--red-bg);--radius-card:12px;
+  --chat-pad:max(16px,calc((100% - 760px) / 2));      /* chat column: at most 760 px wide on a laptop */
 }
-*{box-sizing:border-box;margin:0;padding:0}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
 html,body{height:100%}
-body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text-main);
-  line-height:1.4;font-size:15px;touch-action:manipulation;overflow:hidden}
-button{font:inherit;cursor:pointer;color:var(--ink);-webkit-appearance:none;appearance:none;touch-action:manipulation}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.4;font-size:15px;letter-spacing:-.01em;
+  -webkit-font-smoothing:antialiased;touch-action:manipulation;overflow:hidden}
+button,select,input,textarea{font-family:inherit;letter-spacing:inherit}
+button{font:inherit;cursor:pointer;color:var(--ink);-webkit-appearance:none;appearance:none;touch-action:manipulation}   /* iPhone Safari paints buttons blue unless they set a colour */
 a{color:var(--ink)}
 svg{display:block;flex:none}
 .icon{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
@@ -27,116 +38,137 @@ svg{display:block;flex:none}
 #app{display:none;height:100vh;height:100dvh}
 #listPane,#chatPane{display:flex;flex-direction:column;min-height:0;min-width:0;height:100%}
 #listPane{width:100%}
-#chatPane{display:none;flex:1}
+#chatPane{display:none;flex:1;position:relative}
 body.show-chat #listPane{display:none}
 body.show-chat #chatPane{display:flex}
 @media (min-width:860px){
-  #listPane{width:380px;flex:none;border-right:1px solid var(--border)}
+  #listPane{width:390px;flex:none;border-right:1px solid var(--line)}
   #chatPane,body.show-chat #chatPane{display:flex}
   body.show-chat #listPane{display:flex}
   .only-narrow{display:none!important}
 }
-.pane__top{flex:none;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 16px 8px;border-bottom:1px solid var(--border)}
+.pane__top{flex:none;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 16px 8px;border-bottom:1px solid var(--line)}
 .pane__scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.pane__foot{flex:none;display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;padding:4px 16px calc(4px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--bg);font-size:13px;color:var(--muted)}
 .top__row{display:flex;align-items:center;gap:8px;min-height:44px}
 .top__title{font-size:18px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grow{flex:1}
 .iconbtn{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;border:0;background:transparent;
-  color:var(--ink);border-radius:10px;margin-left:-10px;gap:2px;font-size:14px;font-weight:600}
-.tabs{display:flex;gap:6px;margin-top:6px}
-.tab{flex:1;min-height:40px;border:1px solid var(--border);background:var(--card-bg);color:var(--ink);border-radius:10px;
+  color:var(--ink);border-radius:var(--r);margin-left:-10px;gap:2px;font-size:14px;font-weight:600}
+.tabs{display:flex;gap:6px;margin-top:4px}
+.tab{flex:1;min-height:44px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:var(--r);
   font-size:14px;font-weight:600;padding:0 8px}
 .tab.on{background:var(--ink);border-color:var(--ink);color:#fff}
-.tab small{font-weight:600;opacity:.7;margin-left:3px}
-.sub{display:flex;justify-content:flex-end;margin-top:6px}
-.linkbtn{border:0;background:transparent;color:var(--ink);font-size:13px;font-weight:600;text-decoration:underline;min-height:36px;padding:0 4px}
+.tab small{font-weight:600;opacity:.7;margin-left:3px;font-size:12px}
+.sub{display:flex;justify-content:flex-end;margin-top:2px}
+.linkbtn{display:inline-flex;align-items:center;border:0;background:transparent;color:var(--ink);font-size:13px;font-weight:600;text-decoration:underline;min-height:44px;padding:0 6px}
+.chip{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;font-size:14px;font-weight:600}
+.chip--on{border-color:var(--green);color:var(--green);background:var(--green-bg)}
+.chip--off{color:var(--muted)}
+.filters{display:flex;gap:6px;margin-top:6px}
+.filters input,.filters select{min-height:44px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:var(--r);font-size:16px;padding:0 12px;min-width:0}
+.filters input{flex:1}
+.filters select{flex:0 0 auto;max-width:44%}
 
 /* ---------- list ---------- */
 .list{padding:12px 16px;display:flex;flex-direction:column;gap:8px}
-.empty{padding:40px 16px;text-align:center;color:var(--text-muted)}
-.row{display:block;width:100%;text-align:left;background:var(--card-bg);border:1px solid var(--border);
+.empty{padding:40px 16px;text-align:center;color:var(--muted)}
+.row{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);
   border-radius:var(--radius-card);padding:12px 14px;color:var(--ink)}
-.row:active{background:#f1f1f1}
+.row:active{background:#f3f1ee}
 .row.sel{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
 .row__top{display:flex;align-items:center;gap:8px}
 .dot{width:10px;height:10px;border-radius:50%;background:var(--ink);flex:none}
 .row__name{font-weight:600;font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row.unread .row__name{font-weight:800}
+.row.unread .row__name{font-weight:700}
 .row.unread .row__prev{font-weight:600}
-.row__time{font-size:12px;color:var(--text-muted);flex:none}
-.row__meta{font-size:13px;color:var(--text-muted);margin-top:2px}
+.row__time{font-size:12px;color:var(--muted);flex:none}
+.row__meta{font-size:13px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row__room{font-weight:700;color:var(--ink-2)}
+.row__listing{font-size:12px}
 .row__prev{font-size:14px;margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
-.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center}
 .tag{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--bubble);color:var(--ink)}
-.tag--red{background:var(--bg-red);color:var(--status-red)}
-.tag--grey{background:#ececec;color:var(--text-muted)}
+.tag--red{background:var(--red-bg);color:var(--red)}
+.tag--green{background:var(--green-bg);color:var(--green)}
+.tag--amber{background:var(--amber-bg);color:var(--amber)}
+.tag--grey{background:#ececea;color:var(--muted)}
 .tag--ink{background:transparent;color:var(--ink);border:1px solid var(--ink)}
-.row__wait{font-size:12px;color:var(--text-muted);align-self:center}
-.btn--full{width:100%;min-height:48px;margin-top:8px}
-.card{margin-top:8px;border-radius:10px;padding:10px 12px;border:1px solid var(--border);background:var(--card-bg);font-size:14px}
-.card--amber{background:var(--bg-amber);border-color:#ecd98b;color:var(--status-amber)}
-.card--red{background:var(--bg-red);border-color:#efc4c4;color:var(--status-red)}
-.card--grey{background:#f1f1f1;color:var(--text-muted)}
-.card__title{font-weight:700}
-.card__sub{margin-top:2px}
-.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;background:var(--ink);color:#ffffff;border-radius:12px;padding:6px 8px 6px 16px;display:flex;align-items:center;gap:10px;font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,.25)}
-.toast button{min-height:44px;padding:0 14px;border:0;background:transparent;color:#ffffff;font-weight:700;text-decoration:underline;font-size:14px}
-.rv__btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
-.tag--green{background:var(--bg-green);color:var(--status-green)}
-.warn{display:flex;gap:8px;align-items:flex-start;background:var(--bg-red);color:var(--status-red);
-  border:1px solid #efc4c4;border-radius:10px;padding:8px 10px;font-size:13px;font-weight:600;margin-top:8px}
-.warn .icon{margin-top:1px}
-.warn--late{background:var(--bg-amber);color:var(--status-amber);border-color:#ecd98b}
+.row__wait{font-size:12px;color:var(--muted)}
 
 /* ---------- chat ---------- */
-.head{flex:none;padding:calc(6px + env(safe-area-inset-top)) 16px 8px;border-bottom:1px solid var(--border);background:var(--bg)}
+.head{flex:none;position:relative;padding:calc(6px + env(safe-area-inset-top)) var(--chat-pad) 8px;border-bottom:1px solid var(--line);background:var(--bg)}
 .head__row{display:flex;align-items:center;gap:6px;min-height:44px}
 .head__name{font-size:18px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.head__line{font-size:13px;color:var(--text-muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.head__line{font-size:13px;color:var(--muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.head__more{display:none;margin-left:0;margin-right:-10px}
 .actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
-.btn{min-height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--ink);background:var(--card-bg);color:var(--ink);
-  font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
-.btn--primary{background:var(--ink);color:#ffffff}
-.btn:disabled{opacity:.55}
-.thread{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px;display:flex;flex-direction:column;gap:8px}
-.day{align-self:center;font-size:12px;color:var(--text-muted);margin:8px 0 0;background:#ececec;border-radius:999px;padding:2px 10px}
+.btn{min-height:44px;padding:0 14px;border-radius:var(--r);border:1.5px solid var(--line);background:var(--surface);color:var(--ink);
+  font-weight:600;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none}
+.btn--primary{background:var(--ink);border-color:var(--ink);color:#ffffff}
+.btn:disabled{opacity:.45}
+/* on a phone with the keyboard open the header shrinks to one line; the buttons move into the "..." menu */
+#chatPane.typing .head__line,#chatPane.typing .head .card{display:none}
+#chatPane.typing .head__more{display:inline-flex}
+#chatPane.typing .actions{display:none}
+#chatPane.typing.menu-open .actions{display:flex;flex-direction:column;position:absolute;left:16px;right:16px;top:100%;z-index:6;background:var(--surface);
+  border:1px solid var(--line);border-radius:12px;padding:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);margin-top:0}
+.thread{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px var(--chat-pad);display:flex;flex-direction:column;gap:8px}
+.day{align-self:center;font-size:12px;color:var(--muted);margin:8px 0 0;background:#ececea;border-radius:999px;padding:2px 10px}
 .bubble{max-width:86%;align-self:flex-start;background:var(--bubble);border-radius:16px 16px 16px 4px;padding:9px 12px;
   white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px}
-.bubble__time{font-size:11px;color:var(--text-muted);margin-top:4px}
+.bubble__time{font-size:12px;color:var(--muted);margin-top:4px}
 .me{align-self:flex-end;max-width:86%;display:flex;flex-direction:column;align-items:flex-end}
 .bubble--me{align-self:flex-end;background:var(--ink);color:#ffffff;border-radius:16px 16px 4px 16px;padding:9px 12px;
   white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;max-width:100%}
-.me__status{font-size:12px;color:var(--text-muted);margin-top:3px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-.me__status--bad{color:var(--status-red);font-weight:600}
-.me__status--wait{color:var(--status-amber);font-weight:600}
-.me__status--ok{color:var(--status-green);font-weight:600}
+/* the AI assistant's replies: outlined, with a label, so they never look like ours */
+.ai-label{font-size:12px;font-weight:700;color:var(--ink-2);margin:0 4px 2px}
+.bubble--ai{align-self:flex-end;background:var(--surface);color:var(--ink);border:1.5px solid var(--ink-2);border-radius:16px 16px 4px 16px;padding:8px 12px;
+  white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;max-width:100%}
+.me__status{font-size:12px;color:var(--muted);margin-top:3px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.me__status--bad{color:var(--red);font-weight:600}
+.me__status--wait{color:var(--amber);font-weight:600}
+.me__status--ok{color:var(--green);font-weight:600}
+.mini{min-height:44px;padding:0 14px;border-radius:var(--r);border:1.5px solid var(--ink);background:var(--surface);color:var(--ink);font-weight:600;font-size:14px}
 .mini--link{display:inline-flex;align-items:center;text-decoration:none}
-.mini{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--ink);background:var(--card-bg);color:var(--ink);font-weight:700;font-size:13px}
-.note{align-self:center;text-align:center;font-size:12px;color:var(--text-muted);padding:2px 8px}
-.msg{color:var(--text-muted);padding:14px 16px;font-size:14px}
-.err{margin:16px;padding:12px;border-radius:10px;background:var(--bg-red);color:var(--status-red);font-size:14px}
-.rv{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-card);padding:12px 14px}
+.note{align-self:center;text-align:center;font-size:12px;color:var(--muted);padding:2px 8px}
+.msg{color:var(--muted);padding:14px 16px;font-size:14px}
+.err{margin:16px;padding:12px;border-radius:var(--r);background:var(--red-bg);color:var(--red);font-size:14px}
+.rv{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-card);padding:12px 14px}
 .rv__reason{font-weight:700}
-.rv__meta{font-size:13px;color:var(--text-muted);margin-top:2px;overflow-wrap:anywhere}
-.placeholder{flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);padding:24px;text-align:center}
+.rv__meta{font-size:13px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.rv__btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.placeholder{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);padding:24px;text-align:center}
+.card{margin-top:8px;border-radius:var(--r);padding:10px 12px;border:1px solid var(--line);background:var(--surface);font-size:14px}
+.card--amber{background:var(--amber-bg);border-color:#e3d6b0;color:var(--amber)}
+.card--red{background:var(--red-bg);border-color:#ebc9c9;color:var(--red)}
+.card--grey{background:#f3f2ef;color:var(--muted)}
+.card__title{font-weight:700}
+.card__sub{margin-top:2px}
+.btn--full{width:100%;min-height:48px;margin-top:8px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;background:var(--ink);color:#ffffff;border-radius:12px;padding:6px 8px 6px 16px;display:flex;align-items:center;gap:10px;font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,.25)}
+.toast button{min-height:44px;padding:0 14px;border:0;background:transparent;color:#ffffff;font-weight:700;text-decoration:underline;font-size:14px}
+
+/* ---------- AI draft, notes ---------- */
+.draft{flex:none;margin:0 var(--chat-pad) 8px;border:1.5px solid var(--ink-2);background:var(--surface);border-radius:12px;padding:10px 12px}
+.draft__title{font-size:14px;font-weight:700}
+.draft__why{font-size:12px;color:var(--muted);margin-top:2px}
+.draft__text{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:6px;max-height:28vh;overflow-y:auto;font-size:15px}
+.draft__btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.draft--needs{background:var(--amber-bg);border-color:#e3d6b0}
+.draft--needs .draft__title{color:var(--amber)}
+.draft--info{background:#f3f2ef;border-color:var(--line)}
 
 /* ---------- composer ---------- */
-.reply{flex:none;background:var(--bg);border-top:1px solid var(--border);padding:8px 16px calc(8px + env(safe-area-inset-bottom))}
+.reply{flex:none;background:var(--bg);border-top:1px solid var(--line);padding:8px var(--chat-pad) calc(8px + env(safe-area-inset-bottom))}
 .reply__row{display:flex;gap:8px;align-items:flex-end}
-.reply textarea{flex:1;min-width:0;font:inherit;font-size:16px;line-height:1.35;color:var(--ink);background:var(--card-bg);
-  border:1px solid var(--border);border-radius:12px;padding:10px 12px;resize:none;max-height:40vh;min-height:44px;-webkit-appearance:none;appearance:none}
-.reply .btn{min-height:44px;padding:0 18px}
-.reply__err{color:var(--status-red);font-size:13px;margin:0 0 6px}
-.reply__count{font-size:11px;color:var(--text-muted);text-align:right;margin-top:2px}
-.reply__hint{font-size:11px;color:var(--text-muted);margin-top:2px}
-.tag--amber{background:var(--bg-amber);color:var(--status-amber)}
-.draft{flex:none;margin:0 16px 8px;border:1px solid var(--border);background:var(--card-bg);border-radius:12px;padding:10px 12px}
-.draft__label{font-size:12px;font-weight:700;color:var(--text-muted)}
-.draft__text{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px;max-height:28vh;overflow-y:auto;font-size:15px}
-.draft__btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
-.draft--needs{background:var(--bg-amber);border-color:#ecd98b}
-.draft--needs .draft__label,.draft--needs .draft__text{color:var(--status-amber)}
-.draft--info{background:#f1f1f1}
-.wbox{background:var(--bg-amber);color:var(--status-amber);border:1px solid #ecd98b;border-radius:10px;padding:8px 10px;font-size:13px;margin-bottom:8px}
+.reply textarea{flex:1;min-width:0;font:inherit;font-size:16px;line-height:1.35;color:var(--ink);background:var(--surface);
+  border:1.5px solid var(--line);border-radius:var(--r);padding:10px 12px;resize:none;max-height:40vh;min-height:48px;-webkit-appearance:none;appearance:none}
+.reply .btn{min-height:48px;padding:0 20px}
+.reply__err{color:var(--red);font-size:13px;margin:0 0 6px}
+.reply__count{font-size:12px;color:var(--muted);text-align:right;margin-top:2px}
+.reply__hint{font-size:12px;color:var(--muted);margin-top:2px}
+.wbox{background:var(--amber-bg);color:var(--amber);border:1px solid #e3d6b0;border-radius:var(--r);padding:8px 10px;font-size:13px;margin-bottom:8px}
 .wbox ul{margin:4px 0 8px 18px}
 .wbox__btns{display:flex;gap:8px}
 </style>
@@ -146,13 +178,14 @@ body.show-chat #chatPane{display:flex}
   <div id="listPane">
     <div class="pane__top" id="listTop"></div>
     <div class="pane__scroll" id="listBody"></div>
+    <div class="pane__foot" id="listFoot"></div>
   </div>
   <div id="chatPane"></div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, updateDoc, collection, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, updateDoc, collection, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { requireInboxUser, inboxUserFor } from "./shared/inbox-auth.js";
@@ -184,6 +217,7 @@ const ICON = {
   check: '<path d="M20 6 9 17l-5-5"/>',
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   out: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
 };
 const icon = n => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
@@ -198,6 +232,11 @@ let loaded = { convs: false, review: false };
 let loadError = "";
 let reviewError = "";
 let lastRenderedTab = "";
+let searchQ = "";           // the search box
+let listingFilter = "";     // the listing filter ("" = all)
+let aiMode = null;          // off | drafts | auto, from globals/config (null until read)
+let cameFromList = false;   // the chat was opened from the list in this visit (so Back can use the browser history)
+let topBuilt = false;
 let msgUnsub = null;
 let msgs = [];
 let msgsFor = null;
@@ -391,7 +430,14 @@ const route = () => {
   return { page: "list" };
 };
 const go = h => { location.hash = h; };
-window.addEventListener("hashchange", () => { if (started) render(); });
+let lastRoutePage = "list";
+window.addEventListener("hashchange", () => {
+  const r = route();
+  cameFromList = r.page === "conv" && lastRoutePage === "list";     // opened from the list in this visit
+  lastRoutePage = r.page;
+  if (started) render();
+});
+const goBackToList = () => { if (cameFromList && history.length > 1) { cameFromList = false; history.back(); } else go(""); };
 
 /* ---------- render ---------- */
 function render() {
@@ -404,33 +450,87 @@ function render() {
   else renderPlaceholder();
 }
 
-function renderList(r) {
-  const vis = convs.filter(visible).sort((a, b) => activityTime(b) - activityTime(a));
-  const nNeeds = vis.filter(needsReply).length;
-  const rows = vis.filter(c => tab === "needs" ? needsReply(c) : tab === "done" ? !!c.done : true);
-  // Needs reply: the guest who has waited longest first.
-  if (tab === "needs") rows.sort((a, b) => waitSince(a) - waitSince(b));
+const AI_MODE_TEXT = {
+  auto: ["Automatic", "The AI assistant answers simple questions by itself, and tells you when it needs you."],
+  drafts: ["Drafts", "The AI assistant writes a draft. Nothing is sent until you tap Send this reply."],
+  off: ["Off", "The AI assistant is off. Nothing is drafted or sent."],
+};
+
+function buildListTop() {
+  topBuilt = true;
   $("listTop").innerHTML = `
     <div class="top__row"><div class="top__title">Guest inbox</div>
-      <button class="linkbtn" id="alertsBtn" type="button">${esc(alertsLabel())}</button>
       <button class="linkbtn" id="adminBtn" type="button">Admin</button></div>
+    <div class="top__row"><button class="chip" id="aiChip" type="button">AI: ...</button><span class="grow"></span>
+      <button class="linkbtn" id="alertsBtn" type="button"></button></div>
+    <div class="card card--grey" id="aiInfo" hidden></div>
     <div class="tabs">
-      <button class="tab ${tab === "needs" ? "on" : ""}" data-tab="needs" type="button">Needs reply<small>${nNeeds}</small></button>
-      <button class="tab ${tab === "all" ? "on" : ""}" data-tab="all" type="button">All</button>
-      <button class="tab ${tab === "done" ? "on" : ""}" data-tab="done" type="button">Done</button>
+      <button class="tab" data-tab="needs" type="button"></button>
+      <button class="tab" data-tab="all" type="button">All</button>
+      <button class="tab" data-tab="done" type="button">Done</button>
     </div>
-    <div class="sub"><button class="linkbtn" id="reviewBtn" type="button">Other Booking.com emails (${reviewItems.length})</button></div>`;
+    <div class="filters"><input id="searchBox" type="search" placeholder="Search name, booking, message" autocomplete="off" aria-label="Search">
+      <select id="listingSel" aria-label="Listing"><option value="">All listings</option></select></div>
+    <div class="sub"><button class="linkbtn" id="reviewBtn" type="button"></button></div>`;
   $("listTop").querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.tab; renderList(route()); });
   $("reviewBtn").onclick = () => go("review");
   $("adminBtn").onclick = () => { location.href = "/checkin-admin"; };
   $("alertsBtn").onclick = toggleAlerts;
+  $("searchBox").oninput = e => { searchQ = e.target.value; renderList(route()); };
+  $("listingSel").onchange = e => { listingFilter = e.target.value; renderList(route()); };
+  $("aiChip").onclick = () => { $("aiInfo").hidden = !$("aiInfo").hidden; paintAiChip(); };
+  $("listFoot").innerHTML = `<span id="whoAmI"></span><button class="linkbtn" id="signOutBtn" type="button">Sign out</button>`;
+  $("signOutBtn").onclick = async () => { try { await signOut(auth); } catch (e) { /* reload anyway */ } location.reload(); };
+}
+
+function paintAiChip() {
+  const chip = $("aiChip"), info = $("aiInfo");
+  if (!chip) return;
+  const m = AI_MODE_TEXT[aiMode];
+  chip.textContent = m ? `AI: ${m[0]}` : "AI: unknown";
+  chip.classList.toggle("chip--on", aiMode === "auto" || aiMode === "drafts");
+  chip.classList.toggle("chip--off", aiMode === "off");
+  info.innerHTML = m
+    ? `<div class="card__title">AI: ${esc(m[0])}</div><div class="card__sub">${esc(m[1])} Change it in the admin: More, Booking.com AI.</div>
+       <button class="btn" id="aiOpenAdmin" type="button" style="margin-top:8px">Open admin</button>`
+    : `<div class="card__sub">The AI mode could not be read. It is set in the admin: More, Booking.com AI.</div>`;
+  const b = $("aiOpenAdmin"); if (b) b.onclick = () => { location.href = "/checkin-admin"; };
+}
+
+function renderList(r) {
+  if (!topBuilt) buildListTop();
+  const vis = convs.filter(visible).sort((a, b) => activityTime(b) - activityTime(a));
+  const nNeeds = vis.filter(needsReply).length;
+  // the listing filter keeps its choices in step with the conversations
+  const listings = [...new Set(vis.map(c => c.propertyName).filter(Boolean))].sort();
+  const sel = $("listingSel");
+  if (sel.options.length !== listings.length + 1 || [...sel.options].slice(1).some((o, i) => o.value !== listings[i])) {
+    sel.innerHTML = `<option value="">All listings</option>` + listings.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join("");
+  }
+  sel.value = listings.includes(listingFilter) ? listingFilter : "";
+  const q = searchQ.trim().toLowerCase();
+  const matches = c => !q || [c.guestName, c.bookingNumber, c.roomCode, c.propertyName, c.lastMessagePreview].some(x => String(x || "").toLowerCase().includes(q));
+  const rows = vis.filter(c => (!listingFilter || c.propertyName === listingFilter) && matches(c))
+    .filter(c => tab === "needs" ? needsReply(c) : tab === "done" ? !!c.done : true);
+  // Needs reply: the guest who has waited longest first.
+  if (tab === "needs") rows.sort((a, b) => waitSince(a) - waitSince(b));
+  $("listTop").querySelectorAll(".tab").forEach(b => {
+    b.classList.toggle("on", b.dataset.tab === tab);
+    if (b.dataset.tab === "needs") b.innerHTML = `Needs reply<small>${nNeeds}</small>`;
+  });
+  $("reviewBtn").textContent = `Other Booking.com emails (${reviewItems.length})`;
+  $("alertsBtn").textContent = alertsLabel();
+  $("whoAmI").textContent = me ? `Signed in as ${me.name}` : "";
+  paintAiChip();
 
   const body = $("listBody");
-  const keep = lastRenderedTab === tab ? body.scrollTop : 0;      // a new tab starts at the top; a live update keeps the place
-  lastRenderedTab = tab;
+  const viewKey = `${tab}|${searchQ}|${listingFilter}`;
+  const keep = lastRenderedTab === viewKey ? body.scrollTop : 0;  // a new tab or search starts at the top; a live update keeps the place
+  lastRenderedTab = viewKey;
   let html;
   if (loadError) html = `<div class="err">${esc(loadError)}</div>`;
   else if (!loaded.convs) html = `<div class="msg">Loading...</div>`;
+  else if (!rows.length && (q || listingFilter)) html = `<div class="empty">Nothing matches. Clear the search or choose All listings.</div>`;
   else if (!rows.length) html = `<div class="empty">${tab === "needs" ? "Nothing waiting for a reply." : tab === "done" ? "Nothing marked done yet." : "No conversations yet."}</div>`;
   else html = `<div class="list">${rows.map(c => rowHtml(c, r.page === "conv" && r.id === c.id)).join("")}</div>`;
   body.innerHTML = html;
@@ -451,7 +551,7 @@ function rowHtml(c, selected) {
   return `<button class="row ${unread ? "unread" : ""} ${selected ? "sel" : ""}" type="button" data-id="${esc(c.id)}">
     <div class="row__top">${unread ? '<span class="dot" title="Needs reply"></span>' : ""}
       <span class="row__name">${esc(c.guestName || "Guest")}</span><span class="row__time">${esc(fmtListTime(t))}</span></div>
-    <div class="row__meta">${esc([propLine(c), stayText(c)].filter(Boolean).join(" \u00b7 "))}</div>
+    <div class="row__meta">${c.roomCode ? `<span class="row__room">${esc(c.roomCode)}</span> ` : ""}<span class="row__listing">${esc(c.propertyName || "")}</span>${stayText(c) ? ` \u00b7 ${esc(stayText(c))}` : ""}</div>
     ${prev ? `<div class="row__prev">${esc(prev)}</div>` : ""}
     <div class="tags">${tags.join("")}</div></button>`;
 }
@@ -488,7 +588,7 @@ function renderConv(id) {
     pane.dataset.conv = "";
     pane.innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button></div></div>
       <div class="placeholder">${loaded.convs ? "This conversation was not found." : "Loading..."}</div>`;
-    if ($("backBtn")) $("backBtn").onclick = () => go("");
+    if ($("backBtn")) $("backBtn").onclick = goBackToList;
     return;
   }
   // Built once per conversation, so a live update never wipes what you are typing.
@@ -527,7 +627,8 @@ function drawHead(c) {
   $("convHead").innerHTML = `
     <div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
       <div class="head__name">${esc(c.guestName || "Guest")}</div>
-      ${st ? `<span class="tag ${isCancelled(c) ? "tag--red" : "tag--green"}">${esc(st)}</span>` : ""}</div>
+      ${st ? `<span class="tag ${isCancelled(c) ? "tag--red" : "tag--green"}">${esc(st)}</span>` : ""}
+      <button class="iconbtn head__more" id="moreBtn" type="button" aria-label="More">${icon("more")}</button></div>
     <div class="head__line">${esc(propLine(c))}</div>
     <div class="head__line">${esc(stayText(c))}${c.bookingNumber ? ` \u00b7 Booking ${esc(c.bookingNumber)}` : ""}</div>
     ${cancelCard(c)}
@@ -536,7 +637,10 @@ function drawHead(c) {
       <button class="btn" id="doneBtn" type="button">${c.done ? icon("undo") + "Not done" : icon("check") + "Done"}</button>
       ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">${icon("out")}Open in Booking.com</a>` : ""}
     </div>`;
-  $("backBtn").onclick = () => go("");
+  $("backBtn").onclick = goBackToList;
+  const mb = $("moreBtn");
+  mb.addEventListener("pointerdown", e => e.preventDefault());     // keeps the keyboard open
+  mb.onclick = () => $("chatPane").classList.toggle("menu-open");
   $("doneBtn").onclick = async e => {
     const b = e.currentTarget; b.disabled = true;
     const toDone = !c.done;
@@ -586,8 +690,12 @@ function drawThread() {
     const time = d ? esc(fmtClock(d)) : "";
     if (m.direction === "host") {
       const laterSame = items.slice(i + 1).some(x => x.direction === "host" && x.text === m.text && x.status !== "failed");
-      out.push(`<div class="me"><div class="bubble--me">${esc(m.text)}</div>
-        <div class="me__status">${time}${time ? " · " : ""}${m.sentByName ? esc(m.sentByName) + " · " : ""}${statusHtml(m, laterSame, c)}</div></div>`);
+      const byAi = String(m.sentBy || "").toLowerCase() === "ai" || m.sentByName === "AI";
+      out.push(byAi
+        ? `<div class="me"><div class="ai-label">AI assistant</div><div class="bubble--ai">${esc(m.text)}</div>
+          <div class="me__status">${time}${time ? " · " : ""}${statusHtml(m, laterSame, c)}</div></div>`
+        : `<div class="me"><div class="bubble--me">${esc(m.text)}</div>
+          <div class="me__status">${time}${time ? " · " : ""}${m.sentByName ? esc(m.sentByName) + " · " : ""}${statusHtml(m, laterSame, c)}</div></div>`);
     } else {
       out.push(`<div class="bubble">${esc(m.text)}<div class="bubble__time">${time}</div></div>`);
     }
@@ -624,13 +732,16 @@ function drawDraft(c) {
   if (slot.dataset.key === key) return;            // already showing this one, leave the buttons alone
   slot.dataset.key = key;
   if (kind === "reply") {
-    slot.innerHTML = `<div class="draft"><div class="draft__label">Draft reply (written by the assistant, not sent)</div>
-      ${d.autoBlocked ? `<div class="draft__label">Not sent automatically: ${esc(d.autoBlocked)}</div>` : ""}
-      ${d.needsYouReason ? `<div class="draft__label">Needs you: ${esc(d.needsYouReason)}. Nothing is confirmed or promised in this reply.</div>` : ""}
+    // Why this is only a draft: held back by a rule, or the AI is in Drafts mode.
+    const why = d.autoBlocked ? `Held back: ${d.autoBlocked}.`
+      : d.needsYouReason ? `Needs you: ${d.needsYouReason}. This reply promises nothing.`
+      : aiMode === "drafts" ? "The AI assistant is in Drafts mode, so it never sends by itself." : "";
+    slot.innerHTML = `<div class="draft"><div class="draft__title">AI draft, not sent yet</div>
+      ${why ? `<div class="draft__why">${esc(why)}</div>` : ""}
+      ${guestAddr(c) ? "" : `<div class="draft__why">This conversation has no guest reply address, so nothing can be sent from here. Answer it in Booking.com.</div>`}
       <div class="draft__text">${esc(d.text)}</div>
       ${d.actionUrl ? `<a class="linkbtn" href="${esc(d.actionUrl)}" target="_blank" rel="noopener">${esc(d.actionLabel || "Answer in Booking.com")}</a>` : ""}
-      ${guestAddr(c) ? "" : `<div class="draft__label">This conversation has no guest reply address, so nothing can be sent from here. Answer it in Booking.com.</div>`}
-      <div class="draft__btns"><button class="btn btn--primary" id="dSend" type="button" ${guestAddr(c) ? "" : "disabled"}>Send</button><button class="btn" id="dEdit" type="button">Edit</button><button class="btn" id="dDiscard" type="button">Discard</button></div></div>`;
+      <div class="draft__btns"><button class="btn btn--primary" id="dSend" type="button" ${guestAddr(c) ? "" : "disabled"}>Send this reply</button><button class="btn" id="dEdit" type="button">Edit</button><button class="btn" id="dDiscard" type="button">Discard</button></div></div>`;
     $("dSend").onclick = () => {
       const ta = $("replyText"); if (!ta || !guestAddr(c)) return;
       ta.value = d.text; drafts[id] = d.text; ta.dispatchEvent(new Event("input"));
@@ -641,10 +752,15 @@ function drawDraft(c) {
       ta.value = d.text; drafts[id] = d.text; ta.dispatchEvent(new Event("input")); ta.focus();
       hiddenDrafts[id] = created; slot.dataset.key = ""; slot.innerHTML = "";
     };
+  } else if (kind === "needs_you") {
+    slot.innerHTML = `<div class="draft draft--needs"><div class="draft__title">AI needs you: ${esc(d.reason || d.text)}</div>
+      <div class="draft__why">The AI assistant did not send anything.</div>
+      <div class="draft__btns"><button class="btn" id="dDiscard" type="button">Dismiss</button></div></div>`;
   } else {
-    const label = kind === "needs_you" ? "Needs you" : "Already answered on WhatsApp";
-    slot.innerHTML = `<div class="draft ${kind === "needs_you" ? "draft--needs" : "draft--info"}"><div class="draft__label">${esc(label)}</div>
-      <div class="draft__text">${kind === "needs_you" ? esc("Needs you: " + (d.reason || d.text)) : esc(d.text)}</div>
+    // "Already answered on WhatsApp at 13:30: <what was answered>"
+    const m = String(d.text || "").match(/^Already answered on WhatsApp at (\d{1,2}:\d{2}):\s*([\s\S]*)$/);
+    slot.innerHTML = `<div class="draft draft--info"><div class="draft__title">Already answered on WhatsApp${m ? " at " + esc(m[1]) : ""}</div>
+      <div class="draft__text">${esc(m ? m[2] : d.text)}</div>
       <div class="draft__btns"><button class="btn" id="dDiscard" type="button">Dismiss</button></div></div>`;
   }
   $("dDiscard").onclick = async () => {
@@ -665,7 +781,11 @@ function buildReplyBar(id) {
   ta.value = drafts[id] || "";
   const fit = () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, window.innerHeight * 0.4) + "px"; };
   const count = () => { const n = ta.value.length; $("replyCount").textContent = n > MAX_REPLY * 0.8 ? `${n} / ${MAX_REPLY}` : ""; };
-  ta.oninput = () => { drafts[id] = ta.value; $("replyWarn").innerHTML = ""; $("replyErr").hidden = true; fit(); count(); };
+  const syncSend = () => { const b = $("sendBtn"); if (b) b.disabled = !ta.value.trim() || !!sendingNow[id]; };
+  ta.oninput = () => { drafts[id] = ta.value; $("replyWarn").innerHTML = ""; $("replyErr").hidden = true; fit(); count(); syncSend(); };
+  ta.addEventListener("focus", () => { if (isNarrow()) $("chatPane").classList.add("typing"); });
+  ta.addEventListener("blur", () => { $("chatPane").classList.remove("typing", "menu-open"); });
+  syncSend();
   ta.onkeydown = e => {
     if (e.key === "Enter" && !e.shiftKey && !IS_TOUCH && !e.isComposing) { e.preventDefault(); trySend(id); }
   };
@@ -699,6 +819,7 @@ async function doSend(id, text, isRetry) {
   if (sendingNow[id]) return;
   sendingNow[id] = true;
   const clientId = newId();
+  const sb0 = $("sendBtn"); if (sb0) sb0.disabled = true;
   const ta = $("replyText");
   // My bubble shows at once; the box clears and keeps focus.
   (pending[id] = pending[id] || []).push({ id: clientId, text, sentAt: new Date(), by: me && me.name });
@@ -721,6 +842,7 @@ async function doSend(id, text, isRetry) {
     } else alert("Not sent: " + m);
   }
   sendingNow[id] = false;
+  const sb1 = $("sendBtn"), tb1 = $("replyText"); if (sb1 && tb1) sb1.disabled = !tb1.value.trim();
 }
 
 /* ---------- check this ---------- */
@@ -757,7 +879,7 @@ function renderReview() {
   $("chatPane").innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
     <div class="head__name">Other Booking.com emails (${reviewItems.length})</div></div></div>
     <div class="pane__scroll">${body}</div>`;
-  $("backBtn").onclick = () => go("");
+  $("backBtn").onclick = goBackToList;
   $("chatPane").querySelectorAll("[data-handled]").forEach(b => b.onclick = () => markHandled(b.dataset.handled, b));
 }
 
@@ -773,6 +895,13 @@ function start() {
   onSnapshot(collection(db, "inbox_review"),
     s => { reviewItems = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.resolved); loaded.review = true; reviewError = ""; render(); },
     e => { reviewError = "Could not load the other Booking.com emails (" + (e.code || e.message) + ")."; if (route().page === "review") renderReview(); });
+  // The AI mode (Off / Drafts / Automatic) is set in the admin and saved in globals/config.
+  onSnapshot(doc(db, "globals", "config"), snap => {
+    const c = snap.exists() ? snap.data() : {};
+    aiMode = ["off", "drafts", "auto"].includes(c.bookingAiMode) ? c.bookingAiMode : (c.bookingAiDraftsEnabled === false ? "off" : "drafts");
+    paintAiChip();
+    if (route().page === "conv") { const cv = convs.find(x => x.id === route().id); if (cv) { $("draftSlot") && ($("draftSlot").dataset.key = ""); drawDraft(cv); } }
+  }, () => { aiMode = null; paintAiChip(); });
   render();
   setInterval(() => { if (started && !loadError && route().page !== "conv") renderList(route()); }, 60000);   // keeps "waiting 2 h" current
   if (alertsSupported() && Notification.permission === "granted") checkAlertsStatus();

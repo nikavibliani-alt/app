@@ -16,15 +16,16 @@ export const inboxUserFor = email => INBOX_USERS.find(u => u.email === String(em
 
 const CSS = `
 #ownerAuth{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:1000;
-  background:var(--bg,#f7f7f5);font-family:inherit}
-#ownerAuth .oa-box{background:var(--card-bg,#fff);border:1px solid var(--border,#e2e2de);border-radius:14px;
-  padding:2rem 1.6rem;text-align:center;max-width:340px;width:calc(100% - 32px);box-shadow:0 2px 14px rgba(0,0,0,.06)}
-#ownerAuth .oa-title{font-weight:600;font-size:1.05rem;color:var(--text-main,#1a1a1a);margin-bottom:.35rem}
-#ownerAuth .oa-sub{font-size:.82rem;color:var(--text-muted,#6b6b66);margin-bottom:1.1rem;line-height:1.4}
-#ownerAuth button{font:inherit;font-size:.9rem;font-weight:600;padding:.7rem 1.1rem;border-radius:9px;cursor:pointer;
-  border:1px solid #1a1a1a;background:#1a1a1a;color:#ffffff;width:100%;touch-action:manipulation}
+  background:#FAFAF9;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;letter-spacing:-.01em}
+#ownerAuth .oa-box{background:#fff;border:1px solid #E8E4E0;border-radius:12px;
+  padding:2rem 1.6rem;text-align:center;max-width:340px;width:calc(100% - 32px)}
+#ownerAuth .oa-title{font-weight:700;font-size:1.05rem;color:#2C2C2A;margin-bottom:.35rem}
+#ownerAuth .oa-sub{font-size:.88rem;color:#6B6B68;margin-bottom:1.1rem;line-height:1.4}
+#ownerAuth button{font:inherit;font-size:.95rem;font-weight:600;min-height:48px;padding:0 1.1rem;border-radius:10px;cursor:pointer;
+  border:1.5px solid #2C2C2A;background:#2C2C2A;color:#ffffff;width:100%;touch-action:manipulation}
 #ownerAuth button:disabled{opacity:.55;cursor:default}
-#ownerAuth .oa-msg{min-height:1.2em;margin-top:.8rem;font-size:.78rem;color:var(--status-red,#b3261e);line-height:1.35}
+#ownerAuth .oa-msg{min-height:1.2em;margin-top:.8rem;font-size:.85rem;color:#8b2020;line-height:1.35}
+#ownerAuth .oa-back{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-top:.6rem;font-size:.9rem;font-weight:600;color:#2C2C2A}
 `;
 
 function build() {
@@ -38,7 +39,8 @@ function build() {
     <div class="oa-title">Inbox sign-in</div>
     <div class="oa-sub">This page is only for the people who run the inbox. Sign in with your Google account.</div>
     <button type="button" id="oaBtn">Sign in with Google</button>
-    <div class="oa-msg" id="oaMsg" role="status"></div></div>`;
+    <div class="oa-msg" id="oaMsg" role="status"></div>
+    <a class="oa-back" href="/checkin-admin">Back to admin</a></div>`;
   document.body.appendChild(el);
   return el;
 }
