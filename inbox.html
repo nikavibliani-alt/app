@@ -151,6 +151,19 @@ body.show-chat #chatPane{display:flex}
 
 /* ---------- AI draft, notes ---------- */
 .draft{flex:none;margin:0 var(--chat-pad) 8px;border:1.5px solid var(--ink-2);background:var(--surface);border-radius:12px;padding:10px 12px}
+.aiwait{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 var(--chat-pad);padding:8px 12px;border:1.5px solid var(--ink);border-radius:var(--r);background:var(--surface);font-size:14px}
+.aiwait:empty{display:none}
+.aiwait__t{flex:1;min-width:140px;font-weight:600}
+.aiwhy{font-size:12px;color:var(--muted);margin-top:2px;text-align:right}
+.aiwhy--warn{color:var(--red);font-weight:600}
+.aiwhy__btns{display:flex;gap:6px;justify-content:flex-end;margin-top:2px}
+.aiwhy__btns button{min-height:44px;padding:0 12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:var(--r);font-size:13px;font-weight:600}
+.sect{font-size:14px;font-weight:700;padding:14px 16px 6px}
+.sect small{color:var(--muted);font-weight:600;margin-left:6px}
+.stack{display:flex;flex-direction:column;gap:8px;padding:0 16px}
+.rv__text{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:6px}
+.testbox{display:flex;flex-direction:column;gap:8px;padding:0 16px 24px}
+.testbox textarea,.testbox input{font-size:16px;border:1.5px solid var(--line);border-radius:var(--r);padding:10px 12px;background:var(--surface);color:var(--ink);min-height:44px;width:100%}
 .draft__title{font-size:14px;font-weight:700}
 .draft__why{font-size:12px;color:var(--muted);margin-top:2px}
 .draft__text{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:6px;max-height:28vh;overflow-y:auto;font-size:15px}
@@ -210,7 +223,7 @@ try { inboxMode = localStorage.getItem("maxela_inbox_open") === "tab" ? "tab" : 
 if (!EMBED && !SIGNIN_RETURN && QS.get("standalone") !== "1" && inboxMode === "tab") {
   // The admin setting says "inside the admin": alert taps and bookmarks to /inbox go to the admin's Inbox tab.
   const m = location.hash.match(/^#c\/(.+)$/);
-  location.replace("/checkin-admin?tab=inbox" + (m ? "&c=" + m[1] : ""));
+  location.replace("/checkin-admin?tab=inbox" + (m ? "&c=" + m[1] : location.hash === "#ai" ? "&view=ai" : ""));
 }
 if (EMBED) document.documentElement.classList.add("embed");
 const tellAdmin = msg => { if (EMBED) { try { window.parent.postMessage(Object.assign({ source: "maxela-inbox" }, msg), location.origin); } catch (e) { /* ignore */ } } };
@@ -234,6 +247,8 @@ const checkinLinkFn = httpsCallable(fns, "inboxCheckinLink");
 const discardDraftFn = httpsCallable(fns, "inboxDraftDiscard");
 const alertsFn = httpsCallable(fns, "inboxAlerts");
 const reviewHandledFn = httpsCallable(fns, "inboxReviewHandled");
+const aiActionFn = httpsCallable(fns, "inboxAiAction");
+const aiKnowledgeFn = httpsCallable(fns, "inboxAiKnowledge");
 
 const TZ = "Asia/Tbilisi";
 const $ = id => document.getElementById(id);
@@ -509,10 +524,200 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 window.addEventListener("pagehide", () => stopPresence());
 setInterval(() => { paintPresence(); }, 15000);
 
+/* ---------- keeping an eye on the AI (Step 5) ---------- */
+const aiPaused = c => Number(c && c.aiPausedUntil) > Date.now();
+const tbilisiDayStart = () => { const d = new Date(Date.now() + 4 * 3600000); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - 4 * 3600000; };
+const lastAi = c => (c && c.aiLastReply ? c.aiLastReply : null);
+const aiToReview = () => convs.filter(c => { const l = lastAi(c); return l && !l.review && toDate(l.at) && toDate(l.at).getTime() >= Date.now() - 7 * 86400000; });
+const topicWords = t => (t || []).map(x => String(x).replace(/_/g, " ")).join(", ");
+async function aiAct(id, payload, okText) {
+  try { await aiActionFn({ bookingNumber: id, ...payload }); if (okText) showToast(okText); }
+  catch (e) { showToast("Could not do that: " + ((e && e.message) || "try again")); }
+}
+function aiExtras(c, m) {
+  const l = lastAi(c);
+  if (!l || l.messageId !== m.id) return "";
+  const out = [];
+  if (l.topics && l.topics.length) out.push(`<div class="aiwhy">Topic: ${esc(topicWords(l.topics))}</div>`);
+  if (l.flags && l.flags.length) out.push(`<div class="aiwhy aiwhy--warn">Check this reply: it may contain ${esc(l.flags.join(", "))}.</div>`);
+  if (!l.review) out.push(`<div class="aiwhy__btns"><button type="button" data-aireview="ok" data-conv="${esc(c.id)}">Looks good</button><button type="button" data-aireview="wrong" data-conv="${esc(c.id)}">Wrong</button></div>`);
+  else out.push(`<div class="aiwhy">${l.review === "ok" ? "Marked: looks good" : "Marked: wrong"}${l.reviewedBy ? " by " + esc(l.reviewedBy) : ""}</div>`);
+  return out.join("");
+}
+async function aiReview(id, verdict) {
+  let correction = "";
+  if (verdict === "wrong") { const t = window.prompt("What should it have said? (You can leave this empty. Nothing changes until you approve it in AI knowledge.)", ""); if (t === null) return; correction = t; }
+  await aiAct(id, { action: "review", verdict, correction }, verdict === "ok" ? "Marked as looks good." : correction.trim() ? "Saved as a suggestion. Approve it in AI knowledge." : "Marked as wrong.");
+}
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-aireview]"); if (b) aiReview(b.dataset.conv, b.dataset.aireview); });
+
+/* "AI will reply in 0:45" with Stop, or the pause note, above the draft box */
+let aiWaitTimer = null;
+function paintAiWait(c) {
+  const el = $("aiWait"); if (!el) return;
+  clearInterval(aiWaitTimer);
+  const id = c.id;
+  const paint = () => {
+    const live = $("aiWait"); if (!live || $("chatPane").dataset.conv !== id) { clearInterval(aiWaitTimer); return; }
+    if (live.dataset.pausing === id) return;
+    const cur = convs.find(x => x.id === id) || c;
+    if (aiPaused(cur)) {
+      live.innerHTML = `<span class="aiwait__t">AI is paused for this guest until ${esc(fmtDay(new Date(cur.aiPausedUntil)))}, ${esc(fmtClock(new Date(cur.aiPausedUntil)))}.</span><button class="btn" id="awResume" type="button">Resume AI</button>`;
+      $("awResume").onclick = () => aiAct(id, { action: "resume" }, "AI resumed for this guest.");
+      return;
+    }
+    const due = toDate(cur.aiDueAt);
+    if (aiMode && aiMode !== "off" && cur.aiPending && due && due.getTime() > Date.now()) {
+      const left = Math.max(0, Math.round((due.getTime() - Date.now()) / 1000));
+      const verb = aiMode === "auto" ? "reply" : "write a draft";
+      live.innerHTML = `<span class="aiwait__t">AI will ${verb} in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}</span><button class="btn" id="awStop" type="button">Stop</button><button class="btn" id="awMine" type="button">Write it myself</button>`;
+      $("awStop").onclick = () => aiAct(id, { action: "stop" }, "The AI will not answer this one.");
+      $("awMine").onclick = async () => { await aiAct(id, { action: "stop" }); const ta = $("replyText"); if (ta) ta.focus(); };
+    } else live.innerHTML = "";
+  };
+  paint();
+  aiWaitTimer = setInterval(paint, 1000);
+}
+function showPauseChoices(id) {
+  const el = $("aiWait"); if (!el) return;
+  el.dataset.pausing = id;
+  el.innerHTML = `<span class="aiwait__t">Pause the AI for this guest:</span><button class="btn" id="pz24" type="button">24 hours</button><button class="btn" id="pzCo" type="button">Until check-out</button><button class="btn" id="pzNo" type="button">Cancel</button>`;
+  const done = () => { delete el.dataset.pausing; const c = convs.find(x => x.id === id); if (c) paintAiWait(c); };
+  $("pz24").onclick = async () => { await aiAct(id, { action: "pause", mode: "24h" }, "AI paused for 24 hours."); done(); };
+  $("pzCo").onclick = async () => { await aiAct(id, { action: "pause", mode: "checkout" }, "AI paused until check-out."); done(); };
+  $("pzNo").onclick = done;
+}
+
+const dash = t => String(t || "").replace(/\s+/g, " ").trim();
+function aiRowTop(c) { return `<div class="rv__reason">${esc(c.guestName || "Guest")}</div><div class="rv__meta">${c.roomCode ? esc(c.roomCode) + " " : ""}${esc(c.propertyName || "")}</div>`; }
+function aiRows(list, build, empty) { return list.length ? list.map(build).join("") : `<div class="empty" style="padding:12px 0;text-align:left">${empty}</div>`; }
+
+function renderAiView() {
+  const pane = $("chatPane");
+  if (pane.dataset.conv !== "ai") {
+    pane.dataset.conv = "ai";
+    pane.innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
+      <div class="head__name">AI view</div><button class="linkbtn" id="toKnowledge" type="button">AI knowledge</button></div></div>
+      <div class="pane__scroll" id="aiScroll">
+        <div class="sect" id="aiSecToday"></div><div class="stack" id="aiToday"></div>
+        <div class="sect" id="aiSecHeld"></div><div class="stack" id="aiHeld"></div>
+        <div class="sect" id="aiSecNeeds"></div><div class="stack" id="aiNeeds"></div>
+        <div class="sect">Questions the AI could not answer</div><div class="stack" id="aiUnans"></div>
+        <div class="sect">Try a question</div>
+        <div class="testbox"><textarea id="tbQ" rows="2" maxlength="500" placeholder="Type what a guest might ask" aria-label="Guest question"></textarea>
+          <input id="tbRoom" type="text" placeholder="Room, for example 6-2 (optional)" aria-label="Room" autocomplete="off">
+          <button class="btn btn--primary" id="tbGo" type="button">Show the AI's reply</button><div id="tbOut" class="rv__meta">Nothing is sent to anyone.</div></div>
+      </div>`;
+    $("backBtn").onclick = goBackToList;
+    $("toKnowledge").onclick = () => go("knowledge");
+    $("tbGo").onclick = runTestBox;
+    $("aiScroll").addEventListener("click", e => {
+      const o = e.target.closest("[data-open]"); if (o) go("c/" + encodeURIComponent(o.dataset.open));
+      const a = e.target.closest("[data-addanswer]"); if (a) addAnswerFor(a.dataset.addanswer);
+    });
+  }
+  const start = tbilisiDayStart();
+  const today = convs.filter(c => { const l = lastAi(c); return l && toDate(l.at) && toDate(l.at).getTime() >= start; }).sort((a, b) => toDate(lastAi(b).at) - toDate(lastAi(a).at));
+  const held = convs.filter(c => c.aiDraft && c.aiDraft.kind === "reply" && needsReply(c));
+  const needs = convs.filter(c => c.aiDraft && c.aiDraft.kind === "needs_you" && needsReply(c));
+  const toRev = aiToReview().length;
+  $("aiSecToday").innerHTML = `AI replies today<small>${today.length}${toRev ? `, ${toRev} to review` : ""}</small>`;
+  $("aiToday").innerHTML = aiRows(today, c => { const l = lastAi(c); return `<div class="rv">${aiRowTop(c)}
+      <div class="rv__meta">${esc(fmtClock(toDate(l.at)))}${l.holding ? " . holding reply" : ""}</div>
+      <div class="rv__text">${esc(l.text)}</div>
+      ${l.topics && l.topics.length ? `<div class="rv__meta">Topic: ${esc(topicWords(l.topics))}</div>` : ""}
+      ${l.flags && l.flags.length ? `<div class="aiwhy aiwhy--warn" style="text-align:left">Check this reply: it may contain ${esc(l.flags.join(", "))}.</div>` : ""}
+      <div class="rv__btns">${l.review ? `<span class="tag ${l.review === "ok" ? "tag--green" : "tag--red"}">${l.review === "ok" ? "Looks good" : "Marked wrong"}</span>`
+        : `<button class="btn" type="button" data-aireview="ok" data-conv="${esc(c.id)}">Looks good</button><button class="btn" type="button" data-aireview="wrong" data-conv="${esc(c.id)}">Wrong</button>`}
+        <button class="btn" type="button" data-open="${esc(c.id)}">Open chat</button></div></div>`; }, "The AI has not answered anyone today.");
+  $("aiSecHeld").innerHTML = `Held drafts<small>${held.length}</small>`;
+  $("aiHeld").innerHTML = aiRows(held, c => `<div class="rv">${aiRowTop(c)}
+      <div class="rv__meta">${esc(c.aiDraft.autoBlocked ? "Held back: " + c.aiDraft.autoBlocked : c.aiDraft.needsYouReason ? "Needs you: " + c.aiDraft.needsYouReason : "Waiting for you to send it")}</div>
+      <div class="rv__text">${esc(c.aiDraft.text)}</div><div class="rv__btns"><button class="btn" type="button" data-open="${esc(c.id)}">Open chat</button></div></div>`, "No drafts waiting.");
+  $("aiSecNeeds").innerHTML = `AI needs you<small>${needs.length}</small>`;
+  $("aiNeeds").innerHTML = aiRows(needs, c => `<div class="rv">${aiRowTop(c)}<div class="rv__meta">${esc(c.aiDraft.reason || c.aiDraft.text || "")}</div>
+      <div class="rv__btns"><button class="btn" type="button" data-open="${esc(c.id)}">Open chat</button></div></div>`, "Nothing the AI handed to you.");
+  // grouped by the reason it gave
+  const groups = new Map();
+  convs.filter(c => c.aiDraft && c.aiDraft.kind === "needs_you").forEach(c => { const r = dash(c.aiDraft.reason || c.aiDraft.text); if (r) groups.set(r, (groups.get(r) || 0) + 1); });
+  const gl = [...groups.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+  $("aiUnans").innerHTML = aiRows(gl, ([r, n]) => `<div class="rv"><div class="rv__reason">${esc(r)}</div><div class="rv__meta">${n} ${n === 1 ? "time" : "times"} recently</div>
+      <div class="rv__btns"><button class="btn" type="button" data-addanswer="${esc(r)}">Add an answer</button></div></div>`, "Nothing yet.");
+}
+async function addAnswerFor(reason) {
+  const question = window.prompt("The question a guest asks:", reason); if (question === null || !dash(question)) return;
+  const answer = window.prompt("What should the AI answer? (It is only a suggestion until you approve it in AI knowledge.)", ""); if (answer === null || !dash(answer)) return;
+  try { await aiKnowledgeFn({ action: "add", question, answer, source: "unanswered" }); showToast("Saved as a suggestion. Approve it in AI knowledge."); if (route().page === "knowledge") loadKnowledge(); }
+  catch (e) { showToast("Could not save: " + ((e && e.message) || "try again")); }
+}
+async function runTestBox() {
+  const q = $("tbQ").value.trim(); if (!q) return;
+  const out = $("tbOut"), b = $("tbGo"); b.disabled = true; out.textContent = "Thinking...";
+  try {
+    const r = (await aiKnowledgeFn({ action: "test", question: q, room: $("tbRoom").value.trim() })).data;
+    const topics = r.topics && r.topics.length ? `<div class="rv__meta">Topic: ${esc(topicWords(r.topics))}</div>` : "";
+    out.innerHTML = r.kind === "reply"
+      ? `<div class="rv"><div class="rv__meta">The AI would answer:</div><div class="rv__text">${esc(r.reply)}</div>${topics}${r.scan && r.scan.length ? `<div class="aiwhy aiwhy--warn" style="text-align:left">Check this reply: it may contain ${esc(r.scan.join(", "))}.</div>` : ""}</div>`
+      : `<div class="rv"><div class="rv__meta">The AI would not answer this by itself:</div><div class="rv__text">${esc(r.reason || "")}</div>${topics}</div>`;
+  } catch (e) { out.textContent = "Could not test: " + ((e && e.message) || "try again"); }
+  b.disabled = false;
+}
+
+let knowItems = null, knowError = "";
+async function loadKnowledge() {
+  try { knowItems = (await aiKnowledgeFn({ action: "list" })).data.items; knowError = ""; }
+  catch (e) { knowError = (e && e.message) || "Could not load."; }
+  if (route().page === "knowledge") drawKnowledge();
+}
+function renderKnowledge() {
+  const pane = $("chatPane");
+  if (pane.dataset.conv !== "knowledge") {
+    pane.dataset.conv = "knowledge";
+    pane.innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back">${icon("back")}AI view</button>
+      <div class="head__name">AI knowledge</div><button class="linkbtn" id="kAdd" type="button">Add an answer</button></div>
+      <div class="head__line">Answers you approve here are added to what the Booking.com AI knows. WhatsApp is not changed.</div></div>
+      <div class="pane__scroll" id="kScroll"></div>`;
+    $("backBtn").onclick = () => go("ai");
+    $("kAdd").onclick = () => addAnswerFor("");
+    $("kScroll").addEventListener("click", e => {
+      const b = e.target.closest("[data-k]"); if (b) knowledgeAct(b.dataset.k, b.dataset.id, b.dataset.on);
+    });
+    loadKnowledge();
+  }
+  drawKnowledge();
+}
+function drawKnowledge() {
+  const el = $("kScroll"); if (!el) return;
+  if (knowError) { el.innerHTML = `<div class="err">${esc(knowError)}</div>`; return; }
+  if (!knowItems) { el.innerHTML = `<div class="msg">Loading...</div>`; return; }
+  const card = (i, btns) => `<div class="rv"><div class="rv__reason">${esc(i.question)}</div><div class="rv__text">${esc(i.answer)}</div>
+    ${i.wrongReply ? `<div class="rv__meta">The AI had said: ${esc(i.wrongReply)}</div>` : ""}
+    <div class="rv__meta">${esc(i.by || "")}${i.updatedAt ? " . " + esc(fmtDay(new Date(i.updatedAt))) : ""}</div><div class="rv__btns">${btns}</div></div>`;
+  const b = (k, i, t, on) => `<button class="btn" type="button" data-k="${k}" data-id="${esc(i.id)}"${on !== undefined ? ` data-on="${on}"` : ""}>${t}</button>`;
+  const pend = knowItems.filter(i => i.status === "pending"), appr = knowItems.filter(i => i.status === "approved");
+  el.innerHTML = `<div class="sect">Suggestions<small>${pend.length}</small></div><div class="stack">${aiRows(pend, i => card(i, b("approve", i, "Approve") + b("edit", i, "Edit") + b("reject", i, "Reject")), "No suggestions waiting.")}</div>
+    <div class="sect">Approved answers<small>${appr.length}</small></div><div class="stack">${aiRows(appr, i => card(i, `<span class="tag ${i.enabled ? "tag--green" : ""}">${i.enabled ? "On" : "Off"}</span>` + b("toggle", i, i.enabled ? "Switch off" : "Switch on", i.enabled ? "0" : "1") + b("edit", i, "Edit")), "Nothing approved yet.")}</div><div style="height:24px"></div>`;
+}
+async function knowledgeAct(k, id, on) {
+  const it = (knowItems || []).find(x => x.id === id); if (!it) return;
+  try {
+    if (k === "edit" || (k === "approve" && false)) {
+      const q = window.prompt("Question:", it.question); if (q === null) return;
+      const a = window.prompt("Answer:", it.answer); if (a === null) return;
+      await aiKnowledgeFn({ action: "edit", id, question: q, answer: a });
+    } else if (k === "approve") { if (!window.confirm("Approve this answer? The Booking.com AI will start using it.")) return; await aiKnowledgeFn({ action: "approve", id }); }
+    else if (k === "reject") await aiKnowledgeFn({ action: "reject", id });
+    else if (k === "toggle") await aiKnowledgeFn({ action: "toggle", id, enabled: on === "1" });
+  } catch (e) { showToast("Could not do that: " + ((e && e.message) || "try again")); }
+  loadKnowledge();
+}
+
 /* ---------- routing ---------- */
 const route = () => {
   const h = location.hash.replace(/^#/, "");
   if (h === "review") return { page: "review" };
+  if (h === "ai") return { page: "ai" };
+  if (h === "knowledge") return { page: "knowledge" };
   if (h.startsWith("c/")) return { page: "conv", id: decodeURIComponent(h.slice(2)) };
   return { page: "list" };
 };
@@ -535,6 +740,8 @@ function render() {
   if (r.page !== "conv") stopMsgs();
   if (r.page === "conv") renderConv(r.id);
   else if (r.page === "review") renderReview();
+  else if (r.page === "ai") renderAiView();
+  else if (r.page === "knowledge") renderKnowledge();
   else renderPlaceholder();
 }
 
@@ -559,9 +766,10 @@ function buildListTop() {
     </div>
     <div class="filters"><input id="searchBox" type="search" placeholder="Search name, booking, message" autocomplete="off" aria-label="Search">
       <select id="listingSel" aria-label="Listing"><option value="">All listings</option></select></div>
-    <div class="sub"><button class="linkbtn" id="reviewBtn" type="button"></button></div>`;
+    <div class="sub"><button class="linkbtn" id="reviewBtn" type="button"></button><button class="linkbtn" id="aiViewBtn" type="button"></button></div>`;
   $("listTop").querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.tab; renderList(route()); });
   $("reviewBtn").onclick = () => go("review");
+  $("aiViewBtn").onclick = () => go("ai");
   $("adminBtn").onclick = () => { location.href = "/checkin-admin"; };
   $("alertsBtn").onclick = toggleAlerts;
   $("searchBox").oninput = e => { searchQ = e.target.value; renderList(route()); };
@@ -607,6 +815,8 @@ function renderList(r) {
     if (b.dataset.tab === "needs") { b.innerHTML = `Needs reply<small>${nNeeds}</small>`; setBadge(nNeeds); }
   });
   $("reviewBtn").textContent = `Other Booking.com emails (${reviewItems.length})`;
+  const nRev = aiToReview().length;
+  $("aiViewBtn").textContent = `AI view${nRev ? ` (${nRev} to review)` : ""}`;
   $("alertsBtn").textContent = alertsLabel();
   $("whoAmI").textContent = me ? `Signed in as ${me.name}` : "";
   paintAiChip();
@@ -685,11 +895,12 @@ function renderConv(id) {
   // Built once per conversation, so a live update never wipes what you are typing.
   if (pane.dataset.conv !== id) {
     pane.dataset.conv = id;
-    pane.innerHTML = `<div class="head" id="convHead"></div><div class="thread" id="thread"></div><div id="draftSlot" data-key=""></div><div class="reply" id="replyBar"></div>`;
+    pane.innerHTML = `<div class="head" id="convHead"></div><div class="thread" id="thread"></div><div class="aiwait" id="aiWait"></div><div id="draftSlot" data-key=""></div><div class="reply" id="replyBar"></div>`;
     buildReplyBar(id);
   }
   startPresence(id); paintPresence();
   drawHead(c);
+  paintAiWait(c);
   drawDraft(c);
   const canReply = /@guest\.booking\.com$/i.test(c.replyTo || "");
   $("replyBar").style.display = canReply ? "" : "none";
@@ -728,12 +939,14 @@ function drawHead(c) {
     <div class="actions">
       <button class="btn" id="doneBtn" type="button">${c.done ? icon("undo") + "Not done" : icon("check") + "Done"}</button>
       ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">${icon("out")}Open in Booking.com</a>` : ""}
+      ${aiMode && aiMode !== "off" ? `<button class="btn" id="pauseAiBtn" type="button">${aiPaused(c) ? "Resume AI" : "Pause AI"}</button>` : ""}
     </div>`;
   tellAdmin({ type: "title", title: c.guestName || "Guest" });
   $("backBtn").onclick = goBackToList;
   const mb = $("moreBtn");
   mb.addEventListener("pointerdown", e => e.preventDefault());     // keeps the keyboard open
   mb.onclick = () => $("chatPane").classList.toggle("menu-open");
+  if ($("pauseAiBtn")) $("pauseAiBtn").onclick = () => { $("chatPane").classList.remove("menu-open"); if (aiPaused(c)) aiAct(id, { action: "resume" }); else showPauseChoices(id); };
   $("doneBtn").onclick = async e => {
     const b = e.currentTarget; b.disabled = true;
     const toDone = !c.done;
@@ -787,7 +1000,7 @@ function drawThread() {
       const byAi = String(m.sentBy || "").toLowerCase() === "ai" || m.sentByName === "AI";
       out.push(byAi
         ? `<div class="me"><div class="ai-label">AI assistant</div><div class="bubble--ai">${esc(m.text)}</div>
-          <div class="me__status">${time}${time ? " · " : ""}${statusHtml(m, laterSame, c)}</div></div>`
+          <div class="me__status">${time}${time ? " · " : ""}${statusHtml(m, laterSame, c)}</div>${aiExtras(c, m)}</div>`
         : `<div class="me"><div class="bubble--me">${esc(m.text)}</div>
           <div class="me__status">${time}${time ? " · " : ""}${m.sentByName ? esc(m.sentByName) + " · " : ""}${statusHtml(m, laterSame, c)}</div></div>`);
     } else {
@@ -1028,6 +1241,7 @@ window.addEventListener("message", ev => {
   if (!EMBED || ev.origin !== location.origin || ev.source !== window.parent || !ev.data || ev.data.source !== "maxela-admin") return;
   if (ev.data.type === "open" && ev.data.c) go("c/" + encodeURIComponent(String(ev.data.c)));
   if (ev.data.type === "list") go("");
+  if (ev.data.type === "view" && ev.data.view === "ai") go("ai");
 });
 requireInboxUser({ auth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut }, { onReady: user => { me = inboxUserFor(user && user.email); if (SIGNIN_RETURN) { location.replace("/checkin-admin?tab=inbox"); return; } tellAdmin({ type: "ready" }); start(); } });
 </script>
