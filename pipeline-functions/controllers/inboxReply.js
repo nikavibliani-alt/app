@@ -97,7 +97,29 @@ function queueReplyWrites(tx, db, o) {
 
 // ---------------------------------------------------------------- owner: send a reply
 
-/** deps: { db, now(), trigger?() }. Returns { ok, outboxId, duplicate }. */
+/**
+ * Was anything added to the chat after the message the sender last saw (seenLastId)? `docs` are the newest messages,
+ * newest first. Returns null (nothing new, or the sender did not say what they saw) or
+ * { kind: 'guest' | 'host', by, at (ms), preview }. A guest message wins over a host one. Failed sends do not count.
+ */
+function findConflict(docs, seenLastId, ownClientId) {
+  if (typeof seenLastId !== 'string' || !seenLastId) return null;
+  const idx = docs.findIndex(m => m.id === seenLastId);
+  if (idx <= 0) return null;                       // nothing newer, or the message is too far back to tell
+  const newer = docs.slice(0, idx).filter(m => m.id !== ownClientId && m.data().status !== 'failed');
+  const first = t => String(t || '').split('\n')[0].replace(/\s+/g, ' ').trim().slice(0, 140);
+  const g = newer.find(m => m.data().direction === 'guest');
+  if (g) return { kind: 'guest', by: 'The guest', at: millis(g.data().sentAt), preview: first(g.data().text) };
+  const h = newer.find(m => m.data().direction === 'host');
+  if (h) {
+    const x = h.data();
+    const ai = String(x.sentBy || '').toLowerCase() === 'ai';
+    return { kind: 'host', by: ai ? 'The AI assistant' : (x.sentByName || 'Someone'), at: millis(x.sentAt), preview: first(x.text) };
+  }
+  return null;
+}
+
+/** deps: { db, now(), trigger?() }. Returns { ok, outboxId, duplicate }, or { ok: false, conflict } when something new arrived (nothing is saved). */
 async function sendReply(auth, data, deps) {
   const user = inboxUser(auth);
   if (!user) throw fail('permission-denied', 'Only people with inbox access can send replies.');
@@ -124,6 +146,12 @@ async function sendReply(auth, data, deps) {
     if (!isGuestAddress(c.replyTo)) throw fail('failed-precondition', 'This conversation has no guest address to reply to.');
     const latestGuest = recent.docs.find(m => m.data().direction === 'guest');
     if (!latestGuest) throw fail('failed-precondition', 'There is no guest message to reply to.');
+
+    // Two people, no double replies: if something new arrived since the sender's screen last showed the chat, don't send.
+    if (!d.force) {
+      const conflict = findConflict(recent.docs, d.seenLastId, d.clientId);
+      if (conflict) return { ok: false, conflict };
+    }
 
     queueReplyWrites(tx, db, {
       bookingNumber: d.bookingNumber, clientId: d.clientId, text: clean.text, conv: c,
@@ -347,6 +375,6 @@ function registerCloudFunctions() {
 }
 
 module.exports = {
-  sendReply, queueReplyWrites, pokeWebApp, noteHeartbeat, checkinLink, pull, report, handleOutbox, markUnknown, registerCloudFunctions, Fail,
+  sendReply, findConflict, queueReplyWrites, pokeWebApp, noteHeartbeat, checkinLink, pull, report, handleOutbox, markUnknown, registerCloudFunctions, Fail,
   CONVERSATIONS, OUTBOX,
 };

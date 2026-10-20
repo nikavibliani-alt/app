@@ -346,3 +346,39 @@ test('a queued reply marks the conversation: sending, who replied, wait ended; t
   await C.report({ id: CID, result: 'sent' }, deps(db4));
   assert.ok(!db4.store.get(k).lastSendStatus, 'the newer reply keeps its own status');
 });
+
+test('send: refuses when a guest message or another person replied after what the sender saw, unless forced', async () => {
+  const OTHER = { token: { email: 'nutsamargiani@gmail.com', email_verified: true } };
+  // the sender saw up to gmail-new; Nutsa replied after that
+  const base = seed();
+  base[`inbox_conversations/${NUM}/messages/host-nutsa`] = { direction: 'host', text: 'Hello, parking is free.\nSee you.', sentAt: T(300), status: 'sent', sentBy: 'nutsamargiani@gmail.com', sentByName: 'Nutsa' };
+  let db = fakeDb(base);
+  let r = await C.sendReply(OWNER, { bookingNumber: NUM, clientId: CID, text: 'mine', seenLastId: 'gmail-new' }, deps(db));
+  assert.strictEqual(r.ok, false);
+  assert.deepStrictEqual({ kind: r.conflict.kind, by: r.conflict.by, preview: r.conflict.preview }, { kind: 'host', by: 'Nutsa', preview: 'Hello, parking is free.' });
+  assert.ok(!db.store.has('inbox_outbox/' + CID), 'nothing is saved');
+  // "Send mine anyway"
+  r = await C.sendReply(OWNER, { bookingNumber: NUM, clientId: CID, text: 'mine', seenLastId: 'gmail-new', force: true }, deps(db));
+  assert.strictEqual(r.ok, true);
+  assert.ok(db.store.has('inbox_outbox/' + CID));
+  // the AI replied
+  const ai = seed();
+  ai[`inbox_conversations/${NUM}/messages/host-ai`] = { direction: 'host', text: 'Hi!', sentAt: T(300), status: 'sent', sentBy: 'ai', sentByName: 'AI' };
+  r = await C.sendReply(OWNER, { bookingNumber: NUM, clientId: CID, text: 'mine', seenLastId: 'gmail-new' }, deps(fakeDb(ai)));
+  assert.strictEqual(r.conflict.by, 'The AI assistant');
+  // the guest wrote again (wins over a host reply)
+  const g = { ...base };
+  g[`inbox_conversations/${NUM}/messages/guest-3`] = { direction: 'guest', text: 'one more thing', sentAt: T(400) };
+  r = await C.sendReply(OWNER, { bookingNumber: NUM, clientId: CID, text: 'mine', seenLastId: 'gmail-new' }, deps(fakeDb(g)));
+  assert.strictEqual(r.conflict.kind, 'guest');
+  // nothing new, a failed send, an old client (no seenLastId): all go through
+  r = await C.sendReply(OWNER, { bookingNumber: NUM, clientId: CID, text: 'mine', seenLastId: 'gmail-new' }, deps(fakeDb(seed())));
+  assert.strictEqual(r.ok, true);
+  const failed = seed();
+  failed[`inbox_conversations/${NUM}/messages/host-x`] = { direction: 'host', text: 'x', sentAt: T(300), status: 'failed', sentByName: 'Nutsa' };
+  r = await C.sendReply(OWNER, { bookingNumber: NUM, clientId: CID, text: 'mine', seenLastId: 'gmail-new' }, deps(fakeDb(failed)));
+  assert.strictEqual(r.ok, true);
+  r = await C.sendReply(OWNER, { bookingNumber: NUM, clientId: CID, text: 'mine' }, deps(fakeDb(base)));
+  assert.strictEqual(r.ok, true);
+  void OTHER;
+});

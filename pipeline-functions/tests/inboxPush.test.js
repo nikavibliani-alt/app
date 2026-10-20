@@ -236,3 +236,29 @@ test('a holding reply gives the "needs you" alert, not "AI answered"; a held dra
   assert.strictEqual((await C.onConversationWritten(BN, base, { ...base, aiDraft: held }, d)).action, 'pushed');
   assert.strictEqual(sent[sent.length - 1].payload.body, 'date change request');
 });
+
+test('alerts wait 20 seconds; no alert if one of us replied or opened the chat meanwhile', async () => {
+  // nobody did anything: the alert goes out after the wait
+  clock = T0;
+  let waited = 0;
+  let { d, sent } = mk({}, { sleep: async ms => { waited = ms; clock += ms; } });
+  assert.strictEqual((await C.onGuestMessage(BN, 'm1', guest('Hello'), d)).action, 'pushed');
+  assert.strictEqual(waited, 20000);
+  assert.ok(sent.length > 0);
+  // one of us replied meanwhile
+  clock = T0;
+  ({ d, sent } = mk({ [`inbox_conversations/${BN}`]: { guestName: 'Test Guest', done: false, needsReply: true } }, {
+    sleep: async () => { d.db.store.set(`inbox_conversations/${BN}`, { ...d.db.store.get(`inbox_conversations/${BN}`), needsReply: false, done: true }); },
+  }));
+  assert.strictEqual((await C.onGuestMessage(BN, 'm1', guest('Hello'), d)).action, 'already handled');
+  assert.strictEqual(sent.length, 0);
+  // one of us opened the chat meanwhile (presence record, written by the inbox page)
+  clock = T0;
+  ({ d, sent } = mk({}, { sleep: async () => { d.db.store.set(`inbox_presence/${BN}`, { Nutsa: { at: clock + 5000, typing: false } }); } }));
+  assert.strictEqual((await C.onGuestMessage(BN, 'm1', guest('Hello'), d)).action, 'already opened');
+  assert.strictEqual(sent.length, 0);
+  // somebody was in the chat long before the message: does not count
+  clock = T0;
+  ({ d, sent } = mk({ [`inbox_presence/${BN}`]: { Nutsa: { at: T0 - 600000 } } }, { sleep: async () => {} }));
+  assert.strictEqual((await C.onGuestMessage(BN, 'm1', guest('Hello'), d)).action, 'pushed');
+});

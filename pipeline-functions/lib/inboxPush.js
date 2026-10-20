@@ -6,6 +6,7 @@
 
 const QUIET_MS = 3 * 60 * 1000;            // a new push only after 3 minutes without a guest message
 const STALE_MESSAGE_MS = 60 * 60 * 1000;   // an older message (backfill, late email) never alerts
+const QUIET_BEFORE_ALERT_MS = 20 * 1000;   // wait this long after a guest message before alerting; no alert if one of us replied or opened the chat meanwhile
 const STALE_CANCEL_MS = 6 * 60 * 60 * 1000;
 const MAX_BODY = 90;
 const TBILISI_OFFSET_MS = 4 * 60 * 60 * 1000;
@@ -117,6 +118,6 @@ function cleanSubscription(sub) {
 const isDeviceId = v => typeof v === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(v);
 
 module.exports = {
-  QUIET_MS, STALE_MESSAGE_MS, STALE_CANCEL_MS,
+  QUIET_MS, QUIET_BEFORE_ALERT_MS, STALE_MESSAGE_MS, STALE_CANCEL_MS,
   burstDecision, firstLine, messagePayload, aiAnsweredPayload, needsYouPayload, checkinPayload, cancelPayload, cleanSubscription, isDeviceId, tbilisiClock,
 };

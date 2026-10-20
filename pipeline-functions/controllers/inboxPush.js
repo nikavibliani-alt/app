@@ -21,6 +21,7 @@ const P = require('../lib/inboxPush');
 
 const CONVERSATIONS = 'inbox_conversations';
 const DEVICES = 'inbox_push_devices';
+const PRESENCE = 'inbox_presence';   // one document per conversation: { <person's name>: { at (ms), typing } }, written by the inbox page
 
 class Fail extends Error { constructor(code, message) { super(message); this.code = code; } }
 const ms = v => (v && typeof v.toMillis === 'function' ? v.toMillis() : v && typeof v.toDate === 'function' ? v.toDate().getTime() : v ? new Date(v).getTime() : NaN);
@@ -85,6 +86,15 @@ async function onGuestMessage(bookingNumber, messageId, msg, deps) {
   });
   if (!decision) return { action: 'no conversation' };
   if (!decision.push) return { action: 'same burst' };
+  // Two people, fewer duplicate alerts: wait a little; if one of us already replied or opened the chat meanwhile, no alert.
+  if (typeof deps.sleep === 'function') {
+    const startedAt = now;
+    await deps.sleep(P.QUIET_BEFORE_ALERT_MS);
+    const [after, presence] = await Promise.all([convRef.get(), db.collection(PRESENCE).doc(bookingNumber).get()]);
+    const v = after.exists ? after.data() : null;
+    if (v && (v.needsReply === false || v.done === true)) return { action: 'already handled' };
+    if (presence.exists && Object.values(presence.data() || {}).some(p => p && Number(p.at) >= startedAt)) return { action: 'already opened' };
+  }
   const result = await sendToOwnerDevices(P.messagePayload(decision.conv, bookingNumber, msg.text), deps);
   return { action: 'pushed', ...result };
 }
@@ -186,11 +196,11 @@ function registerCloudFunctions() {
   const deps = () => {
     const webpush = require('web-push');
     webpush.setVapidDetails('mailto:nikavibliani@gmail.com', VAPID_PUBLIC_KEY.value(), VAPID_PRIVATE_KEY.value());
-    return { db: getFirestore(), nowMs: () => Date.now(), now: () => Timestamp.now(), ts: m => Timestamp.fromMillis(m), sendNotification: (sub, body) => webpush.sendNotification(sub, body) };
+    return { db: getFirestore(), nowMs: () => Date.now(), now: () => Timestamp.now(), ts: m => Timestamp.fromMillis(m), sendNotification: (sub, body) => webpush.sendNotification(sub, body), sleep: ms => new Promise(r => setTimeout(r, ms)) };
   };
 
   const inboxPushOnMessage = onDocumentCreated(
-    { document: `${CONVERSATIONS}/{bookingNumber}/messages/{messageId}`, region, secrets, timeoutSeconds: 30, maxInstances: 5, memory: '256MiB' },
+    { document: `${CONVERSATIONS}/{bookingNumber}/messages/{messageId}`, region, secrets, timeoutSeconds: 60, maxInstances: 5, memory: '256MiB' },
     async event => {
       try { await onGuestMessage(event.params.bookingNumber, event.params.messageId, event.data && event.data.data(), deps()); }
       catch (e) { console.error('inboxPushOnMessage failed', e && e.code, e && e.message); }
