@@ -159,6 +159,11 @@ body.show-chat #chatPane{display:flex}
 .draft--needs .draft__title{color:var(--amber)}
 .draft--info{background:#f3f2ef;border-color:var(--line)}
 
+/* ---------- embedded in the admin: the admin owns the title row, the Admin link and alerts ---------- */
+html.embed .top__row--title,html.embed #alertsBtn,html.embed .pane__foot{display:none}
+html.embed .pane__top{padding-top:8px}
+html.embed body{background:var(--bg)}
+
 /* ---------- composer ---------- */
 .reply{flex:none;background:var(--bg);border-top:1px solid var(--line);padding:8px var(--chat-pad) calc(8px + env(safe-area-inset-bottom))}
 .reply__row{display:flex;gap:8px;align-items:flex-end}
@@ -191,9 +196,25 @@ import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/
 import { requireInboxUser, inboxUserFor } from "./shared/inbox-auth.js";
 import { replyWarnings } from "./shared/inbox-reply-warnings.js";
 
+/* ---------- inside the admin (embed) ---------- */
+const QS = new URLSearchParams(location.search);
+const EMBED = QS.get("embed") === "1" && window.parent !== window;
+const SIGNIN_RETURN = QS.get("signin") === "1";                 // opened full page just to sign in, then back to the admin tab
+let inboxMode = "page";
+try { inboxMode = localStorage.getItem("maxela_inbox_open") === "tab" ? "tab" : "page"; } catch (e) { /* page */ }
+if (!EMBED && !SIGNIN_RETURN && QS.get("standalone") !== "1" && inboxMode === "tab") {
+  // The admin setting says "inside the admin": alert taps and bookmarks to /inbox go to the admin's Inbox tab.
+  const m = location.hash.match(/^#c\/(.+)$/);
+  location.replace("/checkin-admin?tab=inbox" + (m ? "&c=" + m[1] : ""));
+}
+if (EMBED) document.documentElement.classList.add("embed");
+const tellAdmin = msg => { if (EMBED) { try { window.parent.postMessage(Object.assign({ source: "maxela-inbox" }, msg), location.origin); } catch (e) { /* ignore */ } } };
+/* Switched OFF until the console steps in the report are done (see docs/INBOX_PLAN.md): the sign-in pop-up then runs on our own domain. */
+const USE_OWN_AUTH_DOMAIN = false;
+
 const firebaseConfig = {
   apiKey: "AIzaSyCbggwwtdw751yQUO6MaHCuYKyNn7AyOTk",
-  authDomain: "sleepy-5c962.firebaseapp.com",
+  authDomain: USE_OWN_AUTH_DOMAIN ? "app.maxelaapartments.com" : "sleepy-5c962.firebaseapp.com",
   projectId: "sleepy-5c962",
   storageBucket: "sleepy-5c962.firebasestorage.app",
   messagingSenderId: "152940098906",
@@ -422,6 +443,13 @@ async function toggleAlerts() {
   }
 }
 
+/* App icon badge (iOS 16.4+ Home Screen app with notifications allowed): the Needs reply count. */
+let lastBadge = -1;
+function setBadge(n) {
+  if (n === lastBadge) return; lastBadge = n;
+  try { if (navigator.setAppBadge) { if (n > 0) navigator.setAppBadge(n); else navigator.clearAppBadge(); } } catch (e) { /* no badge here */ }
+}
+
 /* ---------- routing ---------- */
 const route = () => {
   const h = location.hash.replace(/^#/, "");
@@ -442,6 +470,7 @@ const goBackToList = () => { if (cameFromList && history.length > 1) { cameFromL
 /* ---------- render ---------- */
 function render() {
   const r = route();
+  tellAdmin({ type: "route", page: r.page, id: r.page === "conv" ? r.id : null });
   document.body.classList.toggle("show-chat", r.page !== "list");
   renderList(r);
   if (r.page !== "conv") stopMsgs();
@@ -459,7 +488,7 @@ const AI_MODE_TEXT = {
 function buildListTop() {
   topBuilt = true;
   $("listTop").innerHTML = `
-    <div class="top__row"><div class="top__title">Guest inbox</div>
+    <div class="top__row top__row--title"><div class="top__title">Guest inbox</div>
       <button class="linkbtn" id="adminBtn" type="button">Admin</button></div>
     <div class="top__row"><button class="chip" id="aiChip" type="button">AI: ...</button><span class="grow"></span>
       <button class="linkbtn" id="alertsBtn" type="button"></button></div>
@@ -516,7 +545,7 @@ function renderList(r) {
   if (tab === "needs") rows.sort((a, b) => waitSince(a) - waitSince(b));
   $("listTop").querySelectorAll(".tab").forEach(b => {
     b.classList.toggle("on", b.dataset.tab === tab);
-    if (b.dataset.tab === "needs") b.innerHTML = `Needs reply<small>${nNeeds}</small>`;
+    if (b.dataset.tab === "needs") { b.innerHTML = `Needs reply<small>${nNeeds}</small>`; setBadge(nNeeds); }
   });
   $("reviewBtn").textContent = `Other Booking.com emails (${reviewItems.length})`;
   $("alertsBtn").textContent = alertsLabel();
@@ -637,6 +666,7 @@ function drawHead(c) {
       <button class="btn" id="doneBtn" type="button">${c.done ? icon("undo") + "Not done" : icon("check") + "Done"}</button>
       ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">${icon("out")}Open in Booking.com</a>` : ""}
     </div>`;
+  tellAdmin({ type: "title", title: c.guestName || "Guest" });
   $("backBtn").onclick = goBackToList;
   const mb = $("moreBtn");
   mb.addEventListener("pointerdown", e => e.preventDefault());     // keeps the keyboard open
@@ -783,8 +813,8 @@ function buildReplyBar(id) {
   const count = () => { const n = ta.value.length; $("replyCount").textContent = n > MAX_REPLY * 0.8 ? `${n} / ${MAX_REPLY}` : ""; };
   const syncSend = () => { const b = $("sendBtn"); if (b) b.disabled = !ta.value.trim() || !!sendingNow[id]; };
   ta.oninput = () => { drafts[id] = ta.value; $("replyWarn").innerHTML = ""; $("replyErr").hidden = true; fit(); count(); syncSend(); };
-  ta.addEventListener("focus", () => { if (isNarrow()) $("chatPane").classList.add("typing"); });
-  ta.addEventListener("blur", () => { $("chatPane").classList.remove("typing", "menu-open"); });
+  ta.addEventListener("focus", () => { tellAdmin({ type: "composer", focused: true }); if (isNarrow()) $("chatPane").classList.add("typing"); });
+  ta.addEventListener("blur", () => { tellAdmin({ type: "composer", focused: false }); $("chatPane").classList.remove("typing", "menu-open"); });
   syncSend();
   ta.onkeydown = e => {
     if (e.key === "Enter" && !e.shiftKey && !IS_TOUCH && !e.isComposing) { e.preventDefault(); trySend(id); }
@@ -908,7 +938,12 @@ function start() {
 }
 // Stay signed in on this phone or computer: the sign-in is kept in the browser's local storage until I sign out.
 try { await setPersistence(auth, browserLocalPersistence); } catch (e) { /* the default (also kept) is fine */ }
-requireInboxUser({ auth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut }, { onReady: user => { me = inboxUserFor(user && user.email); start(); } });
+window.addEventListener("message", ev => {
+  if (!EMBED || ev.origin !== location.origin || ev.source !== window.parent || !ev.data || ev.data.source !== "maxela-admin") return;
+  if (ev.data.type === "open" && ev.data.c) go("c/" + encodeURIComponent(String(ev.data.c)));
+  if (ev.data.type === "list") go("");
+});
+requireInboxUser({ auth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut }, { onReady: user => { me = inboxUserFor(user && user.email); if (SIGNIN_RETURN) { location.replace("/checkin-admin?tab=inbox"); return; } tellAdmin({ type: "ready" }); start(); } });
 </script>
 </body>
 </html>

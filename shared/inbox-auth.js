@@ -91,5 +91,6 @@ export function requireInboxUser(sdk, { onReady } = {}) {
     }
     overlay.style.display = "flex";
     btn.disabled = false;
+    if (window.parent !== window) { try { window.parent.postMessage({ source: "maxela-inbox", type: "auth-needed" }, location.origin); } catch (e) { /* ignore */ } }
   });
 }
