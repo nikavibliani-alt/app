@@ -151,6 +151,14 @@ body.show-chat #chatPane{display:flex}
 
 /* ---------- AI draft, notes ---------- */
 .draft{flex:none;margin:0 var(--chat-pad) 8px;border:1.5px solid var(--ink-2);background:var(--surface);border-radius:12px;padding:10px 12px}
+.reqbtn{display:inline-flex;align-items:center;min-height:44px;border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:600;text-decoration:underline;padding:0 4px}
+.reqdone{display:inline-block;font-size:12px;font-weight:600;color:var(--green);padding:4px 4px 0}
+#bpanel{position:absolute;top:0;right:0;bottom:0;width:100%;max-width:380px;background:var(--bg);border-left:1px solid var(--line);z-index:8;display:flex;flex-direction:column}
+@media (max-width:859px){#bpanel{max-width:none;border-left:0}}
+#bpanel[hidden]{display:none}
+.bp__row{padding:10px 16px;border-bottom:1px solid var(--line)}
+.bp__k{font-size:12px;color:var(--muted)}
+.bp__v{font-size:15px;font-weight:600;overflow-wrap:anywhere}
 .aiwait{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 var(--chat-pad);padding:8px 12px;border:1.5px solid var(--ink);border-radius:var(--r);background:var(--surface);font-size:14px}
 .aiwait:empty{display:none}
 .aiwait__t{flex:1;min-width:140px;font-weight:600}
@@ -249,6 +257,8 @@ const alertsFn = httpsCallable(fns, "inboxAlerts");
 const reviewHandledFn = httpsCallable(fns, "inboxReviewHandled");
 const aiActionFn = httpsCallable(fns, "inboxAiAction");
 const aiKnowledgeFn = httpsCallable(fns, "inboxAiKnowledge");
+const bookingPanelFn = httpsCallable(fns, "inboxBookingPanel");
+const requestCreateFn = httpsCallable(fns, "inboxRequestCreate");
 
 const TZ = "Asia/Tbilisi";
 const $ = id => document.getElementById(id);
@@ -523,6 +533,68 @@ function paintPresence() {
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && presenceFor) writePresence(presenceFor, presenceTyping); });
 window.addEventListener("pagehide", () => stopPresence());
 setInterval(() => { paintPresence(); }, 15000);
+
+/* ---------- connected to the rest of the admin (Step 6) ---------- */
+const panelCache = {};        // conversation -> the booking panel answer (facts + requests made from this chat)
+async function loadPanel(id, force) {
+  if (panelCache[id] && !force) return panelCache[id];
+  try { panelCache[id] = (await bookingPanelFn({ bookingNumber: id })).data; }
+  catch (e) { panelCache[id] = { error: (e && e.message) || "Could not load." }; }
+  if ($("chatPane").dataset.conv === id) { paintOpenBooking(id); if (msgsFor === id) drawThread(); }
+  return panelCache[id];
+}
+function requestBtn(id, m) {
+  if (!m.id || String(m.id).startsWith("pending")) return "";
+  const p = panelCache[id];
+  const r = p && p.requests ? p.requests.find(x => x.messageId === m.id) : null;
+  if (r) return `<div class="reqdone">Request created: ${esc(String(r.status || "PENDING").toLowerCase())}</div>`;
+  return `<button class="reqbtn" type="button" data-req="${esc(m.id)}" data-conv="${esc(id)}">+ Request</button>`;
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest && e.target.closest("[data-req]"); if (!b) return;
+  b.disabled = true; b.textContent = "Creating...";
+  try {
+    await requestCreateFn({ bookingNumber: b.dataset.conv, messageId: b.dataset.req });
+    await loadPanel(b.dataset.conv, true);
+    showToast("Request created. It is in the Requests list.");
+  } catch (err) { showToast("Could not create the request: " + ((err && err.message) || "try again")); b.disabled = false; b.textContent = "+ Request"; }
+});
+function paintOpenBooking(id) {
+  const b = $("openBookingBtn"); if (!b) return;
+  const p = panelCache[id];
+  const hc = p && p.reservationNumber;
+  b.hidden = !hc;
+  b.onclick = () => {
+    if (EMBED) tellAdmin({ type: "open-booking", hc });
+    else location.href = "/checkin-admin?hc=" + encodeURIComponent(hc);
+  };
+}
+const fmtIso = s => { if (!s) return ""; const d = new Date(s + "T12:00:00Z"); return isNaN(d) ? s : fmt(d, { day: "numeric", month: "short" }); };
+async function openBookingPanel(id) {
+  let el = $("bpanel");
+  if (!el) { el = document.createElement("div"); el.id = "bpanel"; $("chatPane").appendChild(el); }
+  el.hidden = false;
+  el.innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn" id="bpClose" type="button" aria-label="Close">${icon("back")}Chat</button><div class="head__name">Booking</div></div></div><div class="pane__scroll"><div class="msg">Loading...</div></div>`;
+  $("bpClose").onclick = () => { el.hidden = true; };
+  const p = await loadPanel(id, true);
+  if (el.hidden || $("chatPane").dataset.conv !== id) return;
+  const row = (k, v) => (v ? `<div class="bp__row"><div class="bp__k">${esc(k)}</div><div class="bp__v">${esc(v)}</div></div>` : "");
+  let body;
+  if (p.error) body = `<div class="err">${esc(p.error)}</div>`;
+  else {
+    const r = p.reservation || {};
+    body = row("Dates", r.checkin ? `${fmtIso(r.checkin)} to ${fmtIso(r.checkout)}${r.nights != null ? `, ${r.nights} night${r.nights === 1 ? "" : "s"}` : ""}` : "")
+      + row("Room", r.room) + row("Guests", r.guests ? String(r.guests) : "") + row("Reservation status", r.status)
+      + (p.form ? row("Check-in form", p.form.filled ? "Filled in" : "Not filled in yet") : "")
+      + (p.access ? row("Door access", p.access.text) : "")
+      + (p.cleaning ? row("Cleaning today", p.cleaning.text) : "")
+      + (p.previous && p.previous.length ? row("Earlier stays (same name)", p.previous.map(x => `${fmtIso(x.checkin)} to ${fmtIso(x.checkout)}${x.room ? ", room " + x.room : ""}`).join("\n")) : "")
+      + (!p.found ? `<div class="msg">This chat is not linked to a reservation yet.</div>` : "")
+      + (p.notes && p.notes.length ? `<div class="msg">Some facts could not be read: ${esc(p.notes.join("; "))}</div>` : "");
+  }
+  el.innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn" id="bpClose" type="button" aria-label="Close">${icon("back")}Chat</button><div class="head__name">Booking</div></div></div><div class="pane__scroll" style="white-space:pre-line">${body}</div>`;
+  $("bpClose").onclick = () => { el.hidden = true; };
+}
 
 /* ---------- keeping an eye on the AI (Step 5) ---------- */
 const aiPaused = c => Number(c && c.aiPausedUntil) > Date.now();
@@ -888,7 +960,7 @@ function renderConv(id) {
   if (!c) {
     pane.dataset.conv = "";
     pane.innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button></div></div>
-      <div class="placeholder">${loaded.convs ? "This conversation was not found." : "Loading..."}</div>`;
+      <div class="placeholder">${loaded.convs ? "No messages yet." : "Loading..."}</div>`;
     if ($("backBtn")) $("backBtn").onclick = goBackToList;
     return;
   }
@@ -901,6 +973,7 @@ function renderConv(id) {
   startPresence(id); paintPresence();
   drawHead(c);
   paintAiWait(c);
+  if (!panelCache[id]) loadPanel(id);
   drawDraft(c);
   const canReply = /@guest\.booking\.com$/i.test(c.replyTo || "");
   $("replyBar").style.display = canReply ? "" : "none";
@@ -939,6 +1012,8 @@ function drawHead(c) {
     <div class="actions">
       <button class="btn" id="doneBtn" type="button">${c.done ? icon("undo") + "Not done" : icon("check") + "Done"}</button>
       ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">${icon("out")}Open in Booking.com</a>` : ""}
+      <button class="btn" id="bookingBtn" type="button">Booking details</button>
+      <button class="btn" id="openBookingBtn" type="button" hidden>Open booking</button>
       ${aiMode && aiMode !== "off" ? `<button class="btn" id="pauseAiBtn" type="button">${aiPaused(c) ? "Resume AI" : "Pause AI"}</button>` : ""}
     </div>`;
   tellAdmin({ type: "title", title: c.guestName || "Guest" });
@@ -946,6 +1021,8 @@ function drawHead(c) {
   const mb = $("moreBtn");
   mb.addEventListener("pointerdown", e => e.preventDefault());     // keeps the keyboard open
   mb.onclick = () => $("chatPane").classList.toggle("menu-open");
+  $("bookingBtn").onclick = () => { $("chatPane").classList.remove("menu-open"); openBookingPanel(id); };
+  paintOpenBooking(id);
   if ($("pauseAiBtn")) $("pauseAiBtn").onclick = () => { $("chatPane").classList.remove("menu-open"); if (aiPaused(c)) aiAct(id, { action: "resume" }); else showPauseChoices(id); };
   $("doneBtn").onclick = async e => {
     const b = e.currentTarget; b.disabled = true;
@@ -1004,7 +1081,7 @@ function drawThread() {
         : `<div class="me"><div class="bubble--me">${esc(m.text)}</div>
           <div class="me__status">${time}${time ? " · " : ""}${m.sentByName ? esc(m.sentByName) + " · " : ""}${statusHtml(m, laterSame, c)}</div></div>`);
     } else {
-      out.push(`<div class="bubble">${esc(m.text)}<div class="bubble__time">${time}</div></div>`);
+      out.push(`<div class="bubble">${esc(m.text)}<div class="bubble__time">${time}</div></div>${requestBtn(id, m)}`);
     }
   });
   const line = c ? checkinLine(c) : "";
