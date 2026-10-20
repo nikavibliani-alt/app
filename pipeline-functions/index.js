@@ -67,3 +67,5 @@ const { registerCloudFunctions: registerInboxReview } = require('./controllers/i
 Object.assign(exports, registerInboxReview());   // inboxReviewHandled
 const { registerCloudFunctions: registerInboxAiAdmin } = require('./controllers/inboxAiAdmin');
 Object.assign(exports, registerInboxAiAdmin());   // inboxAiAction, inboxAiKnowledge
+const { registerCloudFunctions: registerInboxBooking } = require('./controllers/inboxBooking');
+Object.assign(exports, registerInboxBooking());   // inboxBookingPanel, inboxRequestCreate

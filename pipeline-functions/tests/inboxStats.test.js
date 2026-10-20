@@ -42,12 +42,12 @@ test('the stats document is written only when a number changed', async () => {
     }),
   };
   const deps = { db, now: () => 'NOW' };
-  assert.deepStrictEqual(await refreshInboxStats(deps), { needsReply: 1, cancelRequests: 0, changed: true });
+  assert.deepStrictEqual(await refreshInboxStats(deps), { needsReply: 1, cancelRequests: 0, arrivalsWaiting: 0, changed: true });
   assert.strictEqual(store.get('globals/inboxStats').needsReply, 1);
   assert.strictEqual((await refreshInboxStats(deps)).changed, false);
   assert.strictEqual(writes, 1);
   store.set('inbox_conversations/3', { done: false, needsReply: true, messageCount: 2 });
-  assert.deepStrictEqual(await refreshInboxStats(deps), { needsReply: 2, cancelRequests: 0, changed: true });
+  assert.deepStrictEqual(await refreshInboxStats(deps), { needsReply: 2, cancelRequests: 0, arrivalsWaiting: 0, changed: true });
 });
 
 test('a cancellation request on a booking that is already cancelled needs nothing; check-in changes count', () => {
@@ -59,4 +59,20 @@ test('a cancellation request on a booking that is already cancelled needs nothin
   const a = { done: false, needsReply: true, messageCount: 0 };
   assert.ok(statsRelevantChange(a, { ...a, checkinRequest: { time: '17:00' } }));
   assert.ok(statsRelevantChange(a, { ...a, reservationStatus: 'CANCELLED' }));
+});
+
+test('arrivals today waiting for a reply: a number only, today\'s check-ins that still need an answer', () => {
+  const { arrivalsWaiting, tbilisiToday } = require('../lib/inboxStats');
+  assert.strictEqual(tbilisiToday(Date.UTC(2026, 10, 9, 21, 0, 0)), '2026-11-10');   // 01:00 in Tbilisi already the next day
+  const today = '2026-11-09';
+  const list = [
+    { checkin: today, needsReply: true, messageCount: 1 },
+    { checkin: today, needsReply: true, messageCount: 2, done: true },
+    { checkin: today, needsReply: true, messageCount: 1, reservationStatus: 'CANCELLED' },
+    { checkin: '2026-11-10', needsReply: true, messageCount: 1 },
+    { checkin: today, needsReply: false, messageCount: 1 },
+    { checkin: today, needsReply: true, messageCount: 1 },
+  ];
+  assert.strictEqual(arrivalsWaiting(list, today), 2);
+  assert.strictEqual(arrivalsWaiting([], today), 0);
 });

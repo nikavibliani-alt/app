@@ -23,10 +23,20 @@ function computeInboxStats(conversations) {
   return { needsReply: n, cancelRequests: cancels };
 }
 
+/** How many guests arriving today (check-in date = today) are waiting for a reply. Numbers only. */
+function arrivalsWaiting(conversations, today) {
+  let n = 0;
+  for (const c of conversations || []) {
+    if (c && today && c.checkin === today && visible(c) && needsReply(c) && !cancelled(c)) n++;
+  }
+  return n;
+}
+const tbilisiToday = nowMs => new Date(nowMs + 4 * 3600000).toISOString().slice(0, 10);
+
 /** Did anything that changes the number change? (Avoids recounting on draft or counter updates.) */
 function statsRelevantChange(before, after) {
-  const pick = c => (c ? [!!c.done, !!c.needsReply, !!c.cancelRequest, !!c.checkinRequest, String(c.reservationStatus || ''), c.messageCount || 0] : null);
+  const pick = c => (c ? [!!c.done, !!c.needsReply, !!c.cancelRequest, !!c.checkinRequest, String(c.reservationStatus || ''), c.messageCount || 0, c.checkin || ''] : null);
   return JSON.stringify(pick(before)) !== JSON.stringify(pick(after));
 }
 
-module.exports = { computeInboxStats, statsRelevantChange };
+module.exports = { arrivalsWaiting, tbilisiToday, computeInboxStats, statsRelevantChange };
