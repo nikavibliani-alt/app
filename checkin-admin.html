@@ -929,57 +929,6 @@ html.inbox-typing #main-nav{display:none}
           <span class="switch-track"></span>
         </label>
       </div>
-      <div class="more-item more-item--mode" role="group" aria-label="Booking.com AI">
-        <div class="more-item__text">
-          <div class="more-item__title">Booking.com AI</div>
-          <div class="more-item__sub" id="more-booking-ai-status">Loading…</div>
-        </div>
-        <div class="seg3" id="more-booking-ai-mode">
-          <button type="button" data-mode="off" onclick="waSetBookingAiMode('off')">Off</button>
-          <button type="button" data-mode="drafts" onclick="waSetBookingAiMode('drafts')">Drafts</button>
-          <button type="button" data-mode="auto" onclick="waSetBookingAiMode('auto')">Automatic</button>
-        </div>
-      </div>
-      <div class="more-item more-item--mode" role="group" aria-label="AI answer alerts">
-        <div class="more-item__text">
-          <div class="more-item__title">AI answer alerts</div>
-          <div class="more-item__sub" id="more-ai-alert-status">Loading…</div>
-        </div>
-        <div class="seg3" id="more-ai-alert-mode">
-          <button type="button" data-mode="every" onclick="waSetAiAlertMode('every')">Every answer</button>
-          <button type="button" data-mode="needs" onclick="waSetAiAlertMode('needs')">Only when it needs you</button>
-        </div>
-      </div>
-      <div class="more-item more-item--switch" role="group" aria-label="Sign AI replies">
-        <div class="more-item__text">
-          <div class="more-item__title">Sign AI replies</div>
-          <div class="more-item__sub" id="more-ai-sign-status">Loading…</div>
-        </div>
-        <label class="switch" title="Add a short line to the first AI reply in a chat">
-          <input type="checkbox" id="more-ai-sign-toggle" onchange="waSetAiSign(this.checked)">
-          <span class="switch-track"></span>
-        </label>
-      </div>
-      <div class="more-item more-item--switch" role="group" aria-label="Booking.com message alerts">
-        <div class="more-item__text">
-          <div class="more-item__title">Booking.com message alerts</div>
-          <div class="more-item__sub" id="more-booking-alerts-status">Loading…</div>
-        </div>
-        <label class="switch" title="Turn Booking.com message alerts on or off">
-          <input type="checkbox" id="more-booking-alerts-toggle" onchange="waSetBookingAlerts(this.checked)">
-          <span class="switch-track"></span>
-        </label>
-      </div>
-      <div class="more-item more-item--mode" role="group" aria-label="Inbox opens">
-        <div class="more-item__text">
-          <div class="more-item__title">Inbox opens</div>
-          <div class="more-item__sub" id="more-inbox-open-status"></div>
-        </div>
-        <div class="seg3" id="more-inbox-open">
-          <button type="button" data-mode="tab" onclick="setInboxOpen('tab')">Inside the admin</button>
-          <button type="button" data-mode="page" onclick="setInboxOpen('page')">As its own page</button>
-        </div>
-      </div>
       <span id="more-list-guest" style="display:contents"></span>
     </div>
     <div class="more-section">Housekeeping setup</div>
@@ -1509,6 +1458,7 @@ const DESTINATIONS=[
   {id:'history',label:'Guest history',tabLabel:'History',icon:'clock',tab:'history',section:'ops'},
   {id:'pricing',label:'Pricing engine',tabLabel:'Pricing',icon:'trending-up',href:'/pricing-v2',section:'ops'},
   {id:'inbox',label:'Guest inbox',tabLabel:'Inbox',icon:'inbox',...(INBOX_IN_TAB?{tab:'inbox'}:{href:'/inbox'}),section:'ops',badge:'inbox',hint:'Booking.com messages'},
+  {id:'inboxsettings',label:'Booking.com inbox',tabLabel:'Inbox setup',icon:'sliders-horizontal',section:'ops',hint:'Settings and AI tools',moreClick:"openInbox(null,'settings')"},
   {id:'failures',label:'Failed searches',tabLabel:'Failed',icon:'search',tab:'failures',section:'ops',badge:'failures',moreId:'more-failures-btn'},
   {id:'wasettings',label:'WhatsApp & bot settings',tabLabel:'WhatsApp',icon:'message-circle',tab:'wasettings',section:'guest',hint:'Modes · templates'},
   {id:'hksettings',label:'HK settings',tabLabel:'HK setup',icon:'sliders-horizontal',tab:'hksettings',section:'hksetup'},
@@ -1533,8 +1483,8 @@ function renderMoreMenu(){
   }
 }
 function navTabSvg(id,size=22){return featherIcon(NAV_POOL[id]?.icon||'circle',size,1.8);}
-function navDestIsLink(id){return !!NAV_POOL[id]?.href;}
-function navDestClick(d){return d.href?`location.href='${d.href}'`:`switchTab('${d.pane}')`;}
+function navDestIsLink(id){const d=NAV_POOL[id];return !!(d&&(d.href||(!d.pane&&d.moreClick)));}
+function navDestClick(d){return d.href?`location.href='${d.href}'`:d.pane?`switchTab('${d.pane}')`:(d.moreClick||`switchTab('stay')`);}
 /* panes that are covered by the current tab bar; every other page highlights More */
 function navBarPanes(slots){
   const set=new Set();
@@ -4673,8 +4623,8 @@ window.closeHistoryPhoto=function(){
 /* ---------- Inbox inside the admin: /inbox?embed=1 in a frame, created on the first visit and kept loaded ---------- */
 let _inboxFrame=null,_inboxReady=false,_inboxQueue=null,_inboxTyping=false;
 function openInbox(c,view){
-  if(INBOX_IN_TAB){_inboxQueue=view==='ai'?'@ai':(c||null);switchTab('inbox');return false;}
-  location.href='/inbox'+(view==='ai'?'#ai':c?'#c/'+encodeURIComponent(c):'');return false;
+  if(INBOX_IN_TAB){_inboxQueue=view?'@'+view:(c||null);switchTab('inbox');return false;}
+  location.href='/inbox'+(view?'#'+view:c?'#c/'+encodeURIComponent(c):'');return false;
 }
 window.openInbox=openInbox;
 function showInboxTab(){
@@ -4682,10 +4632,10 @@ function showInboxTab(){
   if(!_inboxFrame){
     _inboxFrame=document.createElement('iframe');
     _inboxFrame.title='Guest inbox';
-    _inboxFrame.src='/inbox?embed=1'+(_inboxQueue==='@ai'?'#ai':_inboxQueue?'#c/'+encodeURIComponent(_inboxQueue):'');
+    _inboxFrame.src='/inbox?embed=1'+(_inboxQueue&&_inboxQueue[0]==='@'?'#'+_inboxQueue.slice(1):_inboxQueue?'#c/'+encodeURIComponent(_inboxQueue):'');
     _inboxQueue=null;
     wrap.insertBefore(_inboxFrame,wrap.firstChild);
-  }else if(_inboxQueue){inboxSend(_inboxQueue==='@ai'?{type:'view',view:'ai'}:{type:'open',c:_inboxQueue});_inboxQueue=null;}
+  }else if(_inboxQueue){inboxSend(_inboxQueue[0]==='@'?{type:'view',view:_inboxQueue.slice(1)}:{type:'open',c:_inboxQueue});_inboxQueue=null;}
   layoutInbox();
 }
 function inboxSend(m){try{_inboxFrame?.contentWindow?.postMessage(Object.assign({source:'maxela-admin'},m),location.origin);}catch(e){}}
@@ -4704,6 +4654,7 @@ if(window.visualViewport){visualViewport.addEventListener('resize',layoutInbox);
 window.addEventListener('message',ev=>{
   if(ev.origin!==location.origin||!ev.data||ev.data.source!=='maxela-inbox'||ev.source!==_inboxFrame?.contentWindow)return;
   const d=ev.data;
+  if(d.type==='inbox-mode-changed'){setTimeout(()=>location.reload(),500);return;}
   if(d.type==='open-booking'&&d.hc&&typeof openHcDetail==='function'){openHcDetail(String(d.hc));return;}
   if(d.type==='ready'){_inboxReady=true;document.getElementById('inbox-signin')?.classList.remove('show');}
   if(d.type==='auth-needed'){_inboxReady=false;document.getElementById('inbox-signin')?.classList.add('show');}
@@ -7038,7 +6989,7 @@ onSnapshot(doc(db,'globals','elevator_code'),snap=>{
 });
 setInterval(()=>{if(currentTab==='elevator')renderElevator();loadElevatorOnce();},60000);
 setTimeout(()=>{document.getElementById('loading').style.display='none';if(!_resCache&&!_resSubscribed)_loadResCache();if(loaded<2){if(STANDALONE_HK)hkInitStandalone();else switchTab(currentTab);}},5000);
-try{const qp=new URLSearchParams(location.search);const qc=qp.get('c');if(INBOX_IN_TAB&&currentTab==='inbox'){if(qp.get('view')==='ai')_inboxQueue='@ai';else if(qc)_inboxQueue=qc;}}catch(e){}   // alert tap: /checkin-admin?tab=inbox&c=<booking number>
+try{const qp=new URLSearchParams(location.search);const qc=qp.get('c');if(INBOX_IN_TAB&&currentTab==='inbox'){if(['ai','settings','knowledge'].includes(qp.get('view')))_inboxQueue='@'+qp.get('view');else if(qc)_inboxQueue=qc;}}catch(e){}   // alert tap: /checkin-admin?tab=inbox&c=<booking number>
 if(!STANDALONE_HK)switchTab(currentTab);
 </script>
 <script>
