@@ -231,7 +231,7 @@ try { inboxMode = localStorage.getItem("maxela_inbox_open") === "tab" ? "tab" : 
 if (!EMBED && !SIGNIN_RETURN && QS.get("standalone") !== "1" && inboxMode === "tab") {
   // The admin setting says "inside the admin": alert taps and bookmarks to /inbox go to the admin's Inbox tab.
   const m = location.hash.match(/^#c\/(.+)$/);
-  location.replace("/checkin-admin?tab=inbox" + (m ? "&c=" + m[1] : location.hash === "#ai" ? "&view=ai" : ""));
+  location.replace("/checkin-admin?tab=inbox" + (m ? "&c=" + m[1] : /^#(ai|settings|knowledge)$/.test(location.hash) ? "&view=" + location.hash.slice(1) : ""));
 }
 if (EMBED) document.documentElement.classList.add("embed");
 const tellAdmin = msg => { if (EMBED) { try { window.parent.postMessage(Object.assign({ source: "maxela-inbox" }, msg), location.origin); } catch (e) { /* ignore */ } } };
@@ -257,6 +257,7 @@ const alertsFn = httpsCallable(fns, "inboxAlerts");
 const reviewHandledFn = httpsCallable(fns, "inboxReviewHandled");
 const aiActionFn = httpsCallable(fns, "inboxAiAction");
 const aiKnowledgeFn = httpsCallable(fns, "inboxAiKnowledge");
+const settingsSaveFn = httpsCallable(fns, "inboxSettingsSave");
 const bookingPanelFn = httpsCallable(fns, "inboxBookingPanel");
 const requestCreateFn = httpsCallable(fns, "inboxRequestCreate");
 
@@ -435,7 +436,7 @@ const deviceId = () => {
   } catch { return newId(); }
 };
 const alertsLabel = () => (alertsBusy ? "Alerts..." : alertsOn ? "Alerts on" : "Turn on alerts");
-function paintAlerts() { const b = $("alertsBtn"); if (b) b.textContent = alertsLabel(); }
+function paintAlerts() { const b = $("alertsBtn"); if (b) b.textContent = alertsLabel(); if (started && route().page === "settings") drawSettings(); }
 const b64ToBytes = s => { const p = "=".repeat((4 - (s.length % 4)) % 4); const r = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from([...r].map(c => c.charCodeAt(0))); };
 async function checkAlertsStatus() {
   try {
@@ -626,6 +627,7 @@ document.addEventListener("click", e => { const b = e.target.closest && e.target
 
 /* "AI will reply in 0:45" with Stop, or the pause note, above the draft box */
 let aiWaitTimer = null;
+let cfgData = {};
 function paintAiWait(c) {
   const el = $("aiWait"); if (!el) return;
   clearInterval(aiWaitTimer);
@@ -669,21 +671,16 @@ function renderAiView() {
   const pane = $("chatPane");
   if (pane.dataset.conv !== "ai") {
     pane.dataset.conv = "ai";
-    pane.innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
-      <div class="head__name">AI view</div><button class="linkbtn" id="toKnowledge" type="button">AI knowledge</button></div></div>
+    pane.innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn" id="backBtn" type="button" aria-label="Back to settings">${icon("back")}Settings</button>
+      <div class="head__name">AI review</div><button class="linkbtn" id="toKnowledge" type="button">AI knowledge</button></div></div>
       <div class="pane__scroll" id="aiScroll">
         <div class="sect" id="aiSecToday"></div><div class="stack" id="aiToday"></div>
         <div class="sect" id="aiSecHeld"></div><div class="stack" id="aiHeld"></div>
         <div class="sect" id="aiSecNeeds"></div><div class="stack" id="aiNeeds"></div>
         <div class="sect">Questions the AI could not answer</div><div class="stack" id="aiUnans"></div>
-        <div class="sect">Try a question</div>
-        <div class="testbox"><textarea id="tbQ" rows="2" maxlength="500" placeholder="Type what a guest might ask" aria-label="Guest question"></textarea>
-          <input id="tbRoom" type="text" placeholder="Room, for example 6-2 (optional)" aria-label="Room" autocomplete="off">
-          <button class="btn btn--primary" id="tbGo" type="button">Show the AI's reply</button><div id="tbOut" class="rv__meta">Nothing is sent to anyone.</div></div>
       </div>`;
-    $("backBtn").onclick = goBackToList;
+    $("backBtn").onclick = () => go("settings");
     $("toKnowledge").onclick = () => go("knowledge");
-    $("tbGo").onclick = runTestBox;
     $("aiScroll").addEventListener("click", e => {
       const o = e.target.closest("[data-open]"); if (o) go("c/" + encodeURIComponent(o.dataset.open));
       const a = e.target.closest("[data-addanswer]"); if (a) addAnswerFor(a.dataset.addanswer);
@@ -736,6 +733,67 @@ async function runTestBox() {
   b.disabled = false;
 }
 
+/* ---------- the one settings page ---------- */
+async function saveSetting(patch, okText) {
+  try { await settingsSaveFn(patch); if (okText) showToast(okText); }
+  catch (e) { showToast("Could not save: " + ((e && e.message) || "try again")); }
+}
+const segBtns = (name, opts, cur) => `<div class="tabs" data-seg="${name}">${opts.map(([v, t]) => `<button class="tab ${cur === v ? "on" : ""}" type="button" data-v="${v}">${esc(t)}</button>`).join("")}</div>`;
+function setInboxOpenMode(m) {
+  try { localStorage.setItem("maxela_inbox_open", m); } catch (e) { /* ignore */ }
+  if (EMBED) { showToast("Saved. Reloading..."); tellAdmin({ type: "inbox-mode-changed" }); }
+  else { showToast("Saved. It applies the next time you open the inbox from the admin."); drawSettings(); }
+}
+function renderSettings() {
+  const pane = $("chatPane");
+  if (pane.dataset.conv !== "settings") {
+    pane.dataset.conv = "settings";
+    pane.innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back to the list">${icon("back")}Inbox</button>
+      <div class="head__name">Booking.com inbox</div></div></div><div class="pane__scroll" id="setScroll"></div>`;
+    $("backBtn").onclick = goBackToList;
+    $("setScroll").addEventListener("click", e => {
+      const seg = e.target.closest("[data-seg]"), b = e.target.closest("[data-v]");
+      if (seg && b) {
+        const v = b.dataset.v;
+        if (seg.dataset.seg === "aiMode") saveSetting({ bookingAiMode: v }, "AI: " + AI_MODE_TEXT[v][0]);
+        if (seg.dataset.seg === "aiAlert") saveSetting({ aiAlertMode: v }, v === "needs" ? "AI answer alerts: only when it needs you" : "AI answer alerts: every answer");
+        if (seg.dataset.seg === "msgAlerts") saveSetting({ bookingAlertsEnabled: v === "on" }, v === "on" ? "Message alerts on" : "Message alerts off");
+        if (seg.dataset.seg === "sign") saveSetting({ aiSignReplies: v === "on" }, v === "on" ? "AI replies will say they are from the AI assistant" : "AI replies carry no AI line");
+        if (seg.dataset.seg === "opens") setInboxOpenMode(v);
+      }
+      if (e.target.closest("#setAlertsBtn")) toggleAlerts();
+      if (e.target.closest("[data-goto]")) go(e.target.closest("[data-goto]").dataset.goto);
+    });
+    $("setScroll").addEventListener("click", e => { if (e.target.closest("#tbGo")) runTestBox(); });
+  }
+  drawSettings();
+}
+function drawSettings() {
+  const el = $("setScroll"); if (!el) return;
+  const typing = el.querySelector("#tbQ") && (el.querySelector("#tbQ").value || el.querySelector("#tbRoom").value);
+  const q = typing ? { q: el.querySelector("#tbQ").value, r: el.querySelector("#tbRoom").value, o: el.querySelector("#tbOut").innerHTML } : null;
+  const mode = ["off", "drafts", "auto"].includes(aiMode) ? aiMode : null;
+  const nRev = aiToReview().length;
+  const opens = (() => { try { return localStorage.getItem("maxela_inbox_open") === "tab" ? "tab" : "page"; } catch (e) { return "page"; } })();
+  const row = (title, sub, ctl) => `<div class="rv" style="margin:0 16px 8px"><div class="rv__reason">${esc(title)}</div>${sub ? `<div class="rv__meta">${esc(sub)}</div>` : ""}<div style="margin-top:8px">${ctl}</div></div>`;
+  el.innerHTML = `<div class="sect">AI</div>
+    ${row("Booking.com AI", mode ? AI_MODE_TEXT[mode][1] : "The AI mode could not be read.", segBtns("aiMode", [["off", "Off"], ["drafts", "Drafts"], ["auto", "Automatic"]], mode))}
+    ${row("AI answer alerts", cfgData.aiAlertMode === "needs" ? "Only when it needs you, plus a summary at 21:00." : "An alert for every AI answer.", segBtns("aiAlert", [["every", "Every answer"], ["needs", "Only when it needs you"]], cfgData.aiAlertMode === "needs" ? "needs" : "every"))}
+    ${row("Sign AI replies", cfgData.aiSignReplies === true ? "The first AI reply in a chat says it is from the AI assistant." : "Replies carry no AI line.", segBtns("sign", [["off", "Off"], ["on", "On"]], cfgData.aiSignReplies === true ? "on" : "off"))}
+    <div class="sect">Alerts</div>
+    ${row("Booking.com message alerts", "All admin phones and the phones turned on in the inbox.", segBtns("msgAlerts", [["on", "On"], ["off", "Off"]], cfgData.bookingAlertsEnabled === false ? "off" : "on"))}
+    ${row("Alerts on this phone", alertsSupported() ? (alertsOn ? "On for this phone." : "Off for this phone.") : "This browser cannot show alerts. Use the Home Screen app.", alertsSupported() ? `<button class="btn" id="setAlertsBtn" type="button">${esc(alertsLabel())}</button>` : "")}
+    <div class="sect">Inbox</div>
+    ${row("Inbox opens", opens === "tab" ? "In the admin's Inbox tab, with the tab bar. Saved on this phone." : "On its own page, the old way. Saved on this phone.", segBtns("opens", [["tab", "Inside the admin"], ["page", "As its own page"]], opens))}
+    <div class="sect">AI tools</div>
+    ${row("AI review", `Today's AI replies, held drafts and what needs you.${nRev ? ` ${nRev} to review.` : ""}`, `<button class="btn" type="button" data-goto="ai">Open AI review</button>`)}
+    ${row("AI knowledge", "Corrections and extra answers. The AI only uses what you approve.", `<button class="btn" type="button" data-goto="knowledge">Open AI knowledge</button>`)}
+    <div class="testbox" style="padding:0 16px 24px"><div class="rv__reason">Try a question</div><textarea id="tbQ" rows="2" maxlength="500" placeholder="Type what a guest might ask" aria-label="Guest question"></textarea>
+      <input id="tbRoom" type="text" placeholder="Room, for example 6-2 (optional)" aria-label="Room" autocomplete="off">
+      <button class="btn btn--primary" id="tbGo" type="button">Show the AI's reply</button><div id="tbOut" class="rv__meta">Nothing is sent to anyone.</div></div>`;
+  if (q) { el.querySelector("#tbQ").value = q.q; el.querySelector("#tbRoom").value = q.r; el.querySelector("#tbOut").innerHTML = q.o; }
+}
+
 let knowItems = null, knowError = "";
 async function loadKnowledge() {
   try { knowItems = (await aiKnowledgeFn({ action: "list" })).data.items; knowError = ""; }
@@ -746,11 +804,11 @@ function renderKnowledge() {
   const pane = $("chatPane");
   if (pane.dataset.conv !== "knowledge") {
     pane.dataset.conv = "knowledge";
-    pane.innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn only-narrow" id="backBtn" type="button" aria-label="Back">${icon("back")}AI view</button>
+    pane.innerHTML = `<div class="head"><div class="head__row"><button class="iconbtn" id="backBtn" type="button" aria-label="Back to settings">${icon("back")}Settings</button>
       <div class="head__name">AI knowledge</div><button class="linkbtn" id="kAdd" type="button">Add an answer</button></div>
       <div class="head__line">Answers you approve here are added to what the Booking.com AI knows. WhatsApp is not changed.</div></div>
       <div class="pane__scroll" id="kScroll"></div>`;
-    $("backBtn").onclick = () => go("ai");
+    $("backBtn").onclick = () => go("settings");
     $("kAdd").onclick = () => addAnswerFor("");
     $("kScroll").addEventListener("click", e => {
       const b = e.target.closest("[data-k]"); if (b) knowledgeAct(b.dataset.k, b.dataset.id, b.dataset.on);
@@ -790,6 +848,7 @@ const route = () => {
   const h = location.hash.replace(/^#/, "");
   if (h === "review") return { page: "review" };
   if (h === "ai") return { page: "ai" };
+  if (h === "settings") return { page: "settings" };
   if (h === "knowledge") return { page: "knowledge" };
   if (h.startsWith("c/")) return { page: "conv", id: decodeURIComponent(h.slice(2)) };
   return { page: "list" };
@@ -814,6 +873,7 @@ function render() {
   if (r.page === "conv") renderConv(r.id);
   else if (r.page === "review") renderReview();
   else if (r.page === "ai") renderAiView();
+  else if (r.page === "settings") renderSettings();
   else if (r.page === "knowledge") renderKnowledge();
   else renderPlaceholder();
 }
@@ -839,10 +899,10 @@ function buildListTop() {
     </div>
     <div class="filters"><input id="searchBox" type="search" placeholder="Search name, booking, message" autocomplete="off" aria-label="Search">
       <select id="listingSel" aria-label="Listing"><option value="">All listings</option></select></div>
-    <div class="sub"><button class="linkbtn" id="reviewBtn" type="button"></button><button class="linkbtn" id="aiViewBtn" type="button"></button></div>`;
+    <div class="sub"><button class="linkbtn" id="reviewBtn" type="button"></button><button class="linkbtn" id="settingsBtn" type="button"></button></div>`;
   $("listTop").querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.tab; renderList(route()); });
   $("reviewBtn").onclick = () => go("review");
-  $("aiViewBtn").onclick = () => go("ai");
+  $("settingsBtn").onclick = () => go("settings");
   $("adminBtn").onclick = () => { location.href = "/checkin-admin"; };
   $("alertsBtn").onclick = toggleAlerts;
   $("searchBox").oninput = e => { searchQ = e.target.value; renderList(route()); };
@@ -860,10 +920,10 @@ function paintAiChip() {
   chip.classList.toggle("chip--on", aiMode === "auto" || aiMode === "drafts");
   chip.classList.toggle("chip--off", aiMode === "off");
   info.innerHTML = m
-    ? `<div class="card__title">AI: ${esc(m[0])}</div><div class="card__sub">${esc(m[1])} Change it in the admin: More, Booking.com AI.</div>
-       <button class="btn" id="aiOpenAdmin" type="button" style="margin-top:8px">Open admin</button>`
-    : `<div class="card__sub">The AI mode could not be read. It is set in the admin: More, Booking.com AI.</div>`;
-  const b = $("aiOpenAdmin"); if (b) b.onclick = () => { location.href = "/checkin-admin"; };
+    ? `<div class="card__title">AI: ${esc(m[0])}</div><div class="card__sub">${esc(m[1])} Change it in Settings.</div>
+       <button class="btn" id="aiOpenAdmin" type="button" style="margin-top:8px">Open settings</button>`
+    : `<div class="card__sub">The AI mode could not be read. It is set in Settings.</div>`;
+  const b = $("aiOpenAdmin"); if (b) b.onclick = () => go("settings");
 }
 
 function renderList(r) {
@@ -890,7 +950,7 @@ function renderList(r) {
   });
   $("reviewBtn").textContent = `Other Booking.com emails (${reviewItems.length})`;
   const nRev = aiToReview().length;
-  $("aiViewBtn").textContent = `AI view${nRev ? ` (${nRev} to review)` : ""}`;
+  $("settingsBtn").textContent = `Settings${nRev ? ` (${nRev} AI to review)` : ""}`;
   $("alertsBtn").textContent = alertsLabel();
   $("whoAmI").textContent = me ? `Signed in as ${me.name}` : "";
   paintAiChip();
@@ -1302,8 +1362,10 @@ function start() {
   // The AI mode (Off / Drafts / Automatic) is set in the admin and saved in globals/config.
   onSnapshot(doc(db, "globals", "config"), snap => {
     const c = snap.exists() ? snap.data() : {};
+    cfgData = c;
     aiMode = ["off", "drafts", "auto"].includes(c.bookingAiMode) ? c.bookingAiMode : (c.bookingAiDraftsEnabled === false ? "off" : "drafts");
     paintAiChip();
+    if (route().page === "settings") drawSettings();
     if (route().page === "conv") { const cv = convs.find(x => x.id === route().id); if (cv) { $("draftSlot") && ($("draftSlot").dataset.key = ""); drawDraft(cv); } }
   }, () => { aiMode = null; paintAiChip(); });
   // Who is here: one small record per conversation. Needs a Firestore rule (docs/INBOX_PLAN.md); without it this stays hidden.
@@ -1320,7 +1382,7 @@ window.addEventListener("message", ev => {
   if (!EMBED || ev.origin !== location.origin || ev.source !== window.parent || !ev.data || ev.data.source !== "maxela-admin") return;
   if (ev.data.type === "open" && ev.data.c) go("c/" + encodeURIComponent(String(ev.data.c)));
   if (ev.data.type === "list") go("");
-  if (ev.data.type === "view" && ev.data.view === "ai") go("ai");
+  if (ev.data.type === "view" && ["ai", "settings", "knowledge"].includes(ev.data.view)) go(ev.data.view);
 });
 requireInboxUser({ auth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut }, { onReady: user => { me = inboxUserFor(user && user.email); if (SIGNIN_RETURN) { location.replace("/checkin-admin?tab=inbox"); return; } tellAdmin({ type: "ready" }); start(); } });
 </script>

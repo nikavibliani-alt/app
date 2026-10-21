@@ -466,3 +466,11 @@ match /inbox_presence/{conv} {
 Tags: `inbox-in-admin-before`, `inbox-team-before`, `inbox-ai-oversight-before`, `inbox-connected-before`.
 Functions deployed by name: Step 4: `inboxSendReply`, `inboxPushOnMessage`. Step 5: `inboxAiRun`, `inboxPushOnMessage`, new `inboxAiAction`, `inboxAiKnowledge`, `inboxAiEveningSummary`. Step 6: `inboxBookingPanel`, `inboxRequestCreate` (new), `inboxStatsOnWrite`, `inboxAiRun`.
 Server tests: 160 inbox tests pass.
+
+## Update: fixes (21 Oct 2026)
+
+- **Part 0, "No Booking.com email saved":** not our code. The Gmail script runs and the save function answers 200; the script found no newer Booking.com mail after 21 Oct 02:35 (Tbilisi). Three hotels (1738886, 3156470, 8189626; Maxela, Superior, Freedom Square, probably) had their contact email changed to ltd.premiumapartments@gmail.com on 19 Oct and have produced no email since. Check Gmail for `from:booking.com newer_than:2d`; if it is empty, check Extranet, Contact persons, that the address is verified and reservations/guest messages are ticked for each of those hotels.
+- **Part 1, one settings page:** the inbox page `#settings` ("Booking.com inbox": AI mode, AI answer alerts, Sign AI replies, message alerts, alerts on this phone, Inbox opens, AI tools). The admin More menu has one entry, "Booking.com inbox", that opens it (inside the Inbox tab or on its own page). Settings are saved by the callable `inboxSettingsSave`.
+- **Part 2, all listings:** a test proves all five listing names (and a new one) are saved as chats under their own name; the listing filter has a "Listing not named" choice so nothing is hidden. Freedom Square still gets "AI needs you".
+- **Part 3:** the AI view is gone from the main screen. Settings, AI tools has AI review, AI knowledge and the test box. The "AI answered" row tag stays.
+- **Undo:** tag `inbox-fixes-before` (redeploy nothing; delete `inboxSettingsSave` if wanted).
