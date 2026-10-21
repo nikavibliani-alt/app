@@ -284,6 +284,7 @@ let loadError = "";
 let reviewError = "";
 let lastRenderedTab = "";
 let searchQ = "";           // the search box
+const NO_LISTING = "\u0000none";
 let listingFilter = "";     // the listing filter ("" = all)
 let aiMode = null;          // off | drafts | auto, from globals/config (null until read)
 let cameFromList = false;   // the chat was opened from the list in this visit (so Back can use the browser history)
@@ -871,14 +872,15 @@ function renderList(r) {
   const nNeeds = vis.filter(needsReply).length;
   // the listing filter keeps its choices in step with the conversations
   const listings = [...new Set(vis.map(c => c.propertyName).filter(Boolean))].sort();
+  if (vis.some(c => !c.propertyName)) listings.push(NO_LISTING);       // chats whose email had no listing name are never hidden
   const sel = $("listingSel");
   if (sel.options.length !== listings.length + 1 || [...sel.options].slice(1).some((o, i) => o.value !== listings[i])) {
-    sel.innerHTML = `<option value="">All listings</option>` + listings.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join("");
+    sel.innerHTML = `<option value="">All listings</option>` + listings.map(l => `<option value="${esc(l)}">${esc(l === NO_LISTING ? "Listing not named" : l)}</option>`).join("");
   }
   sel.value = listings.includes(listingFilter) ? listingFilter : "";
   const q = searchQ.trim().toLowerCase();
   const matches = c => !q || [c.guestName, c.bookingNumber, c.roomCode, c.propertyName, c.lastMessagePreview].some(x => String(x || "").toLowerCase().includes(q));
-  const rows = vis.filter(c => (!listingFilter || c.propertyName === listingFilter) && matches(c))
+  const rows = vis.filter(c => (!listingFilter || (listingFilter === NO_LISTING ? !c.propertyName : c.propertyName === listingFilter)) && matches(c))
     .filter(c => tab === "needs" ? needsReply(c) : tab === "done" ? !!c.done : true);
   // Needs reply: the guest who has waited longest first.
   if (tab === "needs") rows.sort((a, b) => waitSince(a) - waitSince(b));

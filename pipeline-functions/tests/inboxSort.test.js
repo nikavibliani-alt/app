@@ -208,3 +208,15 @@ test('helpers', () => {
   assert.strictEqual(messageFromText('x said:\nline one\n  line two\n\nReply\n'), 'line one line two');
   assert.strictEqual(scriptOf('привет'), 'cyrillic');
 });
+
+test('every Booking.com listing is saved as a chat with its own name, nothing is dropped because of the listing', () => {
+  const names = ['Super Luxury Apartments', 'Maxela Apartments', 'Shartava Deluxe Apartment', 'Superior Apartments', 'Freedom Square', 'Some New Listing'];
+  names.forEach((name, i) => {
+    const e = chatEmail({ num: String(2000000001 + i) });
+    e.bodyText = e.bodyText.replace('Demo Apartment', name);
+    if (e.bodyHtml) e.bodyHtml = e.bodyHtml.replace('Demo Apartment', name);
+    const r = sortEmail(e);
+    assert.strictEqual(r.kind, 'chat', name);
+    assert.strictEqual(r.propertyName, name);
+  });
+});
