@@ -13,7 +13,7 @@ function fakeDb(seed = {}) {
   const store = new Map(Object.entries(seed));
   const snap = p => ({ id: p.split('/').pop(), exists: store.has(p), data: () => store.get(p) });
   const upd = (p, d) => { store.set(p, { ...store.get(p), ...d }); };
-  const docRef = path => ({ path, get: async () => snap(path), set: async d => { store.set(path, d); }, update: async d => upd(path, d) });
+  const docRef = path => ({ path, get: async () => snap(path), set: async (d, o) => { store.set(path, o && o.merge ? { ...(store.get(path) || {}), ...d } : d); }, update: async d => upd(path, d) });
   const colRef = (path, f = []) => ({
     doc: id => docRef(path + '/' + id),
     where(field, op, val) { return { ...this, f: [...(this.f || []), [field, val]] }; },
@@ -87,4 +87,20 @@ test('test box: uses the approved extra answers, sends nothing, saves nothing', 
   assert.match(seenSystem, /No pool, but a gym nearby/);
   assert.ok(['reply', 'needs_you'].includes(r.kind));
   assert.strictEqual([...db.store.keys()].join(), before);
+});
+
+test('settings page: only the known settings, only inbox users', async () => {
+  const db = fakeDb({ 'globals/config': { botMode: 'available' } });
+  await assert.rejects(X.saveSettings(null, { aiSignReplies: true }, deps(db)), { code: 'permission-denied' });
+  await X.saveSettings(NIKA, { bookingAiMode: 'auto' }, deps(db));
+  assert.deepStrictEqual([db.store.get('globals/config').bookingAiMode, db.store.get('globals/config').bookingAiDraftsEnabled, db.store.get('globals/config').botMode], ['auto', true, 'available']);
+  await X.saveSettings(NIKA, { bookingAiMode: 'off' }, deps(db));
+  assert.strictEqual(db.store.get('globals/config').bookingAiDraftsEnabled, false);
+  await X.saveSettings(NIKA, { aiAlertMode: 'needs' }, deps(db));
+  await X.saveSettings(NIKA, { aiSignReplies: true }, deps(db));
+  await X.saveSettings(NIKA, { bookingAlertsEnabled: false }, deps(db));
+  const c = db.store.get('globals/config');
+  assert.deepStrictEqual([c.aiAlertMode, c.aiSignReplies, c.bookingAlertsEnabled], ['needs', true, false]);
+  await assert.rejects(X.saveSettings(NIKA, { bookingAiMode: 'wild' }, deps(db)), { code: 'invalid-argument' });
+  await assert.rejects(X.saveSettings(NIKA, { aiBotEnabled: false }, deps(db)), { code: 'invalid-argument' });   // WhatsApp settings are not changed from here
 });

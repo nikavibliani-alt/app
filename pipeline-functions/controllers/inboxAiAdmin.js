@@ -164,6 +164,30 @@ async function aiKnowledge(auth, data, deps) {
   throw new Fail('invalid-argument', 'Bad action.');
 }
 
+// ---------------------------------------------------------------- the one settings page
+
+/** The Booking.com inbox settings saved in globals/config, checked one by one. Returns the fields to write. */
+function settingsPatch(data) {
+  const d = data || {};
+  if (d.bookingAiMode !== undefined) {
+    if (!['off', 'drafts', 'auto'].includes(d.bookingAiMode)) throw new Fail('invalid-argument', 'Bad AI mode.');
+    return { bookingAiMode: d.bookingAiMode, bookingAiDraftsEnabled: d.bookingAiMode !== 'off' };   // the old field stays in step for older code
+  }
+  if (d.aiAlertMode !== undefined) {
+    if (!['every', 'needs'].includes(d.aiAlertMode)) throw new Fail('invalid-argument', 'Bad alert choice.');
+    return { aiAlertMode: d.aiAlertMode };
+  }
+  if (d.aiSignReplies !== undefined) return { aiSignReplies: d.aiSignReplies === true };
+  if (d.bookingAlertsEnabled !== undefined) return { bookingAlertsEnabled: d.bookingAlertsEnabled === true };
+  throw new Fail('invalid-argument', 'Nothing to save.');
+}
+async function saveSettings(auth, data, deps) {
+  need(auth);
+  const patch = settingsPatch(data);
+  await deps.db.collection('globals').doc('config').set({ ...patch, updatedAt: deps.ts(deps.nowMs()) }, { merge: true });
+  return { ok: true, saved: patch };
+}
+
 // ---------------------------------------------------------------- Cloud Functions
 
 function registerCloudFunctions() {
@@ -184,7 +208,8 @@ function registerCloudFunctions() {
   const inboxAiAction = onCall({ region, timeoutSeconds: 30, maxInstances: 3, memory: '256MiB' }, wrap((a, d) => aiAction(a, d, deps())));
   const inboxAiKnowledge = onCall({ region, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 60, maxInstances: 3, memory: '256MiB' },
     wrap((a, d) => aiKnowledge(a, d, { ...deps(), apiKey: ANTHROPIC_API_KEY.value() })));
-  return { inboxAiAction, inboxAiKnowledge };
+  const inboxSettingsSave = onCall({ region, timeoutSeconds: 30, maxInstances: 3, memory: '256MiB' }, wrap((a, d) => saveSettings(a, d, deps())));
+  return { inboxAiAction, inboxAiKnowledge, inboxSettingsSave };
 }
 
-module.exports = { aiAction, aiKnowledge, testQuestion, registerCloudFunctions, Fail };
+module.exports = { saveSettings, settingsPatch, aiAction, aiKnowledge, testQuestion, registerCloudFunctions, Fail };
