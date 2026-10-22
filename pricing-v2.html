@@ -350,6 +350,16 @@ body[data-layout="desk"] #bar .btns{min-width:300px}
 .rchip{display:inline-flex;align-items:center;gap:2px;padding:0 0 0 12px;border-radius:999px;background:var(--chip);font-weight:500;font-size:13px;min-height:44px}
 .rchip.pending{outline:1px dashed var(--btn-line)}
 .rchip .x{min-width:44px;min-height:44px;width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;color:var(--ink);background:transparent}
+
+.pslider{display:flex;flex-direction:column;gap:2px}
+.prange{-webkit-appearance:none;appearance:none;background:transparent;width:calc(80% + 28px);margin:0 0 0 calc(10% - 14px);height:44px;cursor:pointer}
+.prange::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:var(--chip)}
+.prange::-moz-range-track{height:6px;border-radius:3px;background:var(--chip)}
+.prange::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:28px;height:28px;border-radius:50%;background:var(--ink);border:3px solid #FFFFFF;box-shadow:0 0 0 1px var(--btn-line);margin-top:-11px}
+.prange::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:var(--ink);border:3px solid #FFFFFF;box-shadow:0 0 0 1px var(--btn-line)}
+.pticks{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.ptick{min-height:44px;padding:0 2px;font-size:13px;font-weight:500;color:var(--soft);background:transparent;text-align:center}
+.ptick.on{color:var(--ink);font-weight:700}
 </style>
 </head>
 <body data-layout="phone">
@@ -429,22 +439,26 @@ const SEASON_TEXT = {
   high:["1 May – 30 Jun","1 – 30 Sep"], peak:["1 Jul – 31 Aug"], new_year:["24 Dec – 14 Jan"],
 };
 
-const MODES = [
-  {id:"fillfast", style:"aggressive", name:"Fill fast", line:"Lowers early and far when a month sells slowly.",
-   below:20, above:15, guard:0.10, p:[10,15,20,20],
-   best:"a slow month, when a guest at a lower price is better than an empty room.",
-   does:["Lowers a little even 1 to 2 months ahead if bookings are behind.","Lowers about 6% a day, never more than 8%.","Before the last 3 days an empty night stays at least 10% of the way from your minimum up to your start price."],
-   watch:"you earn less per night."},
-  {id:"fill", name:"Fill a bit faster", line:"Lowers a little sooner than Balanced.", soon:true},
-  {id:"balanced", style:"normal", name:"Balanced", tag:"recommended", line:"Calm moves around your start price.",
-   below:12, above:15, guard:0.25, p:[5,8,12,12],
-   best:"most rooms, most of the year.",
+// "How hard to push": five stops, for a whole room or for single nights. The style names are what the engine reads (calm_pricing/config.py).
+const STOPS = [
+  {id:"hold", style:"hold", name:"Hold", line:"Keeps the price steady.",
+   does:["Lowers at most 1% a day and never more than 3% under your start price.","Raises at most 3%.","No drop in the last 3 days."],
+   watch:"a night that sells slowly may stay empty."},
+  {id:"calm", style:"calm", name:"Calm", line:"Small, slow moves.",
+   does:["Lowest 6% under your start price, at most 3% a day.","Raises up to 6%.","In the last 3 days it stops lowering halfway to your minimum."],
+   watch:"a slow night fills later than with Normal."},
+  {id:"normal", style:"normal", name:"Normal", tag:"recommended", line:"Calm moves around your start price.",
    does:["Months far away move only a few percent.","Lowers 2 to 4% a day, never more than 5%, in the first update after 09:00.","Raises when nights sell faster than usual."],
    watch:"a slow month fills a bit later than with Fill fast."},
-  {id:"earn", name:"Earn more", line:"Raises sooner, lowers later and less.", soon:true},
-  {id:"steady", name:"Steady", line:"Stays close to your start price.", soon:true, divider:true},
+  {id:"active", style:"active", name:"Active", line:"Lowers a bit sooner and further.",
+   does:["Lowest 16% under your start price, about 4% a day, never more than 6%.","Raises up to 15%.","The last 3 days step down to your minimum as in Normal."],
+   watch:"you earn a little less per night."},
+  {id:"fill", style:"aggressive", name:"Fill fast", line:"Lowers early and far when a month sells slowly.",
+   does:["Lowers a little even 1 to 2 months ahead if bookings are behind.","Lowers about 6% a day, never more than 8%.","Before the last 3 days an empty night stays at least 10% of the way from your minimum up to your start price."],
+   watch:"you earn less per night."},
 ];
-const modeByStyle = s => MODES.find(m => m.style === (s === "aggressive" ? "aggressive" : "normal"));
+const stopByStyle = s => STOPS.find(x => x.style === s) || STOPS[2];
+const stopIndex = s => STOPS.indexOf(stopByStyle(s));
 const RULE_CHOICES = [
   {id:"protect", label:"Don’t change the price", help:"The engine never touches these dates. You set the price yourself in MiniHotel."},
   {id:"hold", label:"Small moves only, more active closer to the date", help:"On these dates only: the price stays close to where it is now and moves more freely as the date gets closer."},
@@ -522,8 +536,8 @@ const S = {
   daily: {}, errors: {}, beta: {auto_apply: false}, score: null, cards: {}, twin: {}, weekly: [],
 };
 // Everything typed but not yet saved. Nothing here is written before Save.
-const P = {room: {}, seasons: {}, holAdd: [], holDel: [], ruleAdd: [], ruleDel: [], seasonRanges: null, aimAdd: [], aimDel: [], ownAdd: []};
-const resetP = () => { P.room = {}; P.seasons = {}; P.holAdd = []; P.holDel = []; P.ruleAdd = []; P.ruleDel = []; P.seasonRanges = null; P.aimAdd = []; P.aimDel = []; P.ownAdd = []; };
+const P = {room: {}, seasons: {}, holAdd: [], holDel: [], ruleAdd: [], ruleDel: [], seasonRanges: null, aimAdd: [], aimDel: [], ownAdd: [], pushAdd: [], pushDel: []};
+const resetP = () => { P.room = {}; P.seasons = {}; P.holAdd = []; P.holDel = []; P.ruleAdd = []; P.ruleDel = []; P.seasonRanges = null; P.aimAdd = []; P.aimDel = []; P.ownAdd = []; P.pushAdd = []; P.pushDel = []; };
 const U = {
   route: {name: "rooms"}, cur: "GEL", win: "now", sel: null, sel2: null, panel: null, allNights: false,
   season: "mid", showOld: false, undo: null, saved: false, notice: "",
@@ -842,7 +856,7 @@ function changeLines() {
   const L = [];
   for (const [rt, f] of Object.entries(P.room)) {
     const nm = roomById(rt).short;
-    if (f.style) L.push(`${nm} mode ${modeByStyle(f.style.from).name} → ${modeByStyle(f.style.v).name}`);
+    if (f.style) L.push(`${nm} pushes ${stopByStyle(f.style.from).name} → ${stopByStyle(f.style.v).name}`);
     if (f.engine) L.push(`${nm} automatic prices ${f.engine.from === "live" ? "Send prices" : "Only calculate"} → ${f.engine.v === "live" ? "Send prices" : "Only calculate"}`);
     if (f.window_days) L.push(`${nm} how far ahead ${aheadLabel(f.window_days.from)} → ${aheadLabel(f.window_days.v)}`);
   }
@@ -855,6 +869,8 @@ function changeLines() {
   P.ruleDel.forEach(r => L.push(`date rule ${fmtShort(r.from)}${r.to !== r.from ? " – " + fmtShort(r.to) : ""} removed`));
   groupNights(P.aimAdd, a => `${a.rt}|${a.pct}`).forEach(g => L.push(`aim ${aimText(g.items[0].pct)} for ${roomById(g.items[0].rt).short}: ${datesText(g.items.map(x => x.date))}`));
   groupNights(P.aimDel, a => a.rt).forEach(g => L.push(`aim removed for ${roomById(g.items[0].rt).short}: ${datesText(g.items.map(x => x.date))}`));
+  groupNights(P.pushAdd, a => `${a.rt}|${a.style}`).forEach(g => L.push(`pushes ${stopByStyle(g.items[0].style).name} for ${roomById(g.items[0].rt).short}: ${datesText(g.items.map(x => x.date))}`));
+  groupNights(P.pushDel, a => a.rt).forEach(g => L.push(`push setting removed for ${roomById(g.items[0].rt).short}: ${datesText(g.items.map(x => x.date))}`));
   groupNights(P.ownAdd, a => `${a.rt}|${a.GEL}|${a.USD}`).forEach(g => L.push(`your own price ${ownText(g.items[0])} for ${roomById(g.items[0].rt).short}: ${datesText(g.items.map(x => x.date))}`));
   return L;
 }
@@ -985,6 +1001,38 @@ function aimAt(rt, iso) {                                   // the aim that stil
   if (rc && typeof rc.avail === "number" && a.avail != null && rc.avail < a.avail) return null;
   return a;
 }
+// ---- how hard to push, for single nights ({rt, date, style, avail}); a night's own setting beats the room default ----
+const pushSaved = () => ovListRaw(S.eng?.settings?.night_push).filter(a => a && a.rt && a.date && a.style);
+const pushNow = () => pushSaved().filter(a => !P.pushDel.some(g => same(g, a))).concat(P.pushAdd);
+const pushRecord = (rt, iso) => pushNow().find(a => a.rt === rt && a.date === iso) || null;
+const isPendingPush = a => P.pushAdd.some(x => same(x, a));
+function pushAt(rt, iso) {                                  // like an aim, it ends when the night gets a booking
+  const a = pushRecord(rt, iso); if (!a) return null;
+  const rc = rec(rt, iso, curFor(roomById(rt), "GEL"));
+  if (rc && typeof rc.avail === "number" && a.avail != null && rc.avail < a.avail) return null;
+  return a;
+}
+const nightStyle = (rt, iso) => { const a = pushAt(rt, iso); return a ? a.style : effRoom(rt, "style"); };
+function setPush(rt, iso, style) {
+  const rc = rec(rt, iso, curFor(roomById(rt), "GEL")); if (!rc || rc.avail === 0) return;
+  const was = pushRecord(rt, iso), roomStyle = effRoom(rt, "style");
+  if (was && was.style === style) return;
+  if (!was && style === roomStyle) return;
+  if (was) { if (isPendingPush(was)) P.pushAdd = P.pushAdd.filter(x => !same(x, was)); else P.pushDel.push(was); }
+  if (style !== roomStyle) P.pushAdd.push({avail: rc.avail, date: iso, rt, style});
+}
+function pushSliderHtml(idx, scope, rt) {                   // idx -1 = the nights picked have different settings
+  const st = idx >= 0 ? STOPS[idx] : null;
+  return `<div class="pslider"><input type="range" class="prange" min="0" max="4" step="1" value="${idx >= 0 ? idx : 2}" data-inp="push" data-scope="${scope}" data-rt="${rt}" aria-label="How hard to push" aria-valuetext="${esc(st ? st.name : "different settings")}">
+    <div class="pticks" role="group" aria-label="How hard to push">${STOPS.map((x, i) => `<button type="button" class="ptick ${i === idx ? "on" : ""}" data-act="pushStop" data-i="${i}" data-scope="${scope}" data-rt="${rt}" aria-pressed="${i === idx}">${esc(x.name)}</button>`).join("")}</div></div>`;
+}
+function applyPush(scope, i, rt) {
+  const style = STOPS[i].style;
+  if (scope === "room") { setRoom(rt, "style", style); touch(); render(); return; }
+  const T = U.tgt; if (!T) return; const snap = snapP();
+  T.free.forEach(iso => setPush(T.rt, iso, style));
+  afterNightAction(`How hard to push: ${stopByStyle(style).name} for ${nightsPhrase(T.free)}.`, snap);
+}
 const ownPendingOf = (rt, iso) => P.ownAdd.find(x => x.rt === rt && x.date === iso) || null;
 const ownSentOf = (rt, iso) => (S.setprice || []).find(x => x && x.rt === rt && x.date === iso) || null;
 const ownText = o => [o.GEL != null ? gel(o.GEL) : "", o.USD != null ? usd(o.USD) : ""].filter(Boolean).join(" / ");
@@ -1042,6 +1090,10 @@ function controlsHtml(rt, isos, desk) {
   const al = free.map(i => aimAt(rt, i)), cur = al.every(a => !a) ? 0 : al.every(a => a && a.pct === al[0].pct) ? al[0].pct : null;
   const aim = free.length ? `<div><div class="lbl">Aim</div><div class="seg aim" role="radiogroup" aria-label="Aim for ${noun}">${AIM_STEPS.map(pc => `<button type="button" class="segb ${cur === pc ? "on" : ""}" role="radio" aria-checked="${cur === pc}" data-act="aim" data-v="${pc}">${aimText(pc)}</button>`).join("")}</div>
       <p class="fine muted" style="font-size:13px">Moves where the engine is heading for ${noun}. The price follows at the normal pace, always between your minimum and maximum. It stays until ${many ? "a night is" : "the night is"} booked or you choose Normal.${al.some(a => a && isPendingAim(a)) ? " Not saved yet." : ""}</p></div>` : "";
+  const eff = free.map(i => nightStyle(rt, i)), allSame = eff.every(x => x === eff[0]), pidx = allSame ? stopIndex(eff[0]) : -1;
+  const own1 = free.length === 1 ? pushAt(rt, free[0]) : null;
+  const pcap = free.length ? (pidx >= 0 ? `${STOPS[pidx].name}: ${STOPS[pidx].line} ${own1 ? "Set for this night only; the room is on " + stopByStyle(effRoom(rt, "style")).name + "." : (free.some(i => pushAt(rt, i)) ? "" : "Same as the room.")}${eff.some((_, k) => { const a = pushAt(rt, free[k]); return a && isPendingPush(a); }) ? " Not saved yet." : ""}` : "These nights have different settings. Pick one to give them all the same.") : "";
+  const push = free.length ? `<div><div class="lbl">How hard to push</div>${pushSliderHtml(pidx, "night", rt)}<p class="fine muted" style="font-size:13px">${esc(pcap)} Always inside your minimum and maximum.</p></div>` : "";
   const U0 = U.own || (U.own = {GEL: "", USD: ""});
   const box = (c, label) => r.cur.includes(c) ? `<label class="ownf"><span>${label}</span><input class="num" type="text" inputmode="decimal" data-inp="own" data-c="${c}" value="${esc(U0[c])}" aria-label="${label}" placeholder="${c === "GEL" ? "₾" : "$"}"></label>` : "";
   const ownOk = ownValues().ok;
@@ -1053,7 +1105,7 @@ function controlsHtml(rt, isos, desk) {
   const back = mine.length ? `<div><button type="button" class="btn dark full small" data-act="giveBackMany">Give ${mine.length > 1 ? "these nights" : "this night"} back to the engine</button>
       <p class="fine muted" style="font-size:12px">Until then the price stays exactly as you set it.</p></div>` : "";
   const gaveAll = mine.length && mine.every(i => (U.gaveBack ??= {})[`${rt}|${i}`]);
-  return `<div class="ctl" id="nightCtl">${gaveAll ? `<p class="muted" style="font-size:13px">Given back. The engine takes ${mine.length > 1 ? "these nights" : "this night"} over at the next price update.</p>` : back}${aim}${own}${keep}
+  return `<div class="ctl" id="nightCtl">${gaveAll ? `<p class="muted" style="font-size:13px">Given back. The engine takes ${mine.length > 1 ? "these nights" : "this night"} over at the next price update.</p>` : back}${aim}${push}${own}${keep}
     ${skipped ? `<p class="fine muted" style="font-size:13px">Left out: ${esc(skipped)}.</p>` : ""}</div>`;
 }
 function ownValues() {
@@ -1099,48 +1151,9 @@ function todaysRange(rt) {
   const a = {min: savedSeason(rt, season, "USD", "min"), start: savedSeason(rt, season, "USD", "start"), max: savedSeason(rt, season, "USD", "max")};
   return {season, g: r.cur.includes("GEL") ? g : null, a: r.cur.includes("USD") ? a : null, cur};
 }
-function modeSheet(rt, modeId) {
-  const m = MODES.find(x => x.id === modeId), bal = MODES.find(x => x.id === "balanced");
-  const tr = todaysRange(rt), g = tr.g;
-  const have = g && g.min && g.start && g.max;
-  const low = have ? Math.ceil(Math.max(g.start * (1 - m.below / 100), g.min + m.guard * (g.start - g.min)) / 5) * 5 : 0;
-  const high = have ? Math.min(g.max, Math.round(g.start * (1 + m.above / 100) / 5) * 5) : 0;
-  const cur = effRoom(rt, "style") === m.style;
-  const showRef = m.id !== "balanced";
-  const aria = `${m.name}: the price stays near start far away, goes down to ${m.below}% under start a week before if empty, then steps down to the minimum by the day before.`;
-  openDialog(`<div class="grab"></div><div class="dh"><h3>${esc(m.name)}</h3>
-    <button type="button" class="ibtn" aria-label="Close" data-act="closeDialog" style="margin-right:-12px;color:var(--ink)">${icon("x", 22)}</button></div>
-    <p><b>Good for:</b> ${esc(m.best)}</p>
-    <figure><figcaption>A night that stays empty and sells slower than usual</figcaption>
-      <svg width="100%" viewBox="0 0 326 132" role="img" aria-label="${esc(aria)}">
-        <line x1="40" y1="20" x2="318" y2="20" stroke="#D8D5D0"/><line x1="40" y1="104" x2="318" y2="104" stroke="#D8D5D0"/>
-        <text x="0" y="24" font-size="12" fill="#3E3D3A">Start</text><text x="0" y="108" font-size="12" fill="#3E3D3A">Min</text>
-        ${showRef ? `<polyline points="${pts(bal.p)}" fill="none" stroke="#9A9893" stroke-width="2.5" stroke-dasharray="5 4"/>` : ""}
-        <polyline points="${pts(m.p)}" fill="none" stroke="#1F1F1F" stroke-width="3"/>
-        <text x="40" y="126" font-size="12" fill="#3E3D3A">60 days</text><text x="110" y="126" font-size="12" fill="#3E3D3A">30</text>
-        <text x="176" y="126" font-size="12" fill="#3E3D3A">14</text><text x="236" y="126" font-size="12" fill="#3E3D3A">7</text>
-        <text x="318" y="126" font-size="12" fill="#3E3D3A" text-anchor="end">day before</text></svg>
-      ${showRef ? `<div style="display:flex;gap:16px;font-size:12px;color:#3E3D3A;padding-top:4px"><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:18px;height:3px;background:#1F1F1F"></span>${esc(m.name)}</span><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:18px;border-top:2.5px dashed #9A9893"></span>Balanced</span></div>` : ""}
-    </figure>
-    ${have ? `<div class="tiles"><div><div class="k">Lowest it goes</div><div class="v">down to ${low} ₾</div><div class="u">before the last 3 days</div></div>
-      <div><div class="k">When it sells fast</div><div class="v">up to ${high} ₾</div><div class="u">never over your maximum</div></div></div>
-      <p class="fine">With ${esc(roomById(rt).short)}’s ${esc(SEASONS[tr.season].label)} numbers: minimum ${g.min}, start ${g.start}, maximum ${g.max} ₾. Friday and Saturday get +8% on top.</p>` : ""}
-    <ul>${m.does.map(d => `<li>${esc(d)}</li>`).join("")}</ul>
-    <p style="font-size:14px"><b>But:</b> ${esc(m.watch)}</p>
-    <p class="fine">Always, in every mode: never under your minimum or over your maximum. The arrival day is never lowered. In the last 3 days an empty night steps down to your minimum, reaching it the day before. The mode is for every date of this room.</p>
-    <button type="button" class="btn dark full" data-act="useMode" data-rt="${rt}" data-mode="${m.id}" data-autofocus>${cur ? "Close" : "Choose " + esc(m.name)}</button>`, m.name + " explained");
-}
 function roomSettingsHtml(rt, desk) {
   const r = roomById(rt), style = effRoom(rt, "style"), eng = effRoom(rt, "engine"), ahead = Number(effRoom(rt, "window_days"));
   const tr = todaysRange(rt);
-  const modeRows = MODES.map(m => {
-    const on = !m.soon && m.style === style;
-    const row = m.soon
-      ? `<div class="optrow"><button type="button" class="opt" role="radio" aria-checked="false" aria-disabled="true" data-act="soon"><span class="rad"></span><span class="tx"><b>${esc(m.name)} <span class="tag">coming soon</span></b><span>Coming soon. Not available yet.</span></span></button></div>`
-      : `<div class="optrow ${on ? "on" : ""}"><button type="button" class="opt" role="radio" aria-checked="${on}" data-act="mode" data-rt="${rt}" data-mode="${m.id}"><span class="rad"></span><span class="tx"><b>${esc(m.name)} ${m.tag ? `<span class="tag">${esc(m.tag)}</span>` : ""}</b><span>${esc(m.line)}</span></span></button>
-         <button type="button" class="ibtn" aria-label="What ${esc(m.name)} does" data-act="info" data-rt="${rt}" data-mode="${m.id}">${icon("info", 22)}</button></div>`;
-    return (m.divider ? `<div style="padding:12px 16px 0;border-top:1px solid var(--line);font-size:12px;font-weight:700;color:var(--soft)">Or keep it simple</div>` : "") + row;
-  }).join("");
   const grid = ["GEL", "USD"].map(c => {
     const v = c === "GEL" ? tr.g : tr.a; if (!v) return "";
     const f = x => (x ? (c === "GEL" ? gel(x) : usd(x)) : "–");
@@ -1149,10 +1162,13 @@ function roomSettingsHtml(rt, desk) {
   const help = eng === "live"
     ? "Send prices: the engine sets this room’s prices and sends them to Booking and Airbnb."
     : "Only calculate: the engine only calculates and shows what it would do. Nothing is sent. The prices in MiniHotel stay as they are until you change them.";
-  return `<section class="sec"><div><h2 class="h2">Mode</h2><p class="sub">How hard the engine works to fill empty nights. Tap the i to see what a mode does.</p></div>
-      <div class="card" style="overflow:hidden" role="radiogroup" aria-label="Mode">
-        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--soft);padding:10px 16px 0"><span>More bookings</span><span>Higher price</span></div>${modeRows}</div>
-      <p class="sub" style="margin:0">The mode is for every date of this room. For only some nights (a slow week, a holiday) tap a night in Next nights and use Aim, your own price, or Don't change.</p></section>
+  const idx = stopIndex(style), st = STOPS[idx];
+  return `<section class="sec" id="roomPush"><div><h2 class="h2">How hard to push</h2><p class="sub">This room pushes: <b>${esc(st.name)}</b>. How hard the engine works to fill empty nights.</p></div>
+      <div class="card pad">${pushSliderHtml(idx, "room", rt)}
+        <div style="font-size:15px"><b>${esc(st.name)}.</b> ${esc(st.line)}</div>
+        <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.45">${st.does.map(d => `<li>${esc(d)}</li>`).join("")}</ul>
+        <p class="fine" style="margin:0"><b>But:</b> ${esc(st.watch)}</p></div>
+      <p class="sub" style="margin:0">This is the default for every night of this room. For only some nights (a slow week, a holiday) tap a night in Next nights: its own setting wins. Always, in every setting: never under your minimum or over your maximum. The weekend extra, events, the holiday rule, hand-set prices and "Don't change" still win.</p></section>
     <section class="sec"><div><h2 class="h2">Who sets minimum, start and maximum</h2><p class="sub">The engine always keeps daily prices between the minimum and maximum. This decides who changes those three numbers.</p></div>
       <div class="card" style="overflow:hidden" role="radiogroup" aria-label="Who sets minimum, start and maximum">
         <div class="optrow on"><button type="button" class="opt" role="radio" aria-checked="true"><span class="rad"></span><span class="tx"><b>Me</b><span>You set them in Seasons. The engine moves daily prices inside them.</span></span></button></div>
@@ -1172,11 +1188,14 @@ function roomSettingsHtml(rt, desk) {
 }
 // A short mark for a night that has an aim, a typed price or a protect (also while it is not saved yet)
 function nightMark(rt, iso) {
-  const aim = aimAt(rt, iso), op = ownPendingOf(rt, iso), sent = ownSentOf(rt, iso);
-  if (op) return `Your price ${ownText(op)}`;
-  if (sent) return `Your price ${ownText(sent)}`;
-  if (aim) return `Aim ${aimText(aim.pct)}`;
-  return "";
+  const aim = aimAt(rt, iso), op = ownPendingOf(rt, iso), sent = ownSentOf(rt, iso), ps = pushAt(rt, iso), parts = [];
+  if (op) parts.push(`Your price ${ownText(op)}`);
+  else if (sent) parts.push(`Your price ${ownText(sent)}`);
+  else {
+    if (aim) parts.push(`Aim ${aimText(aim.pct)}`);
+    if (ps) parts.push(stopByStyle(ps.style).name);
+  }
+  return parts.join(" · ");
 }
 function nightsCardHtml(rt) {
   const r = roomById(rt), list = nightsOf(rt).slice(0, U.allNights ? 28 : 7), selecting = U.selMode === rt, picked = U.picked || (U.picked = new Set());
@@ -1205,8 +1224,8 @@ function nightsCardHtml(rt) {
     <div class="card" style="overflow:hidden">${rows}</div>${sel}
     <button type="button" class="btn light full small" data-act="allNights" style="color:var(--ink)">${U.allNights ? "Show fewer nights" : "Show 4 weeks"}</button></section>`;
 }
-const snapP = () => JSON.stringify({a: P.aimAdd, d: P.aimDel, o: P.ownAdd, r: P.ruleAdd, rd: P.ruleDel});
-const restoreP = t => { const x = JSON.parse(t); P.aimAdd = x.a; P.aimDel = x.d; P.ownAdd = x.o; P.ruleAdd = x.r; P.ruleDel = x.rd; };
+const snapP = () => JSON.stringify({a: P.aimAdd, d: P.aimDel, o: P.ownAdd, r: P.ruleAdd, rd: P.ruleDel, pa: P.pushAdd, pd: P.pushDel, room: P.room});
+const restoreP = t => { const x = JSON.parse(t); P.aimAdd = x.a; P.aimDel = x.d; P.ownAdd = x.o; P.ruleAdd = x.r; P.ruleDel = x.rd; P.pushAdd = x.pa; P.pushDel = x.pd; P.room = x.room; };
 const nightsPhrase = isos => (isos.length === 1 ? fmtDay(isos[0]) : `${isos.length} nights`);
 function setAim(rt, iso, pct) {
   const rc = rec(rt, iso, curFor(roomById(rt), "GEL")); if (!rc || rc.avail === 0) return;
@@ -1233,6 +1252,9 @@ function roomChips(rt) {
   const aims = aimsNow().filter(a => a.rt === rt && a.date >= t && aimAt(rt, a.date)).sort((a, b) => a.date.localeCompare(b.date)), groups = [];
   aims.forEach(a => { const l = groups[groups.length - 1]; if (l && l.pct === a.pct && diffDays(l.to, a.date) === 1) { l.to = a.date; l.items.push(a); } else groups.push({pct: a.pct, from: a.date, to: a.date, items: [a]}); });
   groups.forEach(g => chips.push({kind: "aim", items: g.items, text: `${isoSpan(g.from, g.to)} aim ${aimText(g.pct)}`, pending: g.items.some(isPendingAim)}));
+  const pushes = pushNow().filter(a => a.rt === rt && a.date >= t && pushAt(rt, a.date)).sort((a, b) => a.date.localeCompare(b.date)), pgroups = [];
+  pushes.forEach(a => { const l = pgroups[pgroups.length - 1]; if (l && l.style === a.style && diffDays(l.to, a.date) === 1) { l.to = a.date; l.items.push(a); } else pgroups.push({style: a.style, from: a.date, to: a.date, items: [a]}); });
+  pgroups.forEach(g => chips.push({kind: "push", items: g.items, text: `${isoSpan(g.from, g.to)} pushes ${stopByStyle(g.style).name}`, pending: g.items.some(isPendingPush)}));
   return chips;
 }
 function roomRulesHtml(rt) {
@@ -1302,7 +1324,7 @@ function viewTest(rt) {
 /* =====================================================================
    Rooms (phone)
    ===================================================================== */
-function modeName(rt) { return modeByStyle(savedRoom(rt, "style")).name; }
+function modeName(rt) { return stopByStyle(savedRoom(rt, "style")).name; }
 function viewRooms() {
   const live = newRooms().map(r => {
     const t = tonight(r.id), b = bookedShare(r.id), only = savedRoom(r.id, "engine") !== "live";
@@ -2232,6 +2254,9 @@ async function saveAll() {
       const list = had.filter(x => !fresh.some(f => f.rt === x.rt && f.date === x.date)).concat(fresh);
       await setDoc(controlRef(), {setprice: list}, {merge: true}); S.setprice = list;
     }
+    const freshPush = ovListRaw(fe.settings && fe.settings.night_push);
+    const pushDel = P.pushDel.filter(d => freshPush.some(o => same(o, d)));
+    await writeList(engRef(), "settings.night_push", freshPush, fe.settings && fe.settings.night_push, P.pushAdd, pushDel);
     const freshRules = ovListRaw(fe.settings && fe.settings.date_rules);
     const ruleDel = P.ruleDel.filter(d => freshRules.some(o => same(o, d)));
     await writeList(engRef(), "settings.date_rules", freshRules, fe.settings && fe.settings.date_rules, P.ruleAdd, ruleDel);
@@ -2246,8 +2271,10 @@ async function saveAll() {
     if (newRanges) logChange("season_dates", "Season dates changed: " + rangeStrings(newRanges).join(", "), {season_ranges: {old: rangeStrings(oldRanges), new: rangeStrings(newRanges)}});
     if (Object.keys(rf).filter(k => k !== "seasonRanges").length || P.holAdd.length || holDel.length) logChange("rules_edit", "Pricing page: " + lines.join(", "), rFields);
     P.aimAdd.forEach((a, i) => { eFields[`night_aims.add.${i}`] = {old: null, new: `${a.rt} ${a.date} ${a.pct > 0 ? "+" : ""}${a.pct}%`}; });
+    P.pushAdd.forEach((a, i) => { eFields[`night_push.add.${i}`] = {old: null, new: `${a.rt} ${a.date} ${a.style}`}; });
+    pushDel.forEach((a, i) => { eFields[`night_push.remove.${i}`] = {old: `${a.rt} ${a.date} ${a.style}`, new: null}; });
     aimDel.forEach((a, i) => { eFields[`night_aims.remove.${i}`] = {old: `${a.rt} ${a.date} ${a.pct > 0 ? "+" : ""}${a.pct}%`, new: null}; });
-    if (Object.keys(ef).length || P.ruleAdd.length || ruleDel.length || P.aimAdd.length || aimDel.length) logChange("engine_edit", "Pricing page: " + lines.join(", "), eFields);
+    if (Object.keys(ef).length || P.ruleAdd.length || ruleDel.length || P.aimAdd.length || aimDel.length || P.pushAdd.length || pushDel.length) logChange("engine_edit", "Pricing page: " + lines.join(", "), eFields);
     if (P.ownAdd.length) logChange("own_price", "Pricing page: " + lines.join(", "), Object.fromEntries(P.ownAdd.map(o => [`own_price/${o.rt}|${o.date}`, {old: null, new: ownText(o)}])));
     resetP();
     await loadConfig();
@@ -2358,9 +2385,7 @@ document.addEventListener("click", async e => {
     case "dialogYes": if (DIALOG_YES) DIALOG_YES(); break;
     case "logout": try { await signOut(auth); } catch (er) { /* ignore */ } location.reload(); break;
     case "soon": break;
-    case "mode": setRoom(d.rt, "style", modeById(d.mode).style); touch(); render(); break;
-    case "info": modeSheet(d.rt, d.mode); break;
-    case "useMode": { const m = modeById(d.mode); closeDialog(); if (m.style) { setRoom(d.rt, "style", m.style); touch(); render(); } break; }
+    case "pushStop": applyPush(d.scope, +d.i, d.rt); break;
     case "ahead": setRoom(d.rt, "window_days", Number(d.d)); touch(); render(); break;
     case "engine": setRoom(d.rt, "engine", d.v); touch(); render(); break;
     case "night": if (!isDesk()) { U.more = false; U.own = {GEL: "", USD: ""}; openWhy(d.rt, d.iso); } break;
@@ -2439,6 +2464,7 @@ document.addEventListener("click", async e => {
     case "delChip": {
       const c = (U._chips || [])[+d.i]; if (!c) break; const snap = snapP();
       if (c.kind === "rule") { if (P.ruleAdd.some(x => same(x, c.rule))) P.ruleAdd = P.ruleAdd.filter(x => !same(x, c.rule)); else P.ruleDel.push(c.rule); }
+      else if (c.kind === "push") c.items.forEach(a => { if (isPendingPush(a)) P.pushAdd = P.pushAdd.filter(x => !same(x, a)); else P.pushDel.push(a); });
       else c.items.forEach(a => { if (isPendingAim(a)) P.aimAdd = P.aimAdd.filter(x => !same(x, a)); else P.aimDel.push(a); });
       touch(); render(); showToast(`Removed: ${c.text}.`, () => { restoreP(snap); touch(); render(); }); break;
     }
@@ -2477,7 +2503,6 @@ document.addEventListener("click", async e => {
     default: break;
   }
 });
-const modeById = id => MODES.find(m => m.id === id);
 document.addEventListener("input", e => {
   const t = e.target;
   if (t.dataset && t.dataset.inp === "hol") { holCheck(); return; }
@@ -2491,6 +2516,10 @@ document.addEventListener("input", e => {
     const [rt, season, cur, field] = t.dataset.k.split("|");
     setSeason(rt, season, cur, field, t.value); touch(); refreshSeasonUi();
   }
+});
+document.addEventListener("change", e => {                    // the slider: when the thumb is let go (taps on a label do the same through data-act)
+  const t = e.target;
+  if (t.dataset && t.dataset.inp === "push") applyPush(t.dataset.scope, +t.value, t.dataset.rt);
 });
 $("overlay").addEventListener("click", e => { if (e.target === $("overlay")) closeDialog(); });
 

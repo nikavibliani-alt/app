@@ -95,21 +95,22 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       }
     });
 
-    // ---- 3. mode ----
-    await test('3 mode change: Not saved, Save clears it, row shows saved mode only after Save, nothing leaks to other rooms', w, hh, async (env, desk) => {
+    // ---- 3. how hard to push (room default) ----
+    await test('3 room slider: Not saved, Save clears it, row shows the saved setting only after Save, nothing leaks to other rooms', w, hh, async (env, desk) => {
       const {page} = env;
       await openRoom(env, desk, 'XCV_2');
-      await page.click('[data-act=mode][data-mode=fillfast][data-rt=XCV_2]');
+      assert.ok(/This room pushes: Normal/.test(await text(page, '#roomPush')), await text(page, '#roomPush'));
+      await page.click('[data-act=pushStop][data-scope=room][data-rt=XCV_2][data-i="4"]');
       let b = await bar(page);
-      assert.ok(/Not saved/.test(b) && /XCV 2 mode Balanced → Fill fast/.test(b), b);
+      assert.ok(/Not saved/.test(b) && /XCV 2 pushes Normal → Fill fast/.test(b), b);
       if (!desk) await go(page, '#/rooms');
-      assert.ok(/Balanced/.test(await modeLine(page, desk, 'XCV_2')) && !/Fill fast/.test(await modeLine(page, desk, 'XCV_2')), 'row shows the saved mode');
+      assert.ok(/Normal/.test(await modeLine(page, desk, 'XCV_2')) && !/Fill fast/.test(await modeLine(page, desk, 'XCV_2')), 'row shows the saved setting');
       assert.ok(/Not saved/.test(await bar(page)), 'bar stays');
       await openRoom(env, desk, 'XCV_1');
-      assert.strictEqual(await page.getAttribute('[data-act=mode][data-mode=balanced][data-rt=XCV_1]', 'aria-checked'), 'true');
-      assert.strictEqual(await page.getAttribute('[data-act=mode][data-mode=fillfast][data-rt=XCV_1]', 'aria-checked'), 'false');
+      assert.strictEqual(await page.getAttribute('[data-act=pushStop][data-scope=room][data-rt=XCV_1][data-i="2"]', 'aria-pressed'), 'true');
+      assert.strictEqual(await page.getAttribute('[data-act=pushStop][data-scope=room][data-rt=XCV_1][data-i="4"]', 'aria-pressed'), 'false');
       await openRoom(env, desk, 'XCV_2');
-      assert.strictEqual(await page.getAttribute('[data-act=mode][data-mode=fillfast][data-rt=XCV_2]', 'aria-checked'), 'true');
+      assert.strictEqual(await page.getAttribute('[data-act=pushStop][data-scope=room][data-rt=XCV_2][data-i="4"]', 'aria-pressed'), 'true');
       await page.click('[data-act=save]');
       await page.waitForFunction(() => /Saved\. Used from the next price update\./.test(document.getElementById('bar').innerText));
       const wr = (await h.writes(page)).filter(x => x.path === 'pricing_config/engine_v2');
@@ -119,8 +120,8 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       const eng = await h.doc(page, 'pricing_config/engine_v2');
       assert.strictEqual(eng.settings.room_types.XCV_1.style, 'normal'); assert.strictEqual(eng.settings.room_types.XCV_2.window_days, 180);
       if (!desk) await go(page, '#/rooms');
-      assert.ok(/Fill fast/.test(await modeLine(page, desk, 'XCV_2')), 'row shows the mode after Save');
-      assert.ok(/Balanced/.test(await modeLine(page, desk, 'XCV_1')));
+      assert.ok(/Fill fast/.test(await modeLine(page, desk, 'XCV_2')), 'row shows the setting after Save');
+      assert.ok(/Normal/.test(await modeLine(page, desk, 'XCV_1')));
     });
     await test('3b other room settings: how far ahead and automatic prices (asks before sending prices)', w, hh, async (env, desk) => {
       const {page} = env;
@@ -138,14 +139,17 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       await page.waitForFunction(() => /^Saved/.test(document.getElementById('bar').innerText));
       assert.strictEqual((await h.doc(page, 'pricing_config/engine_v2')).settings.room_types.XCV_1.engine, 'live');
     });
-    await test('3c what a mode does opens, with Escape', w, hh, async (env, desk) => {
+    await test('3c the slider has five stops with labels, a plain description, and works with the keyboard too', w, hh, async (env, desk) => {
       const {page} = env; await openRoom(env, desk, 'XCV_2');
-      await page.click('[data-act=info][data-mode=fillfast]');
-      assert.ok(await focusInDialog(page)); const t = await text(page, '.dlg');
-      assert.ok(/Fill fast/.test(t) && /8%/.test(t) && /Good for/.test(t));
-      await page.keyboard.press('Escape'); assert.ok(!(await dlgOpen(page)));
-      assert.ok(await page.$('[data-act=soon]'), 'coming soon rows exist');
-      assert.strictEqual((await h.writes(page)).length, 0);
+      assert.deepStrictEqual(await page.$$eval('#roomPush .ptick', els => els.map(e => e.innerText.trim())), ['Hold', 'Calm', 'Normal', 'Active', 'Fill fast']);
+      assert.strictEqual(await page.$eval('#roomPush .prange', e => e.value), '2');
+      assert.ok(/Normal\./.test(await text(page, '#roomPush')) && /Lowers 2 to 4% a day/.test(await text(page, '#roomPush')));
+      await page.click('[data-act=pushStop][data-scope=room][data-rt=XCV_2][data-i="1"]');
+      assert.ok(/Calm\./.test(await text(page, '#roomPush')) && /Lowest 6% under your start price/.test(await text(page, '#roomPush')) && /halfway to your minimum/.test(await text(page, '#roomPush')));
+      await page.click('#bar [data-act=undoAll]');
+      await page.focus('#roomPush .prange'); await page.keyboard.press('ArrowRight'); await page.waitForTimeout(80);
+      assert.ok(/XCV 2 pushes Normal → Active/.test(await bar(page)), await bar(page));
+      assert.strictEqual((await h.writes(page)).length, 0, 'nothing is written before Save');
     });
 
     // ---- 4. season prices ----
@@ -323,7 +327,7 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
     await test('7 side panel never hides Save or the pause switch', w, hh, async ({page}) => {
       for (const open of [async () => page.click('.cname[data-rt=XCV_2]'), async () => page.click('.cell[data-rt=XCV_2][data-iso="2026-10-14"]')]) {
         await open(); await page.waitForSelector('.panel');
-        await page.click('[data-act=mode][data-mode=fillfast][data-rt=XCV_2]').catch(async () => { await page.click('.cname[data-rt=XCV_2]'); await page.click('[data-act=mode][data-mode=fillfast][data-rt=XCV_2]'); });
+        await page.click('[data-act=pushStop][data-scope=room][data-rt=XCV_2][data-i="4"]').catch(async () => { await page.click('.cname[data-rt=XCV_2]'); await page.click('[data-act=pushStop][data-scope=room][data-rt=XCV_2][data-i="4"]'); });
         await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
         const r = await page.evaluate(() => {
           const top = sel => { const e = document.querySelector(sel); const b = e.getBoundingClientRect(); const x = b.left + b.width / 2, y = b.top + b.height / 2; const at = document.elementFromPoint(x, y); return {visible: b.width > 0 && y >= 0 && y <= innerHeight, ok: !!at && (e === at || e.contains(at))}; };
@@ -371,14 +375,14 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
         assert.ok(!/Old way, new way being tested/.test(t) && !/New way would be/.test(t), 'no old-way section');
         assert.strictEqual((await page.$$('a.row[href^="#/room/"]')).length, 10);
         await go(page, '#/room/MAXELA');
-        assert.ok(/Mode/.test(await text(page, 'body')) && await page.$('[data-act=mode][data-rt=MAXELA]'), 'MAXELA has the room settings');
+        assert.ok(/How hard to push/.test(await text(page, 'body')) && await page.$('[data-act=pushStop][data-rt=MAXELA]'), 'MAXELA has the room settings');
         await go(page, '#/test/MAXELA'); assert.ok(!(await page.$('text=Try-out so far')), 'no test screen for a live room');
         await go(page, '#/seasons'); assert.ok(!(await page.$('[data-act=toggleOld]')), 'no old-room toggle');
         assert.strictEqual((await page.$$('[data-room]')).length, 10);
       } else {
         assert.ok(!/Old way, new way being tested/.test(await text(page, '#cwrap')));
         await page.click('.cname[data-rt=MAXELA]'); await page.waitForSelector('.panel');
-        assert.ok(await page.$('.panel [data-act=mode][data-rt=MAXELA]'), 'MAXELA opens the room settings');
+        assert.ok(await page.$('.panel [data-act=pushStop][data-rt=MAXELA]'), 'MAXELA opens the room settings');
       }
       if (!desk) { await go(page, '#/room/MAXELA'); assert.ok(await page.$('[data-act=selToggle]'), 'every moved room has the night controls'); }
       await go(page, desk ? '#/calendar' : '#/rooms'); await page.click('[data-act=how]');
@@ -886,6 +890,57 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       await page.click(`${box} [data-act=protectNights]`); await page.waitForTimeout(100);
       assert.ok(/date rule 14 Oct – 16 Oct \(Don’t change the price\) added/.test(await bar(page)), await bar(page));
       if (!desk) assert.ok(!(await page.$('#pickPanel')), 'select mode ends after the change');
+    });
+    await test('push slider on the night screen: after Aim, before own price and Don\'t change; one night; Save writes it, the log has it, the list and rules line show it', w, hh, async ({page}, desk) => {
+      const box = await night(page, desk);
+      assert.deepStrictEqual(await page.$$eval(`${box} .ptick`, els => els.map(e => e.innerText.trim())), ['Hold', 'Calm', 'Normal', 'Active', 'Fill fast']);
+      const tops = await page.evaluate(b => ['[data-act=aim][data-v="0"]', '.prange', '[data-act=ownSet]', '[data-act=protectNights]'].map(q => document.querySelector(b + ' ' + q).getBoundingClientRect().top), box);
+      assert.ok(tops[0] < tops[1] && tops[1] < tops[2] && tops[2] < tops[3], 'order: Aim, slider, own price, Don\'t change ' + tops);
+      assert.strictEqual(await page.getAttribute(`${box} .ptick:nth-child(3)`, 'aria-pressed'), 'true');
+      await page.click(`${box} [data-act=pushStop][data-scope=night][data-i="1"]`); await page.waitForTimeout(100);
+      assert.ok(/Not saved/.test(await bar(page)) && /pushes Calm for XCV 2: 14 Oct/.test(await bar(page)), await bar(page));
+      assert.strictEqual((await h.writes(page)).length, 0, 'nothing written before Save');
+      await saveBar(page);
+      const wr = await writesTo(page, 'pricing_config/engine_v2'); assert.deepStrictEqual(Object.keys(wr[0].fields), ['settings.night_push']);
+      assert.deepStrictEqual((await h.doc(page, 'pricing_config/engine_v2')).settings.night_push, [{avail: 1, date: '2026-10-14', rt: 'XCV_2', style: 'calm'}]);
+      const rec = (await h.writes(page)).filter(x => x.path.startsWith('pricing_changes/')).map(x => x.data).find(x => x.fields && Object.keys(x.fields).some(k => k.startsWith('night_push')));
+      assert.ok(rec && rec.ts && rec.fields['night_push/add/0'].new === 'XCV_2 2026-10-14 calm', JSON.stringify(rec));
+      if (desk) { assert.ok(/Calm/.test(await text(page, '.cell[data-rt=XCV_2][data-iso="2026-10-14"]')), 'the cell shows it'); await page.click('.cname[data-rt=XCV_2]'); await page.waitForSelector('#roomRules'); }
+      else { await go(page, '#/room/XCV_2'); assert.ok(/Calm/.test(await text(page, '.night[data-iso="2026-10-14"]')), 'the list shows it'); }
+      assert.ok(/14 Oct pushes Calm/.test(await squash(page, '#roomRules')), await squash(page, '#roomRules'));
+      await page.click('#roomRules [data-act=delChip]');
+      assert.ok(/push setting removed for XCV 2: 14 Oct/.test(await bar(page)), await bar(page));
+      await saveBar(page); assert.deepStrictEqual((await h.doc(page, 'pricing_config/engine_v2')).settings.night_push, []);
+    });
+    await test('push slider: a night follows its room until it has its own setting; choosing the room\'s setting again takes the night setting away', w, hh, async ({page}, desk) => {
+      const box = await night(page, desk);
+      assert.strictEqual(await page.getAttribute(`${box} .ptick:nth-child(2)`, 'aria-pressed'), 'true');      // the room is on Calm
+      assert.ok(/Calm: Small, slow moves\. Same as the room\./.test(await squash(page, box)), await squash(page, box));
+      await page.click(`${box} [data-act=pushStop][data-scope=night][data-i="4"]`); await page.waitForTimeout(100);
+      assert.ok(/pushes Fill fast for XCV 2: 14 Oct/.test(await bar(page)), await bar(page));
+      const box2 = await night(page, desk);
+      assert.strictEqual(await page.getAttribute(`${box2} .ptick:nth-child(5)`, 'aria-pressed'), 'true');
+      assert.ok(/Set for this night only; the room is on Calm/.test(await squash(page, box2)), await squash(page, box2));
+      await page.click(`${box2} [data-act=pushStop][data-scope=night][data-i="1"]`); await page.waitForTimeout(100);
+      assert.ok(!/Not saved/.test(await bar(page)), 'back to the room setting: nothing to save: ' + await bar(page));
+    }, {mutate: d => { d['pricing_config/engine_v2'].settings.room_types.XCV_2.style = 'calm'; }});
+    await test('push slider: it ends when the night gets a booking (nothing shown for it)', w, hh, async ({page}, desk) => {
+      const box = await night(page, desk);
+      assert.ok(!(await page.$('#roomRules')) && !/Calm/.test(await squash(page, `${box} .plain`)));
+      assert.strictEqual(await page.getAttribute(`${box} .ptick:nth-child(3)`, 'aria-pressed'), 'true');
+    }, {mutate: d => { d['pricing_config/engine_v2'].settings.night_push = [{avail: 2, date: '2026-10-14', rt: 'XCV_2', style: 'calm'}]; }});
+    await test('push slider for several nights: the same setting for all the empty nights picked', w, hh, async ({page}, desk) => {
+      if (desk) {
+        await go(page, '#/calendar'); await page.click('.cell[data-rt=XCV_2][data-iso="2026-10-14"]'); await page.click('.cell[data-rt=XCV_2][data-iso="2026-10-16"]', {modifiers: ['Shift']});
+        await page.waitForSelector('.panel .prange');
+      } else {
+        await go(page, '#/room/XCV_2'); await page.click('[data-act=allNights]'); await page.click('[data-act=selToggle]');
+        for (const d of ['14', '15', '16']) await page.click(`.night[data-iso="2026-10-${d}"]`);
+        await page.waitForSelector('#pickPanel .prange');
+      }
+      const box = desk ? '.panel' : '#pickPanel';
+      await page.click(`${box} [data-act=pushStop][data-scope=night][data-i="3"]`); await page.waitForTimeout(100);
+      assert.ok(/pushes Active for XCV 2: 14–16 Oct/.test(await bar(page)), await bar(page));
     });
   }
   await test('the Dates tab is gone: holiday dates and events are closed sections in Seasons', 390, 800, async ({page}) => {
