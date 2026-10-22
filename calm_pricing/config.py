@@ -116,6 +116,9 @@ DEFAULTS = {
     # Aim for single nights, set on the pricing page: [{"rt": "XCV_1", "date": "2026-12-20", "pct": -5, "avail": 1}].
     # Moves that night's target by pct percent (inside min/max); it ends when the night gets a booking (free units < avail).
     "night_aims": [],
+    # How hard to push, per single night: [{"rt": "XCV_1", "date": "2026-12-20", "style": "calm", "avail": 1}]. Beats the room's style
+    # and a date rule's style on that night; it ends when the night gets a booking (free units < avail).
+    "night_push": [],
     "events": {},           # {"YYYY-MM-DD": {"label": "...", "pct": 0.30}}
     "room_types": {},       # filled by the caller
     "rules": {},            # {rt: {currency: {season: {"min":, "start":, "max":}}}}
@@ -141,7 +144,65 @@ AGGRESSIVE = {
     "min_guard_share": 0.10,
     "occupancy_goal_floor": 0.92,
 }
-STYLES = ("normal", "aggressive")
+# "How hard to push" has five stops: Hold, Calm, Normal (the Balanced mode: DEFAULTS), Active and Fill fast (AGGRESSIVE).
+# Hold, Calm and Active are the profiles below; each changes only how far and how fast the TARGET and the price move on EMPTY nights.
+# They never override min/max, the weekend and event factors, the holiday rule limits, hand-set prices or "Don't change".
+PUSH_PROFILES = {
+    # Lowers at most 1% a day, never more than 3% under start before the last 3 days, raises at most 3%; no last-3-days drop.
+    "hold": {
+        "bands": [
+            {"from": 61, "to": 10_000, "down": 0.03, "up": 0.03},
+            {"from": 31, "to": 60,     "down": 0.03, "up": 0.03},
+            {"from": 15, "to": 30,     "down": 0.03, "up": 0.03},
+            {"from": 8,  "to": 14,     "down": 0.03, "up": 0.03},
+            {"from": 4,  "to": 7,      "down": 0.03, "up": 0.03},
+            {"from": 1,  "to": 3,      "down": "hold", "up": 0.03},
+            {"from": 0,  "to": 0,      "down": "hold", "up": 0.03},
+        ],
+        "target_adj": {"far_ahead": 0.03, "ahead": 0.03, "on_track": 0.0, "behind": -0.03, "far_behind": -0.03},
+        "speed_up": {"far_ahead": 0.03, "ahead": 0.03, "on_track": 0.02, "behind": 0.02, "far_behind": 0.02},
+        "speed_down": {"far_ahead": 0.0, "ahead": 0.0, "on_track": 0.01, "behind": 0.01, "far_behind": 0.01},
+        "calm": {"daily_down": 0.01, "daily_up": 0.03, "daily_up_hot": 0.03, "daily_down_last3": 0.01},
+        "min_guard_share": 0.25, "no_last_drop": True,
+    },
+    # The planned "Steady" profile: lowest -6% under start, at most 3% a day, raises up to +6%; the last-3-days drop stops
+    # halfway between the price it had when the last 3 days began and your minimum.
+    "calm": {
+        "bands": [
+            {"from": 61, "to": 10_000, "down": 0.06, "up": 0.06},
+            {"from": 31, "to": 60,     "down": 0.06, "up": 0.06},
+            {"from": 15, "to": 30,     "down": 0.06, "up": 0.06},
+            {"from": 8,  "to": 14,     "down": 0.06, "up": 0.06},
+            {"from": 4,  "to": 7,      "down": 0.06, "up": 0.06},
+            {"from": 1,  "to": 3,      "down": "half", "up": 0.06},
+            {"from": 0,  "to": 0,      "down": "hold", "up": 0.06},
+        ],
+        "target_adj": {"far_ahead": 0.06, "ahead": 0.04, "on_track": 0.0, "behind": -0.04, "far_behind": -0.06},
+        "speed_up": {"far_ahead": 0.03, "ahead": 0.03, "on_track": 0.02, "behind": 0.02, "far_behind": 0.02},
+        "speed_down": {"far_ahead": 0.0, "ahead": 0.0, "on_track": 0.02, "behind": 0.02, "far_behind": 0.03},
+        "calm": {"daily_down": 0.03, "daily_up": 0.03, "daily_up_hot": 0.03, "daily_down_last3": 0.03},
+        "min_guard_share": 0.25, "last_half": True,
+    },
+    # The planned "Fill a bit faster": lowest -16% under start, about 4% a day (never more than 6%), raises up to +15%.
+    "active": {
+        "bands": [
+            {"from": 61, "to": 10_000, "down": 0.05, "up": 0.08},
+            {"from": 31, "to": 60,     "down": 0.08, "up": 0.12},
+            {"from": 15, "to": 30,     "down": 0.11, "up": 0.15},
+            {"from": 8,  "to": 14,     "down": 0.14, "up": 0.15},
+            {"from": 4,  "to": 7,      "down": 0.16, "up": 0.15},
+            {"from": 1,  "to": 3,      "down": "min", "up": 0.15},
+            {"from": 0,  "to": 0,      "down": "hold", "up": 0.15},
+        ],
+        "target_adj": {"far_ahead": 0.15, "ahead": 0.08, "on_track": -0.01, "behind": -0.09, "far_behind": -0.16},
+        "speed_up": {},
+        "speed_down": {"far_ahead": 0.0, "ahead": 0.0, "on_track": 0.03, "behind": 0.04, "far_behind": 0.05},
+        "calm": {"daily_down": 0.06},
+        "min_guard_share": 0.15, "occupancy_goal_floor": 0.88,
+    },
+}
+STYLES = ("hold", "calm", "normal", "active", "aggressive")
+PUSH_LABELS = {"hold": "Hold", "calm": "Calm", "normal": "Normal", "active": "Active", "aggressive": "Fill fast"}
 RULE_ACTIONS = ("protect", "aggressive", "normal", "hold")
 AIM_MAX_PCT = 20            # a night aim moves the target by at most 20% up or down
 
@@ -286,6 +347,19 @@ def apply_limits(cfg: dict) -> list:
         else:
             problems.append(f"setting night_aims entry {a!r} is not valid; ignored.")
     cfg["night_aims"] = aims
+    pushes = []
+    for a in cfg.get("night_push") or []:
+        try:
+            from datetime import date as _date
+            ok = (isinstance(a, dict) and isinstance(a["rt"], str) and a.get("style") in STYLES
+                  and bool(_date.fromisoformat(str(a["date"]))) and (a.get("avail") is None or int(a["avail"]) >= 0))
+        except (KeyError, TypeError, ValueError):
+            ok = False
+        if ok:
+            pushes.append({"rt": a["rt"], "date": str(a["date"]), "style": a["style"], "avail": a.get("avail")})
+        else:
+            problems.append(f"setting night_push entry {a!r} is not valid; ignored.")
+    cfg["night_push"] = pushes
     h = cfg.get("holiday")
     if not isinstance(h, dict):
         problems.append("setting holiday is not valid; defaults used.")

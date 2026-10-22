@@ -42,6 +42,7 @@ import requests
 
 import pricing_shadow as ps
 from calm_pricing import run
+from calm_pricing.config import STYLES
 
 BASE_URL = "https://ssl20.minihotelpms.com"
 WRITE_PATH = "/api/ScreenA"
@@ -186,7 +187,7 @@ def live_room_types(rules: dict, settings: dict) -> dict:
             out[rt]["window_days"] = w
         if "portals" in out[rt]:
             out[rt]["portals"] = portals_for(out[rt], rt)
-        if out[rt].get("style") not in (None, "normal", "aggressive"):
+        if out[rt].get("style") not in (None,) + STYLES:
             print(f"  {rt}: style {out[rt]['style']!r} is not valid; normal used.")
             out[rt]["style"] = "normal"
     return out

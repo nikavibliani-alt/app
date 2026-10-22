@@ -29,7 +29,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import copy
 
-from .config import season_of, AGGRESSIVE, is_holiday
+from .config import season_of, AGGRESSIVE, PUSH_PROFILES, PUSH_LABELS, is_holiday
 from .curve import interpolate
 
 STATUS_WORDS = {
@@ -151,7 +151,20 @@ def _profiles(cfg: dict) -> dict:
                     "speed_down": {**cfg["demand"]["speed_down"], **AGGRESSIVE["speed_down"]}}
     ag["calm"] = {**cfg["calm"], "daily_down": max(cfg["calm"]["daily_down"], AGGRESSIVE["daily_down"])}
     ag["min_guard_share"] = min(cfg.get("min_guard_share", 0.25), AGGRESSIVE["min_guard_share"])
-    return {"normal": cfg, "aggressive": ag}
+    out = {"normal": cfg, "aggressive": ag}
+    for name, spec in PUSH_PROFILES.items():
+        p = dict(cfg)
+        p["bands"] = copy.deepcopy(spec["bands"])
+        p["demand"] = {**cfg["demand"],
+                       "target_adj": {**cfg["demand"]["target_adj"], **spec["target_adj"]},
+                       "speed_up": {**cfg["demand"]["speed_up"], **spec.get("speed_up", {})},
+                       "speed_down": {**cfg["demand"]["speed_down"], **spec["speed_down"]}}
+        p["calm"] = {**cfg["calm"], **spec["calm"]}
+        p["min_guard_share"] = spec["min_guard_share"]
+        p["no_last_drop"], p["last_half"] = bool(spec.get("no_last_drop")), bool(spec.get("last_half"))
+        p["occupancy_goal_floor"] = spec.get("occupancy_goal_floor")
+        out[name] = p
+    return out
 
 
 def _date_rule(rt: str, ds: str, rules: list):
@@ -291,6 +304,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
     aims = {}
     for a_ in cfg.get("night_aims") or []:
         aims[(a_["rt"], str(a_["date"]))] = (float(a_["pct"]), a_.get("avail"))
+    # "How hard to push" for single nights: {(room type, date): (style, free units when it was set)}.
+    pushes = {(a_["rt"], str(a_["date"])): (a_["style"], a_.get("avail")) for a_ in cfg.get("night_push") or []}
     # Prices typed on the pricing page ("Set my own price"): {"ROOM|YYYY-MM-DD": {"GEL": x, "USD": y}}. Written once, then
     # the night counts as hand-set. own_done = the keys that are finished (written, already that price, or booked).
     own_prices = snapshot.get("own_prices") or {}
@@ -430,7 +445,9 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                                       "kind": "protected", "style": None, "blocked": [],
                                       "why": [f"Protected date ({rule.get('note') or 'date rule'}): left alone."]})
                 continue
-            style = (rule["action"] if rule and rule["action"] != "hold" else None) or info.get("style") or "normal"
+            night_push = pushes.get((rt, ds))
+            night_style = night_push[0] if night_push and (night_push[1] is None or avail >= int(night_push[1])) else None
+            style = night_style or (rule["action"] if rule and rule["action"] != "hold" else None) or info.get("style") or "normal"
             hol_kind = None                      # "holiday" (a holiday date) or "hold" (a date rule): small moves only
             if rule and rule["action"] == "hold":
                 hol_kind = "hold"
@@ -438,7 +455,11 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 hol_kind = "holiday"
             pc = profiles.get(style, cfg)
             dm, calm = pc["demand"], pc["calm"]
-            goal_d = max(goal, AGGRESSIVE["occupancy_goal_floor"]) if style == "aggressive" else goal
+            goal_d = goal
+            if style == "aggressive":
+                goal_d = max(goal, AGGRESSIVE["occupancy_goal_floor"])
+            elif pc.get("occupancy_goal_floor"):
+                goal_d = max(goal, pc["occupancy_goal_floor"])
 
             # ---------- demand signal (same for every currency) ----------
             own = occ[rt][ds]
@@ -635,20 +656,30 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 raw = base * (1 + lu) * (1 + adj)
                 band = _band(days_out, pc)
                 high = base * (1 + float(band["up"]))
+                # last-3-days floor: your minimum; for the Calm stop only halfway between the price it had when the last 3 days began and the minimum
+                floor_last = mn
+                if pc.get("last_half"):
+                    if days_out <= 3:
+                        anchor = st.setdefault("l3_anchor", current)
+                        floor_last = min(current, mn + (anchor - mn) / 2)
+                    else:
+                        st.pop("l3_anchor", None)
                 if band["down"] == "min":
                     low = mn
+                elif band["down"] == "half":
+                    low = floor_last
                 elif band["down"] == "hold":
-                    low = min(current, base)
+                    low = current if pc.get("no_last_drop") else min(current, base)
                 else:
                     low = base * (1 - float(band["down"]))
-                if days_out >= 2:
+                if days_out >= 2 and band["down"] != "half":
                     # the minimum itself is kept for the night before arrival day
                     guard = mn + pc.get("min_guard_share", 0.25) * max(0.0, start - mn)
                     low = max(low, guard) if band["down"] != "min" else max(low, mn + (guard - mn) * 0.5)
                 target = min(max(raw, low), high)
-                last_days_behind = 1 <= days_out <= 3 and status in ("behind", "far_behind") and not pickup
+                last_days_behind = 1 <= days_out <= 3 and status in ("behind", "far_behind") and not pickup and not pc.get("no_last_drop")
                 if last_days_behind:
-                    target = mn
+                    target = floor_last
                 target = min(max(target, mn), mx_eff)
                 if aim_pct:
                     target = min(max(target * (1 + aim_pct / 100), mn), mx_eff)
@@ -658,6 +689,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 dec["why"].append(f"{season.replace('_', ' ').capitalize()} season: start {_fmt(cur, start)}.")
                 if style == "aggressive":
                     dec["why"].append("Aggressive mode (fill the month): lowers faster and further when selling slowly.")
+                elif style in PUSH_PROFILES:
+                    dec["why"].append(f"How hard to push: {PUSH_LABELS[style]}" + (" (set for this night)." if night_style else "."))
                 if wk:
                     dec["why"].append(f"{dday.strftime('%A')} night +{wk:.0%}.")
                 if ev_pct:
@@ -749,7 +782,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                         sp = max(sp, 0.02)
                     proposed = min(target, current * (1 + sp))
                 elif last_days_behind:
-                    proposed = current - (current - mn) * float(cascade.get(days_out, 1.0))
+                    proposed = current - (current - floor_last) * float(cascade.get(days_out, 1.0))
                 else:
                     sp = dm["speed_down"]["on_track" if (pickup and status in ("behind", "far_behind")) else status]
                     if current > high:
