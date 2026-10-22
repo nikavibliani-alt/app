@@ -32,6 +32,9 @@ def main(task, dry):
     if task == "seasons_migrate":
         import seasons_migrate as m
         return m.main(flag)
+    if task == "alert_probe":
+        import alert_probe as m
+        return m.main()
     if task == "night_probe":
         import night_probe as m
         return m.main()
