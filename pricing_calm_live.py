@@ -33,6 +33,7 @@ import argparse
 import json
 import os
 import sys
+import threading
 import time
 from datetime import datetime
 from urllib.parse import urlparse
@@ -237,24 +238,89 @@ def send_prices(payload: list, cookie: str, post=None):
 
 
 PUSH_TIMEOUT = 120         # seconds per try; the Expedia push takes about 60 s
+CHANNEL_TOTAL_TIMEOUT = 180   # seconds for ONE channel in total (all tries); then it counts as failed and the next channel goes on
 
 
-def push_channels(portals: list, cookie: str, post=None, sleep=time.sleep, timeout=None):
+def _call_with_deadline(post, url, body, hdrs, seconds):
+    """One request that can never take longer than `seconds`: it runs in a helper thread and is given up on when the time is over."""
+    box = {}
+
+    def work():
+        try:
+            box["resp"] = post(url, json=body, headers=hdrs, timeout=seconds)
+        except BaseException as e:  # noqa: BLE001
+            box["err"] = e
+    t = threading.Thread(target=work, daemon=True)
+    t.start()
+    t.join(seconds)
+    if t.is_alive():
+        raise requests.exceptions.ReadTimeout(f"no answer within {seconds:g} s")
+    if "err" in box:
+        raise box["err"]
+    return box["resp"]
+
+
+def push_channels(portals: list, cookie: str, post=None, sleep=time.sleep, timeout=None, total=None, clock=time.monotonic):
+    """Push each channel. A channel gets at most `total` seconds in all (3 tries inside that); if it does not answer or fails, it is
+    reported as failed and the next channel goes on. Never raises for a channel problem."""
     post = post or requests.post
+    total = CHANNEL_TOTAL_TIMEOUT if total is None else total
     failed = []
     for portal in portals:
+        start, ok = clock(), False
         for attempt in range(3):
-            try:
-                resp = post(f"{BASE_URL}{SYNC_PATH}?Portal={portal}", json={"portal": portal},
-                            headers=headers(cookie), timeout=timeout or PUSH_TIMEOUT)
-                resp.raise_for_status()
+            left = total - (clock() - start)
+            if left <= 0:
                 break
-            except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError):
-                if attempt == 2:
-                    failed.append(portal)
-                else:
+            try:
+                resp = _call_with_deadline(post, f"{BASE_URL}{SYNC_PATH}?Portal={portal}", {"portal": portal}, headers(cookie), min(timeout or PUSH_TIMEOUT, left))
+                resp.raise_for_status()
+                ok = True
+                break
+            except requests.exceptions.RequestException:
+                if attempt < 2 and total - (clock() - start) > 10:
                     sleep(5)
+        if not ok:
+            failed.append(portal)
     return failed
+
+
+# ---- nights that did not reach a channel: remembered, and sent again in the next run ----
+PENDING_DOC = ("pricing_config", "channel_pending")
+MAX_PENDING_DATES = 500
+
+
+def read_pending(db) -> dict:
+    """{portal: {"since": iso, "rooms": {rt: [dates]}}} of channels whose last push failed. A read problem counts as nothing pending."""
+    try:
+        snap = db.collection(PENDING_DOC[0]).document(PENDING_DOC[1]).get()
+        raw = (snap.to_dict() or {}).get("portals") if snap.exists else None
+    except Exception:
+        return {}
+    return {p: v for p, v in (raw or {}).items() if p in VALID_PORTALS and isinstance(v, dict)}
+
+
+def write_pending(db, pending: dict):
+    try:
+        db.collection(PENDING_DOC[0]).document(PENDING_DOC[1]).set({"portals": pending, "updated": datetime.now().isoformat()})
+    except Exception as e:  # noqa: BLE001
+        print(f"  Could not save the channel re-send list: {type(e).__name__}")
+
+
+def update_pending(pending: dict, attempted: list, failed: list, writes: list, live_rts: dict, now) -> dict:
+    """The channels that went through leave the list; a failed channel keeps (or gets) the nights this run changed for it."""
+    out = {p: v for p, v in pending.items() if p in failed or p not in attempted}
+    for p in failed:
+        cur = out.get(p) or {"since": now.isoformat(timespec="seconds"), "rooms": {}}
+        rooms = {rt: list(ds) for rt, ds in (cur.get("rooms") or {}).items()}
+        for w in writes:
+            if p in portals_for(live_rts.get(w["rt"], {}), w["rt"]):
+                ds = rooms.setdefault(w["rt"], [])
+                if w["date"] not in ds and len(ds) < MAX_PENDING_DATES:
+                    ds.append(w["date"])
+        cur["rooms"] = {rt: sorted(ds) for rt, ds in rooms.items()}
+        out[p] = cur
+    return out
 
 
 def parse_reset(text: str) -> set:
@@ -455,8 +521,13 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
 
         report = reset_report(result, reset_rts, today) if reset_rts else None
         portals = portals_to_push(writes, live_rts)
+        in_use = {p for rt_, v in live_rts.items() for p in portals_for(v, rt_)}
+        pending = {p: v for p, v in read_pending(db).items() if p in in_use}
+        all_portals = sorted(set(portals) | set(pending), key=VALID_PORTALS.index)
         print("  Channels it pushes after the write: " + (", ".join(portals) if portals else "none (no price change)")
               + ("  (not sent)" if args.dry else ""))
+        if pending:
+            print("  Channels from an earlier failed push, sent again now: " + ", ".join(sorted(pending)) + ("  (not sent)" if args.dry else ""))
         if args.dry:
             print("Dry run: nothing written to MiniHotel, nothing saved.")
             return {**result, "sent": False, "payload": payload, "portals": portals, "report": report}
@@ -474,10 +545,19 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         failed_portals = []
         if payload:
             send_prices(payload, cookie, post=post)              # raises on error: memory is then NOT saved
-            failed_portals = push_channels(portals, cookie, post=post)
+        if all_portals and (payload or pending):
+            failed_portals = push_channels(all_portals, cookie, post=post)
+        resent = [p for p in all_portals if p in pending and p not in failed_portals]
+        new_pending = update_pending(pending, all_portals, failed_portals, writes, live_rts, now)
         extra["failed_portals"] = failed_portals
+        extra["resent_portals"] = resent
+        extra["pending_portals"] = sorted(new_pending)
+        if resent:
+            print(f"  Re-sent in this run: {', '.join(resent)}: OK.")
         ps.save(db, now, result["state"], result, extra,
                 prefix=STATE_PREFIX, daily_coll="pricing_calm_daily", runs_coll="pricing_calm_runs")
+        if new_pending != pending:
+            write_pending(db, new_pending)                        # a failed channel is remembered; one that went through leaves the list
         clear_release(db, release)                                # the nights you gave back are handled: take them off the list
         if own or own_all:
             clear_own_prices(db, set(result.get("own_done") or ()), today.isoformat() if hasattr(today, "isoformat") else str(today))

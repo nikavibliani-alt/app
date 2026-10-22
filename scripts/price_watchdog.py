@@ -64,6 +64,20 @@ def season_notes(db) -> list:
     return []
 
 
+CHANNEL_NAMES = {"BOOKING": "Booking.com", "EXPEDIA": "Expedia", "AIRBNB": "Airbnb"}
+
+
+def channel_notes(runs: list, pending: dict) -> list:
+    """A channel push that failed and was sent again in a later run: say so, so one slow moment does not look like a problem."""
+    notes, last_failed = [], set((runs[-1].get("failed_portals") or []) if runs else [])
+    for r in runs:
+        for p in r.get("resent_portals") or []:
+            if p not in last_failed and p not in pending:
+                when = str(r.get("ts", ""))[11:16]
+                notes.append(f"{CHANNEL_NAMES.get(p, p)}: the push failed earlier and was re-sent in the next run ({when}): OK.")
+    return notes
+
+
 def whatsapp_payload(to, issue, language, label=GUEST_LABEL):
     return {"messaging_product": "whatsapp", "to": to, "type": "template",
             "template": {"name": "owner_alert", "language": {"code": language},
@@ -124,10 +138,17 @@ def main(argv=None, db=None, post=requests.post, now=None, env=os.environ):
     result = check(daily, states, run_view, cfg, now, live_rts=list(live_rts))
     paused = bool(last and last.get("paused"))
 
+    try:
+        pending = live.read_pending(db)
+    except Exception:
+        pending = {}
+    for i in result["issues"]:                       # a failed channel is remembered and sent again by the next run
+        if i["code"] == "channel_failed" and any(CHANNEL_NAMES.get(p, p) in i["text"] for p in pending):
+            i["text"] += " It will be re-sent in the next run."
     issues = result["issues"][:MAX_LISTED]
     doc = {"ts": now.isoformat(), "day": today, "status": result["status"], "counts": result["counts"],
            "checked": result["checked"], "issues": issues, "total_issues": len(result["issues"]),
-           "main_run_done": main_done, "rooms": sorted(live_rts), "paused": paused, "notes": season_notes(db)}
+           "main_run_done": main_done, "rooms": sorted(live_rts), "paused": paused, "notes": season_notes(db) + channel_notes(runs, pending)}
     print(f"Watchdog: {result['status']} | checked {result['checked']} prices in {len(daily)} of {len(live_rts)} rooms | "
           f"issues {result['counts'] or 'none'} | main run today: {main_done}")
 
