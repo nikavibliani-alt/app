@@ -82,21 +82,20 @@ export function normalizeTypeCfg(raw) {
     photo: str(s.photo),
     perUnitPhoto: s.perUnitPhoto === true,
   }));
-  if (!method && !steps.length && !Object.keys(a).length) return null;
-  return {
-    access: {
-      method,
-      entranceCard: a.entranceCard === true,
-      lockboxWhere: str(a.lockboxWhere),
-      lockboxPhoto: str(a.lockboxPhoto),
-      handoverWho: str(a.handoverWho),
-      handoverPhone: digits(a.handoverPhone),
-      handoverWhere: str(a.handoverWhere),
-      returnNote: str(a.returnNote),
-    },
-    steps,
-    updatedAt: raw.updatedAt || null,
+  const access = {
+    method,
+    entranceCard: a.entranceCard === true,
+    lockboxWhere: str(a.lockboxWhere),
+    lockboxPhoto: str(a.lockboxPhoto),
+    handoverWho: str(a.handoverWho),
+    handoverPhone: digits(a.handoverPhone),
+    handoverWhere: str(a.handoverWhere),
+    returnNote: str(a.returnNote),
   };
+  const empty = !steps.length && !method && !access.entranceCard && !access.lockboxWhere && !access.lockboxPhoto
+    && !access.handoverWho && !access.handoverPhone && !access.handoverWhere && !access.returnNote;
+  if (empty) return null;   // nothing filled in: the guest page keeps looking exactly like today
+  return { access, steps, updatedAt: raw.updatedAt || null };
 }
 
 /* The access method for a unit: its own choice, else the type's, else the smart lock box that exists today. */
@@ -171,7 +170,7 @@ export function unitProblems(typeCfg, unitCode, unit, opts = {}) {
   const out = [];
   const t = normalizeTypeCfg(typeCfg);
   const m = resolveAccessMethod(t, u).method;
-  if (m === 'smartlock' && !opts.noLock && !u.tuyaDeviceId) out.push(unitCode + ' has no lock');
+  if (m === 'smartlock' && !opts.noLock && !u.tuyaDeviceId && !u.doorCode) out.push(unitCode + ' has no lock');
   else if (m === 'code' && !u.doorCode) out.push(unitCode + ' has no lock');
   else if (m === 'lockbox' && !u.lockboxCode) out.push(unitCode + ' has no lock');
   if (t) {

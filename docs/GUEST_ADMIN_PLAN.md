@@ -313,3 +313,4 @@ Steps: 1 shared logic (shared/apt-arrival.js + tests) / 2 admin navigation (type
 Undo: tell me "undo apartments redesign" (back to tag before-apts-redesign) or "undo apartments step N".
 Progress log:
 - Step 1: shared/apt-arrival.js (roomGroup used by admin gpPropForRoom and guest groupForRoom, resolveArrival, fillPlaceholders, unitProblems) + pipeline-functions/tests/aptArrival.test.js. No visible change.
+- Step 2: Apartments tab shows type cards (access method, shared steps, status). Type page (Units | Arrival steps | Settings, Save top right, unsaved guard) in #apt-type-overlay; unit page reorganised (How guests get in, type steps greyed "From <type>", own steps with "Make this step shared", WiFi, folded rows). Types save to checkin_admin/config.aptTypes.GROUP only (merge); per-unit step photos to checkin_apartments.stepPhotos. Build 1015a.

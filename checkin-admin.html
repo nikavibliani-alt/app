@@ -441,6 +441,46 @@ html.inbox-typing #main-nav{display:none}
 .apt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .apt-pill__code{font-family:var(--mono);font-weight:700;font-size:14px;}
 .apt-pill__name{font-size:12px;color:var(--muted);flex:1;}
+/* Apartments: types and units */
+#apt-type-overlay{position:fixed;inset:0;background:var(--bg);z-index:205;display:none;flex-direction:column;max-width:480px;margin:0 auto;overflow-y:auto;}
+#apt-type-overlay.open{display:flex;}
+.at-card{display:flex;align-items:center;gap:12px;width:100%;padding:14px;margin-bottom:10px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);cursor:pointer;text-align:left;font-family:var(--sans);color:var(--ink);-webkit-tap-highlight-color:transparent;}
+.at-card:active{background:var(--bg);}
+.at-card__icon{flex:none;width:44px;height:44px;border-radius:12px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--ink-2);}
+.at-card__body{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;}
+.at-card__name{font-size:15px;font-weight:700;color:var(--ink);}
+.at-card__units{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:normal;}
+.at-card__chev{flex:none;color:var(--muted);display:flex;}
+.at-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.at-chip{display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--line);font-size:11px;font-weight:600;color:var(--ink-2);}
+.at-chip--green{background:var(--green-bg);border-color:#bfdcca;color:var(--green);}
+.at-chip--red{background:var(--red-bg);border-color:#e8c4c4;color:var(--red);}
+.at-tabs{display:flex;gap:6px;padding:10px 14px 0;background:var(--bg);position:sticky;top:0;z-index:3;}
+.at-tab{flex:1;min-height:40px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink-2);font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;}
+.at-tab.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.at-muted{font-size:12px;color:var(--muted);font-weight:500;line-height:1.4;}
+.at-sub{font-size:12px;color:var(--muted);font-weight:600;margin:0 0 10px;}
+.at-access{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.at-access__m{font-size:15px;font-weight:700;margin-bottom:2px;}
+.at-step{padding:12px 0;border-bottom:1px solid var(--line);}
+.at-step:last-of-type{border-bottom:none;}
+.at-step--from{opacity:.75;background:var(--bg);border-radius:var(--rs);padding:10px;margin-bottom:8px;border-bottom:none;}
+.at-step__top{display:flex;gap:10px;align-items:flex-start;}
+.at-step__num{flex:none;width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.at-step__txt{flex:1;min-width:0;}
+.at-step__title{font-size:14px;font-weight:700;}
+.at-step__btns{display:flex;gap:6px;margin-top:8px;align-items:center;}
+.at-tag{display:inline-block;margin-top:6px;font-size:11px;font-weight:600;color:var(--ink-2);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:2px 8px;}
+.at-thumb{flex:none;width:44px;height:44px;border-radius:8px;object-fit:cover;background:var(--bg);border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;color:var(--muted);}
+.at-thumb--empty{border:1.5px dashed var(--line);}
+.at-thumb--missing{border-color:var(--red);color:var(--red);}
+.at-thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.at-thumbwrap{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--muted);font-weight:600;cursor:pointer;}
+.at-phs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;}
+.at-ph{min-height:30px;padding:0 10px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--ink-2);font-family:var(--mono);font-size:12px;cursor:pointer;}
+.at-photo__img{width:100%;max-height:200px;object-fit:cover;border-radius:var(--rs);border:1px solid var(--line);}
+.at-link{border:none;background:transparent;color:var(--ink-2);font-family:var(--sans);font-size:12px;font-weight:600;text-decoration:underline;cursor:pointer;padding:6px 0;min-height:32px;}
+.at-chipsrow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
 .apt-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:12px;overflow:hidden;}
 .apt-card-hd{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);font-size:13px;font-weight:700;}
 .apt-card-bd{padding:14px;}
@@ -784,7 +824,7 @@ html.inbox-typing #main-nav{display:none}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1014d · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1015a · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -841,9 +881,9 @@ html.inbox-typing #main-nav{display:none}
     <div class="aptsguest-switch"></div>
     <div class="apt-sync-note">MiniHotel sync updates reservations only — your room list and apartment content stay as you set them here.</div>
     <div class="apt-toolbar">
-      <button type="button" class="btn btn-primary" onclick="toggleAddRoomForm()">+ Add room</button>
+      <button type="button" class="btn btn-primary" onclick="toggleAddRoomForm()">+ Add unit</button>
       <button type="button" class="btn" id="apt-reorder-btn" onclick="toggleAptReorder()">Rearrange</button>
-      <button type="button" class="btn" onclick="toggleHiddenRooms()">Hidden rooms</button>
+      <button type="button" class="btn" id="apt-hidden-btn" onclick="toggleHiddenRooms()">Hidden units</button>
     </div>
     <div id="apt-reorder-hint" class="apt-reorder-hint" hidden>Drag <strong>≡</strong> to reorder rooms · tap <strong>Done</strong> when finished</div>
     <div id="add-room-form" class="apt-add-form" hidden></div>
@@ -957,6 +997,16 @@ html.inbox-typing #main-nav{display:none}
     <div class="detail-title" id="detail-title">Guest</div>
   </div>
   <div class="detail-body" id="detail-body"></div>
+</div>
+
+<div id="apt-type-overlay">
+  <div class="apt-ed-bar">
+    <button class="detail-back" onclick="goBack()" aria-label="Back"><svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6L9 12l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="detail-title" id="apt-type-title">Type</div>
+    <button class="btn btn-primary" id="apt-type-save" style="display:none" onclick="atSave()">Save</button>
+  </div>
+  <div class="at-tabs" id="apt-type-tabs"></div>
+  <div class="apt-ed-body" id="apt-type-body" style="flex:1 0 auto"></div>
 </div>
 
 <div id="apt-editor-overlay">
@@ -1977,7 +2027,7 @@ let _gpEditCtx=null;
 async function loadGuestSettings(){
   try{
     const snap=await getDoc(doc(db,'checkin_admin','config'));
-    if(!snap.exists())gsHouseRules={};
+    if(!snap.exists()){gsHouseRules={};gsAptTypes={};}
     if(snap.exists()){
       const d=snap.data();
       if(d.visibility)gsVisibility={...JSON.parse(JSON.stringify(SECTION_DEFAULTS)),...d.visibility};
@@ -1993,6 +2043,7 @@ async function loadGuestSettings(){
       if(d.parkingInfo)gsParkingInfo=d.parkingInfo;
       if(d.shuttleInfo)gsShuttleInfo=d.shuttleInfo;
       gsHouseRules=d.houseRules||{};
+      gsAptTypes=d.aptTypes||{};
       if(d.waitingTabs){
         const wt={...WAITING_TABS_DEFAULTS,...d.waitingTabs};
         delete wt.shuttle;
@@ -4706,6 +4757,7 @@ window.goBack=function(){
   if(document.getElementById('hr-editor-overlay')?.classList.contains('open')){closeHrEditor();return;}
   if(document.getElementById('gp-editor-overlay')?.classList.contains('open')){closeGpEditor();return;}
   if(document.getElementById('apt-editor-overlay')?.classList.contains('open')){if(aptEditorDirty()&&!confirm('Discard unsaved changes?'))return;closeAptEditor();return;}
+  if(document.getElementById('apt-type-overlay')?.classList.contains('open')){closeAptType();return;}
   if(document.getElementById('req-detail')?.classList.contains('open')){closeReqDetail();return;}
   if(document.getElementById('detail')?.classList.contains('open')){closeDetail();return;}
   if(MORE_SUB_PAGES.has(currentTab)){
@@ -4724,6 +4776,7 @@ function renderAptsGuestSwitch(){
 window.openAptsGuest=function(){switchTab(_aptsGuestLast);};
 window.switchTab=function(tab){
   if(tab!=='apts'&&window.aptEditorDirty&&aptEditorDirty()&&!confirm('Discard unsaved changes?'))return;
+  if(tab!=='apts'&&window.atDirty&&atDirty()&&!confirm('Discard unsaved changes?'))return;
   if(tab==='hksettings'&&currentTab!=='hksettings')hkSetSectionStore('menu');   // coming from another tab: start at the menu
   if(STANDALONE_HK){
     if(tab==='hksettings'&&!isHkAdmin())tab='hk';
@@ -4757,7 +4810,7 @@ window.switchTab=function(tab){
   if(tab==='failures')renderFailures();
   if(tab==='navsettings')renderNavSettings();
   closeDetail();closeReqDetail();closeGpEditor();
-  if(tab!=='apts')closeAptEditor();
+  if(tab!=='apts'){closeAptEditor();closeAptType(true);}
 };
 
 window.unlockGuest=async function(guestId){
@@ -5778,7 +5831,7 @@ window.saveRoomMeta=async function(roomCode){
     renderAptsList();
   }catch(e){toast('Save failed: '+e.message);}
 };
-function renderAptsList(){
+function renderAptsListFlat(){
   const listEl=document.getElementById('apts-list');
   const inactiveEl=document.getElementById('apts-inactive');
   if(!listEl)return;
@@ -5862,12 +5915,305 @@ function renderAptsList(){
   if(_showAddRoomForm)renderAddRoomForm();
 }
 
+/* ── Apartments: types -> units. Data: config.aptTypes[GROUP] (see shared/apt-arrival.js). NEVER put a code in it. ── */
+let gsAptTypes={};
+const _at={group:'',tab:'units',draft:null,base:'',view:'main',editIdx:-1};
+function atClone(o){return JSON.parse(JSON.stringify(o));}
+function atUnits(group){return getApartments().filter(a=>a.id!=='abashidze'&&roomGroup(a.id,roomsData[a.id]?.site)===group);}
+function atBlank(){return{access:{method:'',entranceCard:false,lockboxWhere:'',lockboxPhoto:'',handoverWho:'',handoverPhone:'',handoverWhere:'',returnNote:''},steps:[],updatedAt:null};}
+function atSaved(group){return normalizeTypeCfg(gsAptTypes[group])||atBlank();}
+function atEffMethod(cfg,unit){return resolveAccessMethod(cfg,unit||{}).method;}
+function atProblems(group){
+  const out=[];
+  for(const u of atUnits(group))out.push(...unitProblems(gsAptTypes[group],u.code,aptData[u.id],{noLock:gpNoLock(u.id)}));
+  return out;
+}
+function atUnitHint(group,u){
+  const p=unitProblems(gsAptTypes[group],u.code,aptData[u.id],{noLock:gpNoLock(u.id)});
+  if(p.length)return{ok:false,text:p[0].replace(u.code+' ','').replace(/^./,c=>c.toUpperCase())};
+  const d=aptData[u.id]||{};
+  const own=(d.photos||[]).length;
+  return{ok:true,text:own?own+' own step'+(own===1?'':'s'):'Ready'};
+}
+function atStatusChip(probs){
+  if(!probs.length)return'<span class="at-chip at-chip--green">All ready</span>';
+  return`<span class="at-chip at-chip--red">${esc(probs[0])}${probs.length>1?' (+'+(probs.length-1)+')':''}</span>`;
+}
+function renderAptTypeCards(){
+  return APT_GROUPS.map(g=>{
+    const units=atUnits(g.id);
+    if(!units.length)return'';
+    const cfg=normalizeTypeCfg(gsAptTypes[g.id]);
+    const n=cfg?cfg.steps.length:0;
+    const method=ACCESS_LABELS[atEffMethod(gsAptTypes[g.id],{})];
+    return`<button type="button" class="at-card" onclick="openAptType('${g.id}')">
+      <span class="at-card__icon">${featherIcon(g.icon,22,1.8)}</span>
+      <span class="at-card__body">
+        <span class="at-card__name">${esc(g.label)}</span>
+        <span class="at-card__units">${units.map(u=>esc(u.code)).join('  ')}</span>
+        <span class="at-chips"><span class="at-chip">${esc(method)}</span><span class="at-chip">${n?n+' shared step'+(n===1?'':'s'):'No shared steps'}</span>${atStatusChip(atProblems(g.id))}</span>
+      </span>
+      <span class="at-card__chev">${featherIcon('chevron-right',18,2)}</span>
+    </button>`;
+  }).join('');
+}
+function atThumb(url,missing){
+  return url?`<img class="at-thumb" src="${esc(url)}" alt="">`:`<span class="at-thumb at-thumb--empty${missing?' at-thumb--missing':''}">${featherIcon('plus',14,2)}</span>`;
+}
+
+/* ---- type page (overlay) ---- */
+window.openAptType=function(group){
+  _at.group=group;_at.tab='units';_at.view='main';_at.editIdx=-1;
+  _at.draft=atClone(atSaved(group));
+  _at.base=JSON.stringify(_at.draft);
+  document.getElementById('apt-type-overlay').classList.add('open');
+  atRender();
+};
+window.atDirty=function(){return !!_at.draft&&document.getElementById('apt-type-overlay')?.classList.contains('open')&&JSON.stringify(_at.draft)!==_at.base;};
+window.closeAptType=function(force){
+  if(_at.view==='step'&&!force){_at.view='main';_at.editIdx=-1;atRender();return;}
+  if(!force&&atDirty()&&!confirm('Discard unsaved changes?'))return;
+  document.getElementById('apt-type-overlay')?.classList.remove('open');
+  _at.draft=null;_at.view='main';
+  if(currentTab==='apts')renderAptsList();
+};
+function atTouch(){atUpdateSave();}
+function atUpdateSave(){
+  const b=document.getElementById('apt-type-save');
+  if(b)b.style.display=atDirty()?'inline-flex':'none';
+}
+window.atSetTab=function(t){_at.tab=t;_at.view='main';_at.editIdx=-1;atRender();};
+function atRender(soft){
+  const ov=document.getElementById('apt-type-overlay');
+  if(!ov||!ov.classList.contains('open')||!_at.draft)return;
+  if(soft){const ae=document.activeElement;if(_at.view==='step'||(ae&&ae.closest&&ae.closest('#apt-type-body')&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)))return;}
+  const g=APT_GROUPS.find(x=>x.id===_at.group)||{label:_at.group};
+  document.getElementById('apt-type-title').textContent=_at.view==='step'?'Edit step':g.label;
+  const tabs=[['units','Units'],['steps','Arrival steps'],['settings','Settings']];
+  document.getElementById('apt-type-tabs').style.display=_at.view==='step'?'none':'flex';
+  document.getElementById('apt-type-tabs').innerHTML=tabs.map(([k,l])=>`<button type="button" class="at-tab${_at.tab===k?' active':''}" onclick="atSetTab('${k}')">${l}</button>`).join('');
+  const body=document.getElementById('apt-type-body');
+  const top=body.scrollTop;
+  body.innerHTML=_at.view==='step'?atStepEditHtml():(_at.tab==='units'?atUnitsHtml():_at.tab==='steps'?atStepsHtml():atSettingsHtml());
+  body.scrollTop=top;
+  atUpdateSave();
+}
+function atUnitsHtml(){
+  const units=atUnits(_at.group);
+  if(!units.length)return'<div class="empty">No units in this type yet</div>';
+  return units.map(u=>{
+    const h=atUnitHint(_at.group,u);
+    return`<div class="apt-pill-row"><button type="button" class="apt-pill" onclick="window.openAptEditor('${esc(u.id)}')">
+      <span class="apt-dot" style="background:${h.ok?'var(--green)':'var(--red)'}"></span>
+      <span class="apt-pill__code">${esc(u.code)}</span>
+      <span class="apt-pill__name">${esc(u.name)} · ${esc(h.text)}</span></button>
+      <button type="button" class="apt-pill-hide" onclick="hideRoom('${esc(u.id)}')" title="Hide unit">Hide</button></div>`;
+  }).join('');
+}
+function atAccessCardHtml(){
+  const a=_at.draft.access;
+  const m=a.method||'smartlock';
+  let lines='';
+  if(m==='smartlock')lines='A new door code is made for every booking.';
+  else if(m==='code')lines='The same door code every stay. Set the code on each unit.';
+  else if(m==='lockbox')lines=(a.lockboxWhere?'Box: '+esc(a.lockboxWhere)+'. ':'')+'Set the box code on each unit.';
+  else lines=(a.handoverWho?esc(a.handoverWho)+' meets the guest. ':'Someone meets the guest. ')+(a.handoverWhere?esc(a.handoverWhere):'');
+  return`<div class="apt-card"><div class="apt-card-hd">How guests get in</div><div class="apt-card-bd">
+    <div class="at-access"><div><div class="at-access__m">${esc(ACCESS_LABELS[m])}${a.method?'':' <span class="at-muted">(as today)</span>'}</div><div class="at-muted">${lines}</div>${a.entranceCard?'<div class="at-muted">Guests also get an entrance card or building key.</div>':''}</div>
+    ${atChangeAccessBtn('type')}</div></div></div>`;
+}
+function atChangeAccessBtn(scope){return'';}   // the "Change" button is added with the access sheet
+function atStepsHtml(){
+  const d=_at.draft,units=atUnits(_at.group),n=units.length;
+  const list=d.steps.map((s,i)=>{
+    const tag=s.perUnitPhoto
+      ?`<div class="at-tag">Each unit has its own photo</div><div class="at-thumbs">${units.map(u=>{const url=(aptData[u.id]?.stepPhotos||{})[s.id]||'';return`<label class="at-thumbwrap" title="${esc(u.code)}">${atThumb(url,true)}<span>${esc(u.code)}</span><input type="file" accept="image/*" style="display:none" onchange="atUnitStepPhoto('${esc(u.id)}','${esc(s.id)}',this)"></label>`;}).join('')}</div>`
+      :`<div class="at-tag">Same for all ${n}</div>`;
+    return`<div class="at-step">
+      <div class="at-step__top">
+        <div class="at-step__num">${i+1}</div>
+        ${s.perUnitPhoto?'':atThumb(s.photo,false)}
+        <div class="at-step__txt"><div class="at-step__title">${esc(s.title||'(no title)')}</div><div class="at-muted">${esc(s.text)}</div>${tag}</div>
+      </div>
+      <div class="at-step__btns">
+        <button type="button" class="apt-step-btn" aria-label="Move up" ${i===0?'disabled':''} onclick="atMoveStep(${i},-1)">${featherIcon('chevron-up',16,2)}</button>
+        <button type="button" class="apt-step-btn" aria-label="Move down" ${i===d.steps.length-1?'disabled':''} onclick="atMoveStep(${i},1)">${featherIcon('chevron-down',16,2)}</button>
+        <button type="button" class="btn" style="flex:1;min-height:36px" onclick="atEditStep(${i})">Edit</button>
+        <button type="button" class="btn" style="flex:none;min-height:36px;color:var(--red)" onclick="atDeleteStep(${i})">Delete</button>
+      </div></div>`;
+  }).join('');
+  return`${atAccessCardHtml()}
+    <div class="apt-card"><div class="apt-card-hd">Arrival steps</div><div class="apt-card-bd">
+      ${list||'<div class="at-muted" style="padding:6px 0">No shared steps yet. Guests see each unit\'s own steps, as today.</div>'}
+      <button type="button" class="apt-add" onclick="atAddStep()">+ Add step for all ${n} units</button>
+      <p class="apt-hint" style="margin-top:10px">A unit can add extra steps of its own after these.</p>
+    </div></div>`;
+}
+window.atAddStep=function(){
+  _at.draft.steps.push({id:'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),title:'',text:'',photo:'',perUnitPhoto:false});
+  _at.view='step';_at.editIdx=_at.draft.steps.length-1;atRender();
+};
+window.atEditStep=function(i){if(!_at.draft.steps[i])return;_at.view='step';_at.editIdx=i;atRender();};
+window.atDeleteStep=function(i){
+  const s=_at.draft.steps[i];if(!s)return;
+  if(!confirm('Delete the step "'+(s.title||'untitled')+'" for all units in this type?'))return;
+  _at.draft.steps.splice(i,1);atRender();
+};
+window.atMoveStep=function(i,d){
+  const a=_at.draft.steps,j=i+d;if(j<0||j>=a.length)return;
+  [a[i],a[j]]=[a[j],a[i]];atRender();
+};
+function atStepEditHtml(){
+  const s=_at.draft.steps[_at.editIdx];if(!s)return'';
+  const units=atUnits(_at.group);
+  const chips=PLACEHOLDERS.map(p=>`<button type="button" class="at-ph" onclick="atInsertPh('${p}')">${esc(p)}</button>`).join('');
+  const perUnit=s.perUnitPhoto
+    ?`<p class="apt-hint">Each unit adds its own photo here. Missing ones are dashed red; tap to upload.</p><div class="at-thumbs">${units.map(u=>{const url=(aptData[u.id]?.stepPhotos||{})[s.id]||'';return`<label class="at-thumbwrap">${atThumb(url,true)}<span>${esc(u.code)}</span><input type="file" accept="image/*" style="display:none" onchange="atUnitStepPhoto('${esc(u.id)}','${esc(s.id)}',this)"></label>`;}).join('')}</div>`
+    :`<div class="at-photo">${s.photo?`<img src="${esc(s.photo)}" alt="" class="at-photo__img">`:'<div class="at-muted">No photo</div>'}</div>
+      <input type="file" id="at-step-file" accept="image/*" style="display:none" onchange="atStepPhoto(this)">
+      <button type="button" class="btn" style="width:100%;margin-top:8px" onclick="document.getElementById('at-step-file').click()">${s.photo?'Replace photo':'Upload photo'}</button>
+      ${s.photo?'<button type="button" class="btn" style="width:100%;margin-top:8px;color:var(--red)" onclick="atStepPhotoClear()">Remove photo</button>':''}`;
+  return`<div class="apt-card"><div class="apt-card-hd">Step ${_at.editIdx+1}</div><div class="apt-card-bd">
+      <label class="apt-label">Title</label>
+      <input class="apt-input" value="${esc(s.title)}" oninput="atSetStep('title',this.value)" placeholder="Open the gate">
+      <label class="apt-label">Text</label>
+      <textarea class="apt-textarea" id="at-step-text" oninput="atSetStep('text',this.value)" placeholder="What the guest should do">${esc(s.text)}</textarea>
+      <div class="at-phs"><span class="at-muted">Insert:</span>${chips}</div>
+      <p class="apt-hint">Codes are filled in only when the room is ready. Before that the guest sees a short "shown when your room is ready" note.</p>
+    </div></div>
+    <div class="apt-card"><div class="apt-card-hd">Photo</div><div class="apt-card-bd">
+      <label class="hr-check"><input type="checkbox" ${s.perUnitPhoto?'checked':''} onchange="atSetPerUnit(this.checked)"> Each unit has its own photo</label>
+      ${perUnit}
+    </div></div>
+    <button type="button" class="btn btn-primary" style="width:100%" onclick="closeAptType()">Done with this step</button>`;
+}
+window.atSetStep=function(k,v){const s=_at.draft.steps[_at.editIdx];if(!s)return;s[k]=v;atTouch();};
+window.atSetPerUnit=function(on){const s=_at.draft.steps[_at.editIdx];if(!s)return;s.perUnitPhoto=!!on;atRender();};
+window.atInsertPh=function(ph){
+  const s=_at.draft.steps[_at.editIdx];if(!s)return;
+  const el=document.getElementById('at-step-text');
+  const pos=el&&typeof el.selectionStart==='number'?el.selectionStart:s.text.length;
+  const end=el&&typeof el.selectionEnd==='number'?el.selectionEnd:pos;
+  s.text=s.text.slice(0,pos)+ph+s.text.slice(end);
+  atTouch();atRender();
+  const el2=document.getElementById('at-step-text');
+  if(el2){el2.focus();const c=pos+ph.length;try{el2.setSelectionRange(c,c);}catch(e){}}
+};
+window.atStepPhoto=async function(input){
+  const f=input.files&&input.files[0];const s=_at.draft.steps[_at.editIdx];if(!f||!s)return;
+  try{toast('Uploading…',15000);s.photo=await uploadToCloudinary(f,'maxela/types/'+_at.group);atTouch();atRender();toast('Photo added');}
+  catch(e){toast('Upload failed: '+e.message);}
+};
+window.atStepPhotoClear=function(){const s=_at.draft.steps[_at.editIdx];if(!s)return;s.photo='';atTouch();atRender();};
+/* a unit's own photo for a shared step: saved straight to the unit (stepPhotos), not part of the type draft */
+window.atUnitStepPhoto=async function(unitId,stepId,input){
+  const f=input.files&&input.files[0];if(!f)return;
+  try{
+    toast('Uploading…',15000);
+    const url=await uploadToCloudinary(f,'maxela/'+unitId+'/steps');
+    await setDoc(doc(db,'checkin_apartments',unitId),{stepPhotos:{[stepId]:url}},{merge:true});
+    aptData[unitId]={...aptData[unitId],stepPhotos:{...((aptData[unitId]||{}).stepPhotos||{}),[stepId]:url}};
+    toast('Photo saved');
+    atRender();
+    if(_currentAptId===unitId&&document.getElementById('apt-editor-overlay')?.classList.contains('open'))_aptRerender(unitId);
+    if(currentTab==='apts')renderAptsList();
+  }catch(e){toast('Upload failed: '+e.message);}
+};
+function atSettingsHtml(){
+  const units=atUnits(_at.group),n=units.length;
+  const first=aptData[units[0]?.id]||{};
+  return`<div class="apt-card"><div class="apt-card-hd">Check-in and check-out times</div><div class="apt-card-bd">
+      <p class="apt-hint" style="margin-bottom:8px">Each unit keeps its own times. This sets the same times on all ${n} units at once.</p>
+      <div class="apt-row">
+        <div><label class="apt-label">Check-in</label><input class="apt-input" type="time" id="at-ci" value="${esc(first.checkInTime||'15:00')}"></div>
+        <div><label class="apt-label">Check-out</label><input class="apt-input" type="time" id="at-co" value="${esc(first.checkOutTime||'12:00')}"></div>
+      </div>
+      <button type="button" class="btn" style="width:100%;margin-top:10px" onclick="atApplyTimes()">Apply to all ${n} units</button>
+    </div></div>
+    <div class="apt-card"><div class="apt-card-hd">Guest page</div><div class="apt-card-bd">
+      <button type="button" class="btn" style="width:100%" onclick="atOpenGuestSettings()">Location, house rules and guest page</button>
+    </div></div>`;
+}
+window.atApplyTimes=async function(){
+  const ci=document.getElementById('at-ci')?.value||'15:00',co=document.getElementById('at-co')?.value||'12:00';
+  const units=atUnits(_at.group);
+  if(!confirm('Set check-in '+ci+' and check-out '+co+' on all '+units.length+' units of '+groupLabel(_at.group)+'?'))return;
+  try{
+    for(const u of units){
+      await setDoc(doc(db,'checkin_apartments',u.id),{checkInTime:ci,checkOutTime:co,updatedAt:serverTimestamp()},{merge:true});
+      aptData[u.id]={...aptData[u.id],checkInTime:ci,checkOutTime:co};
+    }
+    toast('Times set on '+units.length+' units');
+  }catch(e){toast('Failed: '+e.message);}
+};
+window.atOpenGuestSettings=function(){
+  if(atDirty()&&!confirm('Discard unsaved changes?'))return;
+  const g=_at.group;closeAptType(true);
+  gsProp=g;switchTab('guestsettings');
+};
+window.atSave=async function(){
+  if(!_at.draft)return;
+  const g=_at.group;
+  const out=atClone(_at.draft);
+  delete out.updatedAt;
+  try{
+    await setDoc(doc(db,'checkin_admin','config'),{aptTypes:{[g]:{...out,updatedAt:serverTimestamp()}},updatedAt:serverTimestamp()},{merge:true});
+    gsAptTypes[g]={...out,updatedAt:new Date().toISOString()};
+    _at.base=JSON.stringify(_at.draft);
+    toast('Saved');
+    atRender();
+    if(currentTab==='apts')renderAptsList();
+  }catch(e){toast('Save failed: '+e.message);}
+};
+/* the unit page: a step that only this unit has can become a shared step of the type */
+window.atShareStep=async function(i){
+  const unitId=_currentAptId;if(!unitId)return;
+  const d=aptData[unitId]||{};
+  const url=(d.photos||[])[i],cap=((d.photoCaptions||[])[i]||'').trim();
+  if(url===undefined)return;
+  const group=roomGroup(unitId,roomsData[unitId]?.site);
+  if(!confirm('Make this step shared? Every unit of '+groupLabel(group)+' will show it before its own steps.'))return;
+  const same=confirm('Is the photo the same for all units?\n\nOK = same photo for all units.\nCancel = each unit has its own photo (this unit keeps this one; the others need to add theirs).');
+  const cfg=atClone(atSaved(group));
+  const id='s'+Date.now().toString(36)+Math.random().toString(36).slice(2,4);
+  cfg.steps.push({id,title:'',text:cap,photo:same?url:'',perUnitPhoto:!same});
+  delete cfg.updatedAt;
+  const photos=[...(d.photos||[])],caps=[...(d.photoCaptions||[])];
+  photos.splice(i,1);caps.splice(i,1);
+  try{
+    await setDoc(doc(db,'checkin_admin','config'),{aptTypes:{[group]:{...cfg,updatedAt:serverTimestamp()}},updatedAt:serverTimestamp()},{merge:true});
+    const unitDoc={photos,photoCaptions:caps};
+    if(!same)unitDoc.stepPhotos={[id]:url};
+    await setDoc(doc(db,'checkin_apartments',unitId),unitDoc,{merge:true});
+    gsAptTypes[group]={...cfg,updatedAt:new Date().toISOString()};
+    aptData[unitId]={...aptData[unitId],photos,photoCaptions:caps,...(same?{}:{stepPhotos:{...(d.stepPhotos||{}),[id]:url}})};
+    toast('Step is now shared');
+    _aptRerender(unitId);
+    if(currentTab==='apts')renderAptsList();
+  }catch(e){toast('Failed: '+e.message);}
+};
+
+function renderAptsList(){
+  renderAptsListFlat();   // keeps the hidden-units list, the add form and Rearrange mode
+  const listEl=document.getElementById('apts-list');
+  const hiddenN=Object.values(roomsData).filter(r=>r.active===false).length;
+  const hb=document.getElementById('apt-hidden-btn');
+  if(hb)hb.textContent='Hidden units ('+hiddenN+')';
+  if(!listEl||_aptReorderMode||!Object.keys(roomsData).length)return;
+  listEl.innerHTML=renderAptTypeCards()||'<div class="empty">No active units — add one above</div>';
+  atRender(true);
+}
+
 window.openAptEditor=function(aptId){
   if(!aptId)return;
   const apt=getAptMeta(aptId);
   const meta=roomsData[aptId]||{};
   _currentAptId=aptId;
   const d=aptData[aptId]||{};
+  const group=roomGroup(aptId,meta.site);
+  const typeCfg=gsAptTypes[group];
+  const arrival=resolveArrival(typeCfg,d);
+  const method=arrival.access.method;
   const initMode=(!!d.doorCode&&!d.tuyaDeviceId)?'manual':'auto';
   const photos=d.photos||[];
   const caps=d.photoCaptions||[];
@@ -5880,18 +6226,31 @@ window.openAptEditor=function(aptId){
         <div class="apt-label">Step ${i+1}</div>
         <textarea class="apt-step-textarea" id="photo-cap-${i}" placeholder="Caption…">${esc(caps[i]||'')}</textarea>
         <input type="file" id="replace-${i}" accept="image/*" style="display:none" onchange="window.doReplacePhoto(${i},this)">
+        <button type="button" class="at-link" onclick="document.getElementById('replace-${i}').click()">Replace photo</button>
+        <button type="button" class="at-link" onclick="atShareStep(${i})">Make this step shared</button>
       </div>
       <div class="apt-step-actions">
         <button type="button" class="apt-step-btn" aria-label="Move up" onclick="window.movePhoto(${i},-1)" ${i===0?'disabled':''}>${featherIcon('chevron-up',16,2)}</button>
         <button type="button" class="apt-step-btn" aria-label="Move down" onclick="window.movePhoto(${i},1)" ${i===photos.length-1?'disabled':''}>${featherIcon('chevron-down',16,2)}</button>
         <button type="button" class="apt-step-btn del" aria-label="Delete photo" onclick="window.deletePhoto(${i})">${featherIcon('x',16,2)}</button>
       </div>
-    </div>`).join('')||'<div style="font-size:13px;color:var(--muted);padding:8px 0;">No photos yet.</div>';
-
-  document.getElementById('apt-ed-body').innerHTML=`
-    <div class="apt-card">
-      <div class="apt-card-hd">Smart lock · ${d.tuyaDeviceId?'Tuya':d.doorCode?'Manual':'Not set'}</div>
-      <div class="apt-card-bd">
+    </div>`).join('')||'<div style="font-size:13px;color:var(--muted);padding:8px 0;">No steps of its own yet.</div>';
+  const shared=arrival.steps.filter(s=>s.shared).map((s,i)=>`
+    <div class="at-step at-step--from">
+      <div class="at-step__top">
+        <div class="at-step__num">${i+1}</div>
+        ${atThumb(s.photo,s.missingPhoto)}
+        <div class="at-step__txt"><div class="at-step__title">${esc(s.title||'(no title)')}</div><div class="at-muted">${esc(s.text)}</div>
+          <div class="at-tag">From ${esc(groupLabel(group))}</div>
+          ${s.perUnitPhoto?`<div><label class="at-link" style="display:inline-block">${s.photo?'Replace photo':'Add this unit\'s photo'}<input type="file" accept="image/*" style="display:none" onchange="atUnitStepPhoto('${esc(aptId)}','${esc(s.id)}',this)"></label></div>`:''}
+        </div>
+      </div></div>`).join('');
+  const lockState=d.tuyaDeviceId?'Smart lock connected':d.doorCode?'Door code set':'No lock yet';
+  const nSteps=arrival.steps.length;
+  const accessLabel=ACCESS_LABELS[method]+' · '+(arrival.access.source==='unit'?'own setting':(arrival.access.source==='type'?'same as type':'as today'));
+  let accessFields='';
+  if(method==='smartlock'){
+    accessFields=`
         <div class="apt-mode-group">
           <button type="button" class="apt-mode-btn ${initMode==='auto'?'active':''}" id="mode-auto" onclick="setLockMode('auto')">Auto (Tuya)</button>
           <button type="button" class="apt-mode-btn ${initMode==='manual'?'active':''}" id="mode-manual" onclick="setLockMode('manual')">Manual code</button>
@@ -5903,7 +6262,39 @@ window.openAptEditor=function(aptId){
         <div id="lock-manual" style="display:${initMode==='manual'?'block':'none'}">
           <label class="apt-label">Door code</label>
           <input class="apt-input" id="apt-doorCode" value="${esc(d.doorCode||'')}" placeholder="1234#">
-        </div>
+        </div>`;
+  }else if(method==='code'){
+    accessFields=`<label class="apt-label">Door code</label><input class="apt-input" id="apt-doorCode" value="${esc(d.doorCode||'')}" placeholder="1234#">`;
+  }else if(method==='lockbox'){
+    accessFields=`<label class="apt-label">Lock box code</label><input class="apt-input" id="apt-lockboxCode" value="${esc(d.lockboxCode||'')}" placeholder="1234">
+        <p class="apt-hint">Only this unit's code. Where the box is, and its photo, are set on the type.</p>`;
+  }else{
+    accessFields='<p class="apt-hint">Nothing to set here. Who meets the guest, and where, is set on the type.</p>';
+  }
+  _ae={method,override:ACCESS_METHODS.includes(d.accessMethod)?d.accessMethod:''};
+  document.getElementById('apt-ed-body').innerHTML=`
+    <div class="at-sub">${esc(groupLabel(group))}</div>
+    <div class="at-chipsrow">
+      <span class="at-chip ${d.tuyaDeviceId||d.doorCode||d.lockboxCode||method==='handover'?'at-chip--green':'at-chip--red'}">${esc(method==='handover'?'Key handed over':lockState)}</span>
+      <span class="at-chip ${d.wifiName?'at-chip--green':''}">${d.wifiName?'WiFi set':'No WiFi'}</span>
+      <span class="at-chip">${nSteps} step${nSteps===1?'':'s'}</span>
+    </div>
+    <div class="apt-card">
+      <div class="apt-card-hd">How guests get in</div>
+      <div class="apt-card-bd">
+        <div class="at-access" style="margin-bottom:10px"><div class="at-access__m">${esc(accessLabel)}</div>${atChangeAccessBtn('unit')}</div>
+        ${accessFields}
+      </div>
+    </div>
+    <div class="apt-card">
+      <div class="apt-card-hd">Arrival steps</div>
+      <div class="apt-card-bd">
+        ${shared||''}
+        ${shared?'<p class="apt-hint" style="margin-bottom:6px">These come from the type and can only be edited there.</p>':''}
+        <label class="apt-label">${shared?'Steps only for '+esc(apt.code):'Steps'}</label>
+        <div id="aptPhotoSteps">${steps}</div>
+        <input type="file" id="apt-photo-input" accept="image/*" multiple style="display:none" onchange="window.uploadPhotos(this)">
+        <button type="button" class="apt-add" onclick="document.getElementById('apt-photo-input').click()">+ Add a step only for ${esc(apt.code)}</button>
       </div>
     </div>
     <div class="apt-card">
@@ -5915,17 +6306,38 @@ window.openAptEditor=function(aptId){
         <input class="apt-input" id="apt-wifiPass" value="${esc(d.wifiPass||'')}">
       </div>
     </div>
-    <div class="apt-card">
-      <div class="apt-card-hd">Timing</div>
-      <div class="apt-card-bd"><div class="apt-row">
+    <div class="apt-fold collapsed" id="apt-fold-text">
+      <button type="button" class="apt-fold__hd" onclick="toggleAptFold('apt-fold-text')">
+        <span class="apt-fold__title">Written instructions and video</span>
+        <span class="apt-fold__hint">Optional</span>
+        <span class="apt-fold__chev">${featherIcon('chevron-down',20,2.2)}</span>
+      </button>
+      <div class="apt-fold__bd">
+        <label class="apt-label" style="margin-top:12px">Written instructions</label>
+        <textarea class="apt-textarea" id="apt-instructions" placeholder="How to arrive…">${esc(d.instructions||'')}</textarea>
+        <label class="apt-label">Video URL</label>
+        <input class="apt-input" id="apt-videoUrl" value="${esc(d.videoUrl||'')}" placeholder="https://…">
+      </div>
+    </div>
+    <div class="apt-fold collapsed" id="apt-fold-times">
+      <button type="button" class="apt-fold__hd" onclick="toggleAptFold('apt-fold-times')">
+        <span class="apt-fold__title">Check-in and check-out times</span>
+        <span class="apt-fold__hint">${esc(d.checkInTime||'15:00')} / ${esc(d.checkOutTime||'12:00')}</span>
+        <span class="apt-fold__chev">${featherIcon('chevron-down',20,2.2)}</span>
+      </button>
+      <div class="apt-fold__bd"><div class="apt-row" style="margin-top:12px">
         <div><label class="apt-label">Check-in</label><input class="apt-input" type="time" id="apt-checkInTime" value="${esc(d.checkInTime||'15:00')}"></div>
         <div><label class="apt-label">Check-out</label><input class="apt-input" type="time" id="apt-checkOutTime" value="${esc(d.checkOutTime||'12:00')}"></div>
       </div></div>
     </div>
-    <div class="apt-card">
-      <div class="apt-card-hd">Location (shown to guests)</div>
-      <div class="apt-card-bd">
-        <p class="apt-hint" style="margin-bottom:8px">Leave empty to use the property type's settings.</p>
+    <div class="apt-fold collapsed" id="apt-fold-location">
+      <button type="button" class="apt-fold__hd" onclick="toggleAptFold('apt-fold-location')">
+        <span class="apt-fold__title">Location</span>
+        <span class="apt-fold__hint">${(d.address||d.propertyName||d.mapsUrl||d.neighborhood||d.floorLabel)?'Own':'Same as type'}</span>
+        <span class="apt-fold__chev">${featherIcon('chevron-down',20,2.2)}</span>
+      </button>
+      <div class="apt-fold__bd">
+        <p class="apt-hint" style="margin-top:12px;margin-bottom:8px">Leave empty to use the type's settings.</p>
         <label class="apt-label">Property name</label>
         <input class="apt-input" id="apt-propertyName" value="${esc(d.propertyName||'')}" placeholder="Maxela Apartments">
         <label class="apt-label">Address</label>
@@ -5938,22 +6350,12 @@ window.openAptEditor=function(aptId){
         <input class="apt-input" id="apt-floorLabel" value="${esc(d.floorLabel||'')}" placeholder="Floor 6">
       </div>
     </div>
-    <div class="apt-card">
-      <div class="apt-card-hd">Check-in instructions · ${photos.length} photos</div>
-      <div class="apt-card-bd">
-        <label class="apt-label">Written instructions</label>
-        <textarea class="apt-textarea" id="apt-instructions" placeholder="How to arrive…">${esc(d.instructions||'')}</textarea>
-        <label class="apt-label">Video URL</label>
-        <input class="apt-input" id="apt-videoUrl" value="${esc(d.videoUrl||'')}" placeholder="https://…">
-        <label class="apt-label">Photo steps</label>
-        <div id="aptPhotoSteps">${steps}</div>
-        <input type="file" id="apt-photo-input" accept="image/*" multiple style="display:none" onchange="window.uploadPhotos(this)">
-        <button type="button" class="apt-add" onclick="document.getElementById('apt-photo-input').click()">+ Add photo step</button>
-      </div>
-    </div>
-    <div class="apt-card">
-      <div class="apt-card-hd">Guest link</div>
-      <div class="apt-card-bd">
+    <div class="apt-fold collapsed" id="apt-fold-link">
+      <button type="button" class="apt-fold__hd" onclick="toggleAptFold('apt-fold-link')">
+        <span class="apt-fold__title">Guest link and preview</span>
+        <span class="apt-fold__chev">${featherIcon('chevron-down',20,2.2)}</span>
+      </button>
+      <div class="apt-fold__bd" style="padding-top:12px">
         <button class="btn" style="width:100%" onclick="navigator.clipboard.writeText('https://app.maxelaapartments.com/checkin-guest.html?apt=${encodeURIComponent(aptId)}').then(()=>toast('Link copied'))">Copy check-in URL</button>
         <button class="btn" style="width:100%;margin-top:8px" onclick="window.open(guestAptPreviewUrl('${encodeURIComponent(aptId)}'),'_blank')">Preview apartment layout</button>
       </div>
@@ -5990,6 +6392,7 @@ window.openAptEditor=function(aptId){
 };
 /* unsaved-edit protection for the apartment editor */
 let _aptBaseline=null;
+let _ae={method:'smartlock',override:''};   // access method shown on the open unit page
 function _aptSnap(){
   const out={};
   document.querySelectorAll('#apt-ed-body input:not([type=file]),#apt-ed-body textarea,#apt-ed-body select').forEach(el=>{
@@ -6015,7 +6418,7 @@ function _aptRebase(match){
 function _aptRerender(aptId,capMap){
   const snap=_aptSnap();
   const scrollers=['apt-ed-body','apt-editor-overlay'].map(id=>{const e=document.getElementById(id);return[e,e?e.scrollTop:0];});
-  const foldOpen=!document.getElementById('apt-fold-registry')?.classList.contains('collapsed');
+  const foldsOpen=['apt-fold-registry','apt-fold-text','apt-fold-times','apt-fold-location','apt-fold-link'].filter(id=>!document.getElementById(id)?.classList.contains('collapsed'));
   openAptEditor(aptId);
   for(const k of Object.keys(snap)){
     if(k==='__mode'||/^photo-cap-\d+$/.test(k))continue;
@@ -6032,7 +6435,7 @@ function _aptRerender(aptId,capMap){
     if(el&&typed!==undefined)el.value=typed;
   }
   if(snap.__mode!==!!document.getElementById('mode-manual')?.classList.contains('active'))setLockMode(snap.__mode?'manual':'auto');
-  if(foldOpen)document.getElementById('apt-fold-registry')?.classList.remove('collapsed');
+  foldsOpen.forEach(id=>document.getElementById(id)?.classList.remove('collapsed'));
   scrollers.forEach(([e,t])=>{if(e)e.scrollTop=t;});
 }
 window.closeAptEditor=function(){
@@ -6050,9 +6453,11 @@ window.saveAptData=async function(){
   const aptId=_currentAptId;if(!aptId)return;
   const photoCaptions=(aptData[aptId]?.photos||[]).map((_,i)=>document.getElementById('photo-cap-'+i)?.value.trim()||'');
   const inManual=document.getElementById('mode-manual')?.classList.contains('active');
+  const hasDoorField=!!document.getElementById('apt-doorCode');
+  const hasTuyaField=!!document.getElementById('apt-tuyaDeviceId');
   const data={
-    tuyaDeviceId:document.getElementById('apt-tuyaDeviceId')?.value.trim()||'',
-    doorCode:inManual?(document.getElementById('apt-doorCode')?.value.trim()||''):(aptData[aptId]?.doorCode||''),
+    tuyaDeviceId:hasTuyaField?(document.getElementById('apt-tuyaDeviceId')?.value.trim()||''):(aptData[aptId]?.tuyaDeviceId||''),
+    doorCode:hasDoorField&&(inManual||_ae.method!=='smartlock')?(document.getElementById('apt-doorCode')?.value.trim()||''):(aptData[aptId]?.doorCode||''),
     checkInTime:document.getElementById('apt-checkInTime')?.value||'15:00',
     checkOutTime:document.getElementById('apt-checkOutTime')?.value||'12:00',
     wifiName:document.getElementById('apt-wifiName')?.value.trim()||'',
@@ -6065,6 +6470,8 @@ window.saveAptData=async function(){
     rules:aptData[aptId]?.rules||'',
     instructions:document.getElementById('apt-instructions')?.value.trim()||'',
     videoUrl:document.getElementById('apt-videoUrl')?.value.trim()||'',
+    accessMethod:_ae.override||'',
+    lockboxCode:document.getElementById('apt-lockboxCode')?document.getElementById('apt-lockboxCode').value.trim():(aptData[aptId]?.lockboxCode||''),
     photos:aptData[aptId]?.photos||[],
     photoCaptions,
     updatedAt:serverTimestamp()

@@ -80,6 +80,7 @@ test('problems in plain words', async () => {
   assert.deepEqual(unitProblems(null, '0-4', { tuyaDeviceId: 'x' }), []);
   assert.deepEqual(unitProblems(null, '0-4', {}), ['0-4 has no lock']);
   assert.deepEqual(unitProblems(null, '0-4', {}, { noLock: true }), []);
+  assert.deepEqual(unitProblems(null, '0-4', { doorCode: '1234' }), []);
   assert.deepEqual(unitProblems({ access: { method: 'code' } }, '6-2', {}), ['6-2 has no lock']);
   assert.deepEqual(unitProblems({ access: { method: 'code' } }, '6-2', { doorCode: '1' }), []);
   assert.deepEqual(unitProblems({ access: { method: 'lockbox' } }, '6-2', {}), ['6-2 has no lock']);
@@ -93,6 +94,7 @@ test('normalizeTypeCfg drops junk and never keeps a code-like field', async () =
   const { normalizeTypeCfg } = await load();
   assert.equal(normalizeTypeCfg(null), null);
   assert.equal(normalizeTypeCfg({}), null);
+  assert.equal(normalizeTypeCfg({ access: { method: '', entranceCard: false }, steps: [] }), null);
   const t = normalizeTypeCfg({ access: { method: 'nonsense', doorCode: '1234', handoverPhone: '+995 555 12-34' }, steps: [null, { title: 5, text: 'x' }] });
   assert.equal(t.access.method, '');
   assert.equal(t.access.handoverPhone, '9955551234');
