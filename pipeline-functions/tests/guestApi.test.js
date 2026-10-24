@@ -265,6 +265,14 @@ test('apartment filter: locked hides secrets and masks numbers in the text, alwa
   assert.equal(open.instructions, 'code 4321# ok');
 });
 
+test('apartment filter: the lock box code is only given when unlocked', () => {
+  const apt = { lockboxCode: '9910', accessMethod: 'lockbox', stepPhotos: { s1: 'https://x/p.jpg' }, address: 'a' };
+  const locked = api.filterApt(apt, false);
+  assert.equal(locked.lockboxCode, undefined);
+  assert.equal(locked.accessMethod, 'lockbox');
+  assert.equal(api.filterApt(apt, true).lockboxCode, '9910');
+});
+
 test('guest-match.js is an exact copy of the guest page code', async () => {
   const { build } = await import('../../scripts/sync-guest-match.js');
   const current = fs.readFileSync(path.join(__dirname, '../lib/guest-match.js'), 'utf8');

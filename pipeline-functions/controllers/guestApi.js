@@ -17,7 +17,7 @@ const { isLikelyGuestToken } = require('../lib/guest-token');
 
 const PUBLIC_RES_FIELDS = ['reservationNumber', 'roomCode', 'checkin', 'checkIn', 'checkout', 'checkOut', 'status', 'guest', 'guestName', 'source'];
 const APT_ALWAYS_REMOVE = ['tuyaDeviceId', 'updatedAt'];
-const APT_LOCKED_REMOVE = ['doorCode', 'wifiName', 'wifiPass', 'doorPhotoUrl', 'videoUrl'];
+const APT_LOCKED_REMOVE = ['doorCode', 'lockboxCode', 'wifiName', 'wifiPass', 'doorPhotoUrl', 'videoUrl'];
 
 // ---------------------------------------------------------------- helpers
 
@@ -57,6 +57,7 @@ function filterApt(apt, unlocked) {
     for (const k of APT_LOCKED_REMOVE) delete out[k];
     if (out.instructions) out.instructions = maskDigits(out.instructions);
     if (Array.isArray(out.photoCaptions)) out.photoCaptions = out.photoCaptions.map(maskDigits);
+    // the unit's lock box code is gone above; arrival steps of a type are config (placeholders only, no codes)
   }
   return out;
 }
