@@ -441,6 +441,16 @@ html.inbox-typing #main-nav{display:none}
 .apt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .apt-pill__code{font-family:var(--mono);font-weight:700;font-size:14px;}
 .apt-pill__name{font-size:12px;color:var(--muted);flex:1;}
+#access-sheet{position:fixed;inset:0;z-index:240;display:none;}
+#access-sheet.open{display:block;}
+.sheet__back{position:absolute;inset:0;background:rgba(0,0,0,.4);}
+.sheet__panel{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,480px);max-height:92vh;overflow-y:auto;background:var(--surface);border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,.18);}
+.sheet__title{font-size:17px;font-weight:700;margin-bottom:12px;}
+.sheet__opt{display:block;width:100%;text-align:left;padding:12px;margin-bottom:8px;border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--ink);font-family:var(--sans);cursor:pointer;}
+.sheet__opt.on{border-color:var(--ink);background:var(--bg);}
+.sheet__opt b{display:block;font-size:14px;margin-bottom:2px;}
+.sheet__opt span{display:block;font-size:12px;color:var(--muted);font-weight:500;}
+.sheet__opt i{display:block;font-style:normal;font-size:11px;color:var(--ink-2);font-weight:600;margin-top:5px;padding:3px 8px;background:var(--bg);border-radius:6px;}
 /* Apartments: types and units */
 #apt-type-overlay{position:fixed;inset:0;background:var(--bg);z-index:205;display:none;flex-direction:column;max-width:480px;margin:0 auto;overflow-y:auto;}
 #apt-type-overlay.open{display:flex;}
@@ -824,7 +834,7 @@ html.inbox-typing #main-nav{display:none}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1015a · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1015b · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -998,6 +1008,8 @@ html.inbox-typing #main-nav{display:none}
   </div>
   <div class="detail-body" id="detail-body"></div>
 </div>
+
+<div id="access-sheet"><div class="sheet__back" onclick="closeAccessSheet()"></div><div class="sheet__panel" id="access-sheet-panel"></div></div>
 
 <div id="apt-type-overlay">
   <div class="apt-ed-bar">
@@ -6022,7 +6034,7 @@ function atAccessCardHtml(){
     <div class="at-access"><div><div class="at-access__m">${esc(ACCESS_LABELS[m])}${a.method?'':' <span class="at-muted">(as today)</span>'}</div><div class="at-muted">${lines}</div>${a.entranceCard?'<div class="at-muted">Guests also get an entrance card or building key.</div>':''}</div>
     ${atChangeAccessBtn('type')}</div></div></div>`;
 }
-function atChangeAccessBtn(scope){return'';}   // the "Change" button is added with the access sheet
+function atChangeAccessBtn(scope){return`<button type="button" class="btn" style="flex:none;min-height:36px;padding:0 14px" onclick="openAccessSheet('${scope}')">Change</button>`;}
 function atStepsHtml(){
   const d=_at.draft,units=atUnits(_at.group),n=units.length;
   const list=d.steps.map((s,i)=>{
@@ -6166,6 +6178,83 @@ window.atSave=async function(){
   }catch(e){toast('Save failed: '+e.message);}
 };
 /* the unit page: a step that only this unit has can become a shared step of the type */
+
+/* ---- access method sheet: "How do guests get in?" (type: applies to all its units; unit: same as type or its own) ---- */
+const _sh={scope:'type',method:'',fields:null};
+window.openAccessSheet=function(scope){
+  _sh.scope=scope;
+  if(scope==='type'){
+    const a=_at.draft.access;
+    _sh.method=a.method||'smartlock';
+    _sh.fields={entranceCard:a.entranceCard,lockboxWhere:a.lockboxWhere,lockboxPhoto:a.lockboxPhoto,handoverWho:a.handoverWho,handoverPhone:a.handoverPhone,handoverWhere:a.handoverWhere,returnNote:a.returnNote};
+  }else{
+    _sh.method=ACCESS_METHODS.includes(aptData[_currentAptId]?.accessMethod)?aptData[_currentAptId].accessMethod:'';
+    _sh.fields=null;
+  }
+  document.getElementById('access-sheet').classList.add('open');
+  shRender();
+};
+window.closeAccessSheet=function(){document.getElementById('access-sheet')?.classList.remove('open');};
+function shRender(){
+  const panel=document.getElementById('access-sheet-panel');if(!panel)return;
+  const f=_sh.fields||{};
+  const typeLabel=(_sh.scope==='unit')?ACCESS_LABELS[atEffMethod(gsAptTypes[roomGroup(_currentAptId,roomsData[_currentAptId]?.site)],{})]:'';
+  const opt=(m,label,desc,see)=>`<button type="button" class="sheet__opt${_sh.method===m?' on':''}" onclick="shPick('${m}')"><b>${esc(label)}</b><span>${esc(desc)}</span>${see?`<i>${esc(see)}</i>`:''}</button>`;
+  let h=`<div class="sheet__title">How do guests get in?</div>`;
+  if(_sh.scope==='unit')h+=opt('','Same as type',typeLabel,'');
+  h+=ACCESS_METHODS.map(m=>opt(m,ACCESS_LABELS[m],ACCESS_DESCRIPTIONS[m],ACCESS_GUEST_SEES[m])).join('');
+  if(_sh.scope==='type'){
+    h+=`<label class="hr-check" style="margin:6px 0 10px"><input type="checkbox" ${f.entranceCard?'checked':''} onchange="shSet('entranceCard',this.checked)"> Guests also get an entrance card or building key</label>`;
+    if(_sh.method==='lockbox'){
+      h+=`<label class="apt-label">Where is the box?</label>
+        <input class="apt-input" value="${esc(f.lockboxWhere)}" oninput="shSet('lockboxWhere',this.value)" placeholder="On the gate, left of the door">
+        <label class="apt-label">Photo of the box</label>
+        ${f.lockboxPhoto?`<img src="${esc(f.lockboxPhoto)}" alt="" class="at-photo__img" style="margin-bottom:8px">`:''}
+        <input type="file" id="sh-file" accept="image/*" style="display:none" onchange="shPhoto(this)">
+        <button type="button" class="btn" style="width:100%" onclick="document.getElementById('sh-file').click()">${f.lockboxPhoto?'Replace photo':'Upload photo'}</button>
+        <p class="apt-hint">The code of each box is set on the unit page, not here.</p>`;
+    }
+    if(_sh.method==='handover'){
+      h+=`<label class="apt-label">Who meets the guest?</label>
+        <input class="apt-input" value="${esc(f.handoverWho)}" oninput="shSet('handoverWho',this.value)" placeholder="Nika, our host">
+        <label class="apt-label">WhatsApp number</label>
+        <input class="apt-input" inputmode="tel" value="${esc(f.handoverPhone)}" oninput="shSet('handoverPhone',this.value.replace(/\D/g,''))" placeholder="995555123456">
+        <label class="apt-label">Where do they meet?</label>
+        <input class="apt-input" value="${esc(f.handoverWhere)}" oninput="shSet('handoverWhere',this.value)" placeholder="At the building entrance">`;
+    }
+    if(_sh.method==='lockbox'||_sh.method==='handover'){
+      h+=`<label class="apt-label">Note for check-out</label>
+        <input class="apt-input" value="${esc(f.returnNote)}" oninput="shSet('returnNote',this.value)" placeholder="${esc(DEFAULT_RETURN_NOTES[_sh.method])}">
+        <p class="apt-hint">Leave empty to show the default note.</p>`;
+    }
+  }else if(_sh.method==='lockbox'||_sh.method==='handover'){
+    h+='<p class="apt-hint">Where the box is, who meets the guest and the check-out note are set on the type.</p>';
+  }
+  h+=`<div style="display:flex;gap:8px;margin-top:12px"><button type="button" class="btn" onclick="closeAccessSheet()">Cancel</button><button type="button" class="btn btn-primary" onclick="shApply()">${_sh.scope==='type'?'Use for all units':'Use for this unit'}</button></div>`;
+  panel.innerHTML=h;
+}
+window.shPick=function(m){_sh.method=m;shRender();};
+window.shSet=function(k,v){if(_sh.fields)_sh.fields[k]=v;};
+window.shPhoto=async function(input){
+  const f=input.files&&input.files[0];if(!f)return;
+  try{toast('Uploading…',15000);_sh.fields.lockboxPhoto=await uploadToCloudinary(f,'maxela/types/'+_at.group);toast('Photo added');shRender();}
+  catch(e){toast('Upload failed: '+e.message);}
+};
+window.shApply=async function(){
+  if(_sh.scope==='type'){
+    Object.assign(_at.draft.access,_sh.fields,{method:_sh.method||'smartlock'});
+    closeAccessSheet();atTouch();atRender();
+    return;
+  }
+  const id=_currentAptId;if(!id)return;
+  try{
+    await setDoc(doc(db,'checkin_apartments',id),{accessMethod:_sh.method,updatedAt:serverTimestamp()},{merge:true});
+    aptData[id]={...aptData[id],accessMethod:_sh.method};
+    closeAccessSheet();toast('Saved');
+    _aptRerender(id);
+    if(currentTab==='apts')renderAptsList();
+  }catch(e){toast('Failed: '+e.message);}
+};
 window.atShareStep=async function(i){
   const unitId=_currentAptId;if(!unitId)return;
   const d=aptData[unitId]||{};
