@@ -20,6 +20,4 @@ jobs:
           firebaseServiceAccount: '${{ secrets.FIREBASE_HOSTING_SA }}'
           projectId: sleepy-5c962
           channelId: live
-                       projectId: sleepy-5c962
-             channelId: live
-             firebaseToolsVersion: '15.34.0'
+          firebaseToolsVersion: '15.34.0'
