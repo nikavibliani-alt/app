@@ -305,3 +305,11 @@ Notes:
 - checkin-admin.html has one DESTINATIONS list; it builds the More menu buttons and the Tab bar layout options (NAV_POOL). Page links (Inbox, Pricing) can be tabs but not the landing tab. Badges (requests, inbox, failed searches) show on tabs and in More. The More tab is highlighted for any page not in the bar.
 - Saved layouts keep their ids (stay, hk, elevator, requests, apts, history). New ids: damage (when enabled), pricing, inbox, failures, wasettings, hksettings.
 - Undo: tell me "undo tab bar list".
+
+## Apartments redesign (restore point: tag before-apts-redesign)
+Types -> units, shared arrival steps per type, an access method per type/unit. Guests see NO change until a type is filled in.
+Data: checkin_admin/config.aptTypes[GROUP] = {access:{method,entranceCard,lockboxWhere,lockboxPhoto,handoverWho,handoverPhone,handoverWhere,returnNote}, steps:[{id,title,text,photo,perUnitPhoto}], updatedAt} (NEVER any code in it). checkin_apartments/{unit}: accessMethod ('' = type), lockboxCode, stepPhotos:{[stepId]:url}; own steps stay photos[] + photoCaptions[].
+Steps: 1 shared logic (shared/apt-arrival.js + tests) / 2 admin navigation (types list, type page, unit page) / 3 access method sheet / 4 guest page + guestApi / 5 check and report.
+Undo: tell me "undo apartments redesign" (back to tag before-apts-redesign) or "undo apartments step N".
+Progress log:
+- Step 1: shared/apt-arrival.js (roomGroup used by admin gpPropForRoom and guest groupForRoom, resolveArrival, fillPlaceholders, unitProblems) + pipeline-functions/tests/aptArrival.test.js. No visible change.

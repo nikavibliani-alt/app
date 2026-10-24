@@ -1064,6 +1064,7 @@ import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gsta
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour,normalizeStayDate}from"./shared/guest-unlock.js";
 import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON,hkPropertyGroupForRoom}from"./shared/hk-bedding.js";
 import{DEFAULT_ROOMS_SEED,ROOM_SITES}from"./shared/room-registry.js";
+import{roomGroup,APT_GROUPS,groupLabel,ACCESS_METHODS,ACCESS_LABELS,ACCESS_DESCRIPTIONS,ACCESS_GUEST_SEES,DEFAULT_RETURN_NOTES,PLACEHOLDERS,normalizeTypeCfg,resolveAccessMethod,resolveArrival,fillPlaceholders,unitProblems}from"./shared/apt-arrival.js";
 import{HR_LANGS,HR_GROUPS,ICON_CHOICES,NO_SMOKING_IMG,defaultHouseRules,resolveHouseRules,renderRulesList,ruleIconHtml,emptyLangs,pick,ruleScope,uniqueRuleIds}from"./shared/house-rules.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
@@ -1897,19 +1898,7 @@ const PARKING_INFO_DEFAULTS={
   VGL:{parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
   XCV:{parkingEnabled:true,parkingDesc:'Paid parking available nearby',parkingMapsUrl:'',parkingMediaUrl:''},
 };
-const GP_ROOM_PROP={
-  '0-1':'ROOMS','0-2':'ROOMS','0-3':'ROOMS','0-4':'ROOMS','0-5':'ROOMS',
-  '6-1':'MAXELA','6-2':'MAXELA','6-4':'MAXELA','6-3':'BIG_APT',
-  '7-1':'MAXELA','7-2':'MAXELA','7-3':'MAXELA','7-4':'MAXELA',
-  'tab-1':'FREEDOM','tab-2':'FREEDOM','tab-3':'FREEDOM',
-};
-function gpPropForRoom(code){
-  const c=String(code||'');
-  if(c.startsWith('orb-'))return'ORBELIANI';
-  if(/^xcv-/i.test(c))return'XCV';
-  if(/^vgl-/i.test(c))return'VGL';
-  return GP_ROOM_PROP[c]||'ROOMS';
-}
+function gpPropForRoom(code){return roomGroup(code);}   // one room -> listing group function (shared/apt-arrival.js)
 /* "no smart lock" follows the Guest page setting of the apartment's type (gsVisibility[group].smartLock === false) */
 let _gsKick=false;
 function gpNoLock(code){

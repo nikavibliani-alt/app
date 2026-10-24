@@ -1207,6 +1207,7 @@ import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEm
 import{GUEST_APP_VERSION,GUEST_APP_URL}from"./shared/guest-app-version.js";
 import{featherIcon}from"./shared/feather-icons.js";
 import{resolveHouseRules,renderRulesList,agreementRules,pick as hrPick}from"./shared/house-rules.js";
+import{roomGroup}from"./shared/apt-arrival.js";
 const fi=(name,size=18,stroke=1.8)=>featherIcon(name,size,stroke);
 // Storage rules (set in Firebase Console):
 //   match /passport_uploads/{allPaths=**} {
@@ -1800,19 +1801,13 @@ function toast(msg,dur=2500){const el=document.getElementById('toast');el.textCo
 function rulesRoomCode(){return(_pendingMatches&&_pendingMatches[0]&&_pendingMatches[0].res&&_pendingMatches[0].res.roomCode)||aptId||'';}
 function entranceCardOn(room){
   const code=room||'';
-  const prop=code.startsWith('orb-')?'ORBELIANI':(ROOM_TO_PROP[code]||(/^xcv-/i.test(code)?'XCV':/^vgl-/i.test(code)?'VGL':'ROOMS'));
+  const prop=groupForRoom(code);
   const v=guestCfgVisibility||(guestFullCfg&&guestFullCfg.visibility)||null;
   const scope=v&&typeof v[prop]==='object'?v[prop]:null;
   if(scope&&typeof scope.entranceCard==='boolean')return scope.entranceCard;
   return prop==='FREEDOM';
 }
-function groupForRoom(code){
-  code=code||'';
-  if(code.startsWith('orb-'))return'ORBELIANI';
-  const g=ROOM_TO_PROP[code];
-  if(g==='ORBE_1'||g==='ORBE_2')return'ORBELIANI';
-  return g||(/^xcv-/i.test(code)?'XCV':/^vgl-/i.test(code)?'VGL':'ROOMS');
-}
+function groupForRoom(code){return roomGroup(code||'');}   // one room -> listing group function, shared with the admin (shared/apt-arrival.js)
 // The rules page comes from shared/house-rules.js: this listing's saved page (checkin_admin/config.houseRules)
 // or today's default page, resolved for the MATCHED BOOKING's room.
 let _houseRules=null;
