@@ -93,6 +93,15 @@ def main():
     zero = [d for d, c in sorted(inv.items()) if d >= today.isoformat() and int(c.get("avail") or 0) == 0]
     closed = [d for d in zero if d not in stay_nights]
     print(f"  next 120 days: {len(zero)} nights with no free unit; {len(closed)} of them have NO confirmed stay (closed or blocked in MiniHotel): {ranges(closed) or 'none'}")
+    if closed:
+        st = collections.Counter()
+        for doc in db.collection("reservations").stream():
+            r = doc.to_dict() or {}
+            if ps.ROOM_CODE_TO_RT.get(r.get("roomCode", "")) == rt and ps._iso_day(r.get("checkin")) and ps._iso_day(r.get("checkout")):
+                ci, co = ps._iso_day(r.get("checkin")), ps._iso_day(r.get("checkout"))
+                if any(ci <= d < co for d in closed):
+                    st[f"{str(r.get('status', '')).upper() or '(none)'} {ci}..{co} booked {ps._iso_day(r.get('creationDate'))}"] += 1
+        print(f"  reservation records covering those closed nights (any status): {dict(st) or 'none'}")
     print(f"  nights with a stay: {len(zero) - len(closed)}: {ranges([d for d in zero if d in stay_nights]) or 'none'}")
 
     print("\n=== 4. Cancellations: real, or changes of an existing booking? ===")

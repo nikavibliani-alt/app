@@ -45,11 +45,13 @@ def test_numbers_count_the_week_only_and_are_exact():
     n = wn.build(sample(), FROM, TO)
     m = n["rooms"]["M"]
     assert n["property_id"] == "maxela" and n["week"] == {"from": FROM, "to": TO, "key": "2026-W42"}
-    assert m["price_up"] == 1 and m["price_down"] == 5                    # 140->150 up; 150->140, 120->100, 130->110, 160->100, 160->130 down
+    assert m["price_raises_written"] == 1 and m["price_drops_written"] == 5      # 140->150 up; 150->140, 120->100, 130->110, 160->100, 160->130 down
+    assert m["nights_lowered"] == 4                                              # 20, 22 Oct and 13 and 12 Oct (13 Oct twice)
     assert m["nights_hit_min"] == 2 and m["nights_hit_max"] == 0         # 100 on 22 Oct and on 12 Oct
-    assert m["last3_drops"] == 1 and m["last3_drops_sold"] == 1          # 13 Oct dropped to 110 on 12 Oct and was booked that day
-    assert (m["cancel_drops_tonight"], m["cancel_drops_tonight_sold"], m["cancel_drops_tomorrow"], m["cancel_drops_tomorrow_sold"]) == (1, 1, 1, 1)
-    assert m["blocked_by_protect"] == 1 and m["blocked_by_hold"] == 1 and m["blocked_other"] == 0
+    assert m["last3_price_drops"] == 1 and m["last3_nights_lowered"] == 1 and m["last3_nights_lowered_then_booked"] == 1   # 13 Oct dropped to 110 on 12 Oct and was booked that day
+    assert (m["cancelled_tonight_lowered"], m["cancelled_tonight_lowered_then_booked"], m["cancelled_tomorrow_lowered"], m["cancelled_tomorrow_lowered_then_booked"]) == (1, 1, 1, 1)
+    assert m["held_back_by_protect"] == 1 and m["held_back_by_hold"] == 0 and m["held_back_other"] == 0     # one decision with two messages counts once
+    assert "price_up" not in m and "price_down" not in m and "last3_drops" not in m and "blocked_other" not in m
     assert m["bookings"] == 1 and m["cancellations"] == 1 and m["bookings_made"] == 2 and m["nights_sold"] == 3
     assert m["avg_sold_price_gel"] == 120 and m["avg_start_gel"] == 150 and m["avg_min_gel"] == 100 and m["avg_max_gel"] == 200
     assert m["sold_at_or_near_min"] == 1 and m["sold_at_or_near_max"] == 0
@@ -94,8 +96,8 @@ class Fake:
 
 def draft():
     return {"headline": "A quiet week with 5 price drops.",
-            "worked": [{"text": "Cancellation drops tonight sold: 1 of 1.", "refs": ["rooms.M.cancel_drops_tonight_sold"]},
-                       {"text": "Prices rose 42 times, a record.", "refs": ["rooms.M.price_up"]}],
+            "worked": [{"text": "Cancellation drops tonight sold: 1 of 1.", "refs": ["rooms.M.cancelled_tonight_lowered_then_booked"]},
+                       {"text": "Prices rose 42 times, a record.", "refs": ["rooms.M.price_raises_written"]}],
             "didnt": [{"text": "The Expedia push failed 1 time.", "refs": ["all.channel_push_failures.EXPEDIA"]}],
             "upgrades": [{"text": "Check why Expedia failed (1 failure).", "refs": ["all.channel_push_failures"]},
                          {"text": "Invented claim without numbers about the future.", "refs": []}]}
@@ -119,7 +121,8 @@ def test_checker_removes_unsupported_claims_and_the_number_check_backs_it_up():
 def test_no_checker_answer_means_nothing_is_trusted():
     n = wn.build(sample(), FROM, TO)
     out = ai.apply_check(n, draft(), None)
-    assert out["worked"] == out["didnt"] == out["upgrades"] == [] and len(out["removed"]) == 5 and "could not be confirmed" in out["headline"]
+    assert out["worked"] == out["didnt"] == out["upgrades"] == [] and len(out["removed"]) == 5
+    assert out["headline_by"] == "numbers" and "did not run" in out["headline_note"] and "2 bookings made" in out["headline"]
 
 
 def test_two_separate_calls_and_failures_never_crash():
@@ -187,3 +190,59 @@ def test_unmarked_season_days_are_mentioned_in_the_weekly_numbers():
     assert any("3 days unmarked: 3-5 Mar. They use Mid prices until you mark them." in x for x in n["data_notes"])
     assert wn.build(sample(), FROM, TO)["all"]["season_unmarked"]["count"] == 0
     assert wn.unsupported_numbers("3 days are unmarked: 3-5 Mar", n) == []
+
+
+def test_every_number_has_a_plain_meaning_and_the_analyst_is_told_to_use_it():
+    n = wn.build(sample(), FROM, TO)
+    for k in ("price_drops_written", "last3_nights_lowered_then_booked", "held_back_other", "cancellations", "cancellations_after_stay"):
+        assert k in n["guide"] and len(n["guide"][k]) > 40
+    assert "NOT a number of nights" in n["guide"]["price_drops_written"] and "BOOKED AFTER" in n["guide"]["last3_nights_lowered_then_booked"]
+    assert "does NOT mean nights are closed" in n["guide"]["held_back_other"]
+    for key in {k for r in n["rooms"].values() for k in r} - {"bookings"}:
+        assert key in n["guide"] or key.startswith("avg_") or key.startswith("sold_at") or key in ("price_raises_written",), f"{key} has no plain meaning"
+    assert "guide" in ai.ANALYST_SYSTEM and "never a number of nights" in ai.ANALYST_SYSTEM and "lowered, then booked" in ai.ANALYST_SYSTEM
+    assert "guide" in ai.CHECKER_SYSTEM
+
+
+def test_the_header_says_the_truth_about_the_checker():
+    n = wn.build(sample(), FROM, TO)
+    ran_rejected = ai.apply_check(n, draft(), {"headline": {"verdict": "no"}, "items": []})
+    assert ran_rejected["checked"] is True and ran_rejected["headline_by"] == "numbers"
+    assert "The checker ran" in ran_rejected["headline_note"] and "did not run" not in ran_rejected["headline_note"]
+    assert "could not be confirmed" not in ran_rejected["headline"] and "bookings made" in ran_rejected["headline"]
+    bad_num = ai.apply_check(n, {**draft(), "headline": "A record 99 price drops."}, {"headline": {"verdict": "yes"}, "items": []})
+    assert "99" in bad_num["headline_note"] and bad_num["headline_by"] == "numbers"
+    good = ai.apply_check(n, draft(), {"headline": {"verdict": "yes"}, "items": []})
+    assert good["headline"] == "A quiet week with 5 price drops." and good["headline_by"] == "analyst" and good["headline_note"] == ""
+    fixed = ai.apply_check(n, draft(), {"headline": {"verdict": "partly", "fixed_text": "A quiet week."}, "items": []})
+    assert fixed["headline"] == "A quiet week." and fixed["headline_by"] == "checker"
+
+
+def test_only_real_cancellations_are_counted():
+    d = sample()
+    d["booking_events"] = [
+        {"rt": "M", "day": "2026-10-10", "event": "cancellation", "ref": "a", "checkin": "2026-10-20"},      # real: cancelled before check-in
+        {"rt": "M", "day": "2026-10-10", "event": "cancellation", "ref": "b", "checkin": "2026-10-05"},      # the stay was already over: freed nothing
+        {"rt": "M", "day": "2026-10-11", "event": "cancellation", "ref": "c", "checkin": "2026-10-25"},      # a change of the same booking
+        {"rt": "M", "day": "2026-10-12", "event": "cancellation", "ref": "d", "checkin": "2026-10-12"},      # cancelled on the check-in day: tonight is freed, real
+    ]
+    d["cancel_class"] = {"c": "changed"}
+    m = wn.build(d, FROM, TO)["rooms"]["M"]
+    assert (m["cancellations"], m["cancellations_changed"], m["cancellations_after_stay"]) == (2, 1, 1)
+    assert wn.cancel_kind({"checkin": "2026-10-05", "day": "2026-10-10", "ref": "x"}, {"x": "changed"}) == "after_stay"
+
+
+def test_changed_cancellations_are_found_from_the_reservations(monkeypatch):
+    import pmslog
+    db = DB()
+    def put(did, **r):
+        db.collection("reservations").document(did).set({"status": "OK2", "creationDate": "2026-10-10", **r})
+    put("100_001", bookingId="100", reservationNumber="100_001", firstName="A", lastName="B", status="CANCELLED")
+    put("100_002", bookingId="100", reservationNumber="100_002", firstName="A", lastName="B")                      # same booking, new line
+    put("200_001", bookingId="200", reservationNumber="200_001", firstName="C", lastName="D", status="CANCELLED")
+    put("300_001", bookingId="300", reservationNumber="300_001", firstName="E", lastName="F", status="CANCELLED")
+    put("301_001", bookingId="301", reservationNumber="301_001", firstName="E", lastName="F", creationDate="2026-10-11")  # same guest booked again next day
+    refs = {x: pmslog.ref_hash(x) for x in ("100_001", "200_001", "300_001")}
+    events = [{"event": "cancellation", "ref": refs[x], "day": "2026-10-10"} for x in refs]
+    got = wn.changed_cancellations(db, events)
+    assert got == {refs["100_001"]: "changed", refs["300_001"]: "changed"}

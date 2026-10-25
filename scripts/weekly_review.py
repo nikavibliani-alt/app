@@ -41,6 +41,8 @@ def main(argv=None, db=None, now=None, send=None, analyst_client=None, checker_c
     ap.add_argument("--no-send", action="store_true")
     args = ap.parse_args(argv)
     now = now or datetime.now(ps.TBILISI).replace(tzinfo=None)
+    if env.get("WEEK_TO"):                                   # run for a past week by hand: the week that ends on that day
+        now = datetime.fromisoformat(env["WEEK_TO"][:10] + "T23:59:00")
     db = db or ps.init_db()
     data, week_from, week_to = wn.load(db, now)
     numbers = wn.build(data, week_from, week_to)

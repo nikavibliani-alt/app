@@ -8,6 +8,10 @@ on:
         description: 'scorecard, twin, twin_compare, weekly or history'
         required: true
         default: 'scorecard'
+      week_to:
+        description: 'weekly only: the last day of the week to make (YYYY-MM-DD); empty = the week ending today'
+        required: false
+        default: ''
       dry:
         description: 'Dry run'
         type: boolean
@@ -41,4 +45,5 @@ jobs:
           META_PHONE_NUMBER_ID:     ${{ secrets.META_PHONE_NUMBER_ID }}
           TASK: ${{ github.event.inputs.task }}
           DRY: ${{ github.event.inputs.dry }}
+          WEEK_TO: ${{ github.event.inputs.week_to }}
         run: python scripts/run_task.py "$TASK" "$DRY"

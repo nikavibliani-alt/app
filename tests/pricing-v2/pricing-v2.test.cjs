@@ -966,12 +966,18 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       assert.ok(/Weekly/.test(await text(page, 'a.tab[href="#/weekly"]')));
       assert.ok(/6 Oct – 12 Oct 2026/.test(t) && /A calm week: 11 nights sold in Maxela/.test(t), t.slice(0, 300));
       assert.ok(/What worked/.test(t) && /What did not work/.test(t) && /Possible upgrades/.test(t) && /nothing here changed a price/i.test(t));
-      assert.ok(/The tonight drop sold: 1 of 1/.test(t) && /shortened by the checker/.test(t) && /1 claim removed, 1 shortened/.test(t), 'checker line');
+      assert.ok(/The tonight drop sold: 1 of 1/.test(t) && /shortened by the checker/.test(t) && /The checker ran: 1 claim removed, 1 shortened/.test(t), 'checker line');
       assert.ok(/What the data cannot show yet/.test(t) && /only exists since 2026-10-12/.test(t));
       assert.ok(/Maxela|MAXELA/i.test(t) && /Nights sold\s*11/.test(t) && !/XCV 2\s*Bookings made/.test(t), 'numbers per room, quiet rooms left out');
       assert.ok(/Right 9 of 14/.test(t) && /Expedia 1/i.test(t));
+      await page.click('[data-act=weekPick][data-k="2026-W40"]');
+      const t2 = (await text(page, '.page')).replace(/\s+/g, ' ');
+      assert.ok(/The checker ran but did not confirm the written headline, so this headline is made from the numbers/.test(t2) && /The checker ran: 0 claims removed, 0 shortened/.test(t2) && !/could not be confirmed/.test(t2), t2.slice(0, 400));
+      assert.ok(/Price drops written \(each: one night, one price list, one run\)\s*187/.test(t2) && /Different nights lowered\s*30/.test(t2) && /Last 3 days: nights lowered, then booked\s*2/.test(t2), 'clear labels');
+      assert.ok(/Real cancellations\s*2/.test(t2) && /Booking changes \(not cancellations\)\s*1/.test(t2) && /Marked cancelled after the stay \(not cancellations\)\s*9/.test(t2) && /Price changes held back by other rules\s*1933/.test(t2));
+      assert.ok(!/…that then sold/.test(t2), 'the old unclear label is gone from a new week');
       await page.click('[data-act=weekPick][data-k="2026-W41"]');
-      assert.ok(/Thin week\./.test(await text(page, '.page')) && /did not run/.test(await text(page, '.page')));
+      assert.ok(/Thin week\./.test(await text(page, '.page')) && /The checker did not run/.test(await text(page, '.page')));
     });
   }
 

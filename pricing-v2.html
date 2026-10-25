@@ -1899,11 +1899,20 @@ function cardHtml(id) {
   const v = {right: "Right", wrong: "Wrong", unclear: "Unclear"}[c.verdict] || "";
   return `<div style="font-size:13px;margin-top:4px"><span class="verdict ${esc(c.verdict)}">${v}</span>${esc((c.reason || "").replace(/ → (Right|Wrong|Unclear)$/, ""))}</div>` + twinHtml(id);
 }
+// New weeks use the clear names; weeks saved before still show their old names (a row appears only when the number exists).
 const WEEK_ROWS = [["bookings_made", "Bookings made"], ["nights_sold", "Nights sold"], ["avg_sold_price_gel", "Average price sold (₾)"], ["avg_start_gel", "Average start price (₾)"],
+  ["price_raises_written", "Price raises written (each: one night, one price list, one run)"], ["price_drops_written", "Price drops written (each: one night, one price list, one run)"], ["nights_lowered", "Different nights lowered"],
   ["price_up", "Price rises"], ["price_down", "Price drops"], ["nights_hit_min", "Nights at your minimum"], ["nights_hit_max", "Nights at your maximum"],
-  ["last3_drops", "Drops in the last 3 days"], ["last3_drops_sold", "…that then sold"], ["cancel_drops_tonight", "Cancelled tonight, lowered"], ["cancel_drops_tonight_sold", "…that then sold"],
-  ["cancel_drops_tomorrow", "Cancelled tomorrow, lowered"], ["cancel_drops_tomorrow_sold", "…that then sold"], ["cancellations", "Cancellations"],
-  ["holiday_rule_moves", "Holiday-rule moves"], ["blocked_by_protect", "Kept by protect"], ["blocked_by_hold", "Kept by hold"], ["stopped_by_safety_check", "Stopped by a safety check"]];
+  ["last3_price_drops", "Last 3 days: price drops on empty nights"], ["last3_nights_lowered", "Last 3 days: different nights lowered"], ["last3_nights_lowered_then_booked", "Last 3 days: nights lowered, then booked"],
+  ["last3_drops", "Drops in the last 3 days"], ["last3_drops_sold", "…that then sold"],
+  ["cancelled_tonight_lowered", "Cancelled tonight, lowered"], ["cancelled_tonight_lowered_then_booked", "…lowered, then booked"],
+  ["cancelled_tomorrow_lowered", "Cancelled tomorrow, lowered"], ["cancelled_tomorrow_lowered_then_booked", "…lowered, then booked"],
+  ["cancel_drops_tonight", "Cancelled tonight, lowered"], ["cancel_drops_tonight_sold", "…that then sold"],
+  ["cancel_drops_tomorrow", "Cancelled tomorrow, lowered"], ["cancel_drops_tomorrow_sold", "…that then sold"],
+  ["cancellations", "Cancellations"], ["cancellations_changed", "Booking changes (not cancellations)"], ["cancellations_after_stay", "Marked cancelled after the stay (not cancellations)"],
+  ["holiday_rule_moves", "Holiday-rule moves"],
+  ["held_back_by_protect", "Price changes held back by Don't change"], ["held_back_by_hold", "Price changes held back by small moves only"], ["held_back_other", "Price changes held back by other rules"],
+  ["blocked_by_protect", "Kept by protect"], ["blocked_by_hold", "Kept by hold"], ["stopped_by_safety_check", "Stopped by a safety check"]];
 const weekRange = w => `${fmtShort(w.from)} – ${fmtShort(w.to)} ${w.to.slice(0, 4)}`;
 function weekList(title, items) {
   return `<section class="sec"><h2 class="h2">${title}</h2>${items && items.length
@@ -1914,10 +1923,10 @@ function viewWeekly() {
   const desk = isDesk(), list = S.weekly, w = list.find(x => x.id === U.weekKey) || list[0];
   const head = `${desk ? "" : `<div class="topbar"><h1>Pricing</h1></div>${tabsHtml(false)}`}${errorsHtml()}`;
   if (!w) return head + `<section class="sec"><h2 class="h2">Weekly report</h2><div class="card empty">No weekly report yet. The first one is made on Sunday evening.</div></section>`;
-  const r = w.report || {}, n = w.numbers || {}, rooms = Object.entries(n.rooms || {}).filter(([, v]) => v.nights_sold || v.price_up || v.price_down || v.cancellations || v.bookings);
+  const r = w.report || {}, n = w.numbers || {}, rooms = Object.entries(n.rooms || {}).filter(([, v]) => v.nights_sold || v.price_up || v.price_down || v.price_raises_written || v.price_drops_written || v.cancellations || v.bookings);
   const past = list.length > 1 ? `<section class="sec"><h2 class="h2">Past weeks</h2><div class="pills">${list.map(x => `<button type="button" class="pill" aria-pressed="${x.id === w.id}" data-act="weekPick" data-k="${esc(x.id)}">${esc(weekRange(x))}</button>`).join("")}</div></section>` : "";
   const notes = (n.data_notes || []).length ? `<section class="sec"><h2 class="h2">What the data cannot show yet</h2><div class="card pad" style="font-size:14px;line-height:1.5">${n.data_notes.map(x => `<div>${esc(x)}</div>`).join("")}</div></section>` : "";
-  const roomCards = rooms.map(([id, v]) => `<div class="card pad"><b>${esc(roomName(id))}</b><div style="display:grid;grid-template-columns:1fr auto;gap:2px 12px;font-size:14px;margin-top:6px">${WEEK_ROWS.filter(([k]) => v[k] !== undefined && v[k] !== null).map(([k, l]) => `<span class="muted">${l}</span><b>${v[k]}</b>`).join("")}</div></div>`).join("");
+  const roomCards = rooms.map(([id, v]) => `<div class="card pad"><b>${esc(roomName(id))}</b><div style="display:grid;grid-template-columns:1fr auto;gap:2px 12px;font-size:14px;margin-top:6px">${WEEK_ROWS.filter(([k]) => v[k] !== undefined && v[k] !== null).map(([k, l]) => `<span class="muted">${k === "cancellations" && n.guide ? "Real cancellations" : l}</span><b>${v[k]}</b>`).join("")}</div></div>`).join("");
   const a = n.all || {}, id = a.ideas || {}, fails = Object.entries(a.channel_push_failures || {}).map(([k, c]) => `${k} ${c}`).join(", ");
   const whole = `<div class="card pad" style="font-size:14px;line-height:1.55">
     <div>Price updates this week: <b>${a.runs ?? 0}</b>, cancellation updates: <b>${a.urgent_runs ?? 0}</b></div>
@@ -1927,9 +1936,9 @@ function viewWeekly() {
     ${(a.season_unmarked || {}).count ? `<div>Season days nobody marked: <b>${a.season_unmarked.count}</b> (they use Mid prices)</div>` : ""}
     <div>Ideas scorecard: <b>${id.finished ? `Right ${id.right} of ${id.finished}` : "no finished ideas yet"}</b></div>
     <div>What-if twin: <b>${(a.twin || {}).finished ? `${a.twin.finished} compared, its prices ${a.twin.avg_difference_pct > 0 ? "higher" : a.twin.avg_difference_pct < 0 ? "lower" : "the same"} on average` : "nothing to compare yet"}</b></div></div>`;
-  const check = r.checked ? `Checked by a second reader: ${(r.removed || []).length} claim${(r.removed || []).length === 1 ? "" : "s"} removed, ${r.edited || 0} shortened.` : "The second reader did not run, so no written claim is shown.";
+  const check = r.checked ? `The checker ran: ${(r.removed || []).length} claim${(r.removed || []).length === 1 ? "" : "s"} removed, ${r.edited || 0} shortened.` : "The checker did not run, so no written claim is shown.";
   return head + `<section class="sec"><div><h2 class="h2">Weekly report</h2><p class="sub">${esc(weekRange(w))}. Suggestions only: nothing here changed a price.</p></div>
-      <div class="card pad" style="font-size:16px;line-height:1.5"><b>${esc(r.headline || "")}</b><div class="muted" style="font-size:13px;margin-top:6px">${esc(check)}</div></div></section>
+      <div class="card pad" style="font-size:16px;line-height:1.5"><b>${esc(r.headline || "")}</b>${r.headline_note ? `<div class="muted" style="font-size:13px;margin-top:6px">${esc(r.headline_note)}</div>` : ""}<div class="muted" style="font-size:13px;margin-top:6px">${esc(check)}</div></div></section>
     <div class="${desk ? "cards2" : ""}" style="${desk ? "" : "display:flex;flex-direction:column;gap:18px"}">${weekList("What worked", r.worked)}${weekList("What did not work", r.didnt)}${weekList("Possible upgrades", r.upgrades)}</div>
     ${notes}
     <section class="sec"><h2 class="h2">The numbers</h2>${whole}<div class="${desk ? "cards2" : ""}" style="${desk ? "" : "display:flex;flex-direction:column;gap:12px"}">${roomCards || '<div class="card empty">No room had activity this week.</div>'}</div></section>${past}`;

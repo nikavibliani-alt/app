@@ -19,6 +19,11 @@ TITLES = {"worked": "What worked", "didnt": "What did not work", "upgrades": "Po
 ANALYST_SYSTEM = """You write the weekly pricing review for the owner of a few apartments. You are given ONE JSON with the week's numbers.
 Rules:
 - Use only numbers that appear in the JSON. Copy them exactly. Never add, average or estimate anything yourself.
+- The JSON has a "guide": the exact meaning of every number. Read it and use each number only for what its guide line says. In particular:
+  a "price drop" or "price raise" count is a number of price changes (one night in one price list in one run), never a number of nights;
+  "held back" counts are price changes that a rule held back, never nights that are closed or blocked;
+  "lowered, then booked" means the night was empty, its price was lowered, and it was booked AFTER that. It never means drops on nights that were already sold;
+  "cancellations" are real cancellations only (changed bookings and stays that were already over are counted separately and are not cancellations).
 - If the data is thin or missing (see data_notes), say that plainly instead of guessing. A zero is a fact only when the JSON says 0.
 - Plain words an owner understands. No jargon, no ALL CAPS, no emojis.
 - Everything is a suggestion. Never say something was changed, and never tell the engine what to do automatically.
@@ -32,6 +37,7 @@ For every item (ids like worked.0, didnt.1, upgrades.2) and for the headline, de
 - "partly": some of it is supported; give "fixed_text" that keeps only what the data supports,
 - "no": it is made up, wrong, or says something was changed automatically.
 Be strict about numbers: a number that is not in the data, or a direction that is wrong, is not supported.
+Also check the MEANING with the "guide" in the numbers: a claim that treats a count of price changes as a number of nights, a "held back" count as closed or blocked nights, or "lowered, then booked" as drops on nights already sold, is wrong ("partly" with a corrected text, or "no").
 Reply with JSON only: {"headline": {"verdict": "yes|partly|no", "fixed_text": str}, "items": [{"id": str, "verdict": "yes|partly|no", "fixed_text": str, "note": str}]}."""
 
 
@@ -93,10 +99,22 @@ def apply_check(numbers: dict, report: dict, check: dict | None) -> dict:
         out[name] = keep
     hv = ((check or {}).get("headline") or {})
     head = report.get("headline") or ""
-    if check is not None and hv.get("verdict") == "partly" and hv.get("fixed_text") and not wn.unsupported_numbers(hv["fixed_text"], numbers):
+    bad_head = wn.unsupported_numbers(head, numbers)
+    out["check_headline"] = {"verdict": hv.get("verdict") if check is not None else None, "numbers_not_in_data": bad_head[:3]}
+    if check is not None and hv.get("verdict") == "yes" and not bad_head:
+        out["headline_by"], out["headline_note"] = "analyst", ""
+    elif check is not None and hv.get("verdict") == "partly" and hv.get("fixed_text") and not wn.unsupported_numbers(hv["fixed_text"], numbers):
         head = hv["fixed_text"]
-    elif check is None or hv.get("verdict") != "yes" or wn.unsupported_numbers(head, numbers):
-        head = "The week in numbers is below. The written summary could not be confirmed against the data."
+        out["headline_by"], out["headline_note"] = "checker", "The checker shortened the written headline to what the data supports."
+    else:
+        head = wn.numbers_headline(numbers)
+        out["headline_by"] = "numbers"
+        if check is None:
+            out["headline_note"] = "The checker did not run, so this headline is made from the numbers only."
+        elif bad_head:
+            out["headline_note"] = f"The checker ran. The written headline used {', '.join(bad_head[:3])}, which is not in the data, so this headline is made from the numbers."
+        else:
+            out["headline_note"] = "The checker ran but did not confirm the written headline, so this headline is made from the numbers."
     out["headline"] = head
     return out
 

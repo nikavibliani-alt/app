@@ -78,6 +78,13 @@ function seedDocs() {
     report: {headline: 'A calm week: 11 nights sold in Maxela and one Expedia push failed.', checked: true, edited: 1, removed: [{id: 'worked.1', text: 'x', why: 'y'}],
       worked: [{text: 'The tonight drop sold: 1 of 1 cancelled nights was rebooked.', refs: []}], didnt: [{text: 'The Expedia push failed 1 time.', refs: []}],
       upgrades: [{text: 'Look at why Expedia failed (1 failure this week).', refs: [], edited: true}]}};
+  docs['pricing_weekly/2026-W40'] = {property_id: 'maxela', week_key: '2026-W40', from: '2026-09-22', to: '2026-09-28', ts: '2026-09-28T21:00:00',
+    numbers: {data_notes: [], guide: {cancellations: 'x'},
+      rooms: {BIG_APT: {bookings_made: 1, nights_sold: 5, price_raises_written: 4, price_drops_written: 187, nights_lowered: 30, last3_price_drops: 6, last3_nights_lowered: 2, last3_nights_lowered_then_booked: 2,
+        cancelled_tonight_lowered: 1, cancelled_tonight_lowered_then_booked: 0, cancellations: 2, cancellations_changed: 1, cancellations_after_stay: 9, held_back_other: 1933, held_back_by_protect: 0}},
+      all: {runs: 20, urgent_runs: 0, channel_push_failures: {}, watchdog_red_days: 0, watchdog_days_recorded: 7, ideas: {finished: 0}, twin: {finished: 0}}},
+    report: {headline: '22–28 Sep: 1 booking made (5 nights), 2 real cancellations, 187 price drops and 4 price raises written.', headline_note: 'The checker ran but did not confirm the written headline, so this headline is made from the numbers.', headline_by: 'numbers',
+      checked: true, edited: 0, removed: [], worked: [], didnt: [], upgrades: []}};
   docs['pricing_weekly/2026-W41'] = {property_id: 'maxela', week_key: '2026-W41', from: '2026-09-29', to: '2026-10-05', ts: '2026-10-05T21:00:00', numbers: {rooms: {}, all: {}, data_notes: []}, report: {headline: 'Thin week.', checked: false, worked: [], didnt: [], upgrades: []}};
   docs['pricing_proposals/ideaA'] = {type: 'startPrice', property: 'XCV_2', season: 'mid', current: r.startPrices.XCV_2.mid, suggested: 165, change_pct: -6, reasoning: 'Only 2 of 22 November nights are booked. Last year by today: 9.', status: 'pending', ts: '2026-10-10T10:00:00'};
   docs['pricing_proposals/ideaB'] = {type: 'ceilingEur', property: 'VGL_ST', season: 'high', current: r.eurRules.VGL_ST.high.max, suggested: r.eurRules.VGL_ST.high.max + 5, reasoning: '5 High-season nights reached your maximum and were booked within 2 days.', status: 'pending', ts: '2026-10-10T09:00:00'};
