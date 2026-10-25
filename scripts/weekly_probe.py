@@ -63,7 +63,7 @@ def main():
                 if len(examples) < 3:
                     examples.append(f"night {e['date']} lowered {e['old']:g}->{e['new']:g} on {e['day']} ({e.get('currency')}), booked on {hit[0]['created']}")
         print(f"  {rt}: {len(l3)} drops on {len(nights)} nights | empty when lowered (free units > 0): {empty_at_drop} of {len(l3)} | "
-              f"drops on nights booked afterwards: {sold_events} (those are {len(sold_nights)} nights) | code says {numbers['rooms'][rt]['last3_drops_sold']}")
+              f"drops on nights booked afterwards: {sold_events} (those are {len(sold_nights)} nights) | code says {numbers['rooms'][rt]['last3_nights_lowered_then_booked']} nights")
         for x in examples:
             print("      e.g.", x)
 
@@ -78,7 +78,7 @@ def main():
     print(f"  events with a held-back message: {ev_blocked}; messages: {sum(msgs.values())} on {len({e['date'] for e in mine if e.get('blocked')})} nights")
     for m, n in msgs.most_common(5):
         print(f"      {n} x {m}")
-    print(f"  the report says: blocked_other {numbers['rooms'][rt]['blocked_other']}, price_down {numbers['rooms'][rt]['price_down']}, bookings made {numbers['rooms'][rt]['bookings_made']}, nights sold {numbers['rooms'][rt]['nights_sold']}")
+    print(f"  the report says: held_back_other {numbers['rooms'][rt]['held_back_other']}, price_drops_written {numbers['rooms'][rt]['price_drops_written']}, bookings made {numbers['rooms'][rt]['bookings_made']}, nights sold {numbers['rooms'][rt]['nights_sold']}")
     # nights closed in MiniHotel: no free unit, but no counted stay on that night
     from minihotel_auth import get_session_cookie
     today = now.date()
