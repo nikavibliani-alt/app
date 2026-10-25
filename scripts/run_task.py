@@ -35,6 +35,9 @@ def main(task, dry):
     if task == "alert_probe":
         import alert_probe as m
         return m.main()
+    if task == "weekly_probe":
+        import weekly_probe as m
+        return m.main()
     if task == "push_probe":
         import push_probe as m
         return m.main()
