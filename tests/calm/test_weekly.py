@@ -246,3 +246,18 @@ def test_changed_cancellations_are_found_from_the_reservations(monkeypatch):
     events = [{"event": "cancellation", "ref": refs[x], "day": "2026-10-10"} for x in refs]
     got = wn.changed_cancellations(db, events)
     assert got == {refs["100_001"]: "changed", refs["300_001"]: "changed"}
+
+
+def test_a_rerun_by_hand_without_sending_keeps_the_record_of_the_message_already_sent():
+    db = DB()
+    db.collection("pricing_weekly").document("2026-W42").set({"whatsapp": "2026-10-12T21:00:00"})
+    n = wn.build(sample(), FROM, TO)
+    data = (sample(), FROM, TO)
+    import weekly_numbers
+    orig = weekly_numbers.load
+    weekly_numbers.load = lambda db_, now_: data
+    try:
+        wr.main(["--no-send"], db=db, now=datetime(2026, 10, 12, 22, 0), analyst_client=None, env={})
+    finally:
+        weekly_numbers.load = orig
+    assert db.store["pricing_weekly"]["2026-W42"]["whatsapp"] == "2026-10-12T21:00:00"

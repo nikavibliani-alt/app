@@ -61,12 +61,11 @@ def main(argv=None, db=None, now=None, send=None, analyst_client=None, checker_c
     doc = {"property_id": wn.PROPERTY_ID, "stream": "weekly", "week_key": key, "from": week_from, "to": week_to, "ts": now.isoformat(),
            "numbers": numbers, "report": report, "ai_calls": 0 if not (api or analyst_client) else (2 if report.get("checked") else 1), "whatsapp": None}
     ref = db.collection("pricing_weekly").document(key)
-    if not args.no_send:
-        old = ref.get()
-        if old.exists and (old.to_dict() or {}).get("whatsapp"):
-            doc["whatsapp"] = old.to_dict()["whatsapp"]                      # one message per week
-        elif notify(db, send):
-            doc["whatsapp"] = now.isoformat()
+    old = ref.get()
+    if old.exists and (old.to_dict() or {}).get("whatsapp"):
+        doc["whatsapp"] = old.to_dict()["whatsapp"]                          # one message per week; a re-run by hand keeps the record of it
+    elif not args.no_send and notify(db, send):
+        doc["whatsapp"] = now.isoformat()
     ref.set(doc)
     print(f"Weekly review {key} saved | checked {report.get('checked')} | items kept {sum(len(report.get(n) or []) for n in weekly_ai.LISTS)} "
           f"| removed {len(report.get('removed') or [])} | edited {report.get('edited')} | WhatsApp {'sent' if doc['whatsapp'] else 'not sent'}")
