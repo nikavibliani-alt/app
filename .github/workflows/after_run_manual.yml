@@ -33,7 +33,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install requests firebase-admin google-cloud-storage anthropic
+        run: pip install requests firebase-admin google-cloud-storage anthropic beautifulsoup4
       - name: Run the task
         env:
           MINIHOTEL_HOTEL:          ${{ secrets.MINIHOTEL_HOTEL }}
