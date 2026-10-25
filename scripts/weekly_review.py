@@ -47,7 +47,7 @@ def main(argv=None, db=None, now=None, send=None, analyst_client=None, checker_c
     data, week_from, week_to = wn.load(db, now)
     numbers = wn.build(data, week_from, week_to)
     key = numbers["week"]["key"]
-    tot = {k: sum(r.get(k) or 0 for r in numbers["rooms"].values()) for k in ("bookings_made", "nights_sold", "price_up", "price_down", "cancellations")}
+    tot = {k: sum(r.get(k) or 0 for r in numbers["rooms"].values()) for k in ("bookings_made", "nights_sold", "price_raises_written", "price_drops_written", "cancellations", "cancellations_changed", "cancellations_after_stay")}
     print(f"Weekly numbers {week_from} to {week_to}: {len(numbers['rooms'])} rooms | {tot} | runs {numbers['all']['runs']} | notes {len(numbers['data_notes'])}")
     if args.dry:
         print("Dry run: no AI call, nothing saved, nothing sent.")
