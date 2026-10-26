@@ -31,6 +31,7 @@ const { urgentPushPayload, sendOwnerPush } = require('./ownerPush');
 const { mediaFor, checkMediaLink, capMediaResend } = require('./videos');
 const { SEED: KB_SEED, renderSystemPrompt, loadKnowledgeBase, unitFactLines, loadUnitWifi, propertyIdForRoom } = require('./knowledge/knowledgeBase');
 const { lookupBooking, bookingLookupLines, guestTextsFrom } = require('./bookingLookup');
+const { languageHintLines } = require('./languageHint');
 const { loadLiveStay, liveContextLines, checkinOpenWithLiveData } = require('./liveData');
 const { CONFIG_DEFAULTS, tbilisiHour, resolveEffectiveMode, buildModeContext, timingSettings, replyDelaySeconds } = require('./botModes');
 const { callClaudeWithRetry, describeClaudeError, buildCachedSystem, formatUsage } = require('./claudeClient');
@@ -875,6 +876,7 @@ exports.whatsappBotWorker = onRequest(
         // door-code scenarios never have to work it out from the hour.
         ...stayTimingContextLines(timing),
         ...unitFactLines(kb, bookingRoom, wifi),
+        ...languageHintLines(combinedGuestText),
         ...bookingLookupLines(lookup, kb.properties?.[propertyIdForRoom(kb, lookup?.roomCode)]?.name),
         ...liveContextLines(live),
       ].join('\n') + memoryContext;

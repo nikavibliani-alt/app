@@ -94,8 +94,20 @@ const DECISION_CHANGES_2026_10_20 = [
   ["\nGuest with a booking asks how or when to pay (card or cash, paying on arrival or at checkout, a deposit, an invoice or receipt, whether it is already paid):\nReply: Let me check on that and get back to you shortly. [ESCALATE]\nWhen the guest wrote in Georgian, Reply exactly: შევამოწმებ და მალე მოგწერთ. [ESCALATE]\nNever explain payment methods yourself: never say how, when or where to pay, that payment goes through Booking.com or Expedia, or that there is nothing to pay. The owner answers this. (A price question from someone who wants to book is the booking or price inquiry scenario instead.)\n",
    ""],
 ];
+// Owner changes (2026-10-26): a guest who says they have checked in gets only
+// a short warm wish (EN / KA reference 36), and Georgian replies never open
+// with filler ("კარგია", "სიამოვნებით"). [now, before] pairs as above.
+const DECISION_CHANGES_2026_10_26 = [
+  ["If the guest wrote in Georgian, in either script: reply fully in Georgian, as naturally and helpfully as you would in English. Answer their actual question — do not just acknowledge that they wrote in Georgian. When replying in Georgian, always use თქვენ (formal) — never შენ (informal) — for \"you\" and all related verb conjugations, regardless of how casually the guest writes.\nIn Georgian, never start a reply with a filler word or acknowledgement such as \"კარგია\" or \"სიამოვნებით\" before the real message: start with the message itself (a greeting is fine). \"არაფრის, სიამოვნებით\" is only the reply to a plain \"thank you\" on its own.",
+   "If the guest wrote in Georgian, in either script: reply fully in Georgian, as naturally and helpfully as you would in English. Answer their actual question — do not just acknowledge that they wrote in Georgian. When replying in Georgian, always use თქვენ (formal) — never შენ (informal) — for \"you\" and all related verb conjugations, regardless of how casually the guest writes."],
+  ["\nGuest writes in English (or any language other than Georgian) that they have checked in, settled in or are inside, even with a thank you (for example \"we're in, thanks\"):\nReply only with this short warm wish, in English, with no acknowledgement before it (no \"great\", \"glad to hear\"): Hi, have a comfortable stay, and if you need anything, just message me.\nGuest writes in Georgian that they have checked in or settled in, even with a thank you: reply with GEORGIAN PHRASING REFERENCE 36 word for word, nothing before it.\n",
+   ""],
+  ["35. Guest is very happy, thanks the host: დიდი მადლობა თქვენ, სასიამოვნო იყო თქვენი მასპინძლობა.\n36. Guest has checked in or settled in (use word for word, nothing before it): გამარჯობა, კომფორტულად დასვენებას გისურვებთ, თუ რამე დაგჭირდებათ, მომწერეთ.",
+   "35. Guest is very happy, thanks the host: დიდი მადლობა თქვენ, სასიამოვნო იყო თქვენი მასპინძლობა."],
+];
 const withoutRuleChanges = (p) => {
-  const undone20 = DECISION_CHANGES_2026_10_20.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `20 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, p);
+  const undone26 = DECISION_CHANGES_2026_10_26.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `26 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, p);
+  const undone20 = DECISION_CHANGES_2026_10_20.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `20 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone26);
   const undone18 = DECISION_CHANGES_2026_10_18.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `18 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone20);
   const undone = DECISION_CHANGES_2026_10_17.reduce((acc, [now, before]) => { assert.ok(acc.includes(now), `decision change not found: ${now.slice(0, 60)}`); return acc.split(now).join(before); }, undone18);
   return RULE_CHANGES_SINCE_SPLIT.reduce((acc, r) => { assert.ok(acc.includes(r), `rule change not found: ${r.slice(0, 60)}`); return acc.replace(r, ''); }, undone);
@@ -273,4 +285,12 @@ test('20 Oct: Georgian refund reply in Georgian; payment questions go to the own
   assert.match(p, /Refund request[^\n]*\nReply: Let me check on that and get back to you shortly\. \[ESCALATE\]\nWhen the guest wrote in Georgian, the whole reply is in Georgian, never English: Reply exactly: შევამოწმებ და მალე მოგწერთ\. \[ESCALATE\]/);
   assert.match(p, /asks how or when to pay[^\n]*\nReply: Let me check on that and get back to you shortly\. \[ESCALATE\]/);
   assert.match(p, /Never explain payment methods yourself/);
+});
+
+test('26 Oct: checked-in wish and no Georgian filler openings', () => {
+  const p = renderSystemPrompt(SEED);
+  assert.match(p, /Hi, have a comfortable stay, and if you need anything, just message me\./);
+  assert.match(p, /36\. Guest has checked in or settled in \(use word for word, nothing before it\): გამარჯობა, კომფორტულად დასვენებას გისურვებთ, თუ რამე დაგჭირდებათ, მომწერეთ\./);
+  assert.match(p, /never start a reply with a filler word or acknowledgement such as "კარგია" or "სიამოვნებით"/);
+  assert.match(p, /2\. "Thank you" reply: არაფრის, სიამოვნებით\./, 'the plain thank-you reply is kept');
 });

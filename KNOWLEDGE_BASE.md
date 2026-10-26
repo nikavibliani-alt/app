@@ -86,5 +86,6 @@ Text fragments used by the bot prompt are kept exactly as they were in the promp
 | Refund in Georgian (20 Oct) | A Georgian guest always gets the Georgian reply: "შევამოწმებ და მალე მოგწერთ." + [ESCALATE]. |
 | Payment questions (20 Oct) | A guest with a booking asking how or when to pay: "check and get back" + [ESCALATE]; the bot never explains payment methods. |
 | Admin settings (20 Oct) | `checkin_admin/config.locationInfo` MAXELA / ROOMS / BIG_APT address = "Zhiuli Shartava 35/37, near Clean House Market" (same 35/37 maps link as the bot); `parkingInfo.BIG_APT.parkingMapsUrl` = the Carrefour garage link. |
+| Checked in (26 Oct) | A guest who says they have checked in / settled in gets only a short warm wish: "Hi, have a comfortable stay, and if you need anything, just message me." / Georgian reference 36. Georgian replies never open with "კარგია" or "სიამოვნებით" ("არაფრის, სიამოვნებით" only answers a plain thank you). A guest-context line (`languageHint.js`) tells the model when the newest message is in Latin letters, so the Georgian sentence does not pull English guests into Georgian. |
 
 The prompt test (`knowledgeBase.test.js`) lists each of these changes word for word; undoing them gives back the original prompt exactly.
