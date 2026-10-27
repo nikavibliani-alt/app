@@ -834,7 +834,7 @@ html.inbox-typing #main-nav{display:none}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1015b · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1015c · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -4459,7 +4459,7 @@ function _renderStayCore(){
   if(!_resCache){el.innerHTML='<div class="empty">Loading reservations…</div>';return;}
 
   if(q){
-    /* searching: only sections that have matches (Staying, Arriving today, Leaving today, upcoming days); past guests are appended by renderStay */
+    /* searching: only sections that have matches (Staying, Arriving today, Leaving today, upcoming days, Later); past guests are appended by renderStay */
     let html='',n=0;
     const add=(title,groups,mode)=>{if(!groups.length)return;n+=groups.length;html+=sectionBlock(title,groups,mode);};
     add('Staying',filterByQ(b.inhouse),'inhouse');
@@ -4468,6 +4468,9 @@ function _renderStayCore(){
     const dayList=upcomingDaysList().slice();
     if(stayFilter==='upcoming'){const i=dayList.findIndex(d=>d.iso===upcomingDay);if(i>0)dayList.unshift(dayList.splice(i,1)[0]);}
     for(const d of dayList)add(d.label+' · '+d.dateLabel,filterByQ(groupsForCheckinDate(d.iso)),'upcoming');
+    /* later: every non-cancelled booking that checks in after the 7-day list (sorted by check-in date) */
+    const in7=addDaysISO(tbilisiToday(),7);
+    add('Later',filterByQ(groupByBaseNum(nonCancelled().filter(r=>(r.checkin||'')>in7).sort((x,y)=>(x.checkin||'').localeCompare(y.checkin||'')||byRoom(x,y)))),'upcoming');
     _stayMatchCount=n;
     el.innerHTML=html;
     return;
