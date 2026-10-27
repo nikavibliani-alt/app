@@ -321,3 +321,9 @@ Progress log:
 ### Stay search: "Later" (restore point: tag before-stay-later)
 - Searching on the Stay page now also lists every non-cancelled booking that checks in after the next-7-days list, in a "Later" section sorted by check-in date. Empty search is unchanged. _resCache query (checkin >= 1 year ago, newest first, limit 1000) holds all future bookings (87 docs from today on); the limit only ever drops the oldest past bookings. Build 1015c.
 - Undo: tell me "undo stay later".
+
+### Later bookings of a registered guest (restore point: tag before-related-later)
+- Guest page 1.6.1: when a registered guest's page loads (and every ~4 min while open, and when the tab comes back), bookings made later by the same person are added to the room switcher and their ids saved to checkin_guests.relatedReservationIds. Same rule as _relatedBookings at search time (same name with room tag stripped, same check-in date, same phone when both have one, not cancelled), stricter in one way: if the booking has no phone, the guest's own contact number (when it is a number) must match.
+- Server path: guestFind mode 'related' in guestApi.js (tested). guestFind/guestStay are not deployed yet (security stage 2), so nothing was redeployed.
+- Note: pipeline-functions test "guestKnowledge copies match the WhatsApp originals" already fails on main (not part of this change).
+- Undo: tell me "undo related later".

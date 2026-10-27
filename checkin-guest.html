@@ -1652,6 +1652,64 @@ function _syncGuestReservationContext(){
 // changed) so callers running this in parallel with their own apartment fetch
 // know to discard that outer result instead of applying it — that outer fetch
 // was kicked off using the pre-hydrate aptId, which is now the wrong room.
+
+/* A registered guest who books another unit LATER: look for new bookings by the same person with the SAME rule as at search
+   time (_relatedBookings: same name with the room tag stripped, same check-in date, same phone when both have one, not cancelled).
+   Stricter only in one way: when the booking has no phone, the guest's own contact number (if it is a number) must match.
+   New ones join allMatchedReservations (room switcher) and their ids are kept on the guest record. */
+let _relatedLastCheck=0,_relatedBusy=false;
+function _contactDigits(c){const d=String(c||'').replace(/\D/g,'');return d.length>=7?d.slice(-7):'';}
+function _laterRelatedFrom(best,pool,knownBases,contact){
+  if(!best)return [];
+  const ph=normalizePhone(best.phone||'')||_contactDigits(contact);
+  const seen=new Set();
+  return _relatedBookings(best,pool.filter(r=>(r.status||'').toUpperCase()!=='CANCELLED')).filter(r=>{
+    const b=reservationBaseNum(r.reservationNumber||r.id);
+    if(knownBases.has(b)||seen.has(b))return false;
+    const rp=normalizePhone(r.phone||'');
+    if(ph&&rp&&rp!==ph)return false;
+    seen.add(b);return true;
+  });
+}
+async function _discoverRelatedBookings(force,noSync){
+  if(_relatedBusy||isPreviewMode()||!guestId||!guestData||guestData.companionGuest||!guestData.matchedReservationId)return false;
+  if(!force&&Date.now()-_relatedLastCheck<4*60*1000)return false;
+  _relatedBusy=true;_relatedLastCheck=Date.now();
+  try{
+    const known=new Set(allMatchedReservations.map(r=>reservationBaseNum(r.reservationNumber||r.id)));
+    let add=[],ids=[];
+    if(GUEST_API){
+      const r=await GAPI.related({guestToken:guestId});
+      add=r.reservations||[];ids=r.relatedIds||[];
+    }else{
+      const base=_ownBase();
+      const best=allMatchedReservations.find(r=>reservationBaseNum(r.reservationNumber||r.id)===base&&(r.status||'').toUpperCase()!=='CANCELLED');
+      const ci=best?(best.checkin||best.checkIn||''):'';
+      if(!best||!ci)return false;
+      const snap=await getDocs(query(collection(db,'reservations'),where('checkin','==',ci)));
+      const pool=snap.docs.map(d=>({id:d.id,...d.data()}));
+      for(const rb of _laterRelatedFrom(best,pool,known,guestData.contact)){
+        let more=[];
+        try{more=await loadSiblingReservations(rb.id);}catch(e){}
+        (more.length?more:[rb]).forEach(a=>{if(!add.some(x=>x.id===a.id))add.push(a);});
+        ids.push(rb.id);
+      }
+    }
+    add=add.filter(r=>!allMatchedReservations.some(x=>x.id===r.id)&&(r.status||'').toUpperCase()!=='CANCELLED'&&!known.has(reservationBaseNum(r.reservationNumber||r.id)));
+    if(!add.length)return false;
+    allMatchedReservations=[...allMatchedReservations,...add];
+    const all=[...new Set([...(guestData.relatedReservationIds||[]),...ids])];
+    guestData={...guestData,relatedReservationIds:all};
+    try{localStorage.setItem('maxela_all_res',JSON.stringify(allMatchedReservations));}catch(e){}
+    setDoc(doc(db,'checkin_guests',guestId),{relatedReservationIds:all},{merge:true}).catch(()=>{});
+    if(!noSync){
+      _syncGuestReservationContext();
+      try{renderGreetingApt();renderTiles();}catch(e){}
+    }
+    return true;
+  }catch(e){console.warn('[related later]',e);return false;}
+  finally{_relatedBusy=false;}
+}
 async function _hydrateGuestReservations(){
   const ref=guestData?.matchedReservationId;
   if(!ref)return null;
@@ -1677,6 +1735,7 @@ async function _hydrateGuestReservations(){
       }
     }catch(e){}
   }
+  if(sibs.length)await _discoverRelatedBookings(true,true);   // bookings the same person made after registering
   _syncGuestReservationContext();
   // keep the saved guest record on the booking's own dates (the typed date may have been wrong)
   try{
@@ -2122,7 +2181,7 @@ function _unlockTick(){
 function startUnlockPoller(){
   if(_unlockPollTimer)return;
   _unlockPollTimer=setInterval(_unlockTick,30000);  // pure time-check, no Firestore
-  _hkPollTimer=setInterval(()=>{refreshHkToday();if(GUEST_API)pollStay();else if(needsElevatorCode())_syncElevatorFromStores();},60000);
+  _hkPollTimer=setInterval(()=>{refreshHkToday();if(GUEST_API)pollStay();else if(needsElevatorCode())_syncElevatorFromStores();_discoverRelatedBookings(false);},60000);
 }
 function stopUnlockPoller(){
   if(_unlockPollTimer){clearInterval(_unlockPollTimer);_unlockPollTimer=null;}
@@ -2132,6 +2191,7 @@ document.addEventListener('visibilitychange',()=>{
   if(!document.hidden){
     _unlockTick();
     refreshHkToday();
+    _discoverRelatedBookings(false);
   }
 });
 
