@@ -5,9 +5,12 @@
 //   Abashidze guests get no bot reply at all: every scenario in the prompt is
 //   Shartava-specific)
 // - whether check-in (15:00 Tbilisi) has already opened for this guest.
+// - whether today is the checkout day and checkout (12:00 Tbilisi) has passed:
+//   after that the stay has ended, and "we checked out" is news, not a request.
 
 const TBILISI_OFFSET_MS = 4 * 60 * 60 * 1000; // UTC+4 year-round, no DST
 const CHECKIN_HOUR = 15;
+const CHECKOUT_HOUR = 12;
 
 // Properties whose guests get no bot reply: the bot sends nothing, Claude is
 // not called, and the owner is alerted once per stay. Matched by the start of
@@ -46,23 +49,28 @@ const dateOnly = (value) => {
 };
 
 /**
- * Check-in timing for the guest's booking, in Tbilisi time:
+ * Check-in and checkout timing for the guest's booking, in Tbilisi time:
  * { today, arrivalDay: true|false|null, checkinTimePassed: bool,
- *   checkinOpen: 'yes'|'no'|'unknown' }.
+ *   checkinOpen: 'yes'|'no'|'unknown',
+ *   checkoutDay: true|false|null, checkoutTimePassed: bool, stayEnded: true|false|null }.
  * Check-in is open on the arrival day from 15:00, and on every later day of
- * the stay through checkout. Unknown dates -> arrivalDay null, checkinOpen 'unknown'.
+ * the stay through checkout. The stay has ended from 12:00 on the checkout day.
+ * Unknown dates -> null / 'unknown'.
  */
 function stayTiming({ checkin, checkout } = {}, nowMs) {
   const { date: today, hour } = tbilisiNow(nowMs);
   const checkinTimePassed = hour >= CHECKIN_HOUR;
-  const arrival = dateOnly(checkin);
-  if (!arrival) return { today, arrivalDay: null, checkinTimePassed, checkinOpen: 'unknown' };
+  const checkoutTimePassed = hour >= CHECKOUT_HOUR;
   const departure = dateOnly(checkout);
+  const checkoutDay = departure ? today === departure : null;
+  const stayEnded = departure ? today > departure || (today === departure && checkoutTimePassed) : null;
+  const arrival = dateOnly(checkin);
+  if (!arrival) return { today, arrivalDay: null, checkinTimePassed, checkinOpen: 'unknown', checkoutDay, checkoutTimePassed, stayEnded };
   const arrivalDay = today === arrival;
   let checkinOpen = 'no';
   if (arrivalDay) checkinOpen = checkinTimePassed ? 'yes' : 'no';
   else if (today > arrival && (!departure || today <= departure)) checkinOpen = 'yes';
-  return { today, arrivalDay, checkinTimePassed, checkinOpen };
+  return { today, arrivalDay, checkinTimePassed, checkinOpen, checkoutDay, checkoutTimePassed, stayEnded };
 }
 
 /** Guest-context lines for the prompt (see the entrance and door-code scenarios). */
@@ -73,6 +81,9 @@ function stayTimingContextLines(timing) {
     `Today is the guest's arrival day: ${yn(timing.arrivalDay)}`,
     `15:00 check-in time has passed today: ${yn(timing.checkinTimePassed)}`,
     `Check-in is already open for this guest: ${timing.checkinOpen}`,
+    `Today is the guest's checkout day: ${yn(timing.checkoutDay)}`,
+    `12:00 checkout time has passed today: ${yn(timing.checkoutTimePassed)}`,
+    `The guest's stay has ended (it is after 12:00 on the checkout day, or later): ${yn(timing.stayEnded)}`,
   ];
 }
 

@@ -105,8 +105,25 @@ const DECISION_CHANGES_2026_10_26 = [
   ["35. Guest is very happy, thanks the host: დიდი მადლობა თქვენ, სასიამოვნო იყო თქვენი მასპინძლობა.\n36. Guest has checked in or settled in (use word for word, nothing before it): გამარჯობა, კომფორტულად დასვენებას გისურვებთ, თუ რამე დაგჭირდებათ, მომწერეთ.",
    "35. Guest is very happy, thanks the host: დიდი მადლობა თქვენ, სასიამოვნო იყო თქვენი მასპინძლობა."],
 ];
+// Owner changes (2026-10-28): checkout-day facts in the guest context; "we
+// left / checked out" after checkout time gets only a goodbye (EN / KA
+// reference 37); late checkout always "I will check" + [ESCALATE], never a
+// refusal; an announced departure gets the keys line. [now, before] pairs.
+const DECISION_CHANGES_2026_10_28 = [
+  ["- Today's date in Tbilisi, whether today is the guest's arrival day, whether 15:00 has passed today, and \"Check-in is already open for this guest\" (yes / no / unknown). These are computed exactly in code: always rely on them for anything about check-in time or door codes, never work the time out yourself.\n- Whether today is the guest's checkout day, whether 12:00 checkout time has passed today, and whether the guest's stay has ended (after 12:00 on the checkout day, or later). Also computed in code: rely on them for anything about checkout, leaving or late checkout.",
+   "- Today's date in Tbilisi, whether today is the guest's arrival day, whether 15:00 has passed today, and \"Check-in is already open for this guest\" (yes / no / unknown). These are computed exactly in code: always rely on them for anything about check-in time or door codes, never work the time out yourself."],
+  ["\nLate checkout request (the guest asks to stay longer or leave later, for example \"can we stay until 2pm?\"):",
+   "\nLate checkout request:"],
+  ["Reply: Let me check availability based on the next guest arrival and I will get back to you shortly. [ESCALATE]\nAlways use exactly this reply: never refuse on your own, never say it is not possible, and never combine \"we can't\" with \"I'll check\". The owner decides.\nRead the tense: only a question or wish about the future is a request. A guest telling you when they will leave (\"we'll check out at 9:30 tomorrow\") is not a late checkout request: thank them and tell them to leave the keys inside the apartment and just close the door when they leave (in Georgian: GEORGIAN PHRASING REFERENCE 13), with no late checkout talk.",
+   "Reply: Let me check availability based on the next guest arrival and I will get back to you shortly. [ESCALATE]"],
+  ["\nGuest says they have left or checked out (past tense, for example \"we checked out\", \"we left\", \"გავედით\", \"გავსახლდით\"), or thanks you as they leave:\nThis is information, not a request. When the guest context says the guest's stay has ended or 12:00 checkout time has passed today, reply only with a short warm goodbye: no checkout times and no late checkout talk. Reply: Thank you for letting us know. Have a safe trip, we hope to see you again.\nWhen replying in Georgian, use GEORGIAN PHRASING REFERENCE 37 word for word.\nGeorgian guests often make typos (for example \"გამივსახლდით\" for \"გავსახლდით\"): when the words are unclear, the timing in the guest context decides. After checkout time it is news that they left, never a late checkout request.\n",
+   ""],
+  ["36. Guest has checked in or settled in (use word for word, nothing before it): გამარჯობა, კომფორტულად დასვენებას გისურვებთ, თუ რამე დაგჭირდებათ, მომწერეთ.\n37. Guest has left or checked out (use word for word, nothing before it): მადლობა, რომ შეგვატყობინეთ. ბედნიერ მგზავრობას გისურვებთ, იმედია ისევ გვესტუმრებით.",
+   "36. Guest has checked in or settled in (use word for word, nothing before it): გამარჯობა, კომფორტულად დასვენებას გისურვებთ, თუ რამე დაგჭირდებათ, მომწერეთ."],
+];
 const withoutRuleChanges = (p) => {
-  const undone26 = DECISION_CHANGES_2026_10_26.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `26 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, p);
+  const undone28 = DECISION_CHANGES_2026_10_28.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `28 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, p);
+  const undone26 = DECISION_CHANGES_2026_10_26.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `26 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone28);
   const undone20 = DECISION_CHANGES_2026_10_20.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `20 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone26);
   const undone18 = DECISION_CHANGES_2026_10_18.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `18 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone20);
   const undone = DECISION_CHANGES_2026_10_17.reduce((acc, [now, before]) => { assert.ok(acc.includes(now), `decision change not found: ${now.slice(0, 60)}`); return acc.split(now).join(before); }, undone18);
@@ -293,4 +310,12 @@ test('26 Oct: checked-in wish and no Georgian filler openings', () => {
   assert.match(p, /36\. Guest has checked in or settled in \(use word for word, nothing before it\): გამარჯობა, კომფორტულად დასვენებას გისურვებთ, თუ რამე დაგჭირდებათ, მომწერეთ\./);
   assert.match(p, /never start a reply with a filler word or acknowledgement such as "კარგია" or "სიამოვნებით"/);
   assert.match(p, /2\. "Thank you" reply: არაფრის, სიამოვნებით\./, 'the plain thank-you reply is kept');
+});
+
+test('28 Oct: checkout day, leaving, late checkout never refused', () => {
+  const p = renderSystemPrompt(SEED);
+  assert.match(p, /Reply: Thank you for letting us know\. Have a safe trip, we hope to see you again\./);
+  assert.match(p, /37\. Guest has left or checked out \(use word for word, nothing before it\): მადლობა, რომ შეგვატყობინეთ\. ბედნიერ მგზავრობას გისურვებთ, იმედია ისევ გვესტუმრებით\./);
+  assert.match(p, /never refuse on your own, never say it is not possible, and never combine "we can't" with "I'll check"/);
+  assert.match(p, /Late checkout request[^\n]*\nReply: Let me check availability based on the next guest arrival and I will get back to you shortly\. \[ESCALATE\]/);
 });
