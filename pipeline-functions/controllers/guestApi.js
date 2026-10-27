@@ -109,6 +109,7 @@ async function runGuestFind(ctx, params, meta = {}) {
   if (mode === 'existing') return runExisting(ctx, params, meta);
   if (mode === 'siblings') return runSiblings(ctx, params, meta);
   if (mode === 'companion') return runCompanion(ctx, params, meta);
+  if (mode === 'related') return runRelated(ctx, params, meta);
   if (mode !== 'find') return bad('BAD_REQUEST', 'unknown mode');
 
   const name = str(params.name, 200);
@@ -189,6 +190,54 @@ async function ownBases(ctx, guestToken) {
   if (!guest) return null;
   const refs = [guest.matchedReservationId, guest.linkedReservationNumber, ...(guest.relatedReservationIds || [])].filter(Boolean);
   return { guest, bases: new Set(refs.map(M.reservationBaseNum).filter(Boolean)) };
+}
+
+/** Phone digits of the guest's own contact, used only when the booking has no phone (never to loosen the search rule). */
+function contactDigits(contact) {
+  const d = String(contact || '').replace(/\D/g, '');
+  return d.length >= 7 ? d.slice(-7) : '';
+}
+
+/**
+ * Bookings made AFTER registration by the same person: the SAME rule as at search time (M._relatedBookings:
+ * same name with the room tag stripped, same check-in date, same phone when both have one, not cancelled),
+ * only stricter: when the booking has no phone, the guest's own contact number (if it is a number) must match too.
+ * Returns the new bookings' siblings plus the ids to keep on the guest record.
+ */
+async function findLaterRelated(ctx, guest, knownBases) {
+  const ref = guest.matchedReservationId;
+  if (!ref) return { reservations: [], relatedIds: [] };
+  const mine = (await loadSiblings(ctx, ref)).filter(r => !isCancelled(r));
+  const best = mine[0];
+  const ci = best && (best.checkin || best.checkIn);
+  if (!best || !ci) return { reservations: [], relatedIds: [] };
+  const pool = (await ctx.listReservationsByCheckin(ci)).filter(r => !isCancelled(r));
+  const ph = M.normalizePhone(best.phone || '') || contactDigits(guest.contact);
+  const found = M._relatedBookings(best, pool).filter(r => {
+    if (knownBases.has(resBase(r))) return false;
+    const rp = M.normalizePhone(r.phone || '');
+    return !ph || !rp || rp === ph;
+  });
+  const reservations = [];
+  const relatedIds = [];
+  const seen = new Set();
+  for (const rb of found) {
+    if (seen.has(resBase(rb))) continue;
+    seen.add(resBase(rb));
+    const more = await loadSiblings(ctx, rb.id);
+    (more.length ? more : [rb]).forEach(a => { if (!reservations.some(g => g.id === a.id)) reservations.push(a); });
+    relatedIds.push(rb.id);
+  }
+  return { reservations: reservations.sort(byRoom), relatedIds };
+}
+
+async function runRelated(ctx, params, meta) {
+  if (await limited(ctx, 'related:' + (meta.ip || '?'), 60, 600)) return bad('RATE_LIMITED', 'Too many requests.');
+  const own = await ownBases(ctx, str(params.guestToken, 80));
+  if (!own) return bad('FORBIDDEN', 'Not your booking');
+  if (own.guest.companionGuest) return { ok: true, reservations: [], relatedIds: [] };
+  const r = await findLaterRelated(ctx, own.guest, own.bases);
+  return { ok: true, reservations: r.reservations.map(pubRes), relatedIds: r.relatedIds };
 }
 
 async function runSiblings(ctx, params, meta) {
@@ -388,5 +437,5 @@ function registerCloudFunctions() {
 
 module.exports = {
   runGuestFind, runGuestStay, registerCloudFunctions, buildLiveCtx,
-  filterApt, pubRes, plain, maskDigits,
+  filterApt, pubRes, plain, maskDigits, findLaterRelated,
 };

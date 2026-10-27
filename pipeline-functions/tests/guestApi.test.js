@@ -265,6 +265,46 @@ test('apartment filter: locked hides secrets and masks numbers in the text, alwa
   assert.equal(open.instructions, 'code 4321# ok');
 });
 
+test('related: a later booking by the same person (same name, date, phone) is found; other phone, date, cancelled are not', async () => {
+  const extra = {
+    '007009001_001': { reservationNumber: '007009001_001', roomCode: '6-4', checkin: '2026-10-12', checkout: '2026-10-15', status: 'OK', guest: 'Ahmed Ali', phone: '+995 555 111 222' },
+    '007009002_001': { reservationNumber: '007009002_001', roomCode: '7-1', checkin: '2026-10-12', checkout: '2026-10-15', status: 'OK', guest: 'Ahmed Ali', phone: '+995 599 999 999' },
+    '007009003_001': { reservationNumber: '007009003_001', roomCode: '7-2', checkin: '2026-10-13', checkout: '2026-10-15', status: 'OK', guest: 'Ahmed Ali', phone: '+995 555 111 222' },
+    '007009004_001': { reservationNumber: '007009004_001', roomCode: '7-4', checkin: '2026-10-12', checkout: '2026-10-15', status: 'CANCELLED', guest: 'Ahmed Ali', phone: '+995 555 111 222' },
+    '007009005_001': { reservationNumber: '007009005_001', roomCode: '0-1', checkin: '2026-10-12', checkout: '2026-10-15', status: 'OK', guest: 'Ahmed Ali', phone: '' },
+    '007009006_001': { reservationNumber: '007009006_001', roomCode: '0-2', checkin: '2026-10-12', checkout: '2026-10-15', status: 'OK', guest: 'Someone Else', phone: '+995 555 111 222' },
+  };
+  const base = makeCtx().data.reservations;
+  const ctx = makeCtx({ reservations: { ...base, ...extra } });
+  const r = await api.runGuestFind(ctx, { mode: 'related', guestToken: TOKEN_A }, IP);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.reservations.map(x => x.roomCode).sort(), ['0-1', '6-4']);   // same phone, and the one with no phone (guest contact matches)
+  assert.deepEqual(r.relatedIds.sort(), ['007009001_001', '007009005_001']);
+  // the guest's own booking (and its sibling room) is never returned as "new"
+  assert.ok(!r.reservations.some(x => x.reservationNumber.startsWith('007004961')));
+});
+
+test('related: when the booking has no phone, the guest contact number must match', async () => {
+  const base = makeCtx().data;
+  const ctx = makeCtx({
+    reservations: {
+      ...base.reservations,
+      '007004961_001': { ...base.reservations['007004961_001'], phone: '' },
+      '007004961_002': { ...base.reservations['007004961_002'], phone: '' },
+      '007009010_001': { reservationNumber: '007009010_001', roomCode: '6-4', checkin: '2026-10-12', checkout: '2026-10-15', status: 'OK', guest: 'Ahmed Ali', phone: '+995 599 000 111' },
+      '007009011_001': { reservationNumber: '007009011_001', roomCode: '7-1', checkin: '2026-10-12', checkout: '2026-10-15', status: 'OK', guest: 'Ahmed Ali', phone: '+995 555 111 222' },
+    },
+  });
+  const r = await api.runGuestFind(ctx, { mode: 'related', guestToken: TOKEN_A }, IP);
+  assert.deepEqual(r.reservations.map(x => x.roomCode), ['7-1']);
+});
+
+test('related: only for a real guest token', async () => {
+  const ctx = makeCtx();
+  assert.equal((await api.runGuestFind(ctx, { mode: 'related', guestToken: 'c'.repeat(32) }, IP)).ok, false);
+  assert.equal((await api.runGuestFind(ctx, { mode: 'related', guestToken: '6-1_2026-10-12' }, IP)).ok, false);
+});
+
 test('apartment filter: the lock box code is only given when unlocked', () => {
   const apt = { lockboxCode: '9910', accessMethod: 'lockbox', stepPhotos: { s1: 'https://x/p.jpg' }, address: 'a' };
   const locked = api.filterApt(apt, false);

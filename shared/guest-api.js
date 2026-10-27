@@ -29,6 +29,7 @@ export function createGuestApi(functions, httpsCallable) {
     existingGuest: p => call(find, { mode: 'existing', ...p }),
     siblings: p => call(find, { mode: 'siblings', ...p }),
     companion: p => call(find, { mode: 'companion', ...p }),
+    related: p => call(find, { mode: 'related', ...p }),
     stay: p => call(stay, p || {}),
   };
 }
