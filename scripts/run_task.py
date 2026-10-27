@@ -47,6 +47,9 @@ def main(task, dry):
     if task == "res_probe":
         import res_probe as m
         return m.main()
+    if task == "window_probe":
+        import window_probe as m
+        return m.main()
     if task == "ideas_cleanup":
         import ideas_logic_cleanup as m
         return m.main(flag)
