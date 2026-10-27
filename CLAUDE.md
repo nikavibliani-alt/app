@@ -6,6 +6,11 @@
 - Plain language, no ALL CAPS shouting labels.
 - Anything added to the More menu goes into the shared destinations list in checkin-admin.html, so it is also offered in Tab bar layout.
 
+# Git safety (before every commit)
+
+- Run `git status` and look at the staged changes before every commit. If the commit would delete files you did not mean to delete, or deletes a large number of files, stop: fix the index with `git reset` (it leaves the files on disk) and never commit it.
+- Clear a stale `.git/index.lock` only after checking that no git process is running (`pgrep -fl git`). Then run `git reset` and check `git status` again before committing.
+
 Read first: docs/GUEST_ADMIN_PLAN.md, docs/AGENT_HANDOFF.md, docs/OPERATIONS.md. Every push to main deploys the website live (Firebase Hosting); never run `firebase deploy` by hand for Hosting. Cloud Functions are not deployed by a push: the WhatsApp bot functions are deployed by hand with `firebase deploy --only functions:whatsapp --project sleepy-5c962`, which is OK.
 
 <!-- gitnexus:start -->
