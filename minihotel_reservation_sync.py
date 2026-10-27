@@ -1046,15 +1046,24 @@ def fetch_booking_ids(session, db, reservations):
     print(f"OTA remarks: {updated} updated, {skipped} skipped, {errors} errors")
 
 
+# The guest page accepts arrival dates up to 365 days ahead, so reservations are fetched and saved for the whole year.
+# Cancellation detection and the manual-room release keep looking only at the near window (they compare Firestore docs
+# against what MiniHotel returned, so a longer window must never widen what they are allowed to change).
+SYNC_DAYS_BACK = 7
+SYNC_DAYS_AHEAD = 365
+NEAR_DAYS_AHEAD = 60
+
+
 def main():
     now = datetime.datetime.utcnow()
     print(f"Starting MiniHotel reservation sync at {now.isoformat()}")
 
-    from_dt = now - datetime.timedelta(days=7)
-    to_dt = now + datetime.timedelta(days=60)
+    from_dt = now - datetime.timedelta(days=SYNC_DAYS_BACK)
+    to_dt = now + datetime.timedelta(days=SYNC_DAYS_AHEAD)
     from_date = from_dt.strftime('%Y-%m-%d')
     to_date = to_dt.strftime('%Y-%m-%d')
-    print(f"Date range: {from_date} → {to_date}")
+    near_to_date = (now + datetime.timedelta(days=NEAR_DAYS_AHEAD)).strftime('%Y-%m-%d')
+    print(f"Date range: {from_date} → {to_date} (cancellation checks: {from_date} → {near_to_date})")
 
     db = init_firestore()
     global ROOM_MAP
@@ -1064,17 +1073,24 @@ def main():
     reservations = fetch_reservations(session, from_date, to_date)
     synced = sync_to_firestore(db, reservations)
 
+    if not reservations:
+        # An empty answer must never be read as "everything was cancelled".
+        print("MiniHotel returned no reservations: skipping the manual-room release and cancellation checks")
+        print(f"Done. {synced} reservations synced.")
+        return
+
     # Drop stale manualRoom pins that double-book a room (e.g. pinned 0-3, MiniHotel says 0-2)
-    auto_release_conflicting_manualroom(db, reservations, from_date, to_date)
+    auto_release_conflicting_manualroom(db, reservations, from_date, near_to_date)
 
     # Fetch phone/email/country for upcoming check-ins
     fetch_guest_details(session, db, reservations)
 
     # Fetch Booking.com/Expedia confirmation IDs for OTA reservations
+    # (only bookings that still need it make an API call, so the longer window adds only a few calls)
     fetch_booking_ids(session, db, reservations)
 
     # Detect cancellations and trigger urgent repricing for near-term ones
-    near_term = detect_cancellations(db, reservations, from_date, to_date)
+    near_term = detect_cancellations(db, reservations, from_date, near_to_date)
     trigger_urgent_pricing(near_term)
 
     # Clean up old duplicates (run once, then can be removed)
