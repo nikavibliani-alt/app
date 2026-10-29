@@ -1,8 +1,6 @@
 name: Elevator Code Monitor
 
 on:
-  schedule:
-    - cron: '0 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -27,3 +25,4 @@ jobs:
         working-directory: scripts
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
