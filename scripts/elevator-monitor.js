@@ -1,121 +1,92 @@
 'use strict';
-const { Resend } = require('resend');
+/* Elevator code monitor. Runs from cron-job.org (workflow_dispatch), every 10-30 minutes.
+ * Reads RTDB /elevator_code, decides with elevator-monitor-logic.js, and on a new problem sends the existing email
+ * plus a push (an elevator_alerts doc, sent to the admin phones by the pushOnElevatorAlert function).
+ * Env: RESEND_API_KEY, FIREBASE_SERVICE_ACCOUNT (for the push doc).
+ * Testing: ELEVATOR_FIXTURE='{"data":{...},"monitor":{...}}' uses fake data, and DRY_RUN=1 sends and writes nothing. */
+const { decide, alertTexts, tbilisiTime } = require('./elevator-monitor-logic');
 
 const FIREBASE_BASE = 'https://sleepy-5c962-default-rtdb.europe-west1.firebasedatabase.app';
-const ELEVATOR_URL  = `${FIREBASE_BASE}/elevator_code.json`;
-const MONITOR_URL   = `${FIREBASE_BASE}/elevator_monitor.json`;
-const LAST_ALERT_URL = `${FIREBASE_BASE}/elevator_monitor/last_alert_sent.json`;
-const WAS_STALE_URL  = `${FIREBASE_BASE}/elevator_monitor/was_stale.json`;
-
-const STALE_MS   = 26 * 60 * 60 * 1000;  // 26 hours (one full cycle + 2h buffer)
-const COOLDOWN_MS = 24 * 60 * 60 * 1000; // max one alert per 24 hours
-const TZ_OFFSET  = 4 * 60 * 60 * 1000;  // UTC+4 Tbilisi
+const ELEVATOR_URL = `${FIREBASE_BASE}/elevator_code.json`;
+const MONITOR_URL = `${FIREBASE_BASE}/elevator_monitor.json`;
 
 const FROM = 'onboarding@resend.dev';
-const TO   = 'nikavibliani@gmail.com';
+const TO = 'nikavibliani@gmail.com';
+const DRY = process.env.DRY_RUN === '1';
 
 async function get(url) {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`GET ${url} → ${res.status} ${res.statusText}`);
+  if (!res.ok) throw new Error(`GET ${url} -> ${res.status} ${res.statusText}`);
   return res.json();
 }
 
-async function put(url, value) {
-  const res = await fetch(url, {
-    method: 'PUT',
+async function patchMonitor(values) {
+  if (DRY) { console.log('[dry run] would save', JSON.stringify(values)); return; }
+  const res = await fetch(MONITOR_URL, {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(value),
+    body: JSON.stringify(values),
   });
-  if (!res.ok) throw new Error(`PUT ${url} → ${res.status} ${res.statusText}`);
+  if (!res.ok) throw new Error(`PATCH ${MONITOR_URL} -> ${res.status} ${res.statusText}`);
 }
 
-function tbilisiTime(ms) {
-  const d = new Date(ms + TZ_OFFSET);
-  return d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC+4';
-}
-
-async function sendEmail(resend, subject, html) {
+async function sendEmail(subject, html) {
+  if (DRY) { console.log('[dry run] would email:', subject); return; }
+  const { Resend } = require('resend');
+  const resend = new Resend(process.env.RESEND_API_KEY);
   const { data, error } = await resend.emails.send({ from: FROM, to: TO, subject, html });
   if (error) throw new Error(`Resend error: ${JSON.stringify(error)}`);
-  console.log(`Email sent: ${subject} (id: ${data?.id})`);
+  console.log(`Email sent: ${subject} (id: ${data && data.id})`);
+}
+
+// One doc per problem; the pushOnElevatorAlert function turns it into a push on every admin phone.
+async function queuePush(title, body) {
+  if (DRY) { console.log('[dry run] would queue push:', title, '|', body); return; }
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) { console.log('No FIREBASE_SERVICE_ACCOUNT, push skipped'); return; }
+  const admin = require('firebase-admin');
+  if (!admin.apps.length) {
+    admin.initializeApp({ credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
+  }
+  await admin.firestore().collection('elevator_alerts').add({ title, body, createdAt: new Date().toISOString() });
+  console.log('Push queued');
 }
 
 async function main() {
-  const resend = new Resend(process.env.RESEND_API_KEY);
   const now = Date.now();
-
-  // ── Read elevator code ─────────────────────────────────────────────────
-  const elevatorData = await get(ELEVATOR_URL);
-
-  if (!elevatorData || elevatorData.updatedAt == null) {
-    console.log('No elevator_code data or missing updatedAt — skipping');
-    return;
+  let data, monitor;
+  if (process.env.ELEVATOR_FIXTURE) {
+    const f = JSON.parse(process.env.ELEVATOR_FIXTURE);
+    data = f.data; monitor = f.monitor;
+  } else {
+    data = await get(ELEVATOR_URL);
+    monitor = (await get(MONITOR_URL).catch(() => null)) || {};
   }
+  const d = decide(data, monitor, now);
+  console.log(`Now: ${tbilisiTime(now)} | ${d.reason} | action: ${d.action}`);
 
-  const updatedAt  = Number(elevatorData.updatedAt);
-  const stalenessMs = now - updatedAt;
-  const isStale    = stalenessMs > STALE_MS;
-  const hoursSince = (stalenessMs / 3_600_000).toFixed(1);
-
-  console.log(`Last updated : ${tbilisiTime(updatedAt)}`);
-  console.log(`Now          : ${tbilisiTime(now)}`);
-  console.log(`Hours since  : ${hoursSince}h`);
-  console.log(`Status       : ${isStale ? 'STALE ⚠️' : 'OK ✅'}`);
-
-  // ── Read monitoring state ──────────────────────────────────────────────
-  const monitor     = (await get(MONITOR_URL).catch(() => null)) || {};
-  const lastAlert   = Number(monitor.last_alert_sent || 0);
-  const wasStale    = Boolean(monitor.was_stale);
-
-  // ── Stale path ────────────────────────────────────────────────────────
-  if (isStale) {
-    const timeSinceAlert = now - lastAlert;
-
-    if (timeSinceAlert < COOLDOWN_MS) {
-      const nextInH = ((COOLDOWN_MS - timeSinceAlert) / 3_600_000).toFixed(1);
-      console.log(`Alert cooldown active — next alert in ${nextInH}h`);
-    } else {
-      const html = `
-        <h2 style="color:#b91c1c">⚠️ Elevator Code Not Updated</h2>
-        <p>The elevator code has not been refreshed in <strong>${hoursSince} hours</strong>.</p>
-        <table cellpadding="6" style="border-collapse:collapse;font-size:14px;">
-          <tr><td style="color:#6b7280">Last updated</td><td><strong>${tbilisiTime(updatedAt)}</strong></td></tr>
-          <tr><td style="color:#6b7280">Current time</td><td><strong>${tbilisiTime(now)}</strong></td></tr>
-          <tr><td style="color:#6b7280">Hours since update</td><td><strong>${hoursSince}h</strong></td></tr>
-        </table>
-        <p style="margin-top:16px">Guests arriving now may receive a stale elevator code.<br>
-        Check the Tuya integration and restart the sync if needed.</p>
-      `;
-      await sendEmail(resend, '⚠️ Elevator Code Not Updated — Action Required', html);
-      await put(LAST_ALERT_URL, now);
-    }
-
-    if (!wasStale) {
-      await put(WAS_STALE_URL, true);
-    }
-    return;
+  if (d.action === 'alert') {
+    const t = alertTexts(d, now);
+    // Save the flag first: if the email or push then fails, the next run does not repeat the other one.
+    await patchMonitor({ alert_open: true, alert_since: now, last_alert_sent: now, was_stale: true });
+    try { await queuePush(t.title, t.body); } catch (e) { console.error('Push failed:', e.message); }
+    await sendEmail(t.subject, `
+      <h2 style="color:#b91c1c">${t.title}</h2>
+      <p>${d.reason}</p>
+      <p>Guests arriving now may get an old elevator code.<br>
+      Open the Samsung phone and check that the ElevatorSync app is running and the building app is open.
+      You can also type the code by hand in the admin Elevator tab; that clears this alert.</p>
+      <p style="color:#6b7280">Checked at ${t.now}. You get one message per problem.</p>`);
+  } else if (d.action === 'recover') {
+    await patchMonitor({ alert_open: false, was_stale: false, recovered_at: now });
+    await sendEmail('Elevator code is current again', `
+      <h2 style="color:#15803d">Elevator code is current again</h2>
+      <p>${d.reason}</p><p>No further action needed.</p>`);
+  } else {
+    console.log('Nothing to do');
   }
-
-  // ── Healthy path ──────────────────────────────────────────────────────
-  if (wasStale) {
-    const html = `
-      <h2 style="color:#15803d">✅ Elevator Code Back Online</h2>
-      <p>The elevator code is updating normally again.</p>
-      <table cellpadding="6" style="border-collapse:collapse;font-size:14px;">
-        <tr><td style="color:#6b7280">Last updated</td><td><strong>${tbilisiTime(updatedAt)}</strong></td></tr>
-        <tr><td style="color:#6b7280">Current time</td><td><strong>${tbilisiTime(now)}</strong></td></tr>
-      </table>
-      <p style="margin-top:16px">No further action needed.</p>
-    `;
-    await sendEmail(resend, '✅ Elevator Code Back Online — SleepyPMS', html);
-    await put(WAS_STALE_URL, false);
-    return;
-  }
-
-  console.log('Elevator code is current — nothing to do');
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Fatal:', err.message);
   process.exit(1);
 });

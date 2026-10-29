@@ -35,7 +35,7 @@ Note: `.github/workflows/minihotel_reservation_sync.yml` may also define a GitHu
 |-----|---------|
 | Pricing engine | cron-job.org → `pricing_engine.yml` |
 | Health monitor | GitHub schedule 2× daily (`health-monitor.yml`) |
-| Elevator monitor | GitHub hourly (`elevator-monitor.yml`) |
+| Elevator monitor | cron-job.org every 10-30 min → `workflow_dispatch` on `elevator-monitor.yml` (the GitHub `schedule:` is removed). Alerts when the code has passed `expires_at` + 30 min with no new code: email + push (`elevator_alerts` doc → `pushOnElevatorAlert`), once per problem. Details: docs/ELEVATOR_APP.md |
 | Pipeline unit tests | GitHub on PR / push to `pipeline-functions/` |
 
 ---

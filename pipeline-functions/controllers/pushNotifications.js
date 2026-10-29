@@ -12,6 +12,7 @@
  *   3. service_requests/{id}     created        → "New Request"
  *   4. hk_status/{id}            done false→true (or created already-done) → "Room Ready"
  *   5. hk_damage_reports/{id}    created        → "⚠ Damage: <room>" (tap opens /checkin-admin?tab=damage)
+ *   6. elevator_alerts/{id}      created        → elevator code problem (written by scripts/elevator-monitor.js)
  *
  * Trigger 4 deliberately does NOT use onDocumentCreated the way the other
  * "something happened" triggers do. In practice, hk_status/{roomCode_date}
@@ -219,7 +220,21 @@ function registerCloudFunctions() {
     }
   );
 
-  return { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone, pushOnDamageReport, pushTestRequest };
+  // scripts/elevator-monitor.js writes elevator_alerts/{id} {title, body} once per problem; this sends it to the admin phones.
+  const pushOnElevatorAlert = onDocumentCreated(
+    { document: 'elevator_alerts/{id}', ...opts },
+    async (event) => {
+      const data = event.data.data() || {};
+      await sendPushToAll({
+        title: String(data.title || 'Elevator code problem'),
+        body: String(data.body || 'Check the Samsung phone.'),
+        tag: 'elevator-alert',
+        url: '/checkin-admin?tab=elevator',
+      });
+    }
+  );
+
+  return { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone, pushOnDamageReport, pushTestRequest, pushOnElevatorAlert };
 }
 
 module.exports = { sendPushToAll, registerCloudFunctions, isHkDoneDateNotFuture };

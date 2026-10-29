@@ -36,13 +36,14 @@ const { guestFind, guestStay } = registerGuestApi();
 exports.guestFind = guestFind;
 exports.guestStay = guestStay;
 
-const { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone, pushOnDamageReport, pushTestRequest } = registerPushNotifications();
+const { pushOnFailedSearch, pushOnGuestCheckout, pushOnServiceRequest, pushOnHkDone, pushOnDamageReport, pushTestRequest, pushOnElevatorAlert } = registerPushNotifications();
 exports.pushTestRequest = pushTestRequest;
 exports.pushOnFailedSearch = pushOnFailedSearch;
 exports.pushOnGuestCheckout = pushOnGuestCheckout;
 exports.pushOnServiceRequest = pushOnServiceRequest;
 exports.pushOnHkDone = pushOnHkDone;
 exports.pushOnDamageReport = pushOnDamageReport;
+exports.pushOnElevatorAlert = pushOnElevatorAlert;
 
 const { registerCloudFunction: registerHotelCollectAlert } = require('./controllers/hotelCollectAlert');
 exports.pushOnHotelCollect = registerHotelCollectAlert();
