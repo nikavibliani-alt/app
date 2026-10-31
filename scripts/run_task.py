@@ -56,6 +56,9 @@ def main(task, dry):
     if task == "small_rooms_probe":
         import small_rooms_probe as m
         return m.main()
+    if task == "release_nights":
+        import release_nights as m
+        return m.main(flag)
     if task == "ideas_cleanup":
         import ideas_logic_cleanup as m
         return m.main(flag)
