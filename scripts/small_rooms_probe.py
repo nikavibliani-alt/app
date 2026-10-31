@@ -51,6 +51,14 @@ def main():
     st_main = copy.deepcopy(state)
     st_main.setdefault("_meta", {})["last_main_day"] = None          # a morning-run replay on this data
     run_before = load_before()
+    only = os.environ.get("NIGHTS", "").strip()           # "old" or "new": run just that engine, alone in this process
+    if only in ("old", "new"):
+        res = (run_before if only == "old" else run)(snap, cfg, copy.deepcopy(state))
+        for d in res["decisions"]:
+            if d["rt"] == "BIG_APT" and d["date"] in ("2026-11-16", "2026-11-18") and d["currency"] == "GEL":
+                print(f"ONLY {only}: {d['rt']} {d['date']} status {d['status']} target {d.get('target')} {d['kind']} {d['proposed']} why {d['why']}")
+        print("PROBE FINISHED")
+        return
     new = run(snap, cfg, copy.deepcopy(state))          # the next ordinary run, exactly as it would act now
     old = run_before(snap, cfg, copy.deepcopy(state))
     new2 = run(snap, cfg, copy.deepcopy(state))          # the same new engine again, after the old one: is a run the same every time?
