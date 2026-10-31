@@ -59,7 +59,7 @@ def rule_of(d, pickup):
         return "room style Hold"
     if "Already close to the target" in w:
         return "already close to its target (target is above the minimum)"
-    if "building is selling" in w or "rest of the building" in w:
+    if "The rest of the building is selling as normal" in w:
         return "rest of the building selling as normal"
     if "Raised less than" in b:
         return "blocked: raised recently"
@@ -94,8 +94,10 @@ def main():
     print(f"Now {now.isoformat(timespec='minutes')} (Tbilisi). Pickup window {calm.get('pickup_days', 3)} days. Typed prices waiting: {len(own)}.")
     print("Styles per room:", {rt: v.get("style") for rt, v in live_rts.items() if isinstance(v, dict) and v.get("style")})
 
+    st_main = copy.deepcopy(state)
+    st_main.setdefault("_meta", {})["last_main_day"] = None      # replay the morning run as if today's had not happened yet
     runs = {"this run (as now)": run(snap, cfg, copy.deepcopy(state)),
-            "morning run (09:00 rules, the only run that may lower)": run({**snap, "run_kind": "main"}, cfg, copy.deepcopy(state))}
+            "morning run (09:00 rules, the only run that may lower)": run({**snap, "run_kind": "main"}, cfg, st_main)}
 
     print("\n=== 1. XCV_1 and XCV_2, next 7 nights ===")
     for rt in ROOMS:
@@ -142,7 +144,10 @@ def main():
         for e in sorted(evs, key=lambda e: e.get("ts", ""))[-14:]:
             print(f"  event {e.get('ts', '')[:16]} {e.get('currency')} main={e.get('main_run')} days_out={e.get('days_out')} kind={e.get('kind')} "
                   f"{e.get('old')} -> {e.get('new')} written={e.get('written')} min={e.get('min')} target={e.get('target')} | reason: {e.get('reason')} | blocked: {e.get('blocked')}")
-        daily = [e.to_dict() for e in db.collection("pricing_calm_runs").order_by("ts", direction="DESCENDING").limit(6).stream()] if False else []
+        near = [r for r in reservations if r["rt"] == rt and r["checkin"] <= (datetime.fromisoformat(night) + timedelta(days=2)).date().isoformat()
+                and r["checkout"] >= (datetime.fromisoformat(night) - timedelta(days=2)).date().isoformat()]
+        for r in sorted(near, key=lambda r: r["checkin"]):
+            print(f"  stay near this night: check-in {r['checkin']} check-out {r['checkout']} booked on {r['created']}")
 
     print("\n=== 3. Every room: empty nights in the next 3 days ===")
     res = runs["morning run (09:00 rules, the only run that may lower)"]
@@ -161,6 +166,13 @@ def main():
         gap = None if d.get("min") is None else round(d["current"] - d["min"], 2)
         print(f"  {rt} {ds} +{d['days_out']}d {SYM.get(cur, cur)} free {d['avail']}/{d['units']} now {d['current']:g} min {d.get('min')} "
               f"(above min by {gap}) target {d.get('target')} status {d.get('status')} pickup {pick} -> {why}")
+    print("\n=== 3b. What today's real morning run said about each empty night in the next 3 days (stored events) ===")
+    today_s = today.isoformat()
+    evs = [e.to_dict() for e in db.collection("pmslog_price_events").where("day", "==", today_s).stream()]
+    evs = [e for e in evs if e.get("main_run") and e.get("days_out") is not None and 0 <= e["days_out"] <= 3 and (e.get("avail") or 0) > 0]
+    for e in sorted(evs, key=lambda e: (e["rt"], e["date"], e["currency"])):
+        print(f"  {e['rt']} {e['date']} +{e['days_out']}d {e['currency']} {e['old']} -> {e['new']} written={e['written']} kind={e['kind']} min={e.get('min')} "
+              f"target={e.get('target')} | {e.get('reason')} | blocked: {e.get('blocked')}")
     print("\nTally of rules (each room-night counted once per currency):")
     for k, v in tally.most_common():
         print(f"  {v:3d}  {k}")
