@@ -53,6 +53,11 @@ def main():
     run_before = load_before()
     new = run(snap, cfg, copy.deepcopy(state))          # the next ordinary run, exactly as it would act now
     old = run_before(snap, cfg, copy.deepcopy(state))
+    new2 = run(snap, cfg, copy.deepcopy(state))          # the same new engine again, after the old one: is a run the same every time?
+    again = [k for k in {(d["rt"], d["date"], d["currency"]): d for d in new["decisions"]}
+             if {(d["rt"], d["date"], d["currency"]): (d["proposed"], d["kind"], d["status"]) for d in new["decisions"]}[k]
+             != {(d["rt"], d["date"], d["currency"]): (d["proposed"], d["kind"], d["status"]) for d in new2["decisions"]}.get(k)]
+    print(f"Same new engine run twice on the same data: {len(again)} decisions differ {again[:4]}")
     print(f"Now {now.isoformat(timespec='minutes')}. Extra nights given back for this replay (none by default): {extra_release or 'none'}. Old engine = commit {BEFORE}.\n")
 
     def key(d):
