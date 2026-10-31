@@ -150,3 +150,112 @@ def test_giving_a_hand_set_night_back_lets_the_small_room_rules_run():
     assert dec(held, 2)["kind"] == "manual"
     back = day_run(cfg, inv, held["state"], hour=13, extra={"release_manual": [f"X|{D(2)}"]})
     assert dec(back, 2)["kind"] != "manual"
+
+
+# ---------------- arrival day of a small room: halfway after 12:00, the minimum after 17:00 ----------------
+
+def arrival_run(cfg, inv, state, hour, extra=None, units_rt="X"):
+    return day_run(cfg, inv, state, hour=hour, extra=extra)
+
+
+def test_arrival_day_two_steps_half_after_noon_then_minimum_after_five():
+    cfg, inv, state = setup(1)
+    inv[D(0)]["prices"]["GEL"] = 180
+    for hour in (4, 9, 11):
+        r = arrival_run(cfg, inv, state, hour)
+        assert dec(r, 0)["kind"] != "arrival" and not dec(r, 0)["write"], hour           # nothing before 12:00
+        state = r["state"]
+    r = arrival_run(cfg, inv, state, 13)
+    d = dec(r, 0)
+    assert d["kind"] == "arrival" and d["write"] and d["proposed"] == 140, d             # halfway between 180 and 100
+    assert [w for w in r["writes"] if w["date"] == D(0)] == [{"rt": "X", "date": D(0), "currency": "GEL", "price": 140}]
+    inv[D(0)]["prices"]["GEL"] = 140
+    state = r["state"]
+    r = arrival_run(cfg, inv, state, 16)
+    assert not dec(r, 0)["write"], "the 13:00 step is used up; nothing else before 17:00"
+    state = r["state"]
+    r = arrival_run(cfg, inv, state, 18)
+    d = dec(r, 0)
+    assert d["kind"] == "arrival" and d["proposed"] == MN, d
+    inv[D(0)]["prices"]["GEL"] = MN
+    r2 = arrival_run(cfg, inv, r["state"], 22)
+    assert not dec(r2, 0)["write"]
+
+
+def test_arrival_day_first_run_after_five_goes_straight_to_the_minimum():
+    cfg, inv, state = setup(1)
+    inv[D(0)]["prices"]["GEL"] = 180
+    d = dec(arrival_run(cfg, inv, state, 18), 0)
+    assert d["kind"] == "arrival" and d["proposed"] == MN, d
+
+
+def test_arrival_day_pushes_only_the_changed_nights():
+    cfg, inv, state = setup(1)
+    inv[D(0)]["prices"]["GEL"] = 180
+    first = arrival_run(cfg, inv, state, 9)
+    for w in first["writes"]:
+        inv[w["date"]]["prices"][w["currency"]] = w["price"]
+    r = arrival_run(cfg, inv, first["state"], 13)
+    assert [w["date"] for w in r["writes"]] == [D(0)], r["writes"]
+
+
+def test_arrival_day_is_not_lowered_for_big_rooms_or_other_styles_or_booked_nights():
+    for units, style, avail in ((3, None, 1), (5, None, 2), (1, "hold", None), (1, "calm", None), (1, "active", None), (1, None, 0)):
+        cfg, inv, state = setup(units, style)
+        inv[D(0)]["prices"]["GEL"] = 180
+        if avail is not None:
+            inv[D(0)]["avail"] = avail
+        d = dec(arrival_run(cfg, inv, state, 18), 0)
+        assert d["kind"] != "arrival" and not d["write"], (units, style, avail, d)
+
+
+def test_arrival_day_leaves_protect_hand_set_holiday_aim_and_push_nights_alone():
+    # protect
+    cfg, inv, state = setup(1)
+    inv[D(0)]["prices"]["GEL"] = 180
+    cfg["date_rules"] = [{"rt": "X", "from": D(0), "to": D(0), "action": "protect"}]
+    assert not dec(arrival_run(cfg, inv, state, 18), 0)["write"]
+    # Aim and "how hard to push" set for that night
+    for key, val in (("night_aims", {"rt": "X", "date": D(0), "pct": -5, "avail": 1}), ("night_push", {"rt": "X", "date": D(0), "style": "normal", "avail": 1})):
+        cfg, inv, state = setup(1)
+        inv[D(0)]["prices"]["GEL"] = 180
+        cfg[key] = [val]
+        d = dec(arrival_run(cfg, inv, state, 18), 0)
+        assert d["kind"] != "arrival" and not d["write"], (key, d)
+    # holiday date
+    cfg = mkcfg(1, mn=MN, start=START, mx=MX, holiday=True)
+    inv = inv_of(1, START)
+    cfg["date_overrides"] = [{"from": (TODAY - timedelta(days=1)).strftime("%m-%d"), "to": (TODAY + timedelta(days=1)).strftime("%m-%d"), "season": "high"}]
+    inv[D(0)]["prices"]["GEL"] = 180
+    held = dec(arrival_run(cfg, inv, {}, 18), 0)
+    assert held["kind"] != "arrival" and not held["write"], held
+    cfg.pop("date_overrides")                            # the same night without the holiday rule is lowered
+    assert dec(arrival_run(cfg, inv, {}, 18), 0)["kind"] == "arrival"
+    # hand-set: the engine wrote 200, someone typed 180
+    cfg, inv, state = setup(1)
+    first = arrival_run(cfg, inv, state, 9)
+    inv[D(0)]["prices"]["GEL"] = 180
+    d = dec(arrival_run(cfg, inv, first["state"], 18), 0)
+    assert d["kind"] == "manual" and not d["write"], d
+
+
+def test_arrival_day_is_never_raised():
+    cfg, inv, state = setup(1)
+    inv[D(0)]["prices"]["GEL"] = MN                     # already at the minimum
+    for hour in (9, 13, 18):
+        r = arrival_run(cfg, inv, state, hour)
+        assert not dec(r, 0)["write"], (hour, dec(r, 0))
+        state = r["state"]
+    cfg, inv, state = setup(1)
+    inv[D(0)]["prices"]["GEL"] = 120
+    d = dec(arrival_run(cfg, inv, state, 18), 0)
+    assert d["proposed"] <= 120, d
+
+
+def test_a_cancellation_drop_still_works_on_arrival_day():
+    cfg, inv, state = setup(1)
+    inv[D(0)]["prices"]["GEL"] = 180
+    now = datetime.combine(TODAY, datetime.min.time()) + timedelta(hours=10)
+    res = run({"now": now, "inventory": {"X": copy.deepcopy(inv)}, "reservations": [], "run_kind": "update",
+               "only": {"rooms": ["X"], "dates": [D(0), D(1)]}, "tonight_drop": True}, cfg, state)
+    assert dec(res, 0)["kind"] == "tonight" and dec(res, 0)["proposed"] == MN

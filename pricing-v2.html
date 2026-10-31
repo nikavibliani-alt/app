@@ -1060,6 +1060,7 @@ function plainWhy(rt, iso, cur, m) {
   let line;
   if (rc.kind === "correction") line = `${season}. The price was outside your minimum or maximum, so it was moved back to ${price}.`;
   else if (rc.kind === "tonight") line = "A booking for tonight or tomorrow was cancelled, so the price was lowered to fill the night.";
+  else if (rc.kind === "arrival") line = `${season}. It is the arrival day and the night is still empty, so the price was lowered to ${price}.`;
   else if (rc.kind === "far_reset") line = `${season}. This night is far away and was above your start price, so it went straight to ${price}.`;
   else {
     const st = STATUS_PLAIN[rc.status], t = rc.target, gap = t && Math.abs(t - rc.new) >= 1;

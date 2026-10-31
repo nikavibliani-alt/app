@@ -15,7 +15,7 @@ Seven checks (each issue = {"code", "rt", "date", "text"}):
 from datetime import datetime, timedelta
 
 # Moves that are deliberate and bigger than a daily step (a correction into min/max, the one-time resets).
-BIG_MOVE_OK_KINDS = ("correction", "reset", "far_reset", "tonight", "own")
+BIG_MOVE_OK_KINDS = ("correction", "reset", "far_reset", "tonight", "own", "arrival")
 TOLERANCE_ABS = {"GEL": 2.0, "USD": 1.0, "EUR": 1.0}      # rounding to the price grid
 TOLERANCE_PCT = 0.01
 MAX_LISTED = 40

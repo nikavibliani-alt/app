@@ -1,4 +1,4 @@
-"""Read-only probe: the last-days rules for small rooms, before and after, on today's real data. Writes NOTHING (no MiniHotel price, no Firestore document, no channel push).
+"""Read-only probe: the last-days and arrival-day rules for small rooms, before and after, on today's real data. Writes NOTHING (no MiniHotel price, no Firestore document, no channel push).
 Shows the empty nights 0-3 days out of the rooms with 1-2 units, and counts every other difference between the old and the new engine.
 """
 import copy
@@ -16,7 +16,7 @@ import pricing_shadow as ps  # noqa: E402
 import pricing_calm_live as live  # noqa: E402
 from calm_pricing import run  # noqa: E402
 
-BEFORE = os.environ.get("ENGINE_BEFORE", "2e0cb2e")        # the commit just before this change
+BEFORE = os.environ.get("ENGINE_BEFORE", "606220d")        # the commit just before this change
 SYM = {"GEL": "₾", "USD": "$"}
 
 
@@ -45,15 +45,15 @@ def main():
     state = ps.load_state(db, prefix=live.STATE_PREFIX)
     own = live.read_own_prices(db, today.isoformat())
     release = live.read_release(db)
-    extra_release = [x for x in os.environ.get("EXTRA_RELEASE", "XCV_1|2026-10-31,XCV_1|2026-11-01").split(",") if x]       # the two hand-set Airbnb nights you asked to give back
+    extra_release = [x for x in os.environ.get("EXTRA_RELEASE", "").split(",") if x]
     snap = {"now": now, "inventory": inventory, "reservations": reservations, "shadow": False,
             "release_manual": sorted(release) + extra_release, "own_prices": own}
     st_main = copy.deepcopy(state)
-    st_main.setdefault("_meta", {})["last_main_day"] = None          # today's real morning run is done: replay it as the next morning's run would act on this data
+    st_main.setdefault("_meta", {})["last_main_day"] = None          # a morning-run replay on this data
     run_before = load_before()
-    new = run({**snap, "run_kind": "main"}, cfg, copy.deepcopy(st_main))
-    old = run_before({**snap, "run_kind": "main"}, cfg, copy.deepcopy(st_main))
-    print(f"Now {now.isoformat(timespec='minutes')}. Extra nights given back for this replay: {extra_release or 'none'}. Old engine = commit {BEFORE}.\n")
+    new = run(snap, cfg, copy.deepcopy(state))          # the next ordinary run, exactly as it would act now
+    old = run_before(snap, cfg, copy.deepcopy(state))
+    print(f"Now {now.isoformat(timespec='minutes')}. Extra nights given back for this replay (none by default): {extra_release or 'none'}. Old engine = commit {BEFORE}.\n")
 
     def key(d):
         return (d["rt"], d["date"], d["currency"])

@@ -32,7 +32,7 @@ STREAMS = {
     "settings_events": "pmslog_settings_events",
     "twin": "pricing_twin",                    # the "what if" twin: its prices next to the real ones, night by night
 }
-WRITE_KINDS = ("move", "correction", "fill", "reset", "far_reset", "tonight", "own")
+WRITE_KINDS = ("move", "correction", "fill", "reset", "far_reset", "tonight", "own", "arrival")
 BUCKET_DEFAULT = "sleepy-5c962-pms-history"
 BUCKET_LOCATION = "europe-west1"
 

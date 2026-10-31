@@ -570,8 +570,8 @@ def test_engine_moves_respect_24h_limits_fuzz():
                     start_p = window[0][1]
                     days_out = (date.fromisoformat(ds) - now.date()).days
                     down = 0.15 if days_out <= 3 else 0.05
-                    if units <= 2 and days_out == 1:
-                        down = 1.0                  # small rooms: the night before arrival may reach the minimum in one step
+                    if units <= 2 and days_out in (0, 1):
+                        down = 1.0                  # small rooms: the night before arrival may reach the minimum in one step; arrival day steps down after 12:00 and 17:00
                         assert w["price"] >= 120 - 0.01, (ds, window)
                     assert w["price"] >= start_p * (1 - down) - 5.01, (ds, window)
                     assert w["price"] <= start_p * 1.15 + 5.01, (ds, window)

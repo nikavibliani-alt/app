@@ -654,6 +654,28 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                         dec["why"].append(f"A booking for {when} was cancelled: the price is already as low as this step allows.")
                     continue
 
+                # ---- 2c. arrival day of a small room (1-2 units), Normal push, empty: lowered in two steps ----
+                # first run after 12:00: halfway to the minimum; first run after 17:00: the minimum. Only lowered, never raised on the arrival day.
+                # Not for protected, hand-set or holiday nights, nor nights with an Aim or a "how hard to push" set for them (those continue above or are skipped here).
+                arrival_small = (units <= 2 and days_out == 0 and style == "normal" and not night_style and not aim_pct
+                                 and hol_kind is None and can_write and not shadow and not reset_mode)
+                if arrival_small:
+                    stage = 2 if now.hour >= 17 else (1 if now.hour >= 12 else 0)
+                    if stage > int(st.get("arrival_stage", 0)):
+                        goal = mn if stage == 2 else mn + (current - mn) / 2
+                        new = _grid_up_to(goal, step, mx_eff) if current > mn + 1e-9 else None
+                        if new is not None and new < current - 1e-9:
+                            dec["proposed"], dec["kind"], dec["write"], dec["arrival_stage"] = new, "arrival", True, stage
+                            changed += 1
+                            per_rt[rt][1] += 1
+                            dec["why"].append(f"Arrival day and still empty: lowered "
+                                              + (f"to your minimum {_fmt(cur, mn)} " if stage == 2 else f"halfway to your minimum {_fmt(cur, mn)} ")
+                                              + f"({_fmt(cur, current)} -> {_fmt(cur, new)}).")
+                            continue
+                        st["arrival_stage"] = stage                  # nothing to lower: this step is used up
+                        dec["why"].append("Arrival day and still empty: the price is already as low as this step allows.")
+                        continue
+
                 # ---- 3. target ----
                 base = start * (1 + wk) * (1 + ev_pct)
                 adj = dm["target_adj"][status]
@@ -829,7 +851,9 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                         reason = f"Raised less than {calm['no_drop_after_raise_h']} hours ago: no drop yet."
                 else:
                     booked_since_change = avail < st.get("avail_at_change", avail)
-                    if days_out <= 3 and status not in ("ahead", "far_ahead"):
+                    if arrival_small:
+                        reason = "Arrival day of a small room: never raised."
+                    elif days_out <= 3 and status not in ("ahead", "far_ahead"):
                         reason = "Last days: raised only if selling faster than normal."
                     elif (last_dir == -1 and not booked_since_change and since_last is not None
                           and since_last < timedelta(hours=calm["no_raise_after_drop_h"])):
@@ -941,7 +965,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
 
     writes, shadow_moves = [], []
     for dec in decisions:
-        if dec["kind"] not in ("move", "correction", "fill", "reset", "far_reset", "tonight", "own"):
+        if dec["kind"] not in ("move", "correction", "fill", "reset", "far_reset", "tonight", "own", "arrival"):
             continue
         st = state[dec["rt"]][dec["date"]][dec["currency"]]
         if not ok or dec["rt"] in stopped_rts:
@@ -960,6 +984,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
         else:
             writes.append({"rt": dec["rt"], "date": dec["date"], "currency": dec["currency"], "price": dec["proposed"]})
             st["last_engine"] = dec["proposed"]
+            if dec["kind"] == "arrival":
+                st["arrival_stage"] = dec["arrival_stage"]           # this step is used up only once the price is really written
             if dec["kind"] == "own":                      # your own price: from now on a hand-set night
                 st["manual_until"], st["manual_price"], st["avail_at_manual"] = MANUAL_FOREVER, dec["proposed"], dec["avail"]
                 own_done.add(f"{dec['rt']}|{dec['date']}")

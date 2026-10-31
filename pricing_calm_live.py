@@ -517,7 +517,7 @@ def main(argv=None, db=None, get=requests.get, post=None, cookie_fn=None, now=No
         fills = sum(1 for d in result["decisions"] if d.get("fill") and d["kind"] in ("fill", "move"))
         if fills:
             print(f"  {fills} empty date(s) get a first price from your start price.")
-        for d in [d for d in result["decisions"] if d["kind"] in ("move", "correction", "fill", "reset", "far_reset", "tonight", "own")][:20]:
+        for d in [d for d in result["decisions"] if d["kind"] in ("move", "correction", "fill", "reset", "far_reset", "tonight", "own", "arrival")][:20]:
             print(f"  {d['rt']:6} {d['date']} {d['currency']}: {d['current']:.0f} -> {d['proposed']:.0f}  ({d['why'][-1]})")
 
         report = reset_report(result, reset_rts, today) if reset_rts else None
