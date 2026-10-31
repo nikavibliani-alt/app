@@ -59,6 +59,9 @@ def main(task, dry):
     if task == "release_nights":
         import release_nights as m
         return m.main(flag)
+    if task == "xcv_now_probe":
+        import xcv_now_probe as m
+        return m.main()
     if task == "ideas_cleanup":
         import ideas_logic_cleanup as m
         return m.main(flag)
