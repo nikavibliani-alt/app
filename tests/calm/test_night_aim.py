@@ -71,6 +71,8 @@ def test_the_cancellation_drop_skips_a_night_with_an_aim():
     cfg["night_aims"] = [{"rt": "X", "date": D(0), "pct": 5, "avail": 1}]
     inv, state = inv_of(1, 230), {}
     go(cfg, inv, state, 0)
+    inv[D(1)]["prices"]["GEL"] = 230                   # (the morning run already took tomorrow to the minimum: put the engine's own earlier price back)
+    state["X"][D(1)]["GEL"]["last_engine"] = 230
     now = datetime.combine(TODAY, datetime.min.time()) + timedelta(hours=14)
     res = run({"now": now, "inventory": {"X": dict(inv)}, "reservations": [], "run_kind": "update", "only": {"rooms": ["X"], "dates": [D(0), D(1)]}, "tonight_drop": True}, cfg, state)
     tonight, tomorrow = d_of(res, 0), d_of(res, 1)

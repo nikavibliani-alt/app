@@ -363,7 +363,7 @@ def test_unsafe_settings_document_cannot_loosen_the_shadow():
     assert any(w.startswith("setting calm.daily_down") for w in res["warnings"])
     assert any(w.startswith("setting safety.max_share_changed") for w in res["warnings"])
     for d in res["decisions"]:
-        if d["kind"] == "move":
+        if d["kind"] == "move" and not (d["units"] <= 2 and d["days_out"] == 1):      # small rooms: the night before arrival may reach the minimum at once
             assert abs(d["proposed"] - d["current"]) / d["current"] <= 0.15 + 0.02, d
 
 

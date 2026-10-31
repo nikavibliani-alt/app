@@ -244,7 +244,8 @@ def _group_occ(group: str, ds: str, room_types: dict, booked: dict, exclude: str
 
 
 def _pickup_dates(reservations: list, today: date, days: int, room_types: dict):
-    """Dates of each room type touched by a booking made in the last `days` (own room type only)."""
+    """Nights of each room type covered by a booking made in the last `days` (own room type only).
+    Only the nights the guest sleeps there count: the check-in and check-out edge days do not."""
     by_rt, by_group = {}, {}
     since = today - timedelta(days=days)
     for r in reservations or []:
@@ -257,8 +258,8 @@ def _pickup_dates(reservations: list, today: date, days: int, room_types: dict):
             continue
         if created < since:
             continue
-        n = ci - timedelta(days=1)
-        while n <= co:
+        n = ci
+        while n < co:
             by_rt.setdefault(rt, set()).add(n.isoformat())
             n += timedelta(days=1)
     return by_rt, by_group
@@ -455,6 +456,9 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 hol_kind = "holiday"
             pc = profiles.get(style, cfg)
             dm, calm = pc["demand"], pc["calm"]
+            # Rooms with 1-2 units, 1-3 days before arrival, normal push: an empty night is judged by its own room's empty units only
+            # (not the building, not the "booking nearby" pause), may step to the minimum, and the night before arrival may reach it in one step.
+            small_last = units <= 2 and 1 <= days_out <= 3 and style == "normal"
             goal_d = goal
             if style == "aggressive":
                 goal_d = max(goal, AGGRESSIVE["occupancy_goal_floor"])
@@ -467,7 +471,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
             if mode == "pool":
                 signal = own
             elif mode == "small_pool":
-                signal = 0.6 * own + 0.4 * g_occ if (g_occ is not None and g_units > units) else own
+                signal = 0.6 * own + 0.4 * g_occ if (g_occ is not None and g_units > units and not small_last) else own
             else:  # single: empty or full, nothing in between
                 signal = own
             expected = goal_d * interpolate(shape, days_out)
@@ -479,7 +483,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 if o_occ is not None and o_units > 0 and o_occ >= expected:
                     # the rest of the building sells as normal: do not undercut it
                     status, building_busy = "on_track", True
-            pickup = ds in pick_rt.get(rt, set())
+            pickup = ds in pick_rt.get(rt, set()) and not small_last
 
             # ---------- fixed factors ----------
             wk = cfg["weekend"]["pct"] if dday.weekday() in cfg["weekend"]["nights"] else 0.0
@@ -770,6 +774,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
 
                 # ---- 4. direction and speed ----
                 dz = max(calm["dead_zone_pct"] * current, calm["dead_zone_abs"].get(cur, 0))
+                if small_last:
+                    dz = 1e-6                    # last 3 days of a small room: no dead zone, only an exact match is "no change"
                 if abs(target - current) < dz:
                     dec["why"].append("Already close to the target: no change.")
                     continue
@@ -839,6 +845,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 # rolling 24-hour limit, applied only in the direction of the move
                 if direction < 0:
                     lim = calm["daily_down_last3"] if days_out <= 3 else calm["daily_down"]
+                    if small_last and days_out == 1 and last_days_behind:
+                        lim = 1.0                # the night before arrival may reach the minimum in one step
                     floor_24h = baseline * (1 - lim)
                     if proposed < floor_24h:
                         dec["blocked"].append(f"Limit: at most -{lim:.0%} in 24 hours.")

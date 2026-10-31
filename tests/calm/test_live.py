@@ -203,7 +203,8 @@ def test_second_day_moves_within_daily_limit(http, settings_file):
                 if r["PriceList"] == "GEL" and out >= 61:
                     assert 85 <= r["Price"] <= 120, d    # far dates go straight to the target (110 / weekend 120)
                 elif r["PriceList"] == "GEL":
-                    assert 140 * (1 - lim) - 0.01 <= r["Price"] <= 140, d
+                    low = 85 if out == 1 else 140 * (1 - lim)          # XCV is a small room: the night before arrival may reach its minimum (85) in one step
+                    assert low - 0.01 <= r["Price"] <= 140, d
 
 
 

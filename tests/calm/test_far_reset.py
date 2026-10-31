@@ -44,7 +44,7 @@ def test_far_dates_jump_to_target_and_near_dates_do_not(http, settings_file):
         if pl == "GEL" and out >= 61:
             assert price == target(ds, 110, 5), (ds, price)       # straight to the target
         elif pl == "GEL" and out > 0:
-            assert price >= 130 * 0.85 - 0.01, (ds, price)         # near dates stay under the daily limits
+            assert price >= 130 * 0.85 - 0.01 or (out == 1 and price >= 85 - 0.01), (ds, price)   # near dates stay under the daily limits (the night before arrival of a small room may reach its minimum)
     assert not any(d["days_out"] <= 60 for d in far_decisions(res))
     assert not [d for d in far_decisions(res) if d["days_out"] == 60]
     assert any(d["days_out"] == 61 for d in far_decisions(res))
