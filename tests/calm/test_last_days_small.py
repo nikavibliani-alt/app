@@ -189,14 +189,19 @@ def test_arrival_day_first_run_after_five_goes_straight_to_the_minimum():
     assert d["kind"] == "arrival" and d["proposed"] == MN, d
 
 
-def test_arrival_day_pushes_only_the_changed_nights():
-    cfg, inv, state = setup(1)
-    inv[D(0)]["prices"]["GEL"] = 180
-    first = arrival_run(cfg, inv, state, 9)
-    for w in first["writes"]:
-        inv[w["date"]]["prices"][w["currency"]] = w["price"]
-    r = arrival_run(cfg, inv, first["state"], 13)
-    assert [w["date"] for w in r["writes"]] == [D(0)], r["writes"]
+def test_arrival_day_adds_only_its_own_night_to_the_prices_to_push():
+    def writes_at(price0):
+        cfg, inv, state = setup(1)
+        inv[D(0)]["prices"]["GEL"] = price0
+        first = arrival_run(cfg, inv, state, 9)
+        for w in first["writes"]:
+            inv[w["date"]]["prices"][w["currency"]] = w["price"]
+        inv[D(0)]["prices"]["GEL"] = price0
+        return arrival_run(cfg, inv, first["state"], 13)["writes"]
+    with_arrival, without = writes_at(180), writes_at(MN)               # at the minimum nothing is left to lower on the arrival day
+    extra = [w for w in with_arrival if w not in without]
+    assert extra == [{"rt": "X", "date": D(0), "currency": "GEL", "price": 140.0}], extra
+    assert [w for w in without if w not in with_arrival] == []
 
 
 def test_arrival_day_is_not_lowered_for_big_rooms_or_other_styles_or_booked_nights():
@@ -259,3 +264,22 @@ def test_a_cancellation_drop_still_works_on_arrival_day():
     res = run({"now": now, "inventory": {"X": copy.deepcopy(inv)}, "reservations": [], "run_kind": "update",
                "only": {"rooms": ["X"], "dates": [D(0), D(1)]}, "tonight_drop": True}, cfg, state)
     assert dec(res, 0)["kind"] == "tonight" and dec(res, 0)["proposed"] == MN
+
+
+def test_the_arrival_step_does_not_disturb_the_other_nights_of_the_room():
+    """The arrival block must not change any variable the next nights rely on (the room's occupancy goal once did)."""
+    import re
+    cfg, inv, state = setup(1)
+    inv[D(0)]["prices"]["GEL"] = 180
+    r = arrival_run(cfg, inv, state, 18)
+    assert dec(r, 0)["kind"] == "arrival"
+    for k in (5, 10, 18, 30):
+        text = " ".join(dec(r, k)["why"])
+        m = re.search(r"normal at \d+ days is (\d+)%", text)
+        assert m and int(m.group(1)) <= 100, (k, text)
+    cfg2, inv2, state2 = setup(1)
+    inv2[D(0)]["prices"]["GEL"] = MN                         # nothing to lower on night 0: the arrival block does not fire
+    r2 = arrival_run(cfg2, inv2, state2, 18)
+    for k in (5, 10, 18, 30):
+        a, b = dec(r, k), dec(r2, k)
+        assert (a["proposed"], a["status"], a["target"], a["kind"]) == (b["proposed"], b["status"], b["target"], b["kind"]), (k, a, b)

@@ -662,8 +662,8 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                 if arrival_small:
                     stage = 2 if now.hour >= 17 else (1 if now.hour >= 12 else 0)
                     if stage > int(st.get("arrival_stage", 0)):
-                        goal = mn if stage == 2 else mn + (current - mn) / 2
-                        new = _grid_up_to(goal, step, mx_eff) if current > mn + 1e-9 else None
+                        arr_goal = mn if stage == 2 else mn + (current - mn) / 2          # (not `goal`: that is the room's occupancy goal)
+                        new = _grid_up_to(arr_goal, step, mx_eff) if current > mn + 1e-9 else None
                         if new is not None and new < current - 1e-9:
                             dec["proposed"], dec["kind"], dec["write"], dec["arrival_stage"] = new, "arrival", True, stage
                             changed += 1
