@@ -100,6 +100,9 @@ def main():
         print(f"  OUTSIDE small-room window: {k} old {res_of(A[k])} new {res_of(B[k])} | {B[k]['why'][-1] if B[k]['why'] else ''}")
         print(f"        price in each run: old current {A[k]['current']:g} / new current {B[k]['current']:g}; status old {A[k].get('status')} new {B[k].get('status')}; "
               f"night covered by a recent booking: {k[1] in pick_new.get(k[0], set())}; blocked old {A[k].get('blocked')} new {B[k].get('blocked')}; days out {B[k]['days_out']}")
+        print(f"        old why: {A[k]['why']}")
+        print(f"        new why: {B[k]['why']}")
+        print(f"        old target {A[k].get('target')} new target {B[k].get('target')}; style old {A[k].get('style')} new {B[k].get('style')}")
     print(f"\n  Decisions old {len(A)}, new {len(B)}; differ {len(diff)}; price writes old {len(old['writes'])}, new {len(new['writes'])}; "
           f"alerts old {len(old['alerts'])} new {len(new['alerts'])}; warnings old {len(old['warnings'])} new {len(new['warnings'])}")
     print("\nPROBE FINISHED")
