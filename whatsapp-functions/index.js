@@ -209,9 +209,12 @@ async function notifyOwner(ownerPhone, { guest, issue }) {
 
 /**
  * Web Push to the admin app's devices (push_subscriptions, VAPID keys), the
- * same system as the Hotel Collect alert. Urgent alerts and bot errors only
- * (ownerPush.js). Never throws; failures are logged as "owner push FAILED".
+ * same system as the Hotel Collect alert. Every escalation, urgent alert and
+ * bot error (ownerPush.js). Never throws; failures are logged as "owner push
+ * FAILED". The worker waits for this before it finishes the batch, so a stuck
+ * device is cut off: a worker timeout would retry and answer the guest twice.
  */
+const PUSH_TIMEOUT_MS = 10000;
 let vapidSet = false;
 async function pushToAdminDevices(payload) {
   try {
@@ -226,9 +229,19 @@ async function pushToAdminDevices(payload) {
           webpush.setVapidDetails('mailto:nikavibliani@gmail.com', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
           vapidSet = true;
         }
-        return webpush.sendNotification(subscription, JSON.stringify(p));
+        return webpush.sendNotification(subscription, JSON.stringify(p), { timeout: PUSH_TIMEOUT_MS });
       },
     });
+  } catch (err) {
+    console.error('owner push FAILED:', err.message || err);
+    return { ok: false };
+  }
+}
+
+/** Builds and sends one alert's push. Never throws, so it cannot stop the bot or the WhatsApp alert. */
+async function pushOwnerAlert(fields) {
+  try {
+    return await pushToAdminDevices(urgentPushPayload(fields));
   } catch (err) {
     console.error('owner push FAILED:', err.message || err);
     return { ok: false };
@@ -809,9 +822,10 @@ exports.whatsappBotWorker = onRequest(
             message: combinedGuestText,
             mode: effectiveMode,
           });
-          if (config.ownerPhone) {
-            await notifyOwner(config.ownerPhone, { guest: ownerAlertGuest(guestName, bookingRoom), issue: `${otherProperty} guest wrote: ${combinedGuestText}` });
-          }
+          await Promise.all([
+            config.ownerPhone ? notifyOwner(config.ownerPhone, { guest: ownerAlertGuest(guestName, bookingRoom), issue: `${otherProperty} guest wrote: ${combinedGuestText}` }) : null,
+            pushOwnerAlert({ kind: 'escalation', guestName, roomCode: bookingRoom, guestText: combinedGuestText, reason: `${otherProperty} guest wrote`, phone }),
+          ]);
           console.log(`whatsappBotWorker: STOPPED — ${otherProperty} booking (${bookingRoom}); nothing sent, owner alerted (first message this stay), for`, phone);
         } else {
           console.log(`whatsappBotWorker: STOPPED — ${otherProperty} booking (${bookingRoom}); nothing sent, owner already alerted this stay, for`, phone);
@@ -896,10 +910,10 @@ exports.whatsappBotWorker = onRequest(
 
       // Owner alerts' {{1}}: "<name> / <property> <room>" (or "unknown property").
       const label = ownerAlertGuest(guestName, bookingRoom);
-      // Push notification for urgent alerts and bot errors (opts.push = kind).
-      const pushUrgent = (opts) => pushToAdminDevices(urgentPushPayload({
+      // Push notification for escalations, urgent alerts and bot errors (opts.push = kind).
+      const pushUrgent = (opts) => pushOwnerAlert({
         kind: opts.push, guestName, roomCode: bookingRoom, guestText: combinedGuestText, reason: opts.reason, phone,
-      }));
+      });
       if (!claude.ok) {
         // Nothing is sent to the guest (no generic fallback). The pending batch is
         // kept, so the guest's message is answered together with their next one.
@@ -1000,7 +1014,7 @@ exports.whatsappBotWorker = onRequest(
           mode: effectiveMode,
           ...fields,
         }),
-        // opts.push: also a push notification (urgent alerts only), side by side with WhatsApp.
+        // opts.push: also a push notification, side by side with WhatsApp.
         notifyOwner: async (issue, opts) => {
           await Promise.all([
             config.ownerPhone ? notifyOwner(config.ownerPhone, { guest: label, issue }) : null,

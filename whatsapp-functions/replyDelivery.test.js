@@ -81,13 +81,22 @@ test('empty reply after removing tags', async (t) => {
     assert.ok(!f.names().includes('storeAssistant'));
     assert.deepEqual(f.calls.find((c) => c[0] === 'writeAlert')[1], { reason: 'escalation', urgency: false });
     assert.equal(f.calls.find((c) => c[0] === 'notifyOwner')[1], 'Guest needs help (mode available): I am locked out, the code does not work', 'issue only; the caller adds the guest name / room');
+    assert.deepEqual(f.calls.find((c) => c[0] === 'notifyOwner')[2], { push: 'escalation', reason: 'Guest needs help' }, 'push next to the WhatsApp alert');
     assert.ok(f.names().includes('finishPending'));
+  });
+  await t.test('escalation with a reply: sent, stored, then WhatsApp alert and push', async () => {
+    const f = fakeDeps();
+    const r = await deliverReply(parseAiReply('The host will get back to you shortly. [ESCALATE]'), WHO, f.deps);
+    assert.equal(r.outcome, 'sent');
+    assert.deepEqual(f.names(), ['humanize', 'preSendCheck', 'sendText', 'storeAssistant', 'writeAlert', 'notifyOwner', 'finishPending']);
+    assert.deepEqual(f.calls.find((c) => c[0] === 'notifyOwner')[2], { push: 'escalation', reason: 'Guest needs help' });
   });
   await t.test('urgent escalation with no text: paged once, nothing sent', async () => {
     const f = fakeDeps();
     const r = await deliverReply(parseAiReply('[ESCALATE] [URGENT:LOCKOUT]'), WHO, f.deps);
     assert.equal(r.outcome, 'escalated_only');
     assert.deepEqual(f.calls.filter((c) => c[0] === 'notifyOwner').map((c) => c[1]), ['URGENT, guest is locked out']);
+    assert.deepEqual(f.calls.filter((c) => c[0] === 'notifyOwner').map((c) => c[2]?.push), ['lockout'], 'one push, not a second escalation push');
     assert.ok(!f.names().includes('sendText'));
   });
   await t.test('no escalation either: bot_error alert, pending kept', async () => {
@@ -220,7 +229,7 @@ test('video tag is recognized anywhere in the reply and never sent as text', asy
   });
 });
 
-test('push notification only for urgent alerts and bot errors, next to the WhatsApp alert', async (t) => {
+test('push notification for every escalation, urgent alert and bot error, next to the WhatsApp alert', async (t) => {
   const pushOf = (f, name) => f.calls.filter((c) => c[0] === name).map((c) => c[c.length - 1]?.push).filter(Boolean);
   await t.test('locked out ([URGENT:LOCKOUT]): push "lockout"', async () => {
     const f = fakeDeps();
@@ -238,15 +247,20 @@ test('push notification only for urgent alerts and bot errors, next to the Whats
     await deliverReply(parseAiReply('[URGENT:ANGRY]'), WHO, f.deps);
     assert.deepEqual(pushOf(f, 'notifyOwner'), ['angry']);
   });
-  await t.test('normal escalation: WhatsApp only, no push', async () => {
+  await t.test('normal escalation: one WhatsApp alert and one push "escalation"', async () => {
     const f = fakeDeps();
     await deliverReply(parseAiReply('Let me check on that and get back to you shortly. [ESCALATE]'), WHO, f.deps);
     assert.equal(f.calls.filter((c) => c[0] === 'notifyOwner').length, 1);
-    assert.deepEqual(pushOf(f, 'notifyOwner'), []);
+    assert.deepEqual(pushOf(f, 'notifyOwner'), ['escalation']);
   });
-  await t.test('tag-only escalation: no push', async () => {
+  await t.test('tag-only escalation: push "escalation"', async () => {
     const f = fakeDeps();
     await deliverReply(parseAiReply('[ESCALATE]'), WHO, f.deps);
+    assert.deepEqual(pushOf(f, 'notifyOwner'), ['escalation']);
+  });
+  await t.test('owner replied before the send: no alert, no push', async () => {
+    const f = fakeDeps({ decision: 'owner_replied' });
+    await deliverReply(parseAiReply('Let me check on that and get back to you shortly. [ESCALATE]'), WHO, f.deps);
     assert.deepEqual(pushOf(f, 'notifyOwner'), []);
   });
   await t.test('normal reply: no alert, no push', async () => {

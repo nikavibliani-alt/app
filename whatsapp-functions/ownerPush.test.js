@@ -22,7 +22,24 @@ test('urgentPushPayload: one title per alert type, property + room like the What
   const err = urgentPushPayload({ ...base, kind: 'bot_error', reason: 'Bot could not reply: Claude credit is empty' });
   assert.equal(err.title, 'Bot could not reply: Shartava 6-2');
   assert.equal(err.body, 'Bot could not reply: Claude credit is empty. Anna Petrova: The lock is not opening, battery dead I think');
-  assert.deepEqual(PUSH_KINDS, ['lockout', 'issue', 'angry', 'bot_error']);
+  assert.deepEqual(PUSH_KINDS, ['lockout', 'issue', 'angry', 'bot_error', 'escalation']);
+});
+
+test('urgentPushPayload: a normal escalation has the WhatsApp label as title, reason + start of message as body', () => {
+  const base = { kind: 'escalation', guestName: 'Anna Petrova', roomCode: '6-2', guestText: 'Can we check out at 3pm?', reason: 'Guest needs help', phone: '995555123456' };
+  assert.deepEqual(urgentPushPayload(base), {
+    title: 'Anna Petrova / Shartava 6-2',
+    body: 'Guest needs help: Can we check out at 3pm?',
+    url: '/checkin-admin',
+    tag: 'wa-escalation-123456',
+  });
+  assert.equal(urgentPushPayload({ ...base, guestName: '' }).title, 'Guest / Shartava 6-2');
+  assert.equal(urgentPushPayload({ ...base, roomCode: '' }).title, 'Anna Petrova / unknown property');
+  assert.equal(urgentPushPayload({ ...base, roomCode: 'tab-1', reason: 'Freedom Square guest wrote' }).body, 'Freedom Square guest wrote: Can we check out at 3pm?');
+  assert.equal(urgentPushPayload({ ...base, guestText: '' }).body, 'Guest needs help', 'no message text');
+  assert.equal(urgentPushPayload({ ...base, reason: '' }).body, 'Guest needs help: Can we check out at 3pm?', 'default reason');
+  const long = urgentPushPayload({ ...base, guestText: 'x'.repeat(300) }).body;
+  assert.equal(long.length, 'Guest needs help: '.length + 100, 'only the start of the message');
 });
 
 test('urgentPushPayload: unknown room, no name, long message, no text', () => {

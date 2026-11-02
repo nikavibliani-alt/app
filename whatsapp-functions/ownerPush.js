@@ -1,27 +1,29 @@
 'use strict';
 
-// Push notifications to the owner's phone for URGENT alerts only, as a second
+// Push notifications to the owner's phone for every escalation, as a second
 // channel next to the WhatsApp owner_alert template (which Meta sometimes
 // declines to deliver, error 131049). Same Web Push system as the Hotel
 // Collect alert: the admin app's devices in push_subscriptions, the VAPID keys
 // and the payload shape sw.js shows ({ title, body, url, tag }).
 //
 // Kinds: 'lockout' ([URGENT:LOCKOUT]), 'issue' ([URGENT:ISSUE]), 'angry'
-// ([URGENT:ANGRY]), 'bot_error' (Claude or Meta failure, empty reply).
-// Normal escalations get no push.
+// ([URGENT:ANGRY]), 'bot_error' (Claude or Meta failure, empty reply),
+// 'escalation' (normal [ESCALATE], other-property guests).
 //
 // Pure apart from the injected loaders/senders. Never throws: a push failure
 // is logged and never stops the bot or the WhatsApp alert.
 
-const { placeLabel, cleanParam } = require('./ownerAlert');
+const { ownerAlertGuest, placeLabel, cleanParam } = require('./ownerAlert');
 
-const PUSH_KINDS = ['lockout', 'issue', 'angry', 'bot_error'];
+const PUSH_KINDS = ['lockout', 'issue', 'angry', 'bot_error', 'escalation'];
 const MAX_SNIPPET = 100;
 const ADMIN_URL = '/checkin-admin';
 
 /**
- * { title, body, url, tag } for one urgent alert, e.g.
+ * { title, body, url, tag } for one alert, e.g.
  * title "URGENT: Shartava 6-2 locked out", body "Anna Petrova: The lock is not opening…".
+ * 'escalation' has the WhatsApp alert's label as its title:
+ * title "Anna Petrova / Shartava 6-2", body "Guest needs help: Can we check out at 3pm?".
  */
 function urgentPushPayload({ kind, guestName, roomCode, guestText, reason, phone }) {
   const place = placeLabel(roomCode);
@@ -32,11 +34,13 @@ function urgentPushPayload({ kind, guestName, roomCode, guestText, reason, phone
     issue: `URGENT: ${place} flooding or security issue`,
     angry: `URGENT: ${place} angry guest`,
     bot_error: `Bot could not reply: ${place}`,
+    escalation: ownerAlertGuest(guestName, roomCode),
   };
   const guestLine = said ? `${name}: ${said}` : name;
-  const body = kind === 'bot_error' && reason
-    ? `${cleanParam(reason, 80, 'unknown error')}. ${guestLine}`
-    : guestLine;
+  const shortReason = cleanParam(reason, 80, kind === 'escalation' ? 'Guest needs help' : 'unknown error');
+  let body = guestLine;
+  if (kind === 'escalation') body = said ? `${shortReason}: ${said}` : shortReason;
+  else if (kind === 'bot_error' && reason) body = `${shortReason}. ${guestLine}`;
   return {
     title: titles[kind] || `URGENT: ${place}`,
     body,
