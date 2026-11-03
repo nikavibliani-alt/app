@@ -7,6 +7,7 @@ const {
   SEED, renderSystemPrompt, templatePaths, propertyIdForRoom, unitFactLines, loadUnitWifi, readKnowledgeBase, loadKnowledgeBase, resetKnowledgeBaseCache, getPath,
 } = require('./knowledgeBase');
 const { SYSTEM_PROMPT_TEMPLATE, ORIGINAL_PROMPT_SHA256, ORIGINAL_PROMPT_LENGTH } = require('./promptTemplate');
+const { NOT_MATCHED_NOTE } = require('../bookingLookup');
 
 // Rule (not fact) changes made since the knowledge-base split, word for word.
 // Removing them from the rendered prompt must give back the original prompt
@@ -121,8 +122,20 @@ const DECISION_CHANGES_2026_10_28 = [
   ["36. Guest has checked in or settled in (use word for word, nothing before it): გამარჯობა, კომფორტულად დასვენებას გისურვებთ, თუ რამე დაგჭირდებათ, მომწერეთ.\n37. Guest has left or checked out (use word for word, nothing before it): მადლობა, რომ შეგვატყობინეთ. ბედნიერ მგზავრობას გისურვებთ, იმედია ისევ გვესტუმრებით.",
    "36. Guest has checked in or settled in (use word for word, nothing before it): გამარჯობა, კომფორტულად დასვენებას გისურვებთ, თუ რამე დაგჭირდებათ, მომწერეთ."],
 ];
+// Owner fact (2026-11-03): where the trash goes at Shartava (EN / KA reference
+// 38); never "the cleaning staff will take it"; whether it must go out before
+// checkout is the owner's answer. [now, before] pairs as above.
+const DECISION_CHANGES_2026_11_03 = [
+  ["\nGuest asks where to throw out the trash, or about trash rules, sorting or collection times (only for a Shartava booking; if Room/apartment type is unknown, use \"Guest's booking not matched\" instead):\nReply: The trash bins are in front of the building, on the left side. You can throw everything in together, at any time.\nWhen replying in Georgian, use GEORGIAN PHRASING REFERENCE 38 word for word.\nNever say the cleaning staff will take out the trash, unless the guest booked a paid cleaning and is asking about that cleaning. Never tell the guest to leave the trash by the door or in the hallway.\nIf the guest asks whether they must take the trash out before checkout, this is the owner's answer to give, not yours: Reply: Let me check on that and get back to you shortly. [ESCALATE]\nWhen the guest wrote in Georgian, Reply exactly: შევამოწმებ და მალე მოგწერთ. [ESCALATE]\nNever say yourself that they must, or that they don't need to.\n",
+   ""],
+  ["parking, bag storage, hot water, trash bins, door code timing and WiFi are different for each.",
+   "parking, bag storage, hot water, door code timing and WiFi are different for each."],
+  ["\n38. Trash bins (use word for word): ნაგვის ურნები შენობის წინ, მარცხენა მხარესაა. ყველაფერი შეგიძლიათ ერთად გადაყაროთ, ნებისმიერ დროს.",
+   ""],
+];
 const withoutRuleChanges = (p) => {
-  const undone28 = DECISION_CHANGES_2026_10_28.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `28 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, p);
+  const undone1103 = DECISION_CHANGES_2026_11_03.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `3 Nov change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, p);
+  const undone28 = DECISION_CHANGES_2026_10_28.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `28 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone1103);
   const undone26 = DECISION_CHANGES_2026_10_26.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `26 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone28);
   const undone20 = DECISION_CHANGES_2026_10_20.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `20 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone26);
   const undone18 = DECISION_CHANGES_2026_10_18.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `18 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone20);
@@ -310,6 +323,19 @@ test('26 Oct: checked-in wish and no Georgian filler openings', () => {
   assert.match(p, /36\. Guest has checked in or settled in \(use word for word, nothing before it\): გამარჯობა, კომფორტულად დასვენებას გისურვებთ, თუ რამე დაგჭირდებათ, მომწერეთ\./);
   assert.match(p, /never start a reply with a filler word or acknowledgement such as "კარგია" or "სიამოვნებით"/);
   assert.match(p, /2\. "Thank you" reply: არაფრის, სიამოვნებით\./, 'the plain thank-you reply is kept');
+});
+
+test('3 Nov: trash bins at Shartava, never "the cleaning staff will take it"', () => {
+  const p = renderSystemPrompt(SEED);
+  const t = SEED.policies.trash;
+  assert.equal(t.reply.en, 'The trash bins are in front of the building, on the left side. You can throw everything in together, at any time.');
+  assert.equal(t.reply.ka, 'ნაგვის ურნები შენობის წინ, მარცხენა მხარესაა. ყველაფერი შეგიძლიათ ერთად გადაყაროთ, ნებისმიერ დროს.');
+  assert.deepEqual(t.appliesTo, ['shartava']);
+  assert.ok(p.includes(`Reply: ${t.reply.en}`));
+  assert.ok(p.includes(`38. Trash bins (use word for word): ${t.reply.ka}`));
+  assert.match(p, /Never say the cleaning staff will take out the trash, unless the guest booked a paid cleaning and is asking about that cleaning\./);
+  assert.match(p, /must take the trash out before checkout[^\n]*Reply: Let me check on that and get back to you shortly\. \[ESCALATE\]/);
+  assert.match(NOT_MATCHED_NOTE, /trash bins/, 'an unmatched guest is asked for the booking name first');
 });
 
 test('28 Oct: checkout day, leaving, late checkout never refused', () => {

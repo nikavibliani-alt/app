@@ -197,6 +197,18 @@ module.exports = {
       ],
       "includedInPrice": false
     },
+    "trash": {
+      "reply": {
+        "en": "The trash bins are in front of the building, on the left side. You can throw everything in together, at any time.",
+        "ka": "ნაგვის ურნები შენობის წინ, მარცხენა მხარესაა. ყველაფერი შეგიძლიათ ერთად გადაყაროთ, ნებისმიერ დროს."
+      },
+      "binsLocation": "in front of the building, on the left side",
+      "sorting": false,
+      "anyTime": true,
+      "appliesTo": [
+        "shartava"
+      ]
+    },
     "checkin": {
       "timeKa": "სტანდარტული check-in 15:00 საათიდან არის შესაძლებელი.",
       "doorCodeTimingKa": "ინსტრუქციები 3 საათიდან იქნება ხელმისაწვდომი. თუ უფრო მალე დალაგდება ნომერი, 3 საათამდე შეგეძლებათ შესვლა.",

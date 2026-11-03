@@ -98,7 +98,7 @@ async function lookupBooking(db, { guestTexts, nowMs = Date.now(), log = console
 
 // Said in the guest context whenever the booking is not matched: the prompt rule
 // ("Guest's booking not matched") is followed far more reliably with it.
-const NOT_MATCHED_NOTE = 'This guest\'s booking is not matched, so their location is unknown: do not give the Shartava address, maps links, entrance, parking, bag storage, hot water or WiFi; for those, ask for the name on the booking (see "Guest\'s booking not matched"). Everything else (check-in form or page, check-in and checkout times, early check-in, late checkout, booking questions, escalations) is answered as usual.';
+const NOT_MATCHED_NOTE = 'This guest\'s booking is not matched, so their location is unknown: do not give the Shartava address, maps links, entrance, parking, bag storage, hot water, trash bins or WiFi; for those, ask for the name on the booking (see "Guest\'s booking not matched"). Everything else (check-in form or page, check-in and checkout times, early check-in, late checkout, booking questions, escalations) is answered as usual.';
 
 /** The guest-context lines for a lookup result (none without a lookup). */
 function bookingLookupLines(lookup, propertyName) {
