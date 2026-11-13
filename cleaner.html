@@ -62,6 +62,8 @@ button{font-family:inherit;touch-action:manipulation;}
 .donebtn{width:100%;min-height:60px;border:none;border-radius:var(--r);background:var(--ink);color:#fff;font-size:22px;font-weight:700;cursor:pointer;}
 .donebtn.undo{background:var(--line);color:var(--ink-2);font-size:18px;}
 .donebtn:disabled{opacity:.5;}
+.donebtn.locked{background:var(--line);color:var(--ink-2);opacity:1;cursor:default;font-size:20px;}
+.donehint{margin-top:6px;text-align:center;font-size:14px;color:var(--muted);}
 .empty{text-align:center;padding:48px 16px;color:var(--muted);font-size:18px;}
 .screen{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:32px;text-align:center;font-size:22px;font-weight:600;}
 .screen[hidden]{display:none;}
@@ -150,7 +152,7 @@ const STR={
     leavingShort:'გადის',arrivingShort:'შემოდის',
     noBooking:'ჯავშანი არ არის',
     pending:'დასალაგებელი',donePill:'მზადაა',
-    done:'მზადაა',undo:'გაუქმება',
+    done:'მზადაა',undo:'გაუქმება',doneOnlyOnDay:'მზადაა მხოლოდ იმ დღეს',
     guestOut:'სტუმარმა გასვლა დაადასტურა',
     sheets:'საჭიროა დამატებითი თეთრეული',sofa:'საჭიროა დივნის დამატებითი თეთრეული',
     emptyDay:'ამ დღეს დასალაგებელი ბინა არ არის',
@@ -191,7 +193,7 @@ const STR={
     leavingShort:'Leaving',arrivingShort:'Arriving',
     noBooking:'No booking',
     pending:'To clean',donePill:'Done',
-    done:'Done',undo:'Undo',
+    done:'Done',undo:'Undo',doneOnlyOnDay:'Done only on the day',
     guestOut:'Guest checked out',
     sheets:'Extra sheets needed',sofa:'Extra sofa bed sheets needed',
     emptyDay:'No rooms to clean this day',
@@ -496,6 +498,7 @@ function hkSiteId(roomCode){
 /* ══ DONE — follows the "Done contract" in docs/HK_UPGRADE_PLAN.md (same docs/fields/order as admin toggleHkDone) ══ */
 /* DONE-START */
 async function toggleHkDone(roomCode,dateStr){
+  if(dateStr>tbilisiToday())return;   // cleaners can only mark Done on the day (or later); guards old cached pages and fast double taps
   const key=roomCode+'_'+dateStr;
   if(busy.has(key))return;
   busy.add(key);
@@ -531,6 +534,12 @@ async function toggleHkDone(roomCode,dateStr){
 /* DONE-END */
 
 /* ══ RENDER ══ */
+function tomorrowStr0(){return hkTomorrowStr(tbilisiToday());}
+/** Unlock tomorrow's cards at 00:00 Tbilisi without a reload: timer for the next midnight (+ visibilitychange below). */
+let _midTimer=null;
+function msToTbilisiMidnight(){const t=Date.now()+4*3600e3;return (Math.floor(t/864e5)+1)*864e5-t;}
+function scheduleMidnight(){clearTimeout(_midTimer);_midTimer=setTimeout(()=>{refresh();scheduleMidnight();},msToTbilisiMidnight()+2000);}
+let _shownToday=null;
 function dayLabel(offset,dateStr){
   if(offset===-1)return t('yesterday');
   if(offset===0)return t('today');
@@ -554,6 +563,7 @@ function buildCard(room,dateStr,tomorrowStr){
   const key=room.code+'_'+dateStr;
   const st=hkStatusData[key]||{};
   const done=!!st.done;
+  const futureDay=dateStr>tbilisiToday();
   const coDate=room.overdueFrom||dateStr;   // overdue rooms show the stay that already left
   const co=hkGetCheckout(room.code,coDate);
   const nextRes=hkGetNextCheckin(room.code,dateStr);
@@ -580,7 +590,9 @@ function buildCard(room,dateStr,tomorrowStr){
     ${room.overdueFrom?`<div class="overdue">${esc(t('overdue',{d:room.overdueFrom.slice(8,10)+'.'+room.overdueFrom.slice(5,7)}))}</div>`:''}
     ${guestCheckedOut?`<div class="out">${esc(t('guestOut'))}</div>`:''}
     ${nextRes?beddingHtml(room.code,inGuests):''}
-    <button type="button" class="donebtn${done?' undo':''}" data-act="done" data-room="${esc(room.code)}" data-date="${dateStr}"${busy.has(key)?' disabled':''}>${esc(done?t('undo'):t('done'))}</button>
+    ${futureDay
+      ?`<button type="button" class="donebtn locked" disabled aria-disabled="true">${esc(done?t('done'):(dateStr===tomorrowStr0()?t('tomorrow'):dateStr.slice(8,10)+'.'+dateStr.slice(5,7)))}</button><div class="donehint">${esc(t('doneOnlyOnDay'))}</div>`
+      :`<button type="button" class="donebtn${done?' undo':''}" data-act="done" data-room="${esc(room.code)}" data-date="${dateStr}"${busy.has(key)?' disabled':''}>${esc(done?t('undo'):t('done'))}</button>`}
     ${HK_DAMAGE_ENABLED&&link.canReportDamage?`<button type="button" class="dmgbtn" data-act="damage" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('reportDamage'))}</button>`:''}
     ${HK_DAMAGE_ENABLED&&reportsFor(room.code,dateStr).length?`<button type="button" class="dmgbadge" data-act="viewdmg" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('badge'))}</button>`:''}
     ${HK_DAMAGE_ENABLED&&done?`<button type="button" class="readylink" data-act="ready" data-room="${esc(room.code)}" data-date="${dateStr}">${esc(t('readyPhotos'))}</button>`:''}
@@ -594,6 +606,9 @@ function render(){
 }
 function renderNow(){
   if(!link||_resCache===null)return;
+  const _td=tbilisiToday();
+  if(_shownToday&&_shownToday!==_td)hkActiveDay=0;   // the date rolled over: back to Today
+  _shownToday=_td;
   $('hdr-title').textContent=t('title');
   const labels=(link.teamIds||[]).map(id=>(hkSettings.teams||[]).find(x=>x.id===id)?.label).filter(Boolean);
   $('hdr-sub').textContent=link.name+(labels.length?' · '+labels.join(' + '):'');
@@ -975,6 +990,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 token=getToken();
 showScreen('loading');
 refresh();
+scheduleMidnight();
 </script>
 </body>
 </html>

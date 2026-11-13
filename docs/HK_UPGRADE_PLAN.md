@@ -223,6 +223,13 @@ Files: checkin-admin.html HK tab, plus a minimal matching change in hk-app.html,
   - no update or delete
   - keep the existing passport_uploads rule unchanged
 
+### Cleaners can press Done only on the day (done)
+- cleaner.html: the Done button is active only for a card dated TODAY or earlier (Tbilisi date). Yesterday and overdue carry-over rooms stay pressable for late marking. On future day tabs the button is greyed out and disabled and reads "Tomorrow" (or dd.mm for later days) with the line "Done only on the day" (Georgian: "ხვალ" / "მზადაა მხოლოდ იმ დღეს"). An already-Done future card shows "Done" with Undo disabled.
+- `toggleHkDone` returns immediately when `dateStr` is after today (old cached page, fast double tap). The Done contract itself is unchanged; the admin HK tab is unchanged (admin can still mark any day).
+- At 00:00 Tbilisi the page re-renders without a reload (timer for the next midnight + the existing visibilitychange refresh), so tomorrow's cards unlock; the selected tab returns to Today.
+- WhatsApp: `roomReadyNotification` already ignores a Done on any date other than today (guard from 4 Oct, `roomReadyDate.js`). Remaining gap: a premature Done leaves the arrival-day doc `done:true`, so `whatsapp_checkin_ready.py` (daily fallback, reads `hk_status/{room}_{today}.done`) can treat the room as ready on the arrival day.
+- Tests: `node scripts/test-cleaner-page.js` (Done parity with admin `toggleHkDone`, day lock, rollover). Run it with `node scripts/check-cleaner-page.js` before every cleaner.html commit.
+
 ### Overdue carry-over: un-cleaned rooms stay on today's board (done)
 - Problem (1 Oct): tab-3 was vacated on 30 Sep but never marked Done, so it dropped off the board the next day even though a guest arrived that day. The board only listed rooms with a checkout on the shown day.
 - Rule (admin HK tab and cleaner page, same code): on TODAY's tab a room is also listed, labelled "Not cleaned yet · left dd.mm", when its last stay left in the previous 3 days (`HK_OVERDUE_DAYS`) and no `hk_status` doc with `done:true` exists for that room from that checkout date up to today. Not carried over: a guest has already arrived since the checkout (in-house), cancelled bookings, a checkout that was removed or moved on purpose. Overdue rooms sort first and count in the day tab.
