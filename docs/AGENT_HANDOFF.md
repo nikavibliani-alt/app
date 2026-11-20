@@ -55,6 +55,8 @@ Admin/guest **dev sandboxes** (edit here, then promote):
 | Function | Status |
 |----------|--------|
 | `elevatorCodeGuard`, `elevatorCodeSync` | Deployed |
+| `pushOnElevatorAlert` (elevator_alerts doc -> push), `blockOnCancelledBooking` (booking becomes CANCELLED -> guest records blocked, Tuya password revoked) | Deployed 2026-10-29 / 2026-11-20 (each deployed alone: `firebase deploy --only functions:pipeline:<name>`; if discovery times out use `NODE_OPTIONS=--max-old-space-size=6144 FUNCTIONS_DISCOVERY_TIMEOUT=300`; a plain retry also fixes a failed upload) |
+| Tuya functions `generateOfflinePasswordOnReservation`, `regenerateTuyaPassword`, `deleteTuyaPassword`, `cleanupTuyaPasswordOnDelete` | Deployed, source NOT in this repo (`tuya-functions/index.js` is an empty stub). Never deploy codebase `default` from here: it would delete them. Deployed source is in gs://gcf-v2-sources-152940098906-europe-west1/<name>/function-source.zip |
 | `adminAction`, `guestRegister` | Deployed (callable names — **no** `pipeline-` prefix in URL) |
 | Secret `ADMIN_ACTION_PASSWORD` | Set (= admin HTML gate password) |
 

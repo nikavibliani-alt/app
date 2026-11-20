@@ -327,3 +327,11 @@ Progress log:
 - Server path: guestFind mode 'related' in guestApi.js (tested). guestFind/guestStay are not deployed yet (security stage 2), so nothing was redeployed.
 - Note: pipeline-functions test "guestKnowledge copies match the WhatsApp originals" already fails on main (not part of this change).
 - Undo: tell me "undo related later".
+
+### Codes before unlock (restore point: tag before-code-protection)
+- Step 1 (guest 1.6.1+): before the guest is unlocked, digit codes typed as plain text in arrival steps (own photo steps, type steps, lock box where-text) show "Shown when your room is ready" (same pattern guestApi filterApt masks). After unlock text shows as written. Preview unchanged.
+- Step 2 (admin Build 1016, guest 1.6.2): "Entrance / building code" per unit (checkin_apartments.entranceCode) and per type (checkin_type_codes/{GROUP}.entranceCode, never in the config); fill-in word {entrance code}, gated like {door code}. Unit code beats the type's. guestApi removes entranceCode from a locked apartment. The type code is read directly by the page (stage 2 TODO: make checkin_type_codes server-only and serve it with guestStay).
+- xcv-2 data: caption 2 (a lone entrance code) moved into the unit's entranceCode and replaced by {entrance code}; caption 4 (the lock box code) replaced by {lock box code}. Caption 3 still has a typed elevator code (use {elevator code}). Backup of the old doc was kept in the session scratchpad only.
+- Step 3: scan of plain-text codes, per apartment, in the report of 2026-11-20 (not stored here).
+- Step 4: function blockOnCancelledBooking (pipeline codebase): on a change to CANCELLED, checkin_guests with matchedReservationId = reservation id / number / base number get accessDisabledByAdmin true + accessDisabledReason "booking cancelled" (guests with another live booking are kept), the Tuya password is revoked through the deployed callable deleteTuyaPassword, one system_logs entry (controller CancelledBooking). A change back from CANCELLED lifts only blocks with that reason.
+- Undo: tell me "undo code protection".
