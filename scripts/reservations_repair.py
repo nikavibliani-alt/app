@@ -80,6 +80,17 @@ def main(argv=None, db=None, bucket=None, now=None):
     print("  still to come (check-out today or later):", sum(1 for i in ids if str(byid[i].get("checkout")) >= today.isoformat()))
     for k, v in pl["left"].most_common():
         print(f"  left as they are: {v} - {k}")
+    gone = [byid[d["id"]] for d in docs if d["id"] not in ids]
+    absent = [d for d in gone if not any(str(r.get("reservationNumber") or "").strip() == str(d.get("reservationNumber") or "").strip() for r in api)]
+    gaps = Counter()
+    for d in absent:
+        try:
+            gaps[min(max((date.fromisoformat(str(d.get("syncedAt"))[:10]) - date.fromisoformat(d["checkout"])).days, -1), 9)] += 1
+        except Exception:
+            gaps["?"] += 1
+    print(f"Left cancelled and absent from MiniHotel's answer: {len(absent)} | by check-out month {dict(sorted(Counter(str(d.get('checkout'))[:7] for d in absent).items()))}")
+    print(f"  days from check-out to the day marked (-1 = before the stay ended, 7 = the old bug's signature): {dict(sorted(gaps.items(), key=lambda kv: str(kv[0])))}")
+    print(f"  of those, the stay was already over: {sum(1 for d in absent if str(d.get('checkout')) < today.isoformat())}; created in the last 60 days: {sum(1 for d in absent if str(d.get('creationDate') or '') >= (today - timedelta(days=60)).isoformat())}")
     total = len(list(db.collection("reservations").where("checkin", ">=", (today - timedelta(days=365)).isoformat()).stream()))
     print(f"Records with check-in in the last 365 days or later (what the admin page loads, it keeps the newest 1000): {total}")
     if args.dry or not pl["restore"]:
