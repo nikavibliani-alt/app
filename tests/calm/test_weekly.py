@@ -97,7 +97,7 @@ class Fake:
 def draft():
     return {"headline": "A quiet week with 5 price drops.",
             "worked": [{"text": "Cancellation drops tonight sold: 1 of 1.", "refs": ["rooms.M.cancelled_tonight_lowered_then_booked"]},
-                       {"text": "Prices rose 42 times, a record.", "refs": ["rooms.M.price_raises_written"]}],
+                       {"text": "Prices rose 77 times, a record.", "refs": ["rooms.M.price_raises_written"]}],
             "didnt": [{"text": "The Expedia push failed 1 time.", "refs": ["all.channel_push_failures.EXPEDIA"]}],
             "upgrades": [{"text": "Check why Expedia failed (1 failure).", "refs": ["all.channel_push_failures"]},
                          {"text": "Invented claim without numbers about the future.", "refs": []}]}
@@ -106,7 +106,7 @@ def draft():
 def test_checker_removes_unsupported_claims_and_the_number_check_backs_it_up():
     n = wn.build(sample(), FROM, TO)
     check = {"headline": {"verdict": "yes"}, "items": [
-        {"id": "worked.0", "verdict": "yes"}, {"id": "worked.1", "verdict": "yes"},                    # checker wrongly says yes to 42: the number check removes it
+        {"id": "worked.0", "verdict": "yes"}, {"id": "worked.1", "verdict": "yes"},                    # checker wrongly says yes to 77: the number check removes it
         {"id": "didnt.0", "verdict": "yes"}, {"id": "upgrades.0", "verdict": "partly", "fixed_text": "Check why Expedia failed."},
         {"id": "upgrades.1", "verdict": "no", "note": "made up"}]}
     out = ai.apply_check(n, draft(), check)
@@ -114,7 +114,7 @@ def test_checker_removes_unsupported_claims_and_the_number_check_backs_it_up():
     assert out["didnt"][0]["text"] == "The Expedia push failed 1 time."
     assert [i["text"] for i in out["upgrades"]] == ["Check why Expedia failed."] and out["edited"] == 1
     assert {r["id"] for r in out["removed"]} == {"worked.1", "upgrades.1"}
-    assert "42" in [r for r in out["removed"] if r["id"] == "worked.1"][0]["why"]
+    assert "77" in [r for r in out["removed"] if r["id"] == "worked.1"][0]["why"]
     assert out["headline"] == "A quiet week with 5 price drops."
 
 
@@ -261,3 +261,26 @@ def test_a_rerun_by_hand_without_sending_keeps_the_record_of_the_message_already
     finally:
         weekly_numbers.load = orig
     assert db.store["pricing_weekly"]["2026-W42"]["whatsapp"] == "2026-10-12T21:00:00"
+
+
+def test_stays_paid_in_dollars_are_converted_to_lari_for_the_average_sold_price():
+    d = sample()
+    d["stays"] = [{"rt": "M", "checkin": "2026-10-12", "checkout": "2026-10-13", "created": "2026-10-12", "per_night": 40.0, "currency": "USD"},
+                  {"rt": "M", "checkin": "2026-10-13", "checkout": "2026-10-15", "created": "2026-10-12", "per_night": 130.0, "currency": "GEL"},
+                  {"rt": "M", "checkin": "2026-10-13", "checkout": "2026-10-14", "created": "2026-10-12", "per_night": 50.0, "currency": "XYZ"},      # unknown currency: not guessed
+                  {"rt": "M", "checkin": "2026-10-13", "checkout": "2026-10-14", "created": "2026-10-12", "per_night": None, "currency": "USD"}]    # no price: not counted
+    d["fx"] = {"USD": 2.5}
+    n = wn.build(d, FROM, TO)
+    m = n["rooms"]["M"]
+    assert m["avg_sold_price_gel"] == round((100 + 130 + 130) / 3)               # 40 USD = 100 lari; the 130-lari stay has 2 nights
+    assert m["bookings_made"] == 4
+    assert "1 dollar = 2.5 lari" in n["all"]["fx_note"] and any("1 dollar = 2.5 lari" in x for x in n["data_notes"])
+    assert n["totals"]["avg_sold_price_gel"] == m["avg_sold_price_gel"]
+
+
+def test_totals_and_the_week_number_are_data_so_a_headline_with_them_is_not_flagged():
+    n = wn.build(sample(), FROM, TO)
+    assert n["totals"]["bookings_made"] == sum(r.get("bookings_made") or 0 for r in n["rooms"].values()) == 2
+    text = "Week 42: 2 bookings made (3 nights) and 1 real cancellation."
+    assert wn.unsupported_numbers(text, n) == []
+    assert wn.unsupported_numbers("Week 42: 987 bookings made.", n) == ["987"]       # a number that is nowhere in the data is still caught

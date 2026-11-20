@@ -24,6 +24,10 @@ Rules:
   "held back" counts are price changes that a rule held back, never nights that are closed or blocked;
   "lowered, then booked" means the night was empty, its price was lowered, and it was booked AFTER that. It never means drops on nights that were already sold;
   "cancellations" are real cancellations only (changed bookings and stays that were already over are counted separately and are not cancellations).
+  for the whole property use the "totals" block; never add rooms together yourself;
+  a large "held back" count is normal by itself (only the morning run may lower prices, so most other runs hold lowering): never call it a problem unless the numbers show something else;
+  the special repricing after a cancellation only applies to tonight and tomorrow: a cancelled night further away follows the normal rules, so never say it "was not repriced" as if something failed;
+  the watchdog red-day count is for the whole property, never for one room;
 - If the data is thin or missing (see data_notes), say that plainly instead of guessing. A zero is a fact only when the JSON says 0.
 - Plain words an owner understands. No jargon, no ALL CAPS, no emojis.
 - Everything is a suggestion. Never say something was changed, and never tell the engine what to do automatically.

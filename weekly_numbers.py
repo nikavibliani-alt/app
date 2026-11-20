@@ -21,6 +21,20 @@ def _days(a: str, b: str):
     return [(x + timedelta(days=k)).isoformat() for k in range((y - x).days + 1)]
 
 
+FX_DEFAULT = {"USD": 2.65, "EUR": 2.95}        # lari per dollar / euro: the engine's own rates (calm_pricing.config DEFAULTS["fx"])
+
+
+def _gel(price, currency, fx):
+    """A price per night in lari. Stays paid in dollars or euros are converted at the engine's rate; an unknown currency gives None."""
+    if not isinstance(price, (int, float)) or not price:
+        return None
+    cur = str(currency or "").upper()
+    if cur == "GEL":
+        return price
+    rate = (fx or {}).get(cur)
+    return round(price * rate, 2) if rate else None
+
+
 def _avg(xs):
     xs = [x for x in xs if isinstance(x, (int, float))]
     return round(sum(xs) / len(xs)) if xs else None
@@ -30,6 +44,8 @@ def _avg(xs):
 GUIDE = {
     "bookings_made": "Bookings made this week (by booking date).",
     "nights_sold": "Nights in those bookings.",
+    "avg_sold_price_gel": "Average price per night of those bookings, in lari. Bookings paid in dollars are converted at the rate in all.fx_note.",
+    "totals": "The same numbers added up over all rooms (the whole property). Use these for property-wide statements.",
     "price_raises_written": "How many times a price was raised and written to MiniHotel. One count = one night, in one price list (Booking in lari or Airbnb in dollars), in one run. The same night can be counted many times. It is NOT a number of nights.",
     "price_drops_written": "How many times a price was lowered and written to MiniHotel. One count = one night, in one price list, in one run. The same night can be counted many times. It is NOT a number of nights.",
     "nights_lowered": "How many different nights had at least one price drop this week.",
@@ -91,6 +107,8 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
     def sold_after(rt, night, since):
         return any(s["rt"] == rt and s.get("created") and s["created"] >= since and s["checkin"] <= night < s["checkout"] for s in stays)
 
+    fx = data.get("fx") or FX_DEFAULT
+    all_prices = []
     for rt in rooms:
         r = rooms[rt]
         mine = [e for e in pe if e.get("rt") == rt]
@@ -107,9 +125,10 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
             for night in _days(s["checkin"], (date.fromisoformat(s["checkout"]) - timedelta(days=1)).isoformat()):
                 n_nights += 1
                 lim = limits(rt, night)
-                p = s.get("per_night") if s.get("currency") == "GEL" else None
+                p = _gel(s.get("per_night"), s.get("currency"), fx)
                 if p:
                     sold_prices.append(p)
+                    all_prices.append(p)
                 if lim and p:
                     st, mn, mx = lim
                     starts.append(st); mins.append(mn); maxs.append(mx)
@@ -139,6 +158,12 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
         r["held_back_other"] = len(held) - r["held_back_by_protect"] - r["held_back_by_hold"]
         r["stopped_by_safety_check"] = sum(1 for e in mine if e.get("kind") == "stopped")
 
+    totals = {}
+    for r in rooms.values():
+        for k, v in r.items():
+            if isinstance(v, (int, float)) and not isinstance(v, bool) and not k.startswith("avg_"):
+                totals[k] = totals.get(k, 0) + v
+    totals["avg_sold_price_gel"] = _avg(all_prices)
     runs = [x for x in data.get("runs", []) if week_from <= x.get("day", "") <= week_to]
     fails = {}
     for x in runs:
@@ -154,6 +179,8 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
         if week_from <= day <= week_to:
             changes.append({"day": day, "old": c.get("old"), "new": c.get("new")})
     all_["season_date_changes"] = {"count": len(changes), "list": changes[:5]}
+    usd = (fx or {}).get("USD")
+    all_["fx_note"] = f"Stays paid in dollars are converted to lari at 1 dollar = {usd:g} lari (the engine's rate)." if usd else ""
     um = data.get("season_unmarked") or []
     if um:
         from calm_pricing import seasons as _sn
@@ -184,8 +211,10 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
         notes.append("No twin comparison has finished yet.")
     if not any(r.get("nights_sold") for r in rooms.values()):
         notes.append("No bookings were made this week.")
+    if all_prices and all_["fx_note"]:
+        notes.append(all_["fx_note"])
     return {"property_id": PROPERTY_ID, "week": {"from": week_from, "to": week_to, "key": week_key(week_to)}, "data_notes": notes,
-            "guide": GUIDE, "rooms": rooms, "all": all_}
+            "guide": GUIDE, "rooms": rooms, "totals": totals, "all": all_}
 
 
 def cancel_kind(e: dict, changed_refs: dict) -> str:
@@ -219,6 +248,9 @@ def flat_numbers(numbers: dict) -> set:
     for d in (wk.get("from"), wk.get("to")):
         if d:
             out.update({str(int(d[8:])), d[:4], str(int(d[5:7]))})
+    m = re.search(r"W(\d+)$", str(wk.get("key") or ""))
+    if m:
+        out.add(str(int(m.group(1))))                       # "week 45" is a time word from the week key, not a data number
     return out
 
 
@@ -339,7 +371,7 @@ def load(db, now: datetime) -> dict:
     ssum = db.collection("pricing_scorecard").document("_summary").get()
     cancel_class = changed_cancellations(db, by_day("pmslog_booking_events"))
     return {"price_events": by_day("pmslog_price_events"), "booking_events": by_day("pmslog_booking_events"),
-            "runs": by_day("pricing_calm_runs"), "watchdog_days": wd, "stays": sc.priced_stays(db, today, back_days=120),
+            "runs": by_day("pricing_calm_runs"), "watchdog_days": wd, "stays": sc.priced_stays(db, today, back_days=120), "fx": dict(cfg.get("fx") or FX_DEFAULT),
             "limits": limits, "cancel_class": cancel_class, "season_changes": season_changes, "season_unmarked": season_unmarked, "scorecard": ssum.to_dict() if ssum.exists else {},
             "twin_results": [d.to_dict() or {} for d in db.collection("pricing_twin_results").stream()],
             "events": [dict(d.to_dict() or {}, date=(d.to_dict() or {}).get("date") or d.id.replace("event_", "")) for d in db.collection("pricing_events").stream()],
