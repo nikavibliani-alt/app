@@ -51,9 +51,16 @@ def _client(key):
 
 
 def _call(client, system: str, payload: str) -> dict:
-    msg = client.messages.create(model=MODEL, max_tokens=4096, system=system, messages=[{"role": "user", "content": payload}])
+    """One answer as JSON. A long review can run past the first limit and arrive cut off (not valid JSON): one longer second try."""
     import claude_pricing
-    return claude_pricing.parse_analyst_reply("".join(getattr(b, "text", "") for b in msg.content))
+    last = None
+    for tokens in (8192, 12000):
+        msg = client.messages.create(model=MODEL, max_tokens=tokens, system=system, messages=[{"role": "user", "content": payload}])
+        try:
+            return claude_pricing.parse_analyst_reply("".join(getattr(b, "text", "") for b in msg.content))
+        except Exception as e:  # noqa: BLE001
+            last = e
+    raise last
 
 
 def resolve(numbers: dict, path: str):

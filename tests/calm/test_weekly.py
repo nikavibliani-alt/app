@@ -284,3 +284,22 @@ def test_totals_and_the_week_number_are_data_so_a_headline_with_them_is_not_flag
     text = "Week 42: 2 bookings made (3 nights) and 1 real cancellation."
     assert wn.unsupported_numbers(text, n) == []
     assert wn.unsupported_numbers("Week 42: 987 bookings made.", n) == ["987"]       # a number that is nowhere in the data is still caught
+
+
+def test_a_cut_off_answer_is_tried_once_more_with_a_longer_limit():
+    answers = ['{"headline": "x", "worked": [', json.dumps({"headline": "ok", "worked": [], "didnt": [], "upgrades": []})]
+
+    class C:
+        def __init__(self):
+            self.calls, self.messages = [], self
+
+        def create(self, **kw):
+            self.calls.append(kw["max_tokens"])
+
+            class B:
+                text = answers[len(self.calls) - 1] if False else None
+            b = type("B", (), {"text": answers[len(self.calls) - 1]})
+            return type("M", (), {"content": [b()]})()
+    c = C()
+    out = ai._call(c, "sys", "payload")
+    assert out["headline"] == "ok" and c.calls == [8192, 12000]
