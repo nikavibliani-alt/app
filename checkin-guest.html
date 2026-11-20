@@ -1587,6 +1587,12 @@ function _normalizeElevatorData(raw){
 /* Preview links (?preview=true, ?adminPreview=1) show the layout with placeholder values only — never real codes. */
 function isPreviewMode(){return !!(isPreview||_adminPreviewMode||params.get('preview')==='true');}
 function maskCodes(s){return isPreviewMode()?String(s||'').replace(/\d[\d \-]{1,}\d#?/g,'••••'):s;}
+// Before the guest is unlocked, a digit code typed as plain text (same pattern guestApi filterApt masks) shows "Shown when your room is ready". Preview and unlocked guests see text as written.
+function maskUntilUnlocked(s){
+  s=String(s==null?'':s);
+  if(isPreviewMode()||isUnlocked())return s;
+  return s.replace(/\d[\d \-]{1,}\d#?/g,t('codeWhenReady'));
+}
 function previewScrub(a){
   if(!isPreviewMode()||!a)return a;
   return{...a,doorCode:a.doorCode?'0000#':'',wifiName:a.wifiName?'WiFi network':'',wifiPass:a.wifiPass?'wifi-password':'',
@@ -5151,8 +5157,8 @@ function _renderWalkthroughTyped(list,wrap,arrival){
   const lbPhotos=[],lbCaps=[];
   const cards=steps.map((s,i)=>{
     if(only>=0&&i!==only)return '';
-    const title=fillPlaceholders(s.title,ctx,unlocked).trim();
-    const text=fillPlaceholders(s.text,ctx,unlocked).trim();
+    const title=maskUntilUnlocked(fillPlaceholders(s.title,ctx,unlocked)).trim();
+    const text=maskUntilUnlocked(fillPlaceholders(s.text,ctx,unlocked)).trim();
     let media='';
     if(s.photo){
       const at=lbPhotos.length;lbPhotos.push(s.photo);lbCaps.push((title+' '+text).trim());
@@ -5191,7 +5197,7 @@ function _renderAccess(){
         const has=!!(a.lockboxWhere||a.lockboxPhoto);
         extra.style.display=has?'block':'none';
         const wl=document.getElementById('t-lockbox-where-lbl');if(wl)wl.textContent=t('lockboxWhereLbl');
-        const ww=document.getElementById('hero-lockbox-where');if(ww)ww.textContent=a.lockboxWhere||'';
+        const ww=document.getElementById('hero-lockbox-where');if(ww)ww.textContent=maskUntilUnlocked(a.lockboxWhere||'');
         const ph=document.getElementById('hero-lockbox-photo');
         if(ph){if(a.lockboxPhoto){ph.src=a.lockboxPhoto;ph.style.display='block';}else{ph.style.display='none';}}
       }
@@ -5229,7 +5235,8 @@ function _renderWalkthrough(){
   if(_arr.steps.some(s=>s.shared)){_renderWalkthroughTyped(list,wrap,_arr);return;}   // a type with shared steps is saved
   list.dataset.wtKey=(list.dataset.wtKey||'').replace(/^T\|.*/,'');   // back to today's rendering
   const photos=aptData?.photos||[];
-  const caps=(previewScrub(aptData)||{}).photoCaptions||[];
+  const _un=isUnlocked();
+  const caps=((previewScrub(aptData)||{}).photoCaptions||[]).map(maskUntilUnlocked);
   const phase=_homePhase();
   const expanded=wrap.classList.contains('wt-expanded');
 
@@ -5239,7 +5246,7 @@ function _renderWalkthrough(){
   // <img> even when the src is identical. Key includes phase+expanded (not
   // just photo URLs) so toggling "Show/Hide arrival instructions" — same
   // photos, different view — still re-renders.
-  const _wtKey=phase+'|'+(expanded?1:0)+'|'+photos.join(',');
+  const _wtKey=phase+'|'+(expanded?1:0)+'|'+(_un?1:0)+'|'+lang+'|'+photos.join(',');
   if(list.dataset.wtKey===_wtKey&&list.children.length>0)return;
   list.dataset.wtKey=_wtKey;
 
