@@ -62,6 +62,9 @@ def main(task, dry):
     if task == "xcv_now_probe":
         import xcv_now_probe as m
         return m.main()
+    if task == "three_weeks_probe":
+        import three_weeks_probe as m
+        return m.main()
     if task == "ideas_cleanup":
         import ideas_logic_cleanup as m
         return m.main(flag)
