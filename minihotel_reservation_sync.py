@@ -131,9 +131,8 @@ def login_minihotel():
     )
     print(f"[AUTH] POST login: status={resp.status_code} final_url={resp.url}")
 
-    # Debug: show all cookies received
-    for c in session.cookies:
-        print(f"[AUTH] Cookie: {c.name}={c.value[:40]!r} domain={c.domain}")
+    # Only the number of cookies is printed: their values are a live login and this log is public.
+    print(f"[AUTH] Cookies received: {len(list(session.cookies))}")
 
     # Verify we landed on the dashboard
     if 'login' in resp.url.lower() or 'dashboard' not in resp.url.lower():
@@ -162,10 +161,7 @@ def fetch_reservations(session, from_date, to_date):
     req_headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
     print(f"[API] Request URL: {url}")
     print(f"[API] Request headers: {req_headers}")
-    cookies_dict = {}
-    for cookie in session.cookies:
-        cookies_dict[f"{cookie.name}@{cookie.domain}"] = cookie.value
-    print(f"[API] Cookies being sent: {cookies_dict}")
+    print(f"[API] Cookies being sent: {len(list(session.cookies))} (values are never printed)")
 
     r = session.get(url, headers=req_headers)
 
@@ -1050,7 +1046,7 @@ def fetch_booking_ids(session, db, reservations):
 # Cancellation detection and the manual-room release keep looking only at the near window (they compare Firestore docs
 # against what MiniHotel returned, so a longer window must never widen what they are allowed to change).
 SYNC_DAYS_BACK = 7
-SYNC_DAYS_AHEAD = 365
+SYNC_DAYS_AHEAD = 450       # at least a year ahead, with room to spare (MiniHotel shows about 14 months)
 NEAR_DAYS_AHEAD = 60
 
 
