@@ -71,6 +71,12 @@ def main(task, dry):
     if task == "bigmoves_probe":
         import bigmoves_probe as m
         return m.main()
+    if task == "reservations_repair":
+        import reservations_repair as m
+        return m.main(flag)
+    if task == "vis_probe":
+        import vis_probe as m
+        return m.main()
     if task == "ideas_cleanup":
         import ideas_logic_cleanup as m
         return m.main(flag)

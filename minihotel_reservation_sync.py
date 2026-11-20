@@ -591,6 +591,11 @@ def detect_cancellations(db, api_reservations, from_date, to_date):
             continue  # can't key without a reservation number — skip safely
 
         if rn not in active_res_nums:
+            # A stay that is already over is never "cancelled" for dropping out of the answer: MiniHotel stops returning a stay
+            # on the day its check-out reaches the start of our look-back window, and that looked like a cancellation
+            # (1,100+ finished stays were wrongly marked, exactly 7 days after check-out). Only a stay that has not ended can be cancelled here.
+            if str(data.get('checkout') or '') < today.isoformat():
+                continue
             # Reservation is entirely gone from MiniHotel — true cancellation
             if data.get('status') != 'CANCELLED':
                 batch.update(doc.reference, {
