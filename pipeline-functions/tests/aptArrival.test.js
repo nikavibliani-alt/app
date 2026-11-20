@@ -102,3 +102,12 @@ test('normalizeTypeCfg drops junk and never keeps a code-like field', async () =
   assert.equal(t.steps.length, 1);
   assert.equal(t.steps[0].title, '');
 });
+
+test('{entrance code} is gated like the other codes', async () => {
+  const { fillPlaceholders } = await import('../../shared/apt-arrival.js');
+  const ctx = { entranceCode: '3435#', lockedText: 'Shown when your room is ready' };
+  assert.equal(fillPlaceholders('Enter {entrance code} at the gate', ctx, false), 'Enter Shown when your room is ready at the gate');
+  assert.equal(fillPlaceholders('Enter {entrance code} at the gate', ctx, true), 'Enter 3435# at the gate');
+  assert.equal(fillPlaceholders('{Building code}', ctx, true), '3435#');
+  assert.equal(fillPlaceholders('{entrance code}', { lockedText: 'x', missingText: 'contact host' }, true), 'contact host');
+});

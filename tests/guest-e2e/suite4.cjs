@@ -32,10 +32,31 @@ async function scenario(browser, name, extraDocs) {
   await env.ctx.close();
 }
 
+// {entrance code}: the unit's own code, else the type's (checkin_type_codes), only after unlock
+async function entranceScenario(browser, name, unitDoc, extraDocs, expected) {
+  const env = await h.open(browser, { apiOn: false, startIso: T_BEFORE });
+  await env.page.addInitScript(FAST);
+  await env.page.addInitScript(([docs, unit, photos]) => {
+    Object.assign(window.__DB.docs, docs);
+    window.__DB.docs['checkin_apartments/6-1'] = { ...window.__DB.docs['checkin_apartments/6-1'], ...unit, photos, photoCaptions: ['Gate', '{entrance code}', 'Lock box: {lock box code}'] };
+  }, [extraDocs, unitDoc, PHOTOS]);
+  await h.register(env, { apiOn: false });
+  const before = await listHtml(env.page);
+  assert.ok(!before.includes(expected) && !before.includes('{entrance code}'), name + ': no entrance code before unlock');
+  assert.ok(/Shown when your room is ready/.test(before));
+  await env.setClock(T_AFTER);
+  await env.page.waitForFunction(e => document.getElementById('hero-walkthrough-list').innerHTML.includes(e), expected, { timeout: 20000 });
+  ok(name + ': hidden before unlock, shown after unlock');
+  assert.deepEqual(env.logs.filter(l => l.startsWith('PAGEERROR')), []);
+  await env.ctx.close();
+}
+
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined, args: ['--no-sandbox'] });
   await scenario(browser, 'own photo steps', {});
   await scenario(browser, 'type steps', { 'checkin_admin/config': { aptTypes: { MAXELA: { access: { method: '' }, steps: [{ id: 's1', title: 'Gate', text: 'Gate code is 7788# then walk in', photo: '', perUnitPhoto: false }] } } } });
+  await entranceScenario(browser, 'entrance code of the unit', { entranceCode: '9911#', lockboxCode: '5544' }, {}, '9911#');
+  await entranceScenario(browser, 'entrance code of the type', { lockboxCode: '5544' }, { 'checkin_type_codes/MAXELA': { entranceCode: '6622#' } }, '6622#');
   console.log('\nALL ' + passed + ' CODE-MASKING CHECKS PASSED');
   await browser.close();
 })().catch(e => { console.error('FAIL', e); process.exit(1); });

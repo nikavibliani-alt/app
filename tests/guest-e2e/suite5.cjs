@@ -1,0 +1,36 @@
+// Admin: the Entrance / building code fields (per unit, per type) save where the guest page reads them.
+const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const assert = require('assert');
+const h = require('./e2e.cjs');
+let passed = 0; const ok = n => { passed++; console.log('PASS ' + n); };
+(async () => {
+  const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined, args: ['--no-sandbox'] });
+  const env = await h.open(browser, { apiOn: true, startIso: '2026-10-12T06:00:00Z' });
+  await env.page.addInitScript(() => { localStorage.setItem('maxela_admin_authed', 'yes_' + Date.now()); });
+  await env.page.goto('http://test.local/checkin-admin.html');
+  await env.page.waitForFunction(() => typeof window.openAptEditor === 'function' && typeof window.openAptType === 'function', null, { timeout: 20000 });
+  await env.page.waitForTimeout(1500);
+  await env.page.evaluate(() => window.openAptEditor('6-1'));
+  await env.page.waitForSelector('#apt-entranceCode', { timeout: 5000 });
+  await env.page.fill('#apt-entranceCode', '9911#');
+  await env.page.evaluate(() => window.saveAptData ? window.saveAptData() : window.saveApt());
+  await env.page.waitForTimeout(500);
+  let docs = await env.page.evaluate(() => JSON.parse(JSON.stringify(window.__DB.docs)));
+  assert.equal(docs['checkin_apartments/6-1'].entranceCode, '9911#');
+  ok('unit page: entrance code field saves on the apartment');
+  await env.page.screenshot({ path: process.env.SHOT_UNIT || '/dev/null' });
+  await env.page.evaluate(() => { window.closeAptEditor && window.closeAptEditor(); });
+  await env.page.evaluate(() => { window.openAptType('MAXELA'); window.atSetTab('steps'); });
+  await env.page.waitForSelector('#at-entrance-code', { timeout: 5000 });
+  await env.page.fill('#at-entrance-code', '6622#');
+  await env.page.evaluate(() => window.atSaveEntranceCode());
+  await env.page.waitForTimeout(500);
+  docs = await env.page.evaluate(() => JSON.parse(JSON.stringify(window.__DB.docs)));
+  assert.equal(docs['checkin_type_codes/MAXELA'].entranceCode, '6622#');
+  assert.ok(!JSON.stringify(docs['checkin_admin/config'] || {}).includes('6622'), 'the code is never saved inside the type config');
+  ok('type page: entrance code saves in checkin_type_codes, never in the config');
+  await env.page.screenshot({ path: process.env.SHOT_TYPE || '/dev/null' });
+  assert.deepEqual(env.logs.filter(l => l.startsWith('PAGEERROR')), []);
+  console.log('\nALL ' + passed + ' ADMIN ENTRANCE CODE CHECKS PASSED');
+  await browser.close();
+})().catch(e => { console.error('FAIL', e); process.exit(1); });

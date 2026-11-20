@@ -496,6 +496,7 @@ html.inbox-typing #main-nav{display:none}
 .apt-card-bd{padding:14px;}
 .apt-label{display:block;font-size:var(--label);font-weight:var(--label-weight);letter-spacing:var(--label-track);color:var(--muted);margin-bottom:6px;}
 .apt-input,.apt-textarea{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--rs);font-size:16px;font-family:var(--sans);background:var(--bg);margin-bottom:10px;}
+.apt-input:focus,.apt-textarea:focus{outline:none;border-color:var(--ink);}
 .apt-textarea{min-height:100px;resize:vertical;line-height:1.45;}
 .apt-mode-group{display:flex;gap:6px;margin-bottom:12px;}
 .apt-mode-btn{flex:1;min-height:40px;border:1.5px solid var(--line);border-radius:var(--rs);background:var(--bg);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);}
@@ -834,7 +835,7 @@ html.inbox-typing #main-nav{display:none}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1015c · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1016 · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -5977,7 +5978,20 @@ function atThumb(url,missing){
 }
 
 /* ---- type page (overlay) ---- */
+const _atTypeCode={};   // entrance code per type, from checkin_type_codes (a code, so never inside the type config)
+async function atLoadTypeCode(group){
+  try{const s=await getDoc(doc(db,'checkin_type_codes',group));_atTypeCode[group]=s.exists()?String(s.data().entranceCode||''):'';}catch(e){}
+  if(_at.group===group&&_at.draft&&_at.view==='main'){const i=document.getElementById('at-entrance-code');if(i&&document.activeElement!==i)i.value=_atTypeCode[group]||'';}
+}
+window.atSaveEntranceCode=async function(){
+  const g=_at.group,v=(document.getElementById('at-entrance-code')?.value||'').trim();
+  try{
+    await setDoc(doc(db,'checkin_type_codes',g),{entranceCode:v,updatedAt:serverTimestamp()},{merge:true});
+    _atTypeCode[g]=v;toast(v?'Entrance code saved':'Entrance code cleared');
+  }catch(e){toast('Save failed: '+e.message);}
+};
 window.openAptType=function(group){
+  atLoadTypeCode(group);
   _at.group=group;_at.tab='units';_at.view='main';_at.editIdx=-1;
   _at.draft=atClone(atSaved(group));
   _at.base=JSON.stringify(_at.draft);
@@ -6058,6 +6072,12 @@ function atStepsHtml(){
       </div></div>`;
   }).join('');
   return`${atAccessCardHtml()}
+    <div class="apt-card"><div class="apt-card-hd">Entrance / building code</div><div class="apt-card-bd">
+      <label class="apt-label">Code for all units of this type (optional)</label>
+      <input class="apt-input" id="at-entrance-code" value="${esc(_atTypeCode[_at.group]||'')}" placeholder="1234#" autocomplete="off">
+      <button type="button" class="btn" style="min-height:40px;margin-top:8px;color:var(--ink)" onclick="atSaveEntranceCode()">Save code</button>
+      <p class="apt-hint" style="margin-top:8px">Use the words {entrance code} in a step. Guests see the code only once their room is ready. A unit can have its own code instead. It is saved on its own, not with the steps.</p>
+    </div></div>
     <div class="apt-card"><div class="apt-card-hd">Arrival steps</div><div class="apt-card-bd">
       ${list||'<div class="at-muted" style="padding:6px 0">No shared steps yet. Guests see each unit\'s own steps, as today.</div>'}
       <button type="button" class="apt-add" onclick="atAddStep()">+ Add step for all ${n} units</button>
@@ -6379,6 +6399,14 @@ window.openAptEditor=function(aptId){
       </div>
     </div>
     <div class="apt-card">
+      <div class="apt-card-hd">Entrance / building code</div>
+      <div class="apt-card-bd">
+        <label class="apt-label">This unit's entrance code (optional)</label>
+        <input class="apt-input" id="apt-entranceCode" value="${esc(d.entranceCode||'')}" placeholder="${_atTypeCode[group]?'Same as the type':'1234#'}" autocomplete="off">
+        <p class="apt-hint">Use the words {entrance code} in a step. Guests see the code only once their room is ready. Left empty, the type's code is used.</p>
+      </div>
+    </div>
+    <div class="apt-card">
       <div class="apt-card-hd">Arrival steps</div>
       <div class="apt-card-bd">
         ${shared||''}
@@ -6563,6 +6591,7 @@ window.saveAptData=async function(){
     instructions:document.getElementById('apt-instructions')?.value.trim()||'',
     videoUrl:document.getElementById('apt-videoUrl')?.value.trim()||'',
     accessMethod:_ae.override||'',
+    entranceCode:document.getElementById('apt-entranceCode')?document.getElementById('apt-entranceCode').value.trim():(aptData[aptId]?.entranceCode||''),
     lockboxCode:document.getElementById('apt-lockboxCode')?document.getElementById('apt-lockboxCode').value.trim():(aptData[aptId]?.lockboxCode||''),
     photos:aptData[aptId]?.photos||[],
     photoCaptions,

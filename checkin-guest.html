@@ -5137,9 +5137,23 @@ function _arrivalNow(){
   if(!guestFullCfg&&!_cfgKick){_cfgKick=true;getFullCfg().then(()=>{const l=document.getElementById('hero-walkthrough-list');if(l)l.dataset.wtKey='';try{_renderWalkthrough();_renderAccess();}catch(e){}}).catch(()=>{});}
   return resolveArrival(_typeCfgNow(),aptData||{});
 }
+// The entrance / building code: the unit's own, else its type's (checkin_type_codes/{GROUP}). Read only once the guest is unlocked.
+const _typeCodes={};
+function _entranceCodeForGuest(){
+  if(isPreviewMode())return'0000';
+  const own=String(aptData?.entranceCode||'').trim();
+  if(own)return own;
+  if(!isUnlocked())return'';
+  const g=_unitGroup();
+  if(_typeCodes[g]===undefined){
+    _typeCodes[g]='';
+    getDoc(doc(db,'checkin_type_codes',g)).then(s=>{_typeCodes[g]=s.exists()?String(s.data().entranceCode||'').trim():'';const l=document.getElementById('hero-walkthrough-list');if(l)l.dataset.wtKey='';try{_renderWalkthrough();}catch(e){}}).catch(()=>{delete _typeCodes[g];});
+  }
+  return _typeCodes[g]||'';
+}
 function _stepCtx(){
   return{room:(_roomMeta&&_roomMeta.id===aptId&&_roomMeta.displayCode)||aptId,doorCode:_doorCodeForGuest(),
-    lockboxCode:isPreviewMode()?'0000':String(aptData?.lockboxCode||''),elevatorCode:_elevatorCodeForGuest(),
+    lockboxCode:isPreviewMode()?'0000':String(aptData?.lockboxCode||''),entranceCode:_entranceCodeForGuest(),elevatorCode:_elevatorCodeForGuest(),
     lockedText:t('codeWhenReady'),missingText:'contact host'};
 }
 function _renderWalkthroughTyped(list,wrap,arrival){
@@ -5147,7 +5161,7 @@ function _renderWalkthroughTyped(list,wrap,arrival){
   const expanded=wrap.classList.contains('wt-expanded');
   const ctx=_stepCtx();
   const unlocked=isUnlocked();
-  const key='T|'+phase+'|'+(expanded?1:0)+'|'+lang+'|'+(unlocked?1:0)+'|'+JSON.stringify(arrival.steps)+'|'+[ctx.room,ctx.doorCode,ctx.lockboxCode,ctx.elevatorCode].join('~');
+  const key='T|'+phase+'|'+(expanded?1:0)+'|'+lang+'|'+(unlocked?1:0)+'|'+JSON.stringify(arrival.steps)+'|'+[ctx.room,ctx.doorCode,ctx.lockboxCode,ctx.entranceCode,ctx.elevatorCode].join('~');
   if(list.dataset.wtKey===key&&list.children.length>0)return;
   list.dataset.wtKey=key;
   if(phase==='leaving'){list.innerHTML='';wrap.style.display='none';window._lbPhotos=[];window._lbCaps=[];return;}
@@ -5236,7 +5250,8 @@ function _renderWalkthrough(){
   list.dataset.wtKey=(list.dataset.wtKey||'').replace(/^T\|.*/,'');   // back to today's rendering
   const photos=aptData?.photos||[];
   const _un=isUnlocked();
-  const caps=((previewScrub(aptData)||{}).photoCaptions||[]).map(maskUntilUnlocked);
+  const _ctx=_stepCtx();
+  const caps=((previewScrub(aptData)||{}).photoCaptions||[]).map(c=>maskUntilUnlocked(fillPlaceholders(c,_ctx,_un)));
   const phase=_homePhase();
   const expanded=wrap.classList.contains('wt-expanded');
 
@@ -5246,7 +5261,7 @@ function _renderWalkthrough(){
   // <img> even when the src is identical. Key includes phase+expanded (not
   // just photo URLs) so toggling "Show/Hide arrival instructions" — same
   // photos, different view — still re-renders.
-  const _wtKey=phase+'|'+(expanded?1:0)+'|'+(_un?1:0)+'|'+lang+'|'+photos.join(',');
+  const _wtKey=phase+'|'+(expanded?1:0)+'|'+(_un?1:0)+'|'+lang+'|'+_ctx.entranceCode+'|'+_ctx.lockboxCode+'|'+photos.join(',');
   if(list.dataset.wtKey===_wtKey&&list.children.length>0)return;
   list.dataset.wtKey=_wtKey;
 

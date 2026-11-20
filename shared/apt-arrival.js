@@ -4,7 +4,8 @@
  *   { access:{ method:'smartlock'|'code'|'lockbox'|'handover', entranceCard, lockboxWhere, lockboxPhoto,
  *              handoverWho, handoverPhone, handoverWhere, returnNote },
  *     steps:[{ id, title, text, photo, perUnitPhoto }], updatedAt }
- * Unit (checkin_apartments/{unit}) keeps its own fields and adds: accessMethod ('' = same as type), lockboxCode,
+ * The type's entrance / building code is NOT here: it is in checkin_type_codes/{GROUP}.entranceCode (a code, so never in the config).
+ * Unit (checkin_apartments/{unit}) keeps its own fields and adds: accessMethod ('' = same as type), lockboxCode, entranceCode (own code, beats the type's),
  *   stepPhotos:{[stepId]:url}. The unit's own steps stay photos[] + photoCaptions[].
  * With nothing saved for a type, resolveArrival() gives exactly what the guest page shows today.
  */
@@ -144,9 +145,9 @@ export function resolveArrival(typeCfg, unit, ctx = {}) {
 }
 
 /*
- * Fills {room}, {door code}, {lock box code}, {elevator code} (and the old #elevatorcode).
- * ctx: { room, doorCode, lockboxCode, elevatorCode, lockedText }
- * The three codes are filled ONLY when `unlocked` is true; before that they show lockedText
+ * Fills {room}, {door code}, {lock box code}, {entrance code}, {elevator code} (and the old #elevatorcode).
+ * ctx: { room, doorCode, lockboxCode, entranceCode, elevatorCode, lockedText }
+ * The four codes are filled ONLY when `unlocked` is true; before that they show lockedText
  * (the same "shown when your room is ready" text the code box uses). {room} is not secret.
  */
 export function fillPlaceholders(text, ctx = {}, unlocked = false) {
@@ -156,13 +157,14 @@ export function fillPlaceholders(text, ctx = {}, unlocked = false) {
   out = out.replace(/\{\s*room\s*\}/gi, ctx.room || '');
   out = out.replace(/\{\s*door[ _-]?code\s*\}/gi, () => code(ctx.doorCode));
   out = out.replace(/\{\s*lock[ _-]?box[ _-]?code\s*\}/gi, () => code(ctx.lockboxCode));
+  out = out.replace(/\{\s*(?:entrance|building)[ _-]?code\s*\}/gi, () => code(ctx.entranceCode));
   out = out.replace(/\{\s*elevator[ _-]?code\s*\}/gi, () => code(ctx.elevatorCode));
   out = out.replace(/#elevatorcode/g, () => (ctx.elevatorCode ? String(ctx.elevatorCode) : (ctx.missingText || 'contact host')));
   return out;
 }
 
 /* the placeholders offered in the admin editor */
-export const PLACEHOLDERS = ['{room}', '{door code}', '{lock box code}', '{elevator code}'];
+export const PLACEHOLDERS = ['{room}', '{door code}', '{lock box code}', '{entrance code}', '{elevator code}'];
 
 /* What is missing for one unit, in plain words (empty list = ready). `unit` = checkin_apartments data, `noLock` = the type has no door code box. */
 export function unitProblems(typeCfg, unitCode, unit, opts = {}) {

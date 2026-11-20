@@ -17,7 +17,7 @@ const { isLikelyGuestToken } = require('../lib/guest-token');
 
 const PUBLIC_RES_FIELDS = ['reservationNumber', 'roomCode', 'checkin', 'checkIn', 'checkout', 'checkOut', 'status', 'guest', 'guestName', 'source'];
 const APT_ALWAYS_REMOVE = ['tuyaDeviceId', 'updatedAt'];
-const APT_LOCKED_REMOVE = ['doorCode', 'lockboxCode', 'wifiName', 'wifiPass', 'doorPhotoUrl', 'videoUrl'];
+const APT_LOCKED_REMOVE = ['doorCode', 'lockboxCode', 'entranceCode', 'wifiName', 'wifiPass', 'doorPhotoUrl', 'videoUrl'];
 
 // ---------------------------------------------------------------- helpers
 

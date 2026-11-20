@@ -318,3 +318,9 @@ test('guest-match.js is an exact copy of the guest page code', async () => {
   const current = fs.readFileSync(path.join(__dirname, '../lib/guest-match.js'), 'utf8');
   assert.equal(current, build(), 'run: node scripts/sync-guest-match.js');
 });
+
+test('filterApt removes the unit entrance code before unlock and keeps it after', () => {
+  const apt = { doorCode: '1', lockboxCode: '2', entranceCode: '3435#', address: 'x' };
+  assert.equal(api.filterApt(apt, false).entranceCode, undefined);
+  assert.equal(api.filterApt(apt, true).entranceCode, '3435#');
+});
