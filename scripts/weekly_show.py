@@ -18,6 +18,7 @@ def main(argv=None, db=None):
               f"removed {len(r.get('removed') or [])} edited {r.get('edited')} | draft items {r.get('draft_items')} | notes {len(n.get('data_notes') or [])}")
         for x in (r.get("removed") or [])[:10]:
             print(f"   removed {x.get('id')}: {x.get('why')}")
+        print("   error:", r.get("error"), "| draft items:", r.get("draft_items"))
         print("   headline:", (r.get("headline") or "")[:300])
         print("   headline by:", r.get("headline_by"), "|", r.get("headline_note"), "| checker headline:", r.get("check_headline"))
         rooms_ = n.get("rooms") or {}
