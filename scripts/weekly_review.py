@@ -50,6 +50,8 @@ def main(argv=None, db=None, now=None, send=None, analyst_client=None, checker_c
     tot = {k: sum(r.get(k) or 0 for r in numbers["rooms"].values()) for k in ("bookings_made", "nights_sold", "price_raises_written", "price_drops_written", "cancellations", "cancellations_changed", "cancellations_after_stay")}
     print(f"Weekly numbers {week_from} to {week_to}: {len(numbers['rooms'])} rooms | {tot} | runs {numbers['all']['runs']} | notes {len(numbers['data_notes'])}")
     if args.dry:
+        print("Totals:", numbers.get("totals"))
+        print("Average sold price per room (lari):", {k: v.get("avg_sold_price_gel") for k, v in sorted(numbers["rooms"].items())})
         print("Dry run: no AI call, nothing saved, nothing sent.")
         return {"numbers": numbers}
     api = env.get("ANTHROPIC_API_KEY", "")
