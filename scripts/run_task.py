@@ -65,6 +65,9 @@ def main(task, dry):
     if task == "three_weeks_probe":
         import three_weeks_probe as m
         return m.main()
+    if task == "three_weeks_probe2":
+        import three_weeks_probe2 as m
+        return m.main()
     if task == "ideas_cleanup":
         import ideas_logic_cleanup as m
         return m.main(flag)
