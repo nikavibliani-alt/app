@@ -2,6 +2,7 @@
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const assert = require('assert');
 const h = require('./e2e.cjs');
+const { runCancelledBooking } = require('../../pipeline-functions/controllers/cancelledBooking.js');
 let passed = 0; const ok = n => { passed++; console.log('PASS ' + n); };
 const FAST = `(() => { const si = window.setInterval; window.setInterval = (f, ms, ...a) => si(f, ms === 60000 ? 1000 : ms, ...a); })();`;
 const T_BEFORE = '2026-10-12T06:00:00Z';   // 10:00 Tbilisi on the arrival day: not ready yet
@@ -51,12 +52,46 @@ async function entranceScenario(browser, name, unitDoc, extraDocs, expected) {
   await env.ctx.close();
 }
 
+// a guest who is unlocked and sees the door code; then the booking is cancelled and the real controller blocks the guest record
+async function cancelScenario(browser) {
+  const env = await h.open(browser, { apiOn: false, startIso: T_AFTER });
+  await env.page.addInitScript(FAST);
+  await h.register(env, { apiOn: false });
+  await env.page.waitForFunction(() => /482913/.test(document.getElementById('hero-door-code')?.textContent || ''), null, { timeout: 20000 });
+  ok('booked guest after unlock sees the door code');
+  const docs = () => env.page.evaluate(() => JSON.parse(JSON.stringify(window.__DB.docs)));
+  const before = (await docs())['reservations/007004961_001'];
+  await env.page.evaluate(() => window.__DBAPI.set('reservations/007004961_001', { status: 'CANCELLED' }, true));
+  const after = (await docs())['reservations/007004961_001'];
+  const col = d => Object.entries(d).filter(([k]) => k.startsWith('checkin_guests/')).map(([k, v]) => ({ id: k.split('/')[1], ...v }));
+  const ctx = {
+    now: () => new Date().toISOString(),
+    listGuests: async ids => col(await docs()).filter(g => ids.includes(g.matchedReservationId)),
+    hasOtherLiveBooking: async () => false,
+    updateGuest: (id, data) => env.page.evaluate(([i, d]) => window.__DBAPI.set('checkin_guests/' + i, d, true), [id, data]),
+    deleteTuyaPassword: async () => ({ skipped: true }),
+    logRun: async e => { ctx.logged = e; },
+  };
+  const r = await runCancelledBooking(ctx, '007004961_001', before, after);
+  assert.ok(r.guestsBlocked >= 1, 'the guest record is blocked automatically');
+  const g = col(await docs()).find(x => x.accessDisabledByAdmin === true);
+  assert.equal(g.accessDisabledReason, 'booking cancelled');
+  assert.equal(ctx.logged.controller, 'CancelledBooking');
+  await env.page.waitForFunction(() => !/482913/.test(document.getElementById('hero-door-code')?.textContent || ''), null, { timeout: 20000 });
+  const txt = await env.page.evaluate(() => document.body.innerText);
+  assert.ok(!/482913/.test(txt), 'the door code is gone from the page');
+  ok('cancelled booking: the guest record is blocked automatically (reason "booking cancelled", logged) and the page no longer shows the door code');
+  assert.deepEqual(env.logs.filter(l => l.startsWith('PAGEERROR')), []);
+  await env.ctx.close();
+}
+
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined, args: ['--no-sandbox'] });
   await scenario(browser, 'own photo steps', {});
   await scenario(browser, 'type steps', { 'checkin_admin/config': { aptTypes: { MAXELA: { access: { method: '' }, steps: [{ id: 's1', title: 'Gate', text: 'Gate code is 7788# then walk in', photo: '', perUnitPhoto: false }] } } } });
   await entranceScenario(browser, 'entrance code of the unit', { entranceCode: '9911#', lockboxCode: '5544' }, {}, '9911#');
   await entranceScenario(browser, 'entrance code of the type', { lockboxCode: '5544' }, { 'checkin_type_codes/MAXELA': { entranceCode: '6622#' } }, '6622#');
+  await cancelScenario(browser);
   console.log('\nALL ' + passed + ' CODE-MASKING CHECKS PASSED');
   await browser.close();
 })().catch(e => { console.error('FAIL', e); process.exit(1); });

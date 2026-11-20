@@ -46,7 +46,9 @@ exports.pushOnDamageReport = pushOnDamageReport;
 exports.pushOnElevatorAlert = pushOnElevatorAlert;
 
 const { registerCloudFunction: registerHotelCollectAlert } = require('./controllers/hotelCollectAlert');
+const { registerCloudFunction: registerCancelledBooking } = require('./controllers/cancelledBooking');
 exports.pushOnHotelCollect = registerHotelCollectAlert();
+exports.blockOnCancelledBooking = registerCancelledBooking();
 
 const { registerCloudFunction: registerInboxEmailIngest } = require('./controllers/inboxEmailIngest');
 exports.inboxEmailIngest = registerInboxEmailIngest();
