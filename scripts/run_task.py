@@ -86,6 +86,9 @@ def main(task, dry):
     if task == "xcv_test_mark":
         import xcv_test_mark as m
         return m.main(flag)
+    if task == "new_listing_probe":
+        import new_listing_probe as m
+        return m.main()
     if task == "ideas_cleanup":
         import ideas_logic_cleanup as m
         return m.main(flag)
