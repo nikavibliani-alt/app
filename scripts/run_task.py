@@ -83,6 +83,9 @@ def main(task, dry):
     if task == "orbe2_test_undo":
         import orbe2_test as m
         return m.main(flag + ["--undo"])
+    if task == "xcv_test_mark":
+        import xcv_test_mark as m
+        return m.main(flag)
     if task == "ideas_cleanup":
         import ideas_logic_cleanup as m
         return m.main(flag)

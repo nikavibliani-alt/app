@@ -150,3 +150,20 @@ def test_the_weekly_numbers_compare_the_three_weeks_before_with_the_days_since_t
     assert "owner_tests" in wn.GUIDE
     d["owner_tests"][0]["from"] = "2026-12-01"                                                                                    # not started yet this week: not shown
     assert wn.build(d, "2026-11-17", "2026-11-23")["all"]["owner_tests"] == []
+
+
+def test_the_xcv_owner_test_is_marked_once_per_room_and_has_no_end_date():
+    x = importlib.import_module("xcv_test_mark")
+    db = DB()
+    assert x.main(["--dry"], db=db) == {"todo": ["XCV_1", "XCV_2"]} and "pricing_changes" not in db.store
+    assert x.main([], db=db)["written"] == 2
+    marks = list(db.store["pricing_changes"].values())
+    assert {m["test"]["room"] for m in marks} == {"XCV_1", "XCV_2"} and all(m["type"] == "owner_test" and m["test"]["from"] == "2026-11-03" and m["test"]["to"] is None for m in marks)
+    assert x.main([], db=db) == {"todo": []} and len(db.store["pricing_changes"]) == 2
+    # the weekly numbers accept a test without an end date and compare the 3 weeks before 3 Nov with the days since
+    stays = [stay("2026-10-20", "2026-10-25", "2026-10-26", rt="XCV_1"), stay("2026-11-05", "2026-11-06", "2026-11-08", rt="XCV_1"), stay("2026-11-07", "2026-11-09", "2026-11-10", rt="XCV_1")]
+    d = {"price_events": [], "booking_events": [], "runs": [], "watchdog_days": {}, "stays": stays, "limits": None, "room_ids": ["XCV_1"], "since": "2026-10-09",
+         "owner_tests": [{"name": m["test"]["name"], "room": m["test"]["room"], "from": m["test"]["from"], "to": m["test"]["to"], "change": m["test"]["change"]} for m in marks]}
+    t = wn.build(d, "2026-11-09", "2026-11-15")["all"]["owner_tests"]
+    one = [x_ for x_ in t if x_["room"] == "XCV_1"][0]
+    assert one["before"]["bookings"] == 1 and one["since_start"]["bookings"] == 2 and one["since_start"]["days"] == 13 and one["days_run"] == 13 and one["planned_end"] is None
