@@ -45,6 +45,7 @@ GUIDE = {
     "bookings_made": "Bookings made this week (by booking date).",
     "nights_sold": "Nights in those bookings.",
     "avg_sold_price_gel": "Average price per night of those bookings, in lari. Bookings paid in dollars are converted at the rate in all.fx_note.",
+    "owner_tests": "Tests the owner started on purpose (for example a lowered minimum). Each has the room, the dates, and bookings, nights and average price in lari for the 3 weeks BEFORE the start against the days since the start (by booking date), and per week so they can be compared fairly. Always say how many days of the test have passed: a short test proves little.",
     "totals": "The same numbers added up over all rooms (the whole property). Use these for property-wide statements.",
     "price_raises_written": "How many times a price was raised and written to MiniHotel. One count = one night, in one price list (Booking in lari or Airbnb in dollars), in one run. The same night can be counted many times. It is NOT a number of nights.",
     "price_drops_written": "How many times a price was lowered and written to MiniHotel. One count = one night, in one price list, in one run. The same night can be counted many times. It is NOT a number of nights.",
@@ -89,6 +90,30 @@ def numbers_headline(numbers: dict) -> str:
 
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _owner_tests(tests: list, stays: list, week_to: str, fx: dict) -> list:
+    """Each owner test: the room's bookings made in the 3 weeks before the start against the days since (to the end of the test or of this week)."""
+    out = []
+    for t in tests:
+        room, start = t.get("room"), str(t.get("from") or "")[:10]
+        if not room or not start or start > week_to:
+            continue
+        end = min(str(t.get("to") or week_to)[:10], week_to)
+        b_from = (date.fromisoformat(start) - timedelta(days=21)).isoformat()
+        b_to = (date.fromisoformat(start) - timedelta(days=1)).isoformat()
+
+        def block(a, b):
+            days = (date.fromisoformat(b) - date.fromisoformat(a)).days + 1
+            ss = [s for s in stays if s["rt"] == room and s.get("created") and a <= s["created"] <= b]
+            nights = sum((date.fromisoformat(s["checkout"]) - date.fromisoformat(s["checkin"])).days for s in ss)
+            prices = [p for p in (_gel(s.get("per_night"), s.get("currency"), fx) for s in ss) if p]
+            return {"from": a, "to": b, "days": days, "bookings": len(ss), "nights": nights, "avg_price_gel": _avg(prices),
+                    "bookings_per_week": round(len(ss) / days * 7, 1) if days > 0 else None}
+        out.append({"name": t.get("name"), "room": room, "change": t.get("change"), "started": start, "planned_end": t.get("to"),
+                    "days_run": max(0, (date.fromisoformat(end) - date.fromisoformat(start)).days + 1),
+                    "before": block(b_from, b_to), "since_start": block(start, end) if end >= start else None})
+    return out
 
 
 def week_key(iso: str) -> str:
@@ -190,6 +215,7 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
         if week_from <= day <= week_to:
             changes.append({"day": day, "old": c.get("old"), "new": c.get("new")})
     all_["season_date_changes"] = {"count": len(changes), "list": changes[:5]}
+    all_["owner_tests"] = _owner_tests(data.get("owner_tests") or [], stays, week_to, fx)
     usd = (fx or {}).get("USD")
     all_["fx_note"] = f"Stays paid in dollars are converted to lari at 1 dollar = {usd:g} lari (the engine's rate)." if usd else ""
     um = data.get("season_unmarked") or []
@@ -381,10 +407,19 @@ def load(db, now: datetime) -> dict:
             season_unmarked = _sn.unmarked(_sn.parse(raw)[0])
     except Exception:
         pass
+    owner_tests = []
+    try:
+        for d in db.collection("pricing_changes").where("type", "==", "owner_test").stream():
+            c = d.to_dict() or {}
+            t = c.get("test") or {}
+            if t.get("room") and t.get("from"):
+                owner_tests.append({"name": t.get("name") or c.get("detail"), "room": t["room"], "from": t["from"], "to": t.get("to"), "change": t.get("change")})
+    except Exception:
+        pass
     ssum = db.collection("pricing_scorecard").document("_summary").get()
     cancel_class = changed_cancellations(db, by_day("pmslog_booking_events"))
     return {"price_events": by_day("pmslog_price_events"), "booking_events": by_day("pmslog_booking_events"),
-            "runs": by_day("pricing_calm_runs"), "watchdog_days": wd, "watchdog_why": wd_why, "stays": sc.priced_stays(db, today, back_days=120), "fx": dict(cfg.get("fx") or FX_DEFAULT),
+            "runs": by_day("pricing_calm_runs"), "watchdog_days": wd, "watchdog_why": wd_why, "owner_tests": owner_tests, "stays": sc.priced_stays(db, today, back_days=120), "fx": dict(cfg.get("fx") or FX_DEFAULT),
             "limits": limits, "cancel_class": cancel_class, "season_changes": season_changes, "season_unmarked": season_unmarked, "scorecard": ssum.to_dict() if ssum.exists else {},
             "twin_results": [d.to_dict() or {} for d in db.collection("pricing_twin_results").stream()],
             "events": [dict(d.to_dict() or {}, date=(d.to_dict() or {}).get("date") or d.id.replace("event_", "")) for d in db.collection("pricing_events").stream()],

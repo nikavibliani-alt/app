@@ -77,6 +77,12 @@ def main(task, dry):
     if task == "vis_probe":
         import vis_probe as m
         return m.main()
+    if task == "orbe2_test":
+        import orbe2_test as m
+        return m.main(flag)
+    if task == "orbe2_test_undo":
+        import orbe2_test as m
+        return m.main(flag + ["--undo"])
     if task == "ideas_cleanup":
         import ideas_logic_cleanup as m
         return m.main(flag)

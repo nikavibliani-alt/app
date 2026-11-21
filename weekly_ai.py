@@ -31,6 +31,7 @@ Rules:
   a "held back by the morning-only rule" count is normal and by design: never list it as a problem;
   "same_day" numbers are the arrival-day drops (the 12:00 and 17:00 steps): give them their own sentence and say how many of those nights were booked;
   a week number (like "week 46") is a label, not data: do not quote it as a number;
+  "owner_tests": tests the owner started on purpose: give each one sentence comparing the 3 weeks before with the days since the start (bookings per week, nights, average price), and say how many days have passed; never claim the change caused the result;
   only report REAL problems: channel push failures, safety stops, watchdog red days whose reason is not a rule the engine follows on purpose, rooms that sold nothing, data that is missing. Do not turn normal behaviour into a problem;
 - If the data is thin or missing (see data_notes), say that plainly instead of guessing. A zero is a fact only when the JSON says 0.
 - Plain words an owner understands. No jargon, no ALL CAPS, no emojis.
