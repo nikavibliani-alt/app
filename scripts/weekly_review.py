@@ -52,6 +52,9 @@ def main(argv=None, db=None, now=None, send=None, analyst_client=None, checker_c
     if args.dry:
         print("Totals:", numbers.get("totals"))
         print("Average sold price per room (lari):", {k: v.get("avg_sold_price_gel") for k, v in sorted(numbers["rooms"].items())})
+        print("Same-day drops per room (drops / nights / booked same day):", {k: (v.get("same_day_price_drops"), v.get("same_day_nights_lowered"), v.get("same_day_nights_lowered_then_booked")) for k, v in sorted(numbers["rooms"].items())})
+        print("Watchdog red days and why:", numbers["all"].get("watchdog_red_day_reasons"))
+        print("Owner tests:", numbers["all"].get("owner_tests"))
         print("Dry run: no AI call, nothing saved, nothing sent.")
         return {"numbers": numbers}
     api = env.get("ANTHROPIC_API_KEY", "")
