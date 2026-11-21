@@ -107,6 +107,22 @@ def send_alert(to, issue, post=requests.post, env=os.environ, label=GUEST_LABEL)
     return None
 
 
+def day_reasons(old_issues: list, new_issues: list, cap: int = 15) -> dict:
+    """The reasons a day was red, kept for the weekly report: every different problem seen at any run that day (first `cap` of them)
+    and one plain sentence per kind. Only room, date and the engine's own sentence are stored (no guest data)."""
+    seen, merged_ = set(), []
+    for i in list(old_issues) + list(new_issues):
+        key = (i.get("code"), i.get("text"))
+        if key in seen:
+            continue
+        seen.add(key)
+        merged_.append({"code": i.get("code"), "rt": i.get("rt"), "date": i.get("date"), "text": i.get("text")})
+    counts = {}
+    for i in merged_:
+        counts[i["code"]] = counts.get(i["code"], 0) + 1
+    return {"issues": merged_[:cap], "counts": counts, "why": short_issues({"counts": counts}) if counts else ""}
+
+
 def main(argv=None, db=None, post=requests.post, now=None, env=os.environ):
     parser = argparse.ArgumentParser(description="Price watchdog")
     parser.add_argument("--no-send", action="store_true")
@@ -135,7 +151,7 @@ def main(argv=None, db=None, post=requests.post, now=None, env=os.environ):
         print("Watchdog: waiting | no run yet today, nothing checked")
         db.collection("pricing_watchdog").document("latest").set(doc)
         return {"result": {"status": "waiting", "issues": [], "counts": {}, "checked": 0}, "doc": doc}
-    result = check(daily, states, run_view, cfg, now, live_rts=list(live_rts))
+    result = check(daily, states, run_view, cfg, now, live_rts=live_rts)
     paused = bool(last and last.get("paused"))
 
     try:
@@ -175,8 +191,10 @@ def main(argv=None, db=None, post=requests.post, now=None, env=os.environ):
         hist = db.collection("pricing_watchdog_days").document(today)
         prev = hist.get()
         was_red = prev.exists and (prev.to_dict() or {}).get("status") == "red"
+        old = (prev.to_dict() or {}) if prev.exists else {}
+        why = day_reasons(old.get("issues") or [], result["issues"] if result["status"] == "red" else [])
         hist.set({"property_id": "maxela", "day": today, "status": "red" if (result["status"] == "red" or was_red) else result["status"],
-                  "last": result["status"], "ts": now.isoformat()})
+                  "last": result["status"], "ts": now.isoformat(), "issues": why["issues"], "why": why["why"], "reason_counts": why["counts"]})
     except Exception:
         pass
     return {"result": result, "doc": doc}

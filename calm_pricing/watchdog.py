@@ -4,7 +4,7 @@ no network, no database. `scripts/price_watchdog.py` feeds it from Firestore and
 
 Seven checks (each issue = {"code", "rt", "date", "text"}):
   out_of_range   a price outside the room's minimum / maximum
-  big_move       one run moved a price further than the daily limits allow
+  big_move       one run moved a price further than the daily limits allow (except the night-before-arrival step of a small room)
   up_down_up     a price went up, down and up again within 48 hours
   holiday_broken a holiday / hold date outside its band around the anchor, or a far reset on one
   channel_failed a channel push (Booking, Expedia, Airbnb) failed in the last run
@@ -25,6 +25,15 @@ CHANNEL_NAMES = {"BOOKING": "Booking.com", "EXPEDIA": "Expedia", "AIRBNB": "Airb
 
 def _tol(cur, base):
     return max(TOLERANCE_ABS.get(cur, 1.0), abs(base) * TOLERANCE_PCT)
+
+
+def _units(live_rts, rt):
+    """Units of a room when live_rts is the dict of room types (a plain list of names has no units)."""
+    info = live_rts.get(rt) if isinstance(live_rts, dict) else None
+    try:
+        return int(info.get("units")) if isinstance(info, dict) and info.get("units") is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _daily_limits(calm, aggressive_down=0.0):
@@ -64,7 +73,9 @@ def check(daily, states, run, cfg, now, live_rts=None):
             elif mx is not None and new > mx + _tol(cur, mx):
                 issues.append({"code": "out_of_range", "rt": rt, "date": date,
                                "text": f"{who}: price {new:g} is above the maximum {mx:g}."})
-            if before and kind not in BIG_MOVE_OK_KINDS and new != before:
+            # A small room (1-2 units) may go straight down on the night before arrival: that is a rule (the engine's last-days step), not an error.
+            small_rule = (kind == "move" and r.get("do") == 1 and new < (before or 0) and _units(live_rts, rt) is not None and _units(live_rts, rt) <= 2)
+            if before and kind not in BIG_MOVE_OK_KINDS and new != before and not small_rule:
                 do = r.get("do")
                 up_cap = lim["up"]
                 down_cap = lim["down3"] if (do is not None and do <= 3) else lim["down"]

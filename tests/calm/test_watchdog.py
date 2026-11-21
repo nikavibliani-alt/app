@@ -132,6 +132,9 @@ def test_runner_red_after_the_main_run_saves_the_card_and_sends_once(monkeypatch
     assert "wamid.ABC_1" in db.store["whatsapp_owner_alerts"]
     run_wd(db, post, monkeypatch)                                              # the same problems again: no second message
     assert len(post.calls) == 1
+    day = db.store["pricing_watchdog_days"]["2026-10-07"]                      # the reason of the red day is kept
+    assert day["status"] == "red" and day["why"] == "1 prices outside min/max" and day["reason_counts"] == {"out_of_range": 1}
+    assert len(day["issues"]) == 1 and "above the maximum" in day["issues"][0]["text"]
 
 
 def test_runner_sends_nothing_before_the_main_run_or_when_green_or_with_no_send(monkeypatch):
@@ -195,3 +198,26 @@ def test_the_watchdog_note_mentions_unmarked_season_days_and_never_makes_it_red(
     assert pw.season_notes(db) == []                                         # nothing saved yet: config.json covers every day
     db.collection("pricing_config").document("rules").set({"seasonRanges": [{"from": "01-01", "to": "03-02", "season": "low"}, {"from": "03-15", "to": "12-31", "season": "peak"}]})
     assert pw.season_notes(db) == ["12 days unmarked: 3-14 Mar. They use Mid prices until you mark them."]
+
+
+def test_a_small_room_may_drop_straight_down_the_night_before_arrival_but_nothing_else_big_is_allowed():
+    small = {"X": {"units": 1}}
+    big = {"X": {"units": 7}}
+    drop = {"2026-11-01|USD": rec(25, 36, mn=25, mx=60, do=1)}                        # -31% in one run, one day before arrival
+    assert check({"X": drop}, {}, OK_RUN, CFG, NOW, live_rts=small)["status"] == "green"
+    assert codes(check({"X": drop}, {}, OK_RUN, CFG, NOW, live_rts=big)) == ["big_move"]            # a pool room has no such rule
+    assert codes(check({"X": drop}, {}, OK_RUN, CFG, NOW, live_rts=("X",))) == ["big_move"]          # unknown units: no exemption
+    two = {"2026-11-02|USD": rec(25, 36, mn=25, mx=60, do=2)}
+    assert codes(check({"X": two}, {}, OK_RUN, CFG, NOW, live_rts=small)) == ["big_move"]            # two days out the daily limit still applies
+    up = {"2026-11-01|USD": rec(60, 36, mn=25, mx=60, do=1)}
+    assert codes(check({"X": up}, {}, OK_RUN, CFG, NOW, live_rts=small)) == ["big_move"]             # only a drop is allowed
+
+
+def test_the_reason_of_every_red_day_is_stored_for_the_weekly_report():
+    import price_watchdog as pw
+    a = pw.day_reasons([], [{"code": "big_move", "rt": "X", "date": "2026-11-02", "text": "X 2026-11-02 USD: moved 36 to 20 (-44%) in one run."}])
+    assert a["counts"] == {"big_move": 1} and a["why"] == "1 moves bigger than the rules allow"
+    b = pw.day_reasons(a["issues"], [{"code": "no_price", "rt": "Y", "date": "", "text": "Y: no prices were calculated today."},
+                                    {"code": "big_move", "rt": "X", "date": "2026-11-02", "text": "X 2026-11-02 USD: moved 36 to 20 (-44%) in one run."}])
+    assert b["counts"] == {"big_move": 1, "no_price": 1} and len(b["issues"]) == 2          # the same problem seen twice is kept once
+    assert pw.day_reasons([], [])["why"] == ""
