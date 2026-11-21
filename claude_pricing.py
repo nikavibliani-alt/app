@@ -23,6 +23,7 @@ import idea_effect
 import idea_evidence
 
 RUN_EVERY_DAYS = 7
+MAX_IDEAS_PER_WEEK = 3          # only the 3 ideas that change the most sellable nights are kept
 MAKER_PROPERTIES = ["ROOMS", "MAXELA", "BIG_APT", "FREEDOM", "ORBE_1", "ORBE_2"]
 REPLACED_REASON = "Replaced by a newer idea"
 
@@ -290,7 +291,11 @@ def _checked_proposals(db, proposals, is_num):
             dropped += 0
         if key not in best or len(m["changed"]) > len(best[key]["_effect"]["changed"]):
             best[key] = {**p, "_effect": m}
-    kept = list(best.values())
+    ranked = sorted(best.values(), key=lambda x: -len(x["_effect"]["changed"]))      # most sellable nights first (ties keep the order given)
+    kept = ranked[:MAX_IDEAS_PER_WEEK]
+    for x in ranked[MAX_IDEAS_PER_WEEK:]:
+        dropped += 1
+        print(f"  Dropped {x['property']} {x['season']} ({idea_evidence.price_list_of(x['type'])}): it changes {len(x['_effect']['changed'])} sellable nights; only the best {MAX_IDEAS_PER_WEEK} ideas a week are kept.")
     n_ok = sum(1 for x in (proposals if isinstance(proposals, list) else []) if isinstance(x, dict))
     return kept, dropped, max(0, n_ok - dropped - len(kept))
 

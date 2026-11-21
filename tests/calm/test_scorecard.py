@@ -91,3 +91,21 @@ def test_runner_saves_cards_keeps_final_verdicts_and_writes_the_summary(monkeypa
     monkeypatch.setattr(sc, "priced_stays", lambda db, today, back_days=460: stays(2))
     script.run(db, "2026-12-06")
     assert db.store["pricing_scorecard"]["i1"]["verdict"] == "wrong"                          # a final verdict stays
+
+
+def test_ideas_waiting_more_than_two_weeks_expire_by_themselves_and_are_not_followed():
+    from test_ideas import FakeDB
+    db = FakeDB()
+    put = lambda i, **kw: db.collection("pricing_proposals").document(i).set({"property_id": "maxela", **kw})   # noqa: E731
+    put("old", status="pending", date="2026-10-01", property="X", season="mid", type="floor")
+    put("edge", status="pending", date="2026-10-14", property="X", season="mid", type="floor")                    # exactly 14 days: still waiting
+    put("new", status="pending", date="2026-10-20", property="X", season="mid", type="floor")
+    put("run_2026-10-01", type="run_marker", status="pending", date="2026-10-01")
+    put("applied", status="approved", date="2026-10-01", property="X", season="mid", type="floor")
+    assert sc.expire_old_pending(db, "2026-10-28", dry=True) == 1 and db.store["pricing_proposals"]["old"]["status"] == "pending"       # dry: nothing written
+    assert sc.expire_old_pending(db, "2026-10-28") == 1
+    s = db.store["pricing_proposals"]
+    assert s["old"]["status"] == "rejected" and s["old"]["rejection_reason"] == sc.EXPIRED and s["old"]["expired_on"] == "2026-10-28"
+    assert s["edge"]["status"] == s["new"]["status"] == "pending" and s["applied"]["status"] == "approved" and s["run_2026-10-01"]["status"] == "pending"
+    assert sc.decision_of(s["old"]) is None                              # an expired idea was never a choice: the scorecard does not follow it
+    assert sc.expire_old_pending(db, "2026-10-28") == 0

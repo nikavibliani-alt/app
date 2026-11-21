@@ -25,6 +25,8 @@ MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", 
 WHAT = {"startprice": "start price", "floor": "minimum", "ceiling": "maximum"}
 SEASON_NAMES = {"xmas_low": "low Christmas", "low": "Low season", "mid": "Mid season", "high": "High season", "peak": "Peak season"}
 REPLACED = "Replaced by a newer idea"
+EXPIRED = "Expired: older than 2 weeks"
+EXPIRE_DAYS = 14
 NOT_USEFUL = "Not useful: nothing left to sell"
 NOT_USEFUL_FEW = "Not useful: too few nights to sell"
 
@@ -50,7 +52,7 @@ def decision_of(p: dict):
     st = p.get("status")
     if st in ("approved", "auto_applied"):
         return "applied"
-    if st == "rejected" and p.get("rejection_reason") in (NOT_USEFUL, NOT_USEFUL_FEW):
+    if st == "rejected" and p.get("rejection_reason") in (NOT_USEFUL, NOT_USEFUL_FEW, EXPIRED):
         return None                                     # never a real choice: nothing was left to sell, so it is not followed
     if st == "rejected":
         return "replaced" if p.get("rejection_reason") == REPLACED else "skipped"
@@ -152,3 +154,18 @@ def summary(cards: list) -> dict:
             "wrong": sum(1 for c in fin if c["verdict"] == "wrong"),
             "unclear": sum(1 for c in fin if c["verdict"] == "unclear"),
             "tracking": sum(1 for c in cards if c.get("status") == "tracking")}
+
+
+def expire_old_pending(db, today: str, days: int = EXPIRE_DAYS, dry: bool = False) -> int:
+    """Ideas still waiting for your answer after `days` days are closed by themselves ("Expired: older than 2 weeks"). They were never a choice,
+    so the scorecard does not follow them. Returns how many were (or, dry, would be) closed. Never touches applied or already closed ideas."""
+    limit = (_d(today) - timedelta(days=days)).isoformat()
+    n = 0
+    for doc in db.collection("pricing_proposals").where("status", "==", "pending").stream():
+        d = doc.to_dict() or {}
+        if d.get("type") == "run_marker" or not d.get("date") or str(d["date"])[:10] >= limit:
+            continue
+        n += 1
+        if not dry:
+            db.collection("pricing_proposals").document(doc.id).set({"status": "rejected", "rejection_reason": EXPIRED, "rejected_at": datetime.now().isoformat(), "expired_on": today}, merge=True)
+    return n

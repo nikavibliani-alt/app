@@ -112,3 +112,14 @@ def test_when_the_engine_test_cannot_be_built_no_idea_is_made(monkeypatch):
 
 def test_dates_text_for_the_log():
     assert fx.dates_text(fx.runs_of([iso(0), iso(1), iso(2), iso(9)])) == "7-9 Oct 2026 (3 nights), 16 Oct 2026 (1 night)"
+
+
+def test_only_the_three_ideas_that_change_the_most_sellable_nights_are_kept(monkeypatch):
+    mk = lambda prop, season, typ, cur, sug: {"property": prop, "season": season, "type": typ, "current": cur, "suggested": sug}  # noqa: E731
+    props = [mk("Y", "mid", "startPrice", 100, 90), mk("Y", "low", "startPrice", 100, 90), mk("Y", "high", "startPrice", 100, 90),
+             mk("Y", "peak", "startPrice", 100, 90), mk("Y", "xmas_low", "startPrice", 100, 90)]
+    counts = {("Y", "mid", "startPrice"): 4, ("Y", "low", "startPrice"): 9, ("Y", "high", "startPrice"): 6,
+              ("Y", "peak", "startPrice"): 3, ("Y", "xmas_low", "startPrice"): 7}
+    kept, dropped, _ = run_checked(monkeypatch, props, counts)
+    assert [(p["season"], len(p["_effect"]["changed"])) for p in kept] == [("low", 9), ("xmas_low", 7), ("high", 6)]      # most nights first, three only
+    assert dropped == 2 and cp.MAX_IDEAS_PER_WEEK == 3

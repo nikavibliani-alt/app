@@ -19,11 +19,14 @@ import pricing_shadow as ps  # noqa: E402
 
 
 def run(db, today: str, dry: bool = False) -> dict:
+    expired = sc.expire_old_pending(db, today, dry=dry)
+    if expired:
+        print(f"Ideas older than {sc.EXPIRE_DAYS} days still waiting: {expired} " + ("would be closed (dry)" if dry else "closed as expired"))
     ideas = []
     for status in ("approved", "auto_applied", "rejected"):
         for doc in db.collection("pricing_proposals").where("status", "==", status).stream():
             d = doc.to_dict() or {}
-            if d.get("type") == "run_marker":
+            if d.get("type") == "run_marker" or sc.decision_of(d) is None:      # markers, and ideas that were never a real choice (expired, nothing left to sell)
                 continue
             ideas.append({**d, "id": doc.id})
     stays = sc.priced_stays(db, today)
