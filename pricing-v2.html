@@ -1905,6 +1905,7 @@ const WEEK_ROWS = [["bookings_made", "Bookings made"], ["nights_sold", "Nights s
   ["price_raises_written", "Price raises written (each: one night, one price list, one run)"], ["price_drops_written", "Price drops written (each: one night, one price list, one run)"], ["nights_lowered", "Different nights lowered"],
   ["price_up", "Price rises"], ["price_down", "Price drops"], ["nights_hit_min", "Nights at your minimum"], ["nights_hit_max", "Nights at your maximum"],
   ["last3_price_drops", "Last 3 days: price drops on empty nights"], ["last3_nights_lowered", "Last 3 days: different nights lowered"], ["last3_nights_lowered_then_booked", "Last 3 days: nights lowered, then booked"],
+  ["same_day_price_drops", "Arrival day (12:00 and 17:00 steps): price drops"], ["same_day_nights_lowered", "Arrival day: different nights lowered"], ["same_day_nights_lowered_then_booked", "Arrival day: nights lowered, then booked the same day"],
   ["last3_drops", "Drops in the last 3 days"], ["last3_drops_sold", "…that then sold"],
   ["cancelled_tonight_lowered", "Cancelled tonight, lowered"], ["cancelled_tonight_lowered_then_booked", "…lowered, then booked"],
   ["cancelled_tomorrow_lowered", "Cancelled tomorrow, lowered"], ["cancelled_tomorrow_lowered_then_booked", "…lowered, then booked"],
@@ -1912,7 +1913,7 @@ const WEEK_ROWS = [["bookings_made", "Bookings made"], ["nights_sold", "Nights s
   ["cancel_drops_tomorrow", "Cancelled tomorrow, lowered"], ["cancel_drops_tomorrow_sold", "…that then sold"],
   ["cancellations", "Cancellations"], ["cancellations_changed", "Booking changes (not cancellations)"], ["cancellations_after_stay", "Marked cancelled after the stay (not cancellations)"],
   ["holiday_rule_moves", "Holiday-rule moves"],
-  ["held_back_by_protect", "Price changes held back by Don't change"], ["held_back_by_hold", "Price changes held back by small moves only"], ["held_back_other", "Price changes held back by other rules"],
+  ["held_back_by_protect", "Price changes held back by Don't change"], ["held_back_by_hold", "Price changes held back by small moves only"], ["held_back_morning_only", "Held back: only the morning run may lower (normal)"], ["held_back_other", "Price changes held back by other rules"],
   ["blocked_by_protect", "Kept by protect"], ["blocked_by_hold", "Kept by hold"], ["stopped_by_safety_check", "Stopped by a safety check"]];
 const weekRange = w => `${fmtShort(w.from)} – ${fmtShort(w.to)} ${w.to.slice(0, 4)}`;
 function weekList(title, items) {

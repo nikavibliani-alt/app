@@ -27,7 +27,11 @@ Rules:
   for the whole property use the "totals" block; never add rooms together yourself;
   a large "held back" count is normal by itself (only the morning run may lower prices, so most other runs hold lowering): never call it a problem unless the numbers show something else;
   the special repricing after a cancellation only applies to tonight and tomorrow: a cancelled night further away follows the normal rules, so never say it "was not repriced" as if something failed;
-  the watchdog red-day count is for the whole property, never for one room;
+  the watchdog red-day count is for the whole property, never for one room: use "all.watchdog_red_day_reasons" to say why a day was red;
+  a "held back by the morning-only rule" count is normal and by design: never list it as a problem;
+  "same_day" numbers are the arrival-day drops (the 12:00 and 17:00 steps): give them their own sentence and say how many of those nights were booked;
+  a week number (like "week 46") is a label, not data: do not quote it as a number;
+  only report REAL problems: channel push failures, safety stops, watchdog red days whose reason is not a rule the engine follows on purpose, rooms that sold nothing, data that is missing. Do not turn normal behaviour into a problem;
 - If the data is thin or missing (see data_notes), say that plainly instead of guessing. A zero is a fact only when the JSON says 0.
 - Plain words an owner understands. No jargon, no ALL CAPS, no emojis.
 - Everything is a suggestion. Never say something was changed, and never tell the engine what to do automatically.
@@ -42,6 +46,7 @@ For every item (ids like worked.0, didnt.1, upgrades.2) and for the headline, de
 - "no": it is made up, wrong, or says something was changed automatically.
 Be strict about numbers: a number that is not in the data, or a direction that is wrong, is not supported.
 Also check the MEANING with the "guide" in the numbers: a claim that treats a count of price changes as a number of nights, a "held back" count as closed or blocked nights, or "lowered, then booked" as drops on nights already sold, is wrong ("partly" with a corrected text, or "no").
+Also wrong: an item that lists "held back by the morning-only rule" as a problem (it is normal), that says freed nights were "not repriced" (cancellation drops only cover tonight and tomorrow), or that quotes a week number as data.
 Reply with JSON only: {"headline": {"verdict": "yes|partly|no", "fixed_text": str}, "items": [{"id": str, "verdict": "yes|partly|no", "fixed_text": str, "note": str}]}."""
 
 

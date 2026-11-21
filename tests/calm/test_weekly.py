@@ -303,3 +303,39 @@ def test_a_cut_off_answer_is_tried_once_more_with_a_longer_limit():
     c = C()
     out = ai._call(c, "sys", "payload")
     assert out["headline"] == "ok" and c.calls == [8192, 12000]
+
+
+def test_same_day_drops_have_their_own_line_and_are_not_mixed_into_the_last_3_day_drops():
+    d = sample()
+    d["price_events"] += [ev("M", "2026-10-12", "2026-10-12", 140, 100, kind="arrival", days_out=0),            # the 17:00 step, the night was booked that day (stay created 12 Oct)
+                          ev("M", "2026-10-10", "2026-10-10", 150, 125, kind="arrival", days_out=0),            # an arrival-day drop on a night nobody booked
+                          ev("M", "2026-10-10", "2026-10-10", 125, 100, kind="arrival", days_out=0)]
+    m = wn.build(d, FROM, TO)["rooms"]["M"]
+    assert (m["same_day_price_drops"], m["same_day_nights_lowered"], m["same_day_nights_lowered_then_booked"]) == (3, 2, 1)
+    assert m["last3_price_drops"] == 1 and m["last3_nights_lowered"] == 1                                     # unchanged: arrival-day drops are not counted there
+    assert "same_day_price_drops" in wn.GUIDE and "same_day_nights_lowered_then_booked" in wn.GUIDE
+
+
+def test_held_back_by_the_morning_only_rule_is_counted_apart_and_called_normal():
+    d = sample()
+    d["price_events"] += [ev("M", "2026-10-20", "2026-10-10", 150, 150, written=False, blocked=["Only the morning run may lower prices."]),
+                          ev("M", "2026-10-21", "2026-10-10", 150, 150, written=False, blocked=["Only the morning run may lower prices."]),
+                          ev("M", "2026-10-22", "2026-10-10", 150, 150, written=False, blocked=["Limit: at most -15% in 24 hours."])]
+    m = wn.build(d, FROM, TO)["rooms"]["M"]
+    assert (m["held_back_morning_only"], m["held_back_other"]) == (2, 1)
+    assert "NORMAL" in wn.GUIDE["held_back_morning_only"]
+
+
+def test_the_reason_of_each_red_watchdog_day_travels_in_the_numbers():
+    d = sample()
+    d["watchdog_why"] = {"2026-10-07": "4 moves bigger than the rules allow"}
+    d["watchdog_days"] = {"2026-10-07": "red", "2026-10-08": "red", "2026-10-09": "green"}
+    a = wn.build(d, FROM, TO)["all"]
+    assert a["watchdog_red_day_reasons"] == [{"day": "2026-10-07", "why": "4 moves bigger than the rules allow"},
+                                             {"day": "2026-10-08", "why": "no reason was stored for this day"}]
+
+
+def test_the_analyst_and_the_checker_are_told_what_is_normal():
+    for text in (ai.ANALYST_SYSTEM, ai.CHECKER_SYSTEM):
+        assert "morning-only" in text and "week number" in text
+    assert "tonight and tomorrow" in ai.ANALYST_SYSTEM and "REAL problems" in ai.ANALYST_SYSTEM

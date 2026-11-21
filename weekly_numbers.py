@@ -52,13 +52,17 @@ GUIDE = {
     "last3_price_drops": "Price drops written on EMPTY nights that were 3 days or less from arrival (not the cancellation drops). One count = one night, in one price list, in one run.",
     "last3_nights_lowered": "How many different nights those last-3-day drops were on.",
     "last3_nights_lowered_then_booked": "Of those nights, how many were BOOKED AFTER the price was lowered. The night was empty when its price was lowered. It does not mean nights that were already sold.",
+    "same_day_price_drops": "Price drops written on the ARRIVAL DAY itself, on an empty night of a small room (the 12:00 step halfway to the minimum and the 17:00 step to the minimum). One count = one night, in one price list, in one run.",
+    "same_day_nights_lowered": "How many different nights had a same-day drop.",
+    "same_day_nights_lowered_then_booked": "Of those nights, how many were booked on that same day after the drop (by booking date).",
     "cancelled_tonight_lowered": "After a cancellation, tonight's freed night was lowered to the room's minimum (counts of price changes).",
     "cancelled_tonight_lowered_then_booked": "Of those, how many were booked after the lowering.",
     "cancelled_tomorrow_lowered": "After a cancellation, tomorrow's freed night was lowered halfway to the minimum (counts of price changes).",
     "cancelled_tomorrow_lowered_then_booked": "Of those, how many were booked after the lowering.",
     "held_back_by_protect": "Price changes the engine wanted to make but a Don't change rule held back. One count = one decision for one night in one price list in one run. It does NOT mean nights are closed or blocked.",
     "held_back_by_hold": "Price changes held back by a small-moves-only rule (same kind of count).",
-    "held_back_other": "Price changes held back by another rule, for example only the morning run may lower prices, the daily limits, or the holiday rule limits (same kind of count). It does NOT mean nights are closed or blocked.",
+    "held_back_morning_only": "Price changes held back because only the morning run may lower prices. This is NORMAL and by design, not a problem (same kind of count).",
+    "held_back_other": "Price changes held back by another rule, for example the daily limits or the holiday rule limits (same kind of count). It does NOT mean nights are closed or blocked.",
     "cancellations": "REAL cancellations: a booking cancelled before its check-in day and not replaced by a changed booking. Changes of a booking and cancellations of stays that were already over are not in this number.",
     "cancellations_changed": "Cancelled records that are really a change of the same booking (a new room or new dates). Not real cancellations.",
     "cancellations_after_stay": "Bookings marked cancelled after their check-in day had already passed. They freed no night to sell. Not real cancellations.",
@@ -142,10 +146,14 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
         r["nights_lowered"] = len({e["date"] for e in wrote if e["new"] < e["old"]})
         r["nights_hit_min"] = len({e["date"] for e in wrote if e.get("min") is not None and e["new"] <= e["min"] + 1e-9})
         r["nights_hit_max"] = len({e["date"] for e in wrote if e.get("max") is not None and e["new"] >= e["max"] - 1e-9})
-        l3 = [e for e in wrote if e.get("kind") != "tonight" and e.get("days_out") is not None and e["days_out"] <= 3 and e["new"] < e["old"]]
+        l3 = [e for e in wrote if e.get("kind") not in ("tonight", "arrival") and e.get("days_out") is not None and e["days_out"] <= 3 and e["new"] < e["old"]]
         r["last3_price_drops"] = len(l3)
         r["last3_nights_lowered"] = len({e["date"] for e in l3})
         r["last3_nights_lowered_then_booked"] = len({e["date"] for e in l3 if sold_after(rt, e["date"], e["day"])})
+        sd = [e for e in wrote if e.get("kind") == "arrival" and e["new"] < e["old"]]
+        r["same_day_price_drops"] = len(sd)
+        r["same_day_nights_lowered"] = len({e["date"] for e in sd})
+        r["same_day_nights_lowered_then_booked"] = len({e["date"] for e in sd if sold_after(rt, e["date"], e["day"])})
         for name, dout in (("tonight", 0), ("tomorrow", 1)):
             cd = [e for e in wrote if e.get("kind") == "tonight" and e.get("days_out") == dout]
             r[f"cancelled_{name}_lowered"] = len(cd)
@@ -155,7 +163,8 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
         text = lambda e: " ".join(str(b).lower() for b in (e.get("blocked") or []))     # noqa: E731
         r["held_back_by_protect"] = sum(1 for e in held if "protect" in text(e))
         r["held_back_by_hold"] = sum(1 for e in held if "protect" not in text(e) and "hold" in text(e))
-        r["held_back_other"] = len(held) - r["held_back_by_protect"] - r["held_back_by_hold"]
+        r["held_back_morning_only"] = sum(1 for e in held if "protect" not in text(e) and "hold" not in text(e) and "only the morning run" in text(e))
+        r["held_back_other"] = len(held) - r["held_back_by_protect"] - r["held_back_by_hold"] - r["held_back_morning_only"]
         r["stopped_by_safety_check"] = sum(1 for e in mine if e.get("kind") == "stopped")
 
     totals = {}
@@ -170,9 +179,11 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
         for p in x.get("failed_portals") or []:
             fails[p] = fails.get(p, 0) + 1
     wd = {d: s for d, s in (data.get("watchdog_days") or {}).items() if week_from <= d <= week_to}
+    why_of = data.get("watchdog_why") or {}
     all_ = {"runs": len(runs), "urgent_runs": sum(1 for x in runs if x.get("urgent")), "channel_push_failures": fails,
             "runs_with_stopped_rooms": sum(1 for x in runs if x.get("stopped_room_types")),
-            "watchdog_days_recorded": len(wd), "watchdog_red_days": sum(1 for s in wd.values() if s == "red")}
+            "watchdog_days_recorded": len(wd), "watchdog_red_days": sum(1 for s in wd.values() if s == "red"),
+            "watchdog_red_day_reasons": [{"day": d, "why": why_of.get(d) or "no reason was stored for this day"} for d, s in sorted(wd.items()) if s == "red"]}
     changes = []
     for c in data.get("season_changes", []):
         day = str(c.get("day", ""))[:10]
@@ -345,11 +356,13 @@ def load(db, now: datetime) -> dict:
         cell = (((cfg.get("rules") or {}).get(rt) or {}).get("GEL") or {}).get(season_of(night, cfg))
         return (cell["start"], cell["min"], cell["max"]) if isinstance(cell, dict) and all(k in cell for k in ("start", "min", "max")) else None
 
-    wd = {}
+    wd, wd_why = {}, {}
     for d in days:
         snap = db.collection("pricing_watchdog_days").document(d).get()
         if snap.exists:
             wd[d] = (snap.to_dict() or {}).get("status")
+            if (snap.to_dict() or {}).get("why"):
+                wd_why[d] = (snap.to_dict() or {}).get("why")
     season_changes = []
     try:
         for d in db.collection("pricing_changes").where("type", "==", "season_dates").stream():
@@ -371,7 +384,7 @@ def load(db, now: datetime) -> dict:
     ssum = db.collection("pricing_scorecard").document("_summary").get()
     cancel_class = changed_cancellations(db, by_day("pmslog_booking_events"))
     return {"price_events": by_day("pmslog_price_events"), "booking_events": by_day("pmslog_booking_events"),
-            "runs": by_day("pricing_calm_runs"), "watchdog_days": wd, "stays": sc.priced_stays(db, today, back_days=120), "fx": dict(cfg.get("fx") or FX_DEFAULT),
+            "runs": by_day("pricing_calm_runs"), "watchdog_days": wd, "watchdog_why": wd_why, "stays": sc.priced_stays(db, today, back_days=120), "fx": dict(cfg.get("fx") or FX_DEFAULT),
             "limits": limits, "cancel_class": cancel_class, "season_changes": season_changes, "season_unmarked": season_unmarked, "scorecard": ssum.to_dict() if ssum.exists else {},
             "twin_results": [d.to_dict() or {} for d in db.collection("pricing_twin_results").stream()],
             "events": [dict(d.to_dict() or {}, date=(d.to_dict() or {}).get("date") or d.id.replace("event_", "")) for d in db.collection("pricing_events").stream()],
