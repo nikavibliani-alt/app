@@ -108,10 +108,11 @@ DEFAULTS = {
     },
     # Date rules, newest wins when several match:
     #   {"from": "YYYY-MM-DD", "to": "YYYY-MM-DD", "rooms": "all" | ["XCV_1", ...],
-    #    "action": "protect" | "aggressive" | "normal" | "hold", "note": "New Year"}
+    #    "action": "protect" | "aggressive" | "normal" | "hold" | "aim_min", "note": "New Year"}
     # protect    = the engine leaves those dates completely alone (you set them by hand)
     # aggressive = "fill the month": lower faster and further when selling slower than normal
     # hold       = small moves only, more active closer to the date: the holiday rule above, for these dates
+    # aim_min    = "New listing: aim for minimum": empty nights on these dates go straight to the room's minimum (both price lists)
     "date_rules": [],
     # Aim for single nights, set on the pricing page: [{"rt": "XCV_1", "date": "2026-12-20", "pct": -5, "avail": 1}].
     # Moves that night's target by pct percent (inside min/max); it ends when the night gets a booking (free units < avail).
@@ -203,7 +204,7 @@ PUSH_PROFILES = {
 }
 STYLES = ("hold", "calm", "normal", "active", "aggressive")
 PUSH_LABELS = {"hold": "Hold", "calm": "Calm", "normal": "Normal", "active": "Active", "aggressive": "Fill fast"}
-RULE_ACTIONS = ("protect", "aggressive", "normal", "hold")
+RULE_ACTIONS = ("protect", "aggressive", "normal", "hold", "aim_min")
 AIM_MAX_PCT = 20            # a night aim moves the target by at most 20% up or down
 
 

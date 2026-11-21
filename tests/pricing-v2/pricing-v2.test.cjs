@@ -891,6 +891,73 @@ const modeLine = (page, desk, rt) => text(page, desk ? `.cname[data-rt="${rt}"] 
       assert.ok(/date rule 14 Oct – 16 Oct \(Don’t change the price\) added/.test(await bar(page)), await bar(page));
       if (!desk) assert.ok(!(await page.$('#pickPanel')), 'select mode ends after the change');
     });
+    await test('new listing: button on the room screen with From and To, lists my hand-set nights, adds a rule, marks the nights, switch off, Save writes it and the log has it', w, hh, async ({page}, desk) => {
+      if (desk) { await go(page, '#/calendar'); await page.click('.cname[data-rt=XCV_1]'); } else await go(page, '#/room/XCV_1');
+      await page.waitForSelector('#nlCard');
+      assert.strictEqual((await text(page, '#nlCard [data-act=newListingRoom]')).trim(), 'New listing: aim for minimum');
+      assert.ok(await page.$('#nlCard input[data-k=from]') && await page.$('#nlCard input[data-k=to]'), 'From and To');
+      const tops = await page.evaluate(() => ['#roomRules', '#nlCard', '.night'].map(q => (document.querySelector(q) || document.querySelector('#nlCard')).getBoundingClientRect().top));
+      assert.ok(tops[1] <= tops[2], 'the card comes before the night list');
+      // the button sets its own colour and is not blue
+      const col = await page.$eval('#nlCard [data-act=newListingRoom]', e => { const c = getComputedStyle(e); return [c.color, c.backgroundColor]; });
+      assert.ok(col[0] !== 'rgb(0, 0, 238)' && col[0] !== 'rgb(0, 122, 255)' && col[0] !== col[1], 'the button sets its own text colour, not the phone\'s blue: ' + col.join(' on '));
+      // wrong dates: the button is off and says why
+      await page.fill('#nlCard input[data-k=to]', '2026-10-10'); await page.waitForTimeout(80);
+      assert.strictEqual(await page.getAttribute('#nlCard [data-act=newListingRoom]', 'aria-disabled'), 'true');
+      assert.ok(/To must be the same day as From or later/.test(await text(page, '#nlCard')), await text(page, '#nlCard'));
+      await page.$eval('#nlCard [data-act=newListingRoom]', e => e.click()); assert.ok(!/New listing/.test(await bar(page)), 'nothing added while the dates are wrong');
+      await page.fill('#nlCard input[data-k=from]', '2026-10-14'); await page.waitForTimeout(80);
+      await page.fill('#nlCard input[data-k=to]', '2026-10-20'); await page.waitForTimeout(80);
+      assert.ok(/Set by you in these dates:.*17 Oct/.test((await text(page, '#nlCard')).replace(/\s+/g, ' ')), 'my hand-set night is listed: ' + await text(page, '#nlCard'));
+      assert.ok(await page.$('#nlCard [data-act=giveBackNl]'), 'with a button to give them back');
+      await page.click('#nlCard [data-act=newListingRoom]'); await page.waitForTimeout(120);
+      assert.ok(/Not saved/.test(await bar(page)) && /date rule 14 Oct – 20 Oct \(New listing: aim for minimum\) added/.test(await bar(page)), await bar(page));
+      assert.strictEqual((await h.writes(page)).length, 0, 'nothing is written before Save');
+      assert.ok(/14–20 Oct new listing: aiming for minimum/.test(await squash(page, '#roomRules')) && /not saved/.test(await squash(page, '#roomRules')), await squash(page, '#roomRules'));
+      assert.ok(await page.$('#nlCard .nlrun [data-act=delChip]'), 'a switch-off button in the card too');
+      await saveBar(page);
+      const rules = (await h.doc(page, 'pricing_config/engine_v2')).settings.date_rules;
+      assert.strictEqual(rules.length, 1); const r0 = rules[0];
+      assert.deepStrictEqual([r0.from, r0.to, r0.rooms, r0.action, r0.note, typeof r0.since], ['2026-10-14', '2026-10-20', ['XCV_1'], 'aim_min', 'New listing', 'string']);
+      const rec = (await h.writes(page)).filter(x => x.path.startsWith('pricing_changes/')).map(x => x.data).find(x => x.fields && Object.keys(x.fields).some(k => k.startsWith('date_rules')));
+      assert.ok(rec && rec.ts && rec.fields['date_rules/add/0'].new === '2026-10-14..2026-10-20 aim_min [XCV_1]', JSON.stringify(rec));
+      if (desk) { await go(page, '#/calendar'); assert.ok(/New listing/.test(await text(page, '.cell[data-rt=XCV_1][data-iso="2026-10-15"]')), 'the calendar marks it'); assert.ok(!/New listing/.test(await text(page, '.cell[data-rt=XCV_1][data-iso="2026-10-21"]'))); await page.click('.cname[data-rt=XCV_1]'); await page.waitForSelector('#roomRules'); }
+      else { await go(page, '#/room/XCV_1'); await page.click('[data-act=allNights]'); assert.ok(/New listing/.test(await text(page, '.night[data-iso="2026-10-15"]')), 'the list marks it'); assert.ok(!/New listing/.test(await text(page, '.night[data-iso="2026-10-21"]'))); }
+      assert.ok(/14–20 Oct new listing: aiming for minimum/.test(await squash(page, '#roomRules')));
+      await page.click('#roomRules [data-act=delChip]'); await page.waitForTimeout(100);
+      assert.ok(/date rule 14 Oct – 20 Oct removed/.test(await bar(page)), await bar(page));
+      await saveBar(page); assert.deepStrictEqual((await h.doc(page, 'pricing_config/engine_v2')).settings.date_rules, []);
+    });
+    await test('new listing: the night screen and several selected nights have the same button, one rule per run of nights; XCV 2 lists its own hand-set night', w, hh, async ({page}, desk) => {
+      const box = await night(page, desk);
+      const lbl = (await text(page, `${box} [data-act=newListingNights]`)).trim();
+      assert.strictEqual(lbl, 'New listing: aim for minimum');
+      const tops = await page.evaluate(b => ['[data-act=ownSet]', '[data-act=newListingNights]', '[data-act=protectNights]'].map(q => document.querySelector(b + ' ' + q).getBoundingClientRect().top), box);
+      assert.ok(tops[0] < tops[1] && tops[1] < tops[2], 'between own price and Don\'t change');
+      await page.click(`${box} [data-act=newListingNights]`); await page.waitForTimeout(100);
+      assert.ok(/date rule 14 Oct \(New listing: aim for minimum\) added/.test(await bar(page)), await bar(page));
+      await page.click('#bar [data-act=undoAll]');
+      // the hand-set XCV 2 night (17 Oct) is listed when the range covers it
+      await go(page, '#/room/XCV_2');
+      await page.fill('#nlCard input[data-k=from]', '2026-10-14'); await page.waitForTimeout(60); await page.fill('#nlCard input[data-k=to]', '2026-10-20'); await page.waitForTimeout(80);
+      assert.ok(/Set by you in these dates:.*17 Oct/.test((await text(page, '#nlCard')).replace(/\s+/g, ' ')), await text(page, '#nlCard'));
+    });
+    await test('new listing: several selected nights get one rule for the run, the button is next to Don\'t change', w, hh, async ({page}, desk) => {
+      if (desk) {
+        await go(page, '#/calendar'); await page.click('.cell[data-rt=XCV_2][data-iso="2026-10-14"]'); await page.click('.cell[data-rt=XCV_2][data-iso="2026-10-16"]', {modifiers: ['Shift']});
+        await page.waitForSelector('.panel [data-act=aim]');
+      } else {
+        await go(page, '#/room/XCV_2'); await page.click('[data-act=allNights]'); await page.click('[data-act=selToggle]');
+        for (const d of ['14', '15', '16']) await page.click(`.night[data-iso="2026-10-${d}"]`);
+        await page.waitForSelector('#pickPanel');
+      }
+      const box = desk ? '.panel' : '#pickPanel';
+      await page.click(`${box} [data-act=newListingNights]`); await page.waitForTimeout(100);
+      assert.ok(/date rule 14 Oct – 16 Oct \(New listing: aim for minimum\) added/.test(await bar(page)), await bar(page));
+      await saveBar(page);
+      const rules = (await h.doc(page, 'pricing_config/engine_v2')).settings.date_rules;
+      assert.deepStrictEqual(rules.map(r => [r.from, r.to, r.rooms, r.action]), [['2026-10-14', '2026-10-16', ['XCV_2'], 'aim_min']]);
+    });
     await test('push slider on the night screen: after Aim, before own price and Don\'t change; one night; Save writes it, the log has it, the list and rules line show it', w, hh, async ({page}, desk) => {
       const box = await night(page, desk);
       assert.deepStrictEqual(await page.$$eval(`${box} .ptick`, els => els.map(e => e.innerText.trim())), ['Hold', 'Calm', 'Normal', 'Active', 'Fill fast']);

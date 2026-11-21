@@ -45,6 +45,7 @@ GUIDE = {
     "bookings_made": "Bookings made this week (by booking date).",
     "nights_sold": "Nights in those bookings.",
     "avg_sold_price_gel": "Average price per night of those bookings, in lari. Bookings paid in dollars are converted at the rate in all.fx_note.",
+    "new_listing": "One entry per room that has (or had) a 'New listing: aim for minimum' rule: those dates were priced at the room's minimum on purpose to get bookings and reviews. Bookings and nights on the boosted dates (bookings made since the rule started, and this week) against the room's bookings in the 3 weeks BEFORE the rule started. Say how many days the rule has run; never claim it caused the result.",
     "owner_tests": "Tests the owner started on purpose (for example a lowered minimum). Each has the room, the dates, and bookings, nights and average price in lari for the 3 weeks BEFORE the start against the days since the start (by booking date), and per week so they can be compared fairly. Always say how many days of the test have passed: a short test proves little.",
     "totals": "The same numbers added up over all rooms (the whole property). Use these for property-wide statements.",
     "price_raises_written": "How many times a price was raised and written to MiniHotel. One count = one night, in one price list (Booking in lari or Airbnb in dollars), in one run. The same night can be counted many times. It is NOT a number of nights.",
@@ -90,6 +91,44 @@ def numbers_headline(numbers: dict) -> str:
 
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _new_listing(rules: list, stays: list, week_from: str, week_to: str) -> list:
+    """For each room with a "New listing: aim for minimum" rule that started by the end of this week: bookings and nights ON the boosted dates
+    (booked since the rule started, and booked this week) against the room's bookings in the 3 weeks before the rule started."""
+    by_room = {}
+    for r in rules:
+        since = str(r.get("since") or r.get("from"))[:10]
+        rooms = r.get("rooms")
+        for rt in (rooms if isinstance(rooms, list) else []):
+            if since <= week_to:
+                by_room.setdefault(rt, []).append({"from": str(r["from"])[:10], "to": str(r["to"])[:10], "since": since})
+    out = []
+    for rt, rr in sorted(by_room.items()):
+        boosted = set()
+        for x in rr:
+            boosted.update(_days(x["from"], x["to"]))
+        start = min(x["since"] for x in rr)
+
+        def on_boosted(a, b):
+            n_b = n_n = 0
+            for s_ in stays:
+                if s_["rt"] != rt or not s_.get("created") or not (a <= s_["created"] <= b):
+                    continue
+                nights = [d for d in _days(s_["checkin"], (date.fromisoformat(s_["checkout"]) - timedelta(days=1)).isoformat()) if d in boosted]
+                if nights:
+                    n_b += 1
+                    n_n += len(nights)
+            return {"from": a, "to": b, "bookings": n_b, "nights": n_n}
+        b_from = (date.fromisoformat(start) - timedelta(days=21)).isoformat()
+        b_to = (date.fromisoformat(start) - timedelta(days=1)).isoformat()
+        before = [s_ for s_ in stays if s_["rt"] == rt and s_.get("created") and b_from <= s_["created"] <= b_to]
+        out.append({"room": rt, "rules": rr, "started": start, "days_run": (date.fromisoformat(min(week_to, max(x["to"] for x in rr))) - date.fromisoformat(start)).days + 1,
+                    "this_week_on_boosted_dates": on_boosted(max(week_from, start), week_to),
+                    "since_start_on_boosted_dates": on_boosted(start, week_to),
+                    "before_3_weeks": {"from": b_from, "to": b_to, "bookings": len(before), "bookings_per_week": round(len(before) / 3, 1),
+                                       "nights": sum((date.fromisoformat(s_["checkout"]) - date.fromisoformat(s_["checkin"])).days for s_ in before)}})
+    return out
 
 
 def _owner_tests(tests: list, stays: list, week_to: str, fx: dict) -> list:
@@ -171,7 +210,7 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
         r["nights_lowered"] = len({e["date"] for e in wrote if e["new"] < e["old"]})
         r["nights_hit_min"] = len({e["date"] for e in wrote if e.get("min") is not None and e["new"] <= e["min"] + 1e-9})
         r["nights_hit_max"] = len({e["date"] for e in wrote if e.get("max") is not None and e["new"] >= e["max"] - 1e-9})
-        l3 = [e for e in wrote if e.get("kind") not in ("tonight", "arrival") and e.get("days_out") is not None and e["days_out"] <= 3 and e["new"] < e["old"]]
+        l3 = [e for e in wrote if e.get("kind") not in ("tonight", "arrival", "newlisting") and e.get("days_out") is not None and e["days_out"] <= 3 and e["new"] < e["old"]]
         r["last3_price_drops"] = len(l3)
         r["last3_nights_lowered"] = len({e["date"] for e in l3})
         r["last3_nights_lowered_then_booked"] = len({e["date"] for e in l3 if sold_after(rt, e["date"], e["day"])})
@@ -216,6 +255,7 @@ def build(data: dict, week_from: str, week_to: str) -> dict:
             changes.append({"day": day, "old": c.get("old"), "new": c.get("new")})
     all_["season_date_changes"] = {"count": len(changes), "list": changes[:5]}
     all_["owner_tests"] = _owner_tests(data.get("owner_tests") or [], stays, week_to, fx)
+    all_["new_listing"] = _new_listing(data.get("new_listing_rules") or [], stays, week_from, week_to)
     usd = (fx or {}).get("USD")
     all_["fx_note"] = f"Stays paid in dollars are converted to lari at 1 dollar = {usd:g} lari (the engine's rate)." if usd else ""
     um = data.get("season_unmarked") or []
@@ -407,6 +447,12 @@ def load(db, now: datetime) -> dict:
             season_unmarked = _sn.unmarked(_sn.parse(raw)[0])
     except Exception:
         pass
+    nl_rules = []
+    try:
+        eng = db.collection("pricing_config").document("engine_v2").get()
+        nl_rules = [r for r in (((eng.to_dict() or {}).get("settings") or {}).get("date_rules") or []) if isinstance(r, dict) and r.get("action") == "aim_min"]
+    except Exception:
+        pass
     owner_tests = []
     try:
         for d in db.collection("pricing_changes").where("type", "==", "owner_test").stream():
@@ -419,7 +465,7 @@ def load(db, now: datetime) -> dict:
     ssum = db.collection("pricing_scorecard").document("_summary").get()
     cancel_class = changed_cancellations(db, by_day("pmslog_booking_events"))
     return {"price_events": by_day("pmslog_price_events"), "booking_events": by_day("pmslog_booking_events"),
-            "runs": by_day("pricing_calm_runs"), "watchdog_days": wd, "watchdog_why": wd_why, "owner_tests": owner_tests, "stays": sc.priced_stays(db, today, back_days=120), "fx": dict(cfg.get("fx") or FX_DEFAULT),
+            "runs": by_day("pricing_calm_runs"), "watchdog_days": wd, "watchdog_why": wd_why, "owner_tests": owner_tests, "new_listing_rules": nl_rules, "stays": sc.priced_stays(db, today, back_days=120), "fx": dict(cfg.get("fx") or FX_DEFAULT),
             "limits": limits, "cancel_class": cancel_class, "season_changes": season_changes, "season_unmarked": season_unmarked, "scorecard": ssum.to_dict() if ssum.exists else {},
             "twin_results": [d.to_dict() or {} for d in db.collection("pricing_twin_results").stream()],
             "events": [dict(d.to_dict() or {}, date=(d.to_dict() or {}).get("date") or d.id.replace("event_", "")) for d in db.collection("pricing_events").stream()],

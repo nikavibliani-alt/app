@@ -168,11 +168,23 @@ def _profiles(cfg: dict) -> dict:
 
 
 def _date_rule(rt: str, ds: str, rules: list):
-    """The last matching date rule for this room type and date, or None."""
+    """The last matching date rule for this room type and date, or None. ("New listing" rules are a separate thing: see _aim_min_rule.)"""
+    found = None
+    for r in rules or []:
+        if r.get("action") == "aim_min":
+            continue
+        rooms = r.get("rooms", "all")
+        if str(r["from"]) <= ds <= str(r["to"]) and (rooms == "all" or rt in rooms):
+            found = r
+    return found
+
+
+def _aim_min_rule(rt: str, ds: str, rules: list):
+    """The last matching "New listing: aim for minimum" rule for this room type and date, or None. A rule ends by itself after its To date."""
     found = None
     for r in rules or []:
         rooms = r.get("rooms", "all")
-        if str(r["from"]) <= ds <= str(r["to"]) and (rooms == "all" or rt in rooms):
+        if r.get("action") == "aim_min" and str(r["from"]) <= ds <= str(r["to"]) and (rooms == "all" or rt in rooms):
             found = r
     return found
 
@@ -446,6 +458,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                                       "kind": "protected", "style": None, "blocked": [],
                                       "why": [f"Protected date ({rule.get('note') or 'date rule'}): left alone."]})
                 continue
+            amin = _aim_min_rule(rt, ds, cfg.get("date_rules"))
             night_push = pushes.get((rt, ds))
             night_style = night_push[0] if night_push and (night_push[1] is None or avail >= int(night_push[1])) else None
             style = night_style or (rule["action"] if rule and rule["action"] != "hold" else None) or info.get("style") or "normal"
@@ -675,6 +688,34 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                         st["arrival_stage"] = stage                  # nothing to lower: this step is used up
                         dec["why"].append("Arrival day and still empty: the price is already as low as this step allows.")
                         continue
+
+                # ---- 2d. "New listing: aim for minimum": on the chosen dates an empty night goes straight to the room's minimum ----
+                # Both price lists, no daily limit, no weekend bump. Only the morning run lowers. A room with several units may go up only when
+                # the night is nearly sold out. Hand-set prices, Don't change, holiday dates, events, a night's own Aim or push all win (they are handled above or skip this).
+                if (amin and hol_kind is None and not aim_pct and not night_style and not ev and not ev_next
+                        and can_write and not shadow and not reset_mode and days_out >= 1):
+                    goal_nl = _grid_up_to(min(mn * (1 + lu), mx_eff), step, mx_eff)       # lu is 0 unless the night is nearly sold out
+                    dec["target"], dec["newlisting"] = round(goal_nl, 2), True
+                    dec["why"].append(f"New listing: aiming for your minimum {_fmt(cur, mn)}"
+                                      + (f" plus {lu:.0%} because only {avail} of {units} are left." if lu else "."))
+                    if current > goal_nl + 1e-9:
+                        if not main_run:
+                            dec["blocked"].append("Only the morning run may lower prices.")
+                            continue
+                        dec["proposed"], dec["kind"], dec["write"] = goal_nl, "newlisting", True
+                        changed += 1
+                        per_rt[rt][1] += 1
+                        dec["why"].append(f"Lowered straight to it: {_fmt(cur, current)} -> {_fmt(cur, goal_nl)}.")
+                    elif current < goal_nl - 1e-9 and lu > 0:
+                        up = _grid_move(current, min(goal_nl, current * (1 + calm["daily_up"])), step, 1, goal_nl)
+                        if up > current + 1e-9:
+                            dec["proposed"], dec["kind"], dec["write"] = up, "newlisting", True
+                            changed += 1
+                            per_rt[rt][1] += 1
+                            dec["why"].append(f"Nearly sold out: {_fmt(cur, current)} -> {_fmt(cur, up)}.")
+                    else:
+                        dec["why"].append("Already at that price: no change.")
+                    continue
 
                 # ---- 3. target ----
                 base = start * (1 + wk) * (1 + ev_pct)
@@ -965,7 +1006,7 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
 
     writes, shadow_moves = [], []
     for dec in decisions:
-        if dec["kind"] not in ("move", "correction", "fill", "reset", "far_reset", "tonight", "own", "arrival"):
+        if dec["kind"] not in ("move", "correction", "fill", "reset", "far_reset", "tonight", "own", "arrival", "newlisting"):
             continue
         st = state[dec["rt"]][dec["date"]][dec["currency"]]
         if not ok or dec["rt"] in stopped_rts:

@@ -339,6 +339,11 @@ body[data-layout="desk"] #bar .btns{min-width:300px}
 .seg.aim{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
 .seg.aim .segb{padding:0 2px;font-size:14px}
 .ownrow{display:flex;gap:10px}
+.nlrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.nlrow label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--soft);min-width:0}
+.nlrow input{width:100%;min-width:0;height:44px;padding:0 8px;border:1px solid var(--btn-line);border-radius:10px;font:600 16px system-ui,sans-serif;color:var(--ink);background:#FFFFFF}
+.nlhand{display:flex;flex-direction:column;gap:8px}
+.nlrun{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
 .ownf{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--soft)}
 .more{background:var(--chip);border-radius:12px;padding:10px 12px}
 .night.pick{padding-left:12px}
@@ -464,6 +469,7 @@ const RULE_CHOICES = [
   {id:"hold", label:"Small moves only, more active closer to the date", help:"On these dates only: the price stays close to where it is now and moves more freely as the date gets closer."},
   {id:"aggressive", label:"Fill fast", help:"On these dates only: lowers earlier and further if they sell slowly."},
   {id:"normal", label:"Balanced", help:"On these dates only: the normal calm rules, whatever the room’s mode is."},
+  {id:"aim_min", label:"New listing: aim for minimum", help:"On these dates only: empty nights go straight to your minimum price, to get bookings and reviews."},
 ];
 const ruleLabel = a => (RULE_CHOICES.find(r => r.id === a) || {label: String(a)}).label;
 const HOL_ROWS = [["far", "More than 30 days"], ["mid", "30 to 21 days"], ["near", "20 to 15 days"]];
@@ -1056,6 +1062,7 @@ function plainWhy(rt, iso, cur, m) {
   if (sent && kind !== "mine") return `You set ${ownText(sent)}. It goes out at the next price update, and then the engine leaves it alone.`;
   if (kind === "prot") return "You told the engine not to change this night, so its price stays as it is in MiniHotel.";
   if (kind === "mine") return `Set by you at ${price}. The engine does not change it until the night is booked or you give it back.`;
+  if (kind === "free" && newListingAt(rt, iso) && !isEventDay(iso)) return "New listing: the engine aims for your minimum on this night, in both Booking and Airbnb prices. It lowers straight to it at the morning run.";
   const season = `${SEASONS[seasonOnDay(iso)].label} season`, aim = aimAt(rt, iso);
   let line;
   if (rc.kind === "correction") line = `${season}. The price was outside your minimum or maximum, so it was moved back to ${price}.`;
@@ -1101,12 +1108,14 @@ function controlsHtml(rt, isos, desk) {
   const own = `<div><div class="lbl">Set my own price</div><div class="ownrow">${box("GEL", "Booking ₾")}${box("USD", "Airbnb $")}</div>
       <button type="button" class="btn ${ownOk ? "dark" : "off"} full small" data-act="ownSet" id="ownBtn" aria-disabled="${!ownOk}" style="margin-top:8px">Set my price for ${noun}</button>
       <p class="fine muted" style="font-size:13px">The engine never changes it, not even to fix your minimum or maximum. It stays until ${many ? "a night is" : "the night is"} booked or you give ${many ? "them" : "it"} back.</p></div>`;
+  const nlb = free.length && !isOld(rt) ? `<div><button type="button" class="btn light full small" data-act="newListingNights" style="color:var(--ink)">New listing: aim for minimum</button>
+      <p class="fine muted" style="font-size:13px">${many ? "These nights go" : "This night goes"} straight to your minimum at the next morning run (Booking ₾ and Airbnb $), to get bookings and reviews. It ends by itself after the last date. Remove it in the room's rules line.</p></div>` : "";
   const keep = free.length ? `<div><button type="button" class="btn light full small" data-act="protectNights" style="color:var(--ink)">Don't change ${many ? "these nights'" : "this night's"} price</button>
       <p class="fine muted" style="font-size:13px">The engine leaves ${noun} alone. You set the price yourself in MiniHotel.</p></div>` : "";
   const back = mine.length ? `<div><button type="button" class="btn dark full small" data-act="giveBackMany">Give ${mine.length > 1 ? "these nights" : "this night"} back to the engine</button>
       <p class="fine muted" style="font-size:12px">Until then the price stays exactly as you set it.</p></div>` : "";
   const gaveAll = mine.length && mine.every(i => (U.gaveBack ??= {})[`${rt}|${i}`]);
-  return `<div class="ctl" id="nightCtl">${gaveAll ? `<p class="muted" style="font-size:13px">Given back. The engine takes ${mine.length > 1 ? "these nights" : "this night"} over at the next price update.</p>` : back}${aim}${push}${own}${keep}
+  return `<div class="ctl" id="nightCtl">${gaveAll ? `<p class="muted" style="font-size:13px">Given back. The engine takes ${mine.length > 1 ? "these nights" : "this night"} over at the next price update.</p>` : back}${aim}${push}${own}${nlb}${keep}
     ${skipped ? `<p class="fine muted" style="font-size:13px">Left out: ${esc(skipped)}.</p>` : ""}</div>`;
 }
 function ownValues() {
@@ -1196,6 +1205,7 @@ function nightMark(rt, iso) {
     if (aim) parts.push(`Aim ${aimText(aim.pct)}`);
     if (ps) parts.push(stopByStyle(ps.style).name);
   }
+  if (newListingAt(rt, iso)) parts.unshift("New listing");
   return parts.join(" · ");
 }
 function nightsCardHtml(rt) {
@@ -1209,7 +1219,7 @@ function nightsCardHtml(rt) {
       const hand = isHandSet(rt, n.iso, g), mk = nightMark(rt, n.iso);
       if (mk) what = mk; else if (kind === "prot") what = "Don't change"; else if (hand) what = (g.kind === "manual" || g.kind === "own") ? "Set by you" : "Set by hand"; else if (isEventDay(n.iso)) what = "Empty · event"; else if (r.units > 1) what = `${g.avail} of ${r.units} free`;
       if (mk && kind === "prot") what = "Don't change";
-      const pend = (aimAt(rt, n.iso) && isPendingAim(aimAt(rt, n.iso))) || ownPendingOf(rt, n.iso) || P.ruleAdd.some(x => x.action === "protect" && ruleCovers(x, rt, n.iso));
+      const pend = (aimAt(rt, n.iso) && isPendingAim(aimAt(rt, n.iso))) || ownPendingOf(rt, n.iso) || P.ruleAdd.some(x => (x.action === "protect" || x.action === "aim_min") && ruleCovers(x, rt, n.iso));
       if (pend) what += ", not saved";
     }
     gp = n.gel ? gel(n.gel.new) : ""; up = n.usd ? usd(n.usd.new) : "";
@@ -1242,9 +1252,41 @@ function afterNightAction(msg, snap) {
   closeDialog(); render();
   showToast(msg + " Press Save to keep it.", () => { restoreP(snap); touch(); render(); });
 }
+// New listing: aim for minimum. A date rule per room; empty nights in its dates go straight to the minimum. It ends by itself after the To date.
+const newListingAt = (rt, iso) => fileRules().concat(rulesNow()).some(r => r.action === "aim_min" && ruleCovers(r, rt, iso));
+const nlOf = rt => ((U.nl ??= {})[rt] ??= {from: today(), to: addDays(today(), 13)});
+function nlCheck(v) {
+  const iso = x => /^\d{4}-\d{2}-\d{2}$/.test(x || "");
+  if (!iso(v.from) || !iso(v.to)) return {ok: false, why: "Pick both dates."};
+  if (v.from < today()) return {ok: false, why: "From cannot be in the past."};
+  if (v.to < v.from) return {ok: false, why: "To must be the same day as From or later."};
+  if (diffDays(v.from, v.to) > 400) return {ok: false, why: "At most 400 days."};
+  return {ok: true, why: ""};
+}
+const nlHandSet = rt => { const v = nlOf(rt); if (!nlCheck(v).ok) return []; const out = []; for (let d = v.from; d <= v.to; d = addDays(d, 1)) if (nightKind(rt, d) === "mine") out.push(d); return out; };
+function addNewListingRule(rt, from, to) {
+  const r = {from, to, rooms: [rt], action: "aim_min", note: "New listing", since: today()};
+  if (!rulesNow().some(x => same(x, r))) P.ruleAdd.push(r);
+}
+function newListingHtml(rt) {
+  if (isOld(rt)) return "";
+  const v = nlOf(rt), chk = nlCheck(v), mine = nlHandSet(rt), chips = U._chips || [];
+  const running = chips.map((c, i) => ({c, i})).filter(x => x.c.kind === "rule" && x.c.rule.action === "aim_min" && ruleHasRoom(x.c.rule, rt));
+  return `<section class="sec" id="nlCard"><div class="card pad" style="display:flex;flex-direction:column;gap:10px">
+    <div><h2 class="h2">New listing: aim for minimum</h2><p class="sub">For a new listing. On the dates you pick, empty nights go straight to the minimum price (Booking ₾ and Airbnb $) at the next morning run, to get bookings and reviews. Other dates stay normal. It ends by itself after the To date, or switch it off any time.</p></div>
+    <div class="nlrow"><label><span>From</span><input type="date" data-inp="nl" data-k="from" data-rt="${rt}" value="${esc(v.from)}" min="${today()}" aria-label="From date"></label>
+      <label><span>To</span><input type="date" data-inp="nl" data-k="to" data-rt="${rt}" value="${esc(v.to)}" min="${esc(v.from || today())}" aria-label="To date"></label></div>
+    ${chk.ok ? "" : `<p class="warnline" style="font-size:14px" role="alert">${esc(chk.why)}</p>`}
+    ${chk.ok && mine.length ? `<div class="nlhand"><p style="font-size:14px;line-height:1.45;margin:0"><b>Set by you in these dates:</b> ${esc(datesText(mine))}. The rule leaves ${mine.length === 1 ? "it" : "them"} alone, at the price you set.</p>
+      <button type="button" class="btn light full small" data-act="giveBackNl" data-rt="${rt}" style="color:var(--ink)">Give ${mine.length === 1 ? "this night" : "these nights"} back to the engine</button></div>` : ""}
+    <button type="button" class="btn ${chk.ok ? "dark" : "off"} full" data-act="newListingRoom" data-rt="${rt}" aria-disabled="${!chk.ok}">New listing: aim for minimum</button>
+    <p class="fine muted" style="font-size:13px">Not for nights you set by hand, "Don't change" nights, holiday dates or events. Booked nights are never touched.</p>
+    ${running.length ? `<div class="nlrun"><b style="font-size:14px">Running:</b> ${running.map(x => `<span class="rchip ${x.c.pending ? "pending" : ""}">${esc(isoSpan(x.c.rule.from, x.c.rule.to))}${x.c.pending ? " (not saved)" : ""}<button type="button" class="x" data-act="delChip" data-i="${x.i}" aria-label="Switch off ${esc(isoSpan(x.c.rule.from, x.c.rule.to))}">${icon("x", 16)}</button></span>`).join(" ")}</div>` : ""}
+  </div></section>`;
+}
 // The room's own date rules and aims, in one line, each with a remove button
 const isoSpan = (a, b) => (a === b ? fmtShort(a) : a.slice(0, 7) === b.slice(0, 7) ? `${+a.slice(8)}–${fmtShort(b)}` : `${fmtShort(a)} – ${fmtShort(b)}`);
-const RULE_WORD = {protect: "don't change", hold: "small moves only", aggressive: "fill fast", normal: "balanced"};
+const RULE_WORD = {protect: "don't change", hold: "small moves only", aggressive: "fill fast", normal: "balanced", aim_min: "new listing: aiming for minimum"};
 function roomChips(rt) {
   const t = today(), chips = [];
   fileRules().filter(r => r.to >= t && ruleHasRoom(r, rt)).forEach(r => chips.push({text: `${isoSpan(r.from, r.to)} ${RULE_WORD[r.action] || r.action}`, note: "settings file"}));
@@ -1269,7 +1311,7 @@ function viewRoom(rt) {
   const line = savedRoom(rt, "engine") === "live" ? "Automatic prices on. Sent to Booking and Airbnb." : "Test only. Nothing is sent.";
   return `<div class="page"><div style="display:flex;flex-direction:column;gap:4px"><a class="backl" href="#/rooms">${icon("left")}Rooms</a>
     <h1 style="font-size:26px;font-weight:700">${esc(r.name)}</h1><p class="sub" style="font-size:14px">${S.paused ? "Paused. " : ""}${line}</p></div>
-    ${roomRulesHtml(rt)}${nightsCardHtml(rt)}${roomSettingsHtml(rt, false)}</div>`;
+    ${roomRulesHtml(rt)}${newListingHtml(rt)}${nightsCardHtml(rt)}${roomSettingsHtml(rt, false)}</div>`;
 }
 
 /* =====================================================================
@@ -2045,7 +2087,7 @@ function panelHtml() {
   }
   if (p.type === "room") {
     const r = roomById(p.rt), line = savedRoom(p.rt, "engine") === "live" ? "Automatic prices on. Sent to Booking and Airbnb." : "Test only. Nothing is sent.";
-    return `<aside class="panel" aria-label="Details"><div class="ph"><div><h2>${esc(r.name)}</h2><div class="muted" style="font-size:13px">${S.paused ? "Paused. " : ""}${line}</div></div>${close}</div>${roomRulesHtml(p.rt)}${roomSettingsHtml(p.rt, true)}</aside>`;
+    return `<aside class="panel" aria-label="Details"><div class="ph"><div><h2>${esc(r.name)}</h2><div class="muted" style="font-size:13px">${S.paused ? "Paused. " : ""}${line}</div></div>${close}</div>${roomRulesHtml(p.rt)}${newListingHtml(p.rt)}${roomSettingsHtml(p.rt, true)}</aside>`;
   }
   const r = roomById(p.rt);
   return `<aside class="panel" aria-label="Details"><div class="ph"><div><h2>${esc(r.name)}</h2><div class="muted" style="font-size:13px">Old way. The new way only calculates. Test ends ${TEST_ENDS}.</div></div>${close}</div>${testHtml(p.rt, true)}</aside>`;
@@ -2277,8 +2319,9 @@ async function saveAll() {
     for (const [rt, f] of Object.entries(P.room)) for (const [field, e] of Object.entries(f)) eFields[`room_types.${rt}.${field}`] = {old: e.raw ?? e.from, new: e.v};
     P.holAdd.forEach((o, i) => { rFields[`dateOverrides.add.${i}`] = {old: null, new: `${o.from}..${o.to} ${o.season}`}; });
     holDel.forEach((o, i) => { rFields[`dateOverrides.remove.${i}`] = {old: `${o.from}..${o.to} ${o.season}`, new: null}; });
-    P.ruleAdd.forEach((r, i) => { eFields[`date_rules.add.${i}`] = {old: null, new: `${r.from}..${r.to} ${r.action}`}; });
-    ruleDel.forEach((r, i) => { eFields[`date_rules.remove.${i}`] = {old: `${r.from}..${r.to} ${r.action}`, new: null}; });
+    const rmText = r => (Array.isArray(r.rooms) ? ` [${r.rooms.join("+")}]` : "");
+    P.ruleAdd.forEach((r, i) => { eFields[`date_rules.add.${i}`] = {old: null, new: `${r.from}..${r.to} ${r.action}${rmText(r)}`}; });
+    ruleDel.forEach((r, i) => { eFields[`date_rules.remove.${i}`] = {old: `${r.from}..${r.to} ${r.action}${rmText(r)}`, new: null}; });
     if (newRanges) logChange("season_dates", "Season dates changed: " + rangeStrings(newRanges).join(", "), {season_ranges: {old: rangeStrings(oldRanges), new: rangeStrings(newRanges)}});
     if (Object.keys(rf).filter(k => k !== "seasonRanges").length || P.holAdd.length || holDel.length) logChange("rules_edit", "Pricing page: " + lines.join(", "), rFields);
     P.aimAdd.forEach((a, i) => { eFields[`night_aims.add.${i}`] = {old: null, new: `${a.rt} ${a.date} ${a.pct > 0 ? "+" : ""}${a.pct}%`}; });
@@ -2455,6 +2498,21 @@ document.addEventListener("click", async e => {
       runs.forEach(x => P.ruleAdd.push({from: x.from, to: x.to, rooms: [T.rt], action: "protect", note: "from the calendar"}));
       afterNightAction(`The engine will not change ${nightsPhrase(T.free)}.`, snap); break;
     }
+    case "newListingRoom": {
+      if (t.getAttribute("aria-disabled") === "true") break;
+      const v = nlOf(d.rt); if (!nlCheck(v).ok) break; const snap = snapP();
+      addNewListingRule(d.rt, v.from, v.to);
+      touch(); render();
+      showToast(`New listing rule added for ${roomName(d.rt)}, ${isoSpan(v.from, v.to)}. Press Save to keep it.`, () => { restoreP(snap); touch(); render(); }); break;
+    }
+    case "newListingNights": {
+      const T = U.tgt; if (!T || !T.free.length) break; const snap = snapP(), runs = [];
+      T.free.slice().sort().forEach(iso => { const l = runs[runs.length - 1]; if (l && diffDays(l.to, iso) === 1) l.to = iso; else runs.push({from: iso, to: iso}); });
+      runs.forEach(x => addNewListingRule(T.rt, x.from, x.to));
+      afterNightAction(`New listing: aiming for the minimum on ${nightsPhrase(T.free)}.`, snap); break;
+    }
+    case "giveBackNl": U.tgt = {rt: d.rt, isos: [], free: [], mine: nlHandSet(d.rt)};      // then the same as "give back" below
+    // falls through
     case "giveBackMany": {
       const T = U.tgt; if (!T || !T.mine.length) break;
       const keys = T.mine.map(i => `${T.rt}|${i}`);
@@ -2530,6 +2588,7 @@ document.addEventListener("input", e => {
 });
 document.addEventListener("change", e => {                    // the slider: when the thumb is let go (taps on a label do the same through data-act)
   const t = e.target;
+  if (t.dataset && t.dataset.inp === "nl") { const v = nlOf(t.dataset.rt); v[t.dataset.k] = t.value; if (t.dataset.k === "from" && v.to && v.to < v.from) v.to = v.from; render(); return; }
   if (t.dataset && t.dataset.inp === "push") applyPush(t.dataset.scope, +t.value, t.dataset.rt);
 });
 $("overlay").addEventListener("click", e => { if (e.target === $("overlay")) closeDialog(); });
