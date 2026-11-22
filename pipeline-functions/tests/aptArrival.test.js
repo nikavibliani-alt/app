@@ -111,3 +111,12 @@ test('{entrance code} is gated like the other codes', async () => {
   assert.equal(fillPlaceholders('{Building code}', ctx, true), '3435#');
   assert.equal(fillPlaceholders('{entrance code}', { lockedText: 'x', missingText: 'contact host' }, true), 'contact host');
 });
+
+test('building code card title: kept on the type, trimmed, empty means the default', async () => {
+  const { normalizeTypeCfg, resolveArrival } = await import('../../shared/apt-arrival.js');
+  const t = normalizeTypeCfg({ access: { buildingLabel: '  Main door code ' }, steps: [] });
+  assert.equal(t.access.buildingLabel, 'Main door code');
+  assert.equal(resolveArrival({ access: { buildingLabel: 'Main door code' } }, {}).access.buildingLabel, 'Main door code');
+  assert.equal(resolveArrival(null, {}).access.buildingLabel, '');
+  assert.equal(normalizeTypeCfg({ access: { buildingLabel: '' }, steps: [] }), null);
+});

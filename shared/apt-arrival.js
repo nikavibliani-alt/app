@@ -92,9 +92,10 @@ export function normalizeTypeCfg(raw) {
     handoverPhone: digits(a.handoverPhone),
     handoverWhere: str(a.handoverWhere),
     returnNote: str(a.returnNote),
+    buildingLabel: str(a.buildingLabel).trim().slice(0, 60),   // title of the building code card on the guest page ('' = the default words)
   };
   const empty = !steps.length && !method && !access.entranceCard && !access.lockboxWhere && !access.lockboxPhoto
-    && !access.handoverWho && !access.handoverPhone && !access.handoverWhere && !access.returnNote;
+    && !access.handoverWho && !access.handoverPhone && !access.handoverWhere && !access.returnNote && !access.buildingLabel;
   if (empty) return null;   // nothing filled in: the guest page keeps looking exactly like today
   return { access, steps, updatedAt: raw.updatedAt || null };
 }
@@ -128,6 +129,7 @@ export function resolveArrival(typeCfg, unit, ctx = {}) {
     handoverPhone: a.handoverPhone || '',
     handoverWhere: a.handoverWhere || '',
     returnNote: a.returnNote || '',
+    buildingLabel: a.buildingLabel || '',
     returnNoteIsDefault: !a.returnNote && !!DEFAULT_RETURN_NOTES[m.method],
   };
   const stepPhotos = u.stepPhotos && typeof u.stepPhotos === 'object' ? u.stepPhotos : {};

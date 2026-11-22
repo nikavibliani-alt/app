@@ -835,7 +835,7 @@ html.inbox-typing #main-nav{display:none}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1016 · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1017 · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -5936,7 +5936,7 @@ let gsAptTypes={};
 const _at={group:'',tab:'units',draft:null,base:'',view:'main',editIdx:-1};
 function atClone(o){return JSON.parse(JSON.stringify(o));}
 function atUnits(group){return getApartments().filter(a=>a.id!=='abashidze'&&roomGroup(a.id,roomsData[a.id]?.site)===group);}
-function atBlank(){return{access:{method:'',entranceCard:false,lockboxWhere:'',lockboxPhoto:'',handoverWho:'',handoverPhone:'',handoverWhere:'',returnNote:''},steps:[],updatedAt:null};}
+function atBlank(){return{access:{method:'',entranceCard:false,lockboxWhere:'',lockboxPhoto:'',handoverWho:'',handoverPhone:'',handoverWhere:'',returnNote:'',buildingLabel:''},steps:[],updatedAt:null};}
 function atSaved(group){return normalizeTypeCfg(gsAptTypes[group])||atBlank();}
 function atEffMethod(cfg,unit){return resolveAccessMethod(cfg,unit||{}).method;}
 function atProblems(group){
@@ -5983,6 +5983,7 @@ async function atLoadTypeCode(group){
   try{const s=await getDoc(doc(db,'checkin_type_codes',group));_atTypeCode[group]=s.exists()?String(s.data().entranceCode||''):'';}catch(e){}
   if(_at.group===group&&_at.draft&&_at.view==='main'){const i=document.getElementById('at-entrance-code');if(i&&document.activeElement!==i)i.value=_atTypeCode[group]||'';}
 }
+window.atSetBuildingLabel=function(v){if(!_at.draft)return;_at.draft.access.buildingLabel=String(v||'').slice(0,60);atTouch();};
 window.atSaveEntranceCode=async function(){
   const g=_at.group,v=(document.getElementById('at-entrance-code')?.value||'').trim();
   try{
@@ -6076,7 +6077,10 @@ function atStepsHtml(){
       <label class="apt-label">Code for all units of this type (optional)</label>
       <input class="apt-input" id="at-entrance-code" value="${esc(_atTypeCode[_at.group]||'')}" placeholder="1234#" autocomplete="off">
       <button type="button" class="btn" style="min-height:40px;margin-top:8px;color:var(--ink)" onclick="atSaveEntranceCode()">Save code</button>
-      <p class="apt-hint" style="margin-top:8px">Use the words {entrance code} in a step. Guests see the code only once their room is ready. A unit can have its own code instead. It is saved on its own, not with the steps.</p>
+      <p class="apt-hint" style="margin-top:8px">Guests see this code in its own card on the home screen, from check-in until check-out, once their room is ready. You can also use the words {entrance code} in a step. A unit can have its own code instead. The code is saved on its own, not with the steps.</p>
+      <label class="apt-label" style="margin-top:12px">Card title on the guest page</label>
+      <input class="apt-input" value="${esc(_at.draft.access.buildingLabel||'')}" oninput="atSetBuildingLabel(this.value)" placeholder="Building / elevator code" autocomplete="off">
+      <p class="apt-hint">Empty = "Building / elevator code" in the guest's language. A title you type shows as written. Saved with the type (Save at the top).
     </div></div>
     <div class="apt-card"><div class="apt-card-hd">Arrival steps</div><div class="apt-card-bd">
       ${list||'<div class="at-muted" style="padding:6px 0">No shared steps yet. Guests see each unit\'s own steps, as today.</div>'}
