@@ -120,3 +120,22 @@ test('building code card title: kept on the type, trimmed, empty means the defau
   assert.equal(resolveArrival(null, {}).access.buildingLabel, '');
   assert.equal(normalizeTypeCfg({ access: { buildingLabel: '' }, steps: [] }), null);
 });
+
+test('check-out steps: type steps first, then the unit own extras; nothing saved = nothing to show', async () => {
+  const { resolveCheckout, normalizeTypeCfg, unitProblems } = await import('../../shared/apt-arrival.js');
+  assert.deepEqual(resolveCheckout(null, {}), []);
+  assert.deepEqual(resolveCheckout({ steps: [{ id: 'a', text: 'x' }] }, { photos: ['p'], photoCaptions: ['c'] }), []);   // arrival steps never leak into check-out
+  const cfg = { checkoutSteps: [
+    { id: 'c1', title: 'Close windows', text: 'Close {room}', photo: 'https://x/1.jpg' },
+    { id: 'c2', title: 'Photo', text: '', perUnitPhoto: true },
+  ] };
+  const unit = { stepPhotos: { c2: 'https://x/u.jpg' }, checkoutPhotos: ['https://x/own.jpg', '', ''], checkoutPhotoCaptions: ['Take the trash out', 'Only words', ''] };
+  const r = resolveCheckout(cfg, unit);
+  assert.deepEqual(r.map(s => s.id), ['c1', 'c2', 'co-unit-0', 'co-unit-1']);
+  assert.equal(r[1].photo, 'https://x/u.jpg');
+  assert.equal(r[2].text, 'Take the trash out');
+  assert.equal(r[3].photo, '');
+  assert.equal(normalizeTypeCfg({ checkoutSteps: [{ id: 'c1', text: 'a' }] }).checkoutSteps.length, 1);
+  assert.equal(normalizeTypeCfg({ checkoutSteps: [] }), null);
+  assert.deepEqual(unitProblems({ checkoutSteps: [{ id: 'c2', perUnitPhoto: true }] }, 'xcv-1', { doorCode: '1' }), ['xcv-1 needs a photo']);
+});

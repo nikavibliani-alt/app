@@ -116,6 +116,70 @@ async function shot(env, name) { if (SHOT) { await env.page.evaluate(() => windo
     await env.ctx.close();
   }
 
-  console.log('\nALL ' + passed + ' BUILDING CODE CARD CHECKS PASSED');
+  // Check-out steps
+  const CO_DOCS = {
+    'checkin_admin/config': { aptTypes: { XCV: { access: { method: 'lockbox', lockboxWhere: 'Grey box by the door' }, steps: [], checkoutSteps: [
+      { id: 'c1', title: 'Close the windows', text: 'Entrance code for the way out: {entrance code}', photo: '', perUnitPhoto: false },
+      { id: 'c2', title: 'Photo step', text: '', photo: 'https://img.test/co.jpg', perUnitPhoto: false },
+    ] } } },
+  };
+  const CO_APT = { ...XCV_APT, entranceCode: '9911#', lockboxCode: '5544', checkoutPhotos: [''], checkoutPhotoCaptions: ['Take the trash out'] };
+  {
+    const env = await open(browser, { room: 'xcv-2', apt: CO_APT, docs: CO_DOCS });
+    await h.register(env, { apiOn: false });
+    assert.equal(await vis(env.page, 'hero-checkout-steps'), false);
+    assert.ok(!(await env.page.evaluate(() => document.body.innerHTML)).includes('9911'), 'no code in the page before unlock');
+    ok('check-out steps: hidden before unlock, no code in the page');
+    await toStaying(env);
+    assert.equal(await vis(env.page, 'hero-checkout-steps'), true);
+    assert.equal(await vis(env.page, 'hero-checkout-list'), false, 'collapsed during the stay');
+    assert.equal(await text(env.page, 'btn-show-checkout'), 'Show how to check out');
+    await shot(env, 'xcv-staying-checkout-closed');
+    await env.page.click('#btn-show-checkout');
+    assert.equal(await vis(env.page, 'hero-checkout-list'), true);
+    const opened = await text(env.page, 'hero-checkout-list');
+    assert.match(opened, /Close the windows/); assert.match(opened, /9911#/); assert.match(opened, /Take the trash out/);
+    assert.equal(await text(env.page, 'btn-show-checkout'), 'Hide how to check out');
+    await shot(env, 'xcv-staying-checkout-open');
+    ok('check-out steps during the stay: an item "How to check out" that opens; steps in order, fill-in words filled');
+    await env.setClock(T.coBefore);
+    await env.page.waitForFunction(() => document.getElementById('page-home').classList.contains('phase-leaving'), null, { timeout: 20000 });
+    assert.equal(await vis(env.page, 'hero-checkout-list'), true);
+    assert.equal(await vis(env.page, 'btn-show-checkout'), false);
+    assert.equal(await text(env.page, 't-checkout-steps-title'), 'How to check out');
+    const order = await env.page.evaluate(() => { const y = id => document.getElementById(id).getBoundingClientRect().top; return { ret: y('hero-return-card'), co: y('hero-checkout-steps'), build: y('hero-building-card') }; });
+    assert.ok(order.ret < order.co, 'the key return note shows first');
+    assert.match(await text(env.page, 'hero-return-card'), /lock box/i);
+    await shot(env, 'xcv-checkout-day-steps');
+    ok('check-out steps on checkout day: shown in full under the key return note, building code card also there');
+    await env.setClock(T.coAfter);
+    await env.page.waitForTimeout(2500);
+    assert.equal(await vis(env.page, 'hero-checkout-list'), true);
+    ok('check-out steps on checkout day after check-out time: still shown');
+    for (const [l, lbl, tog] of [['ka', 'შენობის / ლიფტის კოდი', null], ['ru', 'Код здания / лифта', null], ['ar', 'رمز المبنى / المصعد', null]]) {
+      await env.page.evaluate(x => window.setLang(x), l);
+      await env.page.waitForTimeout(500);
+      assert.match(await text(env.page, 'hero-building-card'), new RegExp(lbl.replace(/[/]/g, '\\/')));
+      assert.notEqual(await text(env.page, 't-checkout-steps-title'), 'How to check out');
+    }
+    ok('new labels are translated (ka, ru, ar)');
+    assert.deepEqual(env.logs.filter(l => l.startsWith('PAGEERROR')), []);
+    await env.ctx.close();
+  }
+  // XCV with an entrance code but no check-out steps, and a Shartava unit: no check-out block at all
+  for (const [name, o] of [['XCV without check-out steps', { room: 'xcv-2', apt: { ...XCV_APT, entranceCode: '9911#' } }], ['Shartava unit', {}]]) {
+    const env = await open(browser, o);
+    await h.register(env, { apiOn: false });
+    await toStaying(env);
+    assert.equal(await vis(env.page, 'hero-checkout-steps'), false);
+    assert.equal(await env.page.evaluate(() => document.getElementById('hero-checkout-steps').dataset.has), '');
+    await env.setClock(T.coBefore);
+    await env.page.waitForFunction(() => document.getElementById('page-home').classList.contains('phase-leaving'), null, { timeout: 20000 });
+    assert.equal(await vis(env.page, 'hero-checkout-steps'), false);
+    ok(name + ': no check-out block (as today)');
+    await env.ctx.close();
+  }
+
+  console.log('\nALL ' + passed + ' BUILDING CODE CARD AND CHECK-OUT CHECKS PASSED');
   await browser.close();
 })().catch(e => { console.error('FAIL', e); process.exit(1); });

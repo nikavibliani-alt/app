@@ -71,18 +71,23 @@ export const DEFAULT_RETURN_NOTES = {
 const str = (v) => (typeof v === 'string' ? v : '');
 const digits = (v) => String(v == null ? '' : v).replace(/\D/g, '');
 
-/* clean copy of a saved type: unknown or missing parts are dropped, so the rest of the code can trust the shape */
-export function normalizeTypeCfg(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const a = raw.access && typeof raw.access === 'object' ? raw.access : {};
-  const method = ACCESS_METHODS.includes(a.method) ? a.method : '';
-  const steps = (Array.isArray(raw.steps) ? raw.steps : []).filter((s) => s && typeof s === 'object').map((s, i) => ({
+function normSteps(list) {
+  return (Array.isArray(list) ? list : []).filter((s) => s && typeof s === 'object').map((s, i) => ({
     id: str(s.id) || ('s' + (i + 1)),
     title: str(s.title),
     text: str(s.text),
     photo: str(s.photo),
     perUnitPhoto: s.perUnitPhoto === true,
   }));
+}
+
+/* clean copy of a saved type: unknown or missing parts are dropped, so the rest of the code can trust the shape */
+export function normalizeTypeCfg(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const a = raw.access && typeof raw.access === 'object' ? raw.access : {};
+  const method = ACCESS_METHODS.includes(a.method) ? a.method : '';
+  const steps = normSteps(raw.steps);
+  const checkoutSteps = normSteps(raw.checkoutSteps);
   const access = {
     method,
     entranceCard: a.entranceCard === true,
@@ -94,10 +99,10 @@ export function normalizeTypeCfg(raw) {
     returnNote: str(a.returnNote),
     buildingLabel: str(a.buildingLabel).trim().slice(0, 60),   // title of the building code card on the guest page ('' = the default words)
   };
-  const empty = !steps.length && !method && !access.entranceCard && !access.lockboxWhere && !access.lockboxPhoto
+  const empty = !steps.length && !checkoutSteps.length && !method && !access.entranceCard && !access.lockboxWhere && !access.lockboxPhoto
     && !access.handoverWho && !access.handoverPhone && !access.handoverWhere && !access.returnNote && !access.buildingLabel;
   if (empty) return null;   // nothing filled in: the guest page keeps looking exactly like today
-  return { access, steps, updatedAt: raw.updatedAt || null };
+  return { access, steps, checkoutSteps, updatedAt: raw.updatedAt || null };
 }
 
 /* The access method for a unit: its own choice, else the type's, else the smart lock box that exists today. */
@@ -147,6 +152,30 @@ export function resolveArrival(typeCfg, unit, ctx = {}) {
 }
 
 /*
+ * -> check-out steps: the type's steps first (a per-unit photo step uses the unit's own photo), then the unit's own extra steps
+ * (checkoutPhotos[] + checkoutPhotoCaptions[]; an empty one is skipped). Same shape as the arrival steps. [] = nothing to show.
+ */
+export function resolveCheckout(typeCfg, unit) {
+  const t = normalizeTypeCfg(typeCfg);
+  const u = unit || {};
+  const stepPhotos = u.stepPhotos && typeof u.stepPhotos === 'object' ? u.stepPhotos : {};
+  const steps = [];
+  for (const s of (t ? t.checkoutSteps : [])) {
+    const photo = s.perUnitPhoto ? str(stepPhotos[s.id]) : s.photo;
+    steps.push({ id: s.id, title: s.title, text: s.text, photo, shared: true, perUnitPhoto: s.perUnitPhoto, missingPhoto: s.perUnitPhoto && !photo });
+  }
+  const photos = Array.isArray(u.checkoutPhotos) ? u.checkoutPhotos : [];
+  const caps = Array.isArray(u.checkoutPhotoCaptions) ? u.checkoutPhotoCaptions : [];
+  for (let i = 0; i < Math.max(photos.length, caps.length); i++) {
+    const photo = str(photos[i]);
+    const text = str(caps[i]);
+    if (!photo && !text.trim()) continue;
+    steps.push({ id: 'co-unit-' + i, title: '', text, photo, shared: false, perUnitPhoto: false, missingPhoto: false, unitIndex: i });
+  }
+  return steps;
+}
+
+/*
  * Fills {room}, {door code}, {lock box code}, {entrance code}, {elevator code} (and the old #elevatorcode).
  * ctx: { room, doorCode, lockboxCode, entranceCode, elevatorCode, lockedText }
  * The four codes are filled ONLY when `unlocked` is true; before that they show lockedText
@@ -178,7 +207,7 @@ export function unitProblems(typeCfg, unitCode, unit, opts = {}) {
   else if (m === 'code' && !u.doorCode) out.push(unitCode + ' has no lock');
   else if (m === 'lockbox' && !u.lockboxCode) out.push(unitCode + ' has no lock');
   if (t) {
-    for (const s of t.steps) {
+    for (const s of [...t.steps, ...t.checkoutSteps]) {
       if (s.perUnitPhoto && !(u.stepPhotos && u.stepPhotos[s.id])) { out.push(unitCode + ' needs a photo'); break; }
     }
   }

@@ -496,7 +496,7 @@ html.inbox-typing #main-nav{display:none}
 .apt-card-bd{padding:14px;}
 .apt-label{display:block;font-size:var(--label);font-weight:var(--label-weight);letter-spacing:var(--label-track);color:var(--muted);margin-bottom:6px;}
 .apt-input,.apt-textarea{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--rs);font-size:16px;font-family:var(--sans);background:var(--bg);margin-bottom:10px;}
-.apt-input:focus,.apt-textarea:focus{outline:none;border-color:var(--ink);}
+.apt-input:focus,.apt-textarea:focus,.apt-step-textarea:focus{outline:none;border-color:var(--ink);}
 .apt-textarea{min-height:100px;resize:vertical;line-height:1.45;}
 .apt-mode-group{display:flex;gap:6px;margin-bottom:12px;}
 .apt-mode-btn{flex:1;min-height:40px;border:1.5px solid var(--line);border-radius:var(--rs);background:var(--bg);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);}
@@ -835,7 +835,7 @@ html.inbox-typing #main-nav{display:none}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1017 · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1018 · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -1127,7 +1127,7 @@ import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gsta
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour,normalizeStayDate}from"./shared/guest-unlock.js";
 import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON,hkPropertyGroupForRoom}from"./shared/hk-bedding.js";
 import{DEFAULT_ROOMS_SEED,ROOM_SITES}from"./shared/room-registry.js";
-import{roomGroup,APT_GROUPS,groupLabel,ACCESS_METHODS,ACCESS_LABELS,ACCESS_DESCRIPTIONS,ACCESS_GUEST_SEES,DEFAULT_RETURN_NOTES,PLACEHOLDERS,normalizeTypeCfg,resolveAccessMethod,resolveArrival,fillPlaceholders,unitProblems}from"./shared/apt-arrival.js";
+import{roomGroup,APT_GROUPS,groupLabel,ACCESS_METHODS,ACCESS_LABELS,ACCESS_DESCRIPTIONS,ACCESS_GUEST_SEES,DEFAULT_RETURN_NOTES,PLACEHOLDERS,normalizeTypeCfg,resolveAccessMethod,resolveArrival,resolveCheckout,fillPlaceholders,unitProblems}from"./shared/apt-arrival.js";
 import{HR_LANGS,HR_GROUPS,ICON_CHOICES,NO_SMOKING_IMG,defaultHouseRules,resolveHouseRules,renderRulesList,ruleIconHtml,emptyLangs,pick,ruleScope,uniqueRuleIds}from"./shared/house-rules.js";
 import{createPipelineAdminClient}from"./shared/pipeline-admin.js";
 import{connectPipelineFunctionsEmulator,mountEmulatorBanner,shouldUseFunctionsEmulator}from"./shared/pipeline-emulator.js";
@@ -5933,10 +5933,10 @@ function renderAptsListFlat(){
 
 /* ── Apartments: types -> units. Data: config.aptTypes[GROUP] (see shared/apt-arrival.js). NEVER put a code in it. ── */
 let gsAptTypes={};
-const _at={group:'',tab:'units',draft:null,base:'',view:'main',editIdx:-1};
+const _at={group:'',tab:'units',key:'steps',draft:null,base:'',view:'main',editIdx:-1};
 function atClone(o){return JSON.parse(JSON.stringify(o));}
 function atUnits(group){return getApartments().filter(a=>a.id!=='abashidze'&&roomGroup(a.id,roomsData[a.id]?.site)===group);}
-function atBlank(){return{access:{method:'',entranceCard:false,lockboxWhere:'',lockboxPhoto:'',handoverWho:'',handoverPhone:'',handoverWhere:'',returnNote:'',buildingLabel:''},steps:[],updatedAt:null};}
+function atBlank(){return{access:{method:'',entranceCard:false,lockboxWhere:'',lockboxPhoto:'',handoverWho:'',handoverPhone:'',handoverWhere:'',returnNote:'',buildingLabel:''},steps:[],checkoutSteps:[],updatedAt:null};}
 function atSaved(group){return normalizeTypeCfg(gsAptTypes[group])||atBlank();}
 function atEffMethod(cfg,unit){return resolveAccessMethod(cfg,unit||{}).method;}
 function atProblems(group){
@@ -5993,7 +5993,7 @@ window.atSaveEntranceCode=async function(){
 };
 window.openAptType=function(group){
   atLoadTypeCode(group);
-  _at.group=group;_at.tab='units';_at.view='main';_at.editIdx=-1;
+  _at.group=group;_at.tab='units';_at.key='steps';_at.view='main';_at.editIdx=-1;
   _at.draft=atClone(atSaved(group));
   _at.base=JSON.stringify(_at.draft);
   document.getElementById('apt-type-overlay').classList.add('open');
@@ -6012,19 +6012,21 @@ function atUpdateSave(){
   const b=document.getElementById('apt-type-save');
   if(b)b.style.display=atDirty()?'inline-flex':'none';
 }
-window.atSetTab=function(t){_at.tab=t;_at.view='main';_at.editIdx=-1;atRender();};
+window.atSetTab=function(t){_at.tab=t;_at.key=t==='checkout'?'checkoutSteps':'steps';_at.view='main';_at.editIdx=-1;atRender();};
+/* the list the step editor works on: arrival steps or check-out steps of the type */
+function atArr(){if(!_at.draft)return[];if(!Array.isArray(_at.draft[_at.key]))_at.draft[_at.key]=[];return _at.draft[_at.key];}
 function atRender(soft){
   const ov=document.getElementById('apt-type-overlay');
   if(!ov||!ov.classList.contains('open')||!_at.draft)return;
   if(soft){const ae=document.activeElement;if(_at.view==='step'||(ae&&ae.closest&&ae.closest('#apt-type-body')&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)))return;}
   const g=APT_GROUPS.find(x=>x.id===_at.group)||{label:_at.group};
   document.getElementById('apt-type-title').textContent=_at.view==='step'?'Edit step':g.label;
-  const tabs=[['units','Units'],['steps','Arrival steps'],['settings','Settings']];
+  const tabs=[['units','Units'],['steps','Arrival steps'],['checkout','Check-out steps'],['settings','Settings']];
   document.getElementById('apt-type-tabs').style.display=_at.view==='step'?'none':'flex';
   document.getElementById('apt-type-tabs').innerHTML=tabs.map(([k,l])=>`<button type="button" class="at-tab${_at.tab===k?' active':''}" onclick="atSetTab('${k}')">${l}</button>`).join('');
   const body=document.getElementById('apt-type-body');
   const top=body.scrollTop;
-  body.innerHTML=_at.view==='step'?atStepEditHtml():(_at.tab==='units'?atUnitsHtml():_at.tab==='steps'?atStepsHtml():atSettingsHtml());
+  body.innerHTML=_at.view==='step'?atStepEditHtml():(_at.tab==='units'?atUnitsHtml():_at.tab==='steps'?atStepsHtml():_at.tab==='checkout'?atStepsHtml():atSettingsHtml());
   body.scrollTop=top;
   atUpdateSave();
 }
@@ -6054,8 +6056,8 @@ function atAccessCardHtml(){
 }
 function atChangeAccessBtn(scope){return`<button type="button" class="btn" style="flex:none;min-height:36px;padding:0 14px" onclick="openAccessSheet('${scope}')">Change</button>`;}
 function atStepsHtml(){
-  const d=_at.draft,units=atUnits(_at.group),n=units.length;
-  const list=d.steps.map((s,i)=>{
+  const d=_at.draft,units=atUnits(_at.group),n=units.length,co=_at.key==='checkoutSteps',arr=atArr();
+  const list=arr.map((s,i)=>{
     const tag=s.perUnitPhoto
       ?`<div class="at-tag">Each unit has its own photo</div><div class="at-thumbs">${units.map(u=>{const url=(aptData[u.id]?.stepPhotos||{})[s.id]||'';return`<label class="at-thumbwrap" title="${esc(u.code)}">${atThumb(url,true)}<span>${esc(u.code)}</span><input type="file" accept="image/*" style="display:none" onchange="atUnitStepPhoto('${esc(u.id)}','${esc(s.id)}',this)"></label>`;}).join('')}</div>`
       :`<div class="at-tag">Same for all ${n}</div>`;
@@ -6067,11 +6069,16 @@ function atStepsHtml(){
       </div>
       <div class="at-step__btns">
         <button type="button" class="apt-step-btn" aria-label="Move up" ${i===0?'disabled':''} onclick="atMoveStep(${i},-1)">${featherIcon('chevron-up',16,2)}</button>
-        <button type="button" class="apt-step-btn" aria-label="Move down" ${i===d.steps.length-1?'disabled':''} onclick="atMoveStep(${i},1)">${featherIcon('chevron-down',16,2)}</button>
+        <button type="button" class="apt-step-btn" aria-label="Move down" ${i===arr.length-1?'disabled':''} onclick="atMoveStep(${i},1)">${featherIcon('chevron-down',16,2)}</button>
         <button type="button" class="btn" style="flex:1;min-height:36px" onclick="atEditStep(${i})">Edit</button>
         <button type="button" class="btn" style="flex:none;min-height:36px;color:var(--red)" onclick="atDeleteStep(${i})">Delete</button>
       </div></div>`;
   }).join('');
+  if(co)return`<div class="apt-card"><div class="apt-card-hd">Check-out steps</div><div class="apt-card-bd">
+      ${list||'<div class="at-muted" style="padding:6px 0">No check-out steps yet. Guests see nothing extra on check-out day, as today.</div>'}
+      <button type="button" class="apt-add" onclick="atAddStep()">+ Add check-out step for all ${n} units</button>
+      <p class="apt-hint" style="margin-top:10px">Guests see these on check-out day, and as "How to check out" during the stay. The lock box or key return note always shows first. A unit can add extra steps of its own on its page.</p>
+    </div></div>`;
   return`${atAccessCardHtml()}
     <div class="apt-card"><div class="apt-card-hd">Entrance / building code</div><div class="apt-card-bd">
       <label class="apt-label">Code for all units of this type (optional)</label>
@@ -6089,21 +6096,21 @@ function atStepsHtml(){
     </div></div>`;
 }
 window.atAddStep=function(){
-  _at.draft.steps.push({id:'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),title:'',text:'',photo:'',perUnitPhoto:false});
-  _at.view='step';_at.editIdx=_at.draft.steps.length-1;atRender();
+  atArr().push({id:'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),title:'',text:'',photo:'',perUnitPhoto:false});
+  _at.view='step';_at.editIdx=atArr().length-1;atRender();
 };
-window.atEditStep=function(i){if(!_at.draft.steps[i])return;_at.view='step';_at.editIdx=i;atRender();};
+window.atEditStep=function(i){if(!atArr()[i])return;_at.view='step';_at.editIdx=i;atRender();};
 window.atDeleteStep=function(i){
-  const s=_at.draft.steps[i];if(!s)return;
+  const s=atArr()[i];if(!s)return;
   if(!confirm('Delete the step "'+(s.title||'untitled')+'" for all units in this type?'))return;
-  _at.draft.steps.splice(i,1);atRender();
+  atArr().splice(i,1);atRender();
 };
 window.atMoveStep=function(i,d){
-  const a=_at.draft.steps,j=i+d;if(j<0||j>=a.length)return;
+  const a=atArr(),j=i+d;if(j<0||j>=a.length)return;
   [a[i],a[j]]=[a[j],a[i]];atRender();
 };
 function atStepEditHtml(){
-  const s=_at.draft.steps[_at.editIdx];if(!s)return'';
+  const s=atArr()[_at.editIdx];if(!s)return'';
   const units=atUnits(_at.group);
   const chips=PLACEHOLDERS.map(p=>`<button type="button" class="at-ph" onclick="atInsertPh('${p}')">${esc(p)}</button>`).join('');
   const perUnit=s.perUnitPhoto
@@ -6126,10 +6133,10 @@ function atStepEditHtml(){
     </div></div>
     <button type="button" class="btn btn-primary" style="width:100%" onclick="closeAptType()">Done with this step</button>`;
 }
-window.atSetStep=function(k,v){const s=_at.draft.steps[_at.editIdx];if(!s)return;s[k]=v;atTouch();};
-window.atSetPerUnit=function(on){const s=_at.draft.steps[_at.editIdx];if(!s)return;s.perUnitPhoto=!!on;atRender();};
+window.atSetStep=function(k,v){const s=atArr()[_at.editIdx];if(!s)return;s[k]=v;atTouch();};
+window.atSetPerUnit=function(on){const s=atArr()[_at.editIdx];if(!s)return;s.perUnitPhoto=!!on;atRender();};
 window.atInsertPh=function(ph){
-  const s=_at.draft.steps[_at.editIdx];if(!s)return;
+  const s=atArr()[_at.editIdx];if(!s)return;
   const el=document.getElementById('at-step-text');
   const pos=el&&typeof el.selectionStart==='number'?el.selectionStart:s.text.length;
   const end=el&&typeof el.selectionEnd==='number'?el.selectionEnd:pos;
@@ -6139,11 +6146,11 @@ window.atInsertPh=function(ph){
   if(el2){el2.focus();const c=pos+ph.length;try{el2.setSelectionRange(c,c);}catch(e){}}
 };
 window.atStepPhoto=async function(input){
-  const f=input.files&&input.files[0];const s=_at.draft.steps[_at.editIdx];if(!f||!s)return;
+  const f=input.files&&input.files[0];const s=atArr()[_at.editIdx];if(!f||!s)return;
   try{toast('Uploading…',15000);s.photo=await uploadToCloudinary(f,'maxela/types/'+_at.group);atTouch();atRender();toast('Photo added');}
   catch(e){toast('Upload failed: '+e.message);}
 };
-window.atStepPhotoClear=function(){const s=_at.draft.steps[_at.editIdx];if(!s)return;s.photo='';atTouch();atRender();};
+window.atStepPhotoClear=function(){const s=atArr()[_at.editIdx];if(!s)return;s.photo='';atTouch();atRender();};
 /* a unit's own photo for a shared step: saved straight to the unit (stepPhotos), not part of the type draft */
 window.atUnitStepPhoto=async function(unitId,stepId,input){
   const f=input.files&&input.files[0];if(!f)return;
@@ -6361,6 +6368,35 @@ window.openAptEditor=function(aptId){
           ${s.perUnitPhoto?`<div><label class="at-link" style="display:inline-block">${s.photo?'Replace photo':'Add this unit\'s photo'}<input type="file" accept="image/*" style="display:none" onchange="atUnitStepPhoto('${esc(aptId)}','${esc(s.id)}',this)"></label></div>`:''}
         </div>
       </div></div>`).join('');
+  const coShared=resolveCheckout(typeCfg,d).filter(s=>s.shared).map((s,i)=>`
+    <div class="at-step at-step--from">
+      <div class="at-step__top">
+        <div class="at-step__num">${i+1}</div>
+        ${atThumb(s.photo,s.missingPhoto)}
+        <div class="at-step__txt"><div class="at-step__title">${esc(s.title||'(no title)')}</div><div class="at-muted">${esc(s.text)}</div>
+          <div class="at-tag">From ${esc(groupLabel(group))}</div>
+          ${s.perUnitPhoto?`<div><label class="at-link" style="display:inline-block">${s.photo?'Replace photo':'Add this unit\'s photo'}<input type="file" accept="image/*" style="display:none" onchange="atUnitStepPhoto('${esc(aptId)}','${esc(s.id)}',this)"></label></div>`:''}
+        </div>
+      </div></div>`).join('');
+  const coPhotos=d.checkoutPhotos||[],coCaps=d.checkoutPhotoCaptions||[];
+  const coOwn=Array.from({length:Math.max(coPhotos.length,coCaps.length)},(_,i)=>{
+    const url=coPhotos[i]||'';
+    return`<div class="apt-step">
+      ${url?`<img src="${esc(url)}" alt="Check-out step ${i+1}" onclick="document.getElementById('co-replace-${i}').click()">`:'<div style="width:64px;height:64px;flex:none;border:1px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);text-align:center">No photo</div>'}
+      <div>
+        <div class="apt-label">Step ${i+1}</div>
+        <textarea class="apt-step-textarea" id="co-cap-${i}" placeholder="What the guest should do">${esc(coCaps[i]||'')}</textarea>
+        <input type="file" id="co-replace-${i}" accept="image/*" style="display:none" onchange="window.coReplacePhoto(${i},this)">
+        <button type="button" class="at-link" onclick="document.getElementById('co-replace-${i}').click()">${url?'Replace photo':'Add a photo'}</button>
+        ${url?`<button type="button" class="at-link" onclick="window.coRemovePhoto(${i})">Remove photo</button>`:''}
+      </div>
+      <div class="apt-step-actions">
+        <button type="button" class="apt-step-btn" aria-label="Move up" onclick="window.coMove(${i},-1)" ${i===0?'disabled':''}>${featherIcon('chevron-up',16,2)}</button>
+        <button type="button" class="apt-step-btn" aria-label="Move down" onclick="window.coMove(${i},1)" ${i===Math.max(coPhotos.length,coCaps.length)-1?'disabled':''}>${featherIcon('chevron-down',16,2)}</button>
+        <button type="button" class="apt-step-btn del" aria-label="Delete step" onclick="window.coDelete(${i})">${featherIcon('x',16,2)}</button>
+      </div>
+    </div>`;
+  }).join('')||'<div style="font-size:13px;color:var(--muted);padding:8px 0;">No check-out steps of its own.</div>';
   const lockState=d.tuyaDeviceId?'Smart lock connected':d.doorCode?'Door code set':'No lock yet';
   const nSteps=arrival.steps.length;
   const accessLabel=ACCESS_LABELS[method]+' · '+(arrival.access.source==='unit'?'own setting':(arrival.access.source==='type'?'same as type':'as today'));
@@ -6419,6 +6455,19 @@ window.openAptEditor=function(aptId){
         <div id="aptPhotoSteps">${steps}</div>
         <input type="file" id="apt-photo-input" accept="image/*" multiple style="display:none" onchange="window.uploadPhotos(this)">
         <button type="button" class="apt-add" onclick="document.getElementById('apt-photo-input').click()">+ Add a step only for ${esc(apt.code)}</button>
+      </div>
+    </div>
+    <div class="apt-card">
+      <div class="apt-card-hd">Check-out steps</div>
+      <div class="apt-card-bd">
+        ${coShared||''}
+        ${coShared?'<p class="apt-hint" style="margin-bottom:6px">These come from the type and can only be edited there.</p>':''}
+        <label class="apt-label">${coShared?'Check-out steps only for '+esc(apt.code):'Check-out steps'}</label>
+        <div id="aptCheckoutSteps">${coOwn}</div>
+        <input type="file" id="co-photo-input" accept="image/*" multiple style="display:none" onchange="window.coAddPhotos(this)">
+        <button type="button" class="apt-add" onclick="document.getElementById('co-photo-input').click()">+ Add a check-out step with a photo</button>
+        <button type="button" class="apt-add" style="margin-top:8px" onclick="window.coAddText()">+ Add a check-out step with words only</button>
+        <p class="apt-hint" style="margin-top:8px">Guests see these on check-out day, and as "How to check out" during the stay, after the type's steps. You can use {room}, {door code}, {lock box code}, {entrance code} and {elevator code} in the words.</p>
       </div>
     </div>
     <div class="apt-card">
@@ -6545,7 +6594,7 @@ function _aptRerender(aptId,capMap){
   const foldsOpen=['apt-fold-registry','apt-fold-text','apt-fold-times','apt-fold-location','apt-fold-link'].filter(id=>!document.getElementById(id)?.classList.contains('collapsed'));
   openAptEditor(aptId);
   for(const k of Object.keys(snap)){
-    if(k==='__mode'||/^photo-cap-\d+$/.test(k))continue;
+    if(k==='__mode'||/^(photo|co)-cap-\d+$/.test(k))continue;
     const el=document.getElementById(k);
     if(!el)continue;
     if(el.type==='checkbox')el.checked=!!snap[k];else el.value=snap[k];
@@ -6599,6 +6648,8 @@ window.saveAptData=async function(){
     lockboxCode:document.getElementById('apt-lockboxCode')?document.getElementById('apt-lockboxCode').value.trim():(aptData[aptId]?.lockboxCode||''),
     photos:aptData[aptId]?.photos||[],
     photoCaptions,
+    checkoutPhotos:aptData[aptId]?.checkoutPhotos||[],
+    checkoutPhotoCaptions:coCapsFromDom(aptId),
     updatedAt:serverTimestamp()
   };
   try{
@@ -6608,6 +6659,55 @@ window.saveAptData=async function(){
     toast('Saved');
     renderAptsList();
   }catch(e){toast('Save failed: '+e.message);}
+};
+
+/* a unit's own check-out steps (checkoutPhotos[] + checkoutPhotoCaptions[]): every change is saved at once, typed words are kept */
+function coCapsFromDom(aptId){
+  const n=Math.max((aptData[aptId]?.checkoutPhotos||[]).length,(aptData[aptId]?.checkoutPhotoCaptions||[]).length);
+  return Array.from({length:n},(_,i)=>{const el=document.getElementById('co-cap-'+i);return el?el.value.trim():((aptData[aptId]?.checkoutPhotoCaptions||[])[i]||'');});
+}
+function coLists(aptId){
+  const caps=coCapsFromDom(aptId);
+  const photos=Array.from({length:caps.length},(_,i)=>(aptData[aptId]?.checkoutPhotos||[])[i]||'');
+  return{photos,caps};
+}
+async function coSave(aptId,photos,caps){
+  await setDoc(doc(db,'checkin_apartments',aptId),{checkoutPhotos:photos,checkoutPhotoCaptions:caps,updatedAt:serverTimestamp()},{merge:true});
+  aptData[aptId]={...aptData[aptId],checkoutPhotos:photos,checkoutPhotoCaptions:caps};
+  _aptRerender(aptId);
+}
+window.coAddPhotos=async function(input){
+  const aptId=_currentAptId;const files=Array.from(input.files||[]);if(!aptId||!files.length)return;
+  try{
+    const {photos,caps}=coLists(aptId);
+    for(let i=0;i<files.length;i++){toast('Uploading '+(i+1)+'/'+files.length+'…',15000);photos.push(await uploadToCloudinary(files[i],'maxela/'+aptId+'/checkout'));caps.push('');}
+    await coSave(aptId,photos,caps);toast('Added');
+  }catch(e){toast('Upload failed: '+e.message);}
+};
+window.coAddText=async function(){
+  const aptId=_currentAptId;if(!aptId)return;
+  try{const {photos,caps}=coLists(aptId);photos.push('');caps.push('');await coSave(aptId,photos,caps);}catch(e){toast('Failed: '+e.message);}
+};
+window.coDelete=async function(i){
+  const aptId=_currentAptId;if(!aptId||!confirm('Delete this check-out step?'))return;
+  try{const {photos,caps}=coLists(aptId);photos.splice(i,1);caps.splice(i,1);await coSave(aptId,photos,caps);}catch(e){toast('Failed: '+e.message);}
+};
+window.coMove=async function(i,dir){
+  const aptId=_currentAptId;if(!aptId)return;
+  try{
+    const {photos,caps}=coLists(aptId);const j=i+dir;if(j<0||j>=photos.length)return;
+    [photos[i],photos[j]]=[photos[j],photos[i]];[caps[i],caps[j]]=[caps[j],caps[i]];
+    await coSave(aptId,photos,caps);
+  }catch(e){toast('Failed: '+e.message);}
+};
+window.coReplacePhoto=async function(i,input){
+  const aptId=_currentAptId;const f=input.files&&input.files[0];if(!aptId||!f)return;
+  try{toast('Uploading…',15000);const {photos,caps}=coLists(aptId);photos[i]=await uploadToCloudinary(f,'maxela/'+aptId+'/checkout');await coSave(aptId,photos,caps);toast('Photo saved');}
+  catch(e){toast('Upload failed: '+e.message);}
+};
+window.coRemovePhoto=async function(i){
+  const aptId=_currentAptId;if(!aptId)return;
+  try{const {photos,caps}=coLists(aptId);photos[i]='';await coSave(aptId,photos,caps);}catch(e){toast('Failed: '+e.message);}
 };
 
 window.uploadPhotos=async function(input){
