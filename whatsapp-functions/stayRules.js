@@ -87,9 +87,27 @@ function stayTimingContextLines(timing) {
   ];
 }
 
+/**
+ * The stay's length in nights and whether a towel and bed sheet change during
+ * the stay is included (stays of `freeFromNights` or more), decided here so
+ * the rule never depends on the model counting dates (it got 10 nights wrong
+ * in a replay). No lines when either date is unknown or the dates make no sense.
+ */
+function stayLengthLines({ checkin, checkout } = {}, freeFromNights = 7) {
+  const from = Date.parse(`${dateOnly(checkin)}T00:00:00Z`);
+  const to = Date.parse(`${dateOnly(checkout)}T00:00:00Z`);
+  const nights = Math.round((to - from) / 86400000);
+  if (!Number.isFinite(nights) || nights < 1) return [];
+  return [
+    `Length of this stay: ${nights} night${nights === 1 ? '' : 's'} (computed in code)`,
+    `Towel change during the stay included: ${nights >= freeFromNights ? 'yes' : 'no'}`,
+  ];
+}
+
 module.exports = {
   otherPropertyForRoom,
   propertyForRoom,
+  stayLengthLines,
   stayTiming,
   stayTimingContextLines,
 };

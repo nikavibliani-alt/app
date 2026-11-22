@@ -23,7 +23,7 @@ const {
 } = require('./summarizer');
 const { loadCurrentStayHistory, prepareClaudeHistory, stripTimeLabels } = require('./stayContext');
 const { findCurrentGuestForm } = require('./guestLookup');
-const { otherPropertyForRoom, stayTiming, stayTimingContextLines } = require('./stayRules');
+const { otherPropertyForRoom, stayLengthLines, stayTiming, stayTimingContextLines } = require('./stayRules');
 const { describeInbound } = require('./inboundContent');
 const { downloadMetaMedia, photosToAttach, attachPhotos } = require('./metaMedia');
 const { sendOwnerAlert, ownerAlertGuest, ownerStatusIds, guestFailedStatusLines, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
@@ -889,6 +889,7 @@ exports.whatsappBotWorker = onRequest(
         // Check-in timing computed here in Tbilisi time, so the entrance and
         // door-code scenarios never have to work it out from the hour.
         ...stayTimingContextLines(timing),
+        ...stayLengthLines({ checkin: checkinDate || guestMatch?.form?.arrivalDate, checkout: checkoutDate }, kb.policies?.longStay?.freeEveryNights),
         ...unitFactLines(kb, bookingRoom, wifi),
         ...languageHintLines(combinedGuestText),
         ...bookingLookupLines(lookup, kb.properties?.[propertyIdForRoom(kb, lookup?.roomCode)]?.name),

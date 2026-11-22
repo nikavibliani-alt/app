@@ -21,7 +21,14 @@ module.exports = {
       ],
       "layout": {
         "en": "It has a private bathroom, a double bed, a single bed and a sofa bed, and fits up to 4 guests."
-      }
+      },
+      "expediaName": "Deluxe Room City View",
+      "amenities": {
+        "en": "Triple Room (Deluxe Room City View on Expedia): fridge, kettle and microwave (no stove, no kitchen); TV with Silknet channels; bidet; no balcony; no washing machine (guests can order our paid laundry service, see LAUNDRY). One iron and ironing board are shared by the Triple Rooms, in their hallway: after use, the guest puts them back in the hallway. The Triple Rooms' entrance is on the first floor, so no elevator is needed; their windows, on the other side of the building, are on the 3rd floor."
+      },
+      "washingMachine": false,
+      "tv": "silknet",
+      "bidet": true
     },
     "superior": {
       "description": "Superior Apartment: two rooms in total: a separate bedroom with a double bed, and a second double bed in the living room, divided by curtains (plus 2 sofas), has kitchen, fits up to 6 guests",
@@ -35,7 +42,17 @@ module.exports = {
       "layout": {
         "en": "It has two rooms in total: a separate bedroom with a double bed, and a second double bed in the living room, divided by curtains. It has a kitchen and fits up to 6 guests."
       },
-      "rooms": 2
+      "rooms": 2,
+      "amenities": {
+        "en": "Superior Apartment: washing machine and drying rack; full kitchen with an electric stove, pots, pans, plates, cutlery and a kettle (no dishwasher); iron and ironing board; balcony; smart TV (no TV channels); every Superior Apartment but one has a bidet."
+      },
+      "variants": {
+        "en": "We have 6 Superior Apartments in 3 designs, all the same size. The apartment is assigned on the check-in day, so a guest can't choose a specific apartment or number. Never say which apartments have a city view or a better view.",
+        "reply": "We have 6 Superior Apartments, all the same size, in 3 different designs. The apartment is assigned on the check-in day, so a specific one can't be chosen in advance."
+      },
+      "washingMachine": true,
+      "balcony": true,
+      "tv": "smart"
     },
     "threeBedroom": {
       "description": "3 Bedroom Apartment: Bedroom 1 has 2 double beds, Bedroom 2 has 1 double bed and 1 baby bed, Bedroom 3 has 1 double bed, living room has 3 sofa beds, 1 separate toilet, 2 bathrooms with showers, has kitchen, fits up to 11 guests plus 1 baby in the baby bed",
@@ -49,7 +66,13 @@ module.exports = {
         "living room: 3 sofa beds"
       ],
       "bathrooms": "2 bathrooms with showers + 1 separate toilet",
-      "maxBabies": 1
+      "maxBabies": 1,
+      "amenities": {
+        "en": "3 Bedroom Apartment: washing machine and drying rack; full kitchen with an electric stove, pots, pans, plates, cutlery and a kettle (no dishwasher); iron and ironing board; balcony; smart TV (no TV channels); bidets in the toilets."
+      },
+      "washingMachine": true,
+      "balcony": true,
+      "tv": "smart"
     }
   },
   "policies": {
@@ -115,6 +138,10 @@ module.exports = {
         "ka": "ბარგის დატოვება check-in-მდე შეგიძლიათ. მიდით პირველ ფოტოზე ნაჩვენებ შესასვლელთან, შემდეგ კი მეორე ფოტოზე ნაჩვენებ შუშის კართან. კარის კოდია 13 24 13#. გთხოვთ, ბარგი დატოვოთ კამერის ქვეშ, ხოლო პასპორტები, ლეპტოპები და სხვა ძვირფასი ნივთები თან იქონიოთ."
       },
       "followUpFacts": "the bags stay inside the building, in the hallway behind the glass door (not outside on the street), under the camera. There is no lockable storage.",
+      "afterCheckout": {
+        "en": "You can leave your bags after checkout too. Go to the entrance in the first photo, then the glass door in the second photo. The smart lock code is 13 24 13#. Please leave your bags under the camera, and keep passports, laptops and other valuables with you.",
+        "apartmentNote": "This is the Triple Rooms' entrance, a different entrance from your apartment's."
+      },
       "mediaId": "1804812277340997",
       "appliesTo": [
         "shartava"
@@ -195,7 +222,94 @@ module.exports = {
       "appliesTo": [
         "shartava"
       ],
-      "includedInPrice": false
+      "includedInPrice": false,
+      "guestOut": {
+        "en": "The guest must be out of the apartment during the cleaning."
+      }
+    },
+    "amenities": {
+      "en": "Every unit: hair dryer; shower gel, shampoo and soap (we refill them on request); radiators and an air conditioner that also heats (the AC remote is in the room). Heating and hot water come from the same boiler. A baby bed can be brought to any unit for free on request. Some units have blackout curtains and some don't, so never promise one. We have no slippers, no plug adapters (guests need their own), no extra beds and no dishwasher.",
+      "appliesTo": [
+        "shartava"
+      ],
+      "slippers": false,
+      "plugAdapters": false,
+      "extraBeds": false,
+      "babyBed": "free on request"
+    },
+    "tv": {
+      "en": "Smart TV (Superior and 3 Bedroom Apartments): turn the TV on with the TV remote, switch it to the HDMI input, then use the second remote, for the smart TV stick. Triple Rooms have Silknet TV channels instead.",
+      "appliesTo": [
+        "shartava"
+      ]
+    },
+    "laundry": {
+      "en": "Triple Room guests can order our paid laundry service on the guest page, priced per item there: we collect it at the time they choose and bring it back the same day. We don't wash socks or underwear. Apartments have a washing machine; detergent is not provided, but on request we can bring some until 18:00.",
+      "appliesTo": [
+        "shartava"
+      ],
+      "returnedSameDay": true,
+      "socksUnderwear": false,
+      "detergentProvided": false,
+      "detergentOnRequestUntil": "18:00"
+    },
+    "longStay": {
+      "en": "For stays of 7 nights or more, cleaning and a towel and bed sheet change are free every 7 nights. For shorter stays a towel change mid-stay is not included.",
+      "appliesTo": [
+        "shartava"
+      ],
+      "freeEveryNights": 7
+    },
+    "houseRules": {
+      "en": "Quiet hours are 22:00 to 08:00. Visitors are welcome during the day but can't stay overnight. Parties are not allowed. Children are welcome.",
+      "appliesTo": [
+        "shartava"
+      ],
+      "quietHours": "22:00-08:00",
+      "visitors": "daytime only",
+      "parties": false
+    },
+    "entrance": {
+      "en": "The QR code on the guest's check-in page opens the street entrance and the elevator. It changes every 24 hours, so the guest always uses the current one on the page (a screenshot stops working). There is no magnet card. Self check-in works at any hour, so a late arrival is fine. A lost key costs 30 GEL.",
+      "appliesTo": [
+        "shartava"
+      ],
+      "qrChangesHours": 24,
+      "magnetCard": false,
+      "lostKeyFee": 30
+    },
+    "extraGuests": {
+      "reply": {
+        "en": "That's no problem, thank you for letting us know. We'll prepare extra bed sheets."
+      },
+      "noticeBy": "the day before, or by 18:00 on the check-in day",
+      "appliesTo": [
+        "shartava"
+      ]
+    },
+    "rebooking": {
+      "reply": {
+        "en": "Before check-in, you can rebook on the same platform you booked on. Or you can keep your current booking and pay for the change in cash when you arrive. Let me check availability and get back to you shortly."
+      },
+      "appliesTo": [
+        "shartava"
+      ]
+    },
+    "proofOfStay": {
+      "reply": {
+        "en": "Of course, we'll send it to you shortly."
+      },
+      "appliesTo": [
+        "shartava"
+      ]
+    },
+    "notOffered": {
+      "en": "We don't offer travel insurance, and we have no city tour at the moment.",
+      "appliesTo": [
+        "shartava"
+      ],
+      "travelInsurance": false,
+      "cityTour": false
     },
     "trash": {
       "reply": {
@@ -203,6 +317,10 @@ module.exports = {
         "ka": "ნაგვის ურნები შენობის წინ, მარცხენა მხარესაა. ყველაფერი შეგიძლიათ ერთად გადაყაროთ, ნებისმიერ დროს."
       },
       "binsLocation": "in front of the building, on the left side",
+      "bins": 4,
+      "beforeCheckout": {
+        "en": "Yes, please take the trash out to the bins before you leave. They are in front of the building, on the left side (4 bins)."
+      },
       "sorting": false,
       "anyTime": true,
       "appliesTo": [

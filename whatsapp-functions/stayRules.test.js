@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { otherPropertyForRoom, propertyForRoom, stayTiming, stayTimingContextLines } = require('./stayRules');
+const { otherPropertyForRoom, propertyForRoom, stayLengthLines, stayTiming, stayTimingContextLines } = require('./stayRules');
 
 // Tbilisi is UTC+4: 11:00 Tbilisi = 07:00 UTC, 22:00 Tbilisi = 18:00 UTC.
 const at = (date, tbilisiHour, minute = 0) => Date.UTC(...date.split('-').map((n, i) => (i === 1 ? Number(n) - 1 : Number(n))), tbilisiHour - 4, minute);
@@ -104,4 +104,20 @@ test('stayTiming: checkout day, 12:00 checkout, stay ended (27 Oct real case: 18
   assert.deepEqual([dayBefore.checkoutDay, dayBefore.stayEnded], [false, false], 'evening before checkout');
   assert.deepEqual([stayTiming(stay, at('2026-10-28', 8)).checkoutDay, stayTiming(stay, at('2026-10-28', 8)).stayEnded], [false, true], 'the day after');
   assert.equal(stayTiming({ checkin: '2026-10-25' }, at('2026-10-27', 18)).stayEnded, null, 'no checkout date -> unknown');
+});
+
+test('stayLengthLines: nights and the towel change rule, decided in code', () => {
+  assert.deepEqual(stayLengthLines({ checkin: '2026-11-15', checkout: '2026-11-25' }), [
+    'Length of this stay: 10 nights (computed in code)',
+    'Towel change during the stay included: yes',
+  ]);
+  assert.deepEqual(stayLengthLines({ checkin: '2026-11-21', checkout: '2026-11-22' }), [
+    'Length of this stay: 1 night (computed in code)',
+    'Towel change during the stay included: no',
+  ]);
+  assert.equal(stayLengthLines({ checkin: '2026-11-21', checkout: '2026-11-28' })[1], 'Towel change during the stay included: yes', '7 nights is included');
+  assert.equal(stayLengthLines({ checkin: '2026-11-21T14:00:00Z', checkout: '2026-11-27' })[1], 'Towel change during the stay included: no', '6 nights, a time part is ignored');
+  assert.deepEqual(stayLengthLines({ checkin: '', checkout: '2026-11-22' }), [], 'unknown dates: no line');
+  assert.deepEqual(stayLengthLines({ checkin: '2026-11-25', checkout: '2026-11-22' }), [], 'checkout before check-in: no line');
+  assert.deepEqual(stayLengthLines(), []);
 });
