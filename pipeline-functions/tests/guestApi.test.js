@@ -324,3 +324,61 @@ test('filterApt removes the unit entrance code before unlock and keeps it after'
   assert.equal(api.filterApt(apt, false).entranceCode, undefined);
   assert.equal(api.filterApt(apt, true).entranceCode, '3435#');
 });
+
+// ------------------------------------------------------------------ back-to-back stays (lib/stay-chain.js)
+
+function stayCtx(nextExtra, links = []) {
+  const ctx = makeCtx();
+  Object.assign(ctx.data.reservations['007004961_001'], { checkin: '2026-10-09', checkout: '2026-10-12' });
+  ctx.data.reservations['007009999'] = { reservationNumber: '007009999', roomCode: '6-1', checkin: '2026-10-12', checkout: '2026-10-16', status: 'OK',
+    guest: 'Ahmed Ali', phone: '+995 555 111 222', tuyaPassword: '909090', ...nextExtra };
+  delete ctx.data.reservations['007004961_002'];
+  Object.assign(ctx.data.guests[TOKEN_A], { arrivalDate: '2026-10-09', checkoutDate: '2026-10-12' });
+  ctx.data.apartments['6-1'].checkOutTime = '12:00';
+  ctx.listReservationsByRoom = async room => Object.entries(ctx.data.reservations).map(([id, v]) => ({ id, ...v })).filter(r => r.roomCode === room);
+  ctx.listStayLinks = async () => links;
+  return ctx;
+}
+const tbl = (hour, minute = 0) => ({ today: '2026-10-12', hour, minute });
+
+test('stay: an extension continues the stay: unlocked on the changeover day, the current booking code', async () => {
+  const ctx = stayCtx();
+  ctx.testClock = tbl(9);
+  let r = await stay(ctx, { guestToken: TOKEN_A, aptId: '6-1' });
+  assert.equal(r.unlocked, true);
+  assert.equal(r.apt.doorCode, '4321#');
+  assert.deepEqual([r.reservation.id, r.reservation.checkin, r.reservation.checkout, r.reservation.ownCheckin], ['007004961_001', '2026-10-09', '2026-10-16', '2026-10-09']);
+  assert.equal(r.reservation.tuyaPassword, '482913', 'before check-out time: the first booking code');
+  assert.ok(!JSON.stringify(r.reservation.stayBookings).includes('909090'), 'no other lock code in the stay list');
+  ctx.testClock = tbl(12, 30);
+  r = await stay(ctx, { guestToken: TOKEN_A, aptId: '6-1' });
+  assert.equal(r.reservation.tuyaPassword, '909090', 'after check-out time: the next booking code');
+  const sib = await api.runGuestFind(ctx, { mode: 'siblings', guestToken: TOKEN_A, reservationRef: '007004961_001' }, IP);
+  assert.equal(sib.reservations[0].checkout, '2026-10-16');
+  assert.ok(!JSON.stringify(sib).includes('909090') && !JSON.stringify(sib).includes('482913'));
+});
+
+test('stay: a pending extension locks after check-out time and sends no codes; confirmed it continues', async () => {
+  const ctx = stayCtx({ phone: '' });
+  ctx.testClock = tbl(11, 59);
+  let r = await stay(ctx, { guestToken: TOKEN_A, aptId: '6-1' });
+  assert.equal(r.unlocked, true);
+  assert.equal(r.reservation.stayPending.id, '007009999');
+  ctx.testClock = tbl(12, 0);
+  r = await stay(ctx, { guestToken: TOKEN_A, aptId: '6-1' });
+  assert.deepEqual([r.unlocked, r.reason], [false, 'extension_pending']);
+  for (const secret of ['4321', 'MaxelaWifi', 'secretwifi', '482913', '909090', '2468']) assert.ok(!JSON.stringify(r).includes(secret), 'leaked: ' + secret);
+  const ok = stayCtx({ phone: '' }, [{ id: '007004961_001__007009999', status: 'confirmed' }]);
+  ok.testClock = tbl(13);
+  r = await stay(ok, { guestToken: TOKEN_A, aptId: '6-1' });
+  assert.equal(r.unlocked, true);
+  assert.equal(r.reservation.checkout, '2026-10-16');
+});
+
+test('stay: a different phone is never joined', async () => {
+  const ctx = stayCtx({ phone: '+995 599 000 000' });
+  ctx.testClock = tbl(21);
+  const r = await stay(ctx, { guestToken: TOKEN_A, aptId: '6-1' });
+  assert.equal(r.unlocked, false);
+  assert.ok(!JSON.stringify(r).includes('909090'));
+});

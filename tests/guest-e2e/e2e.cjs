@@ -21,7 +21,7 @@ const SECRET_STRINGS = ['4321', 'MaxelaWifi', 'secretwifi', '482913', 'DEV123', 
 // a tiny valid JPEG
 const TINY_JPG = Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=', 'base64');
 
-function tbilisi(iso) { const tb = new Date(new Date(iso).getTime() + 4 * 3600e3); return { today: tb.toISOString().slice(0, 10), hour: tb.getUTCHours() }; }
+function tbilisi(iso) { const tb = new Date(new Date(iso).getTime() + 4 * 3600e3); return { today: tb.toISOString().slice(0, 10), hour: tb.getUTCHours(), minute: tb.getUTCMinutes() }; }
 
 async function open(browser, { apiOn, startIso, viewport }) {
   const ctx = await browser.newContext({ viewport: viewport || { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -60,6 +60,8 @@ async function open(browser, { apiOn, startIso, viewport }) {
       getGuest: async id => (docs['checkin_guests/' + id] ? { id, ...docs['checkin_guests/' + id] } : null),
       getApartment: async id => docs['checkin_apartments/' + id] || null,
       getHkStatus: async (room, d) => docs['hk_status/' + room + '_' + d] || null,
+      listReservationsByRoom: async room => col('reservations').filter(r => r.roomCode === room),
+      listStayLinks: async unit => col('stay_links').filter(l => l.unit === unit),
       readElevator: async () => ({ fs: docs['globals/elevator_code'] || null, rtdb: null }),
       addSearchFailure: async d => state.failures.push(d),
       rateLimit: async (key, max) => { state.counters[key] = (state.counters[key] || 0) + 1; return state.counters[key] > max; },

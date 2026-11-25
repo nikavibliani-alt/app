@@ -12,6 +12,7 @@
  */
 
 const M = require('../lib/guest-match');
+const S = require('../lib/stay-chain');
 const { computeGuestUnlock, parseCheckInHour, tbilisiToday, normalizeStayDate } = require('../lib/guest-unlock');
 const { isLikelyGuestToken } = require('../lib/guest-token');
 
@@ -42,7 +43,28 @@ function plain(v) {
 function pubRes(r) {
   const out = { id: r.id };
   for (const k of PUBLIC_RES_FIELDS) if (r[k] !== undefined) out[k] = r[k];
+  // a back-to-back stay (stayViews): the dates only, never the lock passwords of its bookings
+  const brief = b => ({ id: b.id, checkin: b.checkin, checkout: b.checkout });
+  if (r.stayBookings) {
+    out.ownCheckin = r.ownCheckin;
+    out.ownCheckout = r.ownCheckout;
+    out.stayBookings = r.stayBookings.map(brief);
+    out.stayPending = r.stayPending ? brief(r.stayPending) : null;
+  }
   return out;
+}
+
+/** The guest's own bookings with their whole back-to-back stay (the same rule as the page's direct path). */
+async function withStays(ctx, list, preferId) {
+  const pool = [];
+  const decisions = {};
+  for (const room of [...new Set(list.map(r => r.roomCode).filter(Boolean))]) {
+    try {
+      pool.push(...await ctx.listReservationsByRoom(room));
+      for (const l of await ctx.listStayLinks(room)) decisions[l.id] = l.status;
+    } catch (e) { /* without them the bookings are shown as they are */ }
+  }
+  return S.stayViews(list, pool, decisions, preferId);
 }
 
 function maskDigits(s) {
@@ -245,12 +267,13 @@ async function runSiblings(ctx, params, meta) {
   const own = await ownBases(ctx, str(params.guestToken, 80));
   const ref = str(params.reservationRef, 80);
   if (!own || !ref || !own.bases.has(M.reservationBaseNum(ref))) return bad('FORBIDDEN', 'Not your booking');
-  const reservations = await loadSiblings(ctx, ref);
+  const found = await loadSiblings(ctx, ref);
   let refCancelled = false;
-  if (!reservations.length) {
+  if (!found.length) {
     const doc = await ctx.getReservation(ref).catch(() => null);
     refCancelled = !!doc && isCancelled(doc);
   }
+  const reservations = await withStays(ctx, found, own.guest.matchedReservationId);
   return { ok: true, reservations: reservations.map(pubRes), refCancelled };
 }
 
@@ -308,18 +331,18 @@ async function runGuestStay(ctx, params, meta = {}) {
       if (resBase(r) === base && !all.some(x => x.id === r.id)) all.push(r);
     }
   }
-  const active = all.filter(r => !isCancelled(r)).sort(byRoom);
   const ownCancelled = all.length > 0 && all.every(isCancelled);
+  const active = await withStays(ctx, all.filter(r => !isCancelled(r)).sort(byRoom), guest.matchedReservationId);
   const rooms = [...new Set(active.map(r => r.roomCode).filter(Boolean))];
   let aptId = wantedApt && (rooms.includes(wantedApt) || (!rooms.length && wantedApt === guest.aptId)) ? wantedApt : '';
   if (!aptId) aptId = (rooms.includes(guest.aptId) ? guest.aptId : '') || rooms[0] || guest.aptId || '';
 
-  const valid = active.filter(r => r.roomCode === aptId).filter(r => (r.checkout || r.checkOut || '') >= today);
+  const valid = active.filter(r => r.roomCode === aptId).filter(r => (S.stayUntil(r) || r.checkOut || '') >= today);
   const current = valid.filter(r => (r.checkin || r.checkIn || '') <= today);
   const upcoming = valid.filter(r => !(r.checkin || r.checkIn) || (r.checkin || r.checkIn) > today);
   let picked = valid.find(r => r.id === guest.matchedReservationId) || null;
   if (!picked) picked = pickBest(current) || pickBest(upcoming);
-  if (picked && !picked.tuyaPassword) {   // a sibling booking of the same room may carry the lock password
+  if (picked && !picked.tuyaPassword && !picked.stayBookings) {   // a sibling booking of the same room may carry the lock password
     const withPw = pickBest(valid.filter(r => r.tuyaPassword));
     if (withPw && (withPw.checkin || withPw.checkIn) === (picked.checkin || picked.checkIn)) picked = withPw;
   }
@@ -329,7 +352,11 @@ async function runGuestStay(ctx, params, meta = {}) {
   const [hkToday, hkYesterday] = aptId
     ? await Promise.all([ctx.getHkStatus(aptId, today), ctx.getHkStatus(aptId, yesterday)])
     : [null, null];
-  const unlock = computeGuestUnlock({
+  // an extension still waiting for the host: after the confirmed stay's check-out time nothing is open
+  const minutes = clock.hour != null ? clock.hour * 60 + (clock.minute || 0) : tbilisiMinutes();
+  const checkOutMinutes = S.stayMinutes(apt && apt.checkOutTime);
+  const waiting = !!(picked && guest.guestConfirmedCheckout !== true && S.stayPendingDue(picked, today, minutes, checkOutMinutes));
+  const unlock = waiting ? { unlocked: false, state: 'locked', reason: 'extension_pending' } : computeGuestUnlock({
     guest,
     arrivalDate: normalizeStayDate((picked && (picked.checkin || picked.checkIn)) || guest.arrivalDate || ''),
     checkInHour: parseCheckInHour(apt && apt.checkInTime),
@@ -341,7 +368,8 @@ async function runGuestStay(ctx, params, meta = {}) {
   });
 
   const reservation = picked ? pubRes(picked) : null;
-  if (reservation && unlock.unlocked && picked.tuyaPassword) reservation.tuyaPassword = String(picked.tuyaPassword);
+  const running = picked && picked.stayBookings ? S.stayCurrentBooking(picked, today, minutes, checkOutMinutes) : picked;
+  if (reservation && unlock.unlocked && running && running.tuyaPassword) reservation.tuyaPassword = String(running.tuyaPassword);
 
   let elevator = null;
   if (unlock.unlocked) {
@@ -358,6 +386,8 @@ async function runGuestStay(ctx, params, meta = {}) {
     reservations: active.map(pubRes), ownCancelled, elevator,
   };
 }
+
+const tbilisiMinutes = () => { const d = new Date(Date.now() + 4 * 3600 * 1000); return d.getUTCHours() * 60 + d.getUTCMinutes(); };
 
 // ------------------------------------------------------------- live wiring
 
@@ -380,6 +410,8 @@ function buildLiveCtx(secrets = {}) {
     getGuest: async id => { const s = await db.collection('checkin_guests').doc(id).get(); return s.exists ? { id: s.id, ...s.data() } : null; },
     getApartment: async id => { const s = await db.collection('checkin_apartments').doc(id).get(); return s.exists ? s.data() : null; },
     getHkStatus: async (room, date) => { const s = await db.collection('hk_status').doc(room + '_' + date).get(); return s.exists ? s.data() : null; },
+    listReservationsByRoom: async room => rows(await db.collection('reservations').where('roomCode', '==', room).get()),
+    listStayLinks: async unit => rows(await db.collection('stay_links').where('unit', '==', unit).get()),
     readElevator: async () => {
       const fsSnap = await db.collection('globals').doc('elevator_code').get();
       let rtdb = null;
