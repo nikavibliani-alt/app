@@ -49,6 +49,8 @@ const { registerCloudFunction: registerHotelCollectAlert } = require('./controll
 const { registerCloudFunction: registerCancelledBooking } = require('./controllers/cancelledBooking');
 exports.pushOnHotelCollect = registerHotelCollectAlert();
 exports.blockOnCancelledBooking = registerCancelledBooking();
+const { registerCloudFunction: registerStayLinks } = require('./controllers/stayLinks');
+exports.stayLinkOnReservation = registerStayLinks();   // back-to-back stays: stay_links + push to the owner
 
 const { registerCloudFunction: registerInboxEmailIngest } = require('./controllers/inboxEmailIngest');
 exports.inboxEmailIngest = registerInboxEmailIngest();
