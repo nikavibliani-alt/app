@@ -137,8 +137,9 @@ const stayBrief = r => ({ id: stayId(r), checkin: stayIn(r), checkout: stayOut(r
 function stayViews(own, pool, decisions, preferId) {
   const items = (own || []).map(r => {
     const stored = (pool || []).find(x => stayId(x) === stayId(r));
-    const base = stored ? { ...stayPlain(r), ...stored } : stayPlain(r);
-    if (!stored || stayCancelled(base)) return { key: stayId(base), view: base };
+    if (!stored) return { key: stayId(r), view: r };   // its unit is not loaded: leave it as it is
+    const base = { ...stayPlain(r), ...stored };
+    if (stayCancelled(base)) return { key: stayId(base), view: base };
     const info = stayChainOf(stored, pool, decisions);
     const key = stayId(info.chain[0]);
     if (info.chain.length === 1 && !info.pending) return { key, view: base };

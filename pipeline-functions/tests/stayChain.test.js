@@ -112,6 +112,7 @@ test('guest view: a single booking is untouched; a linked one gets the stay date
   assert.deepEqual(S.stayViews([A, B], [A, B, C], {}, 'B').map(r => r.id), ['B'], 'the guest own booking is the one shown');
   assert.deepEqual(S.stayViews([v], [A, B, C], {}), [v], 'applying it again changes nothing');
   assert.deepEqual(S.stayViews([v], [A, { ...B, status: 'CANCELLED' }, C], {}), [A], 'cancelled: back to the booking own dates');
+  assert.deepEqual(S.stayViews([v], [], {}), [v], 'its unit not loaded yet: the stay dates are kept, not reset');
   const pending = S.stayViews([A], [A, { ...B, phone: '' }], {})[0];
   assert.equal(pending.checkout, '2026-11-21', 'unconfirmed: the stay is not longer yet');
   assert.equal(pending.stayPending.id, 'B');

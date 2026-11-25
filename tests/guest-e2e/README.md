@@ -9,3 +9,6 @@ Runs the real guest page (phone size) against the real guest functions code (`pi
 What they check: the whole guest flow (find booking, sign, passport upload (no automatic scan any more), home screen), door code, Wi-Fi and elevator
 code only after check-in, the old page and the new one show the same screen, wrong name or date, someone else's booking,
 rate limit, passport over 10 MB, room move, two-room booking, join link.
+
+Back-to-back stays: suite8.cjs (guest page, both data paths), suite9.cjs (admin), suite10.cjs (cleaner label),
+suite11.cjs (trigger -> guest page -> admin -> guest page, fake push). suite7.cjs: bookings with 3+ rooms.

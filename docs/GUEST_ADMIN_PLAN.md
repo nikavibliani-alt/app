@@ -349,3 +349,14 @@ Progress log:
 - Not changed: unlock rules. "Give access" on the main record opens every room in the switcher; "Give access" on a 2nd/3rd room's own record does not change the main guest's page.
 - Test: tests/guest-e2e/suite7.cjs (25 checks).
 - Undo: tell me "undo multiroom fix".
+
+### Back-to-back stays (restore point: tag before-stay-chain)
+- Rule (one file: shared/stay-chain.js; server copy pipeline-functions/lib/stay-chain.js, block must be identical, a test checks). Base = the WhatsApp bot's Rule A (guestLookup.js stayChain): same unit, same name, next check-in ON the check-out day, not cancelled; a test compares both on the bot's cases. Added: the MiniHotel room tag in a name is ignored; both phones equal -> 'auto'; a phone missing -> 'pending' (owner confirms); phones differ -> never linked; same guest in another unit starting that day -> 'move' notice only (not when they also continue in the unit).
+- The bot was NOT changed: it still links same name + unit + day even with different phones, and does not strip room tags.
+- stay_links/{previousId__nextId}: kind extension|move, status auto|pending|confirmed|rejected|moved, ids, units, dates. No names or phones (open rules; the guest page reads it). Links are computed from the bookings everywhere; stay_links only supplies the owner's confirm / reject (a stored 'auto'/'pending' is information).
+- Trigger stayLinkOnReservation (controllers/stayLinks.js): acts only when unit, dates, status, name or phone change; cancel/delete removes links; push once per pair (pending, moving), only when the changeover day is today or later.
+- Guest page 1.7.0: the guest's booking is shown as the whole stay (checkin/checkout = stay, ownCheckin/ownCheckout kept); record checkoutDate updated (merge); unlock uses the stay start, so no new cleaning wait; door code = lock password of the booking running now; no sign-out while the stay goes on. Pending: after the confirmed part's check-out time the "being confirmed" screen, no codes. guest-unlock.js unchanged.
+- GUEST_API: guestApi.js does the same on the server (guestStay / siblings). guestFind and guestStay are not deployed (switch off).
+- Admin Build 1019: chips and "Extensions to confirm" list on Stay, whole stay + Unlink / Link again in Guest Details; "Same guest continues" in HK. cleaner.html: same label (ka/en). Cleaning logic unchanged.
+- Tests: pipeline-functions/tests/stayChain.test.js, stayLinks.test.js, guestApi.test.js; tests/guest-e2e/suite8 (guest), suite9 (admin), suite10 (cleaner), suite11 (whole loop).
+- Undo: tell me "undo stay chain".
