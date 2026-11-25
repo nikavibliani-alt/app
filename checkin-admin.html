@@ -382,6 +382,25 @@ html.inbox-typing #main-nav{display:none}
 .card__meta{font-size:13px;color:var(--muted);}
 .card__src{font-size:11px;color:#9a948e;margin-left:6px;}
 .card__warn{font-size:12px;font-weight:600;color:var(--red);margin-top:6px;}
+/* Back-to-back stays */
+.stay-chip{display:inline-block;margin:8px 6px 0 0;font-size:12px;font-weight:600;border-radius:999px;padding:4px 10px;color:var(--green);background:var(--green-bg);border:1px solid #cfe3d8;}
+.stay-chip--check{color:var(--amber);background:var(--amber-bg);border-color:#e6dcc2;}
+.stay-ask{margin-top:10px;padding:10px;border-radius:var(--rs);background:var(--amber-bg);border:1px solid #e6dcc2;}
+.stay-ask__q{font-size:13px;font-weight:700;color:var(--amber);}
+.stay-btns{display:flex;gap:8px;margin-top:8px;}
+.stay-btns .btn{min-height:44px;}
+.stay-btns .btn-primary{color:#fff;}
+.stay-banner{background:var(--amber-bg);border:1px solid #e6dcc2;border-radius:var(--r);padding:12px;margin-bottom:12px;}
+.stay-banner__title{font-size:13px;font-weight:700;color:var(--amber);}
+.stay-banner__row{margin-top:10px;padding-top:10px;border-top:1px solid #e6dcc2;}
+.stay-banner__a{font-size:14px;font-weight:700;color:var(--ink);}
+.stay-banner__b{font-size:12px;color:var(--muted);}
+.stay-box{margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs);}
+.stay-box__title{font-size:12px;font-weight:700;margin-bottom:8px;color:var(--ink);}
+.stay-line{display:flex;justify-content:space-between;gap:10px;font-size:14px;font-weight:600;color:var(--ink);}
+.stay-line span{font-weight:400;font-size:12px;color:var(--muted);}
+.stay-link{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0;padding-left:10px;border-left:2px solid var(--line);font-size:12px;color:var(--muted);}
+.stay-small{flex:none;min-height:36px;padding:0 12px;border-radius:var(--rs);border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);}
 .card--stay .card__name{margin-bottom:2px;}
 .section-hd{display:flex;align-items:baseline;justify-content:space-between;padding:8px 2px 10px;}
 .section-hd h2{font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--ink-2);}
@@ -835,7 +854,7 @@ html.inbox-typing #main-nav{display:none}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1018 · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1019 · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -849,6 +868,7 @@ html.inbox-typing #main-nav{display:none}
       <span class="inbox-card__text"><span class="inbox-card__title" style="display:block">Inbox</span><span class="inbox-card__sub" id="inbox-card-sub" style="display:block">Booking.com guest messages</span></span>
       <span class="inbox-card__count" id="inbox-card-count">&ndash;</span>
     </a>
+    <div id="stay-ext"></div>
     <div id="stay-hc"></div>
     <div class="stat-row stat-row--stay" id="stay-stats"></div>
     <div class="day-row show" id="upcoming-days" aria-label="Arrivals by day (arriving / registered)"></div>
@@ -1125,6 +1145,7 @@ import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app
 import{getFirestore,collection,doc,setDoc,updateDoc,deleteDoc,deleteField,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,orderBy,limit,runTransaction,arrayUnion,increment}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getFunctions,httpsCallable,connectFunctionsEmulator}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-functions.js";
 import{computeGuestUnlock,tbilisiToday as unlockToday,tbilisiHour,normalizeStayDate}from"./shared/guest-unlock.js";
+import{stayLinkStatus,stayMovingTo,stayChainOf}from"./shared/stay-chain.js";
 import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON,hkPropertyGroupForRoom}from"./shared/hk-bedding.js";
 import{DEFAULT_ROOMS_SEED,ROOM_SITES}from"./shared/room-registry.js";
 import{roomGroup,APT_GROUPS,groupLabel,ACCESS_METHODS,ACCESS_LABELS,ACCESS_DESCRIPTIONS,ACCESS_GUEST_SEES,DEFAULT_RETURN_NOTES,PLACEHOLDERS,normalizeTypeCfg,resolveAccessMethod,resolveArrival,resolveCheckout,fillPlaceholders,unitProblems}from"./shared/apt-arrival.js";
@@ -3957,7 +3978,8 @@ async function uploadToCloudinary(file,folder='maxela'){
 
 function guestArrivalDate(g,res){
   const door=res||(_resCache||[]).find(r=>isSameReservation(r,g.matchedReservationId));
-  const fromRes=normalizeStayDate(door?.checkin||door?.checkIn);
+  const continued=door&&stayJoined(_stayIdx.get(door.id)?.prev?.status);
+  const fromRes=continued?stayOfRes(door).start:normalizeStayDate(door?.checkin||door?.checkIn);
   if(g.matchedReservationId&&fromRes)return fromRes;
   return normalizeStayDate(g.arrivalDate)||fromRes||'';
 }
@@ -4029,7 +4051,113 @@ function rebuildFormMaps(){
     const f=findFormForReservation(r);
     if(f)_formById.set(r.id,f);
   }
+  rebuildStayIndex();
+  // a booking that continues a stay (or starts one already registered later) belongs to the same guest record
+  for(const [id,idx] of _stayIdx){
+    if(_formById.has(id)||!(stayJoined(idx.prev?.status)||stayJoined(idx.next?.status)))continue;
+    const r=res.find(x=>x.id===id);
+    const f=r&&stayOfRes(r).chain.map(x=>_formById.get(x.id)).find(Boolean);
+    if(f)_formById.set(id,f);
+  }
 }
+
+/* ── Back-to-back stays (shared/stay-chain.js). The links are worked out here from the bookings; stay_links holds the
+   owner's answers (confirmed / rejected) and the trigger's notes. ── */
+let stayLinkDocs={},_stayDec={},_stayIdx=new Map();
+const _stayRank={rejected:1,pending:2,auto:3,confirmed:3};
+function stayJoined(status){return status==='auto'||status==='confirmed';}
+function rebuildStayIndex(){
+  _stayIdx=new Map();
+  _stayDec=Object.fromEntries(Object.entries(stayLinkDocs).map(([k,v])=>[k,v.status]));
+  const from=addDaysISO(tbilisiToday(),-45);
+  const byIn=new Map(),byOut=new Map();
+  const add=(m,k,r)=>{if(!m.has(k))m.set(k,[]);m.get(k).push(r);};
+  for(const r of nonCancelled()){if((r.checkout||'')<from)continue;add(byIn,r.checkin,r);add(byOut,r.checkout,r);}
+  const at=id=>{if(!_stayIdx.has(id))_stayIdx.set(id,{});return _stayIdx.get(id);};
+  const better=(cur,status)=>!cur||_stayRank[status]>_stayRank[cur.status];
+  for(const [day,ending] of byOut){
+    const starting=byIn.get(day);
+    if(!starting)continue;
+    const around=[...ending,...starting];
+    for(const a of ending){
+      for(const b of starting){
+        const status=stayLinkStatus(a,b,_stayDec);
+        if(status==='none')continue;
+        if(better(at(b.id).prev,status))at(b.id).prev={res:a,status};
+        if(better(at(a.id).next,status))at(a.id).next={res:b,status};
+      }
+      const to=stayMovingTo(a,around,_stayDec);
+      if(to){at(a.id).movedTo=to;at(to.id).movedFrom=a;}
+    }
+  }
+}
+function stayOfRes(r){return stayChainOf(r,(_resCache||[]).filter(x=>x.roomCode===r.roomCode),_stayDec);}
+function stayButtons(a,b){
+  const call=status=>`event.stopPropagation();window.stayDecide('${esc(a.id)}','${esc(b.id)}','${status}')`;
+  return `<div class="stay-btns"><button type="button" class="btn btn-primary" onclick="${call('confirmed')}">Link</button><button type="button" class="btn" onclick="${call('rejected')}">Not the same guest</button></div>`;
+}
+function stayCardHtml(grp){
+  let out='';
+  for(const r of grp){
+    const idx=_stayIdx.get(r.id);
+    if(!idx)continue;
+    const room=grp.length>1?r.roomCode+': ':'';
+    const p=idx.prev;
+    if(p&&stayJoined(p.status))out+=`<div class="stay-chip">${esc(room)}Extension of ${esc(fmtDate(stayOfRes(p.res).start))} – ${esc(fmtDate(p.res.checkout))}</div>`;
+    else if(p&&p.status==='pending')out+=`<div class="stay-ask"><div class="stay-ask__q">${esc(room)}Confirm extension?</div>${stayButtons(p.res,r)}</div>`;
+    for(const other of [idx.movedFrom,idx.movedTo])if(other)out+=`<div class="stay-chip stay-chip--check">${esc(room)}Same guest in ${esc(other.roomCode)} - check</div>`;
+  }
+  return out;
+}
+/* extensions waiting for an answer, at the top of the Stay page (a push says "confirm in admin") */
+function renderStayExt(){
+  const el=document.getElementById('stay-ext');
+  if(!el)return;
+  const today=tbilisiToday(),list=[];
+  for(const [id,idx] of _stayIdx){
+    if(idx.prev?.status!=='pending')continue;
+    const b=(_resCache||[]).find(x=>x.id===id);
+    if(b&&(b.checkout||'')>=today)list.push({a:idx.prev.res,b});
+  }
+  list.sort((x,y)=>(x.b.checkin||'').localeCompare(y.b.checkin||'')||byRoom(x.b,y.b));
+  el.innerHTML=list.length?`<div class="stay-banner"><div class="stay-banner__title">Extensions to confirm (${list.length})</div>`+list.map(({a,b})=>
+    `<div class="stay-banner__row"><div class="stay-banner__a">${esc(_stripRoomNum(b.guest||'Guest'))} · ${esc(b.roomCode)}</div><div class="stay-banner__b">${esc(fmtDate(a.checkin))} – ${esc(fmtDate(a.checkout))}, then ${esc(fmtDate(b.checkin))} – ${esc(fmtDate(b.checkout))}</div>${stayButtons(a,b)}</div>`).join('')+'</div>':'';
+}
+/* Guest Details: the whole stay of a booking, with Unlink */
+function stayDetailHtml(res,i){
+  if(!res?.id||!(_resCache||[]).some(x=>x.id===res.id))return'';
+  const info=stayOfRes(res);
+  const list=[...info.chain];
+  const before=_stayIdx.get(list[0].id)?.prev,after=_stayIdx.get(list[list.length-1].id)?.next;
+  if(before&&!stayJoined(before.status))list.unshift(before.res);
+  if(after&&!stayJoined(after.status))list.push(after.res);
+  const moves=info.chain.flatMap(r=>[_stayIdx.get(r.id)?.movedFrom,_stayIdx.get(r.id)?.movedTo]).filter(Boolean);
+  if(list.length<2&&!moves.length)return'';
+  const line=r=>`<div class="stay-line">${esc(r.roomCode)} · ${esc(fmtDate(r.checkin))} – ${esc(fmtDate(r.checkout))}<span>#${esc(r.reservationNumber||r.id)}</span></div>`;
+  const small=(a,b,status,label)=>`<button type="button" class="stay-small" onclick="window.stayDecide('${esc(a.id)}','${esc(b.id)}','${status}')">${label}</button>`;
+  const between=(a,b)=>{
+    const status=stayLinkStatus(a,b,_stayDec);
+    if(stayJoined(status))return `<div class="stay-link"><span>${status==='auto'?'Linked automatically':'Confirmed by you'}</span>${small(a,b,'rejected','Unlink')}</div>`;
+    if(status==='pending')return `<div class="stay-link"><span>Confirm extension?</span></div>${stayButtons(a,b)}`;
+    return `<div class="stay-link"><span>Not linked: you said not the same stay</span>${small(a,b,'confirmed','Link again')}</div>`;
+  };
+  const rows=list.length>1?list.map((r,n)=>(n?between(list[n-1],r):'')+line(r)).join(''):'';
+  return `<div class="stay-box"${i?'':' id="stay-detail"'}><div class="stay-box__title">Whole stay: ${esc(fmtDate(info.start))} – ${esc(fmtDate(info.end))}</div>${rows}${moves.map(m=>`<div class="stay-chip stay-chip--check">Same guest in ${esc(m.roomCode)} - check</div>`).join('')}</div>`;
+}
+window.stayDecide=async function(prevId,nextId,status){
+  const a=(_resCache||[]).find(r=>r.id===prevId),b=(_resCache||[]).find(r=>r.id===nextId);
+  if(!a||!b){toast('Booking not found');return;}
+  if(status==='rejected'&&!confirm(`Not one stay?\n\n${_stripRoomNum(b.guest||'Guest')} · ${b.roomCode}: the booking from ${fmtDate(b.checkin)} will not be joined to the one ending ${fmtDate(a.checkout)}. Access ends at that check-out as usual.`))return;
+  const key=prevId+'__'+nextId,now=new Date().toISOString();
+  const data={kind:'extension',status,prevId,nextId,fromUnit:a.roomCode,unit:b.roomCode,prevCheckin:a.checkin,prevCheckout:a.checkout,nextCheckin:b.checkin,nextCheckout:b.checkout,decidedAt:now,updatedAt:now};
+  try{
+    await setDoc(doc(db,'stay_links',key),data,{merge:true});
+    stayLinkDocs[key]={...(stayLinkDocs[key]||{}),...data};
+    toast(status==='confirmed'?'Linked as one stay':'Kept as separate stays');
+    rebuildFormMaps();render();
+    if(window._detailGuestId&&document.getElementById('detail')?.classList.contains('open'))openDetail(window._detailGuestId);
+  }catch(e){console.error('[stayDecide]',e);toast('Could not save: '+e.message);}
+};
 function getForm(r){return _formById.get(r.id)||null;}
 
 function cardStatus(r,form){
@@ -4378,6 +4506,7 @@ function renderCard(grp,mode){
     <div class="card__meta">${esc(datesStr(grp[0],mode))} · ${esc(guestCountLabel)}${srcLabel?`<span class="card__src">${esc(srcLabel)}</span>`:''}</div>
     ${hc}
     ${warn}
+    ${stayCardHtml(sorted)}
     <div class="card__actions">${waBtn}${main}</div>
   </div>`;
 }
@@ -4553,6 +4682,7 @@ window.renderStay=function(){
   _renderStayCore();
   const past=renderPastGuests();
   syncSearchClear();
+  renderStayExt();
   renderHcBanner();
   hcTryDeepLink();
   const q=(document.getElementById('stay-search')?.value||'').trim();
@@ -5190,6 +5320,7 @@ function updateDetailRoomAction(guestId,resDocId){
 window.openDetail=function(guestId){
   const g=guestData.find(x=>x.id===guestId);if(!g){toast('Guest not found');return;}
   window._hcOpenBase=reservationBaseNum(g.matchedReservationId)||'';
+  window._detailGuestId=guestId;
   const sibs=siblingReservations(g.matchedReservationId);
   const isMulti=sibs.length>1;
   const door=reservationForGuest(g)||sibs[0]||null;
@@ -5245,6 +5376,7 @@ window.openDetail=function(guestId){
     </div>
     ${hcPanelHtml(reservationBaseNum(g.matchedReservationId)||'')}
     ${roomBlocks}
+    ${(isMulti?sibs:[door]).map(stayDetailHtml).join('')}
     ${bookingChatBtn(door)}
     ${g.matchedReservationId?`<div style="margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rs)">
       <div style="font-size:12px;font-weight:700;margin-bottom:8px">Move room (pipeline)${guestReservationManual(g)?' <span class="pill pill-manual">MANUAL</span>':''}</div>
@@ -7562,6 +7694,10 @@ onSnapshot(collection(db,'checkin_apartments'),snap=>{
   aptData={};snap.docs.forEach(d=>{aptData[d.id]=d.data();});
   if(loaded>=2)render();else checkLoaded();
 });
+onSnapshot(collection(db,'stay_links'),snap=>{
+  stayLinkDocs={};snap.docs.forEach(d=>{stayLinkDocs[d.id]=d.data();});
+  if(loaded>=2){rebuildFormMaps();render();}
+},err=>console.warn('[stay_links]',err));
 onSnapshot(collection(db,'checkin_guests'),snap=>{
   guestData=snap.docs.map(d=>({id:d.id,...d.data()}));
   if(loaded>=2){rebuildFormMaps();render();}else checkLoaded();
