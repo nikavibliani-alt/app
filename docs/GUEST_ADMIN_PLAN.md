@@ -341,3 +341,11 @@ Progress log:
 - Step 2 (guest 1.6.4, admin Build 1018): type page tab "Check-out steps" (aptTypes[GROUP].checkoutSteps, same shape and editor as steps, same fill-in words, per-unit photos through unit.stepPhotos); unit page "Check-out steps" with the type's steps (read only) and the unit's own extras (checkin_apartments.checkoutPhotos[] + checkoutPhotoCaptions[], photo optional). Guest page: block #hero-checkout-steps, in full on checkout day under the key return note, and an item "Show how to check out" (opens) while arriving/staying. Hidden when nothing is saved. shared/apt-arrival.js: resolveCheckout().
 - Tests: tests/guest-e2e/suite6.cjs (guest, 16 checks), suite5.cjs (admin, 6 checks).
 - Undo: tell me "undo building code card" (or "undo check-out steps").
+
+### Three or more rooms (restore point: tag before-multiroom-fix)
+- Cause (guest 1.6.4 and earlier): the room switcher had one column per room, never-wrapping names and overflow hidden. With three "Triple Room with Private Bathroom" tiles each was 187px, so the third sat off a 390px screen. The booking search and saved ids were correct.
+- Second defect: a companion's record (and the per-room record saved for a 2nd/3rd room) had no relatedReservationIds, so with separate reservation numbers it showed only its own room after reopening.
+- Fix (guest 1.6.5): tiles wrap (at most three in a row, four sit two by two) and names wrap; _inheritGroupRooms() copies the group's booking ids from the main record (primaryGuestId, up to two steps, only if that group contains this record's own booking). guestApi.js unchanged; guestFind/guestStay are not deployed.
+- Not changed: unlock rules. "Give access" on the main record opens every room in the switcher; "Give access" on a 2nd/3rd room's own record does not change the main guest's page.
+- Test: tests/guest-e2e/suite7.cjs (25 checks).
+- Undo: tell me "undo multiroom fix".

@@ -490,25 +490,23 @@ textarea.form-input{height:90px;padding:12px 14px;resize:none;line-height:1.5;}
 #multi-room-label{display:none;font-family:var(--sans);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:0.08em;margin-bottom:8px;}
 /* Sandbox 2 apartment switcher reuses #multi-room-label — must stay visible */
 #multi-room-label.apt-grid{
-  display:grid;gap:0;
-  grid-template-columns:repeat(var(--apt-cols,2),1fr);
+  display:flex;flex-wrap:wrap;gap:1.5px;   /* the gap shows the line colour between tiles, in rows and columns */
   font-family:var(--sans);font-size:inherit;text-transform:none;
   letter-spacing:normal;color:inherit;margin:10px 0 0;
   border:1.5px solid var(--line);border-radius:12px;overflow:hidden;
-  background:#fff;
+  background:var(--line);
 }
 .apt-tile{
+  flex:1 1 calc(100% / var(--apt-cols,2) - 1.5px);min-width:0;color:var(--ink);
   min-height:52px;aspect-ratio:unset;max-height:none;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:2px;padding:10px 6px;background:#fff;border:none;
-  border-right:1.5px solid var(--line);border-radius:0;
+  gap:3px;padding:10px 6px;background:#fff;border:none;border-radius:0;
   cursor:pointer;font-family:var(--sans);text-align:center;
 }
-.apt-tile:last-child{border-right:none;}
 .apt-tile.active{background:var(--ink);color:#fff;}
 .apt-tile.active .apt-tile__room,.apt-tile.active .apt-tile__name{color:#fff;}
 .apt-tile__room{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--ink);line-height:1;}
-.apt-tile__name{font-size:10px;color:var(--muted);line-height:1.2;padding:0 4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.apt-tile__name{font-size:10px;color:var(--muted);line-height:1.2;padding:0 2px;max-width:100%;overflow-wrap:anywhere;}
 /* Code boxes v2 */
 .v2-code-dark{background:#2C2C2A;color:#fff;padding:28px 24px;margin-bottom:8px;}
 .v2-code-dark .v2-code-label{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:10px;font-family:var(--mono);}
@@ -1744,9 +1742,34 @@ async function _discoverRelatedBookings(force,noSync){
   }catch(e){console.warn('[related later]',e);return false;}
   finally{_relatedBusy=false;}
 }
+/* A companion's record, and the record saved for a 2nd or 3rd room, has no list of the group's OTHER bookings.
+   Take it from the main record they hang off (primaryGuestId, at most two steps) and keep it on this record.
+   Only when that record's group really contains this record's own booking. */
+async function _inheritGroupRooms(){
+  try{
+    const own=new Set([guestData?.matchedReservationId,guestData?.linkedReservationNumber].filter(Boolean).map(reservationBaseNum));
+    if(!own.size||!guestData.primaryGuestId)return;
+    let g={...guestData,id:guestId},owner=null;
+    for(let i=0;i<2&&g.primaryGuestId&&g.primaryGuestId!==g.id;i++){
+      const s=await getDoc(doc(db,'checkin_guests',g.primaryGuestId));
+      if(!s.exists())break;
+      g={...s.data(),id:g.primaryGuestId};owner=g;
+    }
+    if(!owner)return;
+    const ids=[owner.matchedReservationId,...(owner.relatedReservationIds||[])].filter(Boolean);
+    if(!ids.some(id=>own.has(reservationBaseNum(id))))return;
+    const have=new Set([guestData.matchedReservationId,...(guestData.relatedReservationIds||[])].filter(Boolean).map(reservationBaseNum));
+    const add=ids.filter(id=>{const b=reservationBaseNum(id);if(have.has(b))return false;have.add(b);return true;});
+    if(!add.length)return;
+    const all=[...(guestData.relatedReservationIds||[]),...add];
+    guestData={...guestData,relatedReservationIds:all};
+    if(guestId&&!isPreviewMode()&&!_adminPreviewMode)await setDoc(doc(db,'checkin_guests',guestId),{relatedReservationIds:all},{merge:true});
+  }catch(e){console.warn('[group rooms]',e);}
+}
 async function _hydrateGuestReservations(){
   const ref=guestData?.matchedReservationId;
   if(!ref)return null;
+  await _inheritGroupRooms();
   let sibs=await loadSiblingReservations(ref);
   // the guest's other bookings (same group) saved at registration
   for(const rid of (guestData?.relatedReservationIds||[])){
@@ -2612,7 +2635,8 @@ function renderGreetingApt(){
     return;
   }
   el.dataset.aptGridKey=roomsKey;
-  let html='<div id="multi-room-label" class="apt-grid" style="--apt-cols:'+n+'">';
+  const cols=n===4?2:Math.min(n,3);   // at most three in a row so every room is on screen; four sit two by two
+  let html='<div id="multi-room-label" class="apt-grid" style="--apt-cols:'+cols+'">';
   for(const res of allMatchedReservations){
     const room=res.roomCode||'';
     const name=aptDisplayName(room);
