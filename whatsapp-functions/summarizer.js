@@ -18,7 +18,11 @@
 // stay's messages and writes a summary (on the marker, and as the latest
 // summary in whatsapp_guests/{phone}).
 
+const { stayChain, roomReservations } = require('./guestLookup');
+
 const TBILISI_OFFSET_MS = 4 * 60 * 60 * 1000; // UTC+4 year-round, no DST
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PRE_ARRIVAL_DAYS = 15; // messages this long before a stay belong to it
 const MARKER_COLLECTION = 'whatsapp_checkout_summaries';
 
 const SUMMARY_SYSTEM_PROMPT = 'Summarize this guest WhatsApp conversation into 3-5 bullet points covering: issues they had, requests they made, how they communicated, anything notable. Be very brief.';
@@ -92,7 +96,30 @@ async function runPostCheckoutSummary({ reservation, nowMs, store, summarize }) 
   // The routine MiniHotel rewrite case: this checkout was already handled.
   if (await store.getMarker(reservationNumber)) return { outcome: 'already_processed' };
 
-  const form = await store.findWaFormForReservation(reservationNumber);
+  // Rule A (owner, 25 Nov): back-to-back bookings of the same guest in the
+  // same unit are one stay, summarized once, after the real final checkout.
+  // A booking that continues into another one is marked "continues" (no
+  // cutoff, so the bot's history doesn't restart there) and not summarized.
+  let chain = [reservation];
+  if (typeof store.listRoomReservations === 'function' && reservation.roomCode) {
+    const linked = stayChain(reservation, await store.listRoomReservations(reservation.roomCode));
+    if (linked.length) chain = linked;
+  }
+  const last = chain[chain.length - 1];
+  if (String(last.reservationNumber) !== reservationNumber) {
+    if (await store.claimMarker(reservationNumber, { phone: '', cutoffMs: null })) {
+      await store.finishMarker(reservationNumber, { outcome: 'continues', continuesInto: String(last.reservationNumber) });
+    }
+    return { outcome: 'continues' };
+  }
+
+  // The guest's form may belong to any booking of the stay (extensions are
+  // often booked without a new form): the newest one wins.
+  let form = null;
+  for (const r of [...chain].reverse()) {
+    form = await store.findWaFormForReservation(String(r.reservationNumber));
+    if (form) break;
+  }
   if (!form) return { outcome: 'no_wa_form' };
   const phone = normalizePhone(form.contact);
   if (!phone) return { outcome: 'no_phone' };
@@ -107,9 +134,16 @@ async function runPostCheckoutSummary({ reservation, nowMs, store, summarize }) 
     // The stay's messages: after the previous summarized stay's checkout day
     // (so a returning guest's older stays aren't re-summarized) and before
     // this one's ended.
+    // For a stay of several bookings: from the end of the previous real stay;
+    // a summary written for an earlier booking of this same stay (before
+    // back-to-back stays were known) doesn't count, then the stay's messages
+    // start PRE_ARRIVAL_DAYS before its first check-in.
+    const stayStart = String(chain[0].checkin || reservation.checkin || '').slice(0, 10);
     const previousStay = (await store.getLatestSummary(phone))?.lastStay;
-    const previousCutoffMs = checkoutCutoffMs(previousStay?.checkout);
-    const fromMs = previousCutoffMs < cutoffMs ? previousCutoffMs : null;
+    const previousInThisStay = chain.length > 1 && !!previousStay?.checkout && String(previousStay.checkout).slice(0, 10) >= stayStart;
+    const previousCutoffMs = previousInThisStay ? NaN : checkoutCutoffMs(previousStay?.checkout);
+    let fromMs = previousCutoffMs < cutoffMs ? previousCutoffMs : null;
+    if (previousInThisStay) fromMs = checkoutCutoffMs(stayStart) - (PRE_ARRIVAL_DAYS + 1) * DAY_MS;
     const messages = await store.listMessages(phone, { fromMs, toMs: cutoffMs });
 
     if (messages.length === 0) {
@@ -132,7 +166,7 @@ async function runPostCheckoutSummary({ reservation, nowMs, store, summarize }) 
 
     const stay = {
       room: reservation.roomCode || '',
-      checkin: reservation.checkin || '',
+      checkin: chain[0].checkin || reservation.checkin || '',
       checkout: reservation.checkout || '',
       reservationNumber,
     };
@@ -207,6 +241,11 @@ function createFirestoreSummaryStore(db, FieldValue) {
         .limit(1)
         .get();
       return snap.empty ? null : snap.docs[0].data();
+    },
+
+    // Every reservation of one unit, for the back-to-back check (guestLookup.js).
+    async listRoomReservations(roomCode) {
+      return roomReservations(db, roomCode);
     },
 
     async getLatestSummary(phone) {

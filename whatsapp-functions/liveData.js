@@ -12,6 +12,7 @@
 // Never reads door codes: the unit lookup selects only checkInTime.
 
 const { computeGuestUnlock, parseCheckInHour } = require('./guestUnlock');
+const { stayLabel } = require('./stayRules');
 
 const TBILISI_OFFSET_MS = 4 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -91,18 +92,27 @@ function nextArrivalIn(reservations, { roomCode, fromDate, excludeReservation })
   return next ? { date: next, sameDay: next === fromDate } : null;
 }
 
-/** One line for the owner's alert: the stay and the next arrival in the unit. */
-function ownerStayNote({ roomCode, reservation, next }) {
-  if (!roomCode || !reservation?.checkout) return '';
+/**
+ * One line for the owner's alert: the whole stay with its length (Rule B: the
+ * owner decides on a towel change or cleaning by it) and the next arrival in
+ * the unit, e.g. "Stay 1 Nov to 6 Dec, 35 nights; next arrival in 7-2: none
+ * in the next 30 days". `stay` is the whole stay (back-to-back bookings
+ * together); without it, the booking's own dates.
+ */
+function ownerStayNote({ roomCode, reservation, stay, next }) {
+  const whole = stay?.checkout ? stay : reservation;
+  if (!roomCode || !whole?.checkout) return '';
   const nextText = next ? `${next.date}${next.sameDay ? ' (same day as this checkout)' : ''}` : `none in the next ${NEXT_ARRIVAL_WINDOW_DAYS} days`;
-  return `Stay ${dateOnly(reservation.checkin)} to ${dateOnly(reservation.checkout)}; next arrival in ${roomCode}: ${nextText}`;
+  const label = stayLabel(whole);
+  const stayText = label ? label.charAt(0).toUpperCase() + label.slice(1) : `Stay ${dateOnly(whole.checkin)} to ${dateOnly(whole.checkout)}`;
+  return `${stayText}; next arrival in ${roomCode}: ${nextText}`;
 }
 
 /**
  * Reads the live data for one guest (read-only). Every part is optional: a
  * failed read just leaves that part out. Returns { page, airportTransfer, ownerNote }.
  */
-async function loadLiveStay(db, { roomCode, form, reservation, nowMs = Date.now(), log = console }) {
+async function loadLiveStay(db, { roomCode, form, reservation, stay, nowMs = Date.now(), log = console }) {
   const out = { page: null, airportTransfer: null, ownerNote: '' };
   const { today } = tbilisiParts(nowMs);
   const yesterday = addDays(today, -1);
@@ -135,9 +145,11 @@ async function loadLiveStay(db, { roomCode, form, reservation, nowMs = Date.now(
   })().catch((err) => log.warn(`liveData: service prices unavailable (${err?.message || err})`)));
   if (roomCode && reservation?.checkout) {
     tasks.push((async () => {
+      // The next arrival after the whole stay: the guest's own back-to-back bookings are not one.
+      const end = dateOnly(stay?.checkout) || dateOnly(reservation.checkout);
       const snap = await db.collection('reservations').where('roomCode', '==', roomCode).get();
-      const next = nextArrivalIn(snap.docs.map((d) => d.data()), { roomCode, fromDate: dateOnly(reservation.checkout), excludeReservation: reservation.reservationNumber });
-      out.ownerNote = ownerStayNote({ roomCode, reservation, next });
+      const next = nextArrivalIn(snap.docs.map((d) => d.data()), { roomCode, fromDate: end, excludeReservation: reservation.reservationNumber });
+      out.ownerNote = ownerStayNote({ roomCode, reservation, stay, next });
     })().catch((err) => log.warn(`liveData: next arrival unavailable (${err?.message || err})`)));
   }
   await Promise.all(tasks);

@@ -163,8 +163,13 @@ function interpretMetaResponse(data) {
   return { ok: false, code: 'no_message_id', reason: 'Meta returned no message id' };
 }
 
-// A normal escalation's push, next to its WhatsApp alert (ownerPush.js).
-const ESCALATION_PUSH = { push: 'escalation', reason: 'Guest needs help' };
+// A normal escalation's push, next to its WhatsApp alert (ownerPush.js), with
+// the whole stay's length when known (Rule B: the owner decides on a towel
+// change or cleaning by it).
+const escalationPush = (who) => ({ push: 'escalation', reason: who.stayLabel ? `Guest needs help (${who.stayLabel})` : 'Guest needs help' });
+// The escalation's WhatsApp alert: the stay note goes before the guest's text,
+// so a long message can't push it past the alert's length limit.
+const escalationIssue = (who) => `Guest needs help (mode ${who.mode})${who.ownerNote ? ` [${who.ownerNote}]` : ''}: ${who.guestText}`;
 
 /** Owner notifications are limited to one per key per window; alert docs are always written. */
 function shouldNotifyNow(lastNotifiedMs, nowMs, windowMs) {
@@ -182,7 +187,8 @@ function shouldNotifyNow(lastNotifiedMs, nowMs, windowMs) {
  *   'send_failed'     — Meta rejected the text: nothing stored, owner alerted, pending kept
  *   'sent'
  *
- * who: { name, room, guestText, mode, ownerNote? } (ownerNote: stay + next arrival, added to escalation alerts)
+ * who: { name, room, guestText, mode, ownerNote?, stayLabel? } (ownerNote: whole stay with its
+ *   length + next arrival, added to escalation alerts; stayLabel: "stay 1 Nov to 6 Dec, 35 nights", added to the push)
  * deps: preSendCheck() -> 'send'|'newer_message'|'owner_replied', humanize(),
  *   sendVideo(id) / sendText(body) -> { ok, id } | { ok: false, code, reason },
  *   storeAssistant(content), writeAlert(fields), notifyOwner(issue, opts),
@@ -237,7 +243,7 @@ async function deliverReply(plan, who, deps) {
     if (plan.escalate) {
       deps.log.warn('deliverReply: reply had only tags, nothing sent to the guest; escalating to the owner');
       await deps.writeAlert({ reason: 'escalation', urgency: !!plan.urgent });
-      if (!plan.urgent) await deps.notifyOwner(`Guest needs help (mode ${who.mode}): ${who.guestText}${who.ownerNote ? ` [${who.ownerNote}]` : ''}`, ESCALATION_PUSH);
+      if (!plan.urgent) await deps.notifyOwner(escalationIssue(who), escalationPush(who));
       await deps.finishPending();
       return { outcome: 'escalated_only' };
     }
@@ -294,7 +300,7 @@ async function deliverReply(plan, who, deps) {
   if (plan.escalate) {
     await deps.writeAlert({ reason: 'escalation', urgency: !!plan.urgent });
     // Urgent cases were already paged above.
-    if (!plan.urgent) await deps.notifyOwner(`Guest needs help (mode ${who.mode}): ${who.guestText}${who.ownerNote ? ` [${who.ownerNote}]` : ''}`, ESCALATION_PUSH);
+    if (!plan.urgent) await deps.notifyOwner(escalationIssue(who), escalationPush(who));
   }
   await deps.finishPending();
   return { outcome: 'sent' };

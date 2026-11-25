@@ -9,6 +9,7 @@ const {
   pickCurrentForm,
   findCurrentGuestForm,
   stayChain,
+  endsStay,
 } = require('./guestLookup');
 
 const WA = '995555123456'; // WhatsApp sends digits with country code
@@ -181,14 +182,16 @@ test('stayChain: back-to-back bookings of the same guest in the same room are on
   await t.test('the 24 Nov guest: 12 Nov to 6 Dec, the other guest before and the December return are not part of it', () => {
     assert.deepEqual(stayChain(B2B[3], B2B).map((r) => r.reservationNumber), ['R1', 'R2', 'R3', 'R4', 'R5']);
   });
-  await t.test('a 1-day gap still counts, a 2-day gap does not', () => {
+  await t.test('Rule A: only a booking starting on the checkout day joins the stay; a 1-day gap is a new stay', () => {
     const rows = [
       { reservationNumber: 'A', roomCode: '6-2', checkin: '2026-11-01', checkout: '2026-11-05', guest: 'Ann Lee' },
-      { reservationNumber: 'B', roomCode: '6-2', checkin: '2026-11-06', checkout: '2026-11-08', guest: 'Ann Lee' },
-      { reservationNumber: 'C', roomCode: '6-2', checkin: '2026-11-10', checkout: '2026-11-12', guest: 'Ann Lee' },
+      { reservationNumber: 'B', roomCode: '6-2', checkin: '2026-11-05', checkout: '2026-11-08', guest: 'Ann Lee' },
+      { reservationNumber: 'C', roomCode: '6-2', checkin: '2026-11-09', checkout: '2026-11-12', guest: 'Ann Lee' },
     ];
     assert.deepEqual(stayChain(rows[0], rows).map((r) => r.reservationNumber), ['A', 'B']);
     assert.deepEqual(stayChain(rows[2], rows).map((r) => r.reservationNumber), ['C']);
+    assert.equal(endsStay(rows[0], rows), false, 'A continues into B');
+    assert.equal(endsStay(rows[1], rows), true, 'B ends the stay: C starts a day later');
   });
   await t.test('no guest name: only the booking itself', () => {
     const rows = [{ reservationNumber: 'A', checkin: '2026-11-01', checkout: '2026-11-05' }, { reservationNumber: 'B', checkin: '2026-11-05', checkout: '2026-11-08' }];

@@ -254,11 +254,12 @@ module.exports = {
       "detergentOnRequestUntil": "18:00"
     },
     "longStay": {
-      "en": "For stays of 7 nights or more, cleaning and a towel and bed sheet change are free every 7 nights. For shorter stays a towel change mid-stay is not included.",
+      "en": "Back-to-back bookings in the same unit are one stay: we don't clean between them, and nights are counted over the whole stay. For a stay of more than 5 nights, the team checks and arranges a cleaning or a towel change on request. For a stay of 5 nights or less, cleaning is our paid service on the guest page and a towel change during the stay is not included.",
       "appliesTo": [
         "shartava"
       ],
-      "freeEveryNights": 7
+      "overNights": "5",
+      "decided": "Owner, 25 Nov 2026 (replaces the free change every 7 nights)"
     },
     "houseRules": {
       "en": "Quiet hours are 22:00 to 08:00. Visitors are welcome during the day but can't stay overnight. Parties are not allowed. Children are welcome.",

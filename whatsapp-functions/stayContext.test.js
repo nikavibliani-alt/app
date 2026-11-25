@@ -244,7 +244,7 @@ test('prepareClaudeHistory: Claude\'s history always ends with the guest\'s unan
 });
 
 // Minimal fake Firestore for loadCurrentStayHistory's two queries.
-function fakeDb({ markers = [], messages = [], markerQueryFails = false } = {}) {
+function fakeDb({ markers = [], messages = [], markerQueryFails = false, reservations = [] } = {}) {
   const messageQuery = (filters = [], order = null, max = Infinity) => ({
     where: (field, op, value) => messageQuery([...filters, { field, op, value }], order, max),
     orderBy: (field, dir) => messageQuery(filters, { field, dir }, max),
@@ -270,6 +270,17 @@ function fakeDb({ markers = [], messages = [], markerQueryFails = false } = {}) 
           }),
         };
       }
+      if (name === 'reservations') {
+        const q = (filters) => ({
+          where: (field, op, value) => q([...filters, { field, value }]),
+          limit: () => q(filters),
+          async get() {
+            const rows = reservations.filter((r) => filters.every((f) => r[f.field] === f.value));
+            return { empty: !rows.length, docs: rows.map((r) => ({ data: () => r })) };
+          },
+        });
+        return q([]);
+      }
       assert.equal(name, 'whatsapp_conversations');
       return { doc: (phone) => ({ collection: () => { assert.equal(phone, PHONE); return messageQuery(); } }) };
     },
@@ -289,12 +300,31 @@ test('loadCurrentStayHistory (Firestore path)', async (t) => {
     assert.deepEqual(recentNewestFirst.map((x) => x.content), ['Where can I park?']);
   });
 
-  await t.test('the 15-message limit counts current-stay messages only', async () => {
-    const current = Array.from({ length: 20 }, (_, i) => m('user', `new ${i}`, NOW - i * 60 * 1000));
+  await t.test('the whole current stay is kept (not just 15 messages), and only the current stay', async () => {
+    const current = Array.from({ length: 40 }, (_, i) => m('user', `new ${i}`, NOW - i * 60 * 1000));
     const db = fakeDb({ markers, messages: [...current, ...returningGuestHistory('x').slice(1)] });
     const { recentNewestFirst } = await loadCurrentStayHistory(db, PHONE, NOW);
-    assert.equal(recentNewestFirst.length, 15);
+    assert.equal(recentNewestFirst.length, 40);
     assert.ok(recentNewestFirst.every((x) => x.content.startsWith('new ')));
+  });
+
+  await t.test('a checkout followed by a back-to-back extension (same unit, same name) does not restart the history', async () => {
+    const reservations = [
+      { reservationNumber: 'R1', roomCode: '7-2', checkin: '2026-09-15', checkout: '2026-09-18', status: 'OK2', guest: 'Ann Lee' },
+      { reservationNumber: 'R2', roomCode: '7-2', checkin: '2026-09-18', checkout: '2026-09-30', status: 'OK2', guest: 'Ann Lee' },
+    ];
+    const db = fakeDb({ markers: [{ phone: PHONE, cutoffMs: PREV_CUTOFF, reservationNumber: 'R1' }], reservations, messages: returningGuestHistory('Where can I park?') });
+    const { recentNewestFirst, stayStartMs } = await loadCurrentStayHistory(db, PHONE, NOW);
+    assert.ok(Number.isNaN(stayStartMs), 'R1 continues into R2: no boundary');
+    assert.equal(recentNewestFirst.length, 6, 'the messages before R1 ended are kept');
+  });
+
+  await t.test('a checkout with no extension still starts a new stay; the summarizer\'s "continues" markers never do', async () => {
+    const reservations = [{ reservationNumber: 'R1', roomCode: '7-2', checkin: '2026-09-15', checkout: '2026-09-18', status: 'OK2', guest: 'Ann Lee' }];
+    const ended = fakeDb({ markers: [{ phone: PHONE, cutoffMs: PREV_CUTOFF, reservationNumber: 'R1' }], reservations, messages: returningGuestHistory('hi') });
+    assert.equal((await loadCurrentStayHistory(ended, PHONE, NOW)).stayStartMs, PREV_CUTOFF);
+    const cont = fakeDb({ markers: [{ phone: PHONE, cutoffMs: PREV_CUTOFF, outcome: 'continues' }], messages: returningGuestHistory('hi') });
+    assert.ok(Number.isNaN((await loadCurrentStayHistory(cont, PHONE, NOW)).stayStartMs));
   });
 
   await t.test('no previous checkout for this phone: unchanged, last 15 of everything', async () => {
@@ -323,3 +353,13 @@ test('prepareClaudeHistory returns the unanswered stored messages (with their ph
   assert.deepEqual(r.unanswered.map((x) => x.media.id), ['p1', 'p2'], 'oldest first; the answered older photo is not included');
   assert.equal(r.unansweredCount, 2);
 });
+
+test('trimToBudget: newest messages within the size budget, never fewer than the minimum', () => {
+  const { trimToBudget } = require('./stayContext');
+  const msgs = Array.from({ length: 10 }, (_, i) => ({ content: 'x'.repeat(100), i }));
+  assert.equal(trimToBudget(msgs, 450, 2).length, 4);
+  assert.equal(trimToBudget(msgs, 50, 3).length, 3, 'minimum kept even when over budget');
+  assert.equal(trimToBudget(msgs, 100000, 3).length, 10);
+  assert.deepEqual(trimToBudget(msgs, 250, 1).map((x) => x.i), [0, 1], 'newest first kept');
+});
+

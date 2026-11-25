@@ -11,7 +11,15 @@
 // checkout day, Tbilisi). No completed checkout -> no boundary -> history is
 // unchanged.
 
+const { endsStay, roomReservations } = require('./guestLookup');
+
 const MARKER_COLLECTION = 'whatsapp_checkout_summaries';
+
+// The whole current stay goes to Claude (owner, 25 Nov), up to these caps:
+// newest messages first, at least MIN_HISTORY even if they are long.
+const STAY_HISTORY_MAX = 300;
+const STAY_HISTORY_CHARS = 40000;
+const MIN_HISTORY = 15;
 
 function toMillis(value) {
   if (!value) return NaN;
@@ -30,6 +38,59 @@ function latestCompletedCheckoutMs(markers, nowMs) {
     if (!Number.isFinite(latest) || cutoff > latest) latest = cutoff;
   }
   return latest;
+}
+
+/**
+ * Newest-first messages cut to a size budget: the newest ones are kept while
+ * their text fits in maxChars, and never fewer than minKeep.
+ */
+function trimToBudget(newestFirst, maxChars = STAY_HISTORY_CHARS, minKeep = MIN_HISTORY) {
+  let used = 0;
+  const out = [];
+  for (const msg of newestFirst || []) {
+    used += String(msg?.content || '').length;
+    if (out.length >= minKeep && used > maxChars) break;
+    out.push(msg);
+  }
+  return out;
+}
+
+/**
+ * Does this checkout marker end a stay? Not when its booking continues back
+ * to back into another booking of the same guest in the same unit (Rule A:
+ * one stay, see guestLookup.js stayChain), nor a marker the summarizer wrote
+ * for such a booking. A marker whose booking can't be found ends the stay
+ * (the behavior before back-to-back stays were known).
+ */
+async function markerEndsStay(db, marker) {
+  if (marker?.outcome === 'continues') return false;
+  const rn = String(marker?.reservationNumber || marker?.stay?.reservationNumber || '');
+  if (!rn) return true;
+  const snap = await db.collection('reservations').where('reservationNumber', '==', rn).limit(1).get();
+  if (snap.empty) return true;
+  const reservation = snap.docs[0].data();
+  return endsStay(reservation, await roomReservations(db, reservation.roomCode));
+}
+
+/**
+ * The newest completed checkout that really ended a stay (ms), or NaN: a
+ * checkout followed by a back-to-back extension is skipped, so the history
+ * doesn't restart in the middle of one stay.
+ */
+async function stayBoundaryMs(db, markers, nowMs) {
+  const done = (markers || [])
+    .filter((x) => Number.isFinite(Number(x?.cutoffMs)) && Number(x.cutoffMs) <= nowMs)
+    .sort((a, b) => Number(b.cutoffMs) - Number(a.cutoffMs));
+  for (const marker of done) {
+    let ends = true;
+    try {
+      ends = await markerEndsStay(db, marker);
+    } catch (err) {
+      console.warn('stayBoundaryMs: back-to-back check failed, treating the checkout as a stay end:', err.message || err);
+    }
+    if (ends) return Number(marker.cutoffMs);
+  }
+  return NaN;
 }
 
 /** Keeps only messages after the stay boundary; no boundary (NaN) keeps everything. */
@@ -131,16 +192,18 @@ function prepareClaudeHistory(recentNewestFirst, nowMs) {
 }
 
 /**
- * The last `limit` messages of the phone's CURRENT stay, newest first. The
- * boundary is applied in the query, so the limit counts current-stay messages
- * only, and again in JS as a guard. If the marker lookup fails, falls back to
- * the unscoped history (the pre-scoping behavior) instead of failing the reply.
+ * The messages of the phone's CURRENT stay, newest first: everything after the
+ * last checkout that ended a stay (stayBoundaryMs; a back-to-back extension
+ * does not restart it), up to STAY_HISTORY_MAX messages and STAY_HISTORY_CHARS
+ * of text (trimToBudget). The boundary is applied in the query and again in
+ * JS as a guard. If the marker lookup fails, falls back to the unscoped
+ * history (the pre-scoping behavior) instead of failing the reply.
  */
-async function loadCurrentStayHistory(db, phone, nowMs, limit = 15) {
+async function loadCurrentStayHistory(db, phone, nowMs, limit = STAY_HISTORY_MAX) {
   let stayStartMs = NaN;
   try {
     const markers = await db.collection(MARKER_COLLECTION).where('phone', '==', phone).get();
-    stayStartMs = latestCompletedCheckoutMs(markers.docs.map((d) => d.data()), nowMs);
+    stayStartMs = await stayBoundaryMs(db, markers.docs.map((d) => d.data()), nowMs);
   } catch (err) {
     console.warn('loadCurrentStayHistory: checkout marker lookup failed, using unscoped history for', phone, err.message || err);
   }
@@ -148,13 +211,15 @@ async function loadCurrentStayHistory(db, phone, nowMs, limit = 15) {
   let query = db.collection('whatsapp_conversations').doc(phone).collection('messages');
   if (Number.isFinite(stayStartMs)) query = query.where('timestamp', '>', new Date(stayStartMs));
   const snap = await query.orderBy('timestamp', 'desc').limit(limit).get();
-  const recentNewestFirst = currentStayMessages(snap.docs.map((d) => d.data()), stayStartMs);
+  const recentNewestFirst = trimToBudget(currentStayMessages(snap.docs.map((d) => d.data()), stayStartMs));
   return { recentNewestFirst, stayStartMs };
 }
 
 module.exports = {
   latestCompletedCheckoutMs,
   currentStayMessages,
+  stayBoundaryMs,
+  trimToBudget,
   relativeTimeLabel,
   stripTimeLabels,
   toClaudeHistory,

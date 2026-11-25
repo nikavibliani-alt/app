@@ -80,7 +80,10 @@ function baseReservationNumber(matchedReservationId) {
   return raw ? raw.split('_')[0] : '';
 }
 
-const CHAIN_GAP_DAYS = 1; // a next booking starting 0 or 1 day after the last one is the same stay
+// Rule A (owner, 25 Nov): a stay only ends with a checkout and a new check-in
+// that is not on the same day. A next booking starting on the checkout day is
+// the same stay (no cleaning in between); a 1-day gap is a new stay.
+const CHAIN_GAP_DAYS = 0;
 const CHAIN_MAX = 30;
 
 /** Guest name on a reservation, lowercased, single spaces ('' if none). */
@@ -97,8 +100,8 @@ function dayDiff(fromDay, toDay) {
 
 /**
  * The stay a reservation belongs to: it and the same guest's back-to-back
- * bookings in the same room (the next one starts 0 or 1 day after the
- * previous checkout, same guest name, not cancelled), oldest first. An
+ * bookings in the same room (the next one starts on the previous checkout
+ * day, same guest name, not cancelled), oldest first. An
  * extension booked as a new reservation is the same stay, not a new visit.
  * roomReservations: every reservation of that room.
  */
@@ -127,6 +130,12 @@ function stayChain(reservation, roomReservations) {
   step('next', (a, b) => a.checkin.localeCompare(b.checkin));
   step('previous', (a, b) => b.checkout.localeCompare(a.checkout));
   return chain;
+}
+
+/** True when this booking is the last of its stay (no back-to-back booking follows it). */
+function endsStay(reservation, roomReservationsList) {
+  const chain = stayChain(reservation, roomReservationsList);
+  return !chain.length || chain[chain.length - 1].reservationNumber === reservation.reservationNumber;
 }
 
 /** Every reservation of one room (equality filter only, no composite index). */
@@ -227,6 +236,8 @@ module.exports = {
   phonesMatch,
   stayState,
   stayChain,
+  endsStay,
+  roomReservations,
   pickCurrentForm,
   findCurrentGuestForm,
 };

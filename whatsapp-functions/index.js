@@ -23,7 +23,7 @@ const {
 } = require('./summarizer');
 const { loadCurrentStayHistory, prepareClaudeHistory, stripTimeLabels } = require('./stayContext');
 const { findCurrentGuestForm } = require('./guestLookup');
-const { backToBackLines, isReturningGuest, otherPropertyForRoom, returningGuestLines, stayLengthLines, stayTiming, stayTimingContextLines } = require('./stayRules');
+const { backToBackLines, isReturningGuest, otherPropertyForRoom, returningGuestLines, stayLabel, stayLengthLines, stayTiming, stayTimingContextLines } = require('./stayRules');
 const { describeInbound } = require('./inboundContent');
 const { downloadMetaMedia, photosToAttach, attachPhotos } = require('./metaMedia');
 const { sendOwnerAlert, ownerAlertGuest, ownerStatusIds, guestFailedStatusLines, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
@@ -728,8 +728,9 @@ exports.whatsappBotWorker = onRequest(
         return res.sendStatus(200);
       }
 
-      // Last 15 messages of the CURRENT stay (after the phone's most recent
-      // completed checkout, see stayContext.js), fetched once and reused for
+      // The messages of the CURRENT stay (after the phone's most recent
+      // checkout that ended a stay; a back-to-back extension is the same stay,
+      // see stayContext.js), fetched once and reused for
       // every history-based check below: owner continuation silence (CHANGE F),
       // short-ack / escalation-nudge silence (CHANGE 6), and Claude's history,
       // which carries the Host: lines and [VIDEO_SENT:id] markers the prompt's
@@ -888,7 +889,7 @@ exports.whatsappBotWorker = onRequest(
       const kb = await loadKnowledgeBase(db);
       // WiFi only from the check-in page data (several units share a network).
       const wifi = await loadUnitWifi(db, bookingRoom);
-      const live = await loadLiveStay(db, { roomCode: bookingRoom, form: guestMatch?.form, reservation: guestMatch?.reservation });
+      const live = await loadLiveStay(db, { roomCode: bookingRoom, form: guestMatch?.form, reservation: guestMatch?.reservation, stay: { checkin: stayStart, checkout: stayEnd } });
       // Timing for the whole stay: a back-to-back booking starting today is not an arrival day.
       const timing = stayTiming({ checkin: stayStart, checkout: stayEnd }, Date.now());
       timing.checkinOpen = checkinOpenWithLiveData(timing.checkinOpen, live.page);
@@ -904,7 +905,8 @@ exports.whatsappBotWorker = onRequest(
         // door-code scenarios never have to work it out from the hour.
         ...stayTimingContextLines(timing),
         ...returningGuestLines(returning),
-        ...stayLengthLines({ checkin: checkinDate || guestMatch?.form?.arrivalDate, checkout: checkoutDate }, kb.policies?.longStay?.freeEveryNights),
+        // Rule B: nights over the whole stay (back-to-back bookings together).
+        ...stayLengthLines({ checkin: stayStart, checkout: stayEnd }, Number(kb.policies?.longStay?.overNights) || 5),
         ...unitFactLines(kb, bookingRoom, wifi),
         ...languageHintLines(combinedGuestText),
         ...bookingLookupLines(lookup, kb.properties?.[propertyIdForRoom(kb, lookup?.roomCode)]?.name),
@@ -988,6 +990,7 @@ exports.whatsappBotWorker = onRequest(
         guestText: combinedGuestText,
         mode: effectiveMode,
         ownerNote: live.ownerNote,
+        stayLabel: stayLabel({ checkin: stayStart, checkout: stayEnd }),
       }, {
         log: console,
         // Small humanizer — short, after Claude, before send. Not the batching delay.

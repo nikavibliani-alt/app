@@ -252,3 +252,51 @@ test('no messages in the stay: marked done, nothing written to the guest', async
   assert.equal(s.markers.get('7001').status, 'done');
   assert.equal(s.latestWrites, 0);
 });
+
+test('Rule A: back-to-back bookings are one stay, summarized once after the real final checkout', async (t) => {
+  // 7-2: 1-4 Nov, 4-8 Nov (form), 8-24 Nov (no form), same guest; another guest from 24 Nov.
+  const room = [
+    { reservationNumber: 'B1', roomCode: '7-2', checkin: '2026-11-01', checkout: '2026-11-04', status: 'OK2', guest: 'Akbar Nikbakht' },
+    { reservationNumber: 'B2', roomCode: '7-2', checkin: '2026-11-04', checkout: '2026-11-08', status: 'OK2', guest: 'Akbar Nikbakht' },
+    { reservationNumber: 'B3', roomCode: '7-2', checkin: '2026-11-08', checkout: '2026-11-24', status: 'OK2', guest: 'Akbar Nikbakht' },
+    { reservationNumber: 'X1', roomCode: '7-2', checkin: '2026-11-24', checkout: '2026-11-26', status: 'OK2', guest: 'Someone Else' },
+  ];
+  const endOf = (day) => checkoutCutoffMs(day);
+  const storeWith = (opts = {}) => {
+    const st = fakeStore({ messages: [msg('u0', 'user', endOf('2026-10-10')), msg('u1', 'user', endOf('2026-10-30')), msg('u2', 'user', endOf('2026-11-06')), msg('u3', 'user', endOf('2026-11-20'))], ...opts });
+    st.store.listRoomReservations = async () => room;
+    st.formCalls = [];
+    st.store.findWaFormForReservation = async (rn) => { st.formCalls.push(rn); return rn === 'B2' ? { contact: `+${PHONE}`, contactType: 'wa' } : null; };
+    return st;
+  };
+
+  await t.test('a booking that continues into the next one: no summary, a "continues" marker without a cutoff', async () => {
+    const st = storeWith();
+    const sum = countingSummarize();
+    const r = await runPostCheckoutSummary({ reservation: room[1], nowMs: endOf('2026-11-08') + HOUR, store: st.store, summarize: sum });
+    assert.equal(r.outcome, 'continues');
+    assert.equal(sum.calls, 0);
+    assert.equal(st.markers.get('B2').outcome, 'continues');
+    assert.equal(st.markers.get('B2').cutoffMs, null);
+    assert.equal(st.latestWrites, 0);
+  });
+
+  await t.test('the final booking (no form of its own): one summary of the whole stay, the form found on an earlier booking', async () => {
+    const st = storeWith();
+    const sum = countingSummarize();
+    const r = await runPostCheckoutSummary({ reservation: room[2], nowMs: endOf('2026-11-24') + HOUR, store: st.store, summarize: sum });
+    assert.equal(r.outcome, 'summarized');
+    assert.deepEqual(st.formCalls, ['B3', 'B2']);
+    assert.equal(sum.calls, 1);
+    assert.deepEqual(st.latest.lastStay, { room: '7-2', checkin: '2026-11-01', checkout: '2026-11-24', reservationNumber: 'B3' });
+    assert.equal(r.messageCount, 4, 'no previous stay: every message up to the checkout');
+  });
+
+  await t.test('an old summary written for an earlier booking of this stay does not cut the final summary short', async () => {
+    const st = storeWith({ latest: { summary: ['x'], lastStay: { room: '7-2', checkin: '2026-11-04', checkout: '2026-11-08', reservationNumber: 'B2' } } });
+    const r = await runPostCheckoutSummary({ reservation: room[2], nowMs: endOf('2026-11-24') + HOUR, store: st.store, summarize: countingSummarize() });
+    assert.equal(r.outcome, 'summarized');
+    assert.equal(r.messageCount, 3, 'from 15 days before the stay began (the 10 Oct message is older)');
+  });
+});
+

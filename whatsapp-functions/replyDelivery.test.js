@@ -481,3 +481,12 @@ test('deliverReply: a greeting before a real answer is not sent', async () => {
   await deliverReply(parseAiReply('Hi, how can I help you? Your Superior Apartment has two rooms in total.'), { name: 'A', guestText: 'two bedrooms?', mode: 'available' }, f.deps);
   assert.equal(f.calls.find((c) => c[0] === 'sendText')[1], 'Your Superior Apartment has two rooms in total.');
 });
+
+test('deliverReply: an escalation alert carries the whole stay and its length (Rule B), before the guest text', async () => {
+  const f = fakeDeps();
+  const who = { name: 'A', room: '7-2', guestText: 'Hi, Good morning. Could someone come today to clean the bathroom, please?', mode: 'available', ownerNote: 'Stay 1 Nov to 6 Dec, 35 nights; next arrival in 7-2: none in the next 30 days', stayLabel: 'stay 1 Nov to 6 Dec, 35 nights' };
+  await deliverReply(parseAiReply('Sure, we\'ll check and arrange it for you. [ESCALATE]'), who, f.deps);
+  const [, issue, opts] = f.calls.find((c) => c[0] === 'notifyOwner');
+  assert.equal(issue, 'Guest needs help (mode available) [Stay 1 Nov to 6 Dec, 35 nights; next arrival in 7-2: none in the next 30 days]: Hi, Good morning. Could someone come today to clean the bathroom, please?');
+  assert.deepEqual(opts, { push: 'escalation', reason: 'Guest needs help (stay 1 Nov to 6 Dec, 35 nights)' });
+});

@@ -106,20 +106,27 @@ test('stayTiming: checkout day, 12:00 checkout, stay ended (27 Oct real case: 18
   assert.equal(stayTiming({ checkin: '2026-10-25' }, at('2026-10-27', 18)).stayEnded, null, 'no checkout date -> unknown');
 });
 
-test('stayLengthLines: nights and the towel change rule, decided in code', () => {
-  assert.deepEqual(stayLengthLines({ checkin: '2026-11-15', checkout: '2026-11-25' }), [
-    'Length of this stay: 10 nights (computed in code)',
-    'Towel change during the stay included: yes',
+test('stayLengthLines: whole-stay nights and Rule B (longer than 5 nights), decided in code', () => {
+  assert.deepEqual(stayLengthLines({ checkin: '2026-11-01', checkout: '2026-12-06' }), [
+    'Length of this stay: 35 nights (the whole stay, back-to-back bookings counted together; computed in code)',
+    'Stay is longer than 5 nights: yes',
   ]);
   assert.deepEqual(stayLengthLines({ checkin: '2026-11-21', checkout: '2026-11-22' }), [
-    'Length of this stay: 1 night (computed in code)',
-    'Towel change during the stay included: no',
+    'Length of this stay: 1 night (the whole stay, back-to-back bookings counted together; computed in code)',
+    'Stay is longer than 5 nights: no',
   ]);
-  assert.equal(stayLengthLines({ checkin: '2026-11-21', checkout: '2026-11-28' })[1], 'Towel change during the stay included: yes', '7 nights is included');
-  assert.equal(stayLengthLines({ checkin: '2026-11-21T14:00:00Z', checkout: '2026-11-27' })[1], 'Towel change during the stay included: no', '6 nights, a time part is ignored');
+  assert.equal(stayLengthLines({ checkin: '2026-11-21', checkout: '2026-11-26' })[1], 'Stay is longer than 5 nights: no', '5 nights is not longer than 5');
+  assert.equal(stayLengthLines({ checkin: '2026-11-21T14:00:00Z', checkout: '2026-11-27' })[1], 'Stay is longer than 5 nights: yes', '6 nights');
   assert.deepEqual(stayLengthLines({ checkin: '', checkout: '2026-11-22' }), [], 'unknown dates: no line');
   assert.deepEqual(stayLengthLines({ checkin: '2026-11-25', checkout: '2026-11-22' }), [], 'checkout before check-in: no line');
   assert.deepEqual(stayLengthLines(), []);
+});
+
+test('stayLabel: the whole stay for the owner alert', () => {
+  const { stayLabel } = require('./stayRules');
+  assert.equal(stayLabel({ checkin: '2026-11-01', checkout: '2026-12-06' }), 'stay 1 Nov to 6 Dec, 35 nights');
+  assert.equal(stayLabel({ checkin: '2026-11-24', checkout: '2026-11-25' }), 'stay 24 Nov to 25 Nov, 1 night');
+  assert.equal(stayLabel({ checkin: '', checkout: '2026-11-25' }), '');
 });
 
 test('isReturningGuest: only a new visit after a gap of more than 1 day', async (t) => {

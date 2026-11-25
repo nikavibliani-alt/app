@@ -87,20 +87,41 @@ function stayTimingContextLines(timing) {
   ];
 }
 
-/**
- * The stay's length in nights and whether a towel and bed sheet change during
- * the stay is included (stays of `freeFromNights` or more), decided here so
- * the rule never depends on the model counting dates (it got 10 nights wrong
- * in a replay). No lines when either date is unknown or the dates make no sense.
- */
-function stayLengthLines({ checkin, checkout } = {}, freeFromNights = 7) {
+/** Nights from check-in to checkout (date parts only), or NaN when unknown or nonsense. */
+function stayNights({ checkin, checkout } = {}) {
   const from = Date.parse(`${dateOnly(checkin)}T00:00:00Z`);
   const to = Date.parse(`${dateOnly(checkout)}T00:00:00Z`);
   const nights = Math.round((to - from) / 86400000);
-  if (!Number.isFinite(nights) || nights < 1) return [];
+  return Number.isFinite(nights) && nights >= 1 ? nights : NaN;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const shortDate = (value) => {
+  const d = dateOnly(value);
+  return d ? `${Number(d.slice(8, 10))} ${MONTHS[Number(d.slice(5, 7)) - 1]}` : '';
+};
+
+/** For the owner's alerts: "stay 1 Nov to 6 Dec, 35 nights" (whole stay), or '' when the dates are unknown. */
+function stayLabel(stay = {}) {
+  const nights = stayNights(stay);
+  if (!Number.isFinite(nights)) return '';
+  return `stay ${shortDate(stay.checkin)} to ${shortDate(stay.checkout)}, ${nights} night${nights === 1 ? '' : 's'}`;
+}
+
+/**
+ * Rule B (owner, 25 Nov): the length of the WHOLE stay (back-to-back bookings
+ * counted together, see guestLookup.js stayChain) and whether it is longer
+ * than `overNights` nights, decided here so the model never counts dates. A
+ * longer stay gets "we'll check and arrange it" + an alert for cleaning and
+ * towel requests, a shorter one the paid cleaning reply (see the prompt).
+ * No lines when either date is unknown or the dates make no sense.
+ */
+function stayLengthLines(stay = {}, overNights = 5) {
+  const nights = stayNights(stay);
+  if (!Number.isFinite(nights)) return [];
   return [
-    `Length of this stay: ${nights} night${nights === 1 ? '' : 's'} (computed in code)`,
-    `Towel change during the stay included: ${nights >= freeFromNights ? 'yes' : 'no'}`,
+    `Length of this stay: ${nights} night${nights === 1 ? '' : 's'} (the whole stay, back-to-back bookings counted together; computed in code)`,
+    `Stay is longer than ${overNights} nights: ${nights > overNights ? 'yes' : 'no'}`,
   ];
 }
 
@@ -139,7 +160,9 @@ module.exports = {
   otherPropertyForRoom,
   propertyForRoom,
   returningGuestLines,
+  stayLabel,
   stayLengthLines,
+  stayNights,
   stayTiming,
   stayTimingContextLines,
 };

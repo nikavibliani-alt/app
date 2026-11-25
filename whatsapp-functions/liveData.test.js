@@ -58,8 +58,10 @@ test('nextArrivalIn + ownerStayNote: next booking in the same unit, for the owne
   ];
   const next = nextArrivalIn(others, { roomCode: '6-2', fromDate: '2026-10-20', excludeReservation: RES.reservationNumber });
   assert.deepEqual(next, { date: '2026-10-20', sameDay: true });
-  assert.equal(ownerStayNote({ roomCode: '6-2', reservation: RES, next }), 'Stay 2026-10-17 to 2026-10-20; next arrival in 6-2: 2026-10-20 (same day as this checkout)');
-  assert.equal(ownerStayNote({ roomCode: '6-2', reservation: RES, next: null }), 'Stay 2026-10-17 to 2026-10-20; next arrival in 6-2: none in the next 30 days');
+  assert.equal(ownerStayNote({ roomCode: '6-2', reservation: RES, next }), 'Stay 17 Oct to 20 Oct, 3 nights; next arrival in 6-2: 2026-10-20 (same day as this checkout)');
+  assert.equal(ownerStayNote({ roomCode: '6-2', reservation: RES, next: null }), 'Stay 17 Oct to 20 Oct, 3 nights; next arrival in 6-2: none in the next 30 days');
+  assert.equal(ownerStayNote({ roomCode: '7-2', reservation: { checkin: '2026-11-24', checkout: '2026-11-27' }, stay: { checkin: '2026-11-01', checkout: '2026-12-06' }, next: null }),
+    'Stay 1 Nov to 6 Dec, 35 nights; next arrival in 7-2: none in the next 30 days', 'Rule B: the whole stay and its length');
   assert.equal(nextArrivalIn([{ ...RES, reservationNumber: '9', checkin: '2026-12-01' }], { roomCode: '6-2', fromDate: '2026-10-20' }), null, 'beyond 30 days');
 });
 
@@ -95,7 +97,7 @@ test('loadLiveStay: reads only what it needs, never door codes', async () => {
   const live = await loadLiveStay(db, { roomCode: '6-2', form: FORM, reservation: RES, nowMs: at('2026-10-17', 12), log: { warn: () => {} } });
   assert.deepEqual(live.page, { unlocked: true, reason: 'hk_early', label: 'Unlocked early' });
   assert.deepEqual(live.airportTransfer, { smallCarPrice: 70, largeCarPrice: 100, maxGuestsPerCar: 7 });
-  assert.equal(live.ownerNote, 'Stay 2026-10-17 to 2026-10-20; next arrival in 6-2: 2026-10-21');
+  assert.equal(live.ownerNote, 'Stay 17 Oct to 20 Oct, 3 nights; next arrival in 6-2: 2026-10-21');
   const aptRead = db.reads.find((r) => r.col === 'checkin_apartments');
   assert.deepEqual(aptRead.selected, ['checkInTime'], 'only checkInTime is read from checkin_apartments');
   assert.ok(!JSON.stringify(live).includes('4821'));
@@ -113,5 +115,5 @@ test('deliverReply: escalation alerts carry the stay and next-arrival note', asy
   const deps = { log: { error: () => {}, warn: () => {}, log: () => {} }, humanize: async () => {}, preSendCheck: async () => 'send', sendVideo: rec('sendVideo'), sendText: rec('sendText'), storeAssistant: rec('storeAssistant'), writeAlert: rec('writeAlert'), notifyOwner: rec('notifyOwner'), notifyOwnerThrottled: rec('notifyOwnerThrottled'), finishPending: rec('finishPending') };
   await deliverReply(parseAiReply('Let me check availability based on the next guest arrival and I will get back to you shortly. [ESCALATE]'),
     { name: 'A', guestText: 'Can we check out at 3pm?', mode: 'available', ownerNote: 'Stay 2026-10-17 to 2026-10-20; next arrival in 6-2: 2026-10-20 (same day as this checkout)' }, deps);
-  assert.equal(calls.find((c) => c[0] === 'notifyOwner')[1], 'Guest needs help (mode available): Can we check out at 3pm? [Stay 2026-10-17 to 2026-10-20; next arrival in 6-2: 2026-10-20 (same day as this checkout)]');
+  assert.equal(calls.find((c) => c[0] === 'notifyOwner')[1], 'Guest needs help (mode available) [Stay 2026-10-17 to 2026-10-20; next arrival in 6-2: 2026-10-20 (same day as this checkout)]: Can we check out at 3pm?');
 });
