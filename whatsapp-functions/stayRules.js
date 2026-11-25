@@ -104,9 +104,41 @@ function stayLengthLines({ checkin, checkout } = {}, freeFromNights = 7) {
   ];
 }
 
+/**
+ * Is this a returning guest on a new visit? Only when an earlier stay of this
+ * guest ended more than 1 day before this stay's check-in. Back-to-back or
+ * extended bookings (gap of 0 or 1 day) are the same stay, not a return.
+ * stayStart: check-in of the whole current stay; previousCheckouts: checkouts
+ * of the guest's other stays. true / false, or null when stayStart is unknown.
+ */
+function isReturningGuest({ stayStart, previousCheckouts = [] } = {}) {
+  const start = dateOnly(stayStart);
+  if (!start) return null;
+  const startMs = Date.parse(`${start}T00:00:00Z`);
+  // The latest earlier stay that ended on or before this check-in (an overlap is not a return).
+  const prev = previousCheckouts.map(dateOnly).filter((d) => d && d <= start).sort().pop();
+  if (!prev) return false;
+  return (startMs - Date.parse(`${prev}T00:00:00Z`)) / 86400000 > 1;
+}
+
+/** Guest-context line for the returning-guest greeting (see that scenario in the prompt). */
+function returningGuestLines(returning) {
+  const v = returning === null || returning === undefined ? 'unknown' : returning ? 'yes' : 'no';
+  return [`Returning guest on a new visit (an earlier stay ended more than 1 day before this stay's check-in; back-to-back bookings are one stay; computed in code): ${v}`];
+}
+
+/** "Check-in" / "Checkout" for the whole stay, plus the current booking when the stay has back-to-back bookings. */
+function backToBackLines({ bookings, checkin, checkout } = {}) {
+  if (!(bookings > 1)) return [];
+  return [`This stay has ${bookings} back-to-back bookings in the same unit (one stay, not a new arrival in between): the current booking is ${dateOnly(checkin) || 'unknown'} to ${dateOnly(checkout) || 'unknown'}`];
+}
+
 module.exports = {
+  backToBackLines,
+  isReturningGuest,
   otherPropertyForRoom,
   propertyForRoom,
+  returningGuestLines,
   stayLengthLines,
   stayTiming,
   stayTimingContextLines,

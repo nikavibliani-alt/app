@@ -344,25 +344,105 @@ test('bag storage photos', async (t) => {
   });
 });
 
-test('stripReasoning: the 17 Oct Sonnet 5.5 leak is removed, normal replies untouched', () => {
-  const { stripReasoning } = require('./replyDelivery');
-  const leak = 'Guest\'s newest message is in English, so reply in English. The direct booking scenario: "We don\'t take direct bookings, sorry, reservations and payment are only through Booking.com or Expedia." We don\'t take direct bookings, sorry, reservations and payment are only through Booking.com or Expedia.';
-  assert.equal(stripReasoning(leak).text, 'We don\'t take direct bookings, sorry, reservations and payment are only through Booking.com or Expedia.');
-  assert.equal(stripReasoning('The room/apartment type is unknown, so per the rules I will escalate. [ESCALATE]').text.includes('rules'), false);
-  for (const ok of [
-    'Hi, please fill in this form to get your check-in instructions, everything will be available on that page: app.maxelaapartments.com/checkin-guest',
-    'Your door code and step-by-step instructions are on your check-in page, just scroll down through the steps: app.maxelaapartments.com/checkin-guest',
-    'Hi, happy to help in English. Your entrance and access instructions are on your check-in page.',
-    'ცხელი წყლისთვის დააჭირეთ მარჯვენა სახელურის ღილაკს და დაატრიალეთ ქვემოთ, თქვენკენ.',
-  ]) assert.deepEqual(stripReasoning(ok), { text: ok, removed: 0 }, ok);
+// The exact reply sent on 24 Nov (guest ...1031, 7-2): a greeting, the model's
+// self-correction, then a second answer, all in one WhatsApp message.
+const BAD_REPLY_2026_11_24 = 'Good to hear from you again. How can I help?\n\nWait, the guest is asking about cleaning, let me address that directly.\n\nGood morning, let me check on that and get back to you shortly.';
+
+test('findReasoningLeak: leaks and two-answer replies are caught, normal replies pass', async (t) => {
+  const { findReasoningLeak } = require('./replyDelivery');
+  await t.test('the 24 Nov reply is caught', () => {
+    assert.ok(findReasoningLeak(BAD_REPLY_2026_11_24));
+    assert.ok(findReasoningLeak(parseAiReply(BAD_REPLY_2026_11_24).text), 'also after tag parsing and the tone guard');
+  });
+  await t.test('each piece of it is caught on its own', () => {
+    for (const leak of [
+      'Wait, the guest is asking about cleaning.',
+      'The guest is asking about cleaning, so here is the answer.',
+      'Let me address that directly. Daily cleaning is a paid service.',
+      'Sure. Actually, let me check on that and get back to you shortly.',
+      'Actually, I should escalate this. Let me check on that and get back to you shortly.',
+      'Good to hear from you again. How can I help?\n\nGood morning, let me check on that and get back to you shortly.',
+      'Hello, how can I help?\n\nHello, check-in starts at 3pm.',
+      'Hmm, this guest wants a late checkout. Let me check availability.',
+      'The guest\'s message is a request for cleaning.',
+      'Guest\'s newest message is in English, so reply in English. The direct booking scenario: "We don\'t take direct bookings."',
+      'The room/apartment type is unknown, so per the rules I will escalate.',
+    ]) assert.ok(findReasoningLeak(leak), leak);
+  });
+  await t.test('normal replies pass, including the guest page and fixed replies', () => {
+    for (const ok of [
+      'Hi, please fill in this form to get your check-in instructions, everything will be available on that page: app.maxelaapartments.com/checkin-guest',
+      'Your door code and step-by-step instructions are on your check-in page, just scroll down through the steps: app.maxelaapartments.com/checkin-guest',
+      'Daily cleaning is not included in your reservation price. It is available as an optional paid service. You can arrange it on the guest page: app.maxelaapartments.com/checkin-guest',
+      'Yes, you need to be out of the apartment during the cleaning. The guest must be out of the apartment while we clean.',
+      'Good to hear from you again. How can I help?',
+      'Hi, how can I help you?',
+      'Hi, how can I help you? Your booking for 21-24 October is confirmed.',
+      'Please wait for 5-6 seconds after scanning the QR code, then the door opens.',
+      'Thank you for letting us know. Have a safe trip, we hope to see you again.',
+      'Let me check on that and get back to you shortly.',
+      'Thanks for letting us know, I need to check this with the team and get back to you shortly.',
+      'ცხელი წყლისთვის დააჭირეთ მარჯვენა სახელურის ღილაკს და დაატრიალეთ ქვემოთ, თქვენკენ.',
+    ]) assert.equal(findReasoningLeak(ok), null, ok);
+  });
 });
 
-test('deliverReply: a reply that is only reasoning sends nothing and alerts the owner', async () => {
+test('planWithLeakRetry: one retry, then the reply is blocked if it still leaks', async (t) => {
+  const { planWithLeakRetry } = require('./replyDelivery');
+  const clean = 'Daily cleaning is not included in your reservation price. It is available as an optional paid service.';
+  await t.test('a clean first reply: no retry', async () => {
+    let calls = 0;
+    const r = await planWithLeakRetry(clean, parseAiReply, async () => { calls++; return clean; });
+    assert.equal(calls, 0);
+    assert.equal(r.plan.leak, undefined);
+  });
+  await t.test('a leak, then a clean retry: the retry is sent', async () => {
+    let calls = 0;
+    const r = await planWithLeakRetry(BAD_REPLY_2026_11_24, parseAiReply, async () => { calls++; return clean; });
+    assert.equal(calls, 1);
+    assert.equal(r.plan.text, clean);
+    assert.equal(r.plan.leak, undefined);
+  });
+  await t.test('a leak twice: blocked', async () => {
+    const r = await planWithLeakRetry(BAD_REPLY_2026_11_24, parseAiReply, async () => BAD_REPLY_2026_11_24);
+    assert.ok(r.plan.leak);
+  });
+  await t.test('a leak, and the retry call failed: blocked', async () => {
+    const r = await planWithLeakRetry(BAD_REPLY_2026_11_24, parseAiReply, async () => null);
+    assert.ok(r.plan.leak);
+  });
+  await t.test('[SILENT] is not checked', async () => {
+    let calls = 0;
+    await planWithLeakRetry('[SILENT] the guest is thanking the host', parseAiReply, async () => { calls++; return ''; });
+    assert.equal(calls, 0);
+  });
+});
+
+test('deliverReply: the exact 24 Nov reply is blocked, nothing sent, owner alerted with the guest message', async () => {
   const f = fakeDeps();
-  const r = await deliverReply(parseAiReply('The guest\'s newest message is a thank you, so per the rules this needs no answer.'), WHO, f.deps);
-  assert.equal(r.outcome, 'empty_reply');
-  assert.ok(!f.names().includes('sendText'));
+  const who = { name: 'A', room: '7-2', guestText: 'Hi, Good morning. Could someone come today to clean the bathroom, please?', mode: 'available' };
+  const r = await deliverReply(parseAiReply(BAD_REPLY_2026_11_24), who, f.deps);
+  assert.equal(r.outcome, 'leak_blocked');
+  assert.ok(!f.names().includes('sendText') && !f.names().includes('storeAssistant') && !f.names().includes('humanize'));
   assert.equal(f.calls.find((c) => c[0] === 'writeAlert')[1].errorType, 'reasoning_leak');
+  const [, issue, opts] = f.calls.find((c) => c[0] === 'notifyOwner');
+  assert.match(issue, /clean the bathroom/);
+  assert.equal(opts.push, 'bot_error', 'push next to the WhatsApp alert');
+  assert.ok(f.names().includes('finishPending'));
+});
+
+test('deliverReply: a plan the worker marked as leaking is blocked even if the text looks fine', async () => {
+  const f = fakeDeps();
+  const r = await deliverReply({ ...parseAiReply('Let me check on that and get back to you shortly.'), leak: 'self-correction' }, WHO, f.deps);
+  assert.equal(r.outcome, 'leak_blocked');
+  assert.ok(!f.names().includes('sendText'));
+});
+
+test('deliverReply: a newer guest message wins over a leak alert', async () => {
+  const f = fakeDeps({ decision: 'newer_message' });
+  const r = await deliverReply(parseAiReply(BAD_REPLY_2026_11_24), WHO, f.deps);
+  assert.equal(r.outcome, 'stopped_newer');
+  assert.ok(!f.names().includes('notifyOwner'));
 });
 
 test('findForbiddenCode: door / lock codes blocked, the bag storage code and normal numbers allowed', () => {
@@ -392,7 +472,8 @@ test('dropGreetingPrefix: the generic greeting goes when an answer follows it, s
   assert.equal(dropGreetingPrefix('Hi, how can I help you? Your booking for 21-24 October is confirmed.'), 'Your booking for 21-24 October is confirmed.');
   assert.equal(dropGreetingPrefix('Hello, how can I help? Check-in starts at 3pm.'), 'Check-in starts at 3pm.');
   assert.equal(dropGreetingPrefix('გამარჯობა, რით შემიძლია დაგეხმაროთ? ჯავშანი დადასტურებულია.'), 'ჯავშანი დადასტურებულია.');
-  for (const t of ['Hi, how can I help you?', 'Hi, how can I help you? Thanks', 'Hi Zubair, your booking is confirmed.', 'Your door code is on your check-in page.']) assert.equal(dropGreetingPrefix(t), t, t);
+  assert.equal(dropGreetingPrefix('Good to hear from you again. How can I help? Check-in starts at 3pm.'), 'Check-in starts at 3pm.');
+  for (const t of ['Hi, how can I help you?', 'Good to hear from you again. How can I help?', 'Hi, how can I help you? Thanks', 'Hi Zubair, your booking is confirmed.', 'Your door code is on your check-in page.']) assert.equal(dropGreetingPrefix(t), t, t);
 });
 
 test('deliverReply: a greeting before a real answer is not sent', async () => {

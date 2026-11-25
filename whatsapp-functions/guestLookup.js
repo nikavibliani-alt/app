@@ -80,10 +80,76 @@ function baseReservationNumber(matchedReservationId) {
   return raw ? raw.split('_')[0] : '';
 }
 
+const CHAIN_GAP_DAYS = 1; // a next booking starting 0 or 1 day after the last one is the same stay
+const CHAIN_MAX = 30;
+
+/** Guest name on a reservation, lowercased, single spaces ('' if none). */
+function reservationGuestName(r) {
+  const name = r?.guest || [r?.firstName, r?.lastName].filter(Boolean).join(' ');
+  return String(name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function dayDiff(fromDay, toDay) {
+  const a = Date.parse(`${String(fromDay || '').slice(0, 10)}T00:00:00Z`);
+  const b = Date.parse(`${String(toDay || '').slice(0, 10)}T00:00:00Z`);
+  return Number.isFinite(a) && Number.isFinite(b) ? Math.round((b - a) / DAY_MS) : NaN;
+}
+
+/**
+ * The stay a reservation belongs to: it and the same guest's back-to-back
+ * bookings in the same room (the next one starts 0 or 1 day after the
+ * previous checkout, same guest name, not cancelled), oldest first. An
+ * extension booked as a new reservation is the same stay, not a new visit.
+ * roomReservations: every reservation of that room.
+ */
+function stayChain(reservation, roomReservations) {
+  if (!reservation) return [];
+  const name = reservationGuestName(reservation);
+  const pool = (roomReservations || []).filter((r) => r && !isCancelled(r.status) && r.checkin && r.checkout
+    && name && reservationGuestName(r) === name && r.reservationNumber !== reservation.reservationNumber);
+  const chain = [reservation];
+  const used = new Set([reservation.reservationNumber]);
+  const step = (edge, pick) => {
+    for (let i = 0; i < CHAIN_MAX; i++) {
+      const from = chain[edge === 'next' ? chain.length - 1 : 0];
+      const next = pool
+        .filter((r) => !used.has(r.reservationNumber))
+        .filter((r) => {
+          const gap = edge === 'next' ? dayDiff(from.checkout, r.checkin) : dayDiff(r.checkout, from.checkin);
+          return gap >= 0 && gap <= CHAIN_GAP_DAYS;
+        })
+        .sort(pick)[0];
+      if (!next) return;
+      used.add(next.reservationNumber);
+      if (edge === 'next') chain.push(next); else chain.unshift(next);
+    }
+  };
+  step('next', (a, b) => a.checkin.localeCompare(b.checkin));
+  step('previous', (a, b) => b.checkout.localeCompare(a.checkout));
+  return chain;
+}
+
+/** Every reservation of one room (equality filter only, no composite index). */
+async function roomReservations(db, roomCode) {
+  if (!roomCode) return [];
+  const snap = await db.collection('reservations').where('roomCode', '==', roomCode).get();
+  return snap.docs.map((d) => d.data());
+}
+
 /**
  * The WhatsApp check-in form (and its reservation) for this phone's current or
  * upcoming stay, or null. Reads recent forms (single-field range on
  * arrivalDate, no composite index) and matches phones in code.
+ *
+ * A guest who extended with new bookings often fills no new form, and those
+ * bookings may carry no phone: when no form is current, a form whose booking
+ * continues back to back (same room, same guest name, see stayChain) into
+ * today or later still gives the current booking.
+ *
+ * Also returns stayStart / stayEnd (first check-in and last checkout of the
+ * whole stay), bookings (how many back-to-back bookings it has) and
+ * previousCheckouts (the checkouts of this phone's other bookings), for the
+ * returning-guest line (stayRules.js).
  */
 async function findCurrentGuestForm(db, phone, nowMs) {
   const today = tbilisiDate(nowMs);
@@ -104,14 +170,63 @@ async function findCurrentGuestForm(db, phone, nowMs) {
     }
     candidates.push({ form, reservation });
   }
-  const picked = pickCurrentForm(candidates, today);
-  return picked ? { form: picked.form, reservation: picked.reservation, state: picked.state } : null;
+
+  let picked = pickCurrentForm(candidates, today);
+  let chain = [];
+  const roomCache = new Map();
+  const chainOf = async (reservation) => {
+    const room = reservation?.roomCode || '';
+    if (!room) return reservation ? [reservation] : [];
+    if (!roomCache.has(room)) roomCache.set(room, await roomReservations(db, room));
+    return stayChain(reservation, roomCache.get(room));
+  };
+
+  if (!picked) {
+    // No current form: does a past booking continue back to back into today or later?
+    const past = candidates
+      .filter((c) => c.reservation && stayState(c.form, c.reservation, today) === 'past')
+      .sort((a, b) => String(b.reservation.checkout).localeCompare(String(a.reservation.checkout)))
+      .slice(0, 3);
+    for (const c of past) {
+      const linked = await chainOf(c.reservation);
+      // On a changeover day two bookings are current: the one starting today is the live one.
+      const live = linked.filter((r) => stayState(c.form, r, today) === 'current').pop()
+        || linked.find((r) => stayState(c.form, r, today) === 'upcoming');
+      if (live) {
+        picked = { form: c.form, reservation: live, state: stayState(c.form, live, today), continued: true };
+        chain = linked;
+        break;
+      }
+    }
+  }
+  if (!picked) return null;
+
+  if (!chain.length && picked.reservation) chain = await chainOf(picked.reservation);
+  const inChain = new Set(chain.map((r) => r.reservationNumber));
+  const stayStart = chain[0]?.checkin || picked.reservation?.checkin || picked.form.arrivalDate || '';
+  const stayEnd = chain[chain.length - 1]?.checkout || picked.reservation?.checkout || '';
+  const previousCheckouts = candidates
+    .filter((c) => c.reservation && !isCancelled(c.reservation.status) && !inChain.has(c.reservation.reservationNumber))
+    .map((c) => c.reservation.checkout)
+    .filter(Boolean);
+
+  return {
+    form: picked.form,
+    reservation: picked.reservation,
+    state: picked.state,
+    continued: !!picked.continued,
+    stayStart,
+    stayEnd,
+    bookings: chain.length,
+    previousCheckouts,
+  };
 }
 
 module.exports = {
   canonicalPhone,
   phonesMatch,
   stayState,
+  stayChain,
   pickCurrentForm,
   findCurrentGuestForm,
 };

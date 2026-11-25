@@ -8,6 +8,7 @@ const {
   stayState,
   pickCurrentForm,
   findCurrentGuestForm,
+  stayChain,
 } = require('./guestLookup');
 
 const WA = '995555123456'; // WhatsApp sends digits with country code
@@ -161,3 +162,66 @@ test('findCurrentGuestForm (Firestore path)', async (t) => {
     assert.equal(await findCurrentGuestForm(fakeDb({ reservations, forms: [] }), WA, NOW), null);
   });
 });
+
+// The 24 Nov case (guest ...1031, 7-2): the last check-in form is for the
+// 14-21 Nov booking; the extensions (21-24, 24-27, 27 Nov - 6 Dec) were booked
+// as new reservations, with no form and no phone. Another guest had 7-2 before.
+const B2B = [
+  { reservationNumber: 'R0', roomCode: '7-2', checkin: '2026-11-08', checkout: '2026-11-12', status: 'OK2', guest: 'Someone Else' },
+  { reservationNumber: 'R1', roomCode: '7-2', checkin: '2026-11-12', checkout: '2026-11-14', status: 'OK2', guest: 'Akbar Nikbakht' },
+  { reservationNumber: 'R2', roomCode: '7-2', checkin: '2026-11-14', checkout: '2026-11-21', status: 'OK2', guest: 'Akbar Nikbakht' },
+  { reservationNumber: 'R3', roomCode: '7-2', checkin: '2026-11-21', checkout: '2026-11-24', status: 'OK2', guest: 'Akbar  Nikbakht' },
+  { reservationNumber: 'R4', roomCode: '7-2', checkin: '2026-11-24', checkout: '2026-11-27', status: 'OK2', firstName: 'Akbar', lastName: 'Nikbakht' },
+  { reservationNumber: 'R5', roomCode: '7-2', checkin: '2026-11-27', checkout: '2026-12-06', status: 'OK2', guest: 'AKBAR NIKBAKHT' },
+  { reservationNumber: 'R6', roomCode: '7-2', checkin: '2026-12-30', checkout: '2027-01-05', status: 'OK2', guest: 'Akbar Nikbakht' },
+  { reservationNumber: 'R7', roomCode: '7-2', checkin: '2026-12-06', checkout: '2026-12-09', status: 'CL', guest: 'Akbar Nikbakht' },
+];
+
+test('stayChain: back-to-back bookings of the same guest in the same room are one stay', async (t) => {
+  await t.test('the 24 Nov guest: 12 Nov to 6 Dec, the other guest before and the December return are not part of it', () => {
+    assert.deepEqual(stayChain(B2B[3], B2B).map((r) => r.reservationNumber), ['R1', 'R2', 'R3', 'R4', 'R5']);
+  });
+  await t.test('a 1-day gap still counts, a 2-day gap does not', () => {
+    const rows = [
+      { reservationNumber: 'A', roomCode: '6-2', checkin: '2026-11-01', checkout: '2026-11-05', guest: 'Ann Lee' },
+      { reservationNumber: 'B', roomCode: '6-2', checkin: '2026-11-06', checkout: '2026-11-08', guest: 'Ann Lee' },
+      { reservationNumber: 'C', roomCode: '6-2', checkin: '2026-11-10', checkout: '2026-11-12', guest: 'Ann Lee' },
+    ];
+    assert.deepEqual(stayChain(rows[0], rows).map((r) => r.reservationNumber), ['A', 'B']);
+    assert.deepEqual(stayChain(rows[2], rows).map((r) => r.reservationNumber), ['C']);
+  });
+  await t.test('no guest name: only the booking itself', () => {
+    const rows = [{ reservationNumber: 'A', checkin: '2026-11-01', checkout: '2026-11-05' }, { reservationNumber: 'B', checkin: '2026-11-05', checkout: '2026-11-08' }];
+    assert.deepEqual(stayChain(rows[0], rows).map((r) => r.reservationNumber), ['A']);
+  });
+});
+
+test('findCurrentGuestForm: a form for an earlier booking of a back-to-back stay still finds the current booking', async (t) => {
+  const forms = [
+    { contactType: 'wa', contact: '+995555123456', arrivalDate: '2026-11-12', matchedReservationId: 'R1', name: 'Akbar Nikbakht', aptId: '7-2' },
+    { contactType: 'wa', contact: '+995555123456', arrivalDate: '2026-11-14', matchedReservationId: 'R2', name: 'Akbar Nikbakht', aptId: '7-2' },
+    { contactType: 'wa', contact: '+995555123456', arrivalDate: '2026-11-01', matchedReservationId: 'P1', name: 'Akbar Nikbakht', aptId: '0-3' },
+  ];
+  const reservations = [...B2B, { reservationNumber: 'P1', roomCode: '0-3', checkin: '2026-11-01', checkout: '2026-11-04', status: 'OK2', guest: 'Akbar Nikbakht' }];
+  await t.test('24 Nov, 10:39 (the changeover day): the booking starting today, whole stay 12 Nov - 6 Dec', async () => {
+    const m = await findCurrentGuestForm(fakeDb({ forms, reservations }), WA, Date.UTC(2026, 10, 24, 6, 39));
+    assert.equal(m.reservation.reservationNumber, 'R4');
+    assert.equal(m.reservation.roomCode, '7-2');
+    assert.equal(m.continued, true);
+    assert.equal(m.stayStart, '2026-11-12');
+    assert.equal(m.stayEnd, '2026-12-06');
+    assert.equal(m.bookings, 5);
+    assert.deepEqual(m.previousCheckouts, ['2026-11-04'], 'only the earlier stay in 0-3 counts as a previous stay');
+  });
+  await t.test('a current form: the whole stay is still reported', async () => {
+    const m = await findCurrentGuestForm(fakeDb({ forms, reservations }), WA, Date.UTC(2026, 10, 16, 8, 0));
+    assert.equal(m.reservation.reservationNumber, 'R2');
+    assert.equal(m.continued, false);
+    assert.equal(m.stayStart, '2026-11-12');
+    assert.equal(m.stayEnd, '2026-12-06');
+  });
+  await t.test('after the stay ended (7 Dec): no current form', async () => {
+    assert.equal(await findCurrentGuestForm(fakeDb({ forms, reservations }), WA, Date.UTC(2026, 11, 7, 8, 0)), null);
+  });
+});
+

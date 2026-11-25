@@ -121,3 +121,31 @@ test('stayLengthLines: nights and the towel change rule, decided in code', () =>
   assert.deepEqual(stayLengthLines({ checkin: '2026-11-25', checkout: '2026-11-22' }), [], 'checkout before check-in: no line');
   assert.deepEqual(stayLengthLines(), []);
 });
+
+test('isReturningGuest: only a new visit after a gap of more than 1 day', async (t) => {
+  const { isReturningGuest, returningGuestLines, backToBackLines } = require('./stayRules');
+  await t.test('back to back (gap 0) and 1-day gap: same stay, not returning', () => {
+    assert.equal(isReturningGuest({ stayStart: '2026-11-24', previousCheckouts: ['2026-11-24'] }), false);
+    assert.equal(isReturningGuest({ stayStart: '2026-11-25', previousCheckouts: ['2026-11-24'] }), false);
+  });
+  await t.test('previous stay ended weeks ago, or 2 days before: returning', () => {
+    assert.equal(isReturningGuest({ stayStart: '2026-11-24', previousCheckouts: ['2026-10-02'] }), true);
+    assert.equal(isReturningGuest({ stayStart: '2026-11-26', previousCheckouts: ['2026-11-24'] }), true);
+  });
+  await t.test('the latest earlier stay decides; later or overlapping stays are ignored', () => {
+    assert.equal(isReturningGuest({ stayStart: '2026-11-24', previousCheckouts: ['2026-10-02', '2026-11-23T00:00:00Z'] }), false);
+    assert.equal(isReturningGuest({ stayStart: '2026-11-24', previousCheckouts: ['2026-12-06'] }), false);
+  });
+  await t.test('no earlier stay: not returning; unknown stay start: unknown', () => {
+    assert.equal(isReturningGuest({ stayStart: '2026-11-24', previousCheckouts: [] }), false);
+    assert.equal(isReturningGuest({ stayStart: '', previousCheckouts: ['2026-10-02'] }), null);
+  });
+  await t.test('context lines', () => {
+    assert.match(returningGuestLines(true)[0], /^Returning guest on a new visit .*: yes$/);
+    assert.match(returningGuestLines(false)[0], /: no$/);
+    assert.match(returningGuestLines(null)[0], /: unknown$/);
+    assert.deepEqual(backToBackLines({ bookings: 1 }), []);
+    assert.match(backToBackLines({ bookings: 5, checkin: '2026-11-24', checkout: '2026-11-27' })[0], /5 back-to-back bookings.*2026-11-24 to 2026-11-27/);
+  });
+});
+

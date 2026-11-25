@@ -23,7 +23,7 @@ const {
 } = require('./summarizer');
 const { loadCurrentStayHistory, prepareClaudeHistory, stripTimeLabels } = require('./stayContext');
 const { findCurrentGuestForm } = require('./guestLookup');
-const { otherPropertyForRoom, stayLengthLines, stayTiming, stayTimingContextLines } = require('./stayRules');
+const { backToBackLines, isReturningGuest, otherPropertyForRoom, returningGuestLines, stayLengthLines, stayTiming, stayTimingContextLines } = require('./stayRules');
 const { describeInbound } = require('./inboundContent');
 const { downloadMetaMedia, photosToAttach, attachPhotos } = require('./metaMedia');
 const { sendOwnerAlert, ownerAlertGuest, ownerStatusIds, guestFailedStatusLines, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
@@ -35,7 +35,7 @@ const { languageHintLines } = require('./languageHint');
 const { loadLiveStay, liveContextLines, checkinOpenWithLiveData } = require('./liveData');
 const { CONFIG_DEFAULTS, tbilisiHour, resolveEffectiveMode, buildModeContext, timingSettings, replyDelaySeconds } = require('./botModes');
 const { callClaudeWithRetry, describeClaudeError, buildCachedSystem, formatUsage } = require('./claudeClient');
-const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply } = require('./replyDelivery');
+const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply, planWithLeakRetry, LEAK_RETRY_NOTE } = require('./replyDelivery');
 
 if (!getApps().length) initializeApp();
 
@@ -842,6 +842,18 @@ exports.whatsappBotWorker = onRequest(
           memoryContext = `\nPrevious stay notes for this guest: ${summary.map((s) => `- ${s}`).join(' ')}`;
         }
       }
+      // Returning guest on a new visit, decided here (not by the model): an
+      // earlier stay ended more than 1 day before this stay's check-in.
+      // Back-to-back bookings are one stay (guestLookup.js stayChain). The
+      // latest summarized stay (whatsapp_guests lastStay) is an earlier stay
+      // too; one that ended after this stay's check-in is ignored.
+      const lastStay = guestDoc.exists ? guestDoc.data().lastStay : null;
+      const stayStart = guestMatch?.stayStart || checkinDate || guestMatch?.form?.arrivalDate || '';
+      const stayEnd = guestMatch?.stayEnd || checkoutDate;
+      const returning = isReturningGuest({
+        stayStart,
+        previousCheckouts: [...(guestMatch?.previousCheckouts || []), ...(lastStay?.checkout ? [lastStay.checkout] : [])],
+      });
 
       // Owner echoes map to an assistant turn prefixed "Host: " so the model knows
       // a human already responded (current stay only — see above).
@@ -877,18 +889,21 @@ exports.whatsappBotWorker = onRequest(
       // WiFi only from the check-in page data (several units share a network).
       const wifi = await loadUnitWifi(db, bookingRoom);
       const live = await loadLiveStay(db, { roomCode: bookingRoom, form: guestMatch?.form, reservation: guestMatch?.reservation });
-      const timing = stayTiming({ checkin: checkinDate || guestMatch?.form?.arrivalDate, checkout: checkoutDate }, Date.now());
+      // Timing for the whole stay: a back-to-back booking starting today is not an arrival day.
+      const timing = stayTiming({ checkin: stayStart, checkout: stayEnd }, Date.now());
       timing.checkinOpen = checkinOpenWithLiveData(timing.checkinOpen, live.page);
       const guestContext = [
         `Guest name: ${guestName}`,
         `Room/apartment type: ${roomCode || 'unknown'}`,
-        `Check-in: ${checkinDate || 'unknown'}`,
-        `Checkout: ${checkoutDate || 'unknown'}`,
+        `Check-in: ${stayStart || 'unknown'}`,
+        `Checkout: ${stayEnd || 'unknown'}`,
+        ...backToBackLines({ bookings: guestMatch?.bookings, checkin: checkinDate, checkout: checkoutDate }),
         `Filled check-in form: ${hasFilledForm ? 'yes' : 'no'}`,
         `CURRENT_TBILISI_HOUR: ${tbilisiHour()}`,
         // Check-in timing computed here in Tbilisi time, so the entrance and
         // door-code scenarios never have to work it out from the hour.
         ...stayTimingContextLines(timing),
+        ...returningGuestLines(returning),
         ...stayLengthLines({ checkin: checkinDate || guestMatch?.form?.arrivalDate, checkout: checkoutDate }, kb.policies?.longStay?.freeEveryNights),
         ...unitFactLines(kb, bookingRoom, wifi),
         ...languageHintLines(combinedGuestText),
@@ -940,7 +955,19 @@ exports.whatsappBotWorker = onRequest(
       const aiReply = stripTimeLabels(claude.text);
       console.log('whatsappBotWorker: Claude responded, length:', aiReply.length, 'attempts:', claude.attempts);
       // Never send the same video a third time in a conversation (videos.js).
-      const plan = capMediaResend(parseAiReply(aiReply), recentNewestFirst.filter((m) => m.role === 'assistant').map((m) => m.content));
+      const toPlan = (raw) => capMediaResend(parseAiReply(raw), recentNewestFirst.filter((m) => m.role === 'assistant').map((m) => m.content));
+      // A reply that leaks the model's reasoning ("Wait, the guest is asking...")
+      // or holds two answers is never sent: Claude is called once more, and if
+      // that reply leaks too, plan.leak makes deliverReply send nothing and
+      // alert the owner with the guest's message.
+      const { plan, retried, firstLeak } = await planWithLeakRetry(aiReply, toPlan, async () => {
+        const retrySystem = buildCachedSystem(renderSystemPrompt(kb), `${guestContext}\n\n${modeContext}\n\n${LEAK_RETRY_NOTE}`);
+        const again = await callClaudeWithRetry({ apiKey: process.env.ANTHROPIC_API_KEY, system: retrySystem, messages: history });
+        if (!again.ok) return null;
+        console.log(`whatsappBotWorker: Claude usage, leak retry (${again.model}): ${formatUsage(again.usage)}`);
+        return stripTimeLabels(again.text);
+      });
+      if (retried) console.error(`whatsappBotWorker: reply leaked reasoning (${firstLeak}), called Claude again: ${plan.leak ? `still leaked (${plan.leak}), nothing will be sent` : 'clean reply'}, for`, phone);
       if (plan.videoCapped) console.log('whatsappBotWorker: video/photos already sent twice in this conversation, not sending them again; escalating, for', phone);
 
       // CHANGE 7 — [SILENT]: the model asked to send nothing (host already

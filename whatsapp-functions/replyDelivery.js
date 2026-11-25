@@ -78,24 +78,69 @@ function findForbiddenCode(text) {
 // reply in English. The direct booking scenario: ..."). Never sent.
 const REASONING_RE = /\b(?:the guest(?:'s)? (?:newest|latest) message|guest(?:'s)? newest message|so (?:I )?(?:should )?reply in (?:english|georgian)|reply in (?:english|georgian)\b.*\b(?:because|since|so)\b|(?:this|the|that) scenario\b|scenario:|guest context|the rules\b|system prompt|\[silent\]|filled check-in form: (?:yes|no)|check-in is already open for this guest|current_tbilisi_hour|internal tag)/i;
 
+// Self-corrections and talk about "the guest" in the third person (seen on
+// 24 Nov: "Good to hear from you again. How can I help? / Wait, the guest is
+// asking about cleaning, let me address that directly. / Good morning, let me
+// check..."). The guest-facing facts say "the guest page" and "the guest must
+// be out", so only reasoning verbs count after "the guest".
+const SELF_CORRECTION_RE = /(?:^|[.!?:]\s+|\n)\s*(?:(?:wait|hold on|oops|scratch that|on second thought)\s*[,.!:;—–-]|hmm+\b)/i;
+const ACTUALLY_RE = /(?:[.!?:]\s+|\n)\s*actually,?\s|^\s*actually,?\s+(?:let me|I (?:should|need|will|'ll|must)|the guest|wait|no\b|scratch)/i;
+const THIRD_PERSON_RE = /\b(?:the|this) guest(?:'s)? (?:is|was|has|had|wants?|wanted|asks?|asked|asking|says?|said|writes?|wrote|mentions?|mentioned|seems?|needs?|just|now|probably|already|message|question|request(?:s|ed)?|newest|latest|first|did|does|didn't|doesn't)\b|\bthis guest\b/i;
+const META_RE = /\blet me (?:address|respond to|reply to|focus on|re-?read|reconsider|rethink|correct (?:that|this|myself))\b|\bI (?:should|need to|will now|must) (?:reply|respond|answer|address|use|apply|follow)\b|\b(?:address|answer)(?:ing)? (?:that|this|it) directly\b|\bmy (?:previous|first|earlier) (?:reply|answer|draft|response)\b/i;
+// Two answers in one message: a greeting question, then more text after it.
+const HOW_CAN_I_HELP_RE = /how can i help(?: you)?(?: today)?\?|რით შემიძლია დაგეხმაროთ\?/i;
+const OPENING_RE = /^(?:hi|hello|hey|good (?:morning|afternoon|evening)|good to hear from you|გამარჯობა|დილა მშვიდობისა)\b/i;
+
 /**
- * Removes sentences that leak the model's reasoning about its instructions.
- * Returns { text, removed } (text may become '').
+ * Why a reply must not be sent as it is, or null when it is fine: the model's
+ * reasoning about its instructions, a self-correction ("Wait,", "Actually,"),
+ * talk about "the guest" in the third person, or two answers in one message
+ * (a greeting question followed by another reply, or two paragraphs that each
+ * open with a greeting). The worker then calls Claude once more; a reply that
+ * still leaks is never sent (deliverReply).
  */
-function stripReasoning(text) {
-  const t = String(text || '');
-  if (!REASONING_RE.test(t)) return { text: t, removed: 0 };
-  const parts = t.split(/(?<=[.!?]["”»']?)\s+|\n+/);
-  const kept = parts.filter((p) => !REASONING_RE.test(p));
-  // A sentence the model quoted from a scenario ("...": the reply) stays only once.
-  const dedup = kept.filter((p, i) => kept.findIndex((q) => q.trim() === p.trim()) === i);
-  return { text: dedup.join(' ').replace(/\s+/g, ' ').trim(), removed: parts.length - kept.length };
+function findReasoningLeak(text) {
+  const t = String(text || '').trim();
+  if (!t) return null;
+  if (REASONING_RE.test(t)) return 'talks about its instructions';
+  if (SELF_CORRECTION_RE.test(t)) return 'self-correction';
+  if (ACTUALLY_RE.test(t)) return 'self-correction';
+  if (THIRD_PERSON_RE.test(t)) return 'talks about the guest in the third person';
+  if (META_RE.test(t)) return 'talks about its own reply';
+  const help = dropGreetingPrefix(t).match(HOW_CAN_I_HELP_RE);
+  if (help && dropGreetingPrefix(t).slice(help.index + help[0].length).trim().length >= 15) return 'two answers in one message';
+  const openings = t.split(/\n\s*\n/).filter((p) => OPENING_RE.test(p.trim()));
+  if (openings.length >= 2) return 'two answers in one message';
+  return null;
+}
+
+// Added to the second Claude call after a leak (uncached part of the system prompt).
+const LEAK_RETRY_NOTE = 'Your previous draft for this message was not sent: it contained your own notes or two answers. Write only the one message to send to the guest, as the final reply: no notes about the guest or your instructions, no "Wait" or "Actually", no second answer.';
+
+/**
+ * The reply plan after the leak check, with one retry: if the first reply
+ * leaks, `retry()` is called once (-> raw reply text, or null when that call
+ * failed) and its plan is used; if that one leaks too (or the retry failed),
+ * the plan gets `leak` and deliverReply sends nothing. Silent and angry
+ * replies send nothing to the guest anyway, so they are not checked.
+ * Returns { plan, retried, firstLeak }.
+ */
+async function planWithLeakRetry(firstRaw, toPlan, retry) {
+  const leakOf = (p) => (p.silent || p.angry ? null : findReasoningLeak(p.text));
+  const first = toPlan(firstRaw);
+  const firstLeak = leakOf(first);
+  if (!firstLeak) return { plan: first, retried: false, firstLeak: null };
+  const raw = await retry();
+  if (raw === null || raw === undefined) return { plan: { ...first, leak: firstLeak }, retried: true, firstLeak };
+  const second = toPlan(raw);
+  const secondLeak = leakOf(second);
+  return { plan: secondLeak ? { ...second, leak: secondLeak } : second, retried: true, firstLeak };
 }
 
 // "Hi, how can I help you?" is only for a bare greeting. When the model opens
 // with it and then answers a real question (seen 18 Oct: a guest who asked
 // about two bedrooms), the greeting reads as ignoring the question: dropped.
-const GREETING_PREFIX_RE = /^\s*(?:hi|hello)(?: there)?,? how can i help(?: you)?(?: today)?\?\s+|^\s*გამარჯობა,? რით შემიძლია დაგეხმაროთ\?\s+/i;
+const GREETING_PREFIX_RE = /^\s*(?:(?:hi|hello)(?: there)?,?|good to hear from you again[.!,]?) how can i help(?: you)?(?: today)?\?\s+|^\s*გამარჯობა,? რით შემიძლია დაგეხმაროთ\?\s+/i;
 
 /** The reply without a leading generic greeting, when an answer follows it. */
 function dropGreetingPrefix(text) {
@@ -132,6 +177,7 @@ function shouldNotifyNow(lastNotifiedMs, nowMs, windowMs) {
  *   'stopped_owner'   — the owner handled it
  *   'angry_alerted'   — angry guest: nothing sent, owner alerted
  *   'escalated_only'  — tag-only escalation: nothing sent, owner alerted
+ *   'leak_blocked'    — the reply leaked the model's reasoning or held two answers: nothing sent, owner alerted
  *   'empty_reply'     — nothing to send and no escalation: owner alerted, pending kept
  *   'send_failed'     — Meta rejected the text: nothing stored, owner alerted, pending kept
  *   'sent'
@@ -148,8 +194,11 @@ function shouldNotifyNow(lastNotifiedMs, nowMs, windowMs) {
  */
 async function deliverReply(plan, who, deps) {
   const hasContent = !!plan.text || !!plan.videoId;
+  // A reply that leaks the model's reasoning or holds two answers (the worker
+  // already called Claude a second time, see planWithLeakRetry) is never sent.
+  const leak = plan.angry ? null : (plan.leak || findReasoningLeak(plan.text));
 
-  if (hasContent && !plan.angry) await deps.humanize();
+  if (hasContent && !plan.angry && !leak) await deps.humanize();
 
   // Final check BEFORE any send or owner alert.
   const decision = await deps.preSendCheck();
@@ -174,6 +223,15 @@ async function deliverReply(plan, who, deps) {
       : `URGENT: ${who.guestText}`, { push: plan.urgent === 'LOCKOUT' ? 'lockout' : 'issue' });
   }
 
+  // Leaked reply: nothing to the guest, the owner gets the guest's message (WhatsApp + push).
+  if (leak) {
+    deps.log.error(`deliverReply: reply blocked (${leak}), nothing sent to the guest; owner alerted`);
+    await deps.writeAlert({ reason: 'bot_error', errorType: 'reasoning_leak', errorMessage: `reply blocked (${leak}); nothing sent`, urgency: !!plan.urgent });
+    await deps.notifyOwner(`Bot reply blocked, nothing sent to the guest (${leak}). Guest wrote: ${who.guestText}`, { push: 'bot_error', reason: 'Bot reply blocked, nothing sent' });
+    await deps.finishPending();
+    return { outcome: 'leak_blocked' };
+  }
+
   // Tag-only reply (e.g. just "[ESCALATE]"): never send an empty WhatsApp message.
   if (!hasContent) {
     if (plan.escalate) {
@@ -190,19 +248,7 @@ async function deliverReply(plan, who, deps) {
   }
 
   let videoSent = false;
-  let text = plan.text;
-  // Safety net: never send the model's reasoning about its instructions.
-  const cleaned = stripReasoning(text);
-  if (cleaned.removed) {
-    deps.log.error(`deliverReply: removed ${cleaned.removed} reasoning sentence(s) from the reply`);
-    text = cleaned.text;
-    if (!text && !plan.videoId) {
-      await deps.writeAlert({ reason: 'bot_error', errorType: 'reasoning_leak', errorMessage: 'reply was only the model\'s reasoning; nothing sent' });
-      await deps.notifyOwnerThrottled('bot_reasoning_leak', 'Bot could not reply: its reply was only internal reasoning', { push: 'bot_error', reason: 'its reply was only internal reasoning' });
-      return { outcome: 'empty_reply' };
-    }
-  }
-  text = dropGreetingPrefix(text);
+  let text = dropGreetingPrefix(plan.text);
   // Safety net: never send a door / smart lock code (the bag storage code is the only one allowed).
   if (findForbiddenCode(text)) {
     deps.log.error('deliverReply: reply contained a door/lock code, not sent; sending the check-in page pointer instead');
@@ -256,7 +302,9 @@ async function deliverReply(plan, who, deps) {
 
 module.exports = {
   dropGreetingPrefix,
-  stripReasoning,
+  findReasoningLeak,
+  planWithLeakRetry,
+  LEAK_RETRY_NOTE,
   findForbiddenCode,
   SAFE_CODE_REPLY,
   parseAiReply,

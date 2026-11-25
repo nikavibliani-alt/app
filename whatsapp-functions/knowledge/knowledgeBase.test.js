@@ -152,8 +152,19 @@ const DECISION_CHANGES_2026_11_22 = [
   ["Use [SILENT] — send nothing, no reply, no escalation. Never invent recommendations to sound helpful.\nThe one exception: a guest asking whether we offer a city tour gets a reply, using the fact in UNIT AMENITIES AND HOUSE FACTS.",
    "Use [SILENT] — send nothing, no reply, no escalation. Never invent recommendations to sound helpful."],
 ];
+// 25 Nov (guest ...1031, 7-2, back-to-back bookings): the returning greeting
+// only for a computed new visit and a bare greeting; a request to clean during
+// the stay is the paid cleaning service.
+const DECISION_CHANGES_2026_11_25 = [
+  ["- Whether they filled the check-in form or not\n- Previous stay notes if the guest stayed before (background only)\n- \"Returning guest on a new visit\": yes only when an earlier stay ended more than 1 day before this stay's check-in. Computed in code: back-to-back bookings are one stay. When the stay has back-to-back bookings, Check-in and Checkout cover the whole stay and a line names the current booking.", "- Whether they filled the check-in form or not\n- Previous stay notes if returning guest"],
+  ["\nGuest asks for cleaning service, including asking for someone to come and clean the apartment, room, bathroom or kitchen during the stay (today, tomorrow or any day), in any language:", "\nGuest asks for cleaning service:"],
+  ["Reply: Daily cleaning is not included in your reservation price. It is available as an optional paid service. You can arrange it on the guest page: app.maxelaapartments.com/checkin-guest\nThis is not \"let me check\": use this reply. The \"not cleaned properly\" scenario below is only for a complaint that the cleaning before arrival was bad.", "Reply: Daily cleaning is not included in your reservation price. It is available as an optional paid service. You can arrange it on the guest page: app.maxelaapartments.com/checkin-guest"],
+  ["\nReturning guest greeting: only when BOTH are true: the guest context says \"Returning guest on a new visit\" yes, AND the guest's newest message is only a greeting with no question or request (for example just \"Hi\" or \"Hello\"):", "\nReturning guest (previous stay notes exist):"],
+  ["Reply: Good to hear from you again. How can I help?\nIn every other case never use that greeting. Previous stay notes alone do not make a returning guest: back-to-back or extended bookings are one stay. If the message has a question or request, just answer it. A bare greeting from anyone else gets the normal greeting.", "Reply: Good to hear from you again. How can I help?"],
+];
 const withoutRuleChanges = (p) => {
-  const undone1122 = DECISION_CHANGES_2026_11_22.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `22 Nov change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, p);
+  const undone1125 = DECISION_CHANGES_2026_11_25.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `25 Nov change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, p);
+  const undone1122 = DECISION_CHANGES_2026_11_22.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `22 Nov change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone1125);
   const undone1103 = DECISION_CHANGES_2026_11_03.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `3 Nov change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone1122);
   const undone28 = DECISION_CHANGES_2026_10_28.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `28 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone1103);
   const undone26 = DECISION_CHANGES_2026_10_26.reduce((acc, [now, before]) => { assert.equal(acc.split(now).length, 2, `26 Oct change not found once: ${now.slice(0, 60)}`); return acc.replace(now, before); }, undone28);
@@ -386,3 +397,13 @@ test('28 Oct: checkout day, leaving, late checkout never refused', () => {
   assert.match(p, /never refuse on your own, never say it is not possible, and never combine "we can't" with "I'll check"/);
   assert.match(p, /Late checkout request[^\n]*\nReply: Let me check availability based on the next guest arrival and I will get back to you shortly\. \[ESCALATE\]/);
 });
+
+test('25 Nov: returning greeting only for a computed new visit, cleaning requests get the paid service', () => {
+  const p = renderSystemPrompt(SEED);
+  assert.match(p, /Returning guest greeting: only when BOTH are true: the guest context says "Returning guest on a new visit" yes, AND the guest's newest message is only a greeting/);
+  assert.match(p, /back-to-back or extended bookings are one stay/);
+  assert.doesNotMatch(p, /Returning guest \(previous stay notes exist\)/, 'notes alone no longer trigger the greeting');
+  assert.match(p, /Guest asks for cleaning service, including asking for someone to come and clean the apartment, room, bathroom or kitchen during the stay/);
+  assert.match(p, /This is not "let me check": use this reply\./);
+});
+
