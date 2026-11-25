@@ -24,3 +24,6 @@ serviceAccountKey.json
 
 __pycache__/
 *.pyc
+
+# whatsapp-functions — written at deploy time (deployed commit), not source
+whatsapp-functions/build-info.json

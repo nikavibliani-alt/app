@@ -193,6 +193,7 @@
     {
       "source": "whatsapp-functions",
       "codebase": "whatsapp",
+      "predeploy": ["node \"$RESOURCE_DIR/scripts/build-info.js\""],
       "ignore": [
         "node_modules",
         ".git",

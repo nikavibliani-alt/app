@@ -23,7 +23,7 @@ const {
 } = require('./summarizer');
 const { loadCurrentStayHistory, prepareClaudeHistory, stripTimeLabels } = require('./stayContext');
 const { findCurrentGuestForm } = require('./guestLookup');
-const { backToBackLines, isReturningGuest, otherPropertyForRoom, returningGuestLines, stayLabel, stayLengthLines, stayTiming, stayTimingContextLines } = require('./stayRules');
+const { backToBackLines, isReturningGuest, otherPropertyForRoom, propertyForRoom, returningGuestLines, stayLabel, stayLengthLines, stayTiming, stayTimingContextLines } = require('./stayRules');
 const { describeInbound } = require('./inboundContent');
 const { downloadMetaMedia, photosToAttach, attachPhotos } = require('./metaMedia');
 const { sendOwnerAlert, ownerAlertGuest, ownerStatusIds, guestFailedStatusLines, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
@@ -36,6 +36,7 @@ const { loadLiveStay, liveContextLines, checkinOpenWithLiveData } = require('./l
 const { CONFIG_DEFAULTS, tbilisiHour, resolveEffectiveMode, buildModeContext, timingSettings, replyDelaySeconds } = require('./botModes');
 const { callClaudeWithRetry, describeClaudeError, buildCachedSystem, formatUsage } = require('./claudeClient');
 const { parseAiReply, interpretMetaResponse, shouldNotifyNow, deliverReply, planWithLeakRetry, LEAK_RETRY_NOTE } = require('./replyDelivery');
+const { decisionRecorder, decisionForDelivery, promptHash, stayMoment, tagsFromPlan } = require('./botDecisions');
 
 if (!getApps().length) initializeApp();
 
@@ -576,6 +577,9 @@ exports.whatsappWebhook = onRequest(
         // unconditionally); no alert and no Cloud Task while paused — alerts are
         // reserved for when the bot is ON but can't handle something itself.
         if (config.aiBotEnabled === false) {
+          // Learning log only (botDecisions.js): the bot is off, nothing was sent.
+          await decisionRecorder({ db, phone, guestMessages: [text], serverTimestamp: () => FieldValue.serverTimestamp() })
+            .record({ action: 'silent', outcome: 'kill_switch', silentReason: 'kill_switch' });
           return res.sendStatus(200);
         }
 
@@ -636,6 +640,9 @@ exports.whatsappBotWorker = onRequest(
   },
   async (req, res) => {
     console.log('whatsappBotWorker: raw request received');
+    // One bot_decisions document per run (botDecisions.js), written at each
+    // exit below after the bot has acted; it never changes what the bot does.
+    let rec = null;
     try {
       console.log('whatsappBotWorker: request received', JSON.stringify(req.body).substring(0, 200));
 
@@ -652,6 +659,8 @@ exports.whatsappBotWorker = onRequest(
       // Kill switch may have flipped after the task was enqueued
       if (config.aiBotEnabled === false) {
         console.log('whatsappBotWorker: STOPPED — aiBotEnabled is false for', phone);
+        await decisionRecorder({ db, phone, serverTimestamp: () => FieldValue.serverTimestamp() })
+          .record({ action: 'silent', outcome: 'kill_switch', silentReason: 'kill_switch' });
         return res.sendStatus(200);
       }
 
@@ -678,6 +687,8 @@ exports.whatsappBotWorker = onRequest(
       const convoRef        = db.collection('whatsapp_conversations').doc(phone);
       const convoMessagesRef = convoRef.collection('messages');
       const combinedGuestText = (pending.messages || []).join('\n');
+      rec = decisionRecorder({ db, phone, guestMessages: pending.messages || [], mode: effectiveMode, serverTimestamp: () => FieldValue.serverTimestamp() });
+      const recordSilent = (reason) => rec.record({ action: 'silent', outcome: reason, silentReason: reason });
 
       // CHANGE 5 — owner mute, in ALL modes. The bot stays silent for
       // ownerMuteMinutes after any manual owner message (flat timer from that
@@ -716,6 +727,7 @@ exports.whatsappBotWorker = onRequest(
       if (decision.action === 'drop') {
         console.log('whatsappBotWorker: STOPPED — owner replied since this batch started for', phone);
         await deletePendingIfTokenMatches(db, phone, batchToken);
+        await recordSilent('owner_replied');
         return res.sendStatus(200);
       }
       if (decision.action === 'defer') {
@@ -756,6 +768,7 @@ exports.whatsappBotWorker = onRequest(
         )) {
           console.log('whatsappBotWorker: STOPPED — owner continuation silence (within window + short ack/waiting nudge/non-text) for', phone);
           await deletePendingIfTokenMatches(db, phone, batchToken);
+          await recordSilent('owner_recently_active');
           return res.sendStatus(200);
         }
       }
@@ -765,6 +778,7 @@ exports.whatsappBotWorker = onRequest(
       if (shouldStaySilentFromHistory(recentNewestFirst, combinedGuestText)) {
         console.log('whatsappBotWorker: STOPPED — short-ack-after-owner/assistant silence for', phone);
         await deletePendingIfTokenMatches(db, phone, batchToken);
+        await recordSilent('closed_topic');
         return res.sendStatus(200);
       }
 
@@ -810,11 +824,13 @@ exports.whatsappBotWorker = onRequest(
       // Freedom Square as a landmark).
       const bookingRoom = roomCode || guestMatch?.form?.aptId || '';
       const otherProperty = otherPropertyForRoom(bookingRoom);
+      rec.set({ room: bookingRoom || null, property: propertyForRoom(bookingRoom) });
       if (otherProperty) {
         const stayKey = guestMatch?.reservation?.reservationNumber
           || String(guestMatch?.form?.matchedReservationId || '').split('_')[0]
           || guestMatch?.form?.arrivalDate || lookup?.reservationNumber || bookingRoom;
-        if (await claimOncePerStay(db, `other_property_${phone}_${stayKey}`)) {
+        const firstThisStay = await claimOncePerStay(db, `other_property_${phone}_${stayKey}`);
+        if (firstThisStay) {
           await writeAlert(db, {
             reason: 'other_property',
             phone,
@@ -832,6 +848,7 @@ exports.whatsappBotWorker = onRequest(
           console.log(`whatsappBotWorker: STOPPED — ${otherProperty} booking (${bookingRoom}); nothing sent, owner already alerted this stay, for`, phone);
         }
         await deletePendingIfTokenMatches(db, phone, batchToken);
+        await rec.record({ action: firstThisStay ? 'escalated' : 'silent', outcome: 'other_property', silentReason: 'other_property', escalated: firstThisStay });
         return res.sendStatus(200);
       }
 
@@ -867,6 +884,7 @@ exports.whatsappBotWorker = onRequest(
       if (prepared.silent) {
         console.log('whatsappBotWorker: STOPPED — no unanswered guest message (history ends with a bot/Host reply), Claude not called, for', phone);
         await deletePendingIfTokenMatches(db, phone, batchToken);
+        await recordSilent('nothing_unanswered');
         return res.sendStatus(200);
       }
       // Photos in the guest's unanswered batch go to Claude as images (newest 4;
@@ -893,6 +911,10 @@ exports.whatsappBotWorker = onRequest(
       // Timing for the whole stay: a back-to-back booking starting today is not an arrival day.
       const timing = stayTiming({ checkin: stayStart, checkout: stayEnd }, Date.now());
       timing.checkinOpen = checkinOpenWithLiveData(timing.checkinOpen, live.page);
+      rec.set({
+        stayMoment: stayStart || stayEnd ? stayMoment(timing, stayStart) : 'unknown',
+        unitType: kb.units?.[String(bookingRoom).trim().toLowerCase()]?.type || null,
+      });
       const guestContext = [
         `Guest name: ${guestName}`,
         `Room/apartment type: ${roomCode || 'unknown'}`,
@@ -916,7 +938,9 @@ exports.whatsappBotWorker = onRequest(
       const modeContext = buildModeContext(effectiveMode, config.ownerPhone);
       // Prompt caching: the long fixed SYSTEM_PROMPT is the cached prefix; the
       // per-guest part (guest context, mode, times) comes after the breakpoint.
-      const system = buildCachedSystem(renderSystemPrompt(kb), `${guestContext}\n\n${modeContext}`);
+      const systemPrompt = renderSystemPrompt(kb);
+      const system = buildCachedSystem(systemPrompt, `${guestContext}\n\n${modeContext}`);
+      rec.set({ promptHash: promptHash(systemPrompt) });
 
       console.log('whatsappBotWorker: calling Claude for phone:', phone);
       const claude = await callClaudeWithRetry({
@@ -925,6 +949,8 @@ exports.whatsappBotWorker = onRequest(
         messages: history,
       });
       console.log(`whatsappBotWorker: Claude usage (${claude.model}, ${claude.attempts} attempt(s)): ${formatUsage(claude.usage)}`);
+      rec.set({ model: claude.model || null });
+      rec.addUsage(claude.usage);
 
       // Owner alerts' {{1}}: "<name> / <property> <room>" (or "unknown property").
       const label = ownerAlertGuest(guestName, bookingRoom);
@@ -949,6 +975,7 @@ exports.whatsappBotWorker = onRequest(
           errorMessage: claude.message,
         });
         await notifyOwnerThrottled(db, config.ownerPhone, `claude_${claude.errorType}`, { guest: label, issue: `Bot could not reply: ${describeClaudeError(claude)}` }, () => pushUrgent({ push: 'bot_error', reason: `Bot could not reply: ${describeClaudeError(claude)}` }));
+        await rec.record({ action: 'error', outcome: 'claude_failed', silentReason: 'claude_failed', errorType: claude.errorType || null });
         return res.sendStatus(200);
       }
 
@@ -962,15 +989,25 @@ exports.whatsappBotWorker = onRequest(
       // or holds two answers is never sent: Claude is called once more, and if
       // that reply leaks too, plan.leak makes deliverReply send nothing and
       // alert the owner with the guest's message.
+      let usedRaw = aiReply; // the model reply the plan comes from (for bot_decisions)
       const { plan, retried, firstLeak } = await planWithLeakRetry(aiReply, toPlan, async () => {
         const retrySystem = buildCachedSystem(renderSystemPrompt(kb), `${guestContext}\n\n${modeContext}\n\n${LEAK_RETRY_NOTE}`);
         const again = await callClaudeWithRetry({ apiKey: process.env.ANTHROPIC_API_KEY, system: retrySystem, messages: history });
+        rec.addUsage(again.usage);
         if (!again.ok) return null;
         console.log(`whatsappBotWorker: Claude usage, leak retry (${again.model}): ${formatUsage(again.usage)}`);
-        return stripTimeLabels(again.text);
+        usedRaw = stripTimeLabels(again.text);
+        return usedRaw;
       });
       if (retried) console.error(`whatsappBotWorker: reply leaked reasoning (${firstLeak}), called Claude again: ${plan.leak ? `still leaked (${plan.leak}), nothing will be sent` : 'clean reply'}, for`, phone);
       if (plan.videoCapped) console.log('whatsappBotWorker: video/photos already sent twice in this conversation, not sending them again; escalating, for', phone);
+      rec.set({
+        tags: tagsFromPlan(plan),
+        // The model's last reply as written (tags included), before anything was removed.
+        modelReply: usedRaw,
+        leakRetried: !!retried,
+        leak: retried ? { first: firstLeak || null, final: plan.leak || null } : null,
+      });
 
       // CHANGE 7 — [SILENT]: the model asked to send nothing (host already
       // handled it, or the topic is explicitly out of scope). An angry-guest tag
@@ -978,12 +1015,15 @@ exports.whatsappBotWorker = onRequest(
       if (plan.silent && !plan.angry) {
         console.log(`whatsappBotWorker: STOPPED — [SILENT] tag for ${phone}`);
         await deletePendingIfTokenMatches(db, phone, batchToken);
+        await recordSilent('silent_tag');
         return res.sendStatus(200);
       }
 
       // Send phase (replyDelivery.js). The final pre-send check runs before any
       // send AND before any owner alert, so a run replaced by a newer guest
       // message (or overtaken by the owner) never sends and never alerts twice.
+      // `sent`: what actually reached the guest, for bot_decisions only.
+      const sent = { text: null, mediaId: null };
       const { outcome } = await deliverReply(plan, {
         name: guestName,
         room: roomCode,
@@ -1024,9 +1064,14 @@ exports.whatsappBotWorker = onRequest(
             const r = await sendWhatsAppChecked({ messaging_product: 'whatsapp', to: phone, type: item.type, [item.type]: { link: item.link } });
             if (!r.ok) return r;
           }
+          sent.mediaId = id;
           return { ok: true };
         },
-        sendText: (body) => sendWhatsAppChecked({ messaging_product: 'whatsapp', to: phone, type: 'text', text: { body } }),
+        sendText: async (body) => {
+          const r = await sendWhatsAppChecked({ messaging_product: 'whatsapp', to: phone, type: 'text', text: { body } });
+          if (r.ok) sent.text = body;
+          return r;
+        },
         // Stored only after a successful send. [VIDEO_SENT:id] (added by
         // deliverReply only if the video went out) lets a later call avoid
         // resending it. repliesToMs: newest guest message this reply answered —
@@ -1066,9 +1111,11 @@ exports.whatsappBotWorker = onRequest(
         sent: 'completed normally',
       };
       console.log(`whatsappBotWorker: ${OUTCOME_LOG[outcome] || outcome} for`, phone);
+      await rec.record(decisionForDelivery(outcome, plan, sent));
       return res.sendStatus(200);
     } catch (err) {
       console.error('whatsappBotWorker error:', err);
+      if (rec) await rec.record({ action: 'error', outcome: 'exception', silentReason: 'exception', errorType: String(err?.message || err).slice(0, 200) });
       return res.sendStatus(200); // clean completion so Cloud Tasks does not retry indefinitely
     }
   }
