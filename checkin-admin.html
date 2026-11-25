@@ -855,7 +855,7 @@ html.inbox-typing #main-nav{display:none}
         <div class="app-header__titles">
           <div class="app-header__row" style="margin:0;padding:0;border:none">
             <div class="app-title" id="header-title">Stay</div>
-            <span class="app-badge" id="app-version-badge">Build 1019 · Live</span>
+            <span class="app-badge" id="app-version-badge">Build 1020 · Live</span>
           </div>
           <div class="app-sub" id="header-sub">Schedule &amp; guests</div>
         </div>
@@ -4110,7 +4110,17 @@ function stayCardHtml(grp){
   }
   return out;
 }
-/* extensions waiting for an answer, at the top of the Stay page (a push says "confirm in admin") */
+// the booking, or one that follows it, ends today or later: the stay still matters
+function stayStillRuns(booking,today){
+  for(let r=booking,i=0;r&&i<30;i++){
+    if((r.checkout||'')>=today)return true;
+    const next=_stayIdx.get(r.id)?.next;
+    r=next&&next.status!=='rejected'?next.res:null;
+  }
+  return false;
+}
+/* extensions waiting for an answer, at the top of the Stay page (a push says "confirm in admin"). Also the older
+   unconfirmed links of a stay that is still running: the guest's own record may sit on the first booking. */
 function renderStayExt(){
   const el=document.getElementById('stay-ext');
   if(!el)return;
@@ -4118,7 +4128,7 @@ function renderStayExt(){
   for(const [id,idx] of _stayIdx){
     if(idx.prev?.status!=='pending')continue;
     const b=(_resCache||[]).find(x=>x.id===id);
-    if(b&&(b.checkout||'')>=today)list.push({a:idx.prev.res,b});
+    if(b&&stayStillRuns(b,today))list.push({a:idx.prev.res,b});
   }
   list.sort((x,y)=>(x.b.checkin||'').localeCompare(y.b.checkin||'')||byRoom(x.b,y.b));
   el.innerHTML=list.length?`<div class="stay-banner"><div class="stay-banner__title">Extensions to confirm (${list.length})</div>`+list.map(({a,b})=>

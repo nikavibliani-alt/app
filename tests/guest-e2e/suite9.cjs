@@ -95,6 +95,17 @@ const doc = (page, path) => page.evaluate(p => window.__DB.docs[p] || null, path
   assert.ok((await card(env.page, '6-1')).every(t => !/Extension of/.test(t)));
   ok('a cancelled extension disappears');
 
+  // an unconfirmed link whose second booking already ended, but the stay goes on after it: it must still be listed
+  await env.page.evaluate(d => Object.entries(d).forEach(([k, v]) => window.__DBAPI.set(k, v)), Object.assign({},
+    res('P1', '7-4', '05', '07', { guest: 'Eve Long' }), res('P2', '7-4', '07', '10', { guest: 'Eve Long', phone: '' }), res('P3', '7-4', '10', '20', { guest: 'Eve Long', phone: '' }),
+    res('Q1', '7-2', '05', '07', { guest: 'Old Pair' }), res('Q2', '7-2', '07', '10', { guest: 'Old Pair', phone: '' })));
+  await env.page.waitForTimeout(1500);
+  const list = await env.page.evaluate(() => [...document.querySelectorAll('#stay-ext .stay-banner__row')].map(r => r.innerText.replace(/\s+/g, ' ')));
+  assert.ok(list.some(t => /Eve Long.*7-4.*5 Oct – 7 Oct, then 7 Oct – 10 Oct/.test(t)), 'the older link of a running stay: ' + list.join(' | '));
+  assert.ok(list.some(t => /Eve Long.*7 Oct – 10 Oct, then 10 Oct – 20 Oct/.test(t)));
+  assert.ok(!list.some(t => /Old Pair/.test(t)), 'a stay that is over is not asked about');
+  ok('every unconfirmed link of a stay that is still running is listed, also the older ones');
+
   const errors = env.logs.filter(l => l.startsWith('PAGEERROR'));
   assert.deepStrictEqual(errors, []);
   console.log(`\nALL ${passed} ADMIN BACK-TO-BACK STAY CHECKS PASSED`);
