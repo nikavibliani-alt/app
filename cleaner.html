@@ -58,6 +58,7 @@ button{font-family:inherit;touch-action:manipulation;}
 .hk-icon{width:18px;height:18px;flex-shrink:0;}
 .bed{display:flex;align-items:flex-start;gap:8px;margin-bottom:12px;padding:10px 12px;border-radius:10px;background:#fff;border:2px solid #d97706;font-size:16px;font-weight:700;}
 .bed .hk-icon{color:#c2410c;width:22px;height:22px;}
+.same{display:table;margin-bottom:12px;font-size:15px;font-weight:700;color:var(--green);background:var(--green-bg);border:1px solid #86efac;border-radius:999px;padding:6px 12px;}
 .out{display:inline-block;margin-bottom:12px;font-size:15px;font-weight:700;color:var(--green);background:var(--green-bg);border:1px solid #86efac;border-radius:999px;padding:6px 12px;}
 .donebtn{width:100%;min-height:60px;border:none;border-radius:var(--r);background:var(--ink);color:#fff;font-size:22px;font-weight:700;cursor:pointer;}
 .donebtn.undo{background:var(--line);color:var(--ink-2);font-size:18px;}
@@ -136,6 +137,7 @@ import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app
 import{getFirestore,collection,doc,setDoc,updateDoc,onSnapshot,serverTimestamp,getDocs,getDoc,query,where,arrayUnion,increment}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 import{getStorage,ref,uploadBytesResumable,getDownloadURL,getMetadata}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
 import{normalizeStayDate}from"/shared/guest-unlock.js";
+import{stayLinkStatus}from"/shared/stay-chain.js";
 import{hkBeddingAlert,HK_GUEST_ICON,HK_SHEET_ICON}from"/shared/hk-bedding.js";
 import{roomsSorted}from"/shared/room-registry.js";
 import{DAMAGE_CATEGORIES,makeReportId,tbilisiIsoNow,readPhotoMeta,fileExt,uploadOriginal,pickDepartingReservation}from"/shared/hk-damage.js";
@@ -154,6 +156,7 @@ const STR={
     pending:'დასალაგებელი',donePill:'მზადაა',
     done:'მზადაა',undo:'გაუქმება',doneOnlyOnDay:'მზადაა მხოლოდ იმ დღეს',
     guestOut:'სტუმარმა გასვლა დაადასტურა',
+    sameGuest:'იგივე სტუმარი რჩება',
     sheets:'საჭიროა დამატებითი თეთრეული',sofa:'საჭიროა დივნის დამატებითი თეთრეული',
     emptyDay:'ამ დღეს დასალაგებელი ბინა არ არის',
     inactive:'ეს ბმული აღარ მუშაობს. სთხოვეთ მენეჯერს ახალი ბმული.',
@@ -195,6 +198,7 @@ const STR={
     pending:'To clean',donePill:'Done',
     done:'Done',undo:'Undo',doneOnlyOnDay:'Done only on the day',
     guestOut:'Guest checked out',
+    sameGuest:'Same guest continues',
     sheets:'Extra sheets needed',sofa:'Extra sofa bed sheets needed',
     emptyDay:'No rooms to clean this day',
     inactive:'This link is no longer active. Ask your manager for a new link.',
@@ -266,6 +270,7 @@ const HK_SITES_ALL=[
 /* ══ STATE ══ */
 const $=id=>document.getElementById(id);
 let token='',link=null;            // link = {name,teamId}
+let stayDecisions={};            // stay_links answers: previousId__nextId -> status
 let roomsData={},aptData={};
 let hkSettings={defaultCheckOut:'12:00',defaultCheckIn:'15:00',cleanMinutesByType:{...HK_CLEAN_TYPE_DEFAULTS},cleanMinutesByRoom:{},teams:[]};
 let hkCategoryCapacity={ROOMS:{default:2},MAXELA:{default:2},BIG_APT:{default:6},FREEDOM:{default:2},ORBELIANI:{default:2},VGL:{default:2}};
@@ -559,6 +564,11 @@ function beddingHtml(roomCode,guests){
   if(!a)return '';
   return `<div class="bed">${HK_SHEET_ICON}<span>${esc(a.kind==='sofa'?t('sofa'):t('sheets'))}</span></div>`;
 }
+// A label only: the guest leaving this day continues in the same unit (back-to-back stay, shared/stay-chain.js).
+function hkSameGuestContinues(roomCode,dateStr){
+  const res=(_resCache||[]).filter(r=>r.roomCode===roomCode);
+  return res.some(a=>a.checkout===dateStr&&res.some(b=>b.checkin===dateStr&&['auto','confirmed'].includes(stayLinkStatus(a,b,stayDecisions))));
+}
 function buildCard(room,dateStr,tomorrowStr){
   const key=room.code+'_'+dateStr;
   const st=hkStatusData[key]||{};
@@ -570,6 +580,7 @@ function buildCard(room,dateStr,tomorrowStr){
   const form=hkGuestFormForRoom(room.code,dateStr,nextRes);
   const departing=hkDepartingGuestForm(room.code,coDate,co);
   const guestCheckedOut=departing?.guestConfirmedCheckout===true;
+  const sameGuest=hkSameGuestContinues(room.code,dateStr);
   const outGuests=hkGuestCount(co,departing,st.guestCount);
   const inGuests=hkGuestCount(nextRes,form,st.arrivingGuestCount);
   const coTime=st.checkOutTime||co?.checkoutTime||hkSettings.defaultCheckOut||'12:00';
@@ -588,6 +599,7 @@ function buildCard(room,dateStr,tomorrowStr){
       <div class="tbox${inCls}"><b>${esc(t('checkin'))}</b>${nextRes?`<span class="when">${esc(when)}</span><span class="${timeCls}">${esc(ciTime)}</span><div class="cnt">${countHtml(nextRes,inGuests,'arriving')}</div>`:`<div class="cnt">${esc(t('noBooking'))}</div>`}</div>
     </div>
     ${room.overdueFrom?`<div class="overdue">${esc(t('overdue',{d:room.overdueFrom.slice(8,10)+'.'+room.overdueFrom.slice(5,7)}))}</div>`:''}
+    ${sameGuest?`<div class="same">${esc(t('sameGuest'))}</div>`:''}
     ${guestCheckedOut?`<div class="out">${esc(t('guestOut'))}</div>`:''}
     ${nextRes?beddingHtml(room.code,inGuests):''}
     ${futureDay
@@ -813,7 +825,7 @@ async function uploadExtra(files,kind,target){
 /* ══ ACCESS + DATA ══ */
 let unsubs=[],boardStarted=false,boardDay='',linkOk=false,lastTouch=0;
 function stopListeners(){unsubs.forEach(u=>{try{u();}catch(e){}});unsubs=[];boardStarted=false;}
-function clearData(){damageReports={};_resCache=null;guestData=[];hkStatusData={};teamRooms=[];teamCodeSet=new Set();roomsData={};aptData={};link=null;}
+function clearData(){damageReports={};_resCache=null;guestData=[];hkStatusData={};stayDecisions={};teamRooms=[];teamCodeSet=new Set();roomsData={};aptData={};link=null;}
 function showScreen(kind){
   $('hdr').hidden=true;$('tabs').innerHTML='';$('list').innerHTML='';
   const s=$('screen');s.hidden=false;
@@ -907,7 +919,8 @@ function subscribeData(){
     hideScreen();
     _resCache=snap.docs.map(d=>{const x=d.data();return{id:d.id,roomCode:x.roomCode,room:x.room,checkin:x.checkin,checkout:x.checkout,status:x.status,
       checkoutTime:x.checkoutTime,checkinTime:x.checkinTime,guest:x.guest,guests:x.guests,guestCount:x.guestCount,adults:x.adults,
-      children:x.children,child:x.child,kids:x.kids,reservationNumber:x.reservationNumber,source:x.source};})
+      children:x.children,child:x.child,kids:x.kids,reservationNumber:x.reservationNumber,source:x.source,
+      phone:x.phone,firstName:x.firstName,lastName:x.lastName};})
       .filter(r=>teamCodeSet.has(r.roomCode));
     rebuildForms();
   },onErr('reservations')));
@@ -925,6 +938,9 @@ function subscribeData(){
     damageReports=m;render();
     if(sheetMode==='view'){const sh=$('sheet');openReports(sh.dataset.room,sh.dataset.date);}
   },onErr('damage')));
+  unsubs.push(onSnapshot(query(collection(db,'stay_links'),where('nextCheckin','>=',lo)),snap=>{
+    stayDecisions=Object.fromEntries(snap.docs.map(d=>[d.id,d.data().status]));render();   // the manager's confirm / reject answers
+  },onErr('stay_links')));
   unsubs.push(onSnapshot(query(collection(db,'hk_status'),where('date','>=',lo)),snap=>{
     const m={};
     snap.docs.forEach(d=>{const x=d.data();if(teamCodeSet.has(x.roomCode))m[d.id]=x;});

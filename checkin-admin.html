@@ -383,6 +383,7 @@ html.inbox-typing #main-nav{display:none}
 .card__src{font-size:11px;color:#9a948e;margin-left:6px;}
 .card__warn{font-size:12px;font-weight:600;color:var(--red);margin-top:6px;}
 /* Back-to-back stays */
+.hk-same{display:table;margin-top:8px;font-size:11px;font-weight:700;color:var(--green);background:var(--green-bg);border:1px solid #86efac;border-radius:999px;padding:4px 10px;}
 .stay-chip{display:inline-block;margin:8px 6px 0 0;font-size:12px;font-weight:600;border-radius:999px;padding:4px 10px;color:var(--green);background:var(--green-bg);border:1px solid #cfe3d8;}
 .stay-chip--check{color:var(--amber);background:var(--amber-bg);border-color:#e6dcc2;}
 .stay-ask{margin-top:10px;padding:10px;border-radius:var(--rs);background:var(--amber-bg);border:1px solid #e6dcc2;}
@@ -7262,6 +7263,8 @@ async function renderHk(){
     const form=hkGuestFormForRoom(room.code,dateStr,nextRes);
     const departing=hkDepartingGuestForm(room.code,coDate,co);
     const guestCheckedOut=departing?.guestConfirmedCheckout===true;
+    // label only: the guest leaving this day continues in the same unit
+    const sameGuest=(_resCache||[]).some(a=>{const n=a.roomCode===room.code&&a.checkout===dateStr?_stayIdx.get(a.id)?.next:null;return !!n&&stayJoined(n.status)&&n.res.checkin===dateStr;});
     const outGuests=hkGuestCount(co,departing,st.guestCount);
     const inGuests=hkGuestCount(nextRes,form,st.arrivingGuestCount);
     const beddingHtml=nextRes?hkBeddingAlertHtml(room.code,inGuests):'';
@@ -7284,6 +7287,7 @@ async function renderHk(){
         <div class="hk-card__time${inBoxCls}"><b>Check-in</b>${admin&&nextRes?sourceBadgeHtml(nextRes.source):''}${nextRes?`<div class="hk-card__when">${esc(whenLabel)}</div>${esc(ciTime)}<div class="hk-card__count">${hkGuestCountHtml(nextRes,inGuests,'arriving')}</div>`:'<div class="hk-card__count">No booking</div>'}</div>
       </div>
       ${room.overdueFrom?`<div class="hk-overdue">Not cleaned yet · left ${esc(room.overdueFrom.slice(8,10)+'.'+room.overdueFrom.slice(5,7))}</div>`:''}
+      ${sameGuest?'<div class="hk-same">Same guest continues</div>':''}
       ${guestCheckedOut?'<div class="hk-guest-out">Guest checked out</div>':''}
       ${beddingHtml}
       <div class="hk-card__foot"><span style="font-size:12px;color:var(--muted)">${co?.guest?esc(_stripRoomNum(co.guest)):'—'}</span>
