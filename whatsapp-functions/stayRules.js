@@ -109,6 +109,28 @@ function stayLabel(stay = {}) {
 }
 
 /**
+ * 27 Nov (guest asked "is 4 am okay?"): the check-in day and the day after it,
+ * written out here so the model never works out a date for an arrival-time
+ * question ("4 am on 29 Nov is fine, 4 am on 28 Nov is too early"), and
+ * which case applies: before the arrival day, the arrival day before 15:00,
+ * or check-in already open. timing: stayTiming() (checkinOpen may include live data).
+ * Unknown check-in date: a line that says so, so the model gives the reply
+ * without dates and does not think aloud about the missing dates.
+ */
+function checkinDayLines(checkin, timing = {}) {
+  const d = dateOnly(checkin);
+  if (!d) return ['Check-in day: not known. For an arrival-time question give the reply without dates, and never mention the dates or that they are not known (computed in code)'];
+  const next = new Date(Date.parse(`${d}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+  if (timing.checkinOpen === 'yes') {
+    return [`Check-in day: ${shortDate(d)}, check-in is already open, so the guest can arrive any time now (computed in code)`];
+  }
+  if (timing.arrivalDay === true) {
+    return [`Check-in day: today, ${shortDate(d)}, check-in from 15:00 today, not open yet (computed in code)`];
+  }
+  return [`Check-in day: ${shortDate(d)} (check-in from 15:00 that day); the day after check-in: ${shortDate(next)} (computed in code)`];
+}
+
+/**
  * Rule B (owner, 25 Nov): the length of the WHOLE stay (back-to-back bookings
  * counted together, see guestLookup.js stayChain) and whether it is longer
  * than `overNights` nights, decided here so the model never counts dates. A
@@ -156,6 +178,7 @@ function backToBackLines({ bookings, checkin, checkout } = {}) {
 
 module.exports = {
   backToBackLines,
+  checkinDayLines,
   isReturningGuest,
   otherPropertyForRoom,
   propertyForRoom,

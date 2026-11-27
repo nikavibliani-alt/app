@@ -23,7 +23,7 @@ const {
 } = require('./summarizer');
 const { loadCurrentStayHistory, prepareClaudeHistory, stripTimeLabels } = require('./stayContext');
 const { findCurrentGuestForm } = require('./guestLookup');
-const { backToBackLines, isReturningGuest, otherPropertyForRoom, propertyForRoom, returningGuestLines, stayLabel, stayLengthLines, stayTiming, stayTimingContextLines } = require('./stayRules');
+const { backToBackLines, checkinDayLines, isReturningGuest, otherPropertyForRoom, propertyForRoom, returningGuestLines, stayLabel, stayLengthLines, stayTiming, stayTimingContextLines } = require('./stayRules');
 const { describeInbound } = require('./inboundContent');
 const { downloadMetaMedia, photosToAttach, attachPhotos } = require('./metaMedia');
 const { sendOwnerAlert, ownerAlertGuest, ownerStatusIds, guestFailedStatusLines, ownerAlertStatusLines, alertDocId, ALERTS_COLLECTION } = require('./ownerAlert');
@@ -926,6 +926,7 @@ exports.whatsappBotWorker = onRequest(
         // Check-in timing computed here in Tbilisi time, so the entrance and
         // door-code scenarios never have to work it out from the hour.
         ...stayTimingContextLines(timing),
+        ...checkinDayLines(stayStart, timing),
         ...returningGuestLines(returning),
         // Rule B: nights over the whole stay (back-to-back bookings together).
         ...stayLengthLines({ checkin: stayStart, checkout: stayEnd }, Number(kb.policies?.longStay?.overNights) || 5),

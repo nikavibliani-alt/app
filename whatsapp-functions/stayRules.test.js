@@ -156,3 +156,20 @@ test('isReturningGuest: only a new visit after a gap of more than 1 day', async 
   });
 });
 
+
+test('checkinDayLines: the check-in day and the day after, written in code (27 Nov, "is 4 am okay?")', () => {
+  const { checkinDayLines } = require('./stayRules');
+  assert.deepEqual(checkinDayLines('2026-11-28'), ['Check-in day: 28 Nov (check-in from 15:00 that day); the day after check-in: 29 Nov (computed in code)']);
+  assert.match(checkinDayLines('2026-11-30T00:00:00')[0], /30 Nov .* 1 Dec/);
+  assert.match(checkinDayLines('2026-12-31')[0], /31 Dec .* 1 Jan/);
+  assert.match(checkinDayLines('2028-02-28')[0], /28 Feb .* 29 Feb/);
+  // which case applies, from the timing
+  const STAY28 = { checkin: '2026-11-28', checkout: '2026-12-01' };
+  assert.match(checkinDayLines(STAY28.checkin, stayTiming(STAY28, at('2026-11-27', 12)))[0], /^Check-in day: 28 Nov \(check-in from 15:00 that day\); the day after check-in: 29 Nov/);
+  assert.equal(checkinDayLines(STAY28.checkin, stayTiming(STAY28, at('2026-11-28', 10)))[0], 'Check-in day: today, 28 Nov, check-in from 15:00 today, not open yet (computed in code)');
+  assert.equal(checkinDayLines(STAY28.checkin, stayTiming(STAY28, at('2026-11-28', 17)))[0], 'Check-in day: 28 Nov, check-in is already open, so the guest can arrive any time now (computed in code)');
+  assert.match(checkinDayLines(STAY28.checkin, stayTiming(STAY28, at('2026-11-29', 9)))[0], /already open/);
+  assert.match(checkinDayLines(STAY28.checkin, { arrivalDay: true, checkinOpen: 'yes' })[0], /already open/, 'live data opened the page early');
+  assert.match(checkinDayLines('')[0], /^Check-in day: not known\. .*without dates/);
+  assert.match(checkinDayLines(undefined)[0], /^Check-in day: not known/);
+});

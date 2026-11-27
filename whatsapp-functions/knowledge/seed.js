@@ -271,7 +271,7 @@ module.exports = {
       "parties": false
     },
     "entrance": {
-      "en": "The QR code on the guest's check-in page opens the street entrance and the elevator. It changes every 24 hours, so the guest always uses the current one on the page (a screenshot stops working). There is no magnet card. Self check-in works at any hour, so a late arrival is fine. A lost key costs 30 GEL.",
+      "en": "The QR code on the guest's check-in page opens the street entrance and the elevator. It changes every 24 hours, so the guest always uses the current one on the page (a screenshot stops working). There is no magnet card. Check-in starts at 15:00 on the check-in day; from then on it is self check-in at any hour, so a late arrival, even in the early hours of the next day, is fine. An arrival before 15:00 on the check-in day is an early check-in. A lost key costs 30 GEL.",
       "appliesTo": [
         "shartava"
       ],
