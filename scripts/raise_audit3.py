@@ -56,6 +56,8 @@ def main():
     cnt = collections.Counter(r for _, r, _ in cl)
     for r, n in cnt.most_common():
         print(f"  {n:5d}  {r}")
+    for e, r, st in sorted(cl, key=lambda x: (x[0]["rt"], x[0]["date"], str(x[0]["ts"]))):
+        print(f"ROW|{e['rt']}|{e['date']}|{e['currency']}|{e['avail']}|{e['units']}|{e['old']:g}|{e['new']:g}|{str(e['ts'])[:16]}|{'morning' if e.get('main_run') else 'other'}|{e.get('days_out')}|{st}|{r.split(':')[0]}")
     print("\n   by room:")
     byroom = collections.defaultdict(collections.Counter)
     for e, r, _ in cl:
