@@ -95,6 +95,9 @@ def main(task, dry):
     if task == "raise_audit2":
         import raise_audit2 as m
         return m.main()
+    if task == "raise_audit3":
+        import raise_audit3 as m
+        return m.main()
     if task == "ideas_cleanup":
         import ideas_logic_cleanup as m
         return m.main(flag)
