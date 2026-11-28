@@ -89,6 +89,9 @@ def main(task, dry):
     if task == "new_listing_probe":
         import new_listing_probe as m
         return m.main()
+    if task == "raise_audit":
+        import raise_audit as m
+        return m.main()
     if task == "ideas_cleanup":
         import ideas_logic_cleanup as m
         return m.main(flag)
