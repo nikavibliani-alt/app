@@ -141,8 +141,9 @@ def test_up_to_14_days_before_arrival_the_normal_rules_apply():
         r1, r2 = go(cfg, inv, s1, day, hour=13), go(cfg2, inv2, s2, day, hour=13)
     d1, d2 = decision(r1, "X", D(21)), decision(r2, "X", D(21))
     assert d1["days_out"] == 14 and d1["holiday"]["window"] is None
-    assert d1["proposed"] == d2["proposed"]                 # identical to a date without the rule
-    assert "the normal rules apply again" in " ".join(d1["why"])
+    # the holiday night keeps its rules exactly as they were (normal rules again, raises in any run); the plain night is under the new raise rules
+    assert d1["proposed"] == 205 and any("the normal rules apply again" in w for w in d1["why"])
+    assert d2["proposed"] == 200                                  # the plain night was never raised: an empty one-unit night is not pulled up within 60 days
 
 
 def test_no_far_reset_on_holiday_dates():

@@ -165,11 +165,11 @@ def test_single_unit_follows_band_unless_building_is_selling():
     res = run(snap(9, {"S": inventory(1, 255), "P": inventory(7, 255)}), cfg, {})
     s20 = decision(res, "S", (TODAY + timedelta(days=20)).isoformat())
     assert s20["proposed"] < 255 and s20["target"] >= 255 * 0.92 - 1
-    # building full: the empty apartment does not undercut it
+    # building full: the empty apartment is no longer held up (nor pulled up) by it; it follows its own empty night
     res = run(snap(9, {"S": inventory(1, 255), "P": inventory(7, 255, avail_fn=lambda i: 0)}), cfg, {})
     for d in res["decisions"]:
         if d["rt"] == "S" and d["days_out"] >= 4:
-            assert d["proposed"] >= 255, d
+            assert d["proposed"] <= 255 and not any("rest of the building is selling as normal" in w for w in d["why"]), d
 
 
 def test_minimum_reached_night_before_arrival_in_steps():
@@ -434,7 +434,7 @@ def test_small_prices_do_not_get_stuck():
     cfg = _one(rt_units=5, mn=100, start=150, mx=190)
     cfg["calm"]["dead_zone_abs"]["GEL"] = 5
     ds = (TODAY + timedelta(days=40)).isoformat()
-    inv = {"S": inventory(5, 150, avail_fn=lambda i: 4)}
+    inv = {"S": inventory(5, 150, avail_fn=lambda i: 2)}      # 3 of 5 booked: less than half free, so raising is allowed
     inv["S"][ds]["prices"]["GEL"] = 130        # below the band, selling as normal
     res = run(snap(9, inv), cfg, {})
     assert decision(res, "S", ds)["proposed"] > 130

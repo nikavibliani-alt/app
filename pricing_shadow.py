@@ -39,7 +39,8 @@ PRICE_LIST = {"GEL": "GEL", "USD": "EUR"}
 # "off" = ignored. In this shadow script nothing is ever written, whatever the status.
 ROOM_TYPES = {
     "ROOMS":   {"units": 5, "group": "shartava",    "currencies": ["GEL"],        "status": "live"},
-    "MAXELA":  {"units": 7, "group": "shartava",    "currencies": ["GEL"],        "status": "live"},
+    # 6 sellable units: MiniHotel shows one of the 7 listed rooms (7-3) as never available on any night, so counting 7 made every night look 14 points busier than it is.
+    "MAXELA":  {"units": 6, "group": "shartava",    "currencies": ["GEL"],        "status": "live"},
     "BIG_APT": {"units": 1, "group": "shartava",    "currencies": ["GEL", "USD"], "status": "live"},
     "FREEDOM": {"units": 3, "group": "freedom",     "currencies": ["GEL", "USD"], "status": "live"},
     "ORBE_1":  {"units": 2, "group": "orbeliani",   "currencies": ["GEL", "USD"], "status": "live"},

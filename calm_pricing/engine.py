@@ -491,7 +491,9 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
             gap = signal - expected
             status = _status(gap, dm)
             building_busy = False
-            if mode == "single" and own == 0 and days_out > 3 and status in ("behind", "far_behind"):
+            # "The rest of the building sells as normal" no longer holds a night up (nor pulls it up) while at least half the units are free,
+            # which is always the case for an empty one-unit room. It stays only on holiday dates, which keep their rules exactly as they were.
+            if mode == "single" and own == 0 and days_out > 3 and status in ("behind", "far_behind") and hol_kind is not None:
                 o_occ, o_units = _group_occ(group, ds, room_types, booked, exclude=rt) if group else (None, 0)
                 if o_occ is not None and o_units > 0 and o_occ >= expected:
                     # the rest of the building sells as normal: do not undercut it
@@ -892,7 +894,20 @@ def run(snapshot: dict, cfg: dict, state: dict | None = None) -> dict:
                         reason = f"Raised less than {calm['no_drop_after_raise_h']} hours ago: no drop yet."
                 else:
                     booked_since_change = avail < st.get("avail_at_change", avail)
-                    if arrival_small:
+                    # Raising rules (not for holiday dates or "hold" date rules: they keep their rules exactly as they were; corrections of a price below
+                    # the minimum, your own prices and the New listing rule are handled before this point):
+                    #  - only the first run after 09:00 raises, like drops (other runs may still lower for cancellations and the same-day steps)
+                    #  - a one-unit room cannot show demand: an empty night is not raised within 60 days (an event and the season's start price further out may lift it)
+                    #  - a room with 2 or more units is not raised while at least half of its units are free (an event night may be)
+                    raise_rule = hol_kind is None and not arrival_small
+                    event_night = ev_pct > 0
+                    if raise_rule and not main_run:
+                        reason = "Only the morning run may raise prices."
+                    elif raise_rule and units == 1 and days_out <= 60 and not event_night:
+                        reason = "One unit cannot show demand: an empty night is not raised within 60 days (an event can lift it)."
+                    elif raise_rule and units >= 2 and avail / units >= 0.5 and not event_night:
+                        reason = f"{avail} of {units} units are free: no raise while at least half are free."
+                    elif arrival_small:
                         reason = "Arrival day of a small room: never raised."
                     elif days_out <= 3 and status not in ("ahead", "far_ahead"):
                         reason = "Last days: raised only if selling faster than normal."
