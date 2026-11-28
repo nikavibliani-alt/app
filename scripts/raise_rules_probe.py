@@ -156,27 +156,25 @@ def main():
         print(f"  {rt}: old {f(ch['old'])} | new {f(ch['new'])} ({len(ch['new'])} nights)")
 
     # ---------------------------------------------------------------- C. examples
-    print("\n" + "=" * 100 + "\nC. FIVE EXAMPLE NIGHTS (a night the OLD engine raised while mostly free and the NEW engine did not)\n" + "=" * 100)
-    cand = collections.defaultdict(list)
-    for d, h, x in log_o:
-        if x["proposed"] > x["current"] + 1e-9 and x["avail"] / x["units"] >= 0.5 and x["days_out"] <= 60 and not x.get("holiday"):
-            cand[(x["rt"], x["date"], x["currency"])].append((d, h, x))
-    def pick(rts):
-        best = None
-        for k, v in cand.items():
-            if k[0] in rts and (best is None or len(v) > len(cand[best])):
-                best = k
-        return best
+    print("\n" + "=" * 100 + "\nC. FIVE EXAMPLE NIGHTS\n" + "=" * 100)
+    def final(inv, k):
+        return (inv[k[0]][k[1]].get("prices") or {}).get(k[2])
+    allk = [k for k in dec_n[1] if dec_n[1][k]["avail"] > 0 and dec_n[1][k]["days_out"] <= 60 and not dec_n[1][k].get("holiday")]
+    def best(rts, pred=lambda k: True):
+        out = None
+        for k in allk:
+            if k[0] in rts and pred(k) and final(inv_o, k) and final(inv_n, k) and k in dec_o[1]:
+                gap = abs(final(inv_o, k) - final(inv_n, k)) / final(inv_o, k)
+                raised_old = any(key(x) == k and x["proposed"] > x["current"] + 1e-9 for _, _, x in log_o)
+                score = (raised_old, gap)
+                if out is None or score > out[0]:
+                    out = (score, k)
+        return out[1] if out else None
     picks = []
-    for rts in (("BIG_APT", "XCV_1", "XCV_2", "ORBE_2"), ("ORBE_1", "VGL_AP", "VGL_ST", "FREEDOM"), ("MAXELA",), ("ROOMS",), ("BIG_APT", "XCV_1", "XCV_2", "ORBE_2", "ORBE_1", "VGL_AP", "VGL_ST", "FREEDOM", "MAXELA", "ROOMS")):
-        k = pick(rts)
-        if k and k not in picks:
+    for rts in (("ORBE_2", "XCV_1", "XCV_2", "BIG_APT"), ("ORBE_1", "VGL_AP", "VGL_ST", "FREEDOM"), ("MAXELA",), ("MAXELA",), ("ROOMS", "BIG_APT", "XCV_2", "FREEDOM")):
+        k = best(rts, lambda k: k not in picks)
+        if k:
             picks.append(k)
-        elif k is None and rts == ("MAXELA",):
-            # Maxela had no raise in the old simulation: show the night with the biggest status difference instead
-            diff = [(kk, d0) for kk, d0 in dec_o[1].items() if kk[0] == "MAXELA" and kk[2] == "GEL" and d0["avail"] > 0 and kk in dec_n[1] and dec_n[1][kk]["status"] != d0["status"]]
-            if diff:
-                picks.append(diff[0][0])
     for k in picks[:5]:
         rt, ds, cur = k
         u = live_rts[rt]["units"]
@@ -188,10 +186,15 @@ def main():
         print("   NEW engine changes:", "; ".join(f"day{d} {h:02d}:01 {x['current']:g}->{x['proposed']:g}" for d, h, x in pn[:10]) or "none")
         o0, n0 = dec_o[1].get(k), dec_n[1].get(k)
         if o0:
-            print(f"   old, 09:01 run: status {o0['status']} target {o0.get('target')} | " + " / ".join(o0['why'][-3:])[:230])
+            print(f"   old, 09:01 run: status {o0['status']} target {o0.get('target')} | " + " / ".join(o0['why'][-3:])[:260])
         if n0:
-            print(f"   new, 09:01 run: status {n0['status']} target {n0.get('target')} | blocked: {n0.get('blocked')} | " + " / ".join(n0['why'][-2:])[:160])
-        print(f"   price after 3 days: old {(inv_o[rt][ds].get('prices') or {}).get(cur)} | new {(inv_n[rt][ds].get('prices') or {}).get(cur)}")
+            print(f"   new, 09:01 run: status {n0['status']} target {n0.get('target')} | blocked: {n0.get('blocked')} | " + " / ".join(n0['why'][-3:])[:260])
+        print(f"   price after 3 days: old {final(inv_o, k)} | new {final(inv_n, k)}")
+
+    print("\n" + "=" * 100 + "\nF. EVERY RAISE THE NEW ENGINE STILL MAKES (nights up to 60 days out)\n" + "=" * 100)
+    for d, h, x in log_n:
+        if x["days_out"] <= 60 and x["proposed"] > x["current"] + 1e-9:
+            print(f"  {x['rt']} {x['date']} {x['currency']} day{d} {h:02d}:01 {x['current']:g}->{x['proposed']:g} kind={x['kind']} units={x['units']} free={x['avail']} status={x['status']} holiday={bool(x.get('holiday'))} days_out={x['days_out']} | " + " / ".join(x['why'][-2:])[:200])
 
     # ---------------------------------------------------------------- D. Maxela
     print("\n" + "=" * 100 + "\nD. MAXELA with 7 units (old) and 6 units (new): status of the empty nights in the next 30 days at the first morning run\n" + "=" * 100)
